@@ -1,0 +1,689 @@
+package integration_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	types "github.com/devpablocristo/monorepo/pkg/types"
+	"github.com/devpablocristo/monorepo/projects/qh/internal/config"
+	custin "github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/inbound"
+	"github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/inbound/transport"
+	custout "github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/outbound"
+	custcore "github.com/devpablocristo/monorepo/projects/qh/internal/customer/core"
+)
+
+const testDBPath = "/app/config/sqlite-data/test.db"
+
+var (
+	birthDate = time.Now().UTC().AddDate(-39, 0, 0).Truncate(time.Second)
+)
+
+type testServer struct {
+	handler http.Handler
+}
+
+func setupTestServer(t *testing.T) *testServer {
+	// Cargar la configuración como en main
+	config.Load()
+
+	// Sobrescribir la configuración necesaria para pruebas
+	viper.Set("SQLITE_DB_PATH", testDBPath)
+	viper.Set("SQLITE_IN_MEMORY", false)
+
+	// Configurar modo de prueba
+	gin.SetMode(gin.TestMode)
+
+	// Seguir el mismo patrón que en main
+	customerRepository, err := custout.NewRepository()
+	require.NoError(t, err)
+
+	customerUsecases := custcore.NewUseCases(customerRepository)
+
+	customerHandler, err := custin.NewHandler(customerUsecases)
+	require.NoError(t, err)
+
+	// En lugar de Start(), solo configuramos las rutas
+	customerHandler.Routes()
+
+	return &testServer{
+		handler: customerHandler.GetRouter(),
+	}
+}
+
+func tearDown(t *testing.T) {
+	err := os.Remove(testDBPath)
+	require.NoError(t, err)
+}
+
+func (ts *testServer) executeRequest(method, path string, body any) *httptest.ResponseRecorder {
+	var reqBody []byte
+	var err error
+
+	if body != nil {
+		reqBody, err = json.Marshal(body)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	req := httptest.NewRequest(method, path, bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	return rr
+}
+
+func TestCustomerAPI_Integration(t *testing.T) {
+	type testCase struct {
+		name         string
+		method       string
+		path         string
+		body         any
+		setupFunc    func(*testServer)
+		expectedCode int
+		expectedBody any
+		validateFunc func(*testing.T, *httptest.ResponseRecorder)
+	}
+
+	baseCustomer := transport.CustomerJson{
+		Name:      "Homero",
+		LastName:  "Simpson",
+		Email:     "homero@springfield.com",
+		Phone:     "1234567890",
+		Age:       39,
+		BirthDate: birthDate,
+	}
+
+	tests := []testCase{
+		// Pruebas de creación de cliente
+		{
+			name:         "Create Customer Successfully",
+			method:       "POST",
+			path:         "/api/v1/customers",
+			body:         baseCustomer,
+			expectedCode: http.StatusCreated,
+		},
+		{
+			name:   "Create Customer - Email Already Exists",
+			method: "POST",
+			path:   "/api/v1/customers",
+			body:   baseCustomer,
+			setupFunc: func(ts *testServer) {
+				ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+			},
+			expectedCode: http.StatusConflict,
+			expectedBody: &types.APIErrorResponse{
+				Type:    types.APIErrConflict,
+				Code:    http.StatusConflict,
+				Message: "email homero@springfield.com is already in use by another customer",
+			},
+		},
+		// {
+		// 	name:   "Create Customer - Invalid Age",
+		// 	method: "POST",
+		// 	path:   "/api/v1/customers",
+		// 	body: transport.CustomerJson{
+		// 		Name:      "John",
+		// 		LastName:  "Doe",
+		// 		Email:     "john2@example.com",
+		// 		Phone:     "1234567890",
+		// 		Age:       200, // Edad inválida
+		// 		BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 	},
+		// 	expectedCode: http.StatusBadRequest,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrValidation,
+		// 		Code:    http.StatusBadRequest,
+		// 		Message: "Validation error",
+		// 	},
+		// },
+		// {
+		// 	name:   "Create Customer - Invalid Email Format",
+		// 	method: "POST",
+		// 	path:   "/api/v1/customers",
+		// 	body: transport.CustomerJson{
+		// 		Name:      "John",
+		// 		LastName:  "Doe",
+		// 		Email:     "invalid-email",
+		// 		Phone:     "1234567890",
+		// 		Age:       30,
+		// 		BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 	},
+		// 	expectedCode: http.StatusBadRequest,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrValidation,
+		// 		Code:    http.StatusBadRequest,
+		// 		Message: "Validation error",
+		// 	},
+		// },
+		// {
+		// 	name:   "Create Customer - Invalid Phone Length",
+		// 	method: "POST",
+		// 	path:   "/api/v1/customers",
+		// 	body: transport.CustomerJson{
+		// 		Name:      "John",
+		// 		LastName:  "Doe",
+		// 		Email:     "john3@example.com",
+		// 		Phone:     "123", // Teléfono muy corto
+		// 		Age:       30,
+		// 		BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 	},
+		// 	expectedCode: http.StatusBadRequest,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrValidation,
+		// 		Code:    http.StatusBadRequest,
+		// 		Message: "Validation error",
+		// 	},
+		// },
+
+		// Pruebas de obtención de clientes
+		{
+			name:         "Get All Customers - Empty Database",
+			method:       "GET",
+			path:         "/api/v1/customers",
+			expectedCode: http.StatusOK,
+			validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				var resp transport.GetCustomersResponse
+				err := json.Unmarshal(rr.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				assert.Empty(t, resp.Customers)
+			},
+		},
+		{
+			name:         "Get All Customers - With Data",
+			method:       "GET",
+			path:         "/api/v1/customers",
+			expectedCode: http.StatusOK,
+			setupFunc: func(ts *testServer) {
+				ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+			},
+			validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				var resp transport.GetCustomersResponse
+				err := json.Unmarshal(rr.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				assert.NotEmpty(t, resp.Customers)
+				assert.Equal(t, baseCustomer.Email, resp.Customers[0].Email)
+			},
+		},
+		// {
+		// 	name:   "Get Customer By ID - Exists",
+		// 	method: "GET",
+		// 	path:   "/api/v1/customers/1",
+		// 	setupFunc: func(ts *testServer) {
+		// 		ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+		// 	},
+		// 	expectedCode: http.StatusOK,
+		// 	validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 		var resp transport.GetCustomerResponse
+		// 		err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		// 		require.NoError(t, err)
+		// 		assert.Equal(t, baseCustomer.Email, resp.Customers.Email)
+		// 	},
+		// },
+		// {
+		// 	name:         "Get Customer By ID - Not Found",
+		// 	method:       "GET",
+		// 	path:         "/api/v1/customers/999",
+		// 	expectedCode: http.StatusNotFound,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrNotFound,
+		// 		Code:    http.StatusNotFound,
+		// 		Message: "Not found",
+		// 	},
+		// },
+		// {
+		// 	name:         "Get Customer By ID - Invalid ID Format",
+		// 	method:       "GET",
+		// 	path:         "/api/v1/customers/invalid",
+		// 	expectedCode: http.StatusBadRequest,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrInvalidInput,
+		// 		Code:    http.StatusBadRequest,
+		// 		Message: "Invalid input",
+		// 	},
+		// },
+
+		// Pruebas de actualización
+		{
+			name:   "Update Customer Successfully",
+			method: "PUT",
+			path:   "/api/v1/customers/1",
+			setupFunc: func(ts *testServer) {
+				// Crear el customer primero
+				createCustomer := transport.CustomerJson{
+					Name:      "Homero",
+					LastName:  "Simpson",
+					Email:     "homero@springfield.com",
+					Phone:     "1234567890",
+					Age:       39,
+					BirthDate: birthDate,
+				}
+				ts.executeRequest("POST", "/api/v1/customers", createCustomer)
+			},
+			body: transport.CustomerJson{
+				Name:      "Homero",
+				LastName:  "Updated",
+				Email:     "homero@springfield.com",
+				Phone:     "1234567890",
+				Age:       39,
+				BirthDate: birthDate,
+			},
+			expectedCode: http.StatusOK,
+		},
+		// 	setupFunc: func(ts *testServer) {
+		// 		ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+		// 	},
+		// 	expectedCode: http.StatusOK,
+		// 	validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 		getResp := ts.executeRequest("GET", "/api/v1/customers/1", nil)
+		// 		var resp transport.GetCustomerResponse
+		// 		err := json.Unmarshal(getResp.Body.Bytes(), &resp)
+		// 		require.NoError(t, err)
+		// 		assert.Equal(t, "Updated", resp.Customers.LastName)
+		// 		assert.Equal(t, 31, resp.Customers.Age)
+		// 	},
+		// },
+		// {
+		// 	name:         "Update Customer - Not Found",
+		// 	method:       "PUT",
+		// 	path:         "/api/v1/customers/999",
+		// 	body:         baseCustomer,
+		// 	expectedCode: http.StatusNotFound,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrNotFound,
+		// 		Code:    http.StatusNotFound,
+		// 		Message: "Not found",
+		// 	},
+		// },
+		// {
+		// 	name:   "Update Customer - Invalid Data",
+		// 	method: "PUT",
+		// 	path:   "/api/v1/customers/1",
+		// 	body: transport.CustomerJson{
+		// 		Name:      "", // Nombre vacío
+		// 		LastName:  "Doe",
+		// 		Email:     "john@example.com",
+		// 		Phone:     "1234567890",
+		// 		Age:       30,
+		// 		BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 	},
+		// 	setupFunc: func(ts *testServer) {
+		// 		ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+		// 	},
+		// 	expectedCode: http.StatusBadRequest,
+		// 	expectedBody: &types.APIErrorResponse{
+		// 		Type:    types.APIErrValidation,
+		// 		Code:    http.StatusBadRequest,
+		// 		Message: "Validation error",
+		// 	},
+		// },
+
+		// Pruebas de eliminación
+		// 	{
+		// 		name:   "Delete Customer Successfully",
+		// 		method: "DELETE",
+		// 		path:   "/api/v1/customers/1",
+		// 		setupFunc: func(ts *testServer) {
+		// 			ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+		// 		},
+		// 		expectedCode: http.StatusNoContent,
+		// 		validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 			getResp := ts.executeRequest("GET", "/api/v1/customers/1", nil)
+		// 			assert.Equal(t, http.StatusNotFound, getResp.Code)
+		// 		},
+		// 	},
+		// 	{
+		// 		name:         "Delete Customer - Not Found",
+		// 		method:       "DELETE",
+		// 		path:         "/api/v1/customers/999",
+		// 		expectedCode: http.StatusNotFound,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrNotFound,
+		// 			Code:    http.StatusNotFound,
+		// 			Message: "Not found",
+		// 		},
+		// 	},
+
+		// 	// Pruebas de KPIs
+		// 	{
+		// 		name:   "Get KPIs - Multiple Customers",
+		// 		method: "GET",
+		// 		path:   "/api/v1/customers/kpi",
+		// 		setupFunc: func(ts *testServer) {
+		// 			customers := []transport.CustomerJson{
+		// 				{
+		// 					Name: "Customer1", LastName: "Test", Email: "customer1@test.com",
+		// 					Phone: "1111111111", Age: 20,
+		// 					BirthDate: time.Now().AddDate(-20, 0, 0),
+		// 				},
+		// 				{
+		// 					Name: "Customer2", LastName: "Test", Email: "customer2@test.com",
+		// 					Phone: "2222222222", Age: 30,
+		// 					BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 				},
+		// 				{
+		// 					Name: "Customer3", LastName: "Test", Email: "customer3@test.com",
+		// 					Phone: "3333333333", Age: 40,
+		// 					BirthDate: time.Now().AddDate(-40, 0, 0),
+		// 				},
+		// 			}
+		// 			for _, c := range customers {
+		// 				ts.executeRequest("POST", "/api/v1/customers", c)
+		// 			}
+		// 		},
+		// 		expectedCode: http.StatusOK,
+		// 		validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 			var resp transport.GetKPIResponse
+		// 			err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		// 			require.NoError(t, err)
+		// 			assert.Equal(t, float64(30), resp.AverageAge)
+		// 			assert.InDelta(t, 8.16, resp.AgeStdDeviation, 0.1)
+		// 		},
+		// 	},
+		// 	{
+		// 		name:         "Get KPIs - Empty Database",
+		// 		method:       "GET",
+		// 		path:         "/api/v1/customers/kpi",
+		// 		expectedCode: http.StatusOK,
+		// 		validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 			var resp transport.GetKPIResponse
+		// 			err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		// 			require.NoError(t, err)
+		// 			assert.Equal(t, float64(0), resp.AverageAge)
+		// 			assert.Equal(t, float64(0), resp.AgeStdDeviation)
+		// 		},
+		// 	},
+
+		// 	// Pruebas de salud del servicio
+		// 	{
+		// 		name:         "Health Check",
+		// 		method:       "GET",
+		// 		path:         "/health",
+		// 		expectedCode: http.StatusOK,
+		// 		validateFunc: func(t *testing.T, rr *httptest.ResponseRecorder) {
+		// 			var resp map[string]any
+		// 			err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		// 			require.NoError(t, err)
+		// 			assert.Contains(t, resp, "status")
+		// 			assert.Contains(t, resp, "timestamp")
+		// 			assert.Equal(t, "healthy", resp["status"])
+		// 		},
+		// 	},
+
+		// 	// Pruebas adicionales de validación
+		// 	{
+		// 		name:   "Create Customer - Missing Required Fields",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      "",
+		// 			LastName:  "",
+		// 			Email:     "",
+		// 			Phone:     "",
+		// 			Age:       0,
+		// 			BirthDate: time.Time{},
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Create Customer - Invalid Birth Date",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      "John",
+		// 			LastName:  "Doe",
+		// 			Email:     "john@example.com",
+		// 			Phone:     "1234567890",
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(1, 0, 0), // Fecha futura
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Create Customer - Age Doesn't Match Birth Date",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      "John",
+		// 			LastName:  "Doe",
+		// 			Email:     "john@example.com",
+		// 			Phone:     "1234567890",
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(-20, 0, 0), // No coincide con la edad
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Update Customer - Email Conflict",
+		// 		method: "PUT",
+		// 		path:   "/api/v1/customers/1",
+		// 		setupFunc: func(ts *testServer) {
+		// 			// Crear dos clientes
+		// 			ts.executeRequest("POST", "/api/v1/customers", baseCustomer)
+		// 			otherCustomer := baseCustomer
+		// 			otherCustomer.Email = "other@example.com"
+		// 			ts.executeRequest("POST", "/api/v1/customers", otherCustomer)
+		// 		},
+		// 		body: transport.CustomerJson{
+		// 			Name:      "John",
+		// 			LastName:  "Doe",
+		// 			Email:     "other@example.com", // Intentar usar email existente
+		// 			Phone:     "1234567890",
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 		},
+		// 		expectedCode: http.StatusConflict,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrConflict,
+		// 			Code:    http.StatusConflict,
+		// 			Message: "Conflict error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Create Customer - Special Characters in Name",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      "John@#$%",
+		// 			LastName:  "Doe",
+		// 			Email:     "john@example.com",
+		// 			Phone:     "1234567890",
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Create Customer - Very Long Name",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      string(make([]byte, 101)), // Nombre de 101 caracteres
+		// 			LastName:  "Doe",
+		// 			Email:     "john@example.com",
+		// 			Phone:     "1234567890",
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+		// 	{
+		// 		name:   "Create Customer - Invalid Phone Characters",
+		// 		method: "POST",
+		// 		path:   "/api/v1/customers",
+		// 		body: transport.CustomerJson{
+		// 			Name:      "John",
+		// 			LastName:  "Doe",
+		// 			Email:     "john@example.com",
+		// 			Phone:     "123abc4567", // Caracteres inválidos en teléfono
+		// 			Age:       30,
+		// 			BirthDate: time.Now().AddDate(-30, 0, 0),
+		// 		},
+		// 		expectedCode: http.StatusBadRequest,
+		// 		expectedBody: &types.APIErrorResponse{
+		// 			Type:    types.APIErrValidation,
+		// 			Code:    http.StatusBadRequest,
+		// 			Message: "Validation error",
+		// 		},
+		// 	},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := setupTestServer(t)
+			defer tearDown(t)
+
+			if tt.setupFunc != nil {
+				tt.setupFunc(ts)
+			}
+
+			rr := ts.executeRequest(tt.method, tt.path, tt.body)
+
+			assert.Equal(t, tt.expectedCode, rr.Code)
+
+			if tt.expectedBody != nil {
+				switch expected := tt.expectedBody.(type) {
+				case *types.APIErrorResponse:
+					var response types.APIErrorResponse
+					err := json.Unmarshal(rr.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, expected.Type, response.Type)
+					assert.Equal(t, expected.Code, response.Code)
+					assert.Equal(t, expected.Message, response.Message)
+				default:
+					var response map[string]any
+					err := json.Unmarshal(rr.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, tt.expectedBody, response)
+				}
+			}
+
+			if tt.validateFunc != nil {
+				tt.validateFunc(t, rr)
+			}
+		})
+	}
+}
+
+// TestCustomerAPI_ConcurrentRequests verifica el comportamiento bajo carga concurrente
+// func TestCustomerAPI_ConcurrentRequests(t *testing.T) {
+// 	ts := setupTestServer(t)
+// 	defer tearDown(t)
+
+// 	// Crear varios clientes concurrentemente
+// 	concurrency := 10
+// 	done := make(chan bool)
+
+// 	for i := 0; i < concurrency; i++ {
+// 		go func(index int) {
+// 			customer := transport.CustomerJson{
+// 				Name:      fmt.Sprintf("User%d", index),
+// 				LastName:  "Test",
+// 				Email:     fmt.Sprintf("user%d@example.com", index),
+// 				Phone:     fmt.Sprintf("123456789%d", index),
+// 				Age:       30,
+// 				BirthDate: time.Now().AddDate(-30, 0, 0),
+// 			}
+
+// 			resp := ts.executeRequest("POST", "/api/v1/customers", customer)
+// 			assert.True(t, resp.Code == http.StatusCreated || resp.Code == http.StatusConflict)
+// 			done <- true
+// 		}(i)
+// 	}
+
+// 	// Esperar a que todas las goroutines terminen
+// 	for i := 0; i < concurrency; i++ {
+// 		<-done
+// 	}
+
+// 	// Verificar que se crearon los clientes correctamente
+// 	resp := ts.executeRequest("GET", "/api/v1/customers", nil)
+// 	assert.Equal(t, http.StatusOK, resp.Code)
+
+// 	var getResp transport.GetCustomersResponse
+// 	err := json.Unmarshal(resp.Body.Bytes(), &getResp)
+// 	require.NoError(t, err)
+
+// 	// Debe haber al menos algunos clientes creados
+// 	assert.NotEmpty(t, getResp.Customers)
+// }
+
+// // TestCustomerAPI_TransactionRollback verifica que las transacciones se revierten correctamente
+// func TestCustomerAPI_TransactionRollback(t *testing.T) {
+// 	ts := setupTestServer(t)
+// 	defer tearDown(t)
+
+// 	// 1. Crear un cliente inicial
+// 	customer1 := transport.CustomerJson{
+// 		Name:      "First",
+// 		LastName:  "Customer",
+// 		Email:     "first@example.com",
+// 		Phone:     "1234567890",
+// 		Age:       30,
+// 		BirthDate: time.Now().AddDate(-30, 0, 0),
+// 	}
+
+// 	resp := ts.executeRequest("POST", "/api/v1/customers", customer1)
+// 	assert.Equal(t, http.StatusCreated, resp.Code)
+
+// 	// 2. Intentar una operación que debería fallar
+// 	customer2 := transport.CustomerJson{
+// 		Name:      "Second",
+// 		LastName:  "Customer",
+// 		Email:     "first@example.com", // Mismo email que el primer cliente
+// 		Phone:     "0987654321",
+// 		Age:       25,
+// 		BirthDate: time.Now().AddDate(-25, 0, 0),
+// 	}
+
+// 	resp = ts.executeRequest("POST", "/api/v1/customers", customer2)
+// 	assert.Equal(t, http.StatusConflict, resp.Code)
+
+// 	// 3. Verificar que el estado de la base de datos es consistente
+// 	resp = ts.executeRequest("GET", "/api/v1/customers", nil)
+// 	assert.Equal(t, http.StatusOK, resp.Code)
+
+// 	var getResp transport.GetCustomersResponse
+// 	err := json.Unmarshal(resp.Body.Bytes(), &getResp)
+// 	require.NoError(t, err)
+
+// 	// Solo debería existir el primer cliente
+// 	assert.Equal(t, 1, len(getResp.Customers))
+// 	assert.Equal(t, customer1.Email, getResp.Customers[0].Email)
+// }

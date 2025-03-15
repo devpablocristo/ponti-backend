@@ -1,0 +1,739 @@
+package customer_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	types "github.com/devpablocristo/monorepo/pkg/types"
+
+	customer "github.com/devpablocristo/monorepo/projects/qh/internal/customer"
+	domain "github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+)
+
+var (
+	birthDate = time.Now().AddDate(-39, 0, 0).Truncate(time.Second)
+)
+
+type ucsMock struct {
+	err error
+}
+
+func (h ucsMock) GetCustomers(ctx context.Context) ([]domain.Customer, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	return []domain.Customer{
+		{
+			ID:        1,
+			Name:      "Homero",
+			LastName:  "Simpson",
+			Email:     "homero@springfield.com",
+			Phone:     "1234567890",
+			Age:       39,
+			BirthDate: birthDate,
+		},
+	}, nil
+}
+
+func (h ucsMock) GetCustomerByID(ctx context.Context, id int64) (*domain.Customer, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	return &domain.Customer{
+		ID:        1,
+		Name:      "Homero",
+		LastName:  "Simpson",
+		Email:     "homero@springfield.com",
+		Phone:     "1234567890",
+		Age:       39,
+		BirthDate: birthDate,
+	}, nil
+}
+
+func (h ucsMock) GetCustomerByEmail(ctx context.Context, email string) (*domain.Customer, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	return &domain.Customer{
+		ID:        1,
+		Name:      "Homero",
+		LastName:  "Simpson",
+		Email:     "homero@springfield.com",
+		Phone:     "1234567890",
+		Age:       39,
+		BirthDate: birthDate,
+	}, nil
+}
+
+func (h ucsMock) CreateCustomer(ctx context.Context, customer *domain.Customer) error {
+	return h.err
+}
+
+func (h ucsMock) UpdateCustomer(ctx context.Context, customer *domain.Customer) error {
+	return h.err
+}
+
+func (h ucsMock) DeleteCustomer(ctx context.Context, id int64) error {
+	return h.err
+}
+
+func (h ucsMock) GetKPI(ctx context.Context) (*domain.KPI, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	return &domain.KPI{
+		AverageAge:      35.5,
+		AgeStdDeviation: 30.5,
+	}, nil
+}
+
+type expectedResponse struct {
+	code int
+	body *types.APIErrorResponse
+}
+
+func Test_Handler_GetCustomers(t *testing.T) {
+	tests := []struct {
+		name     string
+		mock     ucsMock
+		wantCode int
+		wantBody any
+	}{
+		{
+			name:     "should return customers successfully",
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusOK,
+			wantBody: map[string]any{
+				"customers": []any{
+					map[string]any{
+						"id":         float64(1),
+						"name":       "Homero",
+						"last_name":  "Simpson",
+						"email":      "homero@springfield.com",
+						"phone":      "1234567890",
+						"age":        float64(39),
+						"birth_date": birthDate.Format(time.RFC3339),
+					},
+				},
+			},
+		},
+		{
+			name:     "should return error when service fails",
+			mock:     ucsMock{err: errors.New("service error")},
+			wantCode: http.StatusInternalServerError,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrInternal,
+				Code:    http.StatusInternalServerError,
+				Message: "Internal server error",
+				Details: "service error",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			req, _ := http.NewRequest(http.MethodGet, "/api/v1/customers", nil)
+			c.Request = req
+
+			gin.SetMode(gin.TestMode)
+
+			handler, err := customer.NewHandler(tt.mock)
+			require.NoError(t, err)
+
+			handler.GetCustomers(c)
+
+			assert.Equal(t, tt.wantCode, w.Code)
+
+			if tt.wantBody != nil {
+				switch expected := tt.wantBody.(type) {
+				case *types.APIErrorResponse:
+					var response types.APIErrorResponse
+					err := json.Unmarshal(w.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, expected.Type, response.Type)
+					assert.Equal(t, expected.Code, response.Code)
+					assert.Equal(t, expected.Message, response.Message)
+					assert.Equal(t, expected.Details, response.Details)
+				default:
+					var response map[string]any
+					err := json.Unmarshal(w.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, tt.wantBody, response)
+				}
+			}
+		})
+	}
+}
+
+func Test_Handler_GetCustomer(t *testing.T) {
+	tests := []struct {
+		name     string
+		id       string
+		mock     ucsMock
+		wantCode int
+		wantBody any
+	}{
+		{
+			name:     "should return customer successfully",
+			id:       "1",
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusOK,
+			wantBody: map[string]any{
+				"customer": map[string]any{
+					"id":         float64(1),
+					"name":       "Homero",
+					"last_name":  "Simpson",
+					"email":      "homero@springfield.com",
+					"phone":      "1234567890",
+					"age":        float64(39),
+					"birth_date": birthDate.Format(time.RFC3339),
+				},
+			},
+		},
+		{
+			name:     "should return error with invalid id format",
+			id:       "invalid",
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrBadRequest,
+				Code:    http.StatusBadRequest,
+				Message: "invalid customer ID format",
+				Details: "strconv.ParseInt: parsing \"invalid\": invalid syntax",
+			},
+		},
+		{
+			name:     "should return error with negative id",
+			id:       "-1",
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrBadRequest,
+				Code:    http.StatusBadRequest,
+				Message: "invalid customer ID format",
+				Details: "id must be greater than 0",
+			},
+		},
+		{
+			name:     "should return error when service fails",
+			id:       "1",
+			mock:     ucsMock{err: errors.New("service error")},
+			wantCode: http.StatusInternalServerError,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrInternal,
+				Code:    http.StatusInternalServerError,
+				Message: "Internal server error",
+				Details: "service error",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			req, _ := http.NewRequest(http.MethodGet, "/api/v1/customers/"+tt.id, nil)
+			c.Request = req
+			c.Params = []gin.Param{{Key: "id", Value: tt.id}}
+
+			gin.SetMode(gin.TestMode)
+
+			handler, err := customer.NewHandler(tt.mock)
+			require.NoError(t, err)
+
+			handler.GetCustomer(c)
+
+			assert.Equal(t, tt.wantCode, w.Code)
+			if tt.wantBody != nil {
+				switch expected := tt.wantBody.(type) {
+				case *types.APIErrorResponse:
+					var response types.APIErrorResponse
+					err := json.Unmarshal(w.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, expected.Type, response.Type)
+					assert.Equal(t, expected.Code, response.Code)
+					assert.Equal(t, expected.Message, response.Message)
+					assert.Equal(t, expected.Details, response.Details)
+				default:
+					var response map[string]any
+					err := json.Unmarshal(w.Body.Bytes(), &response)
+					require.NoError(t, err)
+					assert.Equal(t, tt.wantBody, response)
+				}
+			}
+		})
+	}
+}
+
+func Test_Handler_CreateCustomer(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     map[string]any
+		mock     ucsMock
+		wantCode int
+		wantBody any
+	}{
+		{
+			name: "should create customer successfully",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homero@springfield.com",
+				"phone":      "1234567890",
+				"age":        31,
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusCreated,
+			wantBody: nil,
+		},
+		{
+			name: "should fail with invalid name length",
+			body: map[string]any{
+				"name":       "H",
+				"last_name":  "S",
+				"email":      "homero@springfield.com",
+				"phone":      "1234567890",
+				"age":        float64(39),
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "invalid name format",
+			},
+		},
+		{
+			name: "should fail with invalid email",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homeroinvalidemail",
+				"phone":      "1234567890",
+				"age":        float64(39),
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "invalid email format",
+			},
+		},
+		{
+			name: "should fail with invalid phone",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homero@springfield.com",
+				"phone":      "123",
+				"age":        25,
+				"birth_date": "1999-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "invalid phone format",
+			},
+		},
+		{
+			name: "should fail with invalid age below minimum",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homero@springfield.com",
+				"phone":      "1234567890",
+				"age":        0,
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "invalid age",
+			},
+		},
+		{
+			name: "should fail with invalid age above maximum",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homero@springfield.com",
+				"phone":      "1234567890",
+				"age":        151,
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "invalid age",
+			},
+		},
+		{
+			name:     "should fail with nil request body",
+			body:     nil,
+			mock:     ucsMock{err: nil},
+			wantCode: http.StatusBadRequest,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrValidation,
+				Code:    http.StatusBadRequest,
+				Message: "request cannot be nil",
+			},
+		},
+		{
+			name: "should fail with service error",
+			body: map[string]any{
+				"name":       "Homero",
+				"last_name":  "Simpson",
+				"email":      "homero@springfield.com",
+				"phone":      "1234567890",
+				"age":        31,
+				"birth_date": "1993-01-01T00:00:00Z",
+			},
+			mock:     ucsMock{err: errors.New("service error")},
+			wantCode: http.StatusInternalServerError,
+			wantBody: &types.APIErrorResponse{
+				Type:    types.APIErrInternal,
+				Code:    http.StatusInternalServerError,
+				Message: "Internal server error",
+				Details: "service error",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			var body []byte
+			var err error
+			if tt.body != nil {
+				body, err = json.Marshal(tt.body)
+				require.NoError(t, err)
+			}
+
+			req, _ := http.NewRequest(http.MethodPost, "/api/v1/customers", bytes.NewBuffer(body))
+			req.Header.Set("Content-Type", "application/json")
+			c.Request = req
+
+			gin.SetMode(gin.TestMode)
+
+			handler, err := customer.NewHandler(tt.mock)
+			require.NoError(t, err)
+
+			handler.CreateCustomer(c)
+
+			t.Logf("Response Status: %d", w.Code)        // Log del código de respuesta
+			t.Logf("Response Body: %s", w.Body.String()) // Log del body de respuesta
+
+			assert.Equal(t, tt.wantCode, w.Code)
+			if tt.wantBody != nil {
+				var response types.APIErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				require.NoError(t, err)
+				expected := tt.wantBody.(*types.APIErrorResponse)
+				assert.Equal(t, expected.Type, response.Type)
+				assert.Equal(t, expected.Code, response.Code)
+				assert.Equal(t, expected.Message, response.Message)
+				if expected.Details != "" {
+					assert.Equal(t, expected.Details, response.Details)
+				}
+			}
+		})
+	}
+}
+
+// func Test_Handler_UpdateCustomer(t *testing.T) {
+// 	validBirthDate := time.Date(1993, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// 	tests := []struct {
+// 		name     string
+// 		id       string
+// 		body     map[string]any
+// 		mock     ucsMock
+// 		wantCode int
+// 		wantBody map[string]any
+// 	}{
+// 		{
+// 			name: "should update customer successfully",
+// 			id:   "1",
+// 			body: map[string]any{
+// 				"name":       "John Doe Updated",
+// 				"email":      "john@example.com",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusOK,
+// 			wantBody: nil,
+// 		},
+// 		{
+// 			name: "should fail with invalid id",
+// 			id:   "invalid",
+// 			body: map[string]any{
+// 				"name":       "John Doe",
+// 				"email":      "john@example.com",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "invalid customer ID format",
+// 				"code":  types.ErrInvalidInput,
+// 			},
+// 		},
+// 		{
+// 			name: "should fail with negative id",
+// 			id:   "-1",
+// 			body: map[string]any{
+// 				"name":       "John Doe",
+// 				"email":      "john@example.com",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "ID must be positive",
+// 				"code":  types.ErrInvalidInput,
+// 			},
+// 		},
+// 		{
+// 			name: "should fail with invalid name length",
+// 			id:   "1",
+// 			body: map[string]any{
+// 				"name":       "J",
+// 				"email":      "john@example.com",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "invalid name format",
+// 				"code":  types.ErrValidation,
+// 			},
+// 		},
+// 		{
+// 			name: "should fail with invalid email",
+// 			id:   "1",
+// 			body: map[string]any{
+// 				"name":       "John Doe",
+// 				"email":      "invalid-email",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "invalid email format",
+// 				"code":  types.ErrValidation,
+// 			},
+// 		},
+// 		{
+// 			name: "should fail with service error",
+// 			id:   "1",
+// 			body: map[string]any{
+// 				"name":       "John Doe",
+// 				"email":      "john@example.com",
+// 				"phone":      "1234567890",
+// 				"age":        30,
+// 				"birth_date": validBirthDate,
+// 			},
+// 			mock:     ucsMock{err: errors.New("service error")},
+// 			wantCode: http.StatusInternalServerError,
+// 			wantBody: map[string]any{
+// 				"error": "service error",
+// 				"code":  types.ErrInternal,
+// 			},
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			w := httptest.NewRecorder()
+// 			c, _ := gin.CreateTestContext(w)
+
+// 			body, err := json.Marshal(tt.body)
+// 			require.NoError(t, err)
+
+// 			req, _ := http.NewRequest(http.MethodPut, "/api/v1/customers/"+tt.id, bytes.NewBuffer(body))
+// 			req.Header.Set("Content-Type", "application/json")
+// 			c.Request = req
+// 			c.Params = []gin.Param{{Key: "id", Value: tt.id}}
+
+// 			gin.SetMode(gin.TestMode)
+
+// 			handler, err := customer.NewHandler(tt.mock)
+// 			require.NoError(t, err)
+
+// 			handler.UpdateCustomer(c)
+
+// 			assert.Equal(t, tt.wantCode, w.Code)
+// 			if tt.wantBody != nil {
+// 				var response map[string]any
+// 				err := json.Unmarshal(w.Body.Bytes(), &response)
+// 				require.NoError(t, err)
+// 				assert.Equal(t, tt.wantBody["error"], response["error"])
+// 				assert.Equal(t, tt.wantBody["code"], response["code"])
+// 			}
+// 		})
+// 	}
+// }
+
+// func Test_Handler_DeleteCustomer(t *testing.T) {
+// 	tests := []struct {
+// 		name     string
+// 		id       string
+// 		mock     ucsMock
+// 		wantCode int
+// 		wantBody map[string]any
+// 	}{
+// 		{
+// 			name:     "should delete customer successfully",
+// 			id:       "1",
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusNoContent,
+// 			wantBody: nil,
+// 		},
+// 		{
+// 			name:     "should fail with invalid id format",
+// 			id:       "invalid",
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "invalid customer ID format",
+// 				"code":  types.ErrInvalidInput,
+// 			},
+// 		},
+// 		{
+// 			name:     "should fail with negative id",
+// 			id:       "-1",
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusBadRequest,
+// 			wantBody: map[string]any{
+// 				"error": "ID must be positive",
+// 				"code":  types.ErrInvalidInput,
+// 			},
+// 		},
+// 		{
+// 			name:     "should fail with service error",
+// 			id:       "1",
+// 			mock:     ucsMock{err: errors.New("service error")},
+// 			wantCode: http.StatusInternalServerError,
+// 			wantBody: map[string]any{
+// 				"error": "service error",
+// 				"code":  types.ErrInternal,
+// 			},
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			w := httptest.NewRecorder()
+// 			c, _ := gin.CreateTestContext(w)
+
+// 			req, _ := http.NewRequest(http.MethodDelete, "/api/v1/customers/"+tt.id, nil)
+// 			c.Request = req
+// 			c.Params = []gin.Param{{Key: "id", Value: tt.id}}
+
+// 			gin.SetMode(gin.TestMode)
+
+// 			handler, err := customer.NewHandler(tt.mock)
+// 			require.NoError(t, err)
+
+// 			handler.DeleteCustomer(c)
+
+// 			assert.Equal(t, tt.wantCode, w.Code)
+// 			if tt.wantBody != nil {
+// 				var response map[string]any
+// 				err := json.Unmarshal(w.Body.Bytes(), &response)
+// 				require.NoError(t, err)
+// 				assert.Equal(t, tt.wantBody["error"], response["error"])
+// 				assert.Equal(t, tt.wantBody["code"], response["code"])
+// 			}
+// 		})
+// 	}
+// }
+
+// func Test_Handler_GetKPI(t *testing.T) {
+// 	tests := []struct {
+// 		name     string
+// 		mock     ucsMock
+// 		wantCode int
+// 		wantBody map[string]any
+// 	}{
+// 		{
+// 			name:     "should return KPI successfully",
+// 			mock:     ucsMock{err: nil},
+// 			wantCode: http.StatusOK,
+// 			wantBody: map[string]any{
+// 				"average_age":       float64(35.5),
+// 				"age_std_deviation": float64(30.5),
+// 			},
+// 		},
+// 		{
+// 			name:     "should fail with service error",
+// 			mock:     ucsMock{err: errors.New("service error")},
+// 			wantCode: http.StatusInternalServerError,
+// 			wantBody: map[string]any{
+// 				"error": "service error",
+// 				"code":  types.ErrInternal,
+// 			},
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			w := httptest.NewRecorder()
+// 			c, _ := gin.CreateTestContext(w)
+
+// 			req, _ := http.NewRequest(http.MethodGet, "/api/v1/customers/kpi", nil)
+// 			c.Request = req
+
+// 			gin.SetMode(gin.TestMode)
+
+// 			handler, err := customer.NewHandler(tt.mock)
+// 			require.NoError(t, err)
+
+// 			handler.GetKPI(c)
+
+// 			assert.Equal(t, tt.wantCode, w.Code)
+// 			if tt.wantBody != nil {
+// 				var response map[string]any
+// 				err := json.Unmarshal(w.Body.Bytes(), &response)
+// 				require.NoError(t, err)
+// 				assert.Equal(t, tt.wantBody, response)
+// 			}
+// 		})
+// 	}
+// }
