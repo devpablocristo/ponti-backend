@@ -6,10 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	utils "github.com/devpablocristo/monorepo/pkg/utils"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/assessment/handler/dto"
 )
 
 func (h *Handler) CreateAssessment(c *gin.Context) {

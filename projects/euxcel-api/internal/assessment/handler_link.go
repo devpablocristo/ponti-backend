@@ -3,8 +3,8 @@ package assessment
 import (
 	"net/http"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/assessment/handler/dto"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 

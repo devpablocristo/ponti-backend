@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 // Tweet representa el DTO básico para un tweet.

@@ -1,9 +1,9 @@
 package dto
 
 import (
-	jwt "github.com/devpablocristo/monorepo/pkg/authe/jwt/v5"
+	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
 )
 
 func ToTokenDomain(token *jwt.Token) *domain.Token {

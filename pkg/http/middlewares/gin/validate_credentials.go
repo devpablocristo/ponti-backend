@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/devpablocristo/monorepo/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 // Constantes para los mensajes de error

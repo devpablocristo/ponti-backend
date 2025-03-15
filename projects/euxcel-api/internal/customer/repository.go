@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 
-	sqlite "github.com/devpablocristo/monorepo/pkg/databases/sql/sqlite"
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	sqlite "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/sqlite"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	model "github.com/devpablocristo/monorepo/projects/qh/internal/customer/repository/models"
-	support "github.com/devpablocristo/monorepo/projects/qh/internal/customer/repository/support"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+	model "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/models"
+	support "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/support"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
 )
 
 type repository struct {

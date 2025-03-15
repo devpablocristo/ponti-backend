@@ -1,11 +1,11 @@
 package assessment
 
 import (
-	authe "github.com/devpablocristo/monorepo/projects/qh/internal/authe"
-	candidate "github.com/devpablocristo/monorepo/projects/qh/internal/candidate"
-	config "github.com/devpablocristo/monorepo/projects/qh/internal/config"
-	notification "github.com/devpablocristo/monorepo/projects/qh/internal/notification"
-	person "github.com/devpablocristo/monorepo/projects/qh/internal/person"
+	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
+	candidate "github.com/alphacodinggroup/euxcel-backend/internal/candidate"
+	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
+	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
+	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
 )
 
 // useCases implementa la interfaz UseCases

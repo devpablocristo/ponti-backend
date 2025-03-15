@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/candidate/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
 )
 
 // Candidate representa el DTO para el candidato.

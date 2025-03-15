@@ -3,14 +3,14 @@ package wire
 import (
 	"errors"
 
-	rabbit "github.com/devpablocristo/monorepo/pkg/brokers/rabbitmq/amqp091/producer"
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
-	cass "github.com/devpablocristo/monorepo/pkg/databases/nosql/cassandra/gocql"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
+	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	tweet "github.com/devpablocristo/monorepo/projects/qh/internal/tweet"
-	user "github.com/devpablocristo/monorepo/projects/qh/internal/user"
+	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
+	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
 )
 
 func ProvideTweetRepository(repo cass.Repository) (tweet.Repository, error) {

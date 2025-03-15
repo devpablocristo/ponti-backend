@@ -1,9 +1,9 @@
 package support
 
 import (
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	utils "github.com/devpablocristo/monorepo/pkg/utils"
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/customer/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/customer/handler/dto"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 )
 
 const (

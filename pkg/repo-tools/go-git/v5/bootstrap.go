@@ -3,7 +3,7 @@ package pkggogit
 import (
 	"github.com/spf13/viper"
 
-	defs "github.com/devpablocristo/monorepo/pkg/repo-tools/go-git/v5/defs"
+	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/go-git/v5/defs"
 )
 
 func Bootstrap(repoRemoteUrlKey, repoLocalPathKey, repoBranchKey string) (defs.Client, error) {

@@ -10,12 +10,12 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 
-	aws "github.com/devpablocristo/monorepo/pkg/aws"
-	paws "github.com/devpablocristo/monorepo/pkg/aws/ports"
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	utils "github.com/devpablocristo/monorepo/pkg/utils"
+	aws "github.com/alphacodinggroup/euxcel-backend/pkg/aws"
+	paws "github.com/alphacodinggroup/euxcel-backend/pkg/aws/ports"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/customer/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/customer/handler/dto"
 )
 
 type LambdaHandler struct {

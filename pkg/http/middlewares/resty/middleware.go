@@ -1,7 +1,7 @@
 package pkgmdw
 
 import (
-	pkgresty "github.com/devpablocristo/monorepo/pkg/http/clients/resty"
+	pkgresty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
 	"github.com/go-resty/resty/v2"
 )
 

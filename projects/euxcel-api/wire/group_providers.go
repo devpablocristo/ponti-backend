@@ -3,11 +3,11 @@ package wire
 import (
 	"errors"
 
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	group "github.com/devpablocristo/monorepo/projects/qh/internal/group"
+	group "github.com/alphacodinggroup/euxcel-backend/internal/group"
 )
 
 func ProvideGroupRepository(repo gorm.Repository) (group.Repository, error) {

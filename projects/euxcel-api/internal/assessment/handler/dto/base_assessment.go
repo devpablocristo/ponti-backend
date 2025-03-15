@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 // Assessment es el DTO que se utiliza para exponer/recibir datos vía JSON.

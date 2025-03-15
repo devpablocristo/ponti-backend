@@ -1,7 +1,7 @@
 package assessment
 
 import (
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 )
 
 type repository struct {

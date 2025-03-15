@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	pkgoauth2 "github.com/devpablocristo/monorepo/pkg/authe/oauth2"
+	pkgoauth2 "github.com/alphacodinggroup/euxcel-backend/pkg/authe/oauth2"
 )
 
 // BootstrapStd inicializa un service OAuth2 genérico

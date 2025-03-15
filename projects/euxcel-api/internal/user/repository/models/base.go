@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 )
 
 type User struct {

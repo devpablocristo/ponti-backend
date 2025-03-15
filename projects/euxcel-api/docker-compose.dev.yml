@@ -1,10 +1,10 @@
 services:
-  qh:
-    container_name: "qh"
+  euxcel-api:
+    container_name: "euxcel-api"
     build:
       context: ../../
-      dockerfile: ./projects/qh/Dockerfile.dev
-    image: "qh:${APP_VERSION}"
+      dockerfile: ./projects/euxcel-api/Dockerfile.dev
+    image: "euxcel-api:${APP_VERSION}"
     env_file:
       - .env
     ports:
@@ -23,7 +23,7 @@ services:
     environment:
       - GO111MODULE=on
       - BUILDING_FILES=/app/cmd/api/main.go
-      - APP_NAME=qh
+      - APP_NAME=euxcel-api
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
@@ -35,7 +35,7 @@ services:
     restart: on-failure
     command: tail -f /dev/null
     profiles:
-      - qh  
+      - euxcel-api  
 
   postgres:
     image: postgres:16.3
@@ -61,7 +61,7 @@ services:
       retries: 5
       start_period: 10s
     profiles:
-      - qh
+      - euxcel-api
 
   pgadmin:
     image: dpage/pgadmin4:8.12
@@ -81,7 +81,7 @@ services:
       - app-network
     restart: unless-stopped
     profiles:
-      - qh
+      - euxcel-api
 
   migrations:
     image: gomicro/goose:3.7.0
@@ -100,7 +100,7 @@ services:
     networks:
       - app-network
     profiles:
-      - qh
+      - euxcel-api
 
   mongodb:
     image: mongo:5.0.28
@@ -117,7 +117,7 @@ services:
       - app-network
     restart: unless-stopped
     profiles:
-      - qh
+      - euxcel-api
 
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
@@ -136,7 +136,7 @@ services:
       - app-network
     restart: unless-stopped
     profiles:
-      - qh
+      - euxcel-api
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -150,7 +150,7 @@ services:
     volumes:
       - mailhog_data:/var/lib/mailhog
     profiles:
-      - qh
+      - euxcel-api
 
   redis:
     image: redis:7.0
@@ -166,7 +166,7 @@ services:
     volumes:
       - redis_data:/data
     profiles:
-      - qh
+      - euxcel-api
 
   rabbitmq:
     image: "rabbitmq:4.0.0-beta.3-management-alpine"
@@ -185,7 +185,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     profiles:
-      - qh
+      - euxcel-api
 
   cassandra:
     image: cassandra:4.1
@@ -206,7 +206,7 @@ services:
       - app-network
     restart: unless-stopped
     profiles:
-      - qh
+      - euxcel-api
 
 networks:
   app-network:

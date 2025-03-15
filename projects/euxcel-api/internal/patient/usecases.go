@@ -3,9 +3,9 @@ package patient
 import (
 	"context"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/patient/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/patient/usecases/domain"
 )
 
 // useCases es la implementación de la interfaz UseCases.

@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/person/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
 )
 
 type Person struct {

@@ -3,9 +3,9 @@ package dto
 import (
 	"errors"
 
-	smtp "github.com/devpablocristo/monorepo/pkg/notification/smtp"
+	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/notification/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
 )
 
 type Email struct {

@@ -22,20 +22,20 @@
     # (Opcional) Si manejas un monorepo multi-módulo y tienes un go.work, también cópialo:
     # COPY go.work .
     
-    # Instalar dependencias de Go para el módulo de qh
-    WORKDIR /app/projects/qh
+    # Instalar dependencias de Go para el módulo de euxcel-api
+    WORKDIR /app/projects/euxcel-api
     RUN go mod download && go mod verify
     
-    # Si en tu proyecto hay otro módulo (por ejemplo, en /app/pkg) y es necesario para compilar qh,
+    # Si en tu proyecto hay otro módulo (por ejemplo, en /app/pkg) y es necesario para compilar euxcel-api,
     # puedes ejecutar:
     WORKDIR /app/pkg
     RUN go mod download && go mod verify
     
-    # Volver al módulo de qh para compilar el binario, ya que allí se encuentra su go.mod.
-    WORKDIR /app/projects/qh
+    # Volver al módulo de euxcel-api para compilar el binario, ya que allí se encuentra su go.mod.
+    WORKDIR /app/projects/euxcel-api
     
     # Compilar el binario para Linux (se habilita CGO por requerir dependencias como SQLite)
-    # Nota: Al estar en /app/projects/qh, la ruta al main es relativa a este directorio.
+    # Nota: Al estar en /app/projects/euxcel-api, la ruta al main es relativa a este directorio.
     RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/main.go
     
     # ---------------------------------------------------
@@ -53,8 +53,8 @@
     # Copiar el binario compilado desde la etapa builder
     COPY --from=builder /app/pkg  /app/pkg
     COPY --from=builder /app/staging_binary /app/staging_binary
-    # Copiar el archivo .env desde el módulo qh (o desde donde lo tengas ubicado)
-    COPY --from=builder /app/projects/qh/.env /app/projects/qh/.env
+    # Copiar el archivo .env desde el módulo euxcel-api (o desde donde lo tengas ubicado)
+    COPY --from=builder /app/projects/euxcel-api/.env /app/projects/euxcel-api/.env
     
     # Exponer el puerto que utilice la aplicación (ajustá si es necesario)
     EXPOSE 8080

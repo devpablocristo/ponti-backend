@@ -133,4 +133,4 @@ Desktop.ini
 # Debugging binaries
 __debug_bin*
 
-projects/qh/infra/consul/data/
+projects/euxcel-api/infra/consul/data/

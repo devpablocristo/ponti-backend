@@ -6,7 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/event/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/event/usecases/domain"
 )
 
 type Event struct {

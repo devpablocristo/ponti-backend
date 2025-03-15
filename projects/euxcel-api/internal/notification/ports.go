@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/notification/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
 )
 
 type SmtpService interface {

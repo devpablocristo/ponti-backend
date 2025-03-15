@@ -1,8 +1,8 @@
 package rating
 
 import (
-	mongo "github.com/devpablocristo/monorepo/pkg/databases/nosql/mongodb/mongo-driver"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/rating/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/rating/usecases/domain"
+	mongo "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 )
 
 type MongoDbRepository struct {

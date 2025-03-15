@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/devpablocristo/monorepo/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 // ErrorHandlingMiddleware captura errores añadidos al contexto y responde de manera adecuada

@@ -7,12 +7,12 @@ import (
 	"math/rand"
 	"time"
 
-	person "github.com/devpablocristo/monorepo/projects/qh/internal/person"
-	personDomain "github.com/devpablocristo/monorepo/projects/qh/internal/person/usecases/domain"
-	tweet "github.com/devpablocristo/monorepo/projects/qh/internal/tweet"
-	tweetDomain "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
-	user "github.com/devpablocristo/monorepo/projects/qh/internal/user"
-	userDomain "github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
+	personDomain "github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
+	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
+	tweetDomain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
+	userDomain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 )
 
 // PersonUserSeed agrupa los datos de seed para una persona y su usuario asociado.

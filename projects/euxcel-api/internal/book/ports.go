@@ -3,7 +3,7 @@ package book
 import (
 	"context"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/book/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/book/usecases/domain"
 )
 
 type Repository interface {

@@ -2,7 +2,7 @@ package main
 
 //"github.com/aws/aws-lambda-go/lambda"
 
-//envs "github.com/devpablocristo/monorepo/pkg/config/godotenv"
+//envs "github.com/alphacodinggroup/euxcel-backend/pkg/config/godotenv"
 
 func main() {
 

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/browser-events/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
 )
 
 type UseCases interface {

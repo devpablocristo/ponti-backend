@@ -3,16 +3,16 @@ package wire
 import (
 	"errors"
 
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/assessment"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/candidate"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/config"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/notification"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/internal/assessment"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
+	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
+	"github.com/alphacodinggroup/euxcel-backend/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
+	"github.com/alphacodinggroup/euxcel-backend/internal/person"
 )
 
 // ProvideAssessmentRepository inyecta la implementación de Repository para Assessment.

@@ -3,18 +3,18 @@ package wire
 import (
 	"fmt"
 
-	jwt "github.com/devpablocristo/monorepo/pkg/authe/jwt/v5"
-	rabbit "github.com/devpablocristo/monorepo/pkg/brokers/rabbitmq/amqp091/producer"
-	rdch "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
-	cass "github.com/devpablocristo/monorepo/pkg/databases/nosql/cassandra/gocql"
-	mng "github.com/devpablocristo/monorepo/pkg/databases/nosql/mongodb/mongo-driver"
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
-	pgdb "github.com/devpablocristo/monorepo/pkg/databases/sql/postgresql/pgxpool"
-	resty "github.com/devpablocristo/monorepo/pkg/http/clients/resty"
-	restymdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/resty"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
-	ssmtp "github.com/devpablocristo/monorepo/pkg/notification/smtp"
-	ws "github.com/devpablocristo/monorepo/pkg/websocket/gorilla"
+	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
+	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
+	rdch "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
+	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
+	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	pgdb "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
+	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
+	restymdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/resty"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	ssmtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
+	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 )
 
 func ProvideGormRepository() (gorm.Repository, error) {

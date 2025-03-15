@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 )
 
 type GinHandler struct {

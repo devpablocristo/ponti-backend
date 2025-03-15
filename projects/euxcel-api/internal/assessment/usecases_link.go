@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 func (u *useCases) GenerateLink(ctx context.Context, assessmentID string) (string, error) {

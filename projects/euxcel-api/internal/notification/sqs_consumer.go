@@ -6,7 +6,7 @@ package notification
 // 	"fmt"
 
 // 	"github.com/devpablocristo/customer-manager/pkg/aws/localstack/defs"
-// 	"github.com/devpablocristo/monorepo/projects/qh/internal/notification/handler/dto"
+// 	"github.com/alphacodinggroup/euxcel-backend/internal/notification/handler/dto"
 // )
 
 // const queueName = "users_verification_email"

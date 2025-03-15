@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/user"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/user"
 )
 
 // usecases implementa la lógica de negocio para tweets.

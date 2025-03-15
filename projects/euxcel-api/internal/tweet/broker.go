@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	rabbit "github.com/devpablocristo/monorepo/pkg/brokers/rabbitmq/amqp091/producer"
+	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 type broker struct {

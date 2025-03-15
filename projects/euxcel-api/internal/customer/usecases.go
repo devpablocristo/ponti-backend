@@ -3,9 +3,9 @@ package customer
 import (
 	"context"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
 )
 
 type useCases struct {

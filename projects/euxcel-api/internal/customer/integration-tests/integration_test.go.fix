@@ -14,12 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/config"
-	custin "github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/inbound"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/inbound/transport"
-	custout "github.com/devpablocristo/monorepo/projects/qh/internal/customer/adapters/outbound"
-	custcore "github.com/devpablocristo/monorepo/projects/qh/internal/customer/core"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	"github.com/alphacodinggroup/euxcel-backend/internal/config"
+	custin "github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/inbound"
+	"github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/inbound/transport"
+	custout "github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/outbound"
+	custcore "github.com/alphacodinggroup/euxcel-backend/internal/customer/core"
 )
 
 const testDBPath = "/app/config/sqlite-data/test.db"

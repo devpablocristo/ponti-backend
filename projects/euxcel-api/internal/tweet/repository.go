@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	cass "github.com/devpablocristo/monorepo/pkg/databases/nosql/cassandra/gocql"
+	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/repository/models"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/repository/models"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 // cassandra es la implementación del repositorio en Cassandra.

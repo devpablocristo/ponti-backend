@@ -7,16 +7,16 @@ import (
 	"log"
 	"time"
 
-	cass "github.com/devpablocristo/monorepo/pkg/databases/nosql/cassandra/gocql"
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
+	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 
-	assessmentmodels "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/repository/models"
-	candidatemodels "github.com/devpablocristo/monorepo/projects/qh/internal/candidate/repository/models"
-	groupmodels "github.com/devpablocristo/monorepo/projects/qh/internal/group/repository/models"
-	personmodels "github.com/devpablocristo/monorepo/projects/qh/internal/person/repository/models"
-	usermodels "github.com/devpablocristo/monorepo/projects/qh/internal/user/repository/models"
+	assessmentmodels "github.com/alphacodinggroup/euxcel-backend/internal/assessment/repository/models"
+	candidatemodels "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
+	groupmodels "github.com/alphacodinggroup/euxcel-backend/internal/group/repository/models"
+	personmodels "github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
+	usermodels "github.com/alphacodinggroup/euxcel-backend/internal/user/repository/models"
 
-	wire "github.com/devpablocristo/monorepo/projects/qh/wire"
+	wire "github.com/alphacodinggroup/euxcel-backend/wire"
 )
 
 // RunWebServer registra las rutas en el router de Gin y arranca el servidor HTTP.

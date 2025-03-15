@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 // CreateAssessment crea un nuevo assessment y lo guarda

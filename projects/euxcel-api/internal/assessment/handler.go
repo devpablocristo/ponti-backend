@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	gsv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 type Handler struct {

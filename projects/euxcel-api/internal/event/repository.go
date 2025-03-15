@@ -7,10 +7,10 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
-	mng "github.com/devpablocristo/monorepo/pkg/databases/nosql/mongodb/mongo-driver"
+	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 
-	models "github.com/devpablocristo/monorepo/projects/qh/internal/event/repository/models"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/event/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/internal/event/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/event/usecases/domain"
 )
 
 type mongoRepository struct {

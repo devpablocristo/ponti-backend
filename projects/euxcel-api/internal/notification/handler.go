@@ -5,12 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	gsv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	utils "github.com/devpablocristo/monorepo/pkg/utils"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/notification/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/notification/handler/dto"
 )
 
 type Handler struct {

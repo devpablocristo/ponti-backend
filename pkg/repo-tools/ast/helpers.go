@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	defs "github.com/devpablocristo/monorepo/pkg/repo-tools/ast/defs"
+	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/ast/defs"
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
 )

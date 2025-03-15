@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 // Tweet representa el modelo que se almacenará en Redis.

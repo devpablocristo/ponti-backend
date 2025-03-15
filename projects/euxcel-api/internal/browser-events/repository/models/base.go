@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/browser-events/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
 )
 
 // BrowserEvent representa el evento para almacenamiento en MongoDB.

@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 
-	models "github.com/devpablocristo/monorepo/projects/qh/internal/candidate/repository/models"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/candidate/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
 )
 
 type repository struct {

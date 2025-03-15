@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	ws "github.com/devpablocristo/monorepo/pkg/websocket/gorilla"
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/browser-events/websocket/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/browser-events/websocket/dto"
+	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 )
 
 // webSocket es el adaptador WS que utiliza el paquete ws para manejar conexiones WebSocket.

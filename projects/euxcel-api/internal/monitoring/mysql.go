@@ -3,7 +3,7 @@ package monitoring
 import (
 	"context"
 
-	mysql "github.com/devpablocristo/monorepo/pkg/databases/sql/mysql/go-sql-driver"
+	mysql "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/mysql/go-sql-driver"
 )
 
 type mysqlRepository struct {

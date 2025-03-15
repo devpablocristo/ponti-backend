@@ -6,8 +6,8 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceRoot}/projects/qh/cmd/api/",
-      "envFile": "${workspaceRoot}/projects/qh/.env"
+      "program": "${workspaceRoot}/projects/euxcel-api/cmd/api/",
+      "envFile": "${workspaceRoot}/projects/euxcel-api/.env"
     }
   ]
 }

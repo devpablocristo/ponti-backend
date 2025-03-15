@@ -1,6 +1,6 @@
 package dto
 
-import "github.com/devpablocristo/monorepo/projects/qh/internal/group/usecases/domain"
+import "github.com/alphacodinggroup/euxcel-backend/internal/group/usecases/domain"
 
 type UpdateGroup struct {
 	Group

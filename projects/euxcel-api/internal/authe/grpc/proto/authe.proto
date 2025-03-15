@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package authe;
-option go_package = "github.com/devpablocristo/monorepo/projects/qh/internal/authe/grpc/pb;pb";
+option go_package = "github.com/alphacodinggroup/euxcel-backend/internal/authe/grpc/pb;pb";
 
 service AuthService {
   rpc GenerateVerificationTokens(VerificationTokenRequest) returns (VerificationTokenResponse);
@@ -19,4 +19,4 @@ message VerificationTokenResponse {
 
 
 // correr desde dentro de /proto
-// protoc --go_out=../pb --go-grpc_out=../pb --go_opt=module=github.com/devpablocristo/monorepo/projects/qh/internal/authe/grpc/pb --go-grpc_opt=module=github.com/devpablocristo/monorepo/projects/qh/internal/authe/grpc/pb authe.proto
+// protoc --go_out=../pb --go-grpc_out=../pb --go_opt=module=github.com/alphacodinggroup/euxcel-backend/internal/authe/grpc/pb --go-grpc_opt=module=github.com/alphacodinggroup/euxcel-backend/internal/authe/grpc/pb authe.proto

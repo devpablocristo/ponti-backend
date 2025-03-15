@@ -28,7 +28,7 @@ WORKDIR /app
 COPY . .
 
 # Instalar dependencias de Go
-WORKDIR /app/projects/qh
+WORKDIR /app/projects/euxcel-api
 RUN go mod download && go mod verify
 
 WORKDIR /app/pkg

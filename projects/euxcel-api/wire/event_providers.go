@@ -3,11 +3,11 @@ package wire
 import (
 	"errors"
 
-	mng "github.com/devpablocristo/monorepo/pkg/databases/nosql/mongodb/mongo-driver"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	event "github.com/devpablocristo/monorepo/projects/qh/internal/event"
+	event "github.com/alphacodinggroup/euxcel-backend/internal/event"
 )
 
 func ProvideEventRepository(repo mng.Repository) (event.Repository, error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
 )
 
 type cache struct {

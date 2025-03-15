@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
 	"github.com/golang-jwt/jwt/v5"
 )
 

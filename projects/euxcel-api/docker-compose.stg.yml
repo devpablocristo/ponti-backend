@@ -1,17 +1,17 @@
 services:
-  qh:
-    container_name: "qh"
+  euxcel-api:
+    container_name: "euxcel-api"
     build:
       context: ../../
-      dockerfile: ./projects/qh/Dockerfile.stg
-    image: "qh:${APP_VERSION}"
+      dockerfile: ./projects/euxcel-api/Dockerfile.stg
+    image: "euxcel-api:${APP_VERSION}"
     env_file:
       # - .env
       - .env.example
     ports:
       - "${QH_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
-      # - APP_NAME=qh
+      # - APP_NAME=euxcel-api
       # - APP_VERSION=1.0
       - APP_ENV=stg
       # - APP_MAX_RETRIES=5

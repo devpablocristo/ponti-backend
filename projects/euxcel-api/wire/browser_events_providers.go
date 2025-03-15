@@ -3,12 +3,12 @@ package wire
 import (
 	"errors"
 
-	mng "github.com/devpablocristo/monorepo/pkg/databases/nosql/mongodb/mongo-driver"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
-	ws "github.com/devpablocristo/monorepo/pkg/websocket/gorilla"
+	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 
-	browserevent "github.com/devpablocristo/monorepo/projects/qh/internal/browser-events"
+	browserevent "github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
 )
 
 func ProvideBrowserEventsRepository(repo mng.Repository) (browserevent.Repository, error) {

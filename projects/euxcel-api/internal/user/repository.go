@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	"github.com/google/uuid"
 
-	models "github.com/devpablocristo/monorepo/projects/qh/internal/user/repository/models"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/internal/user/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 )
 
 type repository struct {

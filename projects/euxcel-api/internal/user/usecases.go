@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	utils "github.com/devpablocristo/monorepo/pkg/utils"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 )
 
 type useCases struct {

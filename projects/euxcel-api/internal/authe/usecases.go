@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
-	support "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/support"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	support "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/support"
 )
 
 type useCases struct {

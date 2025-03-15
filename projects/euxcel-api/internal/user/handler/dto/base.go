@@ -1,8 +1,8 @@
 package dto
 
 import (
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 type User struct {

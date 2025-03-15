@@ -3,11 +3,11 @@ package wire
 import (
 	"errors"
 
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	gin "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
-	smtp "github.com/devpablocristo/monorepo/pkg/notification/smtp"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	gin "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
-	notification "github.com/devpablocristo/monorepo/projects/qh/internal/notification"
+	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
 )
 
 func ProvideNotificationSmtpService(smtp smtp.Service) (notification.SmtpService, error) {

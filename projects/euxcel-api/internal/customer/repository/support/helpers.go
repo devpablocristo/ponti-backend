@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
-	types "github.com/devpablocristo/monorepo/pkg/types"
-	model "github.com/devpablocristo/monorepo/projects/qh/internal/customer/repository/models"
+	model "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/models"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 const (

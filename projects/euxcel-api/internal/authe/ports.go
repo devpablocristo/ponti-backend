@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
 )
 
 type UseCases interface {

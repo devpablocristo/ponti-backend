@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 // Assessment representa la evaluación en la capa GORM.

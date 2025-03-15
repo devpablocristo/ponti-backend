@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 // GetTimeline representa el DTO para el timeline que se enviará en la respuesta.

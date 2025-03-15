@@ -9,10 +9,10 @@ import (
 	"github.com/jackc/pgx" // Para errores pgx.ErrNoRows.
 	"github.com/lib/pq"
 
-	pgdb "github.com/devpablocristo/monorepo/pkg/databases/sql/postgresql/pgxpool"
+	pgdb "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/person/repository/models"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/person/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
+	"github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
 )
 
 type postgresRepository struct {

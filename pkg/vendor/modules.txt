@@ -222,21 +222,6 @@ github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/cyphar/filepath-securejoin v0.2.4
 ## explicit; go 1.13
 github.com/cyphar/filepath-securejoin
-# github.com/devpablocristo/monorepo/pkg v0.0.0-20250303143024-eda927c21c56
-## explicit; go 1.23
-github.com/devpablocristo/monorepo/pkg/authe/oauth2
-github.com/devpablocristo/monorepo/pkg/cloud/aws/localstack
-github.com/devpablocristo/monorepo/pkg/cloud/aws/ports
-github.com/devpablocristo/monorepo/pkg/cloud/aws/realstack
-github.com/devpablocristo/monorepo/pkg/doc/swagger
-github.com/devpablocristo/monorepo/pkg/http/clients/resty
-github.com/devpablocristo/monorepo/pkg/microservices/go-micro/v4/grpc-client
-github.com/devpablocristo/monorepo/pkg/microservices/go-micro/v4/grpc-server
-github.com/devpablocristo/monorepo/pkg/microservices/go-micro/v4/rabbitmq-broker
-github.com/devpablocristo/monorepo/pkg/repo-tools/ast/defs
-github.com/devpablocristo/monorepo/pkg/repo-tools/go-git/v5/defs
-github.com/devpablocristo/monorepo/pkg/types
-github.com/devpablocristo/monorepo/pkg/utils
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous

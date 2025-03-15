@@ -6,7 +6,7 @@ import (
 
 	"github.com/joho/godotenv"
 
-	pkgutils "github.com/devpablocristo/monorepo/pkg/utils"
+	pkgutils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 )
 
 func LoadConfig(filePaths ...string) error {

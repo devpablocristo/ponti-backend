@@ -3,7 +3,7 @@ package group
 import (
 	"context"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/group/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/group/usecases/domain"
 )
 
 type useCases struct {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	models "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/repository/models"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/internal/assessment/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 func (r *repository) StoreLink(ctx context.Context, link *domain.Link) (string, error) {

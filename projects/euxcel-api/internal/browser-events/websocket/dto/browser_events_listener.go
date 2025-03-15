@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/browser-events/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
 )
 
 // BrowserEventDTO es un DTO genérico para representar cualquier evento del navegador.

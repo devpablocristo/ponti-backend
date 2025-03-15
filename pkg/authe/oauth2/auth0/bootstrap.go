@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	pkgoauth2 "github.com/devpablocristo/monorepo/pkg/authe/oauth2"
+	pkgoauth2 "github.com/alphacodinggroup/euxcel-backend/pkg/authe/oauth2"
 	// Importas tu paquete base con interfaces/structs
 	// Este paquete define tu Config y NewService (service.go)
 )

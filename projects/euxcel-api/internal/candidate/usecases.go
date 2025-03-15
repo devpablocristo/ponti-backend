@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/candidate/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
 )
 
 type useCases struct {

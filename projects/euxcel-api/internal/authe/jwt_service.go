@@ -7,11 +7,11 @@ import (
 
 	jwt0 "github.com/golang-jwt/jwt/v5"
 
-	jwt "github.com/devpablocristo/monorepo/pkg/authe/jwt/v5"
+	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/authe/jwt-service/dto"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
-	config "github.com/devpablocristo/monorepo/projects/qh/internal/config"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/authe/jwt-service/dto"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 )
 
 type jwtService struct {

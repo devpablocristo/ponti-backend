@@ -3,7 +3,7 @@ package assessment
 import (
 	"context"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/assessment/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
 )
 
 // UseCases define la interfaz pública con los métodos que expondremos

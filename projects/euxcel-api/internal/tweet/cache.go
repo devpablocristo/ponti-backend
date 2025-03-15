@@ -9,10 +9,10 @@ import (
 
 	redis0 "github.com/go-redis/redis/v8"
 
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
 
-	models "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/cache/models"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/internal/tweet/cache/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 )
 
 // cache es la implementación de Cache utilizando Redis.

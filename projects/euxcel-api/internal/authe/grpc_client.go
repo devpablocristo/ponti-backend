@@ -5,9 +5,9 @@ package authe
 // 	"fmt"
 // 	"time"
 
-// 	client "github.com/devpablocristo/monorepo/pkg/microservices/go-micro/v4/grpc-client"
-// 	domain "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
-// 	"github.com/devpablocristo/monorepo/projects/qh/internal/user/grpc/pb"
+// 	client "github.com/alphacodinggroup/euxcel-backend/pkg/microservices/go-micro/v4/grpc-client"
+// 	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+// 	"github.com/alphacodinggroup/euxcel-backend/internal/user/grpc/pb"
 // )
 
 // type grpcClient struct {

@@ -9,23 +9,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	rabbit "github.com/devpablocristo/monorepo/pkg/brokers/rabbitmq/amqp091/producer"
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
-	cass "github.com/devpablocristo/monorepo/pkg/databases/nosql/cassandra/gocql"
-	gorm "github.com/devpablocristo/monorepo/pkg/databases/sql/gorm"
-	pg "github.com/devpablocristo/monorepo/pkg/databases/sql/postgresql/pgxpool"
+	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
+	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
+	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	pg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 
 	// Usecases y dominio de tweets.
-	tweet "github.com/devpablocristo/monorepo/projects/qh/internal/tweet"
-	tweetDomain "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
+	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
+	tweetDomain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
 
 	// Usecases de usuarios.
-	user "github.com/devpablocristo/monorepo/projects/qh/internal/user"
-	userDomain "github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
+	userDomain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 
 	// Usecases de personas.
-	person "github.com/devpablocristo/monorepo/projects/qh/internal/person"
-	personDomain "github.com/devpablocristo/monorepo/projects/qh/internal/person/usecases/domain"
+	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
+	personDomain "github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
 )
 
 func TestTweetWithUserAndPersonIntegration(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
+	pkgoauth2 "github.com/alphacodinggroup/euxcel-backend/pkg/authe/oauth2"
 	"github.com/auth0-community/go-auth0"
-	pkgoauth2 "github.com/devpablocristo/monorepo/pkg/authe/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 	"gopkg.in/square/go-jose.v2"
 )

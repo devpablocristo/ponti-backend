@@ -3,7 +3,7 @@ package customer
 import (
 	"context"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
 )
 
 type UseCases interface {

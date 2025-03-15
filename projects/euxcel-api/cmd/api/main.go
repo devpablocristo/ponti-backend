@@ -8,7 +8,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/devpablocristo/monorepo/projects/qh/wire"
+	"github.com/alphacodinggroup/euxcel-backend/wire"
 )
 
 func main() {

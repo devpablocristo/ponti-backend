@@ -9,11 +9,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	mock_tweet "github.com/devpablocristo/monorepo/projects/qh/internal/tweet/mocks"
-	mock_user "github.com/devpablocristo/monorepo/projects/qh/internal/user/mocks"
+	mock_tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet/mocks"
+	mock_user "github.com/alphacodinggroup/euxcel-backend/internal/user/mocks"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/tweet/usecases/domain"
-	usrdom "github.com/devpablocristo/monorepo/projects/qh/internal/user/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	usrdom "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 )
 
 func TestCreateTweet(t *testing.T) {

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	resty "github.com/devpablocristo/monorepo/pkg/http/clients/resty"
+	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
 
-	dto "github.com/devpablocristo/monorepo/projects/qh/internal/authe/http-client/dto"
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
-	config "github.com/devpablocristo/monorepo/projects/qh/internal/config"
+	dto "github.com/alphacodinggroup/euxcel-backend/internal/authe/http-client/dto"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 )
 
 type httpClient struct {

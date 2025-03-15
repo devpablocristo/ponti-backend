@@ -1,7 +1,7 @@
 package wire
 
 import (
-	config "github.com/devpablocristo/monorepo/projects/qh/internal/config"
+	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 )
 
 func ProvideConfigLoader() (config.Loader, error) {

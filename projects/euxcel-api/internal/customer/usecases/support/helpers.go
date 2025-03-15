@@ -3,7 +3,7 @@ package support
 import (
 	"math"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
 )
 
 func CalculateKPI(customers []domain.Customer) *domain.KPI {

@@ -12,7 +12,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.41
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.69.2
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.37.0
-	github.com/devpablocristo/monorepo/pkg v0.0.0-20250303143024-eda927c21c56
 	github.com/georgysavva/scany v1.2.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-micro/plugins/v4/client/grpc v1.2.1

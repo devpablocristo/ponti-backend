@@ -7,11 +7,11 @@ import (
 
 	redis0 "github.com/go-redis/redis/v8"
 
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
-	types "github.com/devpablocristo/monorepo/pkg/types"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
+	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe/redis/dto"
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe/redis/dto"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
 )
 
 type cache struct {
@@ -35,20 +35,20 @@ func (c *cache) StoreToken(ctx context.Context, userID string, token *domain.Tok
 }
 
 func (c *cache) RetrieveToken(ctx context.Context, userID string) (*domain.Token, error) {
-    data, err := c.cache.Get(ctx, userID)
-    if err != nil {
-        if errors.Is(err, redis0.Nil) {
-            return nil, types.NewError(types.ErrTokenNotFound, "token not found in cache", nil)
-        }
-        return nil, types.NewError(types.ErrConnection, "failed to retrieve token from cache", err)
-    }
+	data, err := c.cache.Get(ctx, userID)
+	if err != nil {
+		if errors.Is(err, redis0.Nil) {
+			return nil, types.NewError(types.ErrTokenNotFound, "token not found in cache", nil)
+		}
+		return nil, types.NewError(types.ErrConnection, "failed to retrieve token from cache", err)
+	}
 
-    token, parseErr := dto.FromJSONToDomain(data)
-    if parseErr != nil {
-        return nil, types.NewError(types.ErrInvalidInput, "failed to parse token data", parseErr)
-    }
+	token, parseErr := dto.FromJSONToDomain(data)
+	if parseErr != nil {
+		return nil, types.NewError(types.ErrInvalidInput, "failed to parse token data", parseErr)
+	}
 
-    return token, nil
+	return token, nil
 }
 
 func (c *cache) Close() {

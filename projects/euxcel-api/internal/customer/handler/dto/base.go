@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/customer/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
 )
 
 // -----------------------------------------------------------------------------

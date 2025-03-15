@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/devpablocristo/monorepo/projects/qh/internal/notification/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
 )
 
 type Email struct {

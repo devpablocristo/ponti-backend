@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/devpablocristo/monorepo/projects/qh/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
 )
 
 // Token representa el token de acceso para Redis

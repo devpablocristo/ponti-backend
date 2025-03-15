@@ -3,7 +3,7 @@ package patient
 import (
 	"context"
 
-	domain "github.com/devpablocristo/monorepo/projects/qh/internal/patient/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/internal/patient/usecases/domain"
 )
 
 // Repository define los métodos que debe implementar el repositorio para interactuar con Patient.

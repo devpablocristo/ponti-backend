@@ -4,14 +4,14 @@ package wire
 import (
 	"errors"
 
-	jwt "github.com/devpablocristo/monorepo/pkg/authe/jwt/v5"
-	redis "github.com/devpablocristo/monorepo/pkg/databases/cache/redis/v8"
-	resty "github.com/devpablocristo/monorepo/pkg/http/clients/resty"
-	mdw "github.com/devpablocristo/monorepo/pkg/http/middlewares/gin"
-	ginsrv "github.com/devpablocristo/monorepo/pkg/http/servers/gin"
+	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
+	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
+	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
+	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	authe "github.com/devpablocristo/monorepo/projects/qh/internal/authe"
-	config "github.com/devpablocristo/monorepo/projects/qh/internal/config"
+	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
+	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 )
 
 // ProvideAutheCache proporciona una implementación de authe.Cache utilizando Redis.
