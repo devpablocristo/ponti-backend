@@ -5,67 +5,55 @@ import (
 	"fmt"
 
 	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	candidate "github.com/alphacodinggroup/euxcel-backend/internal/candidate"
 	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 	domain "github.com/alphacodinggroup/euxcel-backend/internal/item/usecases/domain"
-	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
-	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
 )
 
-// useCases implementa la interfaz UseCases
+// useCases implementa la interfaz UseCases.
 type useCases struct {
-	repository     Repository
-	config         config.Loader
-	autheUc        authe.UseCases
-	candidateUc    candidate.UseCases
-	personUc       person.UseCases
-	notificationUc notification.UseCases
+	repository Repository
+	config     config.Loader
+	autheUc    authe.UseCases
 }
 
-// NewUseCases crea una instancia de useCases con las dependencias adecuadas
+// NewUseCases crea una instancia de useCases con las dependencias adecuadas.
 func NewUseCases(
 	repo Repository,
-	notif notification.UseCases,
-	candidate candidate.UseCases,
 	cfg config.Loader,
 	au authe.UseCases,
-	pn person.UseCases,
 ) UseCases {
 	return &useCases{
-		repository:     repo,
-		notificationUc: notif,
-		candidateUc:    candidate,
-		config:         cfg,
-		autheUc:        au,
-		personUc:       pn,
+		repository: repo,
+		config:     cfg,
+		autheUc:    au,
 	}
 }
 
-// CreateAssessment crea un nuevo item y lo guarda
-func (u *useCases) CreateAssessment(ctx context.Context, item *domain.Item) (string, error) {
-	assessmentID, err := u.repository.CreateAssessment(ctx, item)
+// CreateItem crea un nuevo item y lo guarda.
+func (u *useCases) CreateItem(ctx context.Context, item *domain.Item) (int64, error) {
+	itemID, err := u.repository.CreateItem(ctx, item)
 	if err != nil {
-		return "", fmt.Errorf("failed to create item: %w", err)
+		return 0, fmt.Errorf("failed to create item: %w", err)
 	}
-	return assessmentID, nil
+	return itemID, nil
 }
 
-// ListAssessments obtiene la lista de todas las evaluaciones
-func (u *useCases) ListAssessments(ctx context.Context) ([]domain.Item, error) {
-	return u.repository.ListAssessments(ctx)
+// ListItems obtiene la lista de todos los items.
+func (u *useCases) ListItems(ctx context.Context) ([]domain.Item, error) {
+	return u.repository.ListItems(ctx)
 }
 
-// GetAssessment obtiene una evaluación por su ID
-func (u *useCases) GetAssessment(ctx context.Context, assessmentID string) (*domain.Item, error) {
-	return u.repository.GetAssessment(ctx, assessmentID)
+// GetItem obtiene un item por su ID.
+func (u *useCases) GetItem(ctx context.Context, itemID int64) (*domain.Item, error) {
+	return u.repository.GetItem(ctx, itemID)
 }
 
-// DeleteAssessment elimina una evaluación
-func (u *useCases) DeleteAssessment(ctx context.Context, ID string) error {
-	return u.repository.DeleteAssessment(ctx, ID)
+// DeleteItem elimina un item por su ID.
+func (u *useCases) DeleteItem(ctx context.Context, itemID int64) error {
+	return u.repository.DeleteItem(ctx, itemID)
 }
 
-// UpdateAssessment actualiza una evaluación existente
-func (u *useCases) UpdateAssessment(ctx context.Context, updateAssessment *domain.Item) error {
-	return u.repository.UpdateAssessment(ctx, updateAssessment)
+// UpdateItem actualiza un item existente.
+func (u *useCases) UpdateItem(ctx context.Context, updateItem *domain.Item) error {
+	return u.repository.UpdateItem(ctx, updateItem)
 }

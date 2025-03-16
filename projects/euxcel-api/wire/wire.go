@@ -26,6 +26,7 @@ import (
 	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
 	event "github.com/alphacodinggroup/euxcel-backend/internal/event"
 	group "github.com/alphacodinggroup/euxcel-backend/internal/group"
+	item "github.com/alphacodinggroup/euxcel-backend/internal/item"
 	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
 	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
 	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
@@ -61,17 +62,19 @@ type Dependencies struct {
 	AutheHandler           *authe.Handler
 	NotificationHandler    *notification.Handler
 	TweetHandler           *tweet.Handler
+	ItemHandler            *item.Handler
 
 	// para pruebas
 	PersonUseCases person.UseCases
 	UserUseCases   user.UseCases
 	TweetUseCases  tweet.UseCases
+	ItemUseCases   item.UseCases
 }
 
 // Initialize se encarga de inyectar todas las dependencias usando Wire.
 func Initialize() (*Dependencies, error) {
 	wire.Build(
-		// Proveedores boostrap
+		// Proveedores bootstrap
 		ProvideConfigLoader,
 		ProvideGinServer,
 		ProvideGormRepository,
@@ -141,6 +144,11 @@ func Initialize() (*Dependencies, error) {
 		ProvideTweetRepository,
 		ProvideTweetUseCases,
 		ProvideTweetHandler,
+
+		// Item
+		ProvideItemRepository,
+		ProvideItemUseCases,
+		ProvideItemHandler,
 
 		wire.Struct(new(Dependencies), "*"),
 	)

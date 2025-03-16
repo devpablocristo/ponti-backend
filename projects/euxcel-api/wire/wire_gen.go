@@ -7,6 +7,18 @@
 package wire
 
 import (
+	"github.com/alphacodinggroup/euxcel-backend/internal/assessment"
+	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
+	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
+	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
+	"github.com/alphacodinggroup/euxcel-backend/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/internal/event"
+	"github.com/alphacodinggroup/euxcel-backend/internal/group"
+	"github.com/alphacodinggroup/euxcel-backend/internal/item"
+	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
+	"github.com/alphacodinggroup/euxcel-backend/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/internal/tweet"
+	"github.com/alphacodinggroup/euxcel-backend/internal/user"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
@@ -19,17 +31,6 @@ import (
 	"github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
-	"github.com/alphacodinggroup/euxcel-backend/internal/assessment"
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
-	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
-	"github.com/alphacodinggroup/euxcel-backend/internal/config"
-	"github.com/alphacodinggroup/euxcel-backend/internal/event"
-	"github.com/alphacodinggroup/euxcel-backend/internal/group"
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
-	"github.com/alphacodinggroup/euxcel-backend/internal/person"
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet"
-	"github.com/alphacodinggroup/euxcel-backend/internal/user"
 )
 
 // Injectors from wire.go:
@@ -169,6 +170,12 @@ func Initialize() (*Dependencies, error) {
 	}
 	tweetUseCases := ProvideTweetUseCases(tweetRepository, userUseCases, tweetCache, broker)
 	tweetHandler := ProvideTweetHandler(server, tweetUseCases, middlewares)
+	itemRepository, err := ProvideItemRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	itemUseCases := ProvideItemUseCases(itemRepository, loader, autheUseCases)
+	itemHandler := ProvideItemHandler(server, itemUseCases, middlewares)
 	dependencies := &Dependencies{
 		ConfigLoader:           loader,
 		GinServer:              server,
@@ -194,9 +201,11 @@ func Initialize() (*Dependencies, error) {
 		AutheHandler:           autheHandler,
 		NotificationHandler:    notificationHandler,
 		TweetHandler:           tweetHandler,
+		ItemHandler:            itemHandler,
 		PersonUseCases:         useCases,
 		UserUseCases:           userUseCases,
 		TweetUseCases:          tweetUseCases,
+		ItemUseCases:           itemUseCases,
 	}
 	return dependencies, nil
 }
@@ -232,9 +241,11 @@ type Dependencies struct {
 	AutheHandler           *authe.Handler
 	NotificationHandler    *notification.Handler
 	TweetHandler           *tweet.Handler
+	ItemHandler            *item.Handler
 
 	// para pruebas
 	PersonUseCases person.UseCases
 	UserUseCases   user.UseCases
 	TweetUseCases  tweet.UseCases
+	ItemUseCases   item.UseCases
 }

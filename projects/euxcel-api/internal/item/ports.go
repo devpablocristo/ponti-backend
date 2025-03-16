@@ -6,19 +6,20 @@ import (
 	domain "github.com/alphacodinggroup/euxcel-backend/internal/item/usecases/domain"
 )
 
-// UseCases define la interfaz pública con los métodos que expondremos
+// UseCases define las operaciones de negocio para items.
 type UseCases interface {
-	CreateAssessment(context.Context, *domain.Item) (string, error)
-	ListAssessments(context.Context) ([]domain.Item, error)
-	GetAssessment(context.Context, string) (*domain.Item, error)
-	DeleteAssessment(context.Context, string) error
-	UpdateAssessment(context.Context, *domain.Item) error
+	CreateItem(ctx context.Context, item *domain.Item) (int64, error)
+	ListItems(ctx context.Context) ([]domain.Item, error)
+	GetItem(ctx context.Context, itemID int64) (*domain.Item, error)
+	DeleteItem(ctx context.Context, itemID int64) error
+	UpdateItem(ctx context.Context, updateItem *domain.Item) error
 }
 
+// Repository define las operaciones que el adaptador GORM debe implementar.
 type Repository interface {
-	CreateAssessment(context.Context, *domain.Item) (string, error)
-	UpdateAssessment(context.Context, *domain.Item) error
-	GetAssessment(context.Context, string) (*domain.Item, error)
-	DeleteAssessment(context.Context, string) error
-	ListAssessments(context.Context) ([]domain.Item, error)
+	CreateItem(ctx context.Context, item *domain.Item) (int64, error)
+	ListItems(ctx context.Context) ([]domain.Item, error)
+	GetItem(ctx context.Context, id int64) (*domain.Item, error)
+	UpdateItem(ctx context.Context, item *domain.Item) error
+	DeleteItem(ctx context.Context, id int64) error
 }

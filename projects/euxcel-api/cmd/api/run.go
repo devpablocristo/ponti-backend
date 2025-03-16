@@ -13,14 +13,15 @@ import (
 	assessmentmodels "github.com/alphacodinggroup/euxcel-backend/internal/assessment/repository/models"
 	candidatemodels "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
 	groupmodels "github.com/alphacodinggroup/euxcel-backend/internal/group/repository/models"
+	itemmodels "github.com/alphacodinggroup/euxcel-backend/internal/item/repository/models" // Agregado para Item
 	personmodels "github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
 	usermodels "github.com/alphacodinggroup/euxcel-backend/internal/user/repository/models"
 
 	wire "github.com/alphacodinggroup/euxcel-backend/wire"
 )
 
-// RunWebServer registra las rutas en el router de Gin y arranca el servidor HTTP.
-func RunWebServer(ctx context.Context, deps *wire.Dependencies) error {
+// RunHttpServer registra las rutas en el router de Gin y arranca el servidor HTTP.
+func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
@@ -40,7 +41,7 @@ func RunWebServer(ctx context.Context, deps *wire.Dependencies) error {
 	return deps.GinServer.RunServer(ctx)
 }
 
-// registerRoutes registra todas las rutas de la aplicación en el router de Gin.
+// registerHttpRoutes registra todas las rutas de la aplicación en el router de Gin.
 func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.EventHandler.Routes()
 	deps.GroupHandler.Routes()
@@ -52,6 +53,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.NotificationHandler.Routes()
 	deps.TweetHandler.Routes()
 	deps.BrowserEventsHandler.Routes()
+	deps.ItemHandler.Routes()
 }
 
 // RunGormMigrations ejecuta las migraciones de la base de datos SQL utilizando GORM.
@@ -80,6 +82,7 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		&assessmentmodels.Link{},
 		&usermodels.User{},
 		&usermodels.Follow{},
+		&itemmodels.Item{},
 	}
 
 	start := time.Now()

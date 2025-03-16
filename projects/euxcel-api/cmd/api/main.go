@@ -50,7 +50,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		if err := RunWebServer(ctx, deps); err != nil {
+		if err := RunHttpServer(ctx, deps); err != nil {
 			log.Fatalf("Error running HTTP server: %v", err)
 		}
 	}()

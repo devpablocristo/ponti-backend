@@ -2,9 +2,9 @@ package item
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
@@ -32,36 +32,31 @@ func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
 	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/assessments"
-	//publicPrefix := apiBase + "/public"
-	validatedPrefix := apiBase + "/validated"
+	apiBase := "/api/" + apiVersion + "/items"
+	publicPrefix := apiBase + "/public"
+	// validatedPrefix := apiBase + "/validated"
 	protectedPrefix := apiBase + "/protected"
 
-	// Rutas públicas
-	// public := router.Group(publicPrefix){}
-
-	validated := router.Group(validatedPrefix)
+	public := router.Group(publicPrefix)
 	{
-		// Aplicar middleware de validación de credenciales
-		validated.Use(h.mws.Validated...)
-
-		// Obtener detalles de un item validado
-		//validated.GET("/:id", h.GetValidatedAssessment)
-		//validated.POST("/:id/responses", h.SubmitAssessmentResponse) // Enviar respuestas a un item validado
+		public.POST("", h.CreateItem)       // Crear un ítem
+		public.GET("", h.ListItems)         // Listar todos los ítems
+		public.GET("/:id", h.GetItem)       // Obtener un ítem por ID
+		public.PUT("/:id", h.UpdateItem)    // Actualizar un ítem
+		public.DELETE("/:id", h.DeleteItem) // Eliminar un ítem
 	}
+
+	// validated := router.Group(validatedPrefix)
+	// {
+	// 	// Aplicar middleware de validación de credenciales
+	// 	validated.Use(h.mws.Validated...)
+	// }
 
 	// Rutas protegidas
 	protected := router.Group(protectedPrefix)
 	{
 		protected.Use(h.mws.Protected...)
-
 		protected.GET("/ping", h.ProtectedPing) // Endpoint de prueba protegido
-
-		protected.POST("", h.CreateAssessment)       // Crear un item
-		protected.GET("", h.ListAssessments)         // Listar todos los assessments
-		protected.GET("/:id", h.GetAssessment)       // Obtener un item por ID
-		protected.PUT("/:id", h.UpdateAssessment)    // Actualizar un item
-		protected.DELETE("/:id", h.DeleteAssessment) // Eliminar un item
 	}
 }
 
@@ -71,38 +66,13 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
-func (h *Handler) CreateAssessment(c *gin.Context) {
-	tokenInterface, exists := c.Get("token")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
-			Error: "token not found in context",
-		})
-		return
-	}
-	token, ok := tokenInterface.(*jwt.Token)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
-			Error: "invalid token type in context",
-		})
-		return
-	}
-
-	// Extraer el claim "sub" del token.
-	userID, err := utils.ExtractClaim(token, "sub")
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	var req dto.CreateAssessment
+func (h *Handler) CreateItem(c *gin.Context) {
+	var req dto.CreateItem
 	if err := utils.ValidateRequest(c, &req); err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
 	}
-	req.HRID = userID
 
 	ctx := c.Request.Context()
 	item, err := req.ToDomain()
@@ -112,33 +82,40 @@ func (h *Handler) CreateAssessment(c *gin.Context) {
 		return
 	}
 
-	newAssessmentID, err := h.ucs.CreateAssessment(ctx, item)
+	newItemID, err := h.ucs.CreateItem(ctx, item)
 	if err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.CreateAssessmentResponse{
-		Message:      "Item created successfully",
-		AssessmentID: newAssessmentID,
+	c.JSON(http.StatusCreated, dto.CreateItemResponse{
+		Message: "Item created successfully",
+		ItemID:  newItemID,
 	})
 }
 
-func (h *Handler) ListAssessments(c *gin.Context) {
-	users, err := h.ucs.ListAssessments(c.Request.Context())
+func (h *Handler) ListItems(c *gin.Context) {
+	items, err := h.ucs.ListItems(c.Request.Context())
 	if err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
 	}
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, items)
 }
 
-func (h *Handler) GetAssessment(c *gin.Context) {
-	id := c.Param("id")
+func (h *Handler) GetItem(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{
+			Error: "invalid item id",
+		})
+		return
+	}
 
-	item, err := h.ucs.GetAssessment(c.Request.Context(), id)
+	item, err := h.ucs.GetItem(c.Request.Context(), id)
 	if err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
@@ -148,7 +125,16 @@ func (h *Handler) GetAssessment(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
-func (h *Handler) UpdateAssessment(c *gin.Context) {
+func (h *Handler) UpdateItem(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{
+			Error: "invalid item id",
+		})
+		return
+	}
+
 	var req dto.Item
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, errCode := types.NewAPIError(err)
@@ -156,13 +142,16 @@ func (h *Handler) UpdateAssessment(c *gin.Context) {
 		return
 	}
 
-	updatedAssessment, err := req.ToDomain()
+	updatedItem, err := req.ToDomain()
 	if err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
 	}
-	if err := h.ucs.UpdateAssessment(c.Request.Context(), updatedAssessment); err != nil {
+	// Aseguramos que el ID del item actualizado coincida con el parámetro de la URL.
+	updatedItem.ID = id
+
+	if err := h.ucs.UpdateItem(c.Request.Context(), updatedItem); err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
@@ -172,9 +161,17 @@ func (h *Handler) UpdateAssessment(c *gin.Context) {
 	})
 }
 
-func (h *Handler) DeleteAssessment(c *gin.Context) {
-	id := c.Param("id")
-	if err := h.ucs.DeleteAssessment(c.Request.Context(), id); err != nil {
+func (h *Handler) DeleteItem(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{
+			Error: "invalid item id",
+		})
+		return
+	}
+
+	if err := h.ucs.DeleteItem(c.Request.Context(), id); err != nil {
 		apiErr, errCode := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(errCode)
 		return
