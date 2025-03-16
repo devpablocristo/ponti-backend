@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Lauch QH to Docker Container",
+      "name": "Debug Euxcel API (Docker)",
       "type": "go",
       "request": "launch",
       "mode": "auto",

@@ -11,8 +11,8 @@ DOCKER_COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
 .PHONY: all build run test clean lint \
 	docker-dev-build docker-dev-up docker-dev-down docker-dev-logs \
 	docker-stg-build docker-stg-up docker-stg-down docker-stg-logs \
-	euxcel-api-dev-build euxcel-api-dev-up euxcel-api-dev-down euxcel-api-dev-logs \
-	euxcel-api-stg-build euxcel-api-stg-up euxcel-api-stg-down euxcel-api-stg-logs
+	dev-build dev-up dev-down dev-logs \
+	stg-build stg-up stg-down stg-logs
 	
 # Default target
 all: build run
@@ -59,16 +59,16 @@ docker-dev-logs:
 	docker compose -f $(DOCKER_COMPOSE_DEV) --profile $(PROFILE) logs -f
 
 # Backend profile targets for dev
-euxcel-api-dev-build:
+dev-build:
 	@$(MAKE) docker-dev-build PROFILE=euxcel-api
 
-euxcel-api-dev-up:
+dev-up:
 	@$(MAKE) docker-dev-up PROFILE=euxcel-api
 
-euxcel-api-dev-down:
+dev-down:
 	@$(MAKE) docker-dev-down PROFILE=euxcel-api
 
-euxcel-api-dev-logs:
+dev-logs:
 	@$(MAKE) docker-dev-logs PROFILE=euxcel-api
 
 # ------------------------------------------------------------------------
@@ -94,14 +94,14 @@ docker-stg-logs:
 	docker compose -f $(DOCKER_COMPOSE_STG) --profile $(PROFILE) logs -f
 
 # Backend profile targets for staging
-euxcel-api-stg-build:
+stg-build:
 	@$(MAKE) docker-stg-build PROFILE=euxcel-api
 
-euxcel-api-stg-up:
+stg-up:
 	@$(MAKE) docker-stg-up PROFILE=euxcel-api
 
-euxcel-api-stg-down:
+stg-down:
 	@$(MAKE) docker-stg-down PROFILE=euxcel-api
 
-euxcel-api-stg-logs:
+stg-logs:
 	@$(MAKE) docker-stg-logs PROFILE=euxcel-api

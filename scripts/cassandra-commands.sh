@@ -2,7 +2,7 @@
 
 cqlsh
 sql
-USE qh_keyspace;
+USE cassandra_keyspace;
 DESC TABLES;
 DESC tweets;
 SELECT * FROM tweets;
