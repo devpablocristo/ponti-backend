@@ -2,6 +2,7 @@ package pkgmongo
 
 import (
 	"fmt"
+	"net/url"
 )
 
 type config struct {
@@ -42,9 +43,24 @@ func (c *config) GetDatabaseName() string {
 	return c.DatabaseName
 }
 
+// DSN retorna la URL de conexión a MongoDB con parámetros adicionales.
 func (c *config) DSN() string {
-	return fmt.Sprintf("mongodb://%s:%s@%s:%s/%s",
-		c.User, c.Password, c.Host, c.Port, c.DatabaseName)
+	u := &url.URL{
+		Scheme: "mongodb",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   fmt.Sprintf("%s:%s", c.Host, c.Port),
+		Path:   c.DatabaseName,
+	}
+
+	// Parámetros de consulta
+	q := u.Query()
+	// Especifica el authSource para la autenticación
+	q.Set("authSource", c.DatabaseName)
+	// Otras opciones útiles
+	q.Set("retryWrites", "true")
+	q.Set("w", "majority")
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func (c *config) Database() string {
