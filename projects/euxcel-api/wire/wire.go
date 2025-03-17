@@ -1,3 +1,6 @@
+//go:build wireinject
+// +build wireinject
+
 package wire
 
 import (
@@ -33,8 +36,7 @@ import (
 	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
 )
 
-// Dependencies reúne todas las dependencias de la aplicación que se
-// inyectan con Wire.
+// Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
 type Dependencies struct {
 	ConfigLoader        config.Loader
 	GinServer           ginsrv.Server

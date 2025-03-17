@@ -12,15 +12,18 @@ import (
 
 	assessmentmodels "github.com/alphacodinggroup/euxcel-backend/internal/assessment/repository/models"
 	candidatemodels "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
+	categorymodels "github.com/alphacodinggroup/euxcel-backend/internal/category/repository/models"
 	groupmodels "github.com/alphacodinggroup/euxcel-backend/internal/group/repository/models"
-	itemmodels "github.com/alphacodinggroup/euxcel-backend/internal/item/repository/models" // Agregado para Item
+	itemmodels "github.com/alphacodinggroup/euxcel-backend/internal/item/repository/models"
+	macrocategorymodels "github.com/alphacodinggroup/euxcel-backend/internal/macrocategory/repository/models"
 	personmodels "github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
+	suppliermodels "github.com/alphacodinggroup/euxcel-backend/internal/supplier/repository/models"
 	usermodels "github.com/alphacodinggroup/euxcel-backend/internal/user/repository/models"
 
 	wire "github.com/alphacodinggroup/euxcel-backend/wire"
 )
 
-// RunHttpServer registra las rutas en el router de Gin y arranca el servidor HTTP.
+// RunHttpServer registers routes in the Gin router and starts the HTTP server.
 func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
@@ -28,20 +31,20 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	log.Println("Registering HTTP routes...")
 
-	// Se configuran middlewares globales en caso de tenerlos.
+	// Configure global middlewares if any.
 	if len(deps.Middlewares.Global) > 0 {
 		deps.GinServer.GetRouter().Use(deps.Middlewares.Global...)
 	}
 
-	// Registrar todas las rutas de la aplicación.
+	// Register all application routes.
 	log.Println("Starting HTTP Server...")
 	registerHttpRoutes(deps)
 
-	// Arranca el servidor HTTP (por ejemplo, en el puerto 8080).
+	// Start the HTTP server (e.g., on port 8080).
 	return deps.GinServer.RunServer(ctx)
 }
 
-// registerHttpRoutes registra todas las rutas de la aplicación en el router de Gin.
+// registerHttpRoutes registers all application routes in the Gin router.
 func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.EventHandler.Routes()
 	deps.GroupHandler.Routes()
@@ -54,13 +57,16 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.TweetHandler.Routes()
 	deps.BrowserEventsHandler.Routes()
 	deps.ItemHandler.Routes()
+	deps.CategoryHandler.Routes()
+	deps.MacroCategoryHandler.Routes()
+	deps.SupplierHandler.Routes()
 }
 
-// RunGormMigrations ejecuta las migraciones de la base de datos SQL utilizando GORM.
+// RunGormMigrations runs SQL migrations using GORM.
 func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 	log.Println("Starting GORM migrations...")
 
-	// Se obtiene la conexión subyacente.
+	// Obtain the underlying database connection.
 	sqlDB, err := repo.Client().DB()
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
@@ -69,7 +75,7 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 
-	// Lista de modelos a migrar.
+	// List of models to migrate.
 	modelsToMigrate := []any{
 		&groupmodels.Group{},
 		&groupmodels.GroupMember{},
@@ -83,6 +89,9 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		&usermodels.User{},
 		&usermodels.Follow{},
 		&itemmodels.Item{},
+		&categorymodels.Category{},
+		&macrocategorymodels.MacroCategory{},
+		&suppliermodels.Supplier{},
 	}
 
 	start := time.Now()
@@ -94,12 +103,12 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 	return nil
 }
 
-// RunCassandraMigrations ejecuta las migraciones para Cassandra.
+// RunCassandraMigrations runs Cassandra migrations.
 func RunCassandraMigrations(ctx context.Context, repo cass.Repository) error {
 	log.Println("Starting Cassandra migrations...")
 	session := repo.GetSession()
 
-	// Crear keyspace si no existe.
+	// Create keyspace if it doesn't exist.
 	createKeyspaceCQL := `
 		CREATE KEYSPACE IF NOT EXISTS mi_keyspace 
 		WITH REPLICATION = { 'class': 'SimpleStrategy', 'replication_factor': 1 }`
@@ -108,7 +117,7 @@ func RunCassandraMigrations(ctx context.Context, repo cass.Repository) error {
 	}
 	log.Println("Keyspace 'mi_keyspace' created or already exists.")
 
-	// Crear tabla "tweets".
+	// Create table "tweets".
 	createTweetsTableCQL := `
 		CREATE TABLE IF NOT EXISTS tweets (
 			id uuid PRIMARY KEY,
@@ -121,7 +130,7 @@ func RunCassandraMigrations(ctx context.Context, repo cass.Repository) error {
 	}
 	log.Println("Table 'tweets' created or already exists.")
 
-	// Crear tabla desnormalizada "timeline_by_user".
+	// Create denormalized table "timeline_by_user".
 	createTimelineTableCQL := `
 		CREATE TABLE IF NOT EXISTS timeline_by_user (
 			user_id text,

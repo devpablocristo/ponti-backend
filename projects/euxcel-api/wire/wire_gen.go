@@ -236,8 +236,7 @@ func Initialize() (*Dependencies, error) {
 
 // wire.go:
 
-// Dependencies reúne todas las dependencias de la aplicación que se
-// inyectan con Wire.
+// Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
 type Dependencies struct {
 	ConfigLoader        config.Loader
 	GinServer           pkggin.Server
