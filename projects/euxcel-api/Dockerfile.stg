@@ -36,7 +36,7 @@
     
     # Compilar el binario para Linux (se habilita CGO por requerir dependencias como SQLite)
     # Nota: Al estar en /app/projects/euxcel-api, la ruta al main es relativa a este directorio.
-    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/main.go
+    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/
     
     # ---------------------------------------------------
     # Etapa 2: Imagen final para staging
