@@ -35,7 +35,7 @@ func (r *repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 	return model.ID, nil
 }
 
-func (r *repository) ListCategory(ctx context.Context) ([]domain.Category, error) {
+func (r *repository) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	var list []models.Category
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list categories", err)

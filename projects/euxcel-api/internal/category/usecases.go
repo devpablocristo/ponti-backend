@@ -18,8 +18,8 @@ func (u *useCases) CreateCategory(ctx context.Context, c *domain.Category) (int6
 	return u.repo.CreateCategory(ctx, c)
 }
 
-func (u *useCases) ListCategory(ctx context.Context) ([]domain.Category, error) {
-	return u.repo.ListCategory(ctx)
+func (u *useCases) ListCategories(ctx context.Context) ([]domain.Category, error) {
+	return u.repo.ListCategories(ctx)
 }
 
 func (u *useCases) GetCategory(ctx context.Context, id int64) (*domain.Category, error) {

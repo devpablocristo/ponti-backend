@@ -9,16 +9,16 @@ import (
 
 	models "github.com/alphacodinggroup/euxcel-backend/internal/supplier/repository/models"
 	domain "github.com/alphacodinggroup/euxcel-backend/internal/supplier/usecases/domain"
-	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	gormAdapter "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
 type repository struct {
-	db gorm.Repository
+	db gormAdapter.Repository
 }
 
 // NewRepository creates a new Supplier repository.
-func NewRepository(db gorm.Repository) Repository {
+func NewRepository(db gormAdapter.Repository) Repository {
 	return &repository{db: db}
 }
 

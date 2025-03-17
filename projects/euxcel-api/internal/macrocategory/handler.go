@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
 	dto "github.com/alphacodinggroup/euxcel-backend/internal/macrocategory/handler/dto"
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
@@ -33,7 +34,6 @@ func (h *Handler) Routes() {
 	apiVersion := h.gsv.GetApiVersion()
 	apiBase := "/api/" + apiVersion + "/macrocategories"
 	publicPrefix := apiBase + "/public"
-	// validatedPrefix := apiBase + "/validated"
 	protectedPrefix := apiBase + "/protected"
 
 	public := router.Group(publicPrefix)
@@ -45,7 +45,6 @@ func (h *Handler) Routes() {
 		public.DELETE("/:id", h.DeleteMacroCategory)
 	}
 
-	// Protected routes
 	protected := router.Group(protectedPrefix)
 	{
 		protected.Use(h.mws.Protected...)
@@ -54,24 +53,23 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
+	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Protected Pong!"})
 }
 
 func (h *Handler) CreateMacroCategory(c *gin.Context) {
 	var req dto.CreateMacroCategory
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr := types.NewError(types.ErrValidation, "invalid payload", err)
-		c.JSON(http.StatusBadRequest, apiErr.ToJSON())
+	// Use utils.ValidateRequest to bind and validate the request.
+	if err := utils.ValidateRequest(c, &req); err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	ctx := c.Request.Context()
 	newID, err := h.ucs.CreateMacroCategory(ctx, req.ToDomain())
 	if err != nil {
-		apiErr, code := types.NewAPIError(err)
-		c.JSON(code, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -82,10 +80,10 @@ func (h *Handler) CreateMacroCategory(c *gin.Context) {
 }
 
 func (h *Handler) ListMacroCategories(c *gin.Context) {
-	list, err := h.ucs.ListMacroCategory(c.Request.Context())
+	list, err := h.ucs.ListMacroCategories(c.Request.Context())
 	if err != nil {
-		apiErr, code := types.NewAPIError(err)
-		c.JSON(code, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, list)
@@ -99,8 +97,8 @@ func (h *Handler) GetMacroCategory(c *gin.Context) {
 	}
 	mc, err := h.ucs.GetMacroCategory(c.Request.Context(), id)
 	if err != nil {
-		apiErr, code := types.NewAPIError(err)
-		c.JSON(code, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, mc)
@@ -119,13 +117,11 @@ func (h *Handler) UpdateMacroCategory(c *gin.Context) {
 	}
 	req.ID = id
 	if err := h.ucs.UpdateMacroCategory(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, code := types.NewAPIError(err)
-		c.JSON(code, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{
-		Message: "Macro category updated successfully",
-	})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Macro category updated successfully"})
 }
 
 func (h *Handler) DeleteMacroCategory(c *gin.Context) {
@@ -135,11 +131,9 @@ func (h *Handler) DeleteMacroCategory(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteMacroCategory(c.Request.Context(), id); err != nil {
-		apiErr, code := types.NewAPIError(err)
-		c.JSON(code, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{
-		Message: "Macro category deleted successfully",
-	})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Macro category deleted successfully"})
 }

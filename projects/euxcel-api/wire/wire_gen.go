@@ -11,12 +11,15 @@ import (
 	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
 	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
 	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
+	"github.com/alphacodinggroup/euxcel-backend/internal/category"
 	"github.com/alphacodinggroup/euxcel-backend/internal/config"
 	"github.com/alphacodinggroup/euxcel-backend/internal/event"
 	"github.com/alphacodinggroup/euxcel-backend/internal/group"
 	"github.com/alphacodinggroup/euxcel-backend/internal/item"
+	"github.com/alphacodinggroup/euxcel-backend/internal/macrocategory"
 	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
 	"github.com/alphacodinggroup/euxcel-backend/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/internal/supplier"
 	"github.com/alphacodinggroup/euxcel-backend/internal/tweet"
 	"github.com/alphacodinggroup/euxcel-backend/internal/user"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
@@ -176,6 +179,24 @@ func Initialize() (*Dependencies, error) {
 	}
 	itemUseCases := ProvideItemUseCases(itemRepository, loader, autheUseCases)
 	itemHandler := ProvideItemHandler(server, itemUseCases, middlewares)
+	categoryRepository, err := ProvideCategoryRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	categoryUseCases := ProvideCategoryUseCases(categoryRepository)
+	categoryHandler := ProvideCategoryHandler(server, categoryUseCases, middlewares)
+	macrocategoryRepository, err := ProvideMacroCategoryRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	macrocategoryUseCases := ProvideMacroCategoryUseCases(macrocategoryRepository)
+	macrocategoryHandler := ProvideMacroCategoryHandler(server, macrocategoryUseCases, middlewares)
+	supplierRepository, err := ProvideSupplierRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	supplierUseCases := ProvideSupplierUseCases(supplierRepository)
+	supplierHandler := ProvideSupplierHandler(server, supplierUseCases, middlewares)
 	dependencies := &Dependencies{
 		ConfigLoader:           loader,
 		GinServer:              server,
@@ -202,6 +223,9 @@ func Initialize() (*Dependencies, error) {
 		NotificationHandler:    notificationHandler,
 		TweetHandler:           tweetHandler,
 		ItemHandler:            itemHandler,
+		CategoryHandler:        categoryHandler,
+		MacroCategoryHandler:   macrocategoryHandler,
+		SupplierHandler:        supplierHandler,
 		PersonUseCases:         useCases,
 		UserUseCases:           userUseCases,
 		TweetUseCases:          tweetUseCases,
@@ -242,8 +266,11 @@ type Dependencies struct {
 	NotificationHandler    *notification.Handler
 	TweetHandler           *tweet.Handler
 	ItemHandler            *item.Handler
+	CategoryHandler        *category.Handler
+	MacroCategoryHandler   *macrocategory.Handler
+	SupplierHandler        *supplier.Handler
 
-	// para pruebas
+	// Para pruebas
 	PersonUseCases person.UseCases
 	UserUseCases   user.UseCases
 	TweetUseCases  tweet.UseCases

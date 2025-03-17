@@ -18,8 +18,8 @@ func (u *useCases) CreateMacroCategory(ctx context.Context, m *domain.MacroCateg
 	return u.repo.CreateMacroCategory(ctx, m)
 }
 
-func (u *useCases) ListMacroCategory(ctx context.Context) ([]domain.MacroCategory, error) {
-	return u.repo.ListMacroCategory(ctx)
+func (u *useCases) ListMacroCategories(ctx context.Context) ([]domain.MacroCategory, error) {
+	return u.repo.ListMacroCategories(ctx)
 }
 
 func (u *useCases) GetMacroCategory(ctx context.Context, id int64) (*domain.MacroCategory, error) {

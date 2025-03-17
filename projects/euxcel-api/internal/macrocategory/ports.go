@@ -9,7 +9,7 @@ import (
 // UseCases defines business operations for MacroCategory.
 type UseCases interface {
 	CreateMacroCategory(ctx context.Context, m *domain.MacroCategory) (int64, error)
-	ListMacroCategory(ctx context.Context) ([]domain.MacroCategory, error)
+	ListMacroCategories(ctx context.Context) ([]domain.MacroCategory, error)
 	GetMacroCategory(ctx context.Context, id int64) (*domain.MacroCategory, error)
 	UpdateMacroCategory(ctx context.Context, m *domain.MacroCategory) error
 	DeleteMacroCategory(ctx context.Context, id int64) error
@@ -18,7 +18,7 @@ type UseCases interface {
 // Repository defines persistence operations for MacroCategory.
 type Repository interface {
 	CreateMacroCategory(ctx context.Context, m *domain.MacroCategory) (int64, error)
-	ListMacroCategory(ctx context.Context) ([]domain.MacroCategory, error)
+	ListMacroCategories(ctx context.Context) ([]domain.MacroCategory, error)
 	GetMacroCategory(ctx context.Context, id int64) (*domain.MacroCategory, error)
 	UpdateMacroCategory(ctx context.Context, m *domain.MacroCategory) error
 	DeleteMacroCategory(ctx context.Context, id int64) error

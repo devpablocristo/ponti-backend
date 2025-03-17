@@ -14,12 +14,14 @@ import (
 	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 )
 
+// Handler encapsulates all dependencies for the Category HTTP handler.
 type Handler struct {
 	ucs UseCases
 	gsv gsv.Server
 	mws *mdw.Middlewares
 }
 
+// NewHandler creates a new Category handler with the provided server, use cases and middlewares.
 func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	return &Handler{
 		ucs: u,
@@ -28,25 +30,25 @@ func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	}
 }
 
+// Routes registers all category routes.
 func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
 	apiVersion := h.gsv.GetApiVersion()
 	apiBase := "/api/" + apiVersion + "/categories"
 	publicPrefix := apiBase + "/public"
-	// validatedPrefix := apiBase + "/validated"
 	protectedPrefix := apiBase + "/protected"
 
 	public := router.Group(publicPrefix)
 	{
-		public.POST("", h.CreateCategory)
-		public.GET("", h.ListCategories)
-		public.GET("/:id", h.GetCategory)
-		public.PUT("/:id", h.UpdateCategory)
-		public.DELETE("/:id", h.DeleteCategory)
+		public.POST("", h.CreateCategory)       // Create a category
+		public.GET("", h.ListCategories)        // List all categories
+		public.GET("/:id", h.GetCategory)       // Get a category by ID
+		public.PUT("/:id", h.UpdateCategory)    // Update a category
+		public.DELETE("/:id", h.DeleteCategory) // Delete a category
 	}
 
-	// Protected routes
+	// Protected routes.
 	protected := router.Group(protectedPrefix)
 	{
 		protected.Use(h.mws.Protected...)
@@ -60,45 +62,42 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
+// CreateCategory handles the creation of a new category.
 func (h *Handler) CreateCategory(c *gin.Context) {
 	var req dto.CreateCategory
 	if err := utils.ValidateRequest(c, &req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		// Include error detail in meta.
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	ctx := c.Request.Context()
-	newCategoryID, err := h.ucs.CreateCategory(ctx, req.ToDomain())
+	newID, err := h.ucs.CreateCategory(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, dto.CreateCategoryResponse{
 		Message:    "Category created successfully",
-		CategoryID: newCategoryID,
+		CategoryID: newID,
 	})
 }
 
+// ListCategories retrieves all categories.
 func (h *Handler) ListCategories(c *gin.Context) {
-	cats, err := h.ucs.ListCategory(c.Request.Context())
+	cats, err := h.ucs.ListCategories(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, cats)
 }
 
+// GetCategory retrieves a category by its ID.
 func (h *Handler) GetCategory(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -109,15 +108,14 @@ func (h *Handler) GetCategory(c *gin.Context) {
 	cat, err := h.ucs.GetCategory(c.Request.Context(), id)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, cat)
 }
 
+// UpdateCategory updates an existing category.
 func (h *Handler) UpdateCategory(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -133,16 +131,13 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 	if err := h.ucs.UpdateCategory(c.Request.Context(), req.ToDomain()); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		// Include details such as "category with id X does not exist" in the response meta.
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{
-		Message: "Category updated successfully",
-	})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category updated successfully"})
 }
 
+// DeleteCategory deletes a category by its ID.
 func (h *Handler) DeleteCategory(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -152,12 +147,8 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 	if err := h.ucs.DeleteCategory(c.Request.Context(), id); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		// Include details such as "category with id X does not exist" in the response meta.
-		c.Error(apiErr).SetMeta(map[string]any{
-			"details": err.Error(),
-		})
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{
-		Message: "Category deleted successfully",
-	})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category deleted successfully"})
 }

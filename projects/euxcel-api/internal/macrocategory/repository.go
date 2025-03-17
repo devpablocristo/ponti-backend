@@ -33,7 +33,7 @@ func (r *repository) CreateMacroCategory(ctx context.Context, m *domain.MacroCat
 	return model.ID, nil
 }
 
-func (r *repository) ListMacroCategory(ctx context.Context) ([]domain.MacroCategory, error) {
+func (r *repository) ListMacroCategories(ctx context.Context) ([]domain.MacroCategory, error) {
 	var list []models.MacroCategory
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list macro categories", err)

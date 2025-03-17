@@ -1,7 +1,5 @@
 package dto
 
-// CreateSupplier is the DTO for the create request of a supplier.
-// It embeds the base Supplier DTO.
 type CreateSupplier struct {
 	Supplier
 }

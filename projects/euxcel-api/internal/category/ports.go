@@ -9,7 +9,7 @@ import (
 // UseCases defines business operations for Category.
 type UseCases interface {
 	CreateCategory(ctx context.Context, c *domain.Category) (int64, error)
-	ListCategory(ctx context.Context) ([]domain.Category, error)
+	ListCategories(ctx context.Context) ([]domain.Category, error)
 	GetCategory(ctx context.Context, id int64) (*domain.Category, error)
 	UpdateCategory(ctx context.Context, c *domain.Category) error
 	DeleteCategory(ctx context.Context, id int64) error
@@ -18,7 +18,7 @@ type UseCases interface {
 // Repository defines operations for Category.
 type Repository interface {
 	CreateCategory(ctx context.Context, c *domain.Category) (int64, error)
-	ListCategory(ctx context.Context) ([]domain.Category, error)
+	ListCategories(ctx context.Context) ([]domain.Category, error)
 	GetCategory(ctx context.Context, id int64) (*domain.Category, error)
 	UpdateCategory(ctx context.Context, c *domain.Category) error
 	DeleteCategory(ctx context.Context, id int64) error
