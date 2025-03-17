@@ -69,23 +69,30 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 func (h *Handler) CreateItem(c *gin.Context) {
 	var req dto.CreateItem
 	if err := utils.ValidateRequest(c, &req); err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		// Include error detail in meta.
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 
 	ctx := c.Request.Context()
 	item, err := req.ToDomain()
 	if err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 
 	newItemID, err := h.ucs.CreateItem(ctx, item)
 	if err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 
@@ -98,8 +105,10 @@ func (h *Handler) CreateItem(c *gin.Context) {
 func (h *Handler) ListItems(c *gin.Context) {
 	items, err := h.ucs.ListItems(c.Request.Context())
 	if err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 	c.JSON(http.StatusOK, items)
@@ -117,8 +126,10 @@ func (h *Handler) GetItem(c *gin.Context) {
 
 	item, err := h.ucs.GetItem(c.Request.Context(), id)
 	if err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 
@@ -137,23 +148,30 @@ func (h *Handler) UpdateItem(c *gin.Context) {
 
 	var req dto.Item
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 
 	updatedItem, err := req.ToDomain()
 	if err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 	// Aseguramos que el ID del item actualizado coincida con el parámetro de la URL.
 	updatedItem.ID = id
 
 	if err := h.ucs.UpdateItem(c.Request.Context(), updatedItem); err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		// Include details such as "item with id X does not exist" in the response meta.
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 	c.JSON(http.StatusCreated, types.MessageResponse{
@@ -172,8 +190,11 @@ func (h *Handler) DeleteItem(c *gin.Context) {
 	}
 
 	if err := h.ucs.DeleteItem(c.Request.Context(), id); err != nil {
-		apiErr, errCode := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(errCode)
+		apiErr, _ := types.NewAPIError(err)
+		// Include details such as "item with id X does not exist" in the response meta.
+		c.Error(apiErr).SetMeta(map[string]any{
+			"details": err.Error(),
+		})
 		return
 	}
 	c.JSON(http.StatusCreated, types.MessageResponse{

@@ -1,6 +1,7 @@
 package pkgmwr
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -9,66 +10,58 @@ import (
 	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
-// ErrorHandlingMiddleware captura errores añadidos al contexto y responde de manera adecuada
+// ErrorHandlingMiddleware captures errors added to the context and responds appropriately.
 func ErrorHandlingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Registro contextual con método y ruta
-		log.Printf("[ErrorHandlingMiddleware] Iniciando manejo de errores para %s %s", c.Request.Method, c.Request.URL.Path)
+		// Log the request method and URL for context.
+		log.Printf("[ErrorHandlingMiddleware] Starting error handling for %s %s", c.Request.Method, c.Request.URL.Path)
 
-		c.Next() // Procesa la solicitud
+		c.Next() // Process the request.
 
-		// Si ya se escribió una respuesta, no volvemos a escribir
+		// If a response has already been written, do not proceed.
 		if c.Writer.Written() {
 			return
 		}
 
-		// Si hay errores en el contexto, procesamos el primero
+		// If there are errors in the context, process the first one.
 		if len(c.Errors) > 0 {
-			log.Printf("[ErrorHandlingMiddleware] Se encontraron %d error(es)", len(c.Errors))
+			log.Printf("[ErrorHandlingMiddleware] Found %d error(s)", len(c.Errors))
 
-			// Tomamos el primer error para responder
+			// Take the first error for the response.
 			ginErr := c.Errors[0]
 			log.Printf("[ErrorHandlingMiddleware] Error: %v", ginErr.Err)
 
 			var status int
-			var response interface{}
+			var response any
 
-			// Manejo de errores del dominio (errores personalizados)
-			if apiErr, ok := ginErr.Err.(*pkgtypes.Error); ok {
-				response = apiErr.ToJSON() // Convertir a formato JSON
-				status = mapErrorTypeToStatus(apiErr.Type)
+			// Check if the error is a domain error (*pkgtypes.Error).
+			var domainErr *pkgtypes.Error
+			if errors.As(ginErr.Err, &domainErr) {
+				apiErr, code := pkgtypes.NewAPIError(domainErr)
+				response = apiErr.ToResponse()
+				status = code
 			} else {
-				// Para errores desconocidos, devolvemos un error interno con mensaje genérico
-				response = gin.H{
-					"error":   "INTERNAL_ERROR",
-					"message": "Ha ocurrido un error interno, por favor intente más tarde.",
+				// Check if the error is already an API error (*pkgtypes.APIError).
+				var apiErr *pkgtypes.APIError
+				if errors.As(ginErr.Err, &apiErr) {
+					response = apiErr.ToResponse()
+					status = apiErr.Code
+				} else {
+					// For unknown errors, return an internal error with a generic message.
+					response = gin.H{
+						"error":   "INTERNAL_ERROR",
+						"message": "An internal error occurred, please try again later.",
+						"details": ginErr.Err.Error(),
+					}
+					status = http.StatusInternalServerError
 				}
-				status = http.StatusInternalServerError
 			}
 
-			// Enviar respuesta JSON con el código de estado adecuado
+			// Send a JSON response with the appropriate status code.
 			c.JSON(status, response)
-			// Abortamos para asegurarnos que no se ejecute más lógica
+			// Abort further processing.
 			c.Abort()
 			return
 		}
-	}
-}
-
-// mapErrorTypeToStatus mapea los tipos de errores a códigos HTTP
-func mapErrorTypeToStatus(errType pkgtypes.ErrorType) int {
-	switch errType {
-	case pkgtypes.ErrNotFound:
-		return http.StatusNotFound
-	case pkgtypes.ErrValidation:
-		return http.StatusBadRequest
-	case pkgtypes.ErrConflict:
-		return http.StatusConflict
-	case pkgtypes.ErrAuthentication, pkgtypes.ErrAuthorization:
-		return http.StatusUnauthorized
-	case pkgtypes.ErrUnavailable:
-		return http.StatusServiceUnavailable
-	default:
-		return http.StatusInternalServerError
 	}
 }

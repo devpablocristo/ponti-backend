@@ -58,7 +58,7 @@ func (e *APIErrorResponse) HasCode(code int) bool {
 	return e.Code == code
 }
 
-// Mapas de mapeo entre errores de dominio y errores de API.
+// Mapeo entre errores de dominio y errores de API.
 var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrNotFound:        APIErrNotFound,
 	ErrConflict:        APIErrConflict,
@@ -70,6 +70,9 @@ var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrAuthentication:  APIErrUnauthorized,
 	ErrAuthorization:   APIErrForbidden,
 	ErrInvalidID:       APIErrBadRequest,
+	ErrUnavailable:     APIErrUnavailable,
+	ErrTokenNotFound:   APIErrUnauthorized,
+	ErrMissingField:    APIErrBadRequest,
 }
 
 // Mapear APIErrorType a códigos HTTP.

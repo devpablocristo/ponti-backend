@@ -23,6 +23,8 @@ const (
 	ErrInvalidID       ErrorType = "INVALID_ID"
 	ErrUnavailable     ErrorType = "SERVICE_UNAVAILABLE"
 	ErrTokenNotFound   ErrorType = "TOKEN_NOT_FOUND"
+	// Nuevo error para campos faltantes
+	ErrMissingField ErrorType = "MISSING_FIELD"
 )
 
 // Error representa un error del dominio.
@@ -113,6 +115,16 @@ func NewTokenNotFoundError(details error) *Error {
 		ErrTokenNotFound,
 		"Token not found in cache",
 		details,
+	)
+}
+
+// NewMissingFieldError crea un error para campos faltantes.
+func NewMissingFieldError(field string) *Error {
+	return NewErrorWithContext(
+		ErrMissingField,
+		fmt.Sprintf("The field '%s' is required", field),
+		nil,
+		map[string]any{"field": field},
 	)
 }
 

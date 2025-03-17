@@ -1,7 +1,6 @@
 package pkgmwr
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,38 +8,35 @@ import (
 	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 )
 
-// Constantes para los mensajes de error
+// Constants for error messages.
 const (
 	errInvalidPayload = "Invalid request payload"
 	errMissingField   = "Either username or email is required"
 )
 
-// ValidateCredentials middleware para validar el payload del login
+// ValidateCredentials middleware to validate the login payload.
 func ValidateCredentials() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		log.Println("Credentials Middleware: Starting...")
+		// Log message can be added here if needed.
 		var credentials pkgtypes.LoginCredentials
 
-		// Intentar enlazar el JSON al struct
+		// Try binding the JSON payload to the struct.
 		if err := ctx.ShouldBindJSON(&credentials); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"message": errInvalidPayload,
-				"error":   err.Error(),
-			})
+			apiErr := pkgtypes.NewError(pkgtypes.ErrValidation, errInvalidPayload, err)
+			ctx.JSON(http.StatusBadRequest, apiErr.ToJSON())
 			ctx.Abort()
 			return
 		}
 
-		// Validar que al menos uno de los campos opcionales esté presente
+		// Validate that at least one of the optional fields is present.
 		if credentials.Username == "" && credentials.Email == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"message": errMissingField,
-			})
+			apiErr := pkgtypes.NewMissingFieldError("username/email")
+			ctx.JSON(http.StatusBadRequest, apiErr.ToJSON())
 			ctx.Abort()
 			return
 		}
 
-		// Guardar las credenciales validadas en el contexto
+		// Save the validated credentials in the context for later use.
 		ctx.Set("credentials", credentials)
 		ctx.Next()
 	}

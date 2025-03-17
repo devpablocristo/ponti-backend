@@ -12,9 +12,9 @@ import (
 	pkgutils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 )
 
-// Validate retorna un gin.HandlerFunc que valida el JWT usando la lógica común.
+// Validate returns a gin.HandlerFunc that validates the JWT using common logic.
 func Validate(cfg pkgutils.Config) gin.HandlerFunc {
-	// Parsear la clave RSA si se proporciona.
+	// Parse the RSA public key if provided.
 	var rsaPublicKey *rsa.PublicKey
 	if cfg.PublicKeyPEM != "" {
 		key, err := pkgutils.ParseRSAPublicKey(cfg.PublicKeyPEM)
@@ -32,7 +32,7 @@ func Validate(cfg pkgutils.Config) gin.HandlerFunc {
 			return
 		}
 
-		// Parsear el token sin verificar para conocer el método de firma.
+		// Parse the token without verifying to get the signing method.
 		unverifiedToken, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("invalid token: %v", err)})
@@ -54,7 +54,7 @@ func Validate(cfg pkgutils.Config) gin.HandlerFunc {
 			return
 		}
 
-		// Guardar el token y los claims en el contexto de Gin.
+		// Save the token and claims in the Gin context.
 		c.Set(cfg.ContextKey, parsedToken)
 		c.Set(pkgutils.GetClaimsKey(cfg.ContextKey), parsedToken.Claims)
 		c.Next()

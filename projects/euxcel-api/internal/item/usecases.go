@@ -2,7 +2,6 @@ package item
 
 import (
 	"context"
-	"fmt"
 
 	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
 	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
@@ -31,11 +30,7 @@ func NewUseCases(
 
 // CreateItem crea un nuevo item y lo guarda.
 func (u *useCases) CreateItem(ctx context.Context, item *domain.Item) (int64, error) {
-	itemID, err := u.repository.CreateItem(ctx, item)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create item: %w", err)
-	}
-	return itemID, nil
+	return u.repository.CreateItem(ctx, item)
 }
 
 // ListItems obtiene la lista de todos los items.
