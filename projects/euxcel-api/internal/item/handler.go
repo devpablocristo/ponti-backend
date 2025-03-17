@@ -39,11 +39,11 @@ func (h *Handler) Routes() {
 
 	public := router.Group(publicPrefix)
 	{
-		public.POST("", h.CreateItem)       // Crear un ítem
-		public.GET("", h.ListItems)         // Listar todos los ítems
-		public.GET("/:id", h.GetItem)       // Obtener un ítem por ID
-		public.PUT("/:id", h.UpdateItem)    // Actualizar un ítem
-		public.DELETE("/:id", h.DeleteItem) // Eliminar un ítem
+		public.POST("", h.CreateItem)
+		public.GET("", h.ListItems)
+		public.GET("/:id", h.GetItem)
+		public.PUT("/:id", h.UpdateItem)
+		public.DELETE("/:id", h.DeleteItem)
 	}
 
 	// validated := router.Group(validatedPrefix)
