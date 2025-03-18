@@ -1,9 +1,9 @@
 package support
 
 import (
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/customer/handler/dto"
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/handler/dto"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 
 	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 )
 
 type broker struct {

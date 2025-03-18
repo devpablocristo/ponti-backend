@@ -9,7 +9,7 @@ import (
 	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/authe/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/handler/dto"
 )
 
 type Handler struct {

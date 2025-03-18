@@ -9,9 +9,9 @@ import (
 
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/authe/jwt-service/dto"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
-	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/jwt-service/dto"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
+	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
 )
 
 type jwtService struct {

@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	candidate "github.com/alphacodinggroup/euxcel-backend/internal/candidate"
+	candidate "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
 )
 
 // ProvideCandidateRepository retorna candidate.Repository a partir de un repositorio GORM.

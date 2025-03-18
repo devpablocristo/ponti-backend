@@ -3,7 +3,7 @@ package category
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/category/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category/usecases/domain"
 )
 
 // UseCases defines business operations for Category.

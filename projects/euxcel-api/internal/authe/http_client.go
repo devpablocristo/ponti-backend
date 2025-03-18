@@ -7,9 +7,9 @@ import (
 
 	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/authe/http-client/dto"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
-	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/http-client/dto"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
+	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
 )
 
 type httpClient struct {

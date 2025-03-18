@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/usecases/domain"
 )
 
 // Candidate representa el DTO para el candidato.

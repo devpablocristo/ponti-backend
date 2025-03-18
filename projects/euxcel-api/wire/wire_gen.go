@@ -7,21 +7,6 @@
 package wire
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/assessment"
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
-	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
-	"github.com/alphacodinggroup/euxcel-backend/internal/category"
-	"github.com/alphacodinggroup/euxcel-backend/internal/config"
-	"github.com/alphacodinggroup/euxcel-backend/internal/event"
-	"github.com/alphacodinggroup/euxcel-backend/internal/group"
-	"github.com/alphacodinggroup/euxcel-backend/internal/item"
-	"github.com/alphacodinggroup/euxcel-backend/internal/macrocategory"
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
-	"github.com/alphacodinggroup/euxcel-backend/internal/person"
-	"github.com/alphacodinggroup/euxcel-backend/internal/supplier"
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet"
-	"github.com/alphacodinggroup/euxcel-backend/internal/user"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
@@ -34,6 +19,21 @@ import (
 	"github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
 
 // Injectors from wire.go:

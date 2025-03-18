@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	event "github.com/alphacodinggroup/euxcel-backend/internal/event"
+	event "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event"
 )
 
 func ProvideEventRepository(repo mng.Repository) (event.Repository, error) {

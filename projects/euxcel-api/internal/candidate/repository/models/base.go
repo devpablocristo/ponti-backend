@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/usecases/domain"
 	"gorm.io/gorm"
 )
 

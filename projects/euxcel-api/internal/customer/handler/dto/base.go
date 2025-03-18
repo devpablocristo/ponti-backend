@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
 )
 
 // -----------------------------------------------------------------------------

@@ -3,7 +3,7 @@ package user
 // import (
 // 	"context"
 
-// 	pb "github.com/alphacodinggroup/euxcel-backend/internal/user/grpc/pb"
+// 	pb "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/grpc/pb"
 // )
 
 // type Server interface {

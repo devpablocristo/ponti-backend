@@ -11,8 +11,8 @@ import (
 
 	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/repository/models"
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/repository/models"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 )
 
 // cassandra es la implementación del repositorio en Cassandra.

@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
-	"github.com/alphacodinggroup/euxcel-backend/internal/config"
-	custin "github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/inbound"
-	"github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/inbound/transport"
-	custout "github.com/alphacodinggroup/euxcel-backend/internal/customer/adapters/outbound"
-	custcore "github.com/alphacodinggroup/euxcel-backend/internal/customer/core"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	custin "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/adapters/inbound"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/adapters/inbound/transport"
+	custout "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/adapters/outbound"
+	custcore "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/core"
 )
 
 const testDBPath = "/app/config/sqlite-data/test.db"

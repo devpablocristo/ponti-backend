@@ -3,7 +3,7 @@ package person
 import (
 	"context"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/usecases/domain"
 )
 
 type UseCases interface {

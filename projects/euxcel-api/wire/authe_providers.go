@@ -10,8 +10,8 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
+	authe "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
 )
 
 // ProvideAutheCache proporciona una implementación de authe.Cache utilizando Redis.

@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/item/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/usecases/domain"
 )
 
 // Item representa el modelo en la base de datos para un artículo o ítem.

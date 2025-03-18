@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/supplier/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/usecases/domain"
 )
 
 // Supplier represents the database model for a supplier.

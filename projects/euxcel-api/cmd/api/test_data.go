@@ -7,12 +7,12 @@ import (
 	"math/rand"
 	"time"
 
-	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
-	personDomain "github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
-	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
-	tweetDomain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
-	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
-	userDomain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
+	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
+	personDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/usecases/domain"
+	tweet "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
+	tweetDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
+	user "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
+	userDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/usecases/domain"
 )
 
 // PersonUserSeed agrupa los datos de seed para una persona y su usuario asociado.

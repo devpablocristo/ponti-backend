@@ -3,7 +3,7 @@ package supplier
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/supplier/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/usecases/domain"
 )
 
 // UseCases defines business operations for Supplier.

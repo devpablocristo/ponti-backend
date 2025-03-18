@@ -3,7 +3,7 @@ package macrocategory
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/macrocategory/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory/usecases/domain"
 )
 
 // UseCases defines business operations for MacroCategory.

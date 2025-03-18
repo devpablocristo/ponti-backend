@@ -6,8 +6,8 @@ package authe
 // 	"time"
 
 // 	client "github.com/alphacodinggroup/euxcel-backend/pkg/microservices/go-micro/v4/grpc-client"
-// 	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
-// 	"github.com/alphacodinggroup/euxcel-backend/internal/user/grpc/pb"
+// 	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
+// 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/grpc/pb"
 // )
 
 // type grpcClient struct {

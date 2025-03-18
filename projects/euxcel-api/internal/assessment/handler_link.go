@@ -3,8 +3,8 @@ package assessment
 import (
 	"net/http"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/assessment/handler/dto"
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment/handler/dto"
 	"github.com/gin-gonic/gin"
 )
 

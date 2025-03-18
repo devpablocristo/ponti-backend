@@ -5,7 +5,7 @@ import (
 
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification/usecases/domain"
 )
 
 type Email struct {

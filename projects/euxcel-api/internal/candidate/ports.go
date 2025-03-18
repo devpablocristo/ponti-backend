@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/usecases/domain"
 )
 
 type UseCases interface {

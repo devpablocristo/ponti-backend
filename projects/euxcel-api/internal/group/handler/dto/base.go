@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/group/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group/usecases/domain"
 )
 
 type Group struct {

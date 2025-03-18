@@ -7,7 +7,7 @@ import (
 	gin "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
-	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
+	notification "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 )
 
 func ProvideNotificationSmtpService(smtp smtp.Service) (notification.SmtpService, error) {

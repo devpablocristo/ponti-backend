@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/supplier/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/usecases/domain"
 )
 
 // Supplier is the DTO for a supplier.

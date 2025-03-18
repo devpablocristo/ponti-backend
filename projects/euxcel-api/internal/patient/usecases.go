@@ -5,7 +5,7 @@ import (
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/patient/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/patient/usecases/domain"
 )
 
 // useCases es la implementación de la interfaz UseCases.

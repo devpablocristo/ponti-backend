@@ -3,7 +3,7 @@ package tweet
 import (
 	"context"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 )
 
 // UseCases define las operaciones de la capa de negocio para tweets.

@@ -7,9 +7,9 @@ import (
 	sqlite "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/sqlite"
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	model "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/models"
-	support "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/support"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
+	model "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/repository/models"
+	support "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/repository/support"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
 )
 
 type repository struct {

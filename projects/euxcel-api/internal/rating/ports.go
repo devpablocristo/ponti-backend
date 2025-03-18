@@ -1,6 +1,6 @@
 package rating
 
-import domain "github.com/alphacodinggroup/euxcel-backend/internal/rating/usecases/domain"
+import domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/rating/usecases/domain"
 
 type Repository interface {
 	CreateRating(r *domain.Rating) (*domain.Rating, error)

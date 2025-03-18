@@ -10,8 +10,8 @@ import (
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/event/handler/dto"
-	sup "github.com/alphacodinggroup/euxcel-backend/internal/event/handler/support"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event/handler/dto"
+	sup "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event/handler/support"
 )
 
 type Handler struct {

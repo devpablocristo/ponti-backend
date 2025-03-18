@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
+	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 )
 
 func ProvidePersonRepository(repo pgdb.Repository) (person.Repository, error) {

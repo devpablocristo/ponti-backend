@@ -3,9 +3,9 @@ package item
 import (
 	"context"
 
-	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/item/usecases/domain"
+	authe "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/usecases/domain"
 )
 
 // useCases implementa la interfaz UseCases.

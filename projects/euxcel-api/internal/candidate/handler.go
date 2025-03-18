@@ -10,7 +10,7 @@ import (
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/candidate/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/handler/dto"
 )
 
 // Handler gestiona los endpoints del recurso candidate.

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
-	model "github.com/alphacodinggroup/euxcel-backend/internal/customer/repository/models"
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	model "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/repository/models"
 )
 
 const (

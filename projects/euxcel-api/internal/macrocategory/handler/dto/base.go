@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/macrocategory/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory/usecases/domain"
 )
 
 // MacroCategory is the DTO for a macro category.

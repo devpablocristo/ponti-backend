@@ -7,7 +7,7 @@ import (
 	"github.com/lib/pq" // Para manejar arrays de texto en PostgreSQL.
 	"gorm.io/gorm"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/usecases/domain"
 )
 
 type Person struct {

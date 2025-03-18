@@ -11,8 +11,8 @@ import (
 
 	pgdb "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
-	"github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/repository/models"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/usecases/domain"
 )
 
 type postgresRepository struct {

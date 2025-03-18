@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	group "github.com/alphacodinggroup/euxcel-backend/internal/group"
+	group "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group"
 )
 
 func ProvideGroupRepository(repo gorm.Repository) (group.Repository, error) {

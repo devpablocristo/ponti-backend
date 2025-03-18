@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/item/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/usecases/domain"
 )
 
 // -----------------------------

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
 	"github.com/golang-jwt/jwt/v5"
 )
 

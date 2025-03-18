@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 )
 

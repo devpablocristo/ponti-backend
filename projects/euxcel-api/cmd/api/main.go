@@ -8,7 +8,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/alphacodinggroup/euxcel-backend/wire"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/wire"
 )
 
 func main() {

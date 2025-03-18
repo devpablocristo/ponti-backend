@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
 )
 
 type GetKPIJson struct {

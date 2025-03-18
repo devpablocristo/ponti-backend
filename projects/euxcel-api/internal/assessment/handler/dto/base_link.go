@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/assessment/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment/usecases/domain"
 )
 
 // Link es un enlace único para acceder a una evaluación.

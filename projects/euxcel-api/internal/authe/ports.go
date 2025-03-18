@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
 )
 
 type UseCases interface {

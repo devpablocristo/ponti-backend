@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
-	"github.com/alphacodinggroup/euxcel-backend/internal/user"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
 
 // usecases implementa la lógica de negocio para tweets.

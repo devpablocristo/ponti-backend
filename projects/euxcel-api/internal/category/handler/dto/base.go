@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/internal/category/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category/usecases/domain"
 )
 
 // Category is the DTO for a specific category.

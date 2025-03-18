@@ -8,8 +8,8 @@ import (
 
 	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events/repository/models"
-	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events/repository/models"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events/usecases/domain"
 )
 
 type mongoRepository struct {

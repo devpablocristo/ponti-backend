@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/group/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group/usecases/domain"
 )
 
 // Group representa un grupo en el sistema, con configuraciones para GORM.

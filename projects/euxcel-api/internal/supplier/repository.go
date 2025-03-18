@@ -7,10 +7,10 @@ import (
 
 	gorm0 "gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/euxcel-backend/internal/supplier/repository/models"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/supplier/usecases/domain"
 	gormAdapter "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	models "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/usecases/domain"
 )
 
 type repository struct {

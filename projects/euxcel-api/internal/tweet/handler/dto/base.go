@@ -3,7 +3,7 @@ package dto
 import (
 	"errors"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 )
 
 // Tweet representa el DTO básico para un tweet.

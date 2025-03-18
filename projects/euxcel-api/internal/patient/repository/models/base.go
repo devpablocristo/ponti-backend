@@ -3,7 +3,7 @@ package model
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/patient/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/patient/usecases/domain"
 )
 
 type CreatePatient struct {

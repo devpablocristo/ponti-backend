@@ -8,7 +8,7 @@ import (
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 
-	browserevent "github.com/alphacodinggroup/euxcel-backend/internal/browser-events"
+	browserevent "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events"
 )
 
 func ProvideBrowserEventsRepository(repo mng.Repository) (browserevent.Repository, error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification/usecases/domain"
 )
 
 type SmtpService interface {

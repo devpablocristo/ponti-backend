@@ -7,12 +7,12 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/assessment"
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	"github.com/alphacodinggroup/euxcel-backend/internal/candidate"
-	"github.com/alphacodinggroup/euxcel-backend/internal/config"
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification"
-	"github.com/alphacodinggroup/euxcel-backend/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 )
 
 // ProvideAssessmentRepository inyecta la implementación de Repository para Assessment.

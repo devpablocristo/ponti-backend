@@ -5,9 +5,9 @@ import (
 
 	"github.com/google/uuid"
 
-	models "github.com/alphacodinggroup/euxcel-backend/internal/group/repository/models"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/group/usecases/domain"
 	gormpkg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
+	models "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group/usecases/domain"
 )
 
 type repository struct {

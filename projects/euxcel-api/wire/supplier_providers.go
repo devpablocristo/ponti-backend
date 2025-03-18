@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/supplier"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
 )
 
 func ProvideSupplierRepository(repo gorm.Repository) (supplier.Repository, error) {

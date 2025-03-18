@@ -3,7 +3,7 @@ package event
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/event/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event/usecases/domain"
 )
 
 type UseCases interface {

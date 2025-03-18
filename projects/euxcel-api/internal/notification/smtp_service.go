@@ -5,8 +5,8 @@ import (
 
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/notification/smtp-service/dto"
-	"github.com/alphacodinggroup/euxcel-backend/internal/notification/usecases/domain"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification/smtp-service/dto"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification/usecases/domain"
 )
 
 type smtpService struct {

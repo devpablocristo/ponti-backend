@@ -9,8 +9,8 @@ import (
 
 	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 
-	models "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/candidate/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/repository/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/usecases/domain"
 )
 
 type repository struct {

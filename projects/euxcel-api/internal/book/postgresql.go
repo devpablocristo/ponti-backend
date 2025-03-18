@@ -5,7 +5,7 @@ import (
 
 	pg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pq"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/book/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/book/usecases/domain"
 )
 
 type repository struct {

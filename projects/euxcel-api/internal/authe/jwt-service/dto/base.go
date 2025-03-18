@@ -3,7 +3,7 @@ package dto
 import (
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
 )
 
 func ToTokenDomain(token *jwt.Token) *domain.Token {

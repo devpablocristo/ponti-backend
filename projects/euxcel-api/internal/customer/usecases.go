@@ -5,7 +5,7 @@ import (
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/customer/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
 )
 
 type useCases struct {

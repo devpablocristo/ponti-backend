@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events/usecases/domain"
 )
 
 type UseCases interface {

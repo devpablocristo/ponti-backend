@@ -1,11 +1,11 @@
 package assessment
 
 import (
-	authe "github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	candidate "github.com/alphacodinggroup/euxcel-backend/internal/candidate"
-	config "github.com/alphacodinggroup/euxcel-backend/internal/config"
-	notification "github.com/alphacodinggroup/euxcel-backend/internal/notification"
-	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
+	authe "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	candidate "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
+	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	notification "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
+	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 )
 
 // useCases implementa la interfaz UseCases

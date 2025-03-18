@@ -11,7 +11,7 @@ import (
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/tweet/handler/dto"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/handler/dto"
 )
 
 type Handler struct {

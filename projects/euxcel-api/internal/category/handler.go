@@ -9,9 +9,9 @@ import (
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
-	dto "github.com/alphacodinggroup/euxcel-backend/internal/category/handler/dto"
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
+	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category/handler/dto"
 )
 
 // Handler encapsulates all dependencies for the Category HTTP handler.

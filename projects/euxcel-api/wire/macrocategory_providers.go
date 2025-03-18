@@ -7,7 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/macrocategory"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
 )
 
 func ProvideMacroCategoryRepository(repo gorm.Repository) (macrocategory.Repository, error) {

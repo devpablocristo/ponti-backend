@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
 	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/usecases/domain"
 )
 
 type useCases struct {

@@ -9,8 +9,8 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
-	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
+	tweet "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
+	user "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
 
 func ProvideTweetRepository(repo cass.Repository) (tweet.Repository, error) {

@@ -10,17 +10,17 @@ import (
 	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 
-	assessmentmodels "github.com/alphacodinggroup/euxcel-backend/internal/assessment/repository/models"
-	candidatemodels "github.com/alphacodinggroup/euxcel-backend/internal/candidate/repository/models"
-	categorymodels "github.com/alphacodinggroup/euxcel-backend/internal/category/repository/models"
-	groupmodels "github.com/alphacodinggroup/euxcel-backend/internal/group/repository/models"
-	itemmodels "github.com/alphacodinggroup/euxcel-backend/internal/item/repository/models"
-	macrocategorymodels "github.com/alphacodinggroup/euxcel-backend/internal/macrocategory/repository/models"
-	personmodels "github.com/alphacodinggroup/euxcel-backend/internal/person/repository/models"
-	suppliermodels "github.com/alphacodinggroup/euxcel-backend/internal/supplier/repository/models"
-	usermodels "github.com/alphacodinggroup/euxcel-backend/internal/user/repository/models"
+	assessmentmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment/repository/models"
+	candidatemodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate/repository/models"
+	categorymodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category/repository/models"
+	groupmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group/repository/models"
+	itemmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/repository/models"
+	macrocategorymodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory/repository/models"
+	personmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/repository/models"
+	suppliermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/repository/models"
+	usermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/repository/models"
 
-	wire "github.com/alphacodinggroup/euxcel-backend/wire"
+	wire "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/wire"
 )
 
 // RunHttpServer registers routes in the Gin router and starts the HTTP server.

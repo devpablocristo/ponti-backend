@@ -11,8 +11,8 @@ import (
 
 	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
 
-	models "github.com/alphacodinggroup/euxcel-backend/internal/tweet/cache/models"
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	models "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/cache/models"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 )
 
 // cache es la implementación de Cache utilizando Redis.

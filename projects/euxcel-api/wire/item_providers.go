@@ -7,9 +7,9 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/authe"
-	"github.com/alphacodinggroup/euxcel-backend/internal/config"
-	"github.com/alphacodinggroup/euxcel-backend/internal/item"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
 )
 
 // ProvideItemRepository inyecta la implementación de Repository para Item.

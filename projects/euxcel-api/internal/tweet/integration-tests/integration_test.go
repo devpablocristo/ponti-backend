@@ -16,16 +16,16 @@ import (
 	pg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 
 	// Usecases y dominio de tweets.
-	tweet "github.com/alphacodinggroup/euxcel-backend/internal/tweet"
-	tweetDomain "github.com/alphacodinggroup/euxcel-backend/internal/tweet/usecases/domain"
+	tweet "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
+	tweetDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet/usecases/domain"
 
 	// Usecases de usuarios.
-	user "github.com/alphacodinggroup/euxcel-backend/internal/user"
-	userDomain "github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
+	user "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
+	userDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/usecases/domain"
 
 	// Usecases de personas.
-	person "github.com/alphacodinggroup/euxcel-backend/internal/person"
-	personDomain "github.com/alphacodinggroup/euxcel-backend/internal/person/usecases/domain"
+	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
+	personDomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/usecases/domain"
 )
 
 func TestTweetWithUserAndPersonIntegration(t *testing.T) {

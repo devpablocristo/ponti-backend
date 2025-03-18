@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/browser-events/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events/usecases/domain"
 )
 
 type useCases struct {

@@ -8,8 +8,8 @@ import (
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
 
-	domain "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/domain"
-	support "github.com/alphacodinggroup/euxcel-backend/internal/authe/usecases/support"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/domain"
+	support "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe/usecases/support"
 )
 
 type useCases struct {

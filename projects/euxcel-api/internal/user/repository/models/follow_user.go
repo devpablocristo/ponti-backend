@@ -3,7 +3,7 @@ package models
 import (
 	"errors"
 
-	"github.com/alphacodinggroup/euxcel-backend/internal/user/usecases/domain"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/usecases/domain"
 )
 
 // Mappers
