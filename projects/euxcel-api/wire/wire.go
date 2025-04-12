@@ -10,69 +10,51 @@ import (
 	"github.com/google/wire"
 
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
-	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 	mongo "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	pg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
-	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 
-	assessment "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment"
 	authe "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
-	browserevent "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events"
-	candidate "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
+
 	category "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category"
 	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
-	event "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event"
-	group "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group"
+
 	item "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
 	macrocategory "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
 	notification "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 	supplier "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
-	tweet "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
 	user "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
 
 // Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
 type Dependencies struct {
-	ConfigLoader        config.Loader
-	GinServer           ginsrv.Server
-	GormRepository      gorm.Repository
-	MongoRepository     mongo.Repository
-	PostgresRepository  pg.Repository
-	RedisCache          redis.Cache
-	JwtService          jwt.Service
-	RestyClient         resty.Client
-	SmtpService         smtp.Service
-	RabbitProducer      rabbit.Producer
-	CassandraRepository cass.Repository
-	WebSocket           ws.Upgrader
+	ConfigLoader       config.Loader
+	GinServer          ginsrv.Server
+	GormRepository     gorm.Repository
+	MongoRepository    mongo.Repository
+	PostgresRepository pg.Repository
+	RedisCache         redis.Cache
+	JwtService         jwt.Service
+	RestyClient        resty.Client
+	SmtpService        smtp.Service
 
 	Middlewares *mdw.Middlewares
 
-	PersonHandler          *person.Handler
-	GroupHandler           *group.Handler
-	EventHandler           *event.Handler
-	UserHandler            *user.Handler
-	AssessmentHandler      *assessment.Handler
-	CandidateHandler       *candidate.Handler
-	BrowserEventsHandler   *browserevent.Handler
-	BrowserEventsWebSocket browserevent.WebSocket
-	AutheHandler           *authe.Handler
-	NotificationHandler    *notification.Handler
-	TweetHandler           *tweet.Handler
-	ItemHandler            *item.Handler
-	CategoryHandler        *category.Handler
-	MacroCategoryHandler   *macrocategory.Handler
-	SupplierHandler        *supplier.Handler
+	PersonHandler        *person.Handler
+	UserHandler          *user.Handler
+	AutheHandler         *authe.Handler
+	NotificationHandler  *notification.Handler
+	ItemHandler          *item.Handler
+	CategoryHandler      *category.Handler
+	MacroCategoryHandler *macrocategory.Handler
+	SupplierHandler      *supplier.Handler
 
 	// Para pruebas
 	PersonUseCases person.UseCases
 	UserUseCases   user.UseCases
-	TweetUseCases  tweet.UseCases
 	ItemUseCases   item.UseCases
 }
 
@@ -91,45 +73,16 @@ func Initialize() (*Dependencies, error) {
 		ProvideJwtService,
 		ProvideHttpClient,
 		ProvideSmtpService,
-		ProvideRabbitProducer,
-		ProvideCassandraRepository,
-		ProvideWebSocketUpgrader,
 
 		// Person
 		ProvidePersonRepository,
 		ProvidePersonUseCases,
 		ProvidePersonHandler,
 
-		// Group
-		ProvideGroupRepository,
-		ProvideGroupUseCases,
-		ProvideGroupHandler,
-
-		// Event
-		ProvideEventRepository,
-		ProvideEventUseCases,
-		ProvideEventHandler,
-
 		// User
 		ProvideUserRepository,
 		ProvideUserUseCases,
 		ProvideUserHandler,
-
-		// Assessment
-		ProvideAssessmentRepository,
-		ProvideAssessmentUseCases,
-		ProvideAssessmentHandler,
-
-		// Candidate
-		ProvideCandidateRepository,
-		ProvideCandidateUseCases,
-		ProvideCandidateHandler,
-
-		// Browser Events
-		ProvideBrowserEventsRepository,
-		ProvideBrowserEventsUseCases,
-		ProvideBrowserEventsWebsocket,
-		ProvideBrowserEventsHandler,
 
 		// Notification
 		ProvideNotificationSmtpService,
@@ -142,13 +95,6 @@ func Initialize() (*Dependencies, error) {
 		ProvideAutheJwtService,
 		ProvideAutheUseCases,
 		ProvideAutheHandler,
-
-		// Tweet
-		ProvideTweetBroker,
-		ProvideTweetCache,
-		ProvideTweetRepository,
-		ProvideTweetUseCases,
-		ProvideTweetHandler,
 
 		// Item
 		ProvideItemRepository,

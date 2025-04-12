@@ -32,17 +32,8 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	// Cargar datos de prueba en el repositorio de personas.
-	if err := seedTestData(ctx, deps.PersonUseCases, deps.UserUseCases, deps.TweetUseCases); err != nil {
-		log.Printf("Error seeding test data: %v", err)
-	}
-
 	if err := RunGormMigrations(ctx, deps.GormRepository); err != nil {
 		log.Fatalf("Failed to run Gorm's migrations: %v", err)
-	}
-
-	if err := RunCassandraMigrations(ctx, deps.CassandraRepository); err != nil {
-		log.Fatalf("Failed to run Cassandra's migrations: %v", err)
 	}
 
 	var wg sync.WaitGroup
@@ -54,13 +45,6 @@ func main() {
 			log.Fatalf("Error running HTTP server: %v", err)
 		}
 	}()
-
-	// go func() {
-	// 	defer wg.Done()
-	// 	if err := RunWebSocketHandler(ctx, deps); err != nil {
-	// 		log.Fatalf("Error running WebSocket server: %v", err)
-	// 	}
-	// }()
 
 	wg.Wait()
 

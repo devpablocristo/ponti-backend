@@ -5,7 +5,6 @@ services:
       context: ../../
       dockerfile: ./projects/euxcel-api/Dockerfile.stg
     image: "euxcel-api:${APP_VERSION}"
-    # Usar el mismo archivo de variables que en dev para asegurarse de que todas las variables necesarias se carguen
     env_file:
       - .env
     ports:
@@ -17,8 +16,7 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
-      - GIN_MODE=debug
-      # - GIN_MODE=release
+      - GIN_MODE=release
     depends_on:
       - postgres
       - mongodb
@@ -28,11 +26,6 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    # healthcheck:
-    #   test: ["CMD-SHELL", "wget --spider -q http://localhost:${HTTP_SERVER_PORT}/health || exit 1"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
 
   postgres:
     image: postgres:16.3
@@ -57,20 +50,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  pgadmin:
-    image: dpage/pgadmin4:8.12
-    container_name: "pgadmin"
-    ports:
-      - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - app-network
-    restart: unless-stopped
 
   mongodb:
     image: mongo:5.0.28
@@ -104,45 +83,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  consul:
-    image: hashicorp/consul:1.20
-    container_name: "consul"
-    ports:
-      - "8500:8500"
-      - "8600:8600/udp"
-    environment:
-      - CONSUL_BIND_INTERFACE=eth0
-      - CONSUL_CLIENT_INTERFACE=eth0
-    command: "agent -server -bootstrap-expect=1 -client=0.0.0.0"
-    volumes:
-      - consul_data:/consul/data:rw
-      - ./infra/consul/config:/consul/config:rw
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  vault:
-    image: hashicorp/vault:1.18
-    container_name: "vault"
-    ports:
-      - "8200:8200"
-    environment:
-      - VAULT_ADDR=http://vault:8200
-      - VAULT_API_ADDR=http://vault:8200
-      - VAULT_CLUSTER_ADDR=http://vault:8201
-      - VAULT_UI=true
-    entrypoint: vault server -config=/vault/config/vault-config.json
-    depends_on:
-      - consul
-    volumes:
-      - ./infra/vault/config:/vault/config:rw
-      - vault_data:/vault/data:rw
-    cap_add:
-      - IPC_LOCK
-    networks:
-      - app-network
-    restart: unless-stopped
-
   redis:
     image: redis:7.0
     container_name: redis
@@ -156,46 +96,6 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
-    profiles:
-      - euxcel-api
-
-  rabbitmq:
-    image: "rabbitmq:4.0.0-beta.3-management-alpine"
-    container_name: rabbitmq
-    environment:
-      - RABBITMQ_USER=${RABBITMQ_USER}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
-    ports:
-      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
-      - "${RABBITMQ_MANAGEMENT_PORT}:${RABBITMQ_MANAGEMENT_PORT}"
-    networks:
-      - app-network
-    restart: unless-stopped
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-    profiles:
-      - euxcel-api
-
-  cassandra:
-    image: cassandra:4.1
-    container_name: cassandra
-    ports:
-      - "${CASSANDRA_PORT}:${CASSANDRA_PORT}"
-    environment:
-      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
-      - CASSANDRA_DC=${CASSANDRA_DC}
-      - CASSANDRA_RACK=${CASSANDRA_RACK}
-      - CASSANDRA_SEEDS=${CASSANDRA_HOSTS}
-      - CASSANDRA_ENDPOINT_SNITCH=${CASSANDRA_ENDPOINT_SNITCH}
-      - CASSANDRA_USERNAME=${CASSANDRA_USERNAME}
-      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
-    volumes:
-      - cassandra_data:/var/lib/cassandra
-    networks:
-      - app-network
-    restart: unless-stopped
     profiles:
       - euxcel-api
 

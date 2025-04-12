@@ -1,6 +1,5 @@
 services:
   euxcel-api:
-    container_name: "euxcel-api"
     build:
       context: ../../
       dockerfile: ./projects/euxcel-api/Dockerfile.dev
@@ -9,7 +8,7 @@ services:
       - .env
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-      - "${DELVE_PORT}:${DELVE_PORT}"  
+      - "${DELVE_PORT}:${DELVE_PORT}"
       - "${WS_SERVER_PORT}:${WS_SERVER_PORT}"
     volumes:
       - type: bind
@@ -21,32 +20,27 @@ services:
     security_opt:
       - seccomp:unconfined
     environment:
-      - GO111MODULE=on
-      - BUILDING_FILES=/app/cmd/api/main.go
-      - APP_NAME=euxcel-api
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_ENDPOINT=http://localstack:${AWS_EDGE_PORT}
+      GO111MODULE: "on"
+      BUILDING_FILES: "/app/cmd/api/main.go"
+      APP_NAME: "euxcel-api"
     depends_on:
       - postgres
     networks:
       - app-network
     restart: on-failure
-    command: tail -f /dev/null
-    profiles:
-      - euxcel-api  
+    command: ["tail", "-f", "/dev/null"]
+    tty: true
+    stdin_open: true
 
   postgres:
     image: postgres:16.3
-    container_name: postgres
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - PGDATA=/var/lib/postgresql/data/pgdata
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres-storage:/storage
@@ -60,19 +54,16 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    profiles:
-      - euxcel-api
 
   pgadmin:
     image: dpage/pgadmin4:8.12
-    container_name: pgadmin
     ports:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
     environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD}"
     logging:
-      driver: "json-file" 
+      driver: "json-file"
     depends_on:
       - postgres
     volumes:
@@ -80,34 +71,35 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    profiles:
-      - euxcel-api
 
   migrations:
     image: gomicro/goose:3.7.0
     volumes:
       - ./infra/migrations:/app/migrations
     environment:
-      - PGHOST=${POSTGRES_HOST}
-      - PGUSER=${POSTGRES_USER}
-      - PGPASSWORD=${POSTGRES_PASSWORD}
-      - PGDATABASE=${POSTGRES_DB}
-      - PGSSLMODE=disable
-    command: >
-      goose -dir /app/migrations postgres "host=${POSTGRES_HOST} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} sslmode=disable" up
+      PGHOST: "${POSTGRES_HOST}"
+      PGUSER: "${POSTGRES_USER}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      PGDATABASE: "${POSTGRES_DB}"
+      PGSSLMODE: "disable"
+    command: [
+      "goose",
+      "-dir", "/app/migrations",
+      "postgres",
+      "host=${POSTGRES_HOST} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} sslmode=disable",
+      "up"
+    ]
     depends_on:
       - postgres
     networks:
       - app-network
-    profiles:
-      - euxcel-api
+    restart: "no"
 
   mongodb:
     image: mongo:5.0.28
-    container_name: mongodb
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
     ports:
       - "${MONGO_PORT}:${MONGO_PORT}"
     volumes:
@@ -116,18 +108,16 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    profiles:
-      - euxcel-api
+    # Opcional: Agregar healthcheck para MongoDB si lo requieres
 
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
-    container_name: mongo-express
     environment:
-      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-      - ME_CONFIG_MONGODB_SERVER=${MONGO_HOST}
-      - ME_CONFIG_MONGODB_URL=${ME_CONFIG_MONGODB_URL}
-      - ME_CONFIG_PORT=${ME_CONFIG_PORT}
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "${MONGO_INITDB_ROOT_USERNAME}"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "${MONGO_INITDB_ROOT_PASSWORD}"
+      ME_CONFIG_MONGODB_SERVER: "${MONGO_HOST}"
+      ME_CONFIG_MONGODB_URL: "${ME_CONFIG_MONGODB_URL}"
+      ME_CONFIG_PORT: "${ME_CONFIG_PORT}"
     ports:
       - "${ME_CONFIG_PORT}:${ME_CONFIG_PORT}"
     depends_on:
@@ -135,78 +125,30 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    profiles:
-      - euxcel-api
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: "mailhog"
     ports:
-      - "${SMTP_PORT}:${SMTP_PORT}"   # Puerto SMTP fijo
+      - "${SMTP_PORT}:${SMTP_PORT}"             # Puerto SMTP fijo
       - "${MH_WEB_UI_PORT}:${MH_WEB_UI_PORT}"   # Puerto UI web fijo
     networks:
       - app-network
     restart: unless-stopped
     volumes:
       - mailhog_data:/var/lib/mailhog
-    profiles:
-      - euxcel-api
 
   redis:
     image: redis:7.0
-    container_name: redis
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     networks:
       - app-network
     restart: unless-stopped
     volumes:
       - redis_data:/data
-    profiles:
-      - euxcel-api
-
-  rabbitmq:
-    image: "rabbitmq:4.0.0-beta.3-management-alpine"
-    container_name: rabbitmq
-    environment:
-      - RABBITMQ_USER=${RABBITMQ_USER}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
-    ports:
-      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
-      - "${RABBITMQ_MANAGEMENT_PORT}:${RABBITMQ_MANAGEMENT_PORT}"
-    networks:
-      - app-network
-    restart: unless-stopped
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-    profiles:
-      - euxcel-api
-
-  cassandra:
-    image: cassandra:4.1
-    container_name: cassandra
-    ports:
-      - "${CASSANDRA_PORT}:${CASSANDRA_PORT}"
-    environment:
-      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
-      - CASSANDRA_DC=${CASSANDRA_DC}
-      - CASSANDRA_RACK=${CASSANDRA_RACK}
-      - CASSANDRA_SEEDS=${CASSANDRA_HOSTS}
-      - CASSANDRA_ENDPOINT_SNITCH=${CASSANDRA_ENDPOINT_SNITCH}
-      - CASSANDRA_USERNAME=${CASSANDRA_USERNAME}
-      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD}
-    volumes:
-      - cassandra_data:/var/lib/cassandra
-    networks:
-      - app-network
-    restart: unless-stopped
-    profiles:
-      - euxcel-api
 
 networks:
   app-network:
@@ -222,173 +164,21 @@ volumes:
   mailhog_data:
 
 # services:
-#   authentication:
-#     container_name: "authentication"
+#   euxcel-api:
+#     container_name: "euxcel-api"
 #     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "authentication:${APP_VERSION}"
+#       context: ../../
+#       dockerfile: ./projects/euxcel-api/Dockerfile.dev
+#     image: "euxcel-api:${APP_VERSION}"
+#     env_file:
+#       - .env
 #     ports:
 #       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${GRPC_SERVER_PORT}:${GRPC_SERVER_PORT}"
-#       - "${DELVE_PORT}:${DELVE_PORT}"
+#       - "${DELVE_PORT}:${DELVE_PORT}"  
+#       - "${WS_SERVER_PORT}:${WS_SERVER_PORT}"
 #     volumes:
 #       - type: bind
-#         source: ..
-#         target: /app
-#     environment:
-#       - BUILDING_FILES=/app/services/authentication/cmd/main.go
-#       - APP_NAME=authentication
-#     depends_on:
-#       # - postgres
-#       - consul
-#       # - cassandra
-#       # - mysql
-#       - redis
-#       # - prometheus
-#       # - grafana
-#       # - pyroscope
-#       # - mongodb
-#       # - rabbitmq
-#       # - dynamodb
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - authentication
-#     command: air -c ${AIR_CONFIG}
-
-#   monitoring-api:
-#     container_name: "monitoring-api"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "monitoring-api:${APP_VERSION}"
-#     ports:
-#       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#     environment:
-#       - BUILDING_FILES=/app/services/monitoring/main.go
-#       - APP_NAME=monitoring-api
-#       - PROMETHEUS_URL=http://prometheus:9090
-#     depends_on:
-#       - mysql
-#       - prometheus
-#       - grafana
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - monitoring    
-#     command: air -c ${AIR_CONFIG}
-
-#   greeter-server:
-#     container_name: "greeter-server"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev  # Ruta al Dockerfile del servidor
-#     image: "greeter-server:${APP_VERSION}"
-#     ports:
-#       - "${GRPC_SERVER_PORT}:${GRPC_SERVER_PORT}"  # Exponer el puerto del servidor gRPC
-#       - "${DELVE_PORT}:${DELVE_PORT}"  # Puerto para debugging con Delve
-#     environment:
-#       - DELVE_PORT=${DELVE_PORT}  # Sobrescribir el valor de DELVE_PORT para el servidor
-#       - GRPC_SERVER_HOST=0.0.0.0  # Escuchar en todas las interfaces
-#       - BUILDING_FILES=/app/services/greeter-server/cmd/main.go
-#       - APP_NAME=greeter-server
-#       - APP_ROLE=server
-#     networks:
-#       - app-network
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#     restart: unless-stopped
-#     profiles:
-#       - greeter-server
-#     command: air -c ${AIR_CONFIG}  
-
-#   greeter-client:
-#     container_name: "greeter-client"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev # Ruta al Dockerfile del cliente
-#     image: "greeter-client:${APP_VERSION}"
-#     ports:
-#     - "${DELVE_PORT}:${DELVE_PORT}"
-#     environment:
-#       - BUILDING_FILES=/app/services/greeter-client/cmd/main.go
-#       - APP_NAME=greeter-client
-#       - APP_ROLE=client
-#     network_mode: "host"  # Usa la red del host
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#     restart: unless-stopped
-#     profiles:
-#       - greeter-client
-#     command: air -c ${AIR_CONFIG}
-
-#   sg_auth:
-#     container_name: "sg_auth"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "sg_auth:${APP_VERSION}"
-#     env_file:
-#       - .env
-#       - .env.local
-#     ports:
-#       - "${AUTH_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${AUTH_GRPC_SERVER_PORT}:${GRPC_SERVER_PORT}"
-#       - "${AUTH_DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#       - /var/run/docker.sock:/var/run/docker.sock
-#     environment:
-#       - BUILDING_FILES=/app/services/auth/cmd/main.go # /app/services/auth/cmd/wire.go
-#       #  Probar BUILDING_FILES=/app/services/auth/cmd/... 
-#       - APP_NAME=sg_auth
-#       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-#       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-#       - AWS_REGION=${AWS_REGION}
-#       - AWS_ENDPOINT=http://localstack:${AWS_EDGE_PORT}
-#     depends_on:
-#       - localstack
-#     networks:
-#       - app-network
-#     cap_add:
-#       - SYS_PTRACE
-#     security_opt:
-#       - seccomp:unconfined
-#     restart: unless-stopped
-#     profiles:
-#       - sg_auth
-#     command: air -c ${AIR_CONFIG}
-
-#   sg_users:
-#     container_name: "sg_users"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "sg_users:${APP_VERSION}"
-#     env_file:
-#       - .env
-#       - .env.local
-#     ports:
-#       - "${USERS_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${USERS_GRPC_SERVER_PORT}:${GRPC_SERVER_PORT}"
-#       - "${USERS_DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
+#         source: ../../
 #         target: /app
 #       - /var/run/docker.sock:/var/run/docker.sock
 #     cap_add:
@@ -396,398 +186,162 @@ volumes:
 #     security_opt:
 #       - seccomp:unconfined
 #     environment:
-#       - BUILDING_FILES=/app/services/users/cmd/main.go
-#       - APP_NAME=sg_users
-#       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-#       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-#       - AWS_REGION=${AWS_REGION}
-#       - AWS_ENDPOINT=http://localstack:${AWS_EDGE_PORT}
-#     depends_on:
-#       - localstack
-#       - postgres
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - sg_users
-#     command: air -c ${AIR_CONFIG}    
-
-#   sg_mailing:
-#     container_name: "sg_mailing"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "sg_mailing:${APP_VERSION}"
-#     env_file:
-#       - .env
-#       - .env.local
-#     ports:
-#       - "${MAILING_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${MAILING_GRPC_SERVER_PORT}:${GRPC_SERVER_PORT}"
-#       - "${MAILING_DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#       - /var/run/docker.sock:/var/run/docker.sock
-#     cap_add:
-#       - SYS_PTRACE
-#     security_opt:
-#       - seccomp:unconfined
-#     environment:
-#       - BUILDING_FILES=/app/services/mailing/cmd/main.go
-#       - APP_NAME=sg_mailing
-#       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-#       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-#       - AWS_REGION=${AWS_REGION}
-#       - AWS_ENDPOINT=http://localstack:${AWS_EDGE_PORT}
-#       - SMTP_HOST=${SMTP_HOST}
-#       - SMTP_PORT=${SMTP_PORT}
-#     depends_on:
-#       - localstack
-#       - mailhog
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - sg_mailing
-#     command: air -c ${AIR_CONFIG}
-
-#   sg_requests:
-#     container_name: "sg_requests"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "sg_requests:${APP_VERSION}"
-#     env_file:
-#       - .env
-#       - .env.local
-#     ports:
-#       - "${REQUESTS_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${REQUESTS_DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#       - /var/run/docker.sock:/var/run/docker.sock
-#     cap_add:
-#       - SYS_PTRACE
-#     security_opt:
-#       - seccomp:unconfined
-#     environment:
-#       - BUILDING_FILES=/app/services/requests/cmd/main.go
-#       - APP_NAME=sg_requests
+#       - GO111MODULE=on
+#       - BUILDING_FILES=/app/cmd/api/main.go
+#       - APP_NAME=euxcel-api
 #       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 #       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 #       - AWS_REGION=${AWS_REGION}
 #       - AWS_ENDPOINT=http://localstack:${AWS_EDGE_PORT}
 #     depends_on:
 #       - postgres
-#       - localstack
 #     networks:
 #       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - sg_backend
-#     command: air -c ${AIR_CONFIG}
-
-#   customer_manager:
-#     container_name: "customer_manager"
-#     build:
-#       context: ..
-#       dockerfile: config/Dockerfile.dev
-#     image: "customer_manager:${APP_VERSION}"
-#     env_file:
-#       - .env
-#       - .env.local
-#     ports:
-#       - "${CUSTOMER_MANAGER_WEB_SERVER_PORT}:${HTTP_SERVER_PORT}"
-#       - "${CUSTOMER_MANAGER_DELVE_PORT}:${DELVE_PORT}"
-#     volumes:
-#       - type: bind
-#         source: ..
-#         target: /app
-#       - /var/run/docker.sock:/var/run/docker.sock
-#       - ./sqlite-data:/data
-#     cap_add:
-#       - SYS_PTRACE
-#     security_opt:
-#       - seccomp:unconfined
-#     environment:
-#       - BUILDING_FILES=/app/projects/tech-house/customer-manager-challenge/cmd/api/main.go
-#       - APP_NAME=customer_manager
-#       - SQLITE_DB_PATH=/data/customers.db
-#       - SQLITE_IN_MEMORY=false
-#       # - SQLITE_DB_PATH=:memory:
-#       # - SQLITE_IN_MEMORY=true
-#     depends_on:
-#       - sqlite-persistent
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - tech-house
+#     restart: on-failure
 #     command: tail -f /dev/null
+#     profiles:
+#       - euxcel-api  
 
-
-
-
-
-#   mysql:
-#     image: mysql:8.0
-#     container_name: mysql
+#   postgres:
+#     image: postgres:16.3
+#     container_name: postgres
 #     ports:
-#       - "${MYSQL_PORT}:${MYSQL_PORT}"
+#       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
 #     environment:
-#       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-#       - MYSQL_DATABASE=${MYSQL_DATABASE}
-#       - MYSQL_USER=${MYSQL_USER}
-#       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+#       - POSTGRES_USER=${POSTGRES_USER}
+#       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+#       - POSTGRES_DB=${POSTGRES_DB}
+#       - PGDATA=/var/lib/postgresql/data/pgdata
 #     volumes:
-#       - mysql_data:/var/lib/mysql
+#       - postgres_data:/var/lib/postgresql/data
+#       - ./infra/postgres-storage:/storage
+#       - ./infra/postgres-init:/docker-entrypoint-initdb.d
 #     networks:
 #       - app-network
 #     restart: unless-stopped
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 5
+#       start_period: 10s
 #     profiles:
-#       - authentication
+#       - euxcel-api
 
-#   phpmyadmin:
-#     image: phpmyadmin:5.2.1-apache
-#     container_name: phpmyadmin
+#   pgadmin:
+#     image: dpage/pgadmin4:8.12
+#     container_name: pgadmin
 #     ports:
-#       - "${PHPMYADMIN_PORT}:${PHPMYADMIN_TARGET_PORT}"
+#       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
 #     environment:
-#       - PMA_HOST=${MYSQL_HOST}
-#       - PMA_USER=${MYSQL_USER}
-#       - PMA_PASSWORD=${MYSQL_PASSWORD}
+#       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+#       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+#     logging:
+#       driver: "json-file" 
 #     depends_on:
-#       - mysql
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - authentication
-
-#   prometheus:
-#     image: prom/prometheus:v2.45.6
-#     container_name: prometheus
+#       - postgres
 #     volumes:
-#       - ./prometheus.yml:/etc/prometheus/prometheus.yml
-#     ports:
-#       - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+#       - pgadmin_data:/var/lib/pgadmin
 #     networks:
 #       - app-network
 #     restart: unless-stopped
 #     profiles:
-#       - authentication
+#       - euxcel-api
 
-#   grafana:
-#     image: grafana/grafana:10.2.8
-#     container_name: grafana
-#     ports:
-#       - "${GRAFANA_PORT}:${GRAFANA_PORT}"
-#     depends_on:
-#       - prometheus
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - authentication
-
-#   pyroscope:
-#     image: grafana/pyroscope:weekly-f76-feefa815b
-#     container_name: pyroscope
-#     ports:
-#       - "${PYROSCOPE_PORT}:${PYROSCOPE_PORT}"
+#   migrations:
+#     image: gomicro/goose:3.7.0
 #     volumes:
-#       - pyroscope_data:/var/lib/pyroscope
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - authentication
-
-#   ngrok:
-#     image: ngrok/ngrok:3.13.0-alpine-91be825
-#     container_name: ngrok
-#     command: ["start", "--all", "--config", "/etc/ngrok.yml"]
-#     volumes:
-#       - ./ngrok.yml:/etc/ngrok.yml
-#     ports:
-#       - "${NGROK_PORT}:${NGROK_PORT}"
-#     networks:
-#       - app-network
-#     restart: unless-stopped
-#     profiles:
-#       - authentication
-
-#   kong-migrations:
-#     image: kong:2.8.5-alpine
-#     command: kong migrations bootstrap
+#       - ./infra/migrations:/app/migrations
 #     environment:
-#       - KONG_DATABASE=${KONG_DATABASE}
-#       - KONG_PG_HOST=${POSTGRES_HOST}
-#       - KONG_PG_PORT=${POSTGRES_PORT}
-#       - KONG_PG_USER=${POSTGRES_USER}
-#       - KONG_PG_PASSWORD=${POSTGRES_PASSWORD}
-#       - KONG_PG_DATABASE=${KONG_PG_DATABASE}  # Base de datos específica para Kong (kong_db)
+#       - PGHOST=${POSTGRES_HOST}
+#       - PGUSER=${POSTGRES_USER}
+#       - PGPASSWORD=${POSTGRES_PASSWORD}
+#       - PGDATABASE=${POSTGRES_DB}
+#       - PGSSLMODE=disable
+#     command: >
+#       goose -dir /app/migrations postgres "host=${POSTGRES_HOST} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} sslmode=disable" up
 #     depends_on:
 #       - postgres
 #     networks:
 #       - app-network
 #     profiles:
-#       - authentication
+#       - euxcel-api
 
-#   kong:
-#     image: kong:2.8.5-alpine
-#     container_name: kong
+#   mongodb:
+#     image: mongo:5.0.28
+#     container_name: mongodb
 #     environment:
-#       - KONG_DATABASE=${KONG_DATABASE}
-#       - KONG_PG_HOST=${POSTGRES_HOST}
-#       - KONG_PG_PORT=${POSTGRES_PORT}
-#       - KONG_PG_USER=${POSTGRES_USER}
-#       - KONG_PG_PASSWORD=${POSTGRES_PASSWORD}
-#       - KONG_PG_DATABASE=${KONG_PG_DATABASE}  # Base de datos específica para Kong
-#       - KONG_PROXY_ACCESS_LOG=${KONG_PROXY_ACCESS_LOG}
-#       - KONG_ADMIN_ACCESS_LOG=${KONG_ADMIN_ACCESS_LOG}
-#       - KONG_PROXY_ERROR_LOG=${KONG_PROXY_ERROR_LOG}
-#       - KONG_ADMIN_ERROR_LOG=${KONG_ADMIN_ERROR_LOG}
-#       - KONG_ADMIN_LISTEN=${KONG_ADMIN_LISTEN}
+#       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+#       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
 #     ports:
-#       - "${KONG_PROXY_PORT}:${KONG_PROXY_PORT}"
-#       - "${KONG_PROXY_SSL_PORT}:${KONG_PROXY_SSL_PORT}"
-#       - "${KONG_ADMIN_PORT}:${KONG_ADMIN_PORT}"
-#       - "${KONG_ADMIN_SSL_PORT}:${KONG_ADMIN_SSL_PORT}"
+#       - "${MONGO_PORT}:${MONGO_PORT}"
+#     volumes:
+#       - mongodb_data:/data/db
+#       - ./infra/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+#     networks:
+#       - app-network
+#     restart: unless-stopped
+#     profiles:
+#       - euxcel-api
+
+#   mongo-express:
+#     image: mongo-express:1.0.2-20-alpine3.19
+#     container_name: mongo-express
+#     environment:
+#       - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_INITDB_ROOT_USERNAME}
+#       - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+#       - ME_CONFIG_MONGODB_SERVER=${MONGO_HOST}
+#       - ME_CONFIG_MONGODB_URL=${ME_CONFIG_MONGODB_URL}
+#       - ME_CONFIG_PORT=${ME_CONFIG_PORT}
+#     ports:
+#       - "${ME_CONFIG_PORT}:${ME_CONFIG_PORT}"
 #     depends_on:
-#       - kong-migrations
+#       - mongodb
 #     networks:
 #       - app-network
 #     restart: unless-stopped
 #     profiles:
-#       - authentication
+#       - euxcel-api
 
-
-
-#   dynamodb:
-#     image: amazon/dynamodb-local:1.24.0
-#     container_name: dynamodb
-#     command: "-jar DynamoDBLocal.jar -port ${DYNAMODB_PORT} -sharedDb -dbPath /home/dynamodblocal/data"
+#   mailhog:
+#     image: mailhog/mailhog:v1.0.1
+#     container_name: "mailhog"
 #     ports:
-#       - "${DYNAMODB_PORT}:${DYNAMODB_PORT}"
+#       - "${SMTP_PORT}:${SMTP_PORT}"   # Puerto SMTP fijo
+#       - "${MH_WEB_UI_PORT}:${MH_WEB_UI_PORT}"   # Puerto UI web fijo
+#     networks:
+#       - app-network
+#     restart: unless-stopped
 #     volumes:
-#       - dynamodb_data:/home/dynamodblocal/data
-#     networks:
-#       - app-network
-#     restart: unless-stopped
+#       - mailhog_data:/var/lib/mailhog
 #     profiles:
-#       - authentication
+#       - euxcel-api
 
-
-
-#   localstack:
-#     image: localstack/localstack:3.8.1
-#     container_name: localstack
+#   redis:
+#     image: redis:7.0
+#     container_name: redis
 #     ports:
-#       - "${AWS_EDGE_PORT}:${AWS_EDGE_PORT}"     # Puerto donde se exponen los servicios de AWS
-#       - "${AWS_WEB_UI_PORT}:${AWS_WEB_UI_PORT}" # Puerto para la interfaz web de LocalStack (opcional)
+#       - "${REDIS_PORT}:${REDIS_PORT}"
 #     environment:
-#       - SERVICES=${AWS_SERVICES}             # Lista de servicios de AWS que se van a emular
-#       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}         # Credenciales ficticias
-#       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-#       - EDGE_PORT=${AWS_EDGE_PORT}           # Puerto principal para LocalStack
-#     volumes:
-#       - "./localstack:/var/lib/localstack" # Opcional: persistencia de datos en LocalStack
+#       - REDIS_PASSWORD=${REDIS_PASSWORD}
+#     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
 #     networks:
 #       - app-network
 #     restart: unless-stopped
-#     profiles:
-#       - sg_backend
-
-#   nginx:
-#     image: nginx:1.27.2
-#     container_name: nginx
-#     ports:
-#       - "${NGINX_SERVER_PORT}:${NGINX_TARGET_SERVER_PORT}"  # Puerto del host: puerto del contenedor Nginx
 #     volumes:
-#       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-#     # depends_on:
-#       # - sg_auth
-#       # - sg_users
-#       # - sg_mailing
-#       # Añade otros servicios según sea necesario
-#     networks:
-#       - app-network
-#     restart: unless-stopped
+#       - redis_data:/data
 #     profiles:
-#       - sg_auth
-
-#   sqlite-persistent:
-#     image: alpine/sqlite:3.45.3
-#     container_name: sqlite-container
-#     working_dir: /data
-#     volumes:
-#       - ./sqlite-data:/data
-#       - ./sqlite-init:/sqlite-init
-#     stdin_open: true
-#     tty: true
-#     entrypoint: ["/bin/sh", "-c"]
-#     command: [
-#       "sqlite3 /data/customers.db '.read /sqlite-init/customers.sql' && sqlite3 /data/customers.db"
-#     ]
-#     healthcheck:
-#       test: ["CMD-SHELL", "sqlite3 /data/customers.db 'SELECT 1;'"]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 3
-#       start_period: 5s
-#     restart: unless-stopped
-#     profiles:
-#       - tech-house
-
-#   sqlite-memory:
-#     image: alpine/sqlite:3.45.3
-#     container_name: sqlite-memory-container
-#     working_dir: /data
-#     volumes:
-#       - ./sqlite-init:/sqlite-init
-#     stdin_open: true
-#     tty: true
-#     entrypoint: ["/bin/sh", "-c"]
-#     command: [
-#       "sqlite3 :memory: '.read /sqlite-init/customers.sql' && sqlite3 :memory:"
-#     ]
-#     healthcheck:
-#       test: ["CMD-SHELL", "sqlite3 :memory: 'SELECT 1;'"]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 3
-#       start_period: 5s
-#     restart: unless-stopped
-#     profiles:
-#       - tech-house
-
-#   sqlite-web:
-#     image: coleifer/sqlite-web
-#     container_name: sqlite-web-container
-#     ports:
-#       - "${SQLITE_WEB_PORT}:${SQLITE_WEB_PORT_TARGET}"
-#     volumes:
-#       - ./sqlite-data:/data
-#     environment:
-#       - SQLITE_DATABASE=/data/customers.db
-#     depends_on:
-#       - sqlite-persistent
-#     restart: unless-stopped
-#     profiles:
-#       - tech-house
+#       - euxcel-api
 
 # networks:
 #   app-network:
 #     driver: bridge
 
 # volumes:
-#   mysql_data:
-#   pyroscope_data:
-#   dynamodb_data:
-#   vault_data:
-#   sqlite_data:
+#   postgres_data:
+#   pgadmin_data:
+#   mongodb_data:
+#   cassandra_data:
+#   redis_data:
+#   rabbitmq_data:
+#   mailhog_data:

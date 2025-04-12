@@ -8,9 +8,7 @@ package wire
 
 import (
 	"github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
-	"github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
@@ -18,21 +16,14 @@ import (
 	"github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
-	"github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/assessment"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/browser-events"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/candidate"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/event"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/group"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/tweet"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
 
@@ -76,18 +67,6 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	producer, err := ProvideRabbitProducer()
-	if err != nil {
-		return nil, err
-	}
-	pkgcassandraRepository, err := ProvideCassandraRepository()
-	if err != nil {
-		return nil, err
-	}
-	upgrader, err := ProvideWebSocketUpgrader()
-	if err != nil {
-		return nil, err
-	}
 	handlerFunc, err := ProvideJwtMiddleware()
 	if err != nil {
 		return nil, err
@@ -102,38 +81,12 @@ func Initialize() (*Dependencies, error) {
 	}
 	useCases := ProvidePersonUseCases(personRepository)
 	handler := ProvidePersonHandler(server, useCases, middlewares)
-	groupRepository, err := ProvideGroupRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	groupUseCases := ProvideGroupUseCases(groupRepository)
-	groupHandler := ProvideGroupHandler(server, groupUseCases, middlewares)
-	eventRepository, err := ProvideEventRepository(pkgmongoRepository)
-	if err != nil {
-		return nil, err
-	}
-	eventUseCases := ProvideEventUseCases(eventRepository)
-	eventHandler := ProvideEventHandler(server, eventUseCases, middlewares)
 	userRepository, err := ProvideUserRepository(repository)
 	if err != nil {
 		return nil, err
 	}
 	userUseCases := ProvideUserUseCases(userRepository)
 	userHandler := ProvideUserHandler(server, userUseCases, middlewares)
-	assessmentRepository, err := ProvideAssessmentRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	smtpService, err := ProvideNotificationSmtpService(pkgsmtpService)
-	if err != nil {
-		return nil, err
-	}
-	notificationUseCases := ProvideNotificationUseCases(smtpService)
-	candidateRepository, err := ProvideCandidateRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	candidateUseCases := ProvideCandidateUseCases(candidateRepository)
 	autheCache, err := ProvideAutheCache(cache)
 	if err != nil {
 		return nil, err
@@ -147,32 +100,13 @@ func Initialize() (*Dependencies, error) {
 		return nil, err
 	}
 	autheUseCases := ProvideAutheUseCases(autheCache, jwtService, httpClient)
-	assessmentUseCases := ProvideAssessmentUseCases(assessmentRepository, notificationUseCases, candidateUseCases, loader, autheUseCases, useCases)
-	assessmentHandler := ProvideAssessmentHandler(server, assessmentUseCases, middlewares)
-	candidateHandler := ProvideCandidateHandler(server, candidateUseCases, middlewares)
-	browserEventRepository, err := ProvideBrowserEventsRepository(pkgmongoRepository)
-	if err != nil {
-		return nil, err
-	}
-	browserEventUseCases := ProvideBrowserEventsUseCases(browserEventRepository)
-	webSocket := ProvideBrowserEventsWebsocket(browserEventUseCases, upgrader)
-	browserEventHandler := ProvideBrowserEventsHandler(server, browserEventUseCases, middlewares, webSocket)
 	autheHandler := ProvideAutheHandler(server, autheUseCases, middlewares)
+	smtpService, err := ProvideNotificationSmtpService(pkgsmtpService)
+	if err != nil {
+		return nil, err
+	}
+	notificationUseCases := ProvideNotificationUseCases(smtpService)
 	notificationHandler := ProvideNotificationHandler(server, notificationUseCases, middlewares)
-	tweetRepository, err := ProvideTweetRepository(pkgcassandraRepository)
-	if err != nil {
-		return nil, err
-	}
-	tweetCache, err := ProvideTweetCache(cache)
-	if err != nil {
-		return nil, err
-	}
-	broker, err := ProvideTweetBroker(producer)
-	if err != nil {
-		return nil, err
-	}
-	tweetUseCases := ProvideTweetUseCases(tweetRepository, userUseCases, tweetCache, broker)
-	tweetHandler := ProvideTweetHandler(server, tweetUseCases, middlewares)
 	itemRepository, err := ProvideItemRepository(repository)
 	if err != nil {
 		return nil, err
@@ -198,38 +132,27 @@ func Initialize() (*Dependencies, error) {
 	supplierUseCases := ProvideSupplierUseCases(supplierRepository)
 	supplierHandler := ProvideSupplierHandler(server, supplierUseCases, middlewares)
 	dependencies := &Dependencies{
-		ConfigLoader:           loader,
-		GinServer:              server,
-		GormRepository:         repository,
-		MongoRepository:        pkgmongoRepository,
-		PostgresRepository:     pkgpostgresqlRepository,
-		RedisCache:             cache,
-		JwtService:             service,
-		RestyClient:            client,
-		SmtpService:            pkgsmtpService,
-		RabbitProducer:         producer,
-		CassandraRepository:    pkgcassandraRepository,
-		WebSocket:              upgrader,
-		Middlewares:            middlewares,
-		PersonHandler:          handler,
-		GroupHandler:           groupHandler,
-		EventHandler:           eventHandler,
-		UserHandler:            userHandler,
-		AssessmentHandler:      assessmentHandler,
-		CandidateHandler:       candidateHandler,
-		BrowserEventsHandler:   browserEventHandler,
-		BrowserEventsWebSocket: webSocket,
-		AutheHandler:           autheHandler,
-		NotificationHandler:    notificationHandler,
-		TweetHandler:           tweetHandler,
-		ItemHandler:            itemHandler,
-		CategoryHandler:        categoryHandler,
-		MacroCategoryHandler:   macrocategoryHandler,
-		SupplierHandler:        supplierHandler,
-		PersonUseCases:         useCases,
-		UserUseCases:           userUseCases,
-		TweetUseCases:          tweetUseCases,
-		ItemUseCases:           itemUseCases,
+		ConfigLoader:         loader,
+		GinServer:            server,
+		GormRepository:       repository,
+		MongoRepository:      pkgmongoRepository,
+		PostgresRepository:   pkgpostgresqlRepository,
+		RedisCache:           cache,
+		JwtService:           service,
+		RestyClient:          client,
+		SmtpService:          pkgsmtpService,
+		Middlewares:          middlewares,
+		PersonHandler:        handler,
+		UserHandler:          userHandler,
+		AutheHandler:         autheHandler,
+		NotificationHandler:  notificationHandler,
+		ItemHandler:          itemHandler,
+		CategoryHandler:      categoryHandler,
+		MacroCategoryHandler: macrocategoryHandler,
+		SupplierHandler:      supplierHandler,
+		PersonUseCases:       useCases,
+		UserUseCases:         userUseCases,
+		ItemUseCases:         itemUseCases,
 	}
 	return dependencies, nil
 }
@@ -238,40 +161,29 @@ func Initialize() (*Dependencies, error) {
 
 // Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
 type Dependencies struct {
-	ConfigLoader        config.Loader
-	GinServer           pkggin.Server
-	GormRepository      pkggorm.Repository
-	MongoRepository     pkgmongo.Repository
-	PostgresRepository  pkgpostgresql.Repository
-	RedisCache          pkgredis.Cache
-	JwtService          pkgjwt.Service
-	RestyClient         pkcresty.Client
-	SmtpService         pkgsmtp.Service
-	RabbitProducer      pkgrabbit.Producer
-	CassandraRepository pkgcassandra.Repository
-	WebSocket           pkgws.Upgrader
+	ConfigLoader       config.Loader
+	GinServer          pkggin.Server
+	GormRepository     pkggorm.Repository
+	MongoRepository    pkgmongo.Repository
+	PostgresRepository pkgpostgresql.Repository
+	RedisCache         pkgredis.Cache
+	JwtService         pkgjwt.Service
+	RestyClient        pkcresty.Client
+	SmtpService        pkgsmtp.Service
 
 	Middlewares *pkgmwr.Middlewares
 
-	PersonHandler          *person.Handler
-	GroupHandler           *group.Handler
-	EventHandler           *event.Handler
-	UserHandler            *user.Handler
-	AssessmentHandler      *assessment.Handler
-	CandidateHandler       *candidate.Handler
-	BrowserEventsHandler   *browserEvent.Handler
-	BrowserEventsWebSocket browserEvent.WebSocket
-	AutheHandler           *authe.Handler
-	NotificationHandler    *notification.Handler
-	TweetHandler           *tweet.Handler
-	ItemHandler            *item.Handler
-	CategoryHandler        *category.Handler
-	MacroCategoryHandler   *macrocategory.Handler
-	SupplierHandler        *supplier.Handler
+	PersonHandler        *person.Handler
+	UserHandler          *user.Handler
+	AutheHandler         *authe.Handler
+	NotificationHandler  *notification.Handler
+	ItemHandler          *item.Handler
+	CategoryHandler      *category.Handler
+	MacroCategoryHandler *macrocategory.Handler
+	SupplierHandler      *supplier.Handler
 
 	// Para pruebas
 	PersonUseCases person.UseCases
 	UserUseCases   user.UseCases
-	TweetUseCases  tweet.UseCases
 	ItemUseCases   item.UseCases
 }

@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
-	rabbit "github.com/alphacodinggroup/euxcel-backend/pkg/brokers/rabbitmq/amqp091/producer"
 	rdch "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	cass "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/cassandra/gocql"
 	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	pgdb "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
@@ -14,7 +12,6 @@ import (
 	restymdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/resty"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 	ssmtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
-	ws "github.com/alphacodinggroup/euxcel-backend/pkg/websocket/gorilla"
 )
 
 func ProvideGormRepository() (gorm.Repository, error) {
@@ -93,38 +90,4 @@ func ProvideJwtService() (jwt.Service, error) {
 	}
 
 	return jwtSrv, nil
-}
-
-func ProvideRabbitProducer() (rabbit.Producer, error) {
-	prod, err := rabbit.Bootstrap()
-	if err != nil {
-		return nil, err
-	}
-
-	return prod, nil
-}
-
-func ProvideCassandraRepository() (cass.Repository, error) {
-	repo, err := cass.Bootstrap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Cassandra repository: %w", err)
-	}
-
-	return repo, nil
-}
-
-// func ProvideWebSocketHandler() (ws.Server, error) {
-// 	server, err := ws.Bootstrap("", "", "", "")
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to initialize WebSocket server: %w", err)
-// 	}
-// 	return server, nil
-// }
-
-func ProvideWebSocketUpgrader() (ws.Upgrader, error) {
-	server, err := ws.Bootstrap()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize WebSocket Upgrader: %w", err)
-	}
-	return server, nil
 }
