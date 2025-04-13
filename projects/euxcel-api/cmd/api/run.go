@@ -98,5 +98,6 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 	}
 	duration := time.Since(start)
 	log.Printf("GORM migrations completed successfully in %s.", duration)
+
 	return nil
 }

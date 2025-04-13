@@ -75,6 +75,5 @@ func Bootstrap(dbTypeStr, name, password, user, host string, port int) (Reposito
 	if err != nil {
 		return nil, err
 	}
-
 	return repo, nil
 }
