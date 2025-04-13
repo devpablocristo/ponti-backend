@@ -23,10 +23,11 @@ services:
     restart: unless-stopped
     user: "1000:1000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${HTTP_SERVER_PORT}/health || exit 1"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pgrep tail || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 3
+      start_period: 5s
 
   postgres:
     image: postgres:16.3
@@ -45,10 +46,11 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:7.0
@@ -64,8 +66,8 @@ services:
       - redis_data_stg:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 30s
+      interval: 10s
+      timeout: 5s
       retries: 3
 
   mailhog:
