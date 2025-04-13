@@ -5,7 +5,6 @@ import (
 
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 	rdch "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	mng "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	pgdb "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
@@ -30,15 +29,6 @@ func ProvideGinServer() (ginsrv.Server, error) {
 		return nil, fmt.Errorf("failed to initialize Gin server: %w", err)
 	}
 	return server, nil
-}
-
-func ProvideMongoDbRepository() (mng.Repository, error) {
-	repo, err := mng.Bootstrap("", "", "", "", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize MongoDB client: %w", err)
-	}
-
-	return repo, nil
 }
 
 func ProvidePostgresRepository() (pgdb.Repository, error) {

@@ -11,7 +11,6 @@ import (
 
 	jwt "github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 	redis "github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	mongo "github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	pg "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 	resty "github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
@@ -40,7 +39,6 @@ type Dependencies struct {
 	ConfigLoader       config.Loader
 	GinServer          ginsrv.Server
 	GormRepository     gorm.Repository
-	MongoRepository    mongo.Repository
 	PostgresRepository pg.Repository
 	RedisCache         redis.Cache
 	JwtService         jwt.Service
@@ -85,7 +83,6 @@ func Initialize() (*Dependencies, error) {
 		ProvideConfigLoader,
 		ProvideGinServer,
 		ProvideGormRepository,
-		ProvideMongoDbRepository,
 		ProvidePostgresRepository,
 		ProvideJwtMiddleware,
 		ProvideMiddlewares,

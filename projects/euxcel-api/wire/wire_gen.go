@@ -9,7 +9,6 @@ package wire
 import (
 	"github.com/alphacodinggroup/euxcel-backend/pkg/authe/jwt/v5"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/cache/redis/v8"
-	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/nosql/mongodb/mongo-driver"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/postgresql/pgxpool"
 	"github.com/alphacodinggroup/euxcel-backend/pkg/http/clients/resty"
@@ -46,10 +45,6 @@ func Initialize() (*Dependencies, error) {
 		return nil, err
 	}
 	repository, err := ProvideGormRepository()
-	if err != nil {
-		return nil, err
-	}
-	pkgmongoRepository, err := ProvideMongoDbRepository()
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +172,6 @@ func Initialize() (*Dependencies, error) {
 		ConfigLoader:         loader,
 		GinServer:            server,
 		GormRepository:       repository,
-		MongoRepository:      pkgmongoRepository,
 		PostgresRepository:   pkgpostgresqlRepository,
 		RedisCache:           cache,
 		JwtService:           service,
@@ -218,7 +212,6 @@ type Dependencies struct {
 	ConfigLoader       config.Loader
 	GinServer          pkggin.Server
 	GormRepository     pkggorm.Repository
-	MongoRepository    pkgmongo.Repository
 	PostgresRepository pkgpostgresql.Repository
 	RedisCache         pkgredis.Cache
 	JwtService         pkgjwt.Service

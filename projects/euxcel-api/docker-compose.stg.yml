@@ -1,6 +1,5 @@
 services:
   euxcel-api:
-    container_name: "euxcel-api"
     build:
       context: ../../
       dockerfile: ./projects/euxcel-api/Dockerfile.stg
@@ -13,23 +12,25 @@ services:
       - APP_ENV=stg
       - APP_ROOT=/app
       - GO111MODULE=on
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
       - GIN_MODE=release
     depends_on:
-      - postgres
-      - mongodb
-      - redis
-      - rabbitmq
-      - cassandra
+      postgres:
+        condition: service_healthy  # Espera a que Postgres esté saludable
+      redis:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    # Ejecuta el contenedor con un usuario no root, si está soportado
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${HTTP_SERVER_PORT}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres:
     image: postgres:16.3
-    container_name: "postgres"
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     environment:
@@ -38,54 +39,20 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_stg:/var/lib/postgresql/data
       - ./infra/postgres-storage:/storage:ro
       - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  mongodb:
-    image: mongo:5.0.28
-    container_name: "mongodb"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-    ports:
-      - "${MONGO_PORT}:${MONGO_PORT}"
-    volumes:
-      - mongodb_data:/data/db
-      - ./infra/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  mongo-express:
-    image: mongo-express:1.0.2-20-alpine3.19
-    container_name: "mongo-express"
-    environment:
-      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-      - ME_CONFIG_MONGODB_SERVER=${MONGO_HOST}
-      - ME_CONFIG_MONGODB_URL=${ME_CONFIG_MONGODB_URL}
-      - ME_CONFIG_PORT=${ME_CONFIG_PORT}
-    ports:
-      - "${ME_CONFIG_PORT}:${ME_CONFIG_PORT}"
-    depends_on:
-      - mongodb
-    networks:
-      - app-network
-    restart: unless-stopped
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   redis:
     image: redis:7.0
-    container_name: redis
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
     environment:
@@ -95,13 +62,15 @@ services:
       - app-network
     restart: unless-stopped
     volumes:
-      - redis_data:/data
-    profiles:
-      - euxcel-api
+      - redis_data_stg:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: "mailhog"
     ports:
       - "${SMTP_PORT}:${SMTP_PORT}"
       - "${MH_WEB_UI_PORT}:${MH_WEB_UI_PORT}"
@@ -109,21 +78,13 @@ services:
       - app-network
     restart: unless-stopped
     volumes:
-      - mailhog_data:/var/lib/mailhog
-    profiles:
-      - euxcel-api
+      - mailhog_data_stg:/var/lib/mailhog
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-  pgadmin_data:
-  mongodb_data:
-  consul_data:
-  vault_data:
-  redis_data:
-  cassandra_data:
-  rabbitmq_data:
-  mailhog_data:
+  postgres_data_stg:
+  redis_data_stg:
+  mailhog_data_stg:
