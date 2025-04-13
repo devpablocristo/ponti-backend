@@ -19,10 +19,16 @@ import (
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/crop"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
+	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
 	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
 )
@@ -131,6 +137,42 @@ func Initialize() (*Dependencies, error) {
 	}
 	supplierUseCases := ProvideSupplierUseCases(supplierRepository)
 	supplierHandler := ProvideSupplierHandler(server, supplierUseCases, middlewares)
+	cropRepository, err := ProvideCropRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	cropUseCases := ProvideCropUseCases(cropRepository)
+	cropHandler := ProvideCropHandler(server, cropUseCases, middlewares)
+	customerRepository, err := ProvideCustomerRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	customerUseCases := ProvideCustomerUseCases(customerRepository)
+	customerHandler := ProvideCustomerHandler(server, customerUseCases, middlewares)
+	fieldRepository, err := ProvideFieldRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	fieldUseCases := ProvideFieldUseCases(fieldRepository)
+	fieldHandler := ProvideFieldHandler(server, fieldUseCases, middlewares)
+	investorRepository, err := ProvideInvestorRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	investorUseCases := ProvideInvestorUseCases(investorRepository)
+	investorHandler := ProvideInvestorHandler(server, investorUseCases, middlewares)
+	lotRepository, err := ProvideLotRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	lotUseCases := ProvideLotUseCases(lotRepository)
+	lotHandler := ProvideLotHandler(server, lotUseCases, middlewares)
+	projectRepository, err := ProvideProjectRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	projectUseCases := ProvideProjectUseCases(projectRepository)
+	projectHandler := ProvideProjectHandler(server, projectUseCases, middlewares)
 	dependencies := &Dependencies{
 		ConfigLoader:         loader,
 		GinServer:            server,
@@ -150,9 +192,21 @@ func Initialize() (*Dependencies, error) {
 		CategoryHandler:      categoryHandler,
 		MacroCategoryHandler: macrocategoryHandler,
 		SupplierHandler:      supplierHandler,
+		CropHandler:          cropHandler,
+		CustomerHandler:      customerHandler,
+		FieldHandler:         fieldHandler,
+		InvestorHandler:      investorHandler,
+		LotHandler:           lotHandler,
+		ProjectHandler:       projectHandler,
 		PersonUseCases:       useCases,
 		UserUseCases:         userUseCases,
 		ItemUseCases:         itemUseCases,
+		CropUseCases:         cropUseCases,
+		CustomerUseCases:     customerUseCases,
+		FieldUseCases:        fieldUseCases,
+		InvestorUseCases:     investorUseCases,
+		LotUseCases:          lotUseCases,
+		ProjectUseCases:      projectUseCases,
 	}
 	return dependencies, nil
 }
@@ -182,8 +236,22 @@ type Dependencies struct {
 	MacroCategoryHandler *macrocategory.Handler
 	SupplierHandler      *supplier.Handler
 
-	// Para pruebas
-	PersonUseCases person.UseCases
-	UserUseCases   user.UseCases
-	ItemUseCases   item.UseCases
+	// Nuevas entidades
+	CropHandler     *crop.Handler
+	CustomerHandler *customer.Handler
+	FieldHandler    *field.Handler
+	InvestorHandler *investor.Handler
+	LotHandler      *lot.Handler
+	ProjectHandler  *project.Handler
+
+	// Para pruebas (use cases existentes y de nuevas entidades si se requieren)
+	PersonUseCases   person.UseCases
+	UserUseCases     user.UseCases
+	ItemUseCases     item.UseCases
+	CropUseCases     crop.UseCases
+	CustomerUseCases customer.UseCases
+	FieldUseCases    field.UseCases
+	InvestorUseCases investor.UseCases
+	LotUseCases      lot.UseCases
+	ProjectUseCases  project.UseCases
 }

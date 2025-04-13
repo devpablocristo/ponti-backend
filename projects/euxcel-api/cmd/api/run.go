@@ -9,9 +9,15 @@ import (
 
 	gorm "github.com/alphacodinggroup/euxcel-backend/pkg/databases/sql/gorm"
 
+	cropmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/crop/repository/models"
+	customermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/repository/models"
+	fieldmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/repository/models"
+	investormodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor/repository/models"
 	itemmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/repository/models"
+	lotmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/repository/models"
 	macrocategorymodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory/repository/models"
 	personmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/repository/models"
+	projectmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/repository/models"
 	suppliermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/repository/models"
 	usermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/repository/models"
 
@@ -49,6 +55,12 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.CategoryHandler.Routes()
 	deps.MacroCategoryHandler.Routes()
 	deps.SupplierHandler.Routes()
+	deps.LotHandler.Routes()
+	deps.CustomerHandler.Routes()
+	deps.InvestorHandler.Routes()
+	deps.FieldHandler.Routes()
+	deps.ProjectHandler.Routes()
+	deps.CropHandler.Routes()
 }
 
 // RunGormMigrations runs SQL migrations using GORM.
@@ -64,7 +76,7 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 
-	// List of models to migrate.
+	// List of models to migrate (entidades existentes + 6 nuevas).
 	modelsToMigrate := []any{
 		&personmodels.Person{},
 		&usermodels.User{},
@@ -72,6 +84,12 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		&itemmodels.Item{},
 		&macrocategorymodels.MacroCategory{},
 		&suppliermodels.Supplier{},
+		&lotmodels.Lot{},
+		&customermodels.Customer{},
+		&investormodels.Investor{},
+		&fieldmodels.Field{},
+		&projectmodels.Project{},
+		&cropmodels.Crop{},
 	}
 
 	start := time.Now()

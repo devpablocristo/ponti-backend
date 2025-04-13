@@ -96,8 +96,6 @@ func (h *Handler) Login(c *gin.Context) {
 	loginType := c.Query("type")
 
 	switch loginType {
-	case "pep":
-		h.pepLogin(c, credentials)
 	case "jwt":
 		h.jwtLogin(c, credentials)
 	case "auth0":
@@ -113,19 +111,6 @@ func (h *Handler) Login(c *gin.Context) {
 		c.Error(apiErr).SetMeta(errCode)
 	}
 
-}
-
-func (h *Handler) pepLogin(c *gin.Context, credentials types.LoginCredentials) {
-	token, err := h.ucs.PepLogin(c.Request.Context(), credentials.Username, credentials.Email, credentials.Password)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-
-	c.JSON(http.StatusOK, dto.LoginResponse{
-		AccessToken:     token.AccessToken,
-		AccessExpiresAt: token.AccessExpiresAt,
-	})
 }
 
 func (h *Handler) jwtLogin(c *gin.Context, credentials types.LoginCredentials) {

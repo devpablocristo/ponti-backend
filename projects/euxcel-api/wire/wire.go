@@ -17,16 +17,22 @@ import (
 	smtp "github.com/alphacodinggroup/euxcel-backend/pkg/notification/smtp"
 
 	authe "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/authe"
-
 	category "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/category"
 	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
-
 	item "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
 	macrocategory "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
 	notification "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 	supplier "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
 	user "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user"
+
+	// Nuevas entidades
+	crop "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/crop"
+	customer "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer"
+	field "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
+	investor "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor"
+	lot "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
+	project "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project"
 )
 
 // Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
@@ -52,10 +58,24 @@ type Dependencies struct {
 	MacroCategoryHandler *macrocategory.Handler
 	SupplierHandler      *supplier.Handler
 
-	// Para pruebas
-	PersonUseCases person.UseCases
-	UserUseCases   user.UseCases
-	ItemUseCases   item.UseCases
+	// Nuevas entidades
+	CropHandler     *crop.Handler
+	CustomerHandler *customer.Handler
+	FieldHandler    *field.Handler
+	InvestorHandler *investor.Handler
+	LotHandler      *lot.Handler
+	ProjectHandler  *project.Handler
+
+	// Para pruebas (use cases existentes y de nuevas entidades si se requieren)
+	PersonUseCases   person.UseCases
+	UserUseCases     user.UseCases
+	ItemUseCases     item.UseCases
+	CropUseCases     crop.UseCases
+	CustomerUseCases customer.UseCases
+	FieldUseCases    field.UseCases
+	InvestorUseCases investor.UseCases
+	LotUseCases      lot.UseCases
+	ProjectUseCases  project.UseCases
 }
 
 // Initialize se encarga de inyectar todas las dependencias usando Wire.
@@ -115,6 +135,31 @@ func Initialize() (*Dependencies, error) {
 		ProvideSupplierRepository,
 		ProvideSupplierUseCases,
 		ProvideSupplierHandler,
+
+		// Nuevas entidades
+		ProvideCropRepository,
+		ProvideCropUseCases,
+		ProvideCropHandler,
+
+		ProvideCustomerRepository,
+		ProvideCustomerUseCases,
+		ProvideCustomerHandler,
+
+		ProvideFieldRepository,
+		ProvideFieldUseCases,
+		ProvideFieldHandler,
+
+		ProvideInvestorRepository,
+		ProvideInvestorUseCases,
+		ProvideInvestorHandler,
+
+		ProvideLotRepository,
+		ProvideLotUseCases,
+		ProvideLotHandler,
+
+		ProvideProjectRepository,
+		ProvideProjectUseCases,
+		ProvideProjectHandler,
 
 		wire.Struct(new(Dependencies), "*"),
 	)

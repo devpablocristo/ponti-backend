@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	envs "github.com/alphacodinggroup/euxcel-backend/pkg/config/godotenv"
@@ -20,41 +19,9 @@ type AppConfig struct {
 	MaxRetries  int
 }
 
-// HrConfig contiene la configuración relacionada con Recursos Humanos.
-type HrConfig struct {
-	AccessExpirationMinutes  time.Duration
-	RefreshExpirationMinutes time.Duration
-}
-
-// AssessmentConfig contiene la configuración relacionada con Assessment.
-type AssessmentConfig struct {
-	BaseURL                  string
-	Subject                  string
-	BodyTemplate             string
-	AccessExpirationMinutes  time.Duration
-	RefreshExpirationMinutes time.Duration
-}
-
-// PepEndpoints define los endpoints específicos para PEP.
-type PepEndpoints struct {
-	Login  string
-	Status string
-	Info   string
-}
-
-// PepConfig contiene la configuración relacionada con PEP.
-type PepConfig struct {
-	BaseURL       string
-	Endpoints     PepEndpoints
-	SigningMethod string
-}
-
 // Config agrupa todas las configuraciones de la aplicación.
 type Config struct {
-	App        AppConfig
-	Hr         HrConfig
-	Assessment AssessmentConfig
-	Pep        PepConfig
+	App AppConfig
 }
 
 // configLoader implementa la interfaz Loader.
@@ -81,38 +48,9 @@ func NewConfigLoader() (Loader, error) {
 		MaxRetries:  getEnvInt("APP_MAX_RETRIES", 5),
 	}
 
-	// Parsear variables de entorno para HrConfig
-	hrConfig := HrConfig{
-		AccessExpirationMinutes:  getEnvDuration("HR_ACCESS_EXPIRATION_MINUTES", 4320),
-		RefreshExpirationMinutes: getEnvDuration("HR_REFRESH_EXPIRATION_MINUTES", 10080),
-	}
-
-	// Parsear variables de entorno para AssessmentConfig
-	assessmentConfig := AssessmentConfig{
-		BaseURL:                  getEnv("ASSESSMENT_TEST_BASE_URL", "http://localhost:8090/api/v1/assessment/test"),
-		Subject:                  getEnv("ASSESSMENT_TEST_SUBJECT", "Unique link test"),
-		BodyTemplate:             getEnv("ASSESSMENT_TEST_TEMPLATE", "This is a test email with a unique link: <a href=\"%s\">Open link</a>"),
-		AccessExpirationMinutes:  getEnvDuration("ASSESSMENT_TEST_TOKEN_ACCESS_EXPIRATION_MINUTES", 4320),
-		RefreshExpirationMinutes: getEnvDuration("ASSESSMENT_TEST_TOKEN_REFRESH_EXPIRATION_MINUTES", 10080),
-	}
-
-	// Parsear variables de entorno para PepConfig
-	pepConfig := PepConfig{
-		BaseURL: getEnv("PEP_BASE_URL", "http://localhost:8080/api/v1/pep"),
-		Endpoints: PepEndpoints{
-			Login:  getEnv("PEP_LOGIN_ENDPOINT", "/auth/login"),
-			Status: getEnv("PEP_STATUS_ENDPOINT", "/status"),
-			Info:   getEnv("PEP_INFO_ENDPOINT", "/info"),
-		},
-		SigningMethod: getEnv("PEP_SIGNING_METHOD", "HMAC"), // Añadido SigningMethod
-	}
-
 	// Agrupar todas las configuraciones
 	cfg := &Config{
-		App:        appConfig,
-		Hr:         hrConfig,
-		Assessment: assessmentConfig,
-		Pep:        pepConfig, // Asignar PepConfig
+		App: appConfig,
 	}
 
 	// Validar configuraciones
@@ -167,45 +105,6 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("API_VERSION is required")
 	}
 
-	// Validaciones para AssessmentConfig
-	if cfg.Assessment.BaseURL == "" {
-		return fmt.Errorf("ASSESSMENT_TEST_BASE_URL is required")
-	}
-	if cfg.Assessment.Subject == "" {
-		return fmt.Errorf("ASSESSMENT_TEST_SUBJECT is required")
-	}
-	if cfg.Assessment.BodyTemplate == "" {
-		return fmt.Errorf("ASSESSMENT_TEST_TEMPLATE is required")
-	}
-
-	// Validaciones para PepConfig
-	if cfg.Pep.BaseURL == "" {
-		return fmt.Errorf("PEP_BASE_URL is required")
-	}
-	if cfg.Pep.Endpoints.Login == "" {
-		return fmt.Errorf("PEP_LOGIN_ENDPOINT is required")
-	}
-	if cfg.Pep.Endpoints.Status == "" {
-		return fmt.Errorf("PEP_STATUS_ENDPOINT is required")
-	}
-	if cfg.Pep.Endpoints.Info == "" {
-		return fmt.Errorf("PEP_INFO_ENDPOINT is required")
-	}
-
-	// Validar SigningMethod
-	signingMethod := strings.ToUpper(cfg.Pep.SigningMethod)
-	if signingMethod != "HMAC" {
-		return fmt.Errorf("PEP_SIGNING_METHOD must be either 'HMAC', got '%s'", cfg.Pep.SigningMethod)
-	}
-
-	// Opcional: Validar que los endpoints empiecen con "/"
-	endpoints := []string{cfg.Pep.Endpoints.Login, cfg.Pep.Endpoints.Status, cfg.Pep.Endpoints.Info}
-	for _, endpoint := range endpoints {
-		if !strings.HasPrefix(endpoint, "/") {
-			return fmt.Errorf("PEP_ENDPOINTS: endpoint %s must start with '/'", endpoint)
-		}
-	}
-
 	// Añade más validaciones según sea necesario
 	return nil
 }
@@ -215,19 +114,4 @@ func validateConfig(cfg *Config) error {
 // GetAppConfig retorna la configuración de la aplicación.
 func (cl *configLoader) GetAppConfig() AppConfig {
 	return cl.config.App
-}
-
-// GetHrConfig retorna la configuración de Recursos Humanos.
-func (cl *configLoader) GetHrConfig() HrConfig {
-	return cl.config.Hr
-}
-
-// GetAssessmentConfig retorna la configuración de Assessment.
-func (cl *configLoader) GetAssessmentConfig() AssessmentConfig {
-	return cl.config.Assessment
-}
-
-// GetPepConfig retorna la configuración de PEP.
-func (cl *configLoader) GetPepConfig() PepConfig {
-	return cl.config.Pep
 }

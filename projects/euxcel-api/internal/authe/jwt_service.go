@@ -26,29 +26,17 @@ func NewJwtService(js jwt.Service, cf config.Loader) (JwtService, error) {
 	}, nil
 }
 
-func (j *jwtService) GenerateHrTokens(ctx context.Context, userID string) (*domain.Token, error) {
-
-	accessExp := j.config.GetHrConfig().AccessExpirationMinutes
-	refreshExp := j.config.GetHrConfig().RefreshExpirationMinutes
-
-	jwtToken, err := j.jwtService.GenerateTokens(ctx, userID, accessExp, refreshExp)
-	if err != nil {
-		return nil, fmt.Errorf("error trying to generate tokens: %w", err)
-	}
-
-	return dto.ToTokenDomain(jwtToken), nil
-}
-
 func (j *jwtService) GenerateLinkTokens(ctx context.Context, userID string) (*domain.Token, error) {
-	accessExp := j.config.GetAssessmentConfig().AccessExpirationMinutes
-	refreshExp := j.config.GetAssessmentConfig().RefreshExpirationMinutes
+	// accessExp := j.config.GetAssessmentConfig().AccessExpirationMinutes
+	// refreshExp := j.config.GetAssessmentConfig().RefreshExpirationMinutes
 
-	jwtToken, err := j.jwtService.GenerateTokens(ctx, userID, accessExp, refreshExp)
-	if err != nil {
-		return nil, fmt.Errorf("error trying to generate tokens: %w", err)
-	}
+	// jwtToken, err := j.jwtService.GenerateTokens(ctx, userID, accessExp, refreshExp)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error trying to generate tokens: %w", err)
+	// }
 
-	return dto.ToTokenDomain(jwtToken), nil
+	// return dto.ToTokenDomain(jwtToken), nil
+	return nil, nil
 }
 
 func (j *jwtService) ValidateToken(ctx context.Context, token string) (*domain.TokenClaims, error) {
