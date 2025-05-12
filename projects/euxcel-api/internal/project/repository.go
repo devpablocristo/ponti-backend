@@ -13,9 +13,6 @@ import (
 	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
 )
 
-// repository implements the Project persistence operations,
-// delegating entity creation to their respective services and
-// only managing ID-based associations.
 type repository struct {
 	db gorm.Repository
 }

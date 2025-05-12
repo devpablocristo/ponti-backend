@@ -6,7 +6,6 @@ import (
 
 	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
 	lot "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
-	lotdomain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/usecases/domain"
 )
 
 type useCases struct {
@@ -26,15 +25,7 @@ func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, err
 		return 0, fmt.Errorf("create field %q: %w", f.Name, err)
 	}
 	for _, l := range f.Lots {
-		lot := &lotdomain.Lot{
-			FieldID:        fieldID,
-			Name:           l.Name,
-			Hectares:       l.Hectares,
-			PreviousCropID: l.PreviousCropID,
-			CurrentCropID:  l.CurrentCropID,
-			Season:         l.Season,
-		}
-		if _, err := u.lot.CreateLot(ctx, lot); err != nil {
+		if _, err := u.lot.CreateLot(ctx, &l); err != nil {
 			return 0, fmt.Errorf("create lot %q for field %q: %w", l.Name, f.Name, err)
 		}
 	}

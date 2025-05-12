@@ -1,11 +1,16 @@
 package domain
 
+import (
+	cropdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/crop/usecases/domain"
+)
+
+// Lot represents a piece of land within a field.
+
 type Lot struct {
-	ID             int64 // Auto-generated primary key
-	FieldID        int64 // Foreign key to Field
-	Name           string
-	Hectares       float64
-	PreviousCropID int64
-	CurrentCropID  int64
-	Season         string
+	ID           int64
+	Name         string
+	Hectares     float64
+	PreviousCrop cropdom.Crop
+	CurrentCrop  cropdom.Crop
+	Season       string
 }

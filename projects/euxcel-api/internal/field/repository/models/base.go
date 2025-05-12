@@ -1,38 +1,50 @@
-// File: internal/field/repository/models/base.go
 package models
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
+	lotdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/usecases/domain"
 )
 
-// Field is the GORM model for a field.
+// Field is the GORM model for fields, including related lots.
 type Field struct {
-	ID              int64   `gorm:"primaryKey" json:"id"`
-	ProjectID       int64   `gorm:"not null;index" json:"project_id"`
-	Name            string  `gorm:"size:100;not null" json:"name"`
-	LeasePercentage float64 `json:"lease_percentage"`
-	LeaseType       string  `gorm:"size:50;not null" json:"lease_type"`
+	ID          int64  `gorm:"primaryKey"`
+	Name        string `gorm:"size:100;not null"`
+	LeaseTypeID int64  `gorm:"not null;index"`
+	Lots        []Lot  `gorm:"foreignKey:FieldID;constraint:OnDelete:CASCADE"`
 }
 
-// ToDomain converts the GORM model to the domain entity.
+// Lot is the GORM model for lots within a field, storing all attributes.
+type Lot struct {
+	ID int64 `gorm:"primaryKey"`
+}
+
+// ToDomain converts the Field model, including preloaded lots, into the domain Field entity.
 func (m Field) ToDomain() *domain.Field {
-	return &domain.Field{
-		ID:              m.ID,
-		ProjectID:       m.ProjectID,
-		Name:            m.Name,
-		LeasePercentage: m.LeasePercentage,
-		LeaseType:       m.LeaseType,
-		Lots:            nil, // loaded separately
+	d := &domain.Field{
+		ID:          m.ID,
+		Name:        m.Name,
+		LeaseTypeID: m.LeaseTypeID,
 	}
+	for _, lotModel := range m.Lots {
+		d.Lots = append(d.Lots, lotdom.Lot{
+			ID: lotModel.ID,
+		})
+	}
+	return d
 }
 
-// FromDomainField converts a domain entity to the GORM model.
-func FromDomainField(d *domain.Field) *Field {
-	return &Field{
-		ID:              d.ID,
-		ProjectID:       d.ProjectID,
-		Name:            d.Name,
-		LeasePercentage: d.LeasePercentage,
-		LeaseType:       d.LeaseType,
+// FromDomainField converts a domain.Field and its lots into the GORM models for persistence.
+func FromDomain(d *domain.Field) *Field {
+	m := &Field{
+		ID:          d.ID,
+		Name:        d.Name,
+		LeaseTypeID: d.LeaseTypeID,
 	}
+	// Map nested lots
+	for _, ld := range d.Lots {
+		m.Lots = append(m.Lots, Lot{
+			ID: ld.ID,
+		})
+	}
+	return m
 }

@@ -28,7 +28,7 @@ func (r *repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	if f == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
 	}
-	model := models.FromDomainField(f)
+	model := models.FromDomain(f)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create field", err)
 	}
@@ -66,7 +66,7 @@ func (r *repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if f == nil {
 		return pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
 	}
-	model := models.FromDomainField(f)
+	model := models.FromDomain(f)
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Field{}).
 		Where("id = ?", f.ID).

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	cropdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/crop/usecases/domain"
 	customer "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
 	field "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
@@ -83,8 +84,8 @@ func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*p
 		// create field if needed
 		if fld.ID == 0 {
 			id, err := u.field.CreateField(ctx, &fielddom.Field{
-				Name:      fld.Name,
-				LeaseType: fld.LeaseType,
+				Name:        fld.Name,
+				LeaseTypeID: fld.LeaseTypeID,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("create field: %w", err)
@@ -96,12 +97,11 @@ func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*p
 			lt := &fld.Lots[j]
 			if lt.ID == 0 {
 				id, err := u.lot.CreateLot(ctx, &lotdom.Lot{
-					Name:           lt.Name,
-					Hectares:       lt.Hectares,
-					PreviousCropID: lt.PreviousCropID,
-					CurrentCropID:  lt.CurrentCropID,
-					Season:         lt.Season,
-					FieldID:        fld.ID,
+					Name:         lt.Name,
+					Hectares:     lt.Hectares,
+					PreviousCrop: cropdom.Crop{ID: lt.PreviousCrop.ID},
+					CurrentCrop:  cropdom.Crop{ID: lt.CurrentCrop.ID},
+					Season:       lt.Season,
 				})
 				if err != nil {
 					return nil, fmt.Errorf("create lot: %w", err)
