@@ -14,14 +14,14 @@ import (
 	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/handler/dto"
 )
 
-// Handler encapsulates all dependencies for the Lot HTTP handler.
+// Handler encapsula las dependencias para el controlador HTTP de Lot.
 type Handler struct {
 	ucs UseCases
 	gsv gsv.Server
 	mws *mdw.Middlewares
 }
 
-// NewHandler creates a new Lot handler.
+// NewHandler crea un nuevo handler para Lot.
 func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	return &Handler{
 		ucs: u,
@@ -30,7 +30,7 @@ func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	}
 }
 
-// Routes registers all lot routes.
+// Routes registra todas las rutas para lot.
 func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
@@ -41,18 +41,18 @@ func (h *Handler) Routes() {
 
 	public := router.Group(publicPrefix)
 	{
-		public.POST("", h.CreateLot)       // Create a lot
-		public.GET("", h.ListLots)         // List all lots
-		public.GET("/:id", h.GetLot)       // Get a lot by ID
-		public.PUT("/:id", h.UpdateLot)    // Update a lot
-		public.DELETE("/:id", h.DeleteLot) // Delete a lot
+		public.POST("", h.CreateLot)
+		public.GET("", h.ListLots)
+		public.GET("/:id", h.GetLot)
+		public.PUT("/:id", h.UpdateLot)
+		public.DELETE("/:id", h.DeleteLot)
 	}
 
-	// Protected routes.
+	// Rutas protegidas.
 	protected := router.Group(protectedPrefix)
 	{
 		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Protected test endpoint
+		protected.GET("/ping", h.ProtectedPing)
 	}
 }
 
@@ -62,7 +62,6 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
-// CreateLot handles the creation of a new lot.
 func (h *Handler) CreateLot(c *gin.Context) {
 	var req dto.CreateLot
 	if err := utils.ValidateRequest(c, &req); err != nil {
@@ -85,7 +84,6 @@ func (h *Handler) CreateLot(c *gin.Context) {
 	})
 }
 
-// ListLots retrieves all lots.
 func (h *Handler) ListLots(c *gin.Context) {
 	lots, err := h.ucs.ListLots(c.Request.Context())
 	if err != nil {
@@ -96,15 +94,14 @@ func (h *Handler) ListLots(c *gin.Context) {
 	c.JSON(http.StatusOK, lots)
 }
 
-// GetLot retrieves a lot by its ID.
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
 
-	lot, err := h.ucs.GetLot(c.Request.Context(), id)
+	lot, err := h.ucs.GetLot(c.Request.Context(), int64(id))
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -114,9 +111,8 @@ func (h *Handler) GetLot(c *gin.Context) {
 	c.JSON(http.StatusOK, lot)
 }
 
-// UpdateLot updates an existing lot.
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
@@ -126,7 +122,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
 		return
 	}
-	req.ID = id
+	req.ID = int64(id)
 	if err := h.ucs.UpdateLot(c.Request.Context(), req.ToDomain()); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -135,14 +131,13 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
 }
 
-// DeleteLot deletes a lot by its ID.
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
-	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteLot(c.Request.Context(), int64(id)); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

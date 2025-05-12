@@ -8,5 +8,5 @@ type CreateCrop struct {
 
 type CreateCropResponse struct {
 	Message string `json:"message"`
-	CropID  int64  `json:"crop_id"`
+	ID      int64  `json:"id"`
 }

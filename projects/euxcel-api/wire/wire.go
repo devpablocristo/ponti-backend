@@ -20,6 +20,7 @@ import (
 	config "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/config"
 	item "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item"
 	macrocategory "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory"
+	manager "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager"
 	notification "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/notification"
 	person "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person"
 	supplier "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier"
@@ -55,14 +56,13 @@ type Dependencies struct {
 	CategoryHandler      *category.Handler
 	MacroCategoryHandler *macrocategory.Handler
 	SupplierHandler      *supplier.Handler
-
-	// Nuevas entidades
-	CropHandler     *crop.Handler
-	CustomerHandler *customer.Handler
-	FieldHandler    *field.Handler
-	InvestorHandler *investor.Handler
-	LotHandler      *lot.Handler
-	ProjectHandler  *project.Handler
+	CropHandler          *crop.Handler
+	CustomerHandler      *customer.Handler
+	ManagerHandler       *manager.Handler
+	FieldHandler         *field.Handler
+	InvestorHandler      *investor.Handler
+	LotHandler           *lot.Handler
+	ProjectHandler       *project.Handler
 
 	// Para pruebas (use cases existentes y de nuevas entidades si se requieren)
 	PersonUseCases   person.UseCases

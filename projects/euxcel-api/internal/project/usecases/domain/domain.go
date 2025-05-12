@@ -1,9 +1,37 @@
 package domain
 
 type Project struct {
-	ID               int64   // Primary key (INT)
-	Name             string  // Project name (VARCHAR)
-	CustomerID       int64   // Foreign key referencing the responsible company (INT)
-	ProjectAdminCost float64 // Administrative cost of the project (DECIMAL)
-	AdminResponsible string  // Administrative responsible (VARCHAR)
+	ID         int64
+	Name       string
+	CustomerID int64
+	Customer   Client
+	Managers   []Manager
+	Investors  []InvestorDetail
+	Fields     []Field
+}
+
+type Client struct {
+	ID   int64
+	Name string
+}
+
+type Manager struct {
+	ID   int64
+	Name string
+}
+
+type InvestorDetail struct {
+	ID         int64
+	Name       string
+	Percentage int
+}
+
+type Field struct {
+	Name      string
+	LeaseType string
+	Lots      []Lot
+}
+
+type Lot struct {
+	ID int64
 }

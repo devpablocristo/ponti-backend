@@ -41,10 +41,10 @@ func (h *Handler) Routes() {
 
 	public := router.Group(publicPrefix)
 	{
-		public.POST("", h.CreateProject)       // Create a project
-		public.GET("", h.ListProjects)         // List all projects
-		public.GET("/:id", h.GetProject)       // Get a project by ID
-		public.PUT("/:id", h.UpdateProject)    // Update a project
+		public.POST("", h.CreateProject) // Create a project
+		public.GET("", h.ListProjects)   // List all projects
+		public.GET("/:id", h.GetProject) // Get a project by ID
+		//public.PUT("/:id", h.UpdateProject)    // Update a project
 		public.DELETE("/:id", h.DeleteProject) // Delete a project
 	}
 
@@ -72,7 +72,7 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateProject(ctx, req.ToDomain())
+	newProject, err := h.ucs.CreateProject(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -80,8 +80,8 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{
-		Message:   "Project created successfully",
-		ProjectID: newID,
+		Message:    "Project created successfully",
+		NewProject: dto.FromDomain(newProject),
 	})
 }
 
@@ -115,25 +115,25 @@ func (h *Handler) GetProject(c *gin.Context) {
 }
 
 // UpdateProject updates an existing project.
-func (h *Handler) UpdateProject(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
-		return
-	}
-	var req dto.Project
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
-		return
-	}
-	req.ID = id
-	if err := h.ucs.UpdateProject(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Project updated successfully"})
-}
+// func (h *Handler) UpdateProject(c *gin.Context) {
+// 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
+// 		return
+// 	}
+// 	var req dto.Project
+// 	if err := c.ShouldBindJSON(&req); err != nil {
+// 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+// 		return
+// 	}
+// 	req.ID = id
+// 	if err := h.ucs.UpdateProject(c.Request.Context(), req.ToDomain()); err != nil {
+// 		apiErr, _ := types.NewAPIError(err)
+// 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+// 		return
+// 	}
+// 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Project updated successfully"})
+// }
 
 // DeleteProject deletes a project by its ID.
 func (h *Handler) DeleteProject(c *gin.Context) {

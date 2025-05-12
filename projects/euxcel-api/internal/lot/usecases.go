@@ -10,7 +10,7 @@ type useCases struct {
 	repo Repository
 }
 
-// NewUseCases creates a new instance of Lot use cases.
+// NewUseCases crea una nueva instancia de casos de uso para Lot.
 func NewUseCases(repo Repository) UseCases {
 	return &useCases{repo: repo}
 }

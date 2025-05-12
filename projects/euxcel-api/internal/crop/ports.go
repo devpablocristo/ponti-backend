@@ -8,18 +8,18 @@ import (
 
 // UseCases defines business operations for Crop.
 type UseCases interface {
-	CreateCrop(ctx context.Context, c *domain.Crop) (int64, error)
-	ListCrops(ctx context.Context) ([]domain.Crop, error)
-	GetCrop(ctx context.Context, id int64) (*domain.Crop, error)
-	UpdateCrop(ctx context.Context, c *domain.Crop) error
-	DeleteCrop(ctx context.Context, id int64) error
+	CreateCrop(context.Context, *domain.Crop) (int64, error)
+	ListCrops(context.Context) ([]domain.Crop, error)
+	GetCrop(context.Context, int64) (*domain.Crop, error)
+	UpdateCrop(context.Context, *domain.Crop) error
+	DeleteCrop(context.Context, int64) error
 }
 
 // Repository defines data persistence operations for Crop.
 type Repository interface {
-	CreateCrop(ctx context.Context, c *domain.Crop) (int64, error)
-	ListCrops(ctx context.Context) ([]domain.Crop, error)
-	GetCrop(ctx context.Context, id int64) (*domain.Crop, error)
-	UpdateCrop(ctx context.Context, c *domain.Crop) error
-	DeleteCrop(ctx context.Context, id int64) error
+	CreateCrop(context.Context, *domain.Crop) (int64, error)
+	ListCrops(context.Context) ([]domain.Crop, error)
+	GetCrop(context.Context, int64) (*domain.Crop, error)
+	UpdateCrop(context.Context, *domain.Crop) error
+	DeleteCrop(context.Context, int64) error
 }

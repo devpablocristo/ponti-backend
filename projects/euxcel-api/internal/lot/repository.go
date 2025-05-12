@@ -17,7 +17,7 @@ type repository struct {
 	db gorm.Repository
 }
 
-// NewRepository creates a new repository instance for Lot.
+// NewRepository crea una nueva instancia de repositorio para Lot.
 func NewRepository(db gorm.Repository) Repository {
 	return &repository{
 		db: db,
@@ -32,6 +32,7 @@ func (r *repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create lot", err)
 	}
+	// model.ID ya es int64
 	return model.ID, nil
 }
 
@@ -49,7 +50,7 @@ func (r *repository) ListLots(ctx context.Context) ([]domain.Lot, error) {
 
 func (r *repository) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 	var model models.Lot
-	err := r.db.Client().WithContext(ctx).Where("lot_id = ?", id).First(&model).Error
+	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm0.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("lot with id %d not found", id), err)
@@ -65,7 +66,7 @@ func (r *repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	}
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Lot{}).
-		Where("lot_id = ?", l.ID).
+		Where("id = ?", l.ID).
 		Updates(models.FromDomainLot(l))
 	if result.Error != nil {
 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update lot", result.Error)
@@ -78,7 +79,7 @@ func (r *repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 func (r *repository) DeleteLot(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Lot{}, "lot_id = ?", id)
+		Delete(&models.Lot{}, "id = ?", id)
 	if result.Error != nil {
 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to delete lot", result.Error)
 	}
