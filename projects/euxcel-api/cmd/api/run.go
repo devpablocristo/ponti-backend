@@ -13,12 +13,9 @@ import (
 	customermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/repository/models"
 	fieldmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor/repository/models"
-	itemmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/item/repository/models"
 	lotmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/repository/models"
-	macrocategorymodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/macrocategory/repository/models"
 	personmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/person/repository/models"
 	projectmodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/repository/models"
-	suppliermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/supplier/repository/models"
 	usermodels "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/user/repository/models"
 
 	wire "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/wire"
@@ -49,12 +46,7 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.PersonHandler.Routes()
 	deps.UserHandler.Routes()
-	deps.AutheHandler.Routes()
 	deps.NotificationHandler.Routes()
-	deps.ItemHandler.Routes()
-	deps.CategoryHandler.Routes()
-	deps.MacroCategoryHandler.Routes()
-	deps.SupplierHandler.Routes()
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.InvestorHandler.Routes()
@@ -81,9 +73,6 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		&personmodels.Person{},
 		&usermodels.User{},
 		&usermodels.Follow{},
-		&itemmodels.Item{},
-		&macrocategorymodels.MacroCategory{},
-		&suppliermodels.Supplier{},
 		&lotmodels.Lot{},
 		&customermodels.Customer{},
 		&investormodels.Investor{},
