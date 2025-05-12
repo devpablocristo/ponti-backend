@@ -7,9 +7,15 @@ import (
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
+	customer "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer"
+	field "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
+	investor "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor"
+	lot "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
+	manager "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager"
 	project "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project"
 )
 
+// ProvideProjectRepository creates a Project repository instance.
 func ProvideProjectRepository(repo gorm.Repository) (project.Repository, error) {
 	if repo == nil {
 		return nil, errors.New("gorm repository cannot be nil")
@@ -17,10 +23,23 @@ func ProvideProjectRepository(repo gorm.Repository) (project.Repository, error) 
 	return project.NewRepository(repo), nil
 }
 
-func ProvideProjectUseCases(repo project.Repository) project.UseCases {
-	return project.NewUseCases(repo)
+// ProvideProjectUseCases wires the Project use cases with its repository and required services.
+func ProvideProjectUseCases(
+	repo project.Repository,
+	customerUC customer.UseCases,
+	managerUC manager.UseCases,
+	investorUC investor.UseCases,
+	fieldUC field.UseCases,
+	lotUC lot.UseCases,
+) project.UseCases {
+	return project.NewUseCases(repo, customerUC, managerUC, investorUC, fieldUC, lotUC)
 }
 
-func ProvideProjectHandler(server ginsrv.Server, usecases project.UseCases, middlewares *mdw.Middlewares) *project.Handler {
-	return project.NewHandler(server, usecases, middlewares)
+// ProvideProjectHandler creates the HTTP handler for Project endpoints.
+func ProvideProjectHandler(
+	server ginsrv.Server,
+	projUC project.UseCases,
+	middlewares *mdw.Middlewares,
+) *project.Handler {
+	return project.NewHandler(server, projUC, middlewares)
 }

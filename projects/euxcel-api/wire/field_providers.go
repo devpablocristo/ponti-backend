@@ -8,8 +8,10 @@ import (
 	ginsrv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
 
 	field "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
+	lot "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
 )
 
+// ProvideFieldRepository creates a Field repository instance.
 func ProvideFieldRepository(repo gorm.Repository) (field.Repository, error) {
 	if repo == nil {
 		return nil, errors.New("gorm repository cannot be nil")
@@ -17,10 +19,19 @@ func ProvideFieldRepository(repo gorm.Repository) (field.Repository, error) {
 	return field.NewRepository(repo), nil
 }
 
-func ProvideFieldUseCases(repo field.Repository) field.UseCases {
-	return field.NewUseCases(repo)
+// ProvideFieldUseCases wires the Field use cases with repository and Lot service.
+func ProvideFieldUseCases(
+	repo field.Repository,
+	lotUC lot.UseCases,
+) field.UseCases {
+	return field.NewUseCases(repo, lotUC)
 }
 
-func ProvideFieldHandler(server ginsrv.Server, usecases field.UseCases, middlewares *mdw.Middlewares) *field.Handler {
-	return field.NewHandler(server, usecases, middlewares)
+// ProvideFieldHandler creates the HTTP handler for Field endpoints.
+func ProvideFieldHandler(
+	server ginsrv.Server,
+	fieldUC field.UseCases,
+	middlewares *mdw.Middlewares,
+) *field.Handler {
+	return field.NewHandler(server, fieldUC, middlewares)
 }
