@@ -14,23 +14,19 @@ import (
 	dto "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/handler/dto"
 )
 
-// Handler encapsula las dependencias para el controlador HTTP de Lot.
+// Handler encapsulates dependencies for the Lot HTTP handler.
 type Handler struct {
 	ucs UseCases
 	gsv gsv.Server
 	mws *mdw.Middlewares
 }
 
-// NewHandler crea un nuevo handler para Lot.
+// NewHandler creates a new Lot handler.
 func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
-	return &Handler{
-		ucs: u,
-		gsv: s,
-		mws: m,
-	}
+	return &Handler{ucs: u, gsv: s, mws: m}
 }
 
-// Routes registra todas las rutas para lot.
+// Routes registers HTTP routes for lots.
 func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
@@ -48,7 +44,6 @@ func (h *Handler) Routes() {
 		public.DELETE("/:id", h.DeleteLot)
 	}
 
-	// Rutas protegidas.
 	protected := router.Group(protectedPrefix)
 	{
 		protected.Use(h.mws.Protected...)
@@ -56,12 +51,12 @@ func (h *Handler) Routes() {
 	}
 }
 
+// ProtectedPing is a test endpoint for protected routes.
 func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
+	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Protected Pong!"})
 }
 
+// CreateLot handles POST /lots
 func (h *Handler) CreateLot(c *gin.Context) {
 	var req dto.CreateLot
 	if err := utils.ValidateRequest(c, &req); err != nil {
@@ -70,20 +65,18 @@ func (h *Handler) CreateLot(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateLot(ctx, req.ToDomain())
+	dom := req.Lot.ToDomain()
+	newID, err := h.ucs.CreateLot(c.Request.Context(), dom)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.CreateLotResponse{
-		Message: "Lot created successfully",
-		ID:      newID,
-	})
+	c.JSON(http.StatusCreated, dto.CreateLotResponse{Message: "Lot created successfully", ID: newID})
 }
 
+// ListLots handles GET /lots
 func (h *Handler) ListLots(c *gin.Context) {
 	lots, err := h.ucs.ListLots(c.Request.Context())
 	if err != nil {
@@ -94,14 +87,15 @@ func (h *Handler) ListLots(c *gin.Context) {
 	c.JSON(http.StatusOK, lots)
 }
 
+// GetLot handles GET /lots/:id
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
 
-	lot, err := h.ucs.GetLot(c.Request.Context(), int64(id))
+	lot, err := h.ucs.GetLot(c.Request.Context(), id)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -111,19 +105,22 @@ func (h *Handler) GetLot(c *gin.Context) {
 	c.JSON(http.StatusOK, lot)
 }
 
+// UpdateLot handles PUT /lots/:id
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
-	var req dto.Lot
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+	var req dto.UpdateLot
+	if err := utils.ValidateRequest(c, &req); err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	req.ID = int64(id)
-	if err := h.ucs.UpdateLot(c.Request.Context(), req.ToDomain()); err != nil {
+	dom := req.Lot.ToDomain()
+	dom.ID = id
+	if err := h.ucs.UpdateLot(c.Request.Context(), dom); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
@@ -131,13 +128,14 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
 }
 
+// DeleteLot handles DELETE /lots/:id
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
-	if err := h.ucs.DeleteLot(c.Request.Context(), int64(id)); err != nil {
+	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
-	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
@@ -62,90 +61,87 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
-// CreateProject handles the creation of a new project.
+// CreateProject handles project creation.
 func (h *Handler) CreateProject(c *gin.Context) {
 	var req dto.CreateProject
-	if err := utils.ValidateRequest(c, &req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	ctx := c.Request.Context()
-	newProject, err := h.ucs.CreateProject(ctx, req.ToDomain())
+	proj, err := h.ucs.CreateProject(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{
-		Message:    "Project created successfully",
-		NewProject: dto.FromDomain(newProject),
+		Message: "created",
+		Project: dto.FromDomain(proj),
 	})
 }
 
-// ListProjects retrieves all projects.
+// ListProjects returns all projects.
 func (h *Handler) ListProjects(c *gin.Context) {
 	projects, err := h.ucs.ListProjects(c.Request.Context())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, projects)
+	var out []dto.Project
+	for _, p := range projects {
+		out = append(out, *dto.FromDomain(&p))
+	}
+	c.JSON(http.StatusOK, out)
 }
 
-// GetProject retrieves a project by its ID.
+// GetProject returns a single project by ID.
 func (h *Handler) GetProject(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-
-	project, err := h.ucs.GetProject(c.Request.Context(), id)
+	proj, err := h.ucs.GetProject(c.Request.Context(), id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, project)
+	c.JSON(http.StatusOK, dto.FromDomain(proj))
 }
 
-// UpdateProject updates an existing project.
-// func (h *Handler) UpdateProject(c *gin.Context) {
-// 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
-// 		return
-// 	}
-// 	var req dto.Project
-// 	if err := c.ShouldBindJSON(&req); err != nil {
-// 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
-// 		return
-// 	}
-// 	req.ID = id
-// 	if err := h.ucs.UpdateProject(c.Request.Context(), req.ToDomain()); err != nil {
-// 		apiErr, _ := types.NewAPIError(err)
-// 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-// 		return
-// 	}
-// 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Project updated successfully"})
-// }
+// UpdateProject handles a full project update.
+func (h *Handler) UpdateProject(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
+		return
+	}
+	var req dto.UpdateProject
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	dom := req.ToDomain()
+	dom.ID = id
+	if err := h.ucs.UpdateProject(c.Request.Context(), dom); err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "updated"})
+}
 
-// DeleteProject deletes a project by its ID.
+// DeleteProject removes a project by ID.
 func (h *Handler) DeleteProject(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
 	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Project deleted successfully"})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
 }

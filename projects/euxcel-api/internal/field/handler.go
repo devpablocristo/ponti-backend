@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/euxcel-backend/pkg/types"
-	utils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
 
 	mdw "github.com/alphacodinggroup/euxcel-backend/pkg/http/middlewares/gin"
 	gsv "github.com/alphacodinggroup/euxcel-backend/pkg/http/servers/gin"
@@ -62,90 +61,69 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
-// CreateField handles the creation of a new field.
+// CreateField handles POST /fields
 func (h *Handler) CreateField(c *gin.Context) {
-	var req dto.CreateField
-	if err := utils.ValidateRequest(c, &req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	var req dto.CreateFieldRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateField(ctx, req.ToDomain())
+	id, err := h.ucs.CreateField(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusCreated, dto.CreateFieldResponse{
-		Message: "Field created successfully",
-		FieldID: newID,
-	})
+	c.JSON(http.StatusCreated, dto.CreateFieldResponse{Message: "Field created", ID: id})
 }
 
-// ListFields retrieves all fields.
+// ListFields handles GET /fields
 func (h *Handler) ListFields(c *gin.Context) {
 	fields, err := h.ucs.ListFields(c.Request.Context())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, fields)
+	dtos := make([]dto.Field, len(fields))
+	for i, f := range fields {
+		dtos[i] = dto.FromDomain(f)
+	}
+	c.JSON(http.StatusOK, dtos)
 }
 
-// GetField retrieves a field by its ID.
+// GetField handles GET /fields/:id
 func (h *Handler) GetField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	f, err := h.ucs.GetField(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	field, err := h.ucs.GetField(c.Request.Context(), id)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, field)
+	c.JSON(http.StatusOK, dto.FromDomain(*f))
 }
 
-// UpdateField updates an existing field.
+// UpdateField handles PUT /fields/:id
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
-		return
-	}
-	var req dto.Field
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var req dto.UpdateField
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateField(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	dom := req.ToDomain()
+	dom.ID = id
+	if err := h.ucs.UpdateField(c.Request.Context(), dom); err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field updated successfully"})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field updated"})
 }
 
-// DeleteField deletes a field by its ID.
+// DeleteField handles DELETE /fields/:id
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
-		return
-	}
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field deleted successfully"})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field deleted"})
 }

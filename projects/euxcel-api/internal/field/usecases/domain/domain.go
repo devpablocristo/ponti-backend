@@ -1,9 +1,16 @@
+// File: internal/field/usecases/domain/field.go
 package domain
 
+import (
+	lotdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/usecases/domain"
+)
+
+// Field represents the domain entity for a field, including its lots.
 type Field struct {
-	ID              int64   // Primary key
-	Name            string  // Field name
-	ProjectID       int64   // Associated project's ID
-	LeasePercentage float64 // Lease percentage, expressed as a decimal value
-	LeaseType       string  // Type of lease
+	ID              int64        // Auto-generated primary key
+	ProjectID       int64        // Foreign key to project
+	Name            string       // Human-readable name
+	LeasePercentage float64      // Percentage of lease, expressed as decimal
+	LeaseType       string       // Type of lease
+	Lots            []lotdom.Lot // Child lots belonging to this field
 }

@@ -1,35 +1,35 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
+	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
 )
 
-// Field is the DTO for a specific Field.
+// FieldDTO matches JSON payload for Field operations.
 type Field struct {
-	ID              int64   `json:"id"`
-	Name            string  `json:"name"`
-	ProjectID       int64   `json:"project_id"`
-	LeasePercentage float64 `json:"lease_percentage"`
-	LeaseType       string  `json:"lease_type"`
+	ID              int64   `json:"id,omitempty"`
+	ProjectID       int64   `json:"project_id" binding:"required"`
+	Name            string  `json:"name" binding:"required"`
+	LeasePercentage float64 `json:"lease_percentage" binding:"required"`
+	LeaseType       string  `json:"lease_type" binding:"required"`
 }
 
-// ToDomain converts the DTO Field to the domain entity.
+// ToDomain converts DTO to domain entity.
 func (f Field) ToDomain() *domain.Field {
 	return &domain.Field{
 		ID:              f.ID,
-		Name:            f.Name,
 		ProjectID:       f.ProjectID,
+		Name:            f.Name,
 		LeasePercentage: f.LeasePercentage,
 		LeaseType:       f.LeaseType,
 	}
 }
 
-// FromDomain converts a domain Field to the DTO.
-func FromDomain(d domain.Field) *Field {
-	return &Field{
+// FromDomain converts domain entity to DTO.
+func FromDomain(d domain.Field) Field {
+	return Field{
 		ID:              d.ID,
-		Name:            d.Name,
 		ProjectID:       d.ProjectID,
+		Name:            d.Name,
 		LeasePercentage: d.LeasePercentage,
 		LeaseType:       d.LeaseType,
 	}

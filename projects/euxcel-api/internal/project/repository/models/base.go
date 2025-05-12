@@ -1,157 +1,83 @@
-// ================================
-// File: internal/project/repository/models/project.go
-// ================================
 package models
 
 import (
-	"github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
+	customerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
+	fielddom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
+	investordom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor/usecases/domain"
+	managerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager/usecases/domain"
+	projectdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
 )
 
-// Project es el modelo GORM para la entidad Project con todas sus relaciones.
+// Project es el modelo GORM para proyectos.
+// Sólo persiste su propio ID, nombre y los IDs de las relaciones.
 type Project struct {
-	ID         int64             `gorm:"primaryKey"`
-	Name       string            `gorm:"type:varchar(100);not null"`
-	CustomerID int64             `gorm:"not null"`
-	Customer   Client            `gorm:"foreignKey:CustomerID"`
-	Managers   []Manager         `gorm:"many2many:project_managers;"`
-	Investors  []ProjectInvestor `gorm:"foreignKey:ProjectID"`
-	Fields     []Field           `gorm:"foreignKey:ProjectID"`
+	ID         int64  `gorm:"primaryKey"`
+	Name       string `gorm:"type:varchar(100);not null"`
+	CustomerID int64  `gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+
+	Managers  []Manager  `gorm:"many2many:project_managers;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Investors []Investor `gorm:"many2many:project_investors;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Fields    []Field    `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
-// Client representa el cliente relacionado a un proyecto.
-type Client struct {
-	ID   int64  `gorm:"primaryKey"`
-	Name string `gorm:"type:varchar(100);not null"`
-}
-
-// Manager representa un manager asociado a uno o más proyectos.
+// Manager sólo expone el ID para la tabla pivote project_managers.
 type Manager struct {
-	ID     int64 `gorm:"primaryKey"`
-	UserID int64
-	User   User   `gorm:"foreignKey:UserID"`
-	Title  string `gorm:"type:varchar(100)"`
+	ID int64 `gorm:"primaryKey"`
 }
 
-// User representa al usuario subyacente de un Manager o Investor.
-type User struct {
-	ID    int64  `gorm:"primaryKey"`
-	Name  string `gorm:"type:varchar(100);not null"`
-	Email string `gorm:"type:varchar(100);unique;not null"`
-}
-
-// ProjectInvestor es la tabla pivote con campo extra de porcentaje.
-type ProjectInvestor struct {
-	ProjectID  int64    `gorm:"primaryKey"`
-	InvestorID int64    `gorm:"primaryKey"`
-	Percentage int      `gorm:"not null"`
-	Investor   Investor `gorm:"foreignKey:InvestorID"`
-}
-
-// Investor representa la entidad Investor.
+// Investor sólo expone el ID para la tabla pivote project_investors.
 type Investor struct {
-	ID      int64 `gorm:"primaryKey"`
-	UserID  int64
-	User    User   `gorm:"foreignKey:UserID"`
-	Company string `gorm:"type:varchar(100)"`
+	ID int64 `gorm:"primaryKey"`
 }
 
-// Field representa un lote dentro de un proyecto.
+// Field tiene su propio ID y la FK ProjectID; no almacena nada más.
 type Field struct {
-	ID        int64  `gorm:"primaryKey"`
-	Name      string `gorm:"type:varchar(100);not null"`
-	LeaseType string `gorm:"type:varchar(50);not null"`
-	ProjectID int64  `gorm:"not null;index"`
-	Lots      []Lot  `gorm:"foreignKey:FieldID"`
+	ID        int64 `gorm:"primaryKey"`
+	ProjectID int64 `gorm:"not null;index"`
 }
 
-// Lot representa una parcela dentro de un lote.
-type Lot struct {
-	ID           int64  `gorm:"primaryKey"`
-	Name         string `gorm:"type:varchar(100);not null"`
-	Hectares     int    `gorm:"not null"`
-	PreviousCrop string `gorm:"type:varchar(100)"`
-	CurrentCrop  string `gorm:"type:varchar(100);not null"`
-	Season       string `gorm:"type:varchar(50);not null"`
-	FieldID      int64  `gorm:"not null;index"`
-}
-
-func (p *Project) ToDomain() *domain.Project {
-	d := &domain.Project{
-		ID:         p.ID,
-		Name:       p.Name,
-		CustomerID: p.CustomerID,
-		Customer: domain.Client{
-			ID:   p.Customer.ID,
-			Name: p.Customer.Name,
-		},
-	}
-	for _, m := range p.Managers {
-		d.Managers = append(d.Managers, domain.Manager{
-			ID:   m.ID,
-			Name: m.User.Name,
-		})
-	}
-	for _, pi := range p.Investors {
-		d.Investors = append(d.Investors, domain.InvestorDetail{
-			ID:         pi.InvestorID,
-			Name:       pi.Investor.User.Name,
-			Percentage: pi.Percentage,
-		})
-	}
-	for _, f := range p.Fields {
-		fld := domain.Field{
-			Name:      f.Name,
-			LeaseType: f.LeaseType,
-		}
-		for _, plt := range f.Lots {
-			fld.Lots = append(fld.Lots, domain.Lot{
-				Name:         plt.Name,
-				Hectares:     plt.Hectares,
-				PreviousCrop: plt.PreviousCrop,
-				CurrentCrop:  plt.CurrentCrop,
-				Season:       plt.Season,
-			})
-		}
-		d.Fields = append(d.Fields, fld)
-	}
-	return d
-}
-
-// FromDomain convierte una entidad domain.Project a un modelo GORM Project.
-func FromDomain(d *domain.Project) *Project {
-	p := &Project{
+// FromDomain convierte el dominio a modelo GORM, guardando solo IDs.
+func FromDomain(d *projectdom.Project) *Project {
+	m := &Project{
 		ID:         d.ID,
 		Name:       d.Name,
-		CustomerID: d.CustomerID,
+		CustomerID: d.Customer.ID,
 	}
-	// Relaciones many-to-many managers
-	for _, m := range d.Managers {
-		p.Managers = append(p.Managers, Manager{ID: m.ID})
+	// Managers
+	for _, mgr := range d.Managers {
+		m.Managers = append(m.Managers, Manager{ID: mgr.ID})
 	}
-	// Pivote inversores
+	// Investors
 	for _, inv := range d.Investors {
-		p.Investors = append(p.Investors, ProjectInvestor{
-			ProjectID:  d.ID,
-			InvestorID: inv.ID,
-			Percentage: inv.Percentage,
-		})
+		m.Investors = append(m.Investors, Investor{ID: inv.ID})
 	}
-	// Fields y plots
-	for _, f := range d.Fields {
-		fld := Field{
-			Name:      f.Name,
-			LeaseType: f.LeaseType,
-		}
-		for _, plt := range f.Lots {
-			fld.Lots = append(fld.Lots, Lot{
-				Name:         plt.Name,
-				Hectares:     plt.Hectares,
-				PreviousCrop: plt.PreviousCrop,
-				CurrentCrop:  plt.CurrentCrop,
-				Season:       plt.Season,
-			})
-		}
-		p.Fields = append(p.Fields, fld)
+	// Fields
+	for _, fld := range d.Fields {
+		m.Fields = append(m.Fields, Field{ID: fld.ID, ProjectID: d.ID})
 	}
-	return p
+	return m
+}
+
+// ToDomain convierte el modelo GORM a dominio, cargando solo IDs.
+func (m *Project) ToDomain() *projectdom.Project {
+	d := &projectdom.Project{
+		ID:   m.ID,
+		Name: m.Name,
+		Customer: customerdom.Customer{
+			ID: m.CustomerID,
+		},
+	}
+	// Managers
+	for _, mgr := range m.Managers {
+		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID})
+	}
+	// Investors
+	for _, inv := range m.Investors {
+		d.Investors = append(d.Investors, investordom.Investor{ID: inv.ID})
+	}
+	// Fields
+	for _, fld := range m.Fields {
+		d.Fields = append(d.Fields, fielddom.Field{ID: fld.ID})
+	}
+	return d
 }

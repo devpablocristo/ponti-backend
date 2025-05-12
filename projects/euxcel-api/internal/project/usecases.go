@@ -6,103 +6,127 @@ import (
 
 	customer "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
+	field "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field"
+	fielddom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
 	investor "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor"
 	investordom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor/usecases/domain"
+	lot "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot"
+	lotdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/lot/usecases/domain"
 	manager "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager"
 	managerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager/usecases/domain"
-	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
+	projectdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
 )
 
+// useCases orchestrates domain object creation by delegating each entity to its own service.
 type useCases struct {
 	repo     Repository
 	customer customer.UseCases
 	manager  manager.UseCases
 	investor investor.UseCases
+	field    field.UseCases
+	lot      lot.UseCases
 }
 
-// NewUseCases creates a new instance of Project use cases.
-func NewUseCases(repo Repository) UseCases {
-	return &useCases{repo: repo}
+// NewUseCases wires up dependencies for all entity services.
+func NewUseCases(
+	repo Repository,
+	cu customer.UseCases,
+	ma manager.UseCases,
+	in investor.UseCases,
+	fu field.UseCases,
+	lo lot.UseCases,
+) UseCases {
+	return &useCases{repo: repo, customer: cu, manager: ma, investor: in, field: fu, lot: lo}
 }
 
-func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (*domain.Project, error) {
+// CreateProject ensures each related entity exists (or is created) and delegates persistence of project associations.
+func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*projectdom.Project, error) {
 	// 1. Customer
-	if p.CustomerID == 0 {
-		// Asumimos que p.Customer está cargado con al menos el Name
-		newCust := &customerdom.Customer{
-			Name: p.Customer.Name,
-		}
-		newCustomerID, err := u.customer.CreateCustomer(ctx, newCust)
+	if p.Customer.ID == 0 {
+		id, err := u.customer.CreateCustomer(ctx, &customerdom.Customer{Name: p.Customer.Name})
 		if err != nil {
-			return nil, fmt.Errorf("crear customer: %w", err)
+			return nil, fmt.Errorf("create customer: %w", err)
 		}
-		p.CustomerID = newCustomerID
+		p.Customer.ID = id
 	}
 
-	// 2. Project Managers
+	// 2. Managers
 	for i := range p.Managers {
-		mgr := &p.Managers[i]
-		if mgr.ID == 0 {
-			newManagerID, err := u.manager.CreateManager(ctx, &managerdom.Manager{
-				Name: mgr.Name,
-			})
+		m := &p.Managers[i]
+		if m.ID == 0 {
+			id, err := u.manager.CreateManager(ctx, &managerdom.Manager{Name: m.Name})
 			if err != nil {
-				return nil, fmt.Errorf("crear manager %q: %w", mgr.Name, err)
+				return nil, fmt.Errorf("create manager: %w", err)
 			}
-			mgr.ID = newManagerID
+			m.ID = id
 		}
 	}
-
-	// type Investor struct {
-	// 	ID               int64     `json:"id"`
-	// 	Name             string    `json:"name"`
-	// 	FieldID          int64     `json:"field_id"`
-	// 	Contributions    float64   `json:"contributions"`
-	// 	ContributionDate time.Time `json:"contribution_date"`
-	// }
-
-	// type Investor struct {
-	// 	ID         int64  `json:"id" binding:"required"`
-	// 	Name       string `json:"name" binding:"required"`
-	// 	Percentage int    `json:"percentage" binding:"required"`
-	// }
 
 	// 3. Investors
 	for i := range p.Investors {
 		inv := &p.Investors[i]
 		if inv.ID == 0 {
-			createdInv, err := u.investor.CreateInvestor(ctx, &investordom.Investor{
-				Name: inv.Name,
-				// TODO: añador a investor
-				//Percentage: inv.Percentage,
+			id, err := u.investor.CreateInvestor(ctx, &investordom.Investor{
+				Name:       inv.Name,
+				Percentage: inv.Percentage,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("crear investor %q: %w", inv.Name, err)
+				return nil, fmt.Errorf("create investor: %w", err)
 			}
-			inv.ID = createdInv.ID
+			inv.ID = id
 		}
 	}
 
-	// 4. Fields y Lots
-	// Si tus Field/Lot llevan un ID y necesitas crearlos antes de la
-	// inserción del Project, podrías repetir el mismo patrón aquí.
-	// Si no, puedes delegar todo a repo.CreateProject.
+	// 4. Fields & Lots
+	for i := range p.Fields {
+		fld := &p.Fields[i]
+		// create field if needed
+		if fld.ID == 0 {
+			id, err := u.field.CreateField(ctx, &fielddom.Field{
+				Name:      fld.Name,
+				LeaseType: fld.LeaseType,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("create field: %w", err)
+			}
+			fld.ID = id
+		}
+		// create lots
+		for j := range fld.Lots {
+			lt := &fld.Lots[j]
+			if lt.ID == 0 {
+				id, err := u.lot.CreateLot(ctx, &lotdom.Lot{
+					Name:           lt.Name,
+					Hectares:       lt.Hectares,
+					PreviousCropID: lt.PreviousCropID,
+					CurrentCropID:  lt.CurrentCropID,
+					Season:         lt.Season,
+					FieldID:        fld.ID,
+				})
+				if err != nil {
+					return nil, fmt.Errorf("create lot: %w", err)
+				}
+				lt.ID = id
+			}
+		}
+	}
 
-	// 5. Persistir el Project con todos los IDs ya resueltos
+	// 5. Persist project associations (IDs only)
 	return u.repo.CreateProject(ctx, p)
 }
 
-func (u *useCases) ListProjects(ctx context.Context) ([]domain.Project, error) {
+func (u *useCases) ListProjects(ctx context.Context) ([]projectdom.Project, error) {
 	return u.repo.ListProjects(ctx)
 }
 
-func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
+func (u *useCases) GetProject(ctx context.Context, id int64) (*projectdom.Project, error) {
 	return u.repo.GetProject(ctx, id)
 }
 
-// func (u *useCases) UpdateProject(ctx context.Context, p *domain.Project) error {
-// 	return u.repo.UpdateProject(ctx, p)
-// }
+func (u *useCases) UpdateProject(ctx context.Context, p *projectdom.Project) error {
+	// similar logic for update: create missing and then persist associations
+	return u.repo.UpdateProject(ctx, p)
+}
 
 func (u *useCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)

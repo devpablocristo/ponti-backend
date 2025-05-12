@@ -1,37 +1,17 @@
 package domain
 
+import (
+	customerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/customer/usecases/domain"
+	fieldom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/field/usecases/domain"
+	investordom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/investor/usecases/domain"
+	managerdom "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/manager/usecases/domain"
+)
+
 type Project struct {
-	ID         int64
-	Name       string
-	CustomerID int64
-	Customer   Client
-	Managers   []Manager
-	Investors  []InvestorDetail
-	Fields     []Field
-}
-
-type Client struct {
-	ID   int64
-	Name string
-}
-
-type Manager struct {
-	ID   int64
-	Name string
-}
-
-type InvestorDetail struct {
-	ID         int64
-	Name       string
-	Percentage int
-}
-
-type Field struct {
-	Name      string
-	LeaseType string
-	Lots      []Lot
-}
-
-type Lot struct {
-	ID int64
+	ID         int64                  // primary key
+	Name       string                 // project name
+	Customer   customerdom.Customer   // loaded client
+	Managers   []managerdom.Manager   // many-to-many relation
+	Investors  []investordom.Investor // pivot relation with extra field
+	Fields     []fieldom.Field        // child fields
 }

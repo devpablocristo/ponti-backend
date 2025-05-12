@@ -13,51 +13,37 @@ import (
 	domain "github.com/alphacodinggroup/euxcel-backend/projects/euxcel-api/internal/project/usecases/domain"
 )
 
+// repository implements the Project persistence operations,
+// delegating entity creation to their respective services and
+// only managing ID-based associations.
 type repository struct {
 	db gorm.Repository
 }
 
-// NewRepository creates a new repository instance for Project.
+// NewRepository creates a new Project repository.
 func NewRepository(db gorm.Repository) Repository {
-	return &repository{
-		db: db,
-	}
+	return &repository{db: db}
 }
 
-// CreateProject persiste un domain.Project completo y devuelve el domain.Project con relaciones cargadas.
+// CreateProject persists a Project and its ID-based relations.
 func (r *repository) CreateProject(ctx context.Context, d *domain.Project) (*domain.Project, error) {
-	// Convertimos el dominio a modelo GORM
 	m := models.FromDomain(d)
-
-	// Ejecutamos todas las inserciones en una única transacción
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
-		// 1. Crear la entidad base
+		// 1. create base project
 		if err := tx.Create(&m).Error; err != nil {
 			return err
 		}
-		// 2. Asociar managers (many2many)
-		if err := tx.Model(&m).Association("Managers").Append(m.Managers); err != nil {
+		// 2. link managers (many2many)
+		if err := tx.Model(&m).Association("Managers").Replace(m.Managers); err != nil {
 			return err
 		}
-		// 3. Insertar pivote de inversores con porcentaje
-		for i := range m.Investors {
-			m.Investors[i].ProjectID = m.ID
-		}
-		if err := tx.Create(&m.Investors).Error; err != nil {
+		// 3. link investors (many2many)
+		if err := tx.Model(&m).Association("Investors").Replace(m.Investors); err != nil {
 			return err
 		}
-		// 4. Insertar fields y plots
-		for i := range m.Fields {
-			m.Fields[i].ProjectID = m.ID
-			if err := tx.Create(&m.Fields[i]).Error; err != nil {
-				return err
-			}
-			for j := range m.Fields[i].Plots {
-				m.Fields[i].Plots[j].FieldID = m.Fields[i].ID
-				if err := tx.Create(&m.Fields[i].Plots[j]).Error; err != nil {
-					return err
-				}
-			}
+		// 4. link fields (has-many)
+		if err := tx.Model(&m).Association("Fields").Replace(m.Fields); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -65,71 +51,105 @@ func (r *repository) CreateProject(ctx context.Context, d *domain.Project) (*dom
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create project", err)
 	}
 
-	// Recargamos con todas las asociaciones para devolver el domain completo
+	// reload with associations
 	var saved models.Project
 	if err := r.db.Client().WithContext(ctx).
-		Preload("Customer").
-		Preload("Managers.User").
-		Preload("Investors.Investor.User").
-		Preload("Fields.Plots").
+		Preload("Managers").
+		Preload("Investors").
+		Preload("Fields").
 		First(&saved, m.ID).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to load project details", err)
 	}
-
-	// Convertimos el modelo GORM de vuelta a domain.Project
-	result := saved.ToDomain()
-	return result, nil
+	return saved.ToDomain(), nil
 }
 
+// ListProjects retrieves all projects with their ID-based relations.
 func (r *repository) ListProjects(ctx context.Context) ([]domain.Project, error) {
 	var list []models.Project
-	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Managers").
+		Preload("Investors").
+		Preload("Fields").
+		Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list projects", err)
 	}
-	result := make([]domain.Project, 0, len(list))
+	var result []domain.Project
 	for _, p := range list {
 		result = append(result, *p.ToDomain())
 	}
 	return result, nil
 }
 
+// GetProject retrieves a single project by ID with its relations.
 func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
-	var model models.Project
-	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
+	var m models.Project
+	err := r.db.Client().WithContext(ctx).
+		Preload("Managers").
+		Preload("Investors").
+		Preload("Fields").
+		First(&m, id).Error
 	if err != nil {
 		if errors.Is(err, gorm0.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project with id %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get project", err)
 	}
-	return model.ToDomain(), nil
+	return m.ToDomain(), nil
 }
 
-// func (r *repository) UpdateProject(ctx context.Context, p *domain.Project) error {
-// 	if p == nil {
-// 		return pkgtypes.NewError(pkgtypes.ErrValidation, "project is nil", nil)
-// 	}
-// 	result := r.db.Client().WithContext(ctx).
-// 		Model(&models.Project{}).
-// 		Where("id = ?", p.ID).
-// 		Updates(models.FromDomainProject(p))
-// 	if result.Error != nil {
-// 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update project", result.Error)
-// 	}
-// 	if result.RowsAffected == 0 {
-// 		return pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project with id %d does not exist", p.ID), nil)
-// 	}
-// 	return nil
-// }
-
-func (r *repository) DeleteProject(ctx context.Context, id int64) error {
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Project{}, "id = ?", id)
-	if result.Error != nil {
-		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to delete project", result.Error)
+// UpdateProject updates a Project's main fields and relinks its ID-based relations.
+func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error {
+	m := models.FromDomain(d)
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+		// update name and customer_id
+		if err := tx.Model(&models.Project{}).
+			Where("id = ?", d.ID).
+			Updates(map[string]interface{}{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
+			return err
+		}
+		// relink managers
+		if err := tx.Model(&models.Project{ID: d.ID}).Association("Managers").Replace(m.Managers); err != nil {
+			return err
+		}
+		// relink investors
+		if err := tx.Model(&models.Project{ID: d.ID}).Association("Investors").Replace(m.Investors); err != nil {
+			return err
+		}
+		// relink fields
+		if err := tx.Model(&models.Project{ID: d.ID}).Association("Fields").Replace(m.Fields); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update project", err)
 	}
-	if result.RowsAffected == 0 {
-		return pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project with id %d does not exist", id), nil)
+	return nil
+}
+
+// DeleteProject removes a project and clears all its ID-based relations.
+func (r *repository) DeleteProject(ctx context.Context, id int64) error {
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+		// clear managers
+		if err := tx.Model(&models.Project{ID: id}).Association("Managers").Clear(); err != nil {
+			return err
+		}
+		// clear investors
+		if err := tx.Model(&models.Project{ID: id}).Association("Investors").Clear(); err != nil {
+			return err
+		}
+		// clear fields
+		if err := tx.Model(&models.Project{ID: id}).Association("Fields").Clear(); err != nil {
+			return err
+		}
+		// delete project
+		if err := tx.Delete(&models.Project{}, id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to delete project", err)
 	}
 	return nil
 }
