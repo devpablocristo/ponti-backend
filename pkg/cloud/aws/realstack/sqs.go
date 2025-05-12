@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
-	"github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
+	"github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
 )
 
 // sqsClient implementa la interfaz SQSClient

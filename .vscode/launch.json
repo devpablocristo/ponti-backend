@@ -6,8 +6,8 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceRoot}/projects/euxcel-api/cmd/api/",
-      "envFile": "${workspaceRoot}/projects/euxcel-api/.env"
+      "program": "${workspaceRoot}/projects/ponti-api/cmd/api/",
+      "envFile": "${workspaceRoot}/projects/ponti-api/.env"
     }
   ]
 }

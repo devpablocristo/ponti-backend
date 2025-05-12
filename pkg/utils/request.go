@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
-	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // ValidateRequest valida la solicitud y retorna un error enriquecido si falla.

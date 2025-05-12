@@ -5,7 +5,7 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	pkgswagger "github.com/alphacodinggroup/euxcel-backend/pkg/doc/swagger"
+	pkgswagger "github.com/alphacodinggroup/ponti-backend/pkg/doc/swagger"
 )
 
 // SetupSwagger configura Swagger en un router Gin

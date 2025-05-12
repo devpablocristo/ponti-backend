@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	"github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
+	"github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
 )
 
 // lambdaClient implementa la interfaz LambdaClient

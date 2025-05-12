@@ -3,7 +3,7 @@ package pkgast
 import (
 	"github.com/spf13/viper"
 
-	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/ast/defs"
+	defs "github.com/alphacodinggroup/ponti-backend/pkg/repo-tools/ast/defs"
 )
 
 // Bootstrap inicializa y valida la configuración del AST parser.

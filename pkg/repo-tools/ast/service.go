@@ -19,7 +19,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 
-	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/ast/defs"
+	defs "github.com/alphacodinggroup/ponti-backend/pkg/repo-tools/ast/defs"
 )
 
 var (

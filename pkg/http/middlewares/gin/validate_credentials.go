@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // Constants for error messages.

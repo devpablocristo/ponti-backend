@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
+	"github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
 )
 
 // Bootstrap inicializa y retorna un Stack AWS basado en la configuración del entorno

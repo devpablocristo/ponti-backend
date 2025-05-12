@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	pkgoauth2 "github.com/alphacodinggroup/euxcel-backend/pkg/authe/oauth2"
+	pkgoauth2 "github.com/alphacodinggroup/ponti-backend/pkg/authe/oauth2"
 )
 
 // Config implementa pkgoauth2.Config para Auth0

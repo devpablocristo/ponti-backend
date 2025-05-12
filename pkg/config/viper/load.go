@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	pkgutils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
+	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
 // Load loads multiple configuration files using Viper.

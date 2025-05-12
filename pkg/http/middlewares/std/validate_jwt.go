@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	pkgutils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
+	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
 // Validate retorna un http.HandlerFunc que valida el JWT usando la lógica común y llama a 'next' si la validación es exitosa.

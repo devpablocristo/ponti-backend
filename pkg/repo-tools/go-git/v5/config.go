@@ -3,7 +3,7 @@ package pkggogit
 import (
 	"fmt"
 
-	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/go-git/v5/defs"
+	defs "github.com/alphacodinggroup/ponti-backend/pkg/repo-tools/go-git/v5/defs"
 )
 
 type config struct {

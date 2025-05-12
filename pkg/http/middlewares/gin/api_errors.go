@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // ErrorHandlingMiddleware captures errors added to the context and responds appropriately.

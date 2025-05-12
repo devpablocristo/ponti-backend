@@ -3,7 +3,7 @@ package pkgast
 import (
 	"fmt"
 
-	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/ast/defs"
+	defs "github.com/alphacodinggroup/ponti-backend/pkg/repo-tools/ast/defs"
 )
 
 type config struct {

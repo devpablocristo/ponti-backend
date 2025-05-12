@@ -3,9 +3,9 @@ package pkgaws
 import (
 	"fmt"
 
-	localstack "github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/localstack"
-	ports "github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
-	realstack "github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/realstack"
+	localstack "github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/localstack"
+	ports "github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
+	realstack "github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/realstack"
 )
 
 // awsProvider implementa StackFactory para AWS real

@@ -9,7 +9,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 
-	defs "github.com/alphacodinggroup/euxcel-backend/pkg/repo-tools/go-git/v5/defs"
+	defs "github.com/alphacodinggroup/ponti-backend/pkg/repo-tools/go-git/v5/defs"
 )
 
 var (

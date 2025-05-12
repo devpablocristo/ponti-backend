@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	pkgutils "github.com/alphacodinggroup/euxcel-backend/pkg/utils"
+	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
 // Validate returns a gin.HandlerFunc that validates the JWT using common logic.

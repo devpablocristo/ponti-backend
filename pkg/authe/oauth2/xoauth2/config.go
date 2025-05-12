@@ -1,7 +1,7 @@
 package pkgxaouth2
 
 import (
-	pkgoauth2 "github.com/alphacodinggroup/euxcel-backend/pkg/authe/oauth2"
+	pkgoauth2 "github.com/alphacodinggroup/ponti-backend/pkg/authe/oauth2"
 )
 
 // Config embede la base, así puedes usar la validación genérica

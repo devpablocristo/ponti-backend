@@ -3,7 +3,7 @@ package pkgaws
 import (
 	"fmt"
 
-	"github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
+	"github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
 )
 
 // config estructura principal de configuración

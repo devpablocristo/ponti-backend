@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 
-	"github.com/alphacodinggroup/euxcel-backend/pkg/cloud/aws/ports"
+	"github.com/alphacodinggroup/ponti-backend/pkg/cloud/aws/ports"
 )
 
 // stack implementa la interfaz Stack para AWS

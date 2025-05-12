@@ -1,4 +1,4 @@
-module github.com/alphacodinggroup/euxcel-backend/pkg
+module github.com/alphacodinggroup/ponti-backend/pkg
 
 go 1.23
 

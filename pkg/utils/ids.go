@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strconv"
 
-	pkgtypes "github.com/alphacodinggroup/euxcel-backend/pkg/types"
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 func ValidateStringID(idParam string) (uint, error) {
