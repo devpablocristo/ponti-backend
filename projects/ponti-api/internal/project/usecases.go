@@ -17,7 +17,6 @@ import (
 	projectdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-// useCases orchestrates domain object creation by delegating each entity to its own service.
 type useCases struct {
 	repo     Repository
 	customer customer.UseCases
@@ -27,7 +26,6 @@ type useCases struct {
 	lot      lot.UseCases
 }
 
-// NewUseCases wires up dependencies for all entity services.
 func NewUseCases(
 	repo Repository,
 	cu customer.UseCases,
@@ -46,7 +44,6 @@ func NewUseCases(
 	}
 }
 
-// CreateProject ensures each related entity exists (or is created) and delegates persistence of project associations.
 func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*projectdom.Project, error) {
 	// 1. Customer
 	if p.Customer.ID == 0 {
@@ -130,7 +127,6 @@ func (u *useCases) GetProject(ctx context.Context, id int64) (*projectdom.Projec
 }
 
 func (u *useCases) UpdateProject(ctx context.Context, p *projectdom.Project) error {
-	// similar logic for update: create missing and then persist associations
 	return u.repo.UpdateProject(ctx, p)
 }
 

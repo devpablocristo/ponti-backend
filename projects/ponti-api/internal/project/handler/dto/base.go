@@ -60,8 +60,7 @@ type Lot struct {
 // ToDomain maps the DTO to the domain.Project
 func (r *Project) ToDomain() *projectdom.Project {
 	d := &projectdom.Project{
-		Name:       r.ProjectName,
-		CustomerID: r.Customer.ID, // asegúrate de asignar el FK
+		Name: r.ProjectName,
 		Customer: customerdom.Customer{
 			ID:   r.Customer.ID,
 			Name: r.Customer.Name,

@@ -8,11 +8,10 @@ import (
 )
 
 type Project struct {
-	ID         int64                  // primary key
-	Name       string                 // project name
-	CustomerID int64                  // foreign key to customer
-	Customer   customerdom.Customer   // loaded client
-	Managers   []managerdom.Manager   // many-to-many relation
-	Investors  []investordom.Investor // pivot relation with extra field
-	Fields     []fieldom.Field        // child fields
+	ID        int64                  // primary key
+	Name      string                 // project name
+	Customer  customerdom.Customer   // loaded client
+	Managers  []managerdom.Manager   // many-to-many relation
+	Investors []investordom.Investor // pivot relation with extra field
+	Fields    []fieldom.Field        // child fields
 }

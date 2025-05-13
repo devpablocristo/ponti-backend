@@ -68,14 +68,14 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	proj, err := h.ucs.CreateProject(c.Request.Context(), req.ToDomain())
+	p, err := h.ucs.CreateProject(c.Request.Context(), req.ToDomain())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{
 		Message: "created",
-		Project: dto.FromDomain(proj),
+		Project: p,
 	})
 }
 

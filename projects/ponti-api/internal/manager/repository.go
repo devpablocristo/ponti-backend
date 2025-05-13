@@ -17,7 +17,6 @@ type repository struct {
 	db gorm.Repository
 }
 
-// NewRepository crea una instancia del adaptador GORM para customers.
 func NewRepository(db gorm.Repository) Repository {
 	return &repository{
 		db: db,
