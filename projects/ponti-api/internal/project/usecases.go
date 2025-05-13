@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -97,11 +96,11 @@ func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*p
 			lt := &fld.Lots[j]
 			if lt.ID == 0 {
 				id, err := u.lot.CreateLot(ctx, &lotdom.Lot{
-					Name:         lt.Name,
-					Hectares:     lt.Hectares,
-					PreviousCrop: cropdom.Crop{ID: lt.PreviousCrop.ID},
-					CurrentCrop:  cropdom.Crop{ID: lt.CurrentCrop.ID},
-					Season:       lt.Season,
+					Name:           lt.Name,
+					Hectares:       lt.Hectares,
+					PreviousCropID: lt.PreviousCropID,
+					CurrentCropID:  lt.CurrentCropID,
+					Season:         lt.Season,
 				})
 				if err != nil {
 					return nil, fmt.Errorf("create lot: %w", err)

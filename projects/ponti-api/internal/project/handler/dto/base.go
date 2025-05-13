@@ -1,7 +1,6 @@
 package dto
 
 import (
-	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
@@ -73,11 +72,11 @@ func (r *Project) ToDomain() *projectdom.Project {
 		fld := fielddom.Field{ID: 0, Name: f.Name, LeaseTypeID: f.LeaseTypeID}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
-				Name:         lt.Name,
-				Hectares:     lt.Hectares,
-				PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID},
-				CurrentCrop:  cropdom.Crop{ID: lt.CurrentCropID},
-				Season:       lt.Season,
+				Name:           lt.Name,
+				Hectares:       lt.Hectares,
+				PreviousCropID: lt.PreviousCropID,
+				CurrentCropID:  lt.CurrentCropID,
+				Season:         lt.Season,
 			})
 		}
 		d.Fields = append(d.Fields, fld)
@@ -100,7 +99,13 @@ func FromDomain(d *projectdom.Project) *Project {
 	for _, fld := range d.Fields {
 		dtoF := Field{Name: fld.Name, LeaseTypeID: fld.LeaseTypeID}
 		for _, lt := range fld.Lots {
-			dtoF.Lots = append(dtoF.Lots, Lot{Name: lt.Name, Hectares: lt.Hectares, PreviousCropID: lt.PreviousCrop.ID, CurrentCropID: lt.CurrentCrop.ID, Season: lt.Season})
+			dtoF.Lots = append(dtoF.Lots, Lot{
+				Name:           lt.Name,
+				Hectares:       lt.Hectares,
+				PreviousCropID: lt.PreviousCropID,
+				CurrentCropID:  lt.CurrentCropID,
+				Season:         lt.Season,
+			})
 		}
 		r.Fields = append(r.Fields, dtoF)
 	}

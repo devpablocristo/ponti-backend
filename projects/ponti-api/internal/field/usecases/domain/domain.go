@@ -1,4 +1,3 @@
-// File: internal/field/usecases/domain/field.go
 package domain
 
 import (

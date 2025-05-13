@@ -29,7 +29,6 @@ import (
 	user "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/user"
 )
 
-// Dependencies reúne todas las dependencias de la aplicación que se inyectan con Wire.
 type Dependencies struct {
 	ConfigLoader       config.Loader
 	GinServer          ginsrv.Server
@@ -63,10 +62,8 @@ type Dependencies struct {
 	ProjectUseCases  project.UseCases
 }
 
-// Initialize se encarga de inyectar todas las dependencias usando Wire.
 func Initialize() (*Dependencies, error) {
 	wire.Build(
-		// Proveedores bootstrap
 		ProvideConfigLoader,
 		ProvideGinServer,
 		ProvideGormRepository,
@@ -78,22 +75,18 @@ func Initialize() (*Dependencies, error) {
 		ProvideHttpClient,
 		ProvideSmtpService,
 
-		// Person
 		ProvidePersonRepository,
 		ProvidePersonUseCases,
 		ProvidePersonHandler,
 
-		// User
 		ProvideUserRepository,
 		ProvideUserUseCases,
 		ProvideUserHandler,
 
-		// Notification
 		ProvideNotificationSmtpService,
 		ProvideNotificationUseCases,
 		ProvideNotificationHandler,
 
-		// Nuevas entidades
 		ProvideCropRepository,
 		ProvideCropUseCases,
 		ProvideCropHandler,
@@ -101,6 +94,10 @@ func Initialize() (*Dependencies, error) {
 		ProvideCustomerRepository,
 		ProvideCustomerUseCases,
 		ProvideCustomerHandler,
+
+		ProvideManagerRepository,
+		ProvideManagerUseCases,
+		ProvideManagerHandler,
 
 		ProvideFieldRepository,
 		ProvideFieldUseCases,

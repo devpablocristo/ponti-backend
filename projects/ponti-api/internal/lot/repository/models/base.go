@@ -1,7 +1,6 @@
 package models
 
 import (
-	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -18,12 +17,12 @@ type Lot struct {
 // ToDomain maps the GORM model to the domain.Lot, using cropdom.Crop for crop references.
 func (m *Lot) ToDomain() *domain.Lot {
 	return &domain.Lot{
-		ID:           m.ID,
-		Name:         m.Name,
-		Hectares:     m.Hectares,
-		PreviousCrop: cropdom.Crop{ID: m.PreviousCropID},
-		CurrentCrop:  cropdom.Crop{ID: m.CurrentCropID},
-		Season:       m.Season,
+		ID:             m.ID,
+		Name:           m.Name,
+		Hectares:       m.Hectares,
+		PreviousCropID: m.PreviousCropID,
+		CurrentCropID:  m.CurrentCropID,
+		Season:         m.Season,
 	}
 }
 
@@ -33,8 +32,8 @@ func FromDomain(d *domain.Lot) *Lot {
 		ID:             d.ID,
 		Name:           d.Name,
 		Hectares:       d.Hectares,
-		PreviousCropID: d.PreviousCrop.ID,
-		CurrentCropID:  d.CurrentCrop.ID,
+		PreviousCropID: d.PreviousCropID,
+		CurrentCropID:  d.CurrentCropID,
 		Season:         d.Season,
 	}
 }

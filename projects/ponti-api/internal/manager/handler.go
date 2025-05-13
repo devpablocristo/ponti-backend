@@ -62,7 +62,6 @@ func (h *Handler) ProtectedPing(c *gin.Context) {
 	})
 }
 
-// CreateManager maneja la creación de un nuevo manager.
 func (h *Handler) CreateManager(c *gin.Context) {
 	var req dto.CreateManager
 	if err := utils.ValidateRequest(c, &req); err != nil {
@@ -85,7 +84,6 @@ func (h *Handler) CreateManager(c *gin.Context) {
 	})
 }
 
-// ListManagers recupera todos los customers.
 func (h *Handler) ListManagers(c *gin.Context) {
 	customers, err := h.ucs.ListManagers(c.Request.Context())
 	if err != nil {
@@ -96,7 +94,6 @@ func (h *Handler) ListManagers(c *gin.Context) {
 	c.JSON(http.StatusOK, customers)
 }
 
-// GetManager recupera un manager por su ID.
 func (h *Handler) GetManager(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
