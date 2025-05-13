@@ -4,11 +4,11 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 )
 
-// Manager representa el modelo GORM para un manager.
 type Manager struct {
-	ID   int64  `gorm:"primaryKey"`
-	Name string `gorm:"type:varchar(100);not null"`
-	Type string `gorm:"type:varchar(100);not null"`
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"column:name;type:varchar(100);not null"`
+	// Para no confundir al parser de GORM:
+	Type string `gorm:"column:type;type:varchar(50);not null"`
 }
 
 // ToDomain convierte el modelo Manager a la entidad de dominio.

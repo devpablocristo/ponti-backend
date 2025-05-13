@@ -10,6 +10,7 @@ import (
 // Field is the GORM model for fields, including related lots.
 type Field struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID   int64     `gorm:"index;column:project_id"`
 	Name        string    `gorm:"size:100;not null;column:name"`
 	LeaseTypeID int64     `gorm:"not null;index;column:lease_type_id"`
 	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at"`

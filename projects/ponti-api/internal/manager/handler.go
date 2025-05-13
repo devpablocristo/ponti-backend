@@ -35,7 +35,7 @@ func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
 	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/customers"
+	apiBase := "/api/" + apiVersion + "/managers"
 	publicPrefix := apiBase + "/public"
 	protectedPrefix := apiBase + "/protected"
 

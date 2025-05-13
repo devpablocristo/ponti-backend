@@ -22,42 +22,74 @@ func NewRepository(db gorm.Repository) Repository {
 	return &repository{db: db}
 }
 
-// CreateProject persists a Project and its ID-based relations.
-func (r *repository) CreateProject(ctx context.Context, d *domain.Project) (*domain.Project, error) {
-	m := models.FromDomain(d)
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
-		// 1. create base project
-		if err := tx.Create(&m).Error; err != nil {
-			return err
-		}
-		// 2. link managers (many2many)
-		if err := tx.Model(&m).Association("Managers").Replace(m.Managers); err != nil {
-			return err
-		}
-		// 3. link investors (many2many)
-		if err := tx.Model(&m).Association("Investors").Replace(m.Investors); err != nil {
-			return err
-		}
-		// 4. link fields (has-many)
-		if err := tx.Model(&m).Association("Fields").Replace(m.Fields); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
+func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*domain.Project, error) {
+	m := models.FromDomain(p) // m.Managers y m.Investors tienen sólo ID
+
+	tx := r.db.Client().WithContext(ctx).Begin()
+
+	// 1) Creamos SOLO el proyecto
+	if err := tx.
+		Omit("Managers", "Investors", "Fields").
+		Create(&m).Error; err != nil {
+		tx.Rollback()
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create project", err)
 	}
 
-	// reload with associations
-	var saved models.Project
-	if err := r.db.Client().WithContext(ctx).
-		Preload("Managers").
-		Preload("Investors").
-		Preload("Fields").
-		First(&saved, m.ID).Error; err != nil {
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to load project details", err)
+	// 2) Asociamos managers en la tabla pivote
+	for _, mgr := range m.Managers {
+		// Opcional: validar que el manager exista
+		var count int64
+		if err := tx.Raw("SELECT count(1) FROM managers WHERE id = ?", mgr.ID).Scan(&count).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify manager", err)
+		}
+		if count == 0 {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("manager id %d does not exist", mgr.ID), nil)
+		}
+
+		if err := tx.Exec(
+			"INSERT INTO project_managers (project_id, manager_id) VALUES (?, ?)",
+			m.ID, mgr.ID,
+		).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate managers", err)
+		}
 	}
-	return saved.ToDomain(), nil
+
+	// 3) Asociamos investors en la tabla pivote (sin tocar la tabla investors)
+	for _, inv := range m.Investors {
+		// Validar existencia
+		var count int64
+		if err := tx.Raw("SELECT count(1) FROM investors WHERE id = ?", inv.ID).Scan(&count).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify investor", err)
+		}
+		if count == 0 {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("investor id %d does not exist", inv.ID), nil)
+		}
+
+		if err := tx.Exec(
+			"INSERT INTO project_investors (project_id, investor_id) VALUES (?, ?)",
+			m.ID, inv.ID,
+		).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate investors", err)
+		}
+	}
+
+	// 4) Creamos los fields (estos sí llevan datos completos)
+	for i := range m.Fields {
+		m.Fields[i].ProjectID = m.ID
+	}
+	if err := tx.Create(&m.Fields).Error; err != nil {
+		tx.Rollback()
+		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create fields", err)
+	}
+
+	tx.Commit()
+	return m.ToDomain(), nil
 }
 
 // ListProjects retrieves all projects with their ID-based relations.

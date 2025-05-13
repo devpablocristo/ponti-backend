@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
@@ -9,34 +11,39 @@ import (
 )
 
 // Project es el modelo GORM para proyectos.
-// Sólo persiste su propio ID, nombre y los IDs de las relaciones.
 type Project struct {
-	ID         int64  `gorm:"primaryKey"`
-	Name       string `gorm:"type:varchar(100);not null"`
-	CustomerID int64  `gorm:"not null;index;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	ID         int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	Name       string    `gorm:"size:100;not null;column:name"`
+	CustomerID int64     `gorm:"not null;index;column:customer_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CreatedAt  time.Time `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
 
-	Managers  []Manager  `gorm:"many2many:project_managers;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Investors []Investor `gorm:"many2many:project_investors;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Managers  []Manager  `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Investors []Investor `gorm:"many2many:project_investors;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Fields    []Field    `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
 type Manager struct {
-	ID int64 `gorm:"primaryKey"`
+	ID int64 `gorm:"primaryKey;column:id"`
 }
 
 // Investor sólo expone el ID para la tabla pivote project_investors.
 type Investor struct {
-	ID int64 `gorm:"primaryKey"`
+	ID int64 `gorm:"primaryKey;column:id"`
 }
 
-// Field tiene su propio ID y la FK ProjectID; no almacena nada más.
+// Field es el modelo GORM para campos de un proyecto.
 type Field struct {
-	ID        int64 `gorm:"primaryKey"`
-	ProjectID int64 `gorm:"not null;index"`
+	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID   int64     `gorm:"not null;index;column:project_id"`
+	Name        string    `gorm:"size:100;not null;column:name"`
+	LeaseTypeID int64     `gorm:"not null;column:lease_type_id"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
-// FromDomain convierte el dominio a modelo GORM, guardando solo IDs.
+// FromDomain convierte el dominio a modelo GORM, guardando todos los campos.
 func FromDomain(d *projectdom.Project) *Project {
 	m := &Project{
 		ID:         d.ID,
@@ -52,13 +59,17 @@ func FromDomain(d *projectdom.Project) *Project {
 		m.Investors = append(m.Investors, Investor{ID: inv.ID})
 	}
 	// Fields
-	for _, fld := range d.Fields {
-		m.Fields = append(m.Fields, Field{ID: fld.ID, ProjectID: d.ID})
+	for _, fd := range d.Fields {
+		m.Fields = append(m.Fields, Field{
+			ProjectID:   m.ID,
+			Name:        fd.Name,
+			LeaseTypeID: fd.LeaseTypeID,
+		})
 	}
 	return m
 }
 
-// ToDomain convierte el modelo GORM a dominio, cargando solo IDs.
+// ToDomain convierte el modelo GORM a dominio, cargando todos los campos.
 func (m *Project) ToDomain() *projectdom.Project {
 	d := &projectdom.Project{
 		ID:   m.ID,
@@ -77,7 +88,11 @@ func (m *Project) ToDomain() *projectdom.Project {
 	}
 	// Fields
 	for _, fld := range m.Fields {
-		d.Fields = append(d.Fields, fielddom.Field{ID: fld.ID})
+		d.Fields = append(d.Fields, fielddom.Field{
+			ID:          fld.ID,
+			Name:        fld.Name,
+			LeaseTypeID: fld.LeaseTypeID,
+		})
 	}
 	return d
 }

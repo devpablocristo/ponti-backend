@@ -40,10 +40,10 @@ func (h *Handler) Routes() {
 
 	public := router.Group(publicPrefix)
 	{
-		public.POST("", h.CreateProject) // Create a project
-		public.GET("", h.ListProjects)   // List all projects
-		public.GET("/:id", h.GetProject) // Get a project by ID
-		//public.PUT("/:id", h.UpdateProject)    // Update a project
+		public.POST("", h.CreateProject)       // Create a project
+		public.GET("", h.ListProjects)         // List all projects
+		public.GET("/:id", h.GetProject)       // Get a project by ID
+		public.PUT("/:id", h.UpdateProject)    // Update a project
 		public.DELETE("/:id", h.DeleteProject) // Delete a project
 	}
 

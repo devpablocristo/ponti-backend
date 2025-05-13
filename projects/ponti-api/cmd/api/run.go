@@ -14,6 +14,7 @@ import (
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	personmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/person/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	usermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/user/repository/models"
@@ -53,6 +54,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.FieldHandler.Routes()
 	deps.ProjectHandler.Routes()
 	deps.CropHandler.Routes()
+	deps.ManagerHandler.Routes()
 }
 
 // RunGormMigrations runs SQL migrations using GORM.
@@ -79,6 +81,7 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		&fieldmodels.Field{},
 		&projectmodels.Project{},
 		&cropmodels.Crop{},
+		&managermodels.Manager{},
 	}
 
 	start := time.Now()

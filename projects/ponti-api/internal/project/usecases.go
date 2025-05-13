@@ -36,7 +36,14 @@ func NewUseCases(
 	fu field.UseCases,
 	lo lot.UseCases,
 ) UseCases {
-	return &useCases{repo: repo, customer: cu, manager: ma, investor: in, field: fu, lot: lo}
+	return &useCases{
+		repo:     repo,
+		customer: cu,
+		manager:  ma,
+		investor: in,
+		field:    fu,
+		lot:      lo,
+	}
 }
 
 // CreateProject ensures each related entity exists (or is created) and delegates persistence of project associations.
