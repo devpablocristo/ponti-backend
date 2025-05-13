@@ -17,17 +17,15 @@ type repository struct {
 	db gorm.Repository
 }
 
-// NewRepository creates a new Project repository.
 func NewRepository(db gorm.Repository) Repository {
 	return &repository{db: db}
 }
 
 func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*domain.Project, error) {
-	m := models.FromDomain(p) // m.Managers y m.Investors tienen sólo ID
+	m := models.FromDomain(p)
 
 	tx := r.db.Client().WithContext(ctx).Begin()
 
-	// 1) Creamos SOLO el proyecto
 	if err := tx.
 		Omit("Managers", "Investors", "Fields").
 		Create(&m).Error; err != nil {
@@ -35,9 +33,7 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*dom
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create project", err)
 	}
 
-	// 2) Asociamos managers en la tabla pivote
 	for _, mgr := range m.Managers {
-		// Opcional: validar que el manager exista
 		var count int64
 		if err := tx.Raw("SELECT count(1) FROM managers WHERE id = ?", mgr.ID).Scan(&count).Error; err != nil {
 			tx.Rollback()
@@ -57,9 +53,7 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*dom
 		}
 	}
 
-	// 3) Asociamos investors en la tabla pivote (sin tocar la tabla investors)
 	for _, inv := range m.Investors {
-		// Validar existencia
 		var count int64
 		if err := tx.Raw("SELECT count(1) FROM investors WHERE id = ?", inv.ID).Scan(&count).Error; err != nil {
 			tx.Rollback()
@@ -79,17 +73,27 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*dom
 		}
 	}
 
-	// 4) Creamos los fields (estos sí llevan datos completos)
-	for i := range m.Fields {
-		m.Fields[i].ProjectID = m.ID
+	for _, fld := range m.Fields {
+		var cnt int64
+		if err := tx.Raw("SELECT count(1) FROM fields WHERE id = ?", fld.ID).Scan(&cnt).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify field", err)
+		}
+		if cnt == 0 {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("field id %d does not exist", fld.ID), nil)
+		}
+		if err := tx.Exec(
+			"INSERT INTO project_fields (project_id, field_id) VALUES (?, ?)",
+			m.ID, fld.ID,
+		).Error; err != nil {
+			tx.Rollback()
+			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate fields", err)
+		}
 	}
-	if err := tx.Create(&m.Fields).Error; err != nil {
-		tx.Rollback()
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create fields", err)
-	}
-
 	tx.Commit()
-	return m.ToDomain(), nil
+	//return m.ToDomain(), nil
+	return p, nil
 }
 
 // ListProjects retrieves all projects with their ID-based relations.
