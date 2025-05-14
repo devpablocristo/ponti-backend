@@ -21,99 +21,97 @@ func NewRepository(db gorm.Repository) Repository {
 	return &repository{db: db}
 }
 
-func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (*domain.Project, error) {
-	m := models.FromDomain(p)
+// CreateProject persists a project and all its associations in a single transaction.
+func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+	var projectID int64
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+		// Build GORM model from domain
+		m := models.FromDomain(p)
 
-	tx := r.db.Client().WithContext(ctx).Begin()
+		// 1. Insert project base
+		if err := tx.
+			Omit("Managers", "Investors", "Fields").
+			Create(&m).Error; err != nil {
+			return fmt.Errorf("failed to create project: %w", err)
+		}
+		projectID = m.ID
 
-	if err := tx.
-		Omit("Managers", "Investors", "Fields").
-		Create(&m).Error; err != nil {
-		tx.Rollback()
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create project", err)
+		// 2. Associate managers
+		for _, mgr := range m.Managers {
+			if err := tx.Exec(
+				"INSERT INTO project_managers (project_id, manager_id) SELECT ?, id FROM managers WHERE id = ?",
+				m.ID, mgr.ID,
+			).Error; err != nil {
+				return fmt.Errorf("failed to associate manager %d: %w", mgr.ID, err)
+			}
+		}
+
+		// 3. Associate investors
+		for _, inv := range m.Investors {
+			if err := tx.Exec(
+				"INSERT INTO project_investors (project_id, investor_id) SELECT ?, id FROM investors WHERE id = ?",
+				m.ID, inv.ID,
+			).Error; err != nil {
+				return fmt.Errorf("failed to associate investor %d: %w", inv.ID, err)
+			}
+		}
+
+		// 4. Associate fields
+		for _, fld := range m.Fields {
+			if err := tx.Exec(
+				"INSERT INTO project_fields (project_id, field_id) SELECT ?, id FROM fields WHERE id = ?",
+				m.ID, fld.ID,
+			).Error; err != nil {
+				return fmt.Errorf("failed to associate field %d: %w", fld.ID, err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		// Wrap in application error
+		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("transaction failed for project creation: %v", err), err)
 	}
 
-	for _, mgr := range m.Managers {
-		var count int64
-		if err := tx.Raw("SELECT count(1) FROM managers WHERE id = ?", mgr.ID).Scan(&count).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify manager", err)
-		}
-		if count == 0 {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("manager id %d does not exist", mgr.ID), nil)
-		}
-
-		if err := tx.Exec(
-			"INSERT INTO project_managers (project_id, manager_id) VALUES (?, ?)",
-			m.ID, mgr.ID,
-		).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate managers", err)
-		}
-	}
-
-	for _, inv := range m.Investors {
-		var count int64
-		if err := tx.Raw("SELECT count(1) FROM investors WHERE id = ?", inv.ID).Scan(&count).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify investor", err)
-		}
-		if count == 0 {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("investor id %d does not exist", inv.ID), nil)
-		}
-
-		if err := tx.Exec(
-			"INSERT INTO project_investors (project_id, investor_id) VALUES (?, ?)",
-			m.ID, inv.ID,
-		).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate investors", err)
-		}
-	}
-
-	for _, fld := range m.Fields {
-		var cnt int64
-		if err := tx.Raw("SELECT count(1) FROM fields WHERE id = ?", fld.ID).Scan(&cnt).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to verify field", err)
-		}
-		if cnt == 0 {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrValidation, fmt.Sprintf("field id %d does not exist", fld.ID), nil)
-		}
-		if err := tx.Exec(
-			"INSERT INTO project_fields (project_id, field_id) VALUES (?, ?)",
-			m.ID, fld.ID,
-		).Error; err != nil {
-			tx.Rollback()
-			return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to associate fields", err)
-		}
-	}
-	tx.Commit()
-	//return m.ToDomain(), nil
-	return p, nil
+	return projectID, nil
 }
 
-// ListProjects retrieves all projects with their ID-based relations.
+// ListProjects retrieves all projects with their associations.
 func (r *repository) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	var list []models.Project
+	var modelsList []models.Project
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
 		Preload("Investors").
 		Preload("Fields").
-		Find(&list).Error; err != nil {
+		Find(&modelsList).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list projects", err)
 	}
 	var result []domain.Project
-	for _, p := range list {
-		result = append(result, *p.ToDomain())
+	for _, m := range modelsList {
+		result = append(result, *m.ToDomain())
 	}
 	return result, nil
 }
 
-// GetProject retrieves a single project by ID with its relations.
+// ListProjectsByCustomerID retrieves projects filtered by customer.
+func (r *repository) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
+	var modelsList []models.Project
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Managers").
+		Preload("Investors").
+		Preload("Fields").
+		Where("customer_id = ?", customerID).
+		Find(&modelsList).Error; err != nil {
+		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("failed to list projects for customer %d: %v", customerID, err), err)
+	}
+	var result []domain.Project
+	for _, m := range modelsList {
+		result = append(result, *m.ToDomain())
+	}
+	return result, nil
+}
+
+// GetProject retrieves a single project by ID.
 func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
@@ -123,11 +121,12 @@ func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		First(&m, id).Error
 	if err != nil {
 		if errors.Is(err, gorm0.ErrRecordNotFound) {
-			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project with id %d not found", id), err)
+			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
 		}
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get project", err)
+		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
 	}
-	return m.ToDomain(), nil
+	proj := m.ToDomain()
+	return proj, nil
 }
 
 // UpdateProject updates a Project's main fields and relinks its ID-based relations.

@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"fmt"
+	"log"
 
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
@@ -14,7 +15,7 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
-	projectdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
 type useCases struct {
@@ -44,29 +45,46 @@ func NewUseCases(
 	}
 }
 
-func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*projectdom.Project, error) {
-	// 1. Customer
+func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+	// Trackers de IDs creados
+	var createdMgrs []int64
+	var createdInvs []int64
+	var createdFields []int64
+	var createdLots []int64
+
+	// 1) Customer
 	if p.Customer.ID == 0 {
 		id, err := u.customer.CreateCustomer(ctx, &customerdom.Customer{Name: p.Customer.Name})
 		if err != nil {
-			return nil, fmt.Errorf("create customer: %w", err)
+			return 0, fmt.Errorf("create customer: %w", err)
 		}
 		p.Customer.ID = id
 	}
 
-	// 2. Managers
+	// 2) Managers
 	for i := range p.Managers {
 		m := &p.Managers[i]
 		if m.ID == 0 {
 			id, err := u.manager.CreateManager(ctx, &managerdom.Manager{Name: m.Name})
 			if err != nil {
-				return nil, fmt.Errorf("create manager: %w", err)
+				// rollback managers creados
+				for _, mid := range createdMgrs {
+					if delErr := u.manager.DeleteManager(ctx, mid); delErr != nil {
+						log.Printf("rollback manager %d failed: %v", mid, delErr)
+					}
+				}
+				// rollback customer
+				if delErr := u.customer.DeleteCustomer(ctx, p.Customer.ID); delErr != nil {
+					return 0, fmt.Errorf("rollback delete customer %d failed: %w", p.Customer.ID, delErr)
+				}
+				return 0, fmt.Errorf("create manager %q: %w", m.Name, err)
 			}
+			createdMgrs = append(createdMgrs, id)
 			m.ID = id
 		}
 	}
 
-	// 3. Investors
+	// 3) Investors
 	for i := range p.Investors {
 		inv := &p.Investors[i]
 		if inv.ID == 0 {
@@ -75,29 +93,58 @@ func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*p
 				Percentage: inv.Percentage,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("create investor: %w", err)
+				// rollback investors
+				for _, iid := range createdInvs {
+					_ = u.investor.DeleteInvestor(ctx, iid)
+				}
+				// rollback managers
+				for _, mid := range createdMgrs {
+					_ = u.manager.DeleteManager(ctx, mid)
+				}
+				// rollback customer
+				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+				return 0, fmt.Errorf("create investor %q: %w", inv.Name, err)
 			}
+			createdInvs = append(createdInvs, id)
 			inv.ID = id
 		}
 	}
 
-	// 4. Fields & Lots
+	// 4) Fields & Lots
 	for i := range p.Fields {
-		fld := &p.Fields[i]
-		// create field if needed
-		if fld.ID == 0 {
+		f := &p.Fields[i]
+		// 4.1) Create Field
+		if f.ID == 0 {
 			id, err := u.field.CreateField(ctx, &fielddom.Field{
-				Name:        fld.Name,
-				LeaseTypeID: fld.LeaseTypeID,
+				Name:        f.Name,
+				LeaseTypeID: f.LeaseTypeID,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("create field: %w", err)
+				// rollback fields y lots
+				for _, lid := range createdLots {
+					_ = u.lot.DeleteLot(ctx, lid)
+				}
+				for _, fid := range createdFields {
+					_ = u.field.DeleteField(ctx, fid)
+				}
+				// rollback investors
+				for _, iid := range createdInvs {
+					_ = u.investor.DeleteInvestor(ctx, iid)
+				}
+				// rollback managers
+				for _, mid := range createdMgrs {
+					_ = u.manager.DeleteManager(ctx, mid)
+				}
+				// rollback customer
+				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+				return 0, fmt.Errorf("create field %q: %w", f.Name, err)
 			}
-			fld.ID = id
+			createdFields = append(createdFields, id)
+			f.ID = id
 		}
-		// create lots
-		for j := range fld.Lots {
-			lt := &fld.Lots[j]
+		// 4.2) Create Lots under this field
+		for j := range f.Lots {
+			lt := &f.Lots[j]
 			if lt.ID == 0 {
 				id, err := u.lot.CreateLot(ctx, &lotdom.Lot{
 					Name:           lt.Name,
@@ -107,29 +154,73 @@ func (u *useCases) CreateProject(ctx context.Context, p *projectdom.Project) (*p
 					Season:         lt.Season,
 				})
 				if err != nil {
-					return nil, fmt.Errorf("create lot: %w", err)
+					// rollback lots
+					for _, lid := range createdLots {
+						_ = u.lot.DeleteLot(ctx, lid)
+					}
+					// rollback fields
+					for _, fid := range createdFields {
+						_ = u.field.DeleteField(ctx, fid)
+					}
+					// rollback investors
+					for _, iid := range createdInvs {
+						_ = u.investor.DeleteInvestor(ctx, iid)
+					}
+					// rollback managers
+					for _, mid := range createdMgrs {
+						_ = u.manager.DeleteManager(ctx, mid)
+					}
+					// rollback customer
+					_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+					return 0, fmt.Errorf("create lot %q: %w", lt.Name, err)
 				}
+				createdLots = append(createdLots, id)
 				lt.ID = id
 			}
 		}
 	}
 
-	// 5. Persist project associations (IDs only)
-	return u.repo.CreateProject(ctx, p)
+	// 5) Persistir proyecto y pivotes (internamente esto ya es transaccional)
+	projectID, err := u.repo.CreateProject(ctx, p)
+	if err != nil {
+		// rollback completo: quitar proyecto si se creó, luego limpiar todo lo anterior
+		// aquí asumimos que CreateProject no dejó nada parcial; si lo hizo, habría que borrarlo:
+		_ = u.repo.DeleteProject(ctx, projectID)
+		for _, lid := range createdLots {
+			_ = u.lot.DeleteLot(ctx, lid)
+		}
+		for _, fid := range createdFields {
+			_ = u.field.DeleteField(ctx, fid)
+		}
+		for _, iid := range createdInvs {
+			_ = u.investor.DeleteInvestor(ctx, iid)
+		}
+		for _, mid := range createdMgrs {
+			_ = u.manager.DeleteManager(ctx, mid)
+		}
+		_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+		return 0, fmt.Errorf("create project: %w", err)
+	}
+
+	return projectID, nil
 }
 
-func (u *useCases) ListProjects(ctx context.Context) ([]projectdom.Project, error) {
+func (u *useCases) ListProjects(ctx context.Context) ([]domain.Project, error) {
 	return u.repo.ListProjects(ctx)
 }
 
-func (u *useCases) GetProject(ctx context.Context, id int64) (*projectdom.Project, error) {
+func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	return u.repo.GetProject(ctx, id)
 }
 
-func (u *useCases) UpdateProject(ctx context.Context, p *projectdom.Project) error {
+func (u *useCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 	return u.repo.UpdateProject(ctx, p)
 }
 
 func (u *useCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)
+}
+
+func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
+	return u.repo.ListProjectsByCustomerID(ctx, customerID)
 }

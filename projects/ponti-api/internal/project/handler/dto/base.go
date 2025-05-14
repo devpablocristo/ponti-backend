@@ -22,19 +22,19 @@ type Project struct {
 
 // Customer DTO
 type Customer struct {
-	ID   int64  `json:"id,omitempty"` // <-- ya puede ser 0
+	ID   int64  `json:"id,omitempty"`
 	Name string `json:"name" binding:"required"`
 }
 
 // Manager DTO
 type Manager struct {
-	ID   int64  `json:"id,omitempty"` // <-- ya puede ser 0
+	ID   int64  `json:"id,omitempty"`
 	Name string `json:"name" binding:"required"`
 }
 
-// Investor DTO with percentage
+// Investor DTO
 type Investor struct {
-	ID         int64  `json:"id,omitempty"` // <-- ya puede ser 0
+	ID         int64  `json:"id,omitempty"`
 	Name       string `json:"name" binding:"required"`
 	Percentage int    `json:"percentage" binding:"required"`
 }
@@ -49,7 +49,7 @@ type Field struct {
 
 // Lot DTO referencing crops by ID
 type Lot struct {
-	ID             int64   `json:"id,omitempty"` // opcional para updates
+	ID             int64   `json:"id,omitempty"`
 	Name           string  `json:"name" binding:"required"`
 	Hectares       float64 `json:"hectares" binding:"required"`
 	PreviousCropID int64   `json:"previous_crop_id" binding:"required"`
