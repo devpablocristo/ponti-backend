@@ -27,7 +27,7 @@ func (r *repository) CreateManager(ctx context.Context, c *domain.Manager) (int6
 	if c == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "manager is nil", nil)
 	}
-	model := models.FromDomainManager(c)
+	model := models.FromDomain(c)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create manager", err)
 	}
@@ -65,7 +65,7 @@ func (r *repository) UpdateManager(ctx context.Context, c *domain.Manager) error
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Manager{}).
 		Where("id = ?", c.ID).
-		Updates(models.FromDomainManager(c))
+		Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update manager", result.Error)
 	}

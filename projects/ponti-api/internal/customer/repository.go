@@ -28,7 +28,7 @@ func (r *repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 	if c == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "customer is nil", nil)
 	}
-	model := models.FromDomainCustomer(c)
+	model := models.FromDomain(c)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create customer", err)
 	}
@@ -66,7 +66,7 @@ func (r *repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Customer{}).
 		Where("id = ?", c.ID).
-		Updates(models.FromDomainCustomer(c))
+		Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update customer", result.Error)
 	}

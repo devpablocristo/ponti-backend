@@ -28,7 +28,7 @@ func (r *repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 	if inv == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "investor is nil", nil)
 	}
-	model := models.FromDomainInvestor(inv)
+	model := models.FromDomain(inv)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create investor", err)
 	}
@@ -66,7 +66,7 @@ func (r *repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Investor{}).
 		Where("id = ?", inv.ID).
-		Updates(models.FromDomainInvestor(inv))
+		Updates(models.FromDomain(inv))
 	if result.Error != nil {
 		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update investor", result.Error)
 	}

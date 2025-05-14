@@ -1,13 +1,17 @@
 package models
 
 import (
+	"time"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 )
 
 // Crop represents a type of crop.
 type Crop struct {
-	ID   int64  `gorm:"primaryKey" json:"id"`
-	Name string `gorm:"size:50;not null" json:"name"`
+	ID        int64     `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"size:50;not null" json:"name"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
 // ToDomain converts the Crop model to the domain entity.

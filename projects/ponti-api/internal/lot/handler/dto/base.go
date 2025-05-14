@@ -8,6 +8,7 @@ import (
 type Lot struct {
 	ID             int64   `json:"id,omitempty"`
 	Name           string  `json:"name"`
+	FiendID        int64   `json:"field_id"`
 	Hectares       float64 `json:"hectares"`
 	PreviousCropID int64   `json:"previous_crop_id"`
 	CurrentCropID  int64   `json:"current_crop_id"`
@@ -19,6 +20,7 @@ func (p Lot) ToDomain() *domain.Lot {
 	return &domain.Lot{
 		ID:             p.ID,
 		Name:           p.Name,
+		FieldID:        p.FiendID,
 		Hectares:       p.Hectares,
 		PreviousCropID: p.PreviousCropID,
 		CurrentCropID:  p.CurrentCropID,
@@ -31,6 +33,7 @@ func FromDomain(d domain.Lot) *Lot {
 	return &Lot{
 		ID:             d.ID,
 		Name:           d.Name,
+		FiendID:        d.FieldID,
 		Hectares:       d.Hectares,
 		PreviousCropID: d.PreviousCropID,
 		CurrentCropID:  d.CurrentCropID,
