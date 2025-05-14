@@ -6,6 +6,7 @@ import (
 
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
+	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
 type useCases struct {
@@ -13,9 +14,11 @@ type useCases struct {
 	lot  lot.UseCases
 }
 
-// NewUseCases wires up Field and Lot repositories.
-func NewUseCases(fRepo Repository, lRepo lot.Repository) UseCases {
-	return &useCases{repo: fRepo, lot: lRepo}
+func NewUseCases(repo Repository, lot lot.UseCases) UseCases {
+	return &useCases{
+		repo: repo,
+		lot:  lot,
+	}
 }
 
 func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
@@ -29,8 +32,7 @@ func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, err
 	for _, l := range f.Lots {
 		l.FieldID = fieldID
 		if _, err := u.lot.CreateLot(ctx, &l); err != nil {
-			// Si falla, borramos el Field recién creado
-			// y dejamos que la BD limpie ophans según tu FK (idealmente ON DELETE CASCADE)
+			// Si falla, se borra el Field recién creado
 			if delErr := u.repo.DeleteField(ctx, fieldID); delErr != nil {
 				return 0, fmt.Errorf(
 					"rollback delete field %d failed: %v (original error: %w)",
@@ -44,22 +46,51 @@ func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, err
 	return fieldID, nil
 }
 
-// ListFields returns all fields.
 func (u *useCases) ListFields(ctx context.Context) ([]domain.Field, error) {
-	return u.repo.ListFields(ctx)
+	fields, err := u.repo.ListFields(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range fields {
+		if err := u.enrichField(ctx, &fields[i]); err != nil {
+			return nil, err
+		}
+	}
+	return fields, nil
 }
 
-// GetField retrieves a field by ID.
 func (u *useCases) GetField(ctx context.Context, id int64) (*domain.Field, error) {
-	return u.repo.GetField(ctx, id)
+	f, err := u.repo.GetField(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.enrichField(ctx, f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
-// UpdateField updates an existing field.
 func (u *useCases) UpdateField(ctx context.Context, f *domain.Field) error {
 	return u.repo.UpdateField(ctx, f)
 }
 
-// DeleteField deletes a field by ID.
 func (u *useCases) DeleteField(ctx context.Context, id int64) error {
 	return u.repo.DeleteField(ctx, id)
+}
+
+// helpers
+func (u *useCases) enrichField(ctx context.Context, f *domain.Field) error {
+	allLots, err := u.lot.ListLots(ctx)
+	if err != nil {
+		return fmt.Errorf("listar lots: %w", err)
+	}
+
+	var related []lotdom.Lot
+	for _, l := range allLots {
+		if l.FieldID == f.ID {
+			related = append(related, l)
+		}
+	}
+	f.Lots = related
+	return nil
 }

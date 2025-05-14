@@ -7,6 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 )
 
@@ -17,8 +18,8 @@ func ProvideLotRepository(repo gorm.Repository) (lot.Repository, error) {
 	return lot.NewRepository(repo), nil
 }
 
-func ProvideLotUseCases(repo lot.Repository) lot.UseCases {
-	return lot.NewUseCases(repo)
+func ProvideLotUseCases(repo lot.Repository, cropUC crop.UseCases) lot.UseCases {
+	return lot.NewUseCases(repo, cropUC)
 }
 
 func ProvideLotHandler(server ginsrv.Server, usecases lot.UseCases, middlewares *mdw.Middlewares) *lot.Handler {

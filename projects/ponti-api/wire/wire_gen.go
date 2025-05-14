@@ -100,7 +100,7 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	lotUseCases := ProvideLotUseCases(lotRepository)
+	lotUseCases := ProvideLotUseCases(lotRepository, cropUseCases)
 	fieldUseCases := ProvideFieldUseCases(fieldRepository, lotUseCases)
 	fieldHandler := ProvideFieldHandler(server, fieldUseCases, middlewares)
 	investorRepository, err := ProvideInvestorRepository(repository)
