@@ -15,7 +15,6 @@ type UseCases interface {
 	ListProjectsByCustomerID(context.Context, int64) ([]domain.Project, error)
 }
 
-// Repository defines persistence operations for Project.
 type Repository interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
 	ListProjects(context.Context) ([]domain.Project, error)

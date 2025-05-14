@@ -7,11 +7,8 @@
 package wire
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/pkg/authe/jwt/v5"
-	"github.com/alphacodinggroup/ponti-backend/pkg/databases/cache/redis/v8"
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/clients/resty"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/notification/smtp"
@@ -47,19 +44,7 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	cache, err := ProvideRedisCache()
-	if err != nil {
-		return nil, err
-	}
-	service, err := ProvideJwtService()
-	if err != nil {
-		return nil, err
-	}
-	client, err := ProvideHttpClient()
-	if err != nil {
-		return nil, err
-	}
-	pkgsmtpService, err := ProvideSmtpService()
+	service, err := ProvideSmtpService()
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +68,7 @@ func Initialize() (*Dependencies, error) {
 	}
 	userUseCases := ProvideUserUseCases(userRepository)
 	userHandler := ProvideUserHandler(server, userUseCases, middlewares)
-	smtpService, err := ProvideNotificationSmtpService(pkgsmtpService)
+	smtpService, err := ProvideNotificationSmtpService(service)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +121,7 @@ func Initialize() (*Dependencies, error) {
 		GinServer:           server,
 		GormRepository:      repository,
 		PostgresRepository:  pkgpostgresqlRepository,
-		RedisCache:          cache,
-		JwtService:          service,
-		RestyClient:         client,
-		SmtpService:         pkgsmtpService,
+		SmtpService:         service,
 		Middlewares:         middlewares,
 		PersonHandler:       handler,
 		UserHandler:         userHandler,
@@ -170,9 +152,6 @@ type Dependencies struct {
 	GinServer          pkggin.Server
 	GormRepository     pkggorm.Repository
 	PostgresRepository pkgpostgresql.Repository
-	RedisCache         pkgredis.Cache
-	JwtService         pkgjwt.Service
-	RestyClient        pkcresty.Client
 	SmtpService        pkgsmtp.Service
 
 	Middlewares *pkgmwr.Middlewares

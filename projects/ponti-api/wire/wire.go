@@ -5,15 +5,11 @@ package wire
 
 import (
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/google/wire"
-
-	jwt "github.com/alphacodinggroup/ponti-backend/pkg/authe/jwt/v5"
-	redis "github.com/alphacodinggroup/ponti-backend/pkg/databases/cache/redis/v8"
-	pg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
-	resty "github.com/alphacodinggroup/ponti-backend/pkg/http/clients/resty"
 	smtp "github.com/alphacodinggroup/ponti-backend/pkg/notification/smtp"
+	"github.com/google/wire"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
@@ -34,9 +30,6 @@ type Dependencies struct {
 	GinServer          ginsrv.Server
 	GormRepository     gorm.Repository
 	PostgresRepository pg.Repository
-	RedisCache         redis.Cache
-	JwtService         jwt.Service
-	RestyClient        resty.Client
 	SmtpService        smtp.Service
 
 	Middlewares *mdw.Middlewares
@@ -70,9 +63,6 @@ func Initialize() (*Dependencies, error) {
 		ProvidePostgresRepository,
 		ProvideJwtMiddleware,
 		ProvideMiddlewares,
-		ProvideRedisCache,
-		ProvideJwtService,
-		ProvideHttpClient,
 		ProvideSmtpService,
 
 		ProvidePersonRepository,
