@@ -8,6 +8,7 @@ import (
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
+	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
@@ -146,12 +147,41 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 	return projID, nil
 }
 
-func (u *useCases) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	return u.repo.ListProjects(ctx)
+func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
+	proj, err := u.repo.GetProject(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.enrichProject(ctx, proj); err != nil {
+		return nil, err
+	}
+	return proj, nil
 }
 
-func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
-	return u.repo.GetProject(ctx, id)
+func (u *useCases) ListProjects(ctx context.Context) ([]domain.Project, error) {
+	list, err := u.repo.ListProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if err := u.enrichProject(ctx, &list[i]); err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
+
+func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
+	list, err := u.repo.ListProjectsByCustomerID(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if err := u.enrichProject(ctx, &list[i]); err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
 }
 
 func (u *useCases) UpdateProject(ctx context.Context, p *domain.Project) error {
@@ -162,6 +192,47 @@ func (u *useCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)
 }
 
-func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
-	return u.repo.ListProjectsByCustomerID(ctx, customerID)
+// helpers
+func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
+	// Customer
+	cust, err := u.customer.GetCustomer(ctx, p.Customer.ID)
+	if err != nil {
+		return fmt.Errorf("fetch customer %d: %w", p.Customer.ID, err)
+	}
+	p.Customer = *cust
+
+	// Managers
+	var mgrs []managerdom.Manager
+	for _, m := range p.Managers {
+		man, err := u.manager.GetManager(ctx, m.ID)
+		if err != nil {
+			return fmt.Errorf("fetch manager %d: %w", m.ID, err)
+		}
+		mgrs = append(mgrs, *man)
+	}
+	p.Managers = mgrs
+
+	// Investors
+	var invs []investordom.Investor
+	for _, inv := range p.Investors {
+		i, err := u.investor.GetInvestor(ctx, inv.ID)
+		if err != nil {
+			return fmt.Errorf("fetch investor %d: %w", inv.ID, err)
+		}
+		invs = append(invs, *i)
+	}
+	p.Investors = invs
+
+	// Fields (incluye nested Lots)
+	var flds []fielddom.Field
+	for _, f := range p.Fields {
+		fld, err := u.field.GetField(ctx, f.ID)
+		if err != nil {
+			return fmt.Errorf("fetch field %d: %w", f.ID, err)
+		}
+		flds = append(flds, *fld)
+	}
+	p.Fields = flds
+
+	return nil
 }
