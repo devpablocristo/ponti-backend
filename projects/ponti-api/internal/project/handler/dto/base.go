@@ -6,7 +6,7 @@ import (
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
-	projectdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
 // Project DTO for create/update and response
@@ -58,8 +58,8 @@ type Lot struct {
 }
 
 // ToDomain maps the DTO to the domain.Project
-func (r *Project) ToDomain() *projectdom.Project {
-	d := &projectdom.Project{
+func (r *Project) ToDomain() *domain.Project {
+	d := &domain.Project{
 		Name: r.ProjectName,
 		Customer: customerdom.Customer{
 			ID:   r.Customer.ID,
@@ -102,7 +102,7 @@ func (r *Project) ToDomain() *projectdom.Project {
 }
 
 // FromDomain maps a domain.Project to the DTO
-func FromDomain(d *projectdom.Project) *Project {
+func FromDomain(d *domain.Project) *Project {
 	r := &Project{
 		ProjectName: d.Name,
 		Customer:    Customer{ID: d.Customer.ID, Name: d.Customer.Name},

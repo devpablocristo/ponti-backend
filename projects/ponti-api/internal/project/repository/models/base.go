@@ -7,7 +7,7 @@ import (
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
-	projectdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
 // Project es el modelo GORM para proyectos.
@@ -39,7 +39,7 @@ type Field struct {
 }
 
 // FromDomain convierte el dominio a modelo GORM, guardando sólo los IDs para asociaciones.
-func FromDomain(d *projectdom.Project) *Project {
+func FromDomain(d *domain.Project) *Project {
 	m := &Project{
 		ID:         d.ID,
 		Name:       d.Name,
@@ -58,8 +58,8 @@ func FromDomain(d *projectdom.Project) *Project {
 }
 
 // ToDomain convierte el modelo GORM a dominio, cargando sólo los IDs.
-func (m *Project) ToDomain() *projectdom.Project {
-	d := &projectdom.Project{
+func (m *Project) ToDomain() *domain.Project {
+	d := &domain.Project{
 		ID:   m.ID,
 		Name: m.Name,
 		Customer: customerdom.Customer{

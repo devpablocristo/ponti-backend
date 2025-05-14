@@ -7,7 +7,6 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
-// Field is the GORM model for fields, including related lots.
 type Field struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	ProjectID   int64     `gorm:"index;column:project_id"`
@@ -15,12 +14,9 @@ type Field struct {
 	LeaseTypeID int64     `gorm:"not null;index;column:lease_type_id"`
 	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime;column:updated_at"`
-
-	// One-to-many: use GORM Lot model type here.
 	Lots []Lot `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 }
 
-// Lot is the GORM model for lots within a field, storing all attributes.
 type Lot struct {
 	ID             int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	FieldID        int64     `gorm:"not null;index;column:field_id"`
@@ -33,7 +29,6 @@ type Lot struct {
 	UpdatedAt      time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
-// ToDomain converts the Field model, including preloaded lots, into the domain Field entity.
 func (m Field) ToDomain() *fielddom.Field {
 	d := &fielddom.Field{
 		ID:          m.ID,
@@ -46,7 +41,6 @@ func (m Field) ToDomain() *fielddom.Field {
 	return d
 }
 
-// ToDomain converts the Lot GORM model into the domain Lot entity.
 func (m Lot) ToDomain() lotdom.Lot {
 	return lotdom.Lot{
 		ID:             m.ID,
@@ -58,7 +52,6 @@ func (m Lot) ToDomain() lotdom.Lot {
 	}
 }
 
-// FromDomain converts a domain Field and nested lots into the GORM Field model.
 func FromDomain(d *fielddom.Field) *Field {
 	m := &Field{
 		ID:          d.ID,

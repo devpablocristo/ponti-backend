@@ -63,9 +63,9 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 			id, err := u.manager.CreateManager(ctx, &managerdom.Manager{Name: m.Name})
 			if err != nil {
 				// rollback managers
-				for _, mid := range createdMgrs {
-					if delErr := u.manager.DeleteManager(ctx, mid); delErr != nil {
-						log.Printf("rollback manager %d failed: %v", mid, delErr)
+				for _, mgrID := range createdMgrs {
+					if delErr := u.manager.DeleteManager(ctx, mgrID); delErr != nil {
+						log.Printf("rollback manager %d failed: %v", mgrID, delErr)
 					}
 				}
 				// rollback customer
@@ -84,12 +84,12 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 			id, err := u.investor.CreateInvestor(ctx, &investordom.Investor{Name: inv.Name, Percentage: inv.Percentage})
 			if err != nil {
 				// rollback investors
-				for _, iid := range createdInvs {
-					_ = u.investor.DeleteInvestor(ctx, iid)
+				for _, invID := range createdInvs {
+					_ = u.investor.DeleteInvestor(ctx, invID)
 				}
 				// rollback managers
-				for _, mid := range createdMgrs {
-					_ = u.manager.DeleteManager(ctx, mid)
+				for _, mgrID := range createdMgrs {
+					_ = u.manager.DeleteManager(ctx, mgrID)
 				}
 				// rollback customer
 				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
@@ -110,12 +110,12 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 				_ = u.field.DeleteField(ctx, fldID)
 			}
 			// rollback investors
-			for _, iid := range createdInvs {
-				_ = u.investor.DeleteInvestor(ctx, iid)
+			for _, invID := range createdInvs {
+				_ = u.investor.DeleteInvestor(ctx, invID)
 			}
 			// rollback managers
-			for _, mid := range createdMgrs {
-				_ = u.manager.DeleteManager(ctx, mid)
+			for _, mgrID := range createdMgrs {
+				_ = u.manager.DeleteManager(ctx, mgrID)
 			}
 			// rollback customer
 			_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
@@ -133,11 +133,11 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 		for _, fldID := range createdFields {
 			_ = u.field.DeleteField(ctx, fldID)
 		}
-		for _, iid := range createdInvs {
-			_ = u.investor.DeleteInvestor(ctx, iid)
+		for _, invID := range createdInvs {
+			_ = u.investor.DeleteInvestor(ctx, invID)
 		}
-		for _, mid := range createdMgrs {
-			_ = u.manager.DeleteManager(ctx, mid)
+		for _, mgrID := range createdMgrs {
+			_ = u.manager.DeleteManager(ctx, mgrID)
 		}
 		_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
 		return 0, fmt.Errorf("create project: %w", err)

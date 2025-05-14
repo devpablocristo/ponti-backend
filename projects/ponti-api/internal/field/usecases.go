@@ -18,17 +18,29 @@ func NewUseCases(fRepo Repository, lRepo lot.Repository) UseCases {
 	return &useCases{repo: fRepo, lot: lRepo}
 }
 
-// CreateField creates the Field and its Lots.
 func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
+	// 1) Crear el Field y obtener su ID
 	fieldID, err := u.repo.CreateField(ctx, f)
 	if err != nil {
 		return 0, fmt.Errorf("create field %q: %w", f.Name, err)
 	}
+
+	// 2) Crear cada Lot apuntando a ese fieldID
 	for _, l := range f.Lots {
+		l.FieldID = fieldID
 		if _, err := u.lot.CreateLot(ctx, &l); err != nil {
+			// Si falla, borramos el Field recién creado
+			// y dejamos que la BD limpie ophans según tu FK (idealmente ON DELETE CASCADE)
+			if delErr := u.repo.DeleteField(ctx, fieldID); delErr != nil {
+				return 0, fmt.Errorf(
+					"rollback delete field %d failed: %v (original error: %w)",
+					fieldID, delErr, err,
+				)
+			}
 			return 0, fmt.Errorf("create lot %q for field %q: %w", l.Name, f.Name, err)
 		}
 	}
+
 	return fieldID, nil
 }
 
