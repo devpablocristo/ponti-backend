@@ -52,7 +52,7 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", Project: pID})
+	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ProjectID: pID})
 }
 
 // ListProjectsByCustomerID returns projects filtered by customer ID (path param).

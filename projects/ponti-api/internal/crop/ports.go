@@ -6,7 +6,6 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 )
 
-// UseCases defines business operations for Crop.
 type UseCases interface {
 	CreateCrop(context.Context, *domain.Crop) (int64, error)
 	ListCrops(context.Context) ([]domain.Crop, error)
@@ -15,7 +14,6 @@ type UseCases interface {
 	DeleteCrop(context.Context, int64) error
 }
 
-// Repository defines data persistence operations for Crop.
 type Repository interface {
 	CreateCrop(context.Context, *domain.Crop) (int64, error)
 	ListCrops(context.Context) ([]domain.Crop, error)

@@ -1,6 +1,7 @@
 package dto
 
 import (
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -18,13 +19,13 @@ type Lot struct {
 // ToDomain converts the DTO into a domain.Lot.
 func (p Lot) ToDomain() *domain.Lot {
 	return &domain.Lot{
-		ID:             p.ID,
-		Name:           p.Name,
-		FieldID:        p.FiendID,
-		Hectares:       p.Hectares,
-		PreviousCropID: p.PreviousCropID,
-		CurrentCropID:  p.CurrentCropID,
-		Season:         p.Season,
+		ID:           p.ID,
+		Name:         p.Name,
+		FieldID:      p.FiendID,
+		Hectares:     p.Hectares,
+		PreviousCrop: cropdom.Crop{ID: p.PreviousCropID},
+		CurrentCrop:  cropdom.Crop{ID: p.CurrentCropID},
+		Season:       p.Season,
 	}
 }
 
@@ -35,8 +36,8 @@ func FromDomain(d domain.Lot) *Lot {
 		Name:           d.Name,
 		FiendID:        d.FieldID,
 		Hectares:       d.Hectares,
-		PreviousCropID: d.PreviousCropID,
-		CurrentCropID:  d.CurrentCropID,
+		PreviousCropID: d.PreviousCrop.ID,
+		CurrentCropID:  d.CurrentCrop.ID,
 		Season:         d.Season,
 	}
 }

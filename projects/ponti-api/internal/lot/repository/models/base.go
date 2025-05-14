@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -19,28 +20,26 @@ type Lot struct {
 	UpdatedAt      time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
-// ToDomain maps the GORM model to the domain.Lot, using cropdom.Crop for crop references.
 func (m *Lot) ToDomain() *domain.Lot {
 	return &domain.Lot{
-		ID:             m.ID,
-		Name:           m.Name,
-		FieldID:        m.FieldID,
-		Hectares:       m.Hectares,
-		PreviousCropID: m.PreviousCropID,
-		CurrentCropID:  m.CurrentCropID,
-		Season:         m.Season,
+		ID:           m.ID,
+		Name:         m.Name,
+		FieldID:      m.FieldID,
+		Hectares:     m.Hectares,
+		PreviousCrop: cropdom.Crop{ID: m.PreviousCropID},
+		CurrentCrop:  cropdom.Crop{ID: m.PreviousCropID},
+		Season:       m.Season,
 	}
 }
 
-// FromDomain maps the domain.Lot to the GORM model, extracting crop IDs.
 func FromDomain(d *domain.Lot) *Lot {
 	return &Lot{
 		ID:             d.ID,
 		Name:           d.Name,
 		FieldID:        d.FieldID,
 		Hectares:       d.Hectares,
-		PreviousCropID: d.PreviousCropID,
-		CurrentCropID:  d.CurrentCropID,
+		PreviousCropID: d.PreviousCrop.ID,
+		CurrentCropID:  d.CurrentCrop.ID,
 		Season:         d.Season,
 	}
 }

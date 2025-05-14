@@ -14,14 +14,12 @@ import (
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/handler/dto"
 )
 
-// Handler encapsulates all dependencies for the Crop HTTP handler.
 type Handler struct {
 	ucs UseCases
 	gsv gsv.Server
 	mws *mdw.Middlewares
 }
 
-// NewHandler creates a new Crop handler.
 func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	return &Handler{
 		ucs: u,
@@ -30,14 +28,12 @@ func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
 	}
 }
 
-// Routes registers all crop routes.
 func (h *Handler) Routes() {
 	router := h.gsv.GetRouter()
 
 	apiVersion := h.gsv.GetApiVersion()
 	apiBase := "/api/" + apiVersion + "/crops"
 	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
 
 	public := router.Group(publicPrefix)
 	{
@@ -47,22 +43,8 @@ func (h *Handler) Routes() {
 		public.PUT("/:id", h.UpdateCrop)
 		public.DELETE("/:id", h.DeleteCrop)
 	}
-
-	// Protected routes.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing)
-	}
 }
 
-func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
-}
-
-// CreateCrop handles the creation of a new crop.
 func (h *Handler) CreateCrop(c *gin.Context) {
 	var req dto.CreateCrop
 	if err := utils.ValidateRequest(c, &req); err != nil {

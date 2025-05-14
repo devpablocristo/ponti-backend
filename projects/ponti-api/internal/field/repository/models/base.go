@@ -3,7 +3,8 @@ package models
 import (
 	"time"
 
-	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -14,7 +15,7 @@ type Field struct {
 	LeaseTypeID int64     `gorm:"not null;index;column:lease_type_id"`
 	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime;column:updated_at"`
-	Lots []Lot `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Lots        []Lot     `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 }
 
 type Lot struct {
@@ -29,8 +30,8 @@ type Lot struct {
 	UpdatedAt      time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
-func (m Field) ToDomain() *fielddom.Field {
-	d := &fielddom.Field{
+func (m Field) ToDomain() *domain.Field {
+	d := &domain.Field{
 		ID:          m.ID,
 		Name:        m.Name,
 		LeaseTypeID: m.LeaseTypeID,
@@ -43,16 +44,16 @@ func (m Field) ToDomain() *fielddom.Field {
 
 func (m Lot) ToDomain() lotdom.Lot {
 	return lotdom.Lot{
-		ID:             m.ID,
-		Name:           m.Name,
-		Hectares:       m.Hectares,
-		PreviousCropID: m.PreviousCropID,
-		CurrentCropID:  m.CurrentCropID,
-		Season:         m.Season,
+		ID:           m.ID,
+		Name:         m.Name,
+		Hectares:     m.Hectares,
+		PreviousCrop: cropdom.Crop{ID: m.PreviousCropID},
+		CurrentCrop:  cropdom.Crop{ID: m.CurrentCropID},
+		Season:       m.Season,
 	}
 }
 
-func FromDomain(d *fielddom.Field) *Field {
+func FromDomain(d *domain.Field) *Field {
 	m := &Field{
 		ID:          d.ID,
 		Name:        d.Name,
@@ -63,8 +64,8 @@ func FromDomain(d *fielddom.Field) *Field {
 			FieldID:        d.ID,
 			Name:           ld.Name,
 			Hectares:       ld.Hectares,
-			PreviousCropID: ld.PreviousCropID,
-			CurrentCropID:  ld.CurrentCropID,
+			PreviousCropID: ld.PreviousCrop.ID,
+			CurrentCropID:  ld.CurrentCrop.ID,
 			Season:         ld.Season,
 		})
 	}

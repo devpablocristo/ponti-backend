@@ -5,6 +5,6 @@ type CreateProject struct {
 }
 
 type CreateProjectResponse struct {
-	Message string `json:"message"`
-	Project int64  `json:"project"`
+	Message   string `json:"message"`
+	ProjectID int64  `json:"project"`
 }

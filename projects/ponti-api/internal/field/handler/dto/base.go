@@ -1,6 +1,7 @@
 package dto
 
 import (
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
@@ -31,11 +32,11 @@ func (f Field) ToDomain() *fielddom.Field {
 	}
 	for _, lt := range f.Lots {
 		d.Lots = append(d.Lots, lotdom.Lot{
-			Name:           lt.Name,
-			Hectares:       lt.Hectares,
-			PreviousCropID: lt.PreviousCropID,
-			CurrentCropID:  lt.CurrentCropID,
-			Season:         lt.Season,
+			Name:         lt.Name,
+			Hectares:     lt.Hectares,
+			PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID},
+			CurrentCrop:  cropdom.Crop{ID: lt.CurrentCropID},
+			Season:       lt.Season,
 		})
 	}
 	return d
@@ -52,8 +53,8 @@ func FromDomain(d fielddom.Field) Field {
 		r.Lots = append(r.Lots, Lot{
 			Name:           ld.Name,
 			Hectares:       ld.Hectares,
-			PreviousCropID: ld.PreviousCropID,
-			CurrentCropID:  ld.CurrentCropID,
+			PreviousCropID: ld.PreviousCrop.ID,
+			CurrentCropID:  ld.CurrentCrop.ID,
 			Season:         ld.Season,
 		})
 	}

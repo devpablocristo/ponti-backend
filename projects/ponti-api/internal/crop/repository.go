@@ -17,7 +17,6 @@ type repository struct {
 	db gorm.Repository
 }
 
-// NewRepository creates a new repository instance for Crop.
 func NewRepository(db gorm.Repository) Repository {
 	return &repository{
 		db: db,
