@@ -27,7 +27,7 @@ func (m *Lot) ToDomain() *domain.Lot {
 		FieldID:      m.FieldID,
 		Hectares:     m.Hectares,
 		PreviousCrop: cropdom.Crop{ID: m.PreviousCropID},
-		CurrentCrop:  cropdom.Crop{ID: m.PreviousCropID},
+		CurrentCrop:  cropdom.Crop{ID: m.CurrentCropID},
 		Season:       m.Season,
 	}
 }

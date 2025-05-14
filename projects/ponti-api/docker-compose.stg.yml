@@ -37,7 +37,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - ponti-db_data_stg:/var/lib/postgresql/data
+      - ponti-db_data:/var/lib/postgresql/data
       - ./infra/postgres-storage:/storage:ro
       - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
@@ -59,12 +59,12 @@ services:
       - app-network
     restart: unless-stopped
     volumes:
-      - mailhog_data_stg:/var/lib/mailhog
+      - mailhog_data:/var/lib/mailhog
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  ponti-db_data_stg:
-  mailhog_data_stg:
+  ponti-db_data:
+  mailhog_data:

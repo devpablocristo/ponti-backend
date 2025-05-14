@@ -9,36 +9,24 @@ if [ "$confirm" != "clean up" ]; then
   exit 0
 fi
 
-# Detener y eliminar todos los contenedores
-if [ "$(docker ps -aq)" ]; then
-  docker stop "$(docker ps -aq)"
-  docker rm "$(docker ps -aq)"
-else
-  echo "No hay contenedores para detener o eliminar."
-fi
+set -eux
 
-# Eliminar todas las imágenes
-if [ "$(docker images -q)" ]; then
-  docker rmi "$(docker images -q)"
-else
-  echo "No hay imágenes para eliminar."
-fi
+# 1) Parar todos los contenedores en ejecución
+docker ps -q | xargs -r docker stop
 
-# Eliminar todos los volúmenes
-if [ "$(docker volume ls -q)" ]; then
-  docker volume rm "$(docker volume ls -q)"
-else
-  echo "No hay volúmenes para eliminar."
-fi
+# 2) Eliminar todos los contenedores
+docker ps -aq | xargs -r docker rm
 
-# Eliminar todas las redes
-if [ "$(docker network ls -q)" ]; then
-  docker network rm "$(docker network ls -q)"
-else
-  echo "No hay redes para eliminar."
-fi
+# 3) Eliminar todas las imágenes
+docker images -q | xargs -r docker rmi -f
 
-# Limpiar el sistema de Docker
-docker system prune -a --volumes -f
+# 4) Eliminar todos los volúmenes
+docker volume ls -q | xargs -r docker volume rm -f
+
+# 5) Eliminar todas las redes no utilizadas
+docker network prune -f
+
+# 6) Eliminar caches de builder
+docker builder prune -af
 
 echo "Docker cleanup completed."
