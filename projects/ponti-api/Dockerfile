@@ -1,4 +1,3 @@
-
 FROM golang:1.23-alpine AS builder
 
 ENV TZ=America/Argentina/Buenos_Aires
@@ -30,14 +29,12 @@ RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/
 FROM alpine:latest
 
 ENV TZ=America/Argentina/Buenos_Aires
-RUN apk add --no-cache tzdata sqlite
 
 WORKDIR /app
 
 COPY --from=builder /app/pkg  /app/pkg
 COPY --from=builder /app/staging_binary /app/staging_binary
 
-EXPOSE 8080     
-    
-# Comando de inicio de la aplicación
+EXPOSE 8080
+
 CMD ["/app/staging_binary"]
