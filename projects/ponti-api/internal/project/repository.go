@@ -57,14 +57,14 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		}
 
 		// 4. Associate fields
-		for _, fld := range m.Fields {
-			if err := tx.Exec(
-				"INSERT INTO project_fields (project_id, field_id) SELECT ?, id FROM fields WHERE id = ?",
-				m.ID, fld.ID,
-			).Error; err != nil {
-				return fmt.Errorf("failed to associate field %d: %w", fld.ID, err)
-			}
-		}
+		// for _, fld := range m.Fields {
+		// 	if err := tx.Exec(
+		// 		"UPDATE fields SET project_id = ? WHERE id = ?",
+		// 		m.ID, fld.ID,
+		// 	).Error; err != nil {
+		// 		return fmt.Errorf("failed to associate field %d: %w", fld.ID, err)
+		// 	}
+		// }
 
 		return nil
 	})

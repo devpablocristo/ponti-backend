@@ -101,9 +101,24 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 		}
 	}
 
-	// 4) Fields (CreateField handles nested lots)
+	// 4) Persist project and pivot tables (handled transactionally in repository)
+	projID, err := u.repo.CreateProject(ctx, p)
+	if err != nil {
+		// full rollback: project, fields, investors, managers, customer
+		_ = u.repo.DeleteProject(ctx, projID)
+		for _, invID := range createdInvs {
+			_ = u.investor.DeleteInvestor(ctx, invID)
+		}
+		for _, mgrID := range createdMgrs {
+			_ = u.manager.DeleteManager(ctx, mgrID)
+		}
+		_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+		return 0, fmt.Errorf("create project: %w", err)
+	}
+
 	for i := range p.Fields {
 		f := &p.Fields[i]
+		f.ProjectID = projID
 		fid, err := u.field.CreateField(ctx, f)
 		if err != nil {
 			// rollback fields
@@ -120,28 +135,11 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 			}
 			// rollback customer
 			_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
+			_ = u.repo.DeleteProject(ctx, projID)
 			return 0, fmt.Errorf("create field %q: %w", f.Name, err)
 		}
 		createdFields = append(createdFields, fid)
 		f.ID = fid
-	}
-
-	// 5) Persist project and pivot tables (handled transactionally in repository)
-	projID, err := u.repo.CreateProject(ctx, p)
-	if err != nil {
-		// full rollback: project, fields, investors, managers, customer
-		_ = u.repo.DeleteProject(ctx, projID)
-		for _, fldID := range createdFields {
-			_ = u.field.DeleteField(ctx, fldID)
-		}
-		for _, invID := range createdInvs {
-			_ = u.investor.DeleteInvestor(ctx, invID)
-		}
-		for _, mgrID := range createdMgrs {
-			_ = u.manager.DeleteManager(ctx, mgrID)
-		}
-		_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
-		return 0, fmt.Errorf("create project: %w", err)
 	}
 
 	return projID, nil

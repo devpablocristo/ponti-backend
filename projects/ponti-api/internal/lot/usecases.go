@@ -24,8 +24,8 @@ func (u *useCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) 
 	return u.repo.CreateLot(ctx, l)
 }
 
-func (u *useCases) ListLots(ctx context.Context) ([]domain.Lot, error) {
-	lots, err := u.repo.ListLots(ctx)
+func (u *useCases) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
+	lots, err := u.repo.ListLots(ctx, fieldID)
 	if err != nil {
 		return nil, err
 	}

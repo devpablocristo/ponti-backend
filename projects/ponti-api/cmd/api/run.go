@@ -15,9 +15,7 @@ import (
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
-	personmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/person/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
-	usermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/user/repository/models"
 
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
@@ -45,9 +43,6 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 
 // registerHttpRoutes registers all application routes in the Gin router.
 func registerHttpRoutes(deps *wire.Dependencies) {
-	deps.PersonHandler.Routes()
-	deps.UserHandler.Routes()
-	deps.NotificationHandler.Routes()
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.InvestorHandler.Routes()
@@ -72,9 +67,6 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 
 	// List of models to migrate (entidades existentes + 6 nuevas).
 	modelsToMigrate := []any{
-		&personmodels.Person{},
-		&usermodels.User{},
-		&usermodels.Follow{},
 		&lotmodels.Lot{},
 		&customermodels.Customer{},
 		&investormodels.Investor{},

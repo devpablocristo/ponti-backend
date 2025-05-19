@@ -50,21 +50,9 @@ services:
       retries: 5
       start_period: 10s
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    ports:
-      - "${SMTP_PORT}:${SMTP_PORT}"
-      - "${MH_WEB_UI_PORT}:${MH_WEB_UI_PORT}"
-    networks:
-      - app-network
-    restart: unless-stopped
-    volumes:
-      - mailhog_data:/var/lib/mailhog
-
 networks:
   app-network:
     driver: bridge
 
 volumes:
   ponti-db_data:
-  mailhog_data:

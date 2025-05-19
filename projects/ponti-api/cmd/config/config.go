@@ -7,6 +7,7 @@ import (
 	"time"
 
 	envs "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
+	"github.com/alphacodinggroup/ponti-backend/pkg/environment"
 )
 
 type AppConfig struct {
@@ -26,12 +27,13 @@ type configLoader struct {
 }
 
 func NewConfigLoader() (Loader, error) {
-	// Ruta al archivo .env
-	envPath := "/projects/ponti-api/.env"
+	env := environment.GetFromString(os.Getenv("GO_ENVIRONMENT"))
 
-	// Cargar el archivo .env
-	if err := envs.LoadConfig(envPath); err != nil {
-		return nil, fmt.Errorf("error loading configuration from %s: %w", envPath, err)
+	if env == environment.Local {
+		envPath := "/projects/ponti-api/.env"
+		if err := envs.LoadConfig(envPath); err != nil {
+			return nil, fmt.Errorf("error loading configuration from %s: %w", envPath, err)
+		}
 	}
 
 	// Parsear variables de entorno para AppConfig

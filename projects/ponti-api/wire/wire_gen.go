@@ -11,7 +11,6 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/notification/smtp"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
@@ -19,10 +18,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/notification"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/person"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/user"
 )
 
 // Injectors from wire.go:
@@ -44,10 +40,6 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	service, err := ProvideSmtpService()
-	if err != nil {
-		return nil, err
-	}
 	handlerFunc, err := ProvideJwtMiddleware()
 	if err != nil {
 		return nil, err
@@ -56,30 +48,12 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	personRepository, err := ProvidePersonRepository(pkgpostgresqlRepository)
-	if err != nil {
-		return nil, err
-	}
-	useCases := ProvidePersonUseCases(personRepository)
-	handler := ProvidePersonHandler(server, useCases, middlewares)
-	userRepository, err := ProvideUserRepository(repository)
-	if err != nil {
-		return nil, err
-	}
-	userUseCases := ProvideUserUseCases(userRepository)
-	userHandler := ProvideUserHandler(server, userUseCases, middlewares)
-	smtpService, err := ProvideNotificationSmtpService(service)
-	if err != nil {
-		return nil, err
-	}
-	notificationUseCases := ProvideNotificationUseCases(smtpService)
-	notificationHandler := ProvideNotificationHandler(server, notificationUseCases, middlewares)
 	cropRepository, err := ProvideCropRepository(repository)
 	if err != nil {
 		return nil, err
 	}
-	cropUseCases := ProvideCropUseCases(cropRepository)
-	cropHandler := ProvideCropHandler(server, cropUseCases, middlewares)
+	useCases := ProvideCropUseCases(cropRepository)
+	handler := ProvideCropHandler(server, useCases, middlewares)
 	customerRepository, err := ProvideCustomerRepository(repository)
 	if err != nil {
 		return nil, err
@@ -100,7 +74,7 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	lotUseCases := ProvideLotUseCases(lotRepository, cropUseCases)
+	lotUseCases := ProvideLotUseCases(lotRepository, useCases)
 	fieldUseCases := ProvideFieldUseCases(fieldRepository, lotUseCases)
 	fieldHandler := ProvideFieldHandler(server, fieldUseCases, middlewares)
 	investorRepository, err := ProvideInvestorRepository(repository)
@@ -117,30 +91,24 @@ func Initialize() (*Dependencies, error) {
 	projectUseCases := ProvideProjectUseCases(projectRepository, customerUseCases, managerUseCases, investorUseCases, fieldUseCases, lotUseCases)
 	projectHandler := ProvideProjectHandler(server, projectUseCases, middlewares)
 	dependencies := &Dependencies{
-		ConfigLoader:        loader,
-		GinServer:           server,
-		GormRepository:      repository,
-		PostgresRepository:  pkgpostgresqlRepository,
-		SmtpService:         service,
-		Middlewares:         middlewares,
-		PersonHandler:       handler,
-		UserHandler:         userHandler,
-		NotificationHandler: notificationHandler,
-		CropHandler:         cropHandler,
-		CustomerHandler:     customerHandler,
-		ManagerHandler:      managerHandler,
-		FieldHandler:        fieldHandler,
-		InvestorHandler:     investorHandler,
-		LotHandler:          lotHandler,
-		ProjectHandler:      projectHandler,
-		PersonUseCases:      useCases,
-		UserUseCases:        userUseCases,
-		CropUseCases:        cropUseCases,
-		CustomerUseCases:    customerUseCases,
-		FieldUseCases:       fieldUseCases,
-		InvestorUseCases:    investorUseCases,
-		LotUseCases:         lotUseCases,
-		ProjectUseCases:     projectUseCases,
+		ConfigLoader:       loader,
+		GinServer:          server,
+		GormRepository:     repository,
+		PostgresRepository: pkgpostgresqlRepository,
+		Middlewares:        middlewares,
+		CropHandler:        handler,
+		CustomerHandler:    customerHandler,
+		ManagerHandler:     managerHandler,
+		FieldHandler:       fieldHandler,
+		InvestorHandler:    investorHandler,
+		LotHandler:         lotHandler,
+		ProjectHandler:     projectHandler,
+		CropUseCases:       useCases,
+		CustomerUseCases:   customerUseCases,
+		FieldUseCases:      fieldUseCases,
+		InvestorUseCases:   investorUseCases,
+		LotUseCases:        lotUseCases,
+		ProjectUseCases:    projectUseCases,
 	}
 	return dependencies, nil
 }
@@ -152,23 +120,17 @@ type Dependencies struct {
 	GinServer          pkggin.Server
 	GormRepository     pkggorm.Repository
 	PostgresRepository pkgpostgresql.Repository
-	SmtpService        pkgsmtp.Service
 
 	Middlewares *pkgmwr.Middlewares
 
-	PersonHandler       *person.Handler
-	UserHandler         *user.Handler
-	NotificationHandler *notification.Handler
-	CropHandler         *crop.Handler
-	CustomerHandler     *customer.Handler
-	ManagerHandler      *manager.Handler
-	FieldHandler        *field.Handler
-	InvestorHandler     *investor.Handler
-	LotHandler          *lot.Handler
-	ProjectHandler      *project.Handler
+	CropHandler     *crop.Handler
+	CustomerHandler *customer.Handler
+	ManagerHandler  *manager.Handler
+	FieldHandler    *field.Handler
+	InvestorHandler *investor.Handler
+	LotHandler      *lot.Handler
+	ProjectHandler  *project.Handler
 
-	PersonUseCases   person.UseCases
-	UserUseCases     user.UseCases
 	CropUseCases     crop.UseCases
 	CustomerUseCases customer.UseCases
 	FieldUseCases    field.UseCases

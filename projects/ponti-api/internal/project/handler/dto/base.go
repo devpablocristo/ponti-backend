@@ -50,12 +50,14 @@ type Field struct {
 
 // Lot DTO referencing crops by ID
 type Lot struct {
-	ID             int64   `json:"id,omitempty"`
-	Name           string  `json:"name" binding:"required"`
-	Hectares       float64 `json:"hectares" binding:"required"`
-	PreviousCropID int64   `json:"previous_crop_id" binding:"required"`
-	CurrentCropID  int64   `json:"current_crop_id" binding:"required"`
-	Season         string  `json:"season" binding:"required"`
+	ID               int64   `json:"id,omitempty"`
+	Name             string  `json:"name" binding:"required"`
+	Hectares         float64 `json:"hectares" binding:"required"`
+	PreviousCropID   int64   `json:"previous_crop_id" binding:"required"`
+	CurrentCropID    int64   `json:"current_crop_id" binding:"required"`
+	PreviousCropName string  `json:"previous_crop_name"`
+	CurrentCropName  string  `json:"current_crop_name"`
+	Season           string  `json:"season" binding:"required"`
 }
 
 // ToDomain maps the DTO to the domain.Project
@@ -125,12 +127,14 @@ func FromDomain(d *domain.Project) *Project {
 		dtoF := Field{ID: fld.ID, Name: fld.Name, LeaseTypeID: fld.LeaseTypeID}
 		for _, lt := range fld.Lots {
 			dtoF.Lots = append(dtoF.Lots, Lot{
-				ID:             lt.ID,
-				Name:           lt.Name,
-				Hectares:       lt.Hectares,
-				PreviousCropID: lt.PreviousCrop.ID,
-				CurrentCropID:  lt.CurrentCrop.ID,
-				Season:         lt.Season,
+				ID:               lt.ID,
+				Name:             lt.Name,
+				Hectares:         lt.Hectares,
+				PreviousCropID:   lt.PreviousCrop.ID,
+				PreviousCropName: lt.PreviousCrop.Name,
+				CurrentCropID:    lt.CurrentCrop.ID,
+				CurrentCropName:  lt.CurrentCrop.Name,
+				Season:           lt.Season,
 			})
 		}
 		r.Fields = append(r.Fields, dtoF)

@@ -29,7 +29,7 @@ func (h *Handler) Routes() {
 	apiV := h.gsv.GetApiVersion()
 	base := "/api/" + apiV + "/projects"
 
-	public := r.Group(base + "/public")
+	public := r.Group(base)
 	{
 		public.POST("", h.CreateProject)                        // Create a project
 		public.GET("", h.ListProjects)                          // List all projects

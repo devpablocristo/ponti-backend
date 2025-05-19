@@ -78,7 +78,13 @@ func (h *Handler) CreateLot(c *gin.Context) {
 
 // ListLots handles GET /lots
 func (h *Handler) ListLots(c *gin.Context) {
-	lots, err := h.ucs.ListLots(c.Request.Context())
+	fieldID, err := strconv.ParseInt(c.Query("field_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
+		return
+	}
+
+	lots, err := h.ucs.ListLots(c.Request.Context(), fieldID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

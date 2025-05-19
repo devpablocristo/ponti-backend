@@ -8,7 +8,6 @@ import (
 	pg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	smtp "github.com/alphacodinggroup/ponti-backend/pkg/notification/smtp"
 	"github.com/google/wire"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
@@ -19,10 +18,7 @@ import (
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
-	notification "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/notification"
-	person "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/person"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
-	user "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/user"
 )
 
 type Dependencies struct {
@@ -30,23 +26,17 @@ type Dependencies struct {
 	GinServer          ginsrv.Server
 	GormRepository     gorm.Repository
 	PostgresRepository pg.Repository
-	SmtpService        smtp.Service
 
 	Middlewares *mdw.Middlewares
 
-	PersonHandler       *person.Handler
-	UserHandler         *user.Handler
-	NotificationHandler *notification.Handler
-	CropHandler         *crop.Handler
-	CustomerHandler     *customer.Handler
-	ManagerHandler      *manager.Handler
-	FieldHandler        *field.Handler
-	InvestorHandler     *investor.Handler
-	LotHandler          *lot.Handler
-	ProjectHandler      *project.Handler
+	CropHandler     *crop.Handler
+	CustomerHandler *customer.Handler
+	ManagerHandler  *manager.Handler
+	FieldHandler    *field.Handler
+	InvestorHandler *investor.Handler
+	LotHandler      *lot.Handler
+	ProjectHandler  *project.Handler
 
-	PersonUseCases   person.UseCases
-	UserUseCases     user.UseCases
 	CropUseCases     crop.UseCases
 	CustomerUseCases customer.UseCases
 	FieldUseCases    field.UseCases
@@ -63,19 +53,6 @@ func Initialize() (*Dependencies, error) {
 		ProvidePostgresRepository,
 		ProvideJwtMiddleware,
 		ProvideMiddlewares,
-		ProvideSmtpService,
-
-		ProvidePersonRepository,
-		ProvidePersonUseCases,
-		ProvidePersonHandler,
-
-		ProvideUserRepository,
-		ProvideUserUseCases,
-		ProvideUserHandler,
-
-		ProvideNotificationSmtpService,
-		ProvideNotificationUseCases,
-		ProvideNotificationHandler,
 
 		ProvideCropRepository,
 		ProvideCropUseCases,

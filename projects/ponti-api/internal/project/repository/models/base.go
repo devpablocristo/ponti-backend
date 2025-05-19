@@ -4,6 +4,7 @@ import (
 	"time"
 
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
@@ -20,7 +21,8 @@ type Project struct {
 
 	Managers  []Manager  `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Investors []Investor `gorm:"many2many:project_investors;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Fields    []Field    `gorm:"many2many:project_fields;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	//Fields    []Field    `gorm:"many2many:project_fields;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Fields []models.Field `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
@@ -52,7 +54,12 @@ func FromDomain(d *domain.Project) *Project {
 		m.Investors = append(m.Investors, Investor{ID: inv.ID})
 	}
 	for _, fld := range d.Fields {
-		m.Fields = append(m.Fields, Field{ID: fld.ID})
+		m.Fields = append(m.Fields, models.Field{
+			ID:          fld.ID,
+			ProjectID:   fld.ProjectID,
+			Name:        fld.Name,
+			LeaseTypeID: fld.LeaseTypeID,
+		})
 	}
 	return m
 }
@@ -73,7 +80,13 @@ func (m *Project) ToDomain() *domain.Project {
 		d.Investors = append(d.Investors, investordom.Investor{ID: inv.ID})
 	}
 	for _, fld := range m.Fields {
-		d.Fields = append(d.Fields, fielddom.Field{ID: fld.ID})
+		d.Fields = append(d.Fields, fielddom.Field{
+			ID:          fld.ID,
+			ProjectID:   fld.ProjectID,
+			Name:        fld.Name,
+			LeaseTypeID: fld.LeaseTypeID,
+			Lots:        fld.ToDomain().Lots,
+		})
 	}
 	return d
 }

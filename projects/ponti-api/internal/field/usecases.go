@@ -80,7 +80,7 @@ func (u *useCases) DeleteField(ctx context.Context, id int64) error {
 
 // helpers
 func (u *useCases) enrichField(ctx context.Context, f *domain.Field) error {
-	allLots, err := u.lot.ListLots(ctx)
+	allLots, err := u.lot.ListLots(ctx, f.ID)
 	if err != nil {
 		return fmt.Errorf("listar lots: %w", err)
 	}

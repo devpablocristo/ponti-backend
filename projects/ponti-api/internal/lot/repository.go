@@ -34,9 +34,9 @@ func (r *repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 }
 
 // ListLots returns all lots.
-func (r *repository) ListLots(ctx context.Context) ([]domain.Lot, error) {
+func (r *repository) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	var list []models.Lot
-	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).Where("field_id = ?", fieldID).Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list lots", err)
 	}
 	result := make([]domain.Lot, 0, len(list))

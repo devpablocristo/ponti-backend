@@ -8,7 +8,7 @@ import (
 
 type UseCases interface {
 	CreateLot(context.Context, *domain.Lot) (int64, error)
-	ListLots(context.Context) ([]domain.Lot, error)
+	ListLots(context.Context, int64) ([]domain.Lot, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
@@ -16,7 +16,7 @@ type UseCases interface {
 
 type Repository interface {
 	CreateLot(context.Context, *domain.Lot) (int64, error)
-	ListLots(context.Context) ([]domain.Lot, error)
+	ListLots(context.Context, int64) ([]domain.Lot, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error

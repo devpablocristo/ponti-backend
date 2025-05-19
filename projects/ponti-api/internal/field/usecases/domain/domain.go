@@ -6,6 +6,7 @@ import (
 
 type Field struct {
 	ID          int64
+	ProjectID   int64
 	Name        string
 	LeaseTypeID int64
 	Lots        []lotdom.Lot

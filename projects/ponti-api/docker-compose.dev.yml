@@ -60,7 +60,7 @@ services:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     logging:
-      driver: "json-file" 
+      driver: "json-file"
     depends_on:
       - ponti-db
     volumes:
@@ -69,17 +69,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    ports:
-      - "${SMTP_PORT}:${SMTP_PORT}"   # Puerto SMTP fijo
-      - "${MH_WEB_UI_PORT}:${MH_WEB_UI_PORT}"   # Puerto UI web fijo
-    networks:
-      - app-network
-    restart: unless-stopped
-    volumes:
-      - mailhog_data:/var/lib/mailhog
-
 networks:
   app-network:
     driver: bridge
@@ -87,4 +76,3 @@ networks:
 volumes:
   ponti-db_data:
   pgadmin_data:
-  mailhog_data:
