@@ -2,6 +2,7 @@ package pkggorm
 
 import (
 	"fmt"
+	"os"
 )
 
 // DBType define los tipos de bases de datos soportadas
@@ -18,6 +19,7 @@ type Config interface {
 	GetDBType() DBType
 	GetHost() string
 	GetUser() string
+	GetSSLMode() string
 	GetPassword() string
 	GetDBName() string
 	GetPort() int
@@ -28,6 +30,7 @@ type Config interface {
 // config es una implementación concreta de Config
 type config struct {
 	dbType     DBType
+	sslMode    string
 	host       string
 	user       string
 	password   string
@@ -37,9 +40,10 @@ type config struct {
 }
 
 // newConfig crea una nueva instancia de Config
-func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath string) Config {
+func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath, sslMode string) Config {
 	return &config{
 		dbType:     dbType,
+		sslMode:    sslMode,
 		host:       host,
 		user:       user,
 		password:   password,
@@ -62,6 +66,10 @@ func (c *config) GetUser() string {
 	return c.user
 }
 
+func (c *config) GetSSLMode() string {
+	return c.sslMode
+}
+
 func (c *config) GetPassword() string {
 	return c.password
 }
@@ -80,6 +88,13 @@ func (c *config) GetSQLitePath() string {
 
 // Validate verifica si la configuración es válida
 func (c *config) Validate() error {
+	if os.Getenv("K_SERVICE") != "" {
+		if c.user == "" || c.dbname == "" || os.Getenv("INSTANCE_CONNECTION_NAME") == "" {
+			return fmt.Errorf("incomplete %s configuration", c.dbType)
+		}
+		return nil
+	}
+
 	switch c.dbType {
 	case Postgres, MySQL:
 		if c.host == "" || c.user == "" || c.password == "" || c.dbname == "" || c.port == 0 {

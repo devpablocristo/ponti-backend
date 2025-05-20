@@ -9,13 +9,9 @@ import (
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 
-	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
-	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
-	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
-	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
@@ -65,20 +61,22 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 
-	// List of models to migrate (entidades existentes + 6 nuevas).
-	modelsToMigrate := []any{
-		&lotmodels.Lot{},
+	models := []any{
+		// &cropmodels.Crop{},
+		// &fieldmodels.Field{},
 		&customermodels.Customer{},
 		&investormodels.Investor{},
-		&fieldmodels.Field{},
-		&projectmodels.Project{},
-		&cropmodels.Crop{},
+		// &lotmodels.Lot{},
+		// &projectmodels.Project{},
 		&managermodels.Manager{},
 	}
 
 	start := time.Now()
-	if err := repo.AutoMigrate(modelsToMigrate...); err != nil {
-		return fmt.Errorf("failed to migrate database models: %w", err)
+	for _, model := range models {
+		fmt.Printf("Migrating model: %T\n", model)
+		if err := repo.AutoMigrate(model); err != nil {
+			return fmt.Errorf("failed to migrate %T: %w", model, err)
+		}
 	}
 	duration := time.Since(start)
 	log.Printf("GORM migrations completed successfully in %s.", duration)

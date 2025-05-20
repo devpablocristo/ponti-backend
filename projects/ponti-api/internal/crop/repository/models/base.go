@@ -14,6 +14,10 @@ type Crop struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
 
+func (Crop) TableName() string {
+	return "crops"
+}
+
 // ToDomain converts the Crop model to the domain entity.
 func (c Crop) ToDomain() *domain.Crop {
 	return &domain.Crop{

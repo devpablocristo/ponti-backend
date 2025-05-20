@@ -5,7 +5,6 @@ package wire
 
 import (
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/google/wire"
@@ -22,10 +21,9 @@ import (
 )
 
 type Dependencies struct {
-	ConfigLoader       config.Loader
-	GinServer          ginsrv.Server
-	GormRepository     gorm.Repository
-	PostgresRepository pg.Repository
+	ConfigLoader   config.Loader
+	GinServer      ginsrv.Server
+	GormRepository gorm.Repository
 
 	Middlewares *mdw.Middlewares
 
@@ -50,7 +48,6 @@ func Initialize() (*Dependencies, error) {
 		ProvideConfigLoader,
 		ProvideGinServer,
 		ProvideGormRepository,
-		ProvidePostgresRepository,
 		ProvideJwtMiddleware,
 		ProvideMiddlewares,
 

@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pgdb "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 )
 
 func ProvideGormRepository() (gorm.Repository, error) {
-	repo, err := gorm.Bootstrap("", "", "", "", "", 0)
+	repo, err := gorm.Bootstrap("", "", "", "", "", "", 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Gorm: %w", err)
 	}
@@ -24,12 +23,4 @@ func ProvideGinServer() (ginsrv.Server, error) {
 		return nil, fmt.Errorf("failed to initialize Gin server: %w", err)
 	}
 	return server, nil
-}
-
-func ProvidePostgresRepository() (pgdb.Repository, error) {
-	repo, err := pgdb.Bootstrap("", "", "", "", "", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to bootstrap PostgreSQL repository: %w", err)
-	}
-	return repo, nil
 }

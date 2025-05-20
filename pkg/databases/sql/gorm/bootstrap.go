@@ -8,7 +8,7 @@ import (
 )
 
 // Bootstrap inicializa la base de datos sin aplicar migraciones automáticamente.
-func Bootstrap(dbTypeStr, name, password, user, host string, port int) (Repository, error) {
+func Bootstrap(dbTypeStr, name, password, user, host, sslMode string, port int) (Repository, error) {
 	if dbTypeStr == "" {
 		dbTypeStr = strings.ToLower(os.Getenv("GORM_TYPE"))
 	}
@@ -28,9 +28,12 @@ func Bootstrap(dbTypeStr, name, password, user, host string, port int) (Reposito
 	var config Config
 	switch dbType {
 	case Postgres, MySQL:
-
 		if host == "" {
 			host = os.Getenv("GORM_HOST")
+		}
+
+		if sslMode == "" {
+			sslMode = os.Getenv("SSL_MODE")
 		}
 
 		if user == "" {
@@ -54,6 +57,7 @@ func Bootstrap(dbTypeStr, name, password, user, host string, port int) (Reposito
 			name,
 			port,
 			"",
+			sslMode,
 		)
 	case SQLite:
 		config = newConfig(
@@ -64,6 +68,7 @@ func Bootstrap(dbTypeStr, name, password, user, host string, port int) (Reposito
 			"",
 			0,
 			os.Getenv("SQLITE_PATH"),
+			"",
 		)
 	}
 

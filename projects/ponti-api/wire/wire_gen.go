@@ -8,7 +8,6 @@ package wire
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/postgresql/pgxpool"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
@@ -33,10 +32,6 @@ func Initialize() (*Dependencies, error) {
 		return nil, err
 	}
 	repository, err := ProvideGormRepository()
-	if err != nil {
-		return nil, err
-	}
-	pkgpostgresqlRepository, err := ProvidePostgresRepository()
 	if err != nil {
 		return nil, err
 	}
@@ -91,24 +86,23 @@ func Initialize() (*Dependencies, error) {
 	projectUseCases := ProvideProjectUseCases(projectRepository, customerUseCases, managerUseCases, investorUseCases, fieldUseCases, lotUseCases)
 	projectHandler := ProvideProjectHandler(server, projectUseCases, middlewares)
 	dependencies := &Dependencies{
-		ConfigLoader:       loader,
-		GinServer:          server,
-		GormRepository:     repository,
-		PostgresRepository: pkgpostgresqlRepository,
-		Middlewares:        middlewares,
-		CropHandler:        handler,
-		CustomerHandler:    customerHandler,
-		ManagerHandler:     managerHandler,
-		FieldHandler:       fieldHandler,
-		InvestorHandler:    investorHandler,
-		LotHandler:         lotHandler,
-		ProjectHandler:     projectHandler,
-		CropUseCases:       useCases,
-		CustomerUseCases:   customerUseCases,
-		FieldUseCases:      fieldUseCases,
-		InvestorUseCases:   investorUseCases,
-		LotUseCases:        lotUseCases,
-		ProjectUseCases:    projectUseCases,
+		ConfigLoader:     loader,
+		GinServer:        server,
+		GormRepository:   repository,
+		Middlewares:      middlewares,
+		CropHandler:      handler,
+		CustomerHandler:  customerHandler,
+		ManagerHandler:   managerHandler,
+		FieldHandler:     fieldHandler,
+		InvestorHandler:  investorHandler,
+		LotHandler:       lotHandler,
+		ProjectHandler:   projectHandler,
+		CropUseCases:     useCases,
+		CustomerUseCases: customerUseCases,
+		FieldUseCases:    fieldUseCases,
+		InvestorUseCases: investorUseCases,
+		LotUseCases:      lotUseCases,
+		ProjectUseCases:  projectUseCases,
 	}
 	return dependencies, nil
 }
@@ -116,10 +110,9 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	ConfigLoader       config.Loader
-	GinServer          pkggin.Server
-	GormRepository     pkggorm.Repository
-	PostgresRepository pkgpostgresql.Repository
+	ConfigLoader   config.Loader
+	GinServer      pkggin.Server
+	GormRepository pkggorm.Repository
 
 	Middlewares *pkgmwr.Middlewares
 

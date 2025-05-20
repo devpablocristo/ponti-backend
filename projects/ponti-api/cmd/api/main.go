@@ -32,9 +32,9 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	if err := RunGormMigrations(ctx, deps.GormRepository); err != nil {
-		log.Fatalf("Failed to run Gorm's migrations: %v", err)
-	}
+	// if err := RunGormMigrations(ctx, deps.GormRepository); err != nil {
+	// 	log.Fatalf("Failed to run Gorm's migrations: %v", err)
+	// }
 
 	var wg sync.WaitGroup
 	wg.Add(1)

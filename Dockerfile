@@ -21,10 +21,10 @@ RUN go mod download && go mod verify
 
 WORKDIR /app/projects/ponti-api
 
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/prod_binary ./cmd/api/
 
 # ---------------------------------------------------
-# Etapa 2: Imagen final para staging
+# Etapa 2: Imagen final para prod
 # ---------------------------------------------------
 FROM alpine:latest
 
@@ -33,8 +33,8 @@ ENV TZ=America/Argentina/Buenos_Aires
 WORKDIR /app
 
 COPY --from=builder /app/pkg  /app/pkg
-COPY --from=builder /app/staging_binary /app/staging_binary
+COPY --from=builder /app/prod_binary /app/prod_binary
 
 EXPOSE 8080
 
-CMD ["/app/staging_binary"]
+CMD ["/app/prod_binary"]
