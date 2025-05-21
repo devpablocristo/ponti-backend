@@ -28,11 +28,9 @@ func (u *useCases) CreateField(ctx context.Context, f *domain.Field) (int64, err
 		return 0, fmt.Errorf("create field %q: %w", f.Name, err)
 	}
 
-	// 2) Crear cada Lot apuntando a ese fieldID
 	for _, l := range f.Lots {
 		l.FieldID = fieldID
 		if _, err := u.lot.CreateLot(ctx, &l); err != nil {
-			// Si falla, se borra el Field recién creado
 			if delErr := u.repo.DeleteField(ctx, fieldID); delErr != nil {
 				return 0, fmt.Errorf(
 					"rollback delete field %d failed: %v (original error: %w)",
@@ -78,7 +76,6 @@ func (u *useCases) DeleteField(ctx context.Context, id int64) error {
 	return u.repo.DeleteField(ctx, id)
 }
 
-// helpers
 func (u *useCases) enrichField(ctx context.Context, f *domain.Field) error {
 	allLots, err := u.lot.ListLots(ctx, f.ID)
 	if err != nil {

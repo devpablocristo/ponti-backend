@@ -27,7 +27,6 @@ func (m Field) ToDomain() *domain.Field {
 
 func FromDomain(d *domain.Field) *Field {
 	m := &Field{
-		ID:          d.ID,
 		ProjectID:   d.ProjectID,
 		Name:        d.Name,
 		LeaseTypeID: d.LeaseTypeID,

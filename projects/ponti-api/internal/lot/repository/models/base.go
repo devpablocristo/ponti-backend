@@ -11,7 +11,7 @@ import (
 
 // Lot is the GORM model for a land parcel, storing only foreign-key references.
 type Lot struct {
-	ID             int64          `gorm:"primaryKey"`
+	ID             int64          `gorm:"primaryKey;autoIncrement"`
 	Name           string         `gorm:"size:100;not null"`
 	FieldID        int64          `gorm:"not null;index;column:field_id"`
 	Field          fieldmod.Field `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`

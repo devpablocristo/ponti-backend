@@ -25,51 +25,35 @@ func NewRepository(db gorm.Repository) Repository {
 func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
-		// Build GORM model from domain
 		m := models.FromDomain(p)
 
-		// 1. Insert project base
-		if err := tx.
-			Omit("Managers", "Investors", "Fields").
-			Create(&m).Error; err != nil {
+		if err := tx.Omit("Managers", "Investors", "Fields").Create(&m).Error; err != nil {
 			return fmt.Errorf("failed to create project: %w", err)
 		}
 		projectID = m.ID
 
-		// 2. Associate managers
 		for _, mgr := range m.Managers {
 			if err := tx.Exec(
 				"INSERT INTO project_managers (project_id, manager_id) SELECT ?, id FROM managers WHERE id = ?",
-				m.ID, mgr.ID,
+				projectID, mgr.ID,
 			).Error; err != nil {
 				return fmt.Errorf("failed to associate manager %d: %w", mgr.ID, err)
 			}
 		}
 
-		// 3. Associate investors
 		for _, inv := range m.Investors {
 			if err := tx.Exec(
-				"INSERT INTO project_investors (project_id, investor_id) SELECT ?, id FROM investors WHERE id = ?",
-				m.ID, inv.ID,
+				`INSERT INTO project_investors (project_id, investor_id, percentage)
+     			SELECT ?, id, ? FROM investors WHERE id = ?`,
+				projectID, inv.Percentage, inv.InvestorID,
 			).Error; err != nil {
-				return fmt.Errorf("failed to associate investor %d: %w", inv.ID, err)
+				return fmt.Errorf("failed to associate investor %d: %w", inv.InvestorID, err)
 			}
 		}
-
-		// 4. Associate fields
-		// for _, fld := range m.Fields {
-		// 	if err := tx.Exec(
-		// 		"UPDATE fields SET project_id = ? WHERE id = ?",
-		// 		m.ID, fld.ID,
-		// 	).Error; err != nil {
-		// 		return fmt.Errorf("failed to associate field %d: %w", fld.ID, err)
-		// 	}
-		// }
 
 		return nil
 	})
 	if err != nil {
-		// Wrap in application error
 		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("transaction failed for project creation: %v", err), err)
 	}
 
@@ -136,7 +120,7 @@ func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		// update name and customer_id
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
-			Updates(map[string]interface{}{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
+			Updates(map[string]any{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
 			return err
 		}
 		// relink managers

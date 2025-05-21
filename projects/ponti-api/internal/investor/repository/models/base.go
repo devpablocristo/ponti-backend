@@ -1,32 +1,24 @@
 package models
 
 import (
-	"time"
-
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 )
 
 type Investor struct {
-	ID               int64     `gorm:"primaryKey"`
-	Name             string    `gorm:"type:varchar(255);not null"`
-	Contributions    float64   `gorm:"type:decimal(10,2);not null"`
-	ContributionDate time.Time `gorm:"type:date;not null"`
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"type:varchar(255);not null"`
 }
 
 func (i Investor) ToDomain() *domain.Investor {
 	return &domain.Investor{
-		ID:               i.ID,
-		Name:             i.Name,
-		Contributions:    i.Contributions,
-		ContributionDate: i.ContributionDate,
+		ID:   i.ID,
+		Name: i.Name,
 	}
 }
 
 func FromDomain(d *domain.Investor) *Investor {
 	return &Investor{
-		ID:               d.ID,
-		Name:             d.Name,
-		Contributions:    d.Contributions,
-		ContributionDate: d.ContributionDate,
+		ID:   d.ID,
+		Name: d.Name,
 	}
 }

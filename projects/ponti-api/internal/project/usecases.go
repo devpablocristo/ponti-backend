@@ -45,31 +45,28 @@ func NewUseCases(
 }
 
 func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
-	// Track created entity IDs for compensation
 	var createdMgrs, createdInvs, createdFields []int64
 
-	// 1) Customer
 	if p.Customer.ID == 0 {
 		custID, err := u.customer.CreateCustomer(ctx, &customerdom.Customer{Name: p.Customer.Name})
 		if err != nil {
 			return 0, fmt.Errorf("create customer: %w", err)
 		}
 		p.Customer.ID = custID
+	} else {
+		// TODO: validar id
 	}
 
-	// 2) Managers
 	for i := range p.Managers {
 		m := &p.Managers[i]
 		if m.ID == 0 {
 			id, err := u.manager.CreateManager(ctx, &managerdom.Manager{Name: m.Name})
 			if err != nil {
-				// rollback managers
 				for _, mgrID := range createdMgrs {
 					if delErr := u.manager.DeleteManager(ctx, mgrID); delErr != nil {
 						log.Printf("rollback manager %d failed: %v", mgrID, delErr)
 					}
 				}
-				// rollback customer
 				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
 				return 0, fmt.Errorf("create manager %q: %w", m.Name, err)
 			}
@@ -78,7 +75,6 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 		}
 	}
 
-	// 3) Investors
 	for i := range p.Investors {
 		inv := &p.Investors[i]
 		if inv.ID == 0 {
@@ -101,7 +97,6 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 		}
 	}
 
-	// 4) Persist project and pivot tables (handled transactionally in repository)
 	projID, err := u.repo.CreateProject(ctx, p)
 	if err != nil {
 		// full rollback: project, fields, investors, managers, customer
