@@ -136,7 +136,7 @@ func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		// update name and customer_id
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
-			Updates(map[string]interface{}{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
+			Updates(map[string]any{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
 			return err
 		}
 		// relink managers

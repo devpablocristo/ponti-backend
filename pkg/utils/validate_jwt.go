@@ -105,7 +105,7 @@ func SelectKeyFunc(token *jwt.Token, secretKey string, rsaKey *rsa.PublicKey) jw
 		if secretKey == "" {
 			return nil
 		}
-		return func(token *jwt.Token) (interface{}, error) {
+		return func(token *jwt.Token) (any, error) {
 			return []byte(secretKey), nil
 		}
 	// Si se usa RSA, se requiere la clave pública.
@@ -113,7 +113,7 @@ func SelectKeyFunc(token *jwt.Token, secretKey string, rsaKey *rsa.PublicKey) jw
 		if rsaKey == nil {
 			return nil
 		}
-		return func(token *jwt.Token) (interface{}, error) {
+		return func(token *jwt.Token) (any, error) {
 			return rsaKey, nil
 		}
 	default:
@@ -185,7 +185,7 @@ func extractFromQuery(r *http.Request, param string) (string, error) {
 
 // formatClaimValue convierte un valor de claim a string.
 // Soporta múltiples tipos comunes como string, float64, int, int64 y bool.
-func formatClaimValue(v interface{}) (string, error) {
+func formatClaimValue(v any) (string, error) {
 	switch val := v.(type) {
 	case string:
 		return val, nil
