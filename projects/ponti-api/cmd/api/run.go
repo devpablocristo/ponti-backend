@@ -9,9 +9,13 @@ import (
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 
+	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
@@ -52,7 +56,6 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 	log.Println("Starting GORM migrations...")
 
-	// Obtain the underlying database connection.
 	sqlDB, err := repo.Client().DB()
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
@@ -62,12 +65,13 @@ func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
 	}
 
 	models := []any{
-		// &cropmodels.Crop{},
-		// &fieldmodels.Field{},
+		&cropmodels.Crop{},
+		&fieldmodels.Field{},
 		&customermodels.Customer{},
 		&investormodels.Investor{},
-		// &lotmodels.Lot{},
-		// &projectmodels.Project{},
+		&lotmodels.Lot{},
+		&projectmodels.Project{},
+		&projectmodels.ProjectInvestor{},
 		&managermodels.Manager{},
 	}
 

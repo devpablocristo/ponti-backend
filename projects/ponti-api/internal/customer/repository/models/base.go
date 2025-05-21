@@ -5,7 +5,7 @@ import (
 )
 
 type Customer struct {
-	ID   int64  `gorm:"primaryKey"`
+	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(100);not null"`
 	Type string `gorm:"type:varchar(100);not null"`
 }

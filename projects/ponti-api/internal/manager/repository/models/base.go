@@ -5,7 +5,7 @@ import (
 )
 
 type Manager struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"column:name;type:varchar(100);not null"`
 	Type string `gorm:"column:type;type:varchar(50);not null"`
 }
