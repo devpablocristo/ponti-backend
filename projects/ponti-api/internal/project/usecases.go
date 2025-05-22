@@ -17,36 +17,48 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-type suggester interface {
+type Repository interface {
+	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
+	ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error)
+	ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error)
+	GetProject(ctx context.Context, id int64) (*domain.Project, error)
+	UpdateProject(ctx context.Context, p *domain.Project) error
+	DeleteProject(ctx context.Context, id int64) error
+}
+
+type SuggesterAdapter interface {
+	Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error)
+	Close() error
+	Health(ctx context.Context) error
 }
 
 type useCases struct {
 	repo      Repository
+	suggester SuggesterAdapter
 	customer  customer.UseCases
 	manager   manager.UseCases
 	investor  investor.UseCases
 	field     field.UseCases
 	lot       lot.UseCases
-	suggester suggester
 }
 
 func NewUseCases(
 	rp Repository,
+	sg SuggesterAdapter,
 	cu customer.UseCases,
 	ma manager.UseCases,
 	in investor.UseCases,
 	fu field.UseCases,
 	lo lot.UseCases,
-	sg suggester,
-) UseCases {
+) *useCases {
 	return &useCases{
+		suggester: sg,
 		repo:      rp,
 		customer:  cu,
 		manager:   ma,
 		investor:  in,
 		field:     fu,
 		lot:       lo,
-		suggester: sg,
 	}
 }
 
@@ -71,7 +83,7 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 				for _, mgrID := range createdMgrs {
 					if delErr := u.manager.DeleteManager(ctx, mgrID); delErr != nil {
 						log.Printf("rollback manager %d failed: %v", mgrID, delErr)
-					}
+					}t
 				}
 				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
 				return 0, fmt.Errorf("create manager %q: %w", m.Name, err)

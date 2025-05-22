@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -8,8 +9,19 @@ import (
 	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	"github.com/gin-gonic/gin"
 )
+
+type UseCases interface {
+	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
+	ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error)
+	ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error)
+	ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error)
+	GetProject(ctx context.Context, id int64) (*domain.Project, error)
+	UpdateProject(ctx context.Context, p *domain.Project) error
+	DeleteProject(ctx context.Context, id int64) error
+}
 
 // Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {

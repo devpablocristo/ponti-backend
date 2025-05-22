@@ -9,7 +9,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	pgksuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggestors/pg_trgm-gin"
+	pgksuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 )
 
 func main() {

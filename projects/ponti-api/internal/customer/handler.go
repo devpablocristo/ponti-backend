@@ -37,7 +37,6 @@ func (h *Handler) Routes() {
 	apiVersion := h.gsv.GetApiVersion()
 	apiBase := "/api/" + apiVersion + "/customers"
 	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
 
 	public := router.Group(publicPrefix)
 	{
@@ -48,18 +47,6 @@ func (h *Handler) Routes() {
 		public.DELETE("/:id", h.DeleteCustomer) // Eliminar un customer
 	}
 
-	// Rutas protegidas.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Endpoint de prueba protegido
-	}
-}
-
-func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
 }
 
 // CreateCustomer maneja la creación de un nuevo customer.
