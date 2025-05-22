@@ -65,7 +65,7 @@ func (r *repository) ListProjects(ctx context.Context) ([]domain.Project, error)
 	var modelsList []models.Project
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
-		Preload("Investors").
+		Preload("Investors.Investor").
 		Preload("Fields").
 		Find(&modelsList).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list projects", err)

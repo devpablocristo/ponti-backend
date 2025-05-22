@@ -7,26 +7,27 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
 // Project es el modelo GORM para proyectos.
 type Project struct {
-	ID         int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	Name       string    `gorm:"size:100;not null;column:name"`
-	CustomerID int64     `gorm:"not null;index;column:customer_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
-
-	Managers  []Manager         `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Investors []ProjectInvestor `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Fields    []models.Field    `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID         int64             `gorm:"primaryKey;autoIncrement;column:id"`
+	Name       string            `gorm:"size:100;not null;column:name"`
+	CustomerID int64             `gorm:"not null;index;column:customer_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CreatedAt  time.Time         `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt  time.Time         `gorm:"autoUpdateTime;column:updated_at"`
+	Managers   []Manager         `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Investors  []ProjectInvestor `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Fields     []models.Field    `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
 type Manager struct {
-	ID int64 `gorm:"primaryKey;column:id;autoIncrement:false"`
+	ID   int64 `gorm:"primaryKey;column:id;autoIncrement:false"`
+	Name string
 }
 
 type ProjectInvestor struct {
@@ -63,11 +64,17 @@ func (m *Project) ToDomain() *domain.Project {
 		},
 	}
 	for _, mgr := range m.Managers {
-		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID})
+		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID, Name: mgr.Name})
 	}
-	// for _, inv := range m.Investors {
-	// 	d.Investors = append(d.Investors, investordom.Investor{ID: inv.ID})
-	// }
+
+	for _, inv := range m.Investors {
+		d.Investors = append(d.Investors, investordom.Investor{
+			ID:         inv.InvestorID,
+			Name:       inv.Investor.Name,
+			Percentage: int(inv.Percentage),
+		})
+	}
+
 	for _, fld := range m.Fields {
 		d.Fields = append(d.Fields, fielddom.Field{
 			ID:          fld.ID,

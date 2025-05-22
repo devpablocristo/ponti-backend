@@ -37,6 +37,10 @@ lint:
 	@echo "Linting the project..."
 	@golangci-lint run --config .golangci.yml --verbose
 
+run-api:
+	@echo "Starting API..."
+	go run ./cmd/api/
+
 # Development Docker commands (sin profiles)
 dev-build:
 	@echo "Building services in dev mode..."

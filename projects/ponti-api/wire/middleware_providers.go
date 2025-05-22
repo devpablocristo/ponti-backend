@@ -29,7 +29,7 @@ func ProvideMiddlewares(jwtMiddleware gin.HandlerFunc) (*mdw.Middlewares, error)
 	}
 
 	validatedMiddlewares := []gin.HandlerFunc{
-		mdw.ValidateCredentials(),
+		mdw.RequireAPIKey(),
 	}
 
 	protectedMiddlewares := []gin.HandlerFunc{

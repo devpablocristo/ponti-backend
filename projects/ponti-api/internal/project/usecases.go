@@ -195,26 +195,26 @@ func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
 	p.Customer = *cust
 
 	// Managers
-	var mgrs []managerdom.Manager
-	for _, m := range p.Managers {
-		man, err := u.manager.GetManager(ctx, m.ID)
-		if err != nil {
-			return fmt.Errorf("fetch manager %d: %w", m.ID, err)
-		}
-		mgrs = append(mgrs, *man)
-	}
-	p.Managers = mgrs
+	// var mgrs []managerdom.Manager
+	// for _, m := range p.Managers {
+	// 	man, err := u.manager.GetManager(ctx, m.ID)
+	// 	if err != nil {
+	// 		return fmt.Errorf("fetch manager %d: %w", m.ID, err)
+	// 	}
+	// 	mgrs = append(mgrs, *man)
+	// }
+	// p.Managers = mgrs
 
 	// Investors
-	var invs []investordom.Investor
-	for _, inv := range p.Investors {
-		i, err := u.investor.GetInvestor(ctx, inv.ID)
-		if err != nil {
-			return fmt.Errorf("fetch investor %d: %w", inv.ID, err)
-		}
-		invs = append(invs, *i)
-	}
-	p.Investors = invs
+	// var invs []investordom.Investor
+	// for _, inv := range p.Investors {
+	// 	i, err := u.investor.GetInvestor(ctx, inv.ID)
+	// 	if err != nil {
+	// 		return fmt.Errorf("fetch investor %d: %w", inv.ID, err)
+	// 	}
+	// 	invs = append(invs, *i)
+	// }
+	// p.Investors = invs
 
 	// Fields (incluye nested Lots)
 	var flds []fielddom.Field
