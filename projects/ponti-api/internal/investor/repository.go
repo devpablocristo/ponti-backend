@@ -35,14 +35,23 @@ func (r *repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 	return model.ID, nil
 }
 
-func (r *repository) ListInvestors(ctx context.Context) ([]domain.Investor, error) {
+// En internal/investor/repository.go
+func (r *repository) ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error) {
 	var list []models.Investor
-	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
+	if err := r.db.Client().
+		WithContext(ctx).
+		Model(&models.Investor{}).
+		Select("id, name").
+		Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list investors", err)
 	}
-	result := make([]domain.Investor, 0, len(list))
-	for _, m := range list {
-		result = append(result, *m.ToDomain())
+
+	result := make([]domain.ListedInvestor, len(list))
+	for i, m := range list {
+		result[i] = domain.ListedInvestor{
+			ID:   m.ID,
+			Name: m.Name,
+		}
 	}
 	return result, nil
 }

@@ -144,3 +144,53 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
 }
+
+func (h *Handler) ListProjectsByName(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	name := c.Query("name")
+	var (
+		items []dto.ListedProject
+		total int64
+		err   error
+	)
+	if name != "" {
+		// Delegate to use case ListProjectsByName
+		list, t, errName := h.ucs.ListProjectsByName(c.Request.Context(), name, page, perPage)
+		if errName != nil {
+			err = errName
+		} else {
+			total = t
+			items = make([]dto.ListedProject, len(list))
+			for i, p := range list {
+				items[i] = dto.ListedProject{ID: p.ID, Name: p.Name}
+			}
+		}
+	} else {
+		// existing ListProjects
+		list, t, errList := h.ucs.ListProjects(c.Request.Context(), page, perPage)
+		if errList != nil {
+			err = errList
+		} else {
+			total = t
+			items = make([]dto.ListedProject, len(list))
+			for i, p := range list {
+				items[i] = dto.ListedProject{ID: p.ID, Name: p.Name}
+			}
+		}
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	resp := dto.ListProjectsResponse{
+		Data: items,
+		PageInfo: dto.PageInfo{
+			PerPage: perPage,
+			Page:    page,
+			MaxPage: int((total + int64(perPage) - 1) / int64(perPage)),
+			Total:   total,
+		},
+	}
+	c.JSON(http.StatusOK, resp)
+}

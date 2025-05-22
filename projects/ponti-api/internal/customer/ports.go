@@ -9,7 +9,7 @@ import (
 // UseCases define las operaciones de negocio para Customer.
 type UseCases interface {
 	CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error)
-	ListCustomers(ctx context.Context) ([]domain.Customer, error)
+	ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error)
 	GetCustomer(ctx context.Context, id int64) (*domain.Customer, error)
 	UpdateCustomer(ctx context.Context, c *domain.Customer) error
 	DeleteCustomer(ctx context.Context, id int64) error
@@ -18,7 +18,7 @@ type UseCases interface {
 // Repository define las operaciones para Customer.
 type Repository interface {
 	CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error)
-	ListCustomers(ctx context.Context) ([]domain.Customer, error)
+	ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error)
 	GetCustomer(ctx context.Context, id int64) (*domain.Customer, error)
 	UpdateCustomer(ctx context.Context, c *domain.Customer) error
 	DeleteCustomer(ctx context.Context, id int64) error

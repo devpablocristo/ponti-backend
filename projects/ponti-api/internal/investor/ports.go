@@ -9,7 +9,7 @@ import (
 // UseCases defines business operations for Investor.
 type UseCases interface {
 	CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error)
-	ListInvestors(ctx context.Context) ([]domain.Investor, error)
+	ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error)
 	GetInvestor(ctx context.Context, id int64) (*domain.Investor, error)
 	UpdateInvestor(ctx context.Context, inv *domain.Investor) error
 	DeleteInvestor(ctx context.Context, id int64) error
@@ -18,7 +18,7 @@ type UseCases interface {
 // Repository defines data persistence operations for Investor.
 type Repository interface {
 	CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error)
-	ListInvestors(ctx context.Context) ([]domain.Investor, error)
+	ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error)
 	GetInvestor(ctx context.Context, id int64) (*domain.Investor, error)
 	UpdateInvestor(ctx context.Context, inv *domain.Investor) error
 	DeleteInvestor(ctx context.Context, id int64) error

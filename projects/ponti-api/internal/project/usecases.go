@@ -17,30 +17,36 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
+type suggester interface {
+}
+
 type useCases struct {
-	repo     Repository
-	customer customer.UseCases
-	manager  manager.UseCases
-	investor investor.UseCases
-	field    field.UseCases
-	lot      lot.UseCases
+	repo      Repository
+	customer  customer.UseCases
+	manager   manager.UseCases
+	investor  investor.UseCases
+	field     field.UseCases
+	lot       lot.UseCases
+	suggester suggester
 }
 
 func NewUseCases(
-	repo Repository,
+	rp Repository,
 	cu customer.UseCases,
 	ma manager.UseCases,
 	in investor.UseCases,
 	fu field.UseCases,
 	lo lot.UseCases,
+	sg suggester,
 ) UseCases {
 	return &useCases{
-		repo:     repo,
-		customer: cu,
-		manager:  ma,
-		investor: in,
-		field:    fu,
-		lot:      lo,
+		repo:      rp,
+		customer:  cu,
+		manager:   ma,
+		investor:  in,
+		field:     fu,
+		lot:       lo,
+		suggester: sg,
 	}
 }
 
@@ -210,4 +216,20 @@ func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
 	p.Fields = flds
 
 	return nil
+}
+
+func (u *useCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {
+	// Use pg_trgm suggester
+	results, err := u.suggester.Suggest(ctx, name)
+	if err != nil {
+		return nil, 0, err
+	}
+	// Convert Suggestion to domain.ListedProject
+	items := make([]domain.ListedProject, len(results))
+	for i, s := range results {
+		items[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Text}
+	}
+	total := int64(len(items))
+	// Note: pagination beyond first page not supported; page and perPage currently ignored.
+	return items, total, nil
 }

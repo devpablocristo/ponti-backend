@@ -87,13 +87,18 @@ func (h *Handler) CreateCustomer(c *gin.Context) {
 
 // ListCustomers recupera todos los customers.
 func (h *Handler) ListCustomers(c *gin.Context) {
-	customers, err := h.ucs.ListCustomers(c.Request.Context())
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+
+	items, total, err := h.ucs.ListCustomers(c.Request.Context(), page, perPage)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, customers)
+
+	resp := dto.NewListCustomersResponse(items, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetCustomer recupera un customer por su ID.

@@ -19,7 +19,7 @@ func (u *useCases) CreateInvestor(ctx context.Context, inv *domain.Investor) (in
 	return u.repo.CreateInvestor(ctx, inv)
 }
 
-func (u *useCases) ListInvestors(ctx context.Context) ([]domain.Investor, error) {
+func (u *useCases) ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error) {
 	return u.repo.ListInvestors(ctx)
 }
 

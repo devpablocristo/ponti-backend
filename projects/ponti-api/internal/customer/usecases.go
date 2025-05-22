@@ -19,8 +19,8 @@ func (u *useCases) CreateCustomer(ctx context.Context, c *domain.Customer) (int6
 	return u.repo.CreateCustomer(ctx, c)
 }
 
-func (u *useCases) ListCustomers(ctx context.Context) ([]domain.Customer, error) {
-	return u.repo.ListCustomers(ctx)
+func (u *useCases) ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error) {
+	return u.repo.ListCustomers(ctx, page, perPage)
 }
 
 func (u *useCases) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {

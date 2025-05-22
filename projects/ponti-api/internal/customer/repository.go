@@ -35,16 +35,36 @@ func (r *repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 	return model.ID, nil
 }
 
-func (r *repository) ListCustomers(ctx context.Context) ([]domain.Customer, error) {
+func (r *repository) ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error) {
 	var list []models.Customer
-	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list customers", err)
+	var total int64
+
+	db0 := r.db.Client().WithContext(ctx).Model(&models.Customer{})
+
+	// Conteo total
+	if err := db0.Count(&total).Error; err != nil {
+		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to count customers", err)
 	}
-	result := make([]domain.Customer, 0, len(list))
-	for _, c := range list {
-		result = append(result, *c.ToDomain())
+
+	// Consulta ligera: sólo id y name
+	if err := db0.
+		Select("id, name").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Find(&list).Error; err != nil {
+		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list customers", err)
 	}
-	return result, nil
+
+	// Mapear a dominio ligero
+	customers := make([]domain.ListedCustomer, len(list))
+	for i, m := range list {
+		customers[i] = domain.ListedCustomer{
+			ID:   m.ID,
+			Name: m.Name,
+		}
+	}
+
+	return customers, total, nil
 }
 
 func (r *repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {

@@ -85,15 +85,16 @@ func (h *Handler) CreateInvestor(c *gin.Context) {
 	})
 }
 
-// ListInvestors retrieves all investors.
 func (h *Handler) ListInvestors(c *gin.Context) {
-	investors, err := h.ucs.ListInvestors(c.Request.Context())
+	items, err := h.ucs.ListInvestors(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, investors)
+
+	resp := dto.NewListInvestorsResponse(items)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetInvestor retrieves an investor by its ID.

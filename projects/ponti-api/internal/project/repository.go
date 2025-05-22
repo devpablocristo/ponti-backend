@@ -85,11 +85,7 @@ func (r *repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
-func (r *repository) ListProjectsByCustomerID(
-	ctx context.Context,
-	customerID int64,
-	page, perPage int,
-) ([]domain.ListedProject, int64, error) {
+func (r *repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
 	var projects []domain.ListedProject
 	var total int64
 

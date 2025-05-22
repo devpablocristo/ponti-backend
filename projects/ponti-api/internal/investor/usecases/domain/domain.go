@@ -9,3 +9,8 @@ type Investor struct {
 	ContributionDate time.Time // Date when the contribution was made
 	Percentage       int       // Percentage of the investment in the project
 }
+
+type ListedInvestor struct {
+	ID   int64  // Primary key
+	Name string // Investor name
+}
