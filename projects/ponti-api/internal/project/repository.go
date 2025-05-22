@@ -60,39 +60,62 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 	return projectID, nil
 }
 
-// ListProjects retrieves all projects with their associations.
-func (r *repository) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	var modelsList []models.Project
-	if err := r.db.Client().WithContext(ctx).
-		Preload("Managers").
-		Preload("Investors").
-		Preload("Fields").
-		Find(&modelsList).Error; err != nil {
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list projects", err)
+func (r *repository) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
+	var projects []domain.ListedProject
+	var total int64
+
+	db0 := r.db.Client().
+		WithContext(ctx).
+		Model(&models.Project{})
+
+	// 1. Conteo total
+	if err := db0.Count(&total).Error; err != nil {
+		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to count projects", err)
 	}
-	var result []domain.Project
-	for _, m := range modelsList {
-		result = append(result, *m.ToDomain())
+
+	// 2. Consulta ligera
+	if err := db0.
+		Select("id, name").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Scan(&projects).Error; err != nil {
+		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list light projects", err)
 	}
-	return result, nil
+
+	return projects, total, nil
 }
 
-// ListProjectsByCustomerID retrieves projects filtered by customer.
-func (r *repository) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
-	var modelsList []models.Project
-	if err := r.db.Client().WithContext(ctx).
-		Preload("Managers").
-		Preload("Investors").
-		Preload("Fields").
-		Where("customer_id = ?", customerID).
-		Find(&modelsList).Error; err != nil {
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("failed to list projects for customer %d: %v", customerID, err), err)
+func (r *repository) ListProjectsByCustomerID(
+	ctx context.Context,
+	customerID int64,
+	page, perPage int,
+) ([]domain.ListedProject, int64, error) {
+	var projects []domain.ListedProject
+	var total int64
+
+	// Base de la consulta filtrada por customer_id
+	db0 := r.db.Client().
+		WithContext(ctx).
+		Model(&models.Project{}).
+		Where("customer_id = ?", customerID)
+
+	// 1. Conteo total para ese cliente
+	if err := db0.Count(&total).Error; err != nil {
+		return nil, 0,
+			pkgtypes.NewError(pkgtypes.ErrInternal, "failed to count projects by customer", err)
 	}
-	var result []domain.Project
-	for _, m := range modelsList {
-		result = append(result, *m.ToDomain())
+
+	// 2. Consulta ligera: sólo id y name
+	if err := db0.
+		Select("id, name").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Scan(&projects).Error; err != nil {
+		return nil, 0,
+			pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list light projects by customer", err)
 	}
-	return result, nil
+
+	return projects, total, nil
 }
 
 // GetProject retrieves a single project by ID.

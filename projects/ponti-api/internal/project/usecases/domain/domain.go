@@ -15,3 +15,8 @@ type Project struct {
 	Investors []investordom.Investor // pivot relation with extra field
 	Fields    []fieldom.Field        // child fields
 }
+
+type ListedProject struct {
+	ID   int64
+	Name string
+}

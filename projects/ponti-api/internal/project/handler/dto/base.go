@@ -12,8 +12,6 @@ import (
 
 // Project DTO for create/update and response
 type Project struct {
-	// Si quieres manejar actualizaciones, podrías añadir aquí un campo Id:
-	// ID   int64  `json:"id,omitempty"`
 	ProjectName     string     `json:"name" binding:"required"`
 	Customer        Customer   `json:"customer" binding:"required"`
 	ProjectManagers []Manager  `json:"managers" binding:"required,dive,required"`

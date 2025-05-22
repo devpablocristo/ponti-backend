@@ -151,30 +151,12 @@ func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, e
 	return proj, nil
 }
 
-func (u *useCases) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	list, err := u.repo.ListProjects(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for i := range list {
-		if err := u.enrichProject(ctx, &list[i]); err != nil {
-			return nil, err
-		}
-	}
-	return list, nil
+func (u *useCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
+	return u.repo.ListProjects(ctx, page, perPage)
 }
 
-func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64) ([]domain.Project, error) {
-	list, err := u.repo.ListProjectsByCustomerID(ctx, customerID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range list {
-		if err := u.enrichProject(ctx, &list[i]); err != nil {
-			return nil, err
-		}
-	}
-	return list, nil
+func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
+	return u.repo.ListProjectsByCustomerID(ctx, customerID, page, perPage)
 }
 
 func (u *useCases) UpdateProject(ctx context.Context, p *domain.Project) error {

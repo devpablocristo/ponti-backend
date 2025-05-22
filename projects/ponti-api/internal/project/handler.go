@@ -55,43 +55,41 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ProjectID: pID})
 }
 
-// ListProjectsByCustomerID returns projects filtered by customer ID (path param).
-func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
-	idStr := c.Param("id")
-	if idStr == "" {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "missing customer id in path"})
+// ListProjects maneja el endpoint GET /projects con paginación ligera
+func (h *Handler) ListProjects(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+
+	// Obtener los proyectos ligeros y total
+	items, total, err := h.ucs.ListProjects(c.Request.Context(), page, perPage)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	customerID, err := strconv.ParseInt(idStr, 10, 64)
+
+	// Construir y devolver la respuesta paginada
+	resp := dto.NewListProjectsResponse(items, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
+}
+
+// ListProjectsByCustomerID maneja GET /projects/customer/:id con paginación ligera
+func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
+	customerID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
 		return
 	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
-	projects, err := h.ucs.ListProjectsByCustomerID(c.Request.Context(), customerID)
+	items, total, err := h.ucs.ListProjectsByCustomerID(c.Request.Context(), customerID, page, perPage)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	out := make([]dto.Project, 0, len(projects))
-	for _, p := range projects {
-		out = append(out, *dto.FromDomain(&p))
-	}
-	c.JSON(http.StatusOK, out)
-}
 
-// ListProjects returns all projects.
-func (h *Handler) ListProjects(c *gin.Context) {
-	projects, err := h.ucs.ListProjects(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
-	}
-	out := make([]dto.Project, 0, len(projects))
-	for _, p := range projects {
-		out = append(out, *dto.FromDomain(&p))
-	}
-	c.JSON(http.StatusOK, out)
+	resp := dto.NewListProjectsResponse(items, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetProject returns a single project by ID.

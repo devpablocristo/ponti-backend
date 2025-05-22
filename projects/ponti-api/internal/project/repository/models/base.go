@@ -1,10 +1,11 @@
+// File: repository/models/base.go
 package models
 
 import (
 	"time"
 
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
@@ -21,7 +22,7 @@ type Project struct {
 
 	Managers  []Manager         `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Investors []ProjectInvestor `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Fields    []models.Field    `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Fields    []fieldmod.Field  `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
@@ -36,6 +37,7 @@ type ProjectInvestor struct {
 	Investor   invmod.Investor `gorm:"foreignKey:InvestorID"`
 }
 
+// FromDomain convierte un domain.Project al modelo GORM Project.
 func FromDomain(d *domain.Project) *Project {
 	m := &Project{
 		Name:       d.Name,
@@ -50,10 +52,10 @@ func FromDomain(d *domain.Project) *Project {
 			Percentage: float64(inv.Percentage),
 		})
 	}
-
 	return m
 }
 
+// ToDomain convierte el modelo GORM Project a domain.Project.
 func (m *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
 		ID:   m.ID,
@@ -65,9 +67,6 @@ func (m *Project) ToDomain() *domain.Project {
 	for _, mgr := range m.Managers {
 		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID})
 	}
-	// for _, inv := range m.Investors {
-	// 	d.Investors = append(d.Investors, investordom.Investor{ID: inv.ID})
-	// }
 	for _, fld := range m.Fields {
 		d.Fields = append(d.Fields, fielddom.Field{
 			ID:          fld.ID,
