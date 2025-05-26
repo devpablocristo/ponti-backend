@@ -9,15 +9,6 @@ import (
 	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 )
 
-// App todas las variables de la aplicación
-type App struct {
-	General    General    // Variables generales
-	API        API        // configuración de la API
-	HTTPServer HTTPServer // configuración del servidor HTTP
-	Debugger   Debugger   // configuración del debugger
-	DB         DB         // configuración de la base de datos
-}
-
 type ConfigLoader struct {
 	envPaths []string
 }
@@ -29,14 +20,14 @@ func NewConfigLoader(paths ...string) *ConfigLoader {
 	return &ConfigLoader{envPaths: paths}
 }
 
-func (l *ConfigLoader) Load() (*App, error) {
+func (l *ConfigLoader) Load() (*ConfigSet, error) {
 	// 1. Cargar archivos .env
 	if err := envvars.LoadConfig(l.envPaths...); err != nil {
 		return nil, fmt.Errorf("could not load .env files: %w", err)
 	}
 
 	// 2. Struct destino
-	var cfg App
+	var cfg ConfigSet
 
 	// 3. Procesar cada grupo según sus tags
 	if err := envconfig.Process("", &cfg.General); err != nil {
@@ -56,7 +47,7 @@ func (l *ConfigLoader) Load() (*App, error) {
 	}
 
 	// 4. Construir BaseURL de la API a partir de APIVersion
-	cfg.API.BaseURL = fmt.Sprintf("api/%s/projects", cfg.API.APIVersion)
+	cfg.API.URL = fmt.Sprintf("api/%s/projects", cfg.API.APIVersion)
 
 	// 5. Validar toda la configuración
 	validate := validator.New()

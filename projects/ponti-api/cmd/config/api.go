@@ -1,14 +1,14 @@
 package config
 
 type API struct {
-	APIVersion string `envconfig:"API_VERSION" default:"v1" validate:"required"`
-	BaseURL    string // construida a partir de APIVersion
+	Version string `envconfig:"API_VERSION" default:"v1" validate:"required"`
+	URL     string // construida a partir de APIVersion
 }
 
-func (c *App) APIVersion() string {
-	return c.API.APIVersion
+func (c *API) APIVersion() string {
+	return c.Version
 }
 
-func (c *App) BaseURL() string {
-	return c.API.BaseURL
+func (c *API) BaseURL() string {
+	return c.URL
 }

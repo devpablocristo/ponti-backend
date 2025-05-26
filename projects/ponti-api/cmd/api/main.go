@@ -27,14 +27,14 @@ func main() {
 		cancel()
 	}()
 
-	loader := config.NewConfigLoader() // defaults to ".env"
-	appCfg, err := loader.Load()
+	cfg := config.NewConfigLoader() // defaults to ".env"
+	cfgSet, err := cfg.Load()
 	if err != nil {
 		log.Fatalf("unable to load config: %v", err)
 	}
 
 	// Initialize dependencies using Wire
-	deps, err := wire.Initialize(appCfg)
+	deps, err := wire.Initialize(cfgSet)
 	if err != nil {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
