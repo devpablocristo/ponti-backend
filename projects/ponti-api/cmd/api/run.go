@@ -53,7 +53,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 }
 
 // RunGormMigrations runs SQL migrations using GORM.
-func RunGormMigrations(ctx context.Context, repo gorm.Repository) error {
+func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 	log.Println("Starting GORM migrations...")
 
 	sqlDB, err := repo.Client().DB()

@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Bootstrap(port, version string, isTest bool) (Server, error) {
+func Bootstrap(port, version string, isTest bool) (*Server, error) {
 	if gin.Mode() == gin.TestMode {
 		return newTestServer()
 	}

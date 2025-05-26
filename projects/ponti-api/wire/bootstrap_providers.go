@@ -1,26 +1,55 @@
 package wire
 
 import (
-	"fmt"
+	"github.com/google/wire"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 )
 
-func ProvideGormRepository() (gorm.Repository, error) {
-	repo, err := gorm.Bootstrap("", "", "", "", "", "", 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Gorm: %w", err)
-	}
-
-	return repo, nil
+type GormConfigPort interface {
+	DBType() string
+	DBHost() string
+	DBUser() string
+	DBPassword() string
+	DBName() string
+	DBSSLMode() string
+	DBPort() int
 }
 
-func ProvideGinServer() (ginsrv.Server, error) {
-	isTest := false
-	server, err := ginsrv.Bootstrap("", "", isTest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Gin server: %w", err)
-	}
-	return server, nil
+type GinConfigPort interface {
+	ServerName() string
+	ServerAddress() string
+	IsTest() bool
 }
+
+func ProvideGormRepository(cfg GormConfigPort) (*gormpkg.Repository, error) {
+	return gormpkg.Bootstrap(
+		cfg.DBType(),
+		cfg.DBHost(),
+		cfg.DBUser(),
+		cfg.DBPassword(),
+		cfg.DBName(),
+		cfg.DBSSLMode(),
+		cfg.DBPort(),
+	)
+}
+
+func ProvideGinServer(cfg GinConfigPort) (*ginsrv.Server, error) {
+	return ginsrv.Bootstrap(
+		cfg.ServerName(),
+		cfg.ServerAddress(),
+		cfg.IsTest(),
+	)
+}
+
+var GormSet = wire.NewSet(
+	ProvideGormRepository,
+	wire.Bind(new(GormConfigPort), new(*cfg.DB)),
+)
+
+var GinSet = wire.NewSet(
+	ProvideGinServer,
+	wire.Bind(new(GinConfigPort), new(*cfg.HTTPServer)),
+)

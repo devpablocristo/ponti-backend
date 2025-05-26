@@ -12,8 +12,8 @@ import (
 	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
-// Validate returns a gin.HandlerFunc that validates the JWT using common logic.
-func Validate(cfg pkgutils.Config) gin.HandlerFunc {
+// ValidateJWT returns a gin.HandlerFunc that validates the JWT using common logic.
+func ValidateJWT(cfg pkgutils.Config) gin.HandlerFunc {
 	// Parse the RSA public key if provided.
 	var rsaPublicKey *rsa.PublicKey
 	if cfg.PublicKeyPEM != "" {

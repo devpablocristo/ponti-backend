@@ -10,8 +10,8 @@ import (
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-// ErrorHandlingMiddleware captures errors added to the context and responds appropriately.
-func ErrorHandlingMiddleware() gin.HandlerFunc {
+// ErrorHandling captures errors added to the context and responds appropriately.
+func ErrorHandling() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Log the request method and URL for context.
 		log.Printf("[ErrorHandlingMiddleware] Starting error handling for %s %s", c.Request.Method, c.Request.URL.Path)

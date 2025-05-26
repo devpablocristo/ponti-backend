@@ -5,7 +5,9 @@ go 1.23.4
 require (
 	github.com/alphacodinggroup/ponti-backend/pkg v0.0.0
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-playground/validator/v10 v10.23.0
 	github.com/google/wire v0.6.0
+	github.com/kelseyhightower/envconfig v1.4.0
 	gorm.io/gorm v1.25.10
 )
 
@@ -27,7 +29,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.23.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect

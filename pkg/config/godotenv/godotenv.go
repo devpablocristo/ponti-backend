@@ -1,4 +1,4 @@
-package pkgenvs
+package pkgdotenv
 
 import (
 	"errors"

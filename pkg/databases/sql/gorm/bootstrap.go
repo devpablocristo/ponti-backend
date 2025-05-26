@@ -8,7 +8,7 @@ import (
 )
 
 // Bootstrap inicializa la base de datos sin aplicar migraciones automáticamente.
-func Bootstrap(dbTypeStr, name, password, user, host, sslMode string, port int) (Repository, error) {
+func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) (*Repository, error) {
 	if dbTypeStr == "" {
 		dbTypeStr = strings.ToLower(os.Getenv("GORM_TYPE"))
 	}
@@ -76,9 +76,5 @@ func Bootstrap(dbTypeStr, name, password, user, host, sslMode string, port int) 
 		return nil, err
 	}
 
-	repo, err := newRepository(config)
-	if err != nil {
-		return nil, err
-	}
-	return repo, nil
+	return newRepository(config)
 }

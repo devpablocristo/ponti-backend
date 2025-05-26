@@ -14,18 +14,7 @@ const (
 	SQLite   DBType = "sqlite"
 )
 
-// Config es la interfaz para manejar configuraciones del cliente GORM
-type Config interface {
-	GetDBType() DBType
-	GetHost() string
-	GetUser() string
-	GetSSLMode() string
-	GetPassword() string
-	GetDBName() string
-	GetPort() int
-	GetSQLitePath() string
-	Validate() error
-}
+
 
 // config es una implementación concreta de Config
 type config struct {

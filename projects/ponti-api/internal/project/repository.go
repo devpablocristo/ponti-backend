@@ -13,16 +13,16 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-type repository struct {
+type Repository struct {
 	db gorm.Repository
 }
 
-func NewRepository(db gorm.Repository) Repository {
-	return &repository{db: db}
+func NewRepository(db gorm.Repository) *Repository {
+	return &Repository{db: db}
 }
 
 // CreateProject persists a project and all its associations in a single transaction.
-func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
 		m := models.FromDomain(p)
@@ -60,7 +60,7 @@ func (r *repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 	return projectID, nil
 }
 
-func (r *repository) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
+func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
 	var projects []domain.ListedProject
 	var total int64
 
@@ -85,7 +85,7 @@ func (r *repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
-func (r *repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
+func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
 	var projects []domain.ListedProject
 	var total int64
 
@@ -115,7 +115,7 @@ func (r *repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 }
 
 // GetProject retrieves a single project by ID.
-func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
+func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
@@ -133,7 +133,7 @@ func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 }
 
 // UpdateProject updates a Project's main fields and relinks its ID-based relations.
-func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error {
+func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	m := models.FromDomain(d)
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
 		// update name and customer_id
@@ -163,7 +163,7 @@ func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error
 }
 
 // DeleteProject removes a project and clears all its ID-based relations.
-func (r *repository) DeleteProject(ctx context.Context, id int64) error {
+func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
 		// clear managers
 		if err := tx.Model(&models.Project{ID: id}).Association("Managers").Clear(); err != nil {

@@ -5,43 +5,66 @@ import (
 	"net/http"
 	"strconv"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	// mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	// gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+
+	"github.com/gin-gonic/gin"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
-	"github.com/gin-gonic/gin"
 )
 
-type UseCases interface {
-	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
-	ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error)
-	ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error)
-	ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error)
-	GetProject(ctx context.Context, id int64) (*domain.Project, error)
-	UpdateProject(ctx context.Context, p *domain.Project) error
-	DeleteProject(ctx context.Context, id int64) error
+type HandlerUseCasesPort interface {
+	CreateProject(context.Context, *domain.Project) (int64, error)
+	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
+	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
+	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
+	GetProject(context.Context, int64) (*domain.Project, error)
+	UpdateProject(context.Context, *domain.Project) error
+	DeleteProject(context.Context, int64) error
+}
+
+type GinServerPort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+type ConfigAPIPort interface {
+	APIVersion() string
+	BaseURL() string
+}
+
+type MiddlewaresPort interface {
+	AuthMiddleware() gin.HandlerFunc
 }
 
 // Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
-	ucs UseCases
-	gsv gsv.Server
-	mws *mdw.Middlewares
+	ucs HandlerUseCasesPort
+	gsv GinServerPort
+	acf ConfigAPIPort
+	//mws MiddlewaresPort
 }
 
 // NewHandler creates a new Project handler.
-func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
-	return &Handler{ucs: u, gsv: s, mws: m}
+// func NewHandler(u HandlerUseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
+func NewHandler(u HandlerUseCasesPort, s GinServerPort, c ConfigAPIPort) *Handler {
+	return &Handler{
+		ucs: u,
+		gsv: s,
+		acf: c,
+		//mws: m
+	}
 }
 
 // Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	apiV := h.gsv.GetApiVersion()
-	base := "/api/" + apiV + "/projects"
 
-	public := r.Group(base)
+	baseURL := h.acf.BaseURL() + "/projects"
+
+	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateProject)                        // Create a project
 		public.GET("", h.ListProjects)                          // List all projects
@@ -54,7 +77,8 @@ func (h *Handler) Routes() {
 
 // CreateProject handles project creation.
 func (h *Handler) CreateProject(c *gin.Context) {
-	var req dto.CreateProject
+	//var req dto.CreateProject
+	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
@@ -128,7 +152,8 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-	var req dto.UpdateProject
+	//var req dto.UpdateProject
+	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return

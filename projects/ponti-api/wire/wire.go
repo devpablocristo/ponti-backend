@@ -4,11 +4,11 @@
 package wire
 
 import (
+	"github.com/google/wire"
+
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/google/wire"
-
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
@@ -21,9 +21,9 @@ import (
 )
 
 type Dependencies struct {
-	ConfigLoader   config.Loader
-	GinServer      ginsrv.Server
-	GormRepository gorm.Repository
+	AppConfig      *config.App
+	GinServer      *ginsrv.Server
+	GormRepository *gorm.Repository
 
 	Middlewares *mdw.Middlewares
 
@@ -43,42 +43,56 @@ type Dependencies struct {
 	ProjectUseCases  project.UseCases
 }
 
-func Initialize() (*Dependencies, error) {
+func Initialize(appCfg *config.App) (*Dependencies, error) {
 	wire.Build(
-		ProvideConfigLoader,
-		ProvideGinServer,
-		ProvideGormRepository,
-		ProvideJwtMiddleware,
-		ProvideMiddlewares,
+		// Inyectamos la configuración cargada en main.go
+		wire.Value(appCfg),
 
+		// Servidor HTTP y repositorio
+		GinSet,
+		GormSet,
+
+		// Middlewares
+		GlobalMiddlewareSet,
+		ValidationMiddlewareSet,
+		AuthMiddlewareSet,
+
+		// Crop
 		ProvideCropRepository,
 		ProvideCropUseCases,
 		ProvideCropHandler,
 
+		// Customer
 		ProvideCustomerRepository,
 		ProvideCustomerUseCases,
 		ProvideCustomerHandler,
 
+		// Manager
 		ProvideManagerRepository,
 		ProvideManagerUseCases,
 		ProvideManagerHandler,
 
+		// Field
 		ProvideFieldRepository,
 		ProvideFieldUseCases,
 		ProvideFieldHandler,
 
+		// Investor
 		ProvideInvestorRepository,
 		ProvideInvestorUseCases,
 		ProvideInvestorHandler,
 
+		// Lot
 		ProvideLotRepository,
 		ProvideLotUseCases,
 		ProvideLotHandler,
 
+		// Project
 		ProvideProjectRepository,
 		ProvideProjectUseCases,
 		ProvideProjectHandler,
 
+		// Construye el struct completo
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

@@ -6,6 +6,7 @@ import (
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	"github.com/google/wire"
 
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -16,11 +17,11 @@ import (
 )
 
 // ProvideProjectRepository creates a Project repository instance.
-func ProvideProjectRepository(repo gorm.Repository) (project.Repository, error) {
+func ProvideProjectRepository(repo *gorm.Repository) (*project.Repository, error) {
 	if repo == nil {
 		return nil, errors.New("gorm repository cannot be nil")
 	}
-	return project.NewRepository(repo), nil
+	return project.NewRepository(*repo), nil
 }
 
 // ProvideProjectUseCases wires the Project use cases with its repository and required services.
@@ -43,3 +44,13 @@ func ProvideProjectHandler(
 ) *project.Handler {
 	return project.NewHandler(server, projUC, middlewares)
 }
+
+var ProjectSet = wire.NewSet(
+	ProvideProjectRepository,
+	ProvideProjectUseCases,
+	ProvideProjectHandler,
+
+	wire.Bind(new(project.UseCases), new(*project.UseCases)),
+	wire.Bind(new(project.GinServerPort), new(ginsrv.Server)),
+	wire.Bind(new(project.MiddlewaresPort), new(*mdw.Middlewares)),
+)

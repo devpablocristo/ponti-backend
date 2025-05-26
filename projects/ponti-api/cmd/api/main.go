@@ -8,6 +8,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
 
@@ -26,8 +27,14 @@ func main() {
 		cancel()
 	}()
 
+	loader := config.NewConfigLoader() // defaults to ".env"
+	appCfg, err := loader.Load()
+	if err != nil {
+		log.Fatalf("unable to load config: %v", err)
+	}
+
 	// Initialize dependencies using Wire
-	deps, err := wire.Initialize()
+	deps, err := wire.Initialize(appCfg)
 	if err != nil {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}

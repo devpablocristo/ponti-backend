@@ -17,26 +17,39 @@ import (
 	"gorm.io/gorm"
 )
 
-// repository es la implementación de Repository
-type repository struct {
+// Config es la interfaz para manejar configuraciones del cliente GORM
+type Config interface {
+	GetDBType() DBType
+	GetHost() string
+	GetUser() string
+	GetSSLMode() string
+	GetPassword() string
+	GetDBName() string
+	GetPort() int
+	GetSQLitePath() string
+	Validate() error
+}
+
+// Repository es la implementación de Repository
+type Repository struct {
 	client  *gorm.DB
 	address string
 	config  Config
 }
 
 // NewRepository inicializa un nuevo repositorio sin usar singleton
-func newRepository(c Config) (Repository, error) {
-	repo := &repository{
+func newRepository(c Config) (*Repository, error) {
+	repo := &Repository{
 		config: c,
 	}
 	if err := repo.Connect(c); err != nil {
-		return nil, fmt.Errorf("failed to initialize repository: %w", err)
+		return nil, fmt.Errorf("failed to initialize Repository: %w", err)
 	}
 	return repo, nil
 }
 
 // Connect establece la conexión con la base de datos según el tipo
-func (r *repository) Connect(config Config) error {
+func (r *Repository) Connect(config Config) error {
 	var db *gorm.DB
 	var err error
 
@@ -146,19 +159,19 @@ func connectWithConnectorIAMAuthN(config Config) (gorm.Dialector, error) {
 	return postgres.New(postgres.Config{Conn: sqlDB}), nil
 }
 
-func (r *repository) Client() *gorm.DB {
+func (r *Repository) Client() *gorm.DB {
 	return r.client
 }
 
-func (r *repository) Address() string {
+func (r *Repository) Address() string {
 	return r.address
 }
 
-func (r *repository) AutoMigrate(models ...any) error {
+func (r *Repository) AutoMigrate(models ...any) error {
 	return r.client.AutoMigrate(models...)
 }
 
-func (r *repository) createDatabaseIfNotExists(config Config) error {
+func (r *Repository) createDatabaseIfNotExists(config Config) error {
 	if os.Getenv("K_SERVICE") != "" {
 		return nil
 	}

@@ -1,5 +1,5 @@
 package dto
 
-type UpdateProject struct {
-	Project
-}
+// type UpdateProject struct {
+// 	Project
+// }

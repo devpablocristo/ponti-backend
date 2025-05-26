@@ -17,7 +17,7 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-type Repository interface {
+type UseCasesRepositoryPort interface {
 	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
 	ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error)
@@ -26,15 +26,15 @@ type Repository interface {
 	DeleteProject(ctx context.Context, id int64) error
 }
 
-type SuggesterAdapter interface {
+type UseCasesSuggesterPort interface {
 	Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error)
 	Close() error
 	Health(ctx context.Context) error
 }
 
-type useCases struct {
-	repo      Repository
-	suggester SuggesterAdapter
+type UseCases struct {
+	repo      UseCasesRepositoryPort
+	suggester UseCasesSuggesterPort
 	customer  customer.UseCases
 	manager   manager.UseCases
 	investor  investor.UseCases
@@ -43,15 +43,15 @@ type useCases struct {
 }
 
 func NewUseCases(
-	rp Repository,
-	sg SuggesterAdapter,
+	rp UseCasesRepositoryPort,
+	sg UseCasesSuggesterPort,
 	cu customer.UseCases,
 	ma manager.UseCases,
 	in investor.UseCases,
 	fu field.UseCases,
 	lo lot.UseCases,
-) *useCases {
-	return &useCases{
+) *UseCases {
+	return &UseCases{
 		suggester: sg,
 		repo:      rp,
 		customer:  cu,
@@ -62,7 +62,7 @@ func NewUseCases(
 	}
 }
 
-func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var createdMgrs, createdInvs, createdFields []int64
 
 	if p.Customer.ID == 0 {
@@ -83,7 +83,7 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 				for _, mgrID := range createdMgrs {
 					if delErr := u.manager.DeleteManager(ctx, mgrID); delErr != nil {
 						log.Printf("rollback manager %d failed: %v", mgrID, delErr)
-					}t
+					}
 				}
 				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
 				return 0, fmt.Errorf("create manager %q: %w", m.Name, err)
@@ -158,7 +158,7 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 	return projID, nil
 }
 
-func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
+func (u *UseCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	proj, err := u.repo.GetProject(ctx, id)
 	if err != nil {
 		return nil, err
@@ -169,24 +169,24 @@ func (u *useCases) GetProject(ctx context.Context, id int64) (*domain.Project, e
 	return proj, nil
 }
 
-func (u *useCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
+func (u *UseCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
 	return u.repo.ListProjects(ctx, page, perPage)
 }
 
-func (u *useCases) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
+func (u *UseCases) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
 	return u.repo.ListProjectsByCustomerID(ctx, customerID, page, perPage)
 }
 
-func (u *useCases) UpdateProject(ctx context.Context, p *domain.Project) error {
+func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 	return u.repo.UpdateProject(ctx, p)
 }
 
-func (u *useCases) DeleteProject(ctx context.Context, id int64) error {
+func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)
 }
 
 // helpers
-func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
+func (u *UseCases) enrichProject(ctx context.Context, p *domain.Project) error {
 	// Customer
 	cust, err := u.customer.GetCustomer(ctx, p.Customer.ID)
 	if err != nil {
@@ -230,7 +230,7 @@ func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
 	return nil
 }
 
-func (u *useCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {
+func (u *UseCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {
 	// Use pg_trgm suggester
 	results, err := u.suggester.Suggest(ctx, name)
 	if err != nil {
@@ -239,7 +239,7 @@ func (u *useCases) ListProjectsByName(ctx context.Context, name string, page, pe
 	// Convert Suggestion to domain.ListedProject
 	items := make([]domain.ListedProject, len(results))
 	for i, s := range results {
-		items[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Text}
+		items[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Name}
 	}
 	total := int64(len(items))
 	// Note: pagination beyond first page not supported; page and perPage currently ignored.
