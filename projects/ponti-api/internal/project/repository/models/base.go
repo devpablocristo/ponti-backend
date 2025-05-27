@@ -27,7 +27,8 @@ type Project struct {
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
 type Manager struct {
-	ID int64 `gorm:"primaryKey;column:id;autoIncrement:false"`
+	ID   int64 `gorm:"primaryKey;column:id;autoIncrement:false"`
+	Name string
 }
 
 type ProjectInvestor struct {
@@ -65,7 +66,7 @@ func (m *Project) ToDomain() *domain.Project {
 		},
 	}
 	for _, mgr := range m.Managers {
-		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID})
+		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID, Name: mgr.Name})
 	}
 	for _, fld := range m.Fields {
 		d.Fields = append(d.Fields, fielddom.Field{

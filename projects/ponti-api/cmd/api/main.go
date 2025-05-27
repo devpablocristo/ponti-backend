@@ -8,27 +8,25 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
+	env "github.com/alphacodinggroup/ponti-backend/pkg/env"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
 
 func main() {
-	// Create a context with cancellation to handle graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Capture system signals for clean termination
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-		<-sigChan // Wait for a signal
+		<-sigChan
 		log.Println("Received termination signal. Shutting down the application...")
 		cancel()
 	}()
 
-	cfg := config.NewConfigLoader() // defaults to ".env"
-	cfgSet, err := cfg.Load()
+	cfgSet, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("unable to load config: %v", err)
 	}
@@ -39,8 +37,12 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	if err := RunGormMigrations(ctx, deps.GormRepository); err != nil {
-		log.Fatalf("Failed to run Gorm's migrations: %v", err)
+	currentEnv := env.GetFromString(cfgSet.General.Environment)
+	switch currentEnv {
+	case env.Local, env.Dev:
+		if err := RunGormMigrations(ctx, deps.GormRepository); err != nil {
+			log.Fatalf("Failed to run Gorm migrations: %v", err)
+		}
 	}
 
 	var wg sync.WaitGroup

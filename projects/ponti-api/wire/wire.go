@@ -21,7 +21,7 @@ import (
 )
 
 type Dependencies struct {
-	AppConfig      *config.App
+	AppConfig      *config.ConfigSet
 	GinServer      *ginsrv.Server
 	GormRepository *gorm.Repository
 
@@ -43,10 +43,10 @@ type Dependencies struct {
 	ProjectUseCases  project.UseCases
 }
 
-func Initialize(appCfg *config.App) (*Dependencies, error) {
+func Initialize(cfgSet *config.ConfigSet) (*Dependencies, error) {
 	wire.Build(
 		// Inyectamos la configuración cargada en main.go
-		wire.Value(appCfg),
+		wire.Value(cfgSet),
 
 		// Servidor HTTP y repositorio
 		GinSet,

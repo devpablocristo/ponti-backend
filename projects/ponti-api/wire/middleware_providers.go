@@ -25,10 +25,15 @@ func ProvideGlobalMiddlewares() []gin.HandlerFunc {
 	}
 }
 
+<<<<<<< HEAD
 func ProvideValidationMiddlewares() []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		mdw.ValidateCredentials(),
 		mdw.ValidateUserIDHeader(),
+=======
+	validatedMiddlewares := []gin.HandlerFunc{
+		mdw.RequireAPIKey(),
+>>>>>>> origin/develop
 	}
 }
 
