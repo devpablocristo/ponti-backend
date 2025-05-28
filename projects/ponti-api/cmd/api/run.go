@@ -31,7 +31,7 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	// Configure global middlewares if any.
 	if len(deps.Middlewares.Global) > 0 {
 		deps.GinServer.GetRouter().Use(deps.Middlewares.Global...)
-		deps.GinServer.GetRouter().Use(deps.Middlewares.Validated...)
+		deps.GinServer.GetRouter().Use(deps.Middlewares.Validation...)
 	}
 
 	// Register all application routes.

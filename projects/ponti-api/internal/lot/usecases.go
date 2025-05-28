@@ -8,23 +8,31 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
-type useCases struct {
-	repo Repository
-	crop crop.UseCases
+type RepositoryPort interface {
+	CreateLot(context.Context, *domain.Lot) (int64, error)
+	ListLots(context.Context, int64) ([]domain.Lot, error)
+	GetLot(context.Context, int64) (*domain.Lot, error)
+	UpdateLot(context.Context, *domain.Lot) error
+	DeleteLot(context.Context, int64) error
 }
 
-func NewUseCases(repo Repository, crop crop.UseCases) UseCases {
-	return &useCases{
+type UseCases struct {
+	repo RepositoryPort
+	crop crop.UseCasesPort
+}
+
+func NewUseCases(repo RepositoryPort, crop crop.UseCasesPort) *UseCases {
+	return &UseCases{
 		repo: repo,
 		crop: crop,
 	}
 }
 
-func (u *useCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
+func (u *UseCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	return u.repo.CreateLot(ctx, l)
 }
 
-func (u *useCases) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
+func (u *UseCases) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	lots, err := u.repo.ListLots(ctx, fieldID)
 	if err != nil {
 		return nil, err
@@ -37,7 +45,7 @@ func (u *useCases) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, e
 	return lots, nil
 }
 
-func (u *useCases) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
+func (u *UseCases) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 	l, err := u.repo.GetLot(ctx, id)
 	if err != nil {
 		return nil, err
@@ -48,16 +56,16 @@ func (u *useCases) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 	return l, nil
 }
 
-func (u *useCases) UpdateLot(ctx context.Context, l *domain.Lot) error {
+func (u *UseCases) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	return u.repo.UpdateLot(ctx, l)
 }
 
-func (u *useCases) DeleteLot(ctx context.Context, id int64) error {
+func (u *UseCases) DeleteLot(ctx context.Context, id int64) error {
 	return u.repo.DeleteLot(ctx, id)
 }
 
 // helpers
-func (u *useCases) enrichLot(ctx context.Context, l *domain.Lot) error {
+func (u *UseCases) enrichLot(ctx context.Context, l *domain.Lot) error {
 	prev, err := u.crop.GetCrop(ctx, l.PreviousCrop.ID)
 	if err != nil {
 		return fmt.Errorf("fetch previous crop %d: %w", l.PreviousCrop.ID, err)

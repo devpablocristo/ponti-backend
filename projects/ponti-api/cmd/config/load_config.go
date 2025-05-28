@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
+	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 	"github.com/go-playground/validator/v10"
 	"github.com/kelseyhightower/envconfig"
-	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 )
 
 // LoadConfig carga y valida toda la configuración de la aplicación.
@@ -49,7 +49,7 @@ func LoadConfig() (*ConfigSet, error) {
 	}
 
 	// 4) Valores derivados
-	cfg.API.URL = fmt.Sprintf("api/%s/projects", cfg.API.APIVersion())
+	cfg.API.BaseURL = fmt.Sprintf("api/%s/projects", cfg.API.APIVersion())
 
 	// 5) Validación final
 	validate := validator.New()

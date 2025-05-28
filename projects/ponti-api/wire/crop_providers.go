@@ -1,26 +1,47 @@
 package wire
 
 import (
-	"errors"
+	"github.com/google/wire"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 )
 
-func ProvideCropRepository(repo gorm.Repository) (crop.Repository, error) {
-	if repo == nil {
-		return nil, errors.New("gorm repository cannot be nil")
-	}
-	return crop.NewRepository(repo), nil
+// ProvideCropRepository crea la implementación concreta de crop.Repository.
+func ProvideCropRepository(repo crop.GormEnginePort) *crop.Repository {
+	return crop.NewRepository(repo)
 }
 
-func ProvideCropUseCases(repo crop.Repository) crop.UseCases {
-	return crop.NewUseCases(repo)
+// ProvideCropUseCases agrupa repositorios en crop.UseCases.
+func ProvideCropUseCases(
+	rep crop.RepositoryPort,
+) *crop.UseCases {
+	return crop.NewUseCases(rep)
 }
 
-func ProvideCropHandler(server ginsrv.Server, usecases crop.UseCases, middlewares *mdw.Middlewares) *crop.Handler {
-	return crop.NewHandler(server, usecases, middlewares)
+// ProvideCropHandler construye el handler HTTP para Crop.
+func ProvideCropHandler(
+	server crop.GinServerPort,
+	UseCases crop.UseCasesPort,
+	config crop.ConfigAPIPort,
+	middlewares crop.MiddlewaresPort,
+) *crop.Handler {
+	return crop.NewHandler(UseCases, server, config, middlewares)
 }
+
+// CropSet expone todos los providers y bindings necesarios para Crop.
+var CropSet = wire.NewSet(
+	ProvideCropRepository,
+	ProvideCropUseCases,
+	ProvideCropHandler,
+
+	// Bindings de interfaces a implementaciones concretas
+	wire.Bind(new(crop.RepositoryPort), new(*crop.Repository)),
+	wire.Bind(new(crop.UseCasesPort), new(*crop.UseCases)),
+	wire.Bind(new(crop.GinServerPort), new(*ginsrv.Server)),
+	wire.Bind(new(crop.ConfigAPIPort), new(*cfg.API)),
+	wire.Bind(new(crop.MiddlewaresPort), new(*mwr.Middlewares)),
+)

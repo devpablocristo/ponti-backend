@@ -5,26 +5,30 @@ import (
 	"errors"
 	"fmt"
 
-	gorm0 "gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
 type Repository struct {
-	db gorm.Repository
+	db GormEnginePort
 }
 
-func NewRepository(db gorm.Repository) *Repository {
-	return &Repository{db: db}
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{
+		db: db,
+	}
 }
 
 // CreateProject persists a project and all its associations in a single transaction.
 func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		m := models.FromDomain(p)
 
 		if err := tx.Omit("Managers", "Investors", "Fields").Create(&m).Error; err != nil {
@@ -123,7 +127,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Fields").
 		First(&m, id).Error
 	if err != nil {
-		if errors.Is(err, gorm0.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
@@ -135,7 +139,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 // UpdateProject updates a Project's main fields and relinks its ID-based relations.
 func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	m := models.FromDomain(d)
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// update name and customer_id
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
@@ -164,7 +168,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 
 // DeleteProject removes a project and clears all its ID-based relations.
 func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// clear managers
 		if err := tx.Model(&models.Project{ID: id}).Association("Managers").Clear(); err != nil {
 			return err

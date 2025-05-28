@@ -1,27 +1,49 @@
 package wire
 
 import (
-	"errors"
+	"github.com/google/wire"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
+	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 )
 
-func ProvideLotRepository(repo gorm.Repository) (lot.Repository, error) {
-	if repo == nil {
-		return nil, errors.New("gorm repository cannot be nil")
-	}
-	return lot.NewRepository(repo), nil
+// ProvideLotRepository crea la implementación concreta de lot.Repository.
+func ProvideLotRepository(repo lot.GormEnginePort) *lot.Repository {
+	return lot.NewRepository(repo)
 }
 
-func ProvideLotUseCases(repo lot.Repository, cropUC crop.UseCases) lot.UseCases {
-	return lot.NewUseCases(repo, cropUC)
+// ProvideLotUseCases agrupa repositorio y servicio de crop en lot.UseCases.
+func ProvideLotUseCases(
+	rep lot.RepositoryPort,
+	cropUC crop.UseCasesPort,
+) *lot.UseCases {
+	return lot.NewUseCases(rep, cropUC)
 }
 
-func ProvideLotHandler(server ginsrv.Server, usecases lot.UseCases, middlewares *mdw.Middlewares) *lot.Handler {
-	return lot.NewHandler(server, usecases, middlewares)
+// ProvideLotHandler construye el handler HTTP para Lot.
+func ProvideLotHandler(
+	server lot.GinServerPort,
+	UseCases lot.UseCasesPort,
+	config lot.ConfigAPIPort,
+	middlewares lot.MiddlewaresPort,
+) *lot.Handler {
+	return lot.NewHandler(UseCases, server, config, middlewares)
 }
+
+// LotSet expone todos los providers y bindings necesarios para Lot.
+var LotSet = wire.NewSet(
+	ProvideLotRepository,
+	ProvideLotUseCases,
+	ProvideLotHandler,
+
+	// Bindings de interfaces a implementaciones concretas
+	wire.Bind(new(lot.RepositoryPort), new(*lot.Repository)),
+	wire.Bind(new(lot.UseCasesPort), new(*lot.UseCases)),
+	wire.Bind(new(lot.GinServerPort), new(*ginsrv.Server)),
+	wire.Bind(new(lot.ConfigAPIPort), new(*cfg.API)),
+	wire.Bind(new(lot.MiddlewaresPort), new(*mwr.Middlewares)),
+)

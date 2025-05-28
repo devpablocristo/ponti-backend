@@ -1,17 +1,26 @@
+// File: wire/middleware_provider.go
 package wire
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
+// MiddlewaresPort define el contrato para los tres grupos de middleware.
+type MiddlewaresPort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// ProvideGlobalMiddlewares son middlewares que corren en todas las rutas.
 func ProvideGlobalMiddlewares() []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		mdw.ErrorHandling(),
-		mdw.RequestAndResponseLogger(mdw.HttpLoggingOptions{
+		mwr.ErrorHandling(),
+		mwr.RequestAndResponseLogger(mwr.HttpLoggingOptions{
 			LogLevel:       "info",
 			IncludeHeaders: true,
 			IncludeBody:    false,
@@ -25,27 +34,35 @@ func ProvideGlobalMiddlewares() []gin.HandlerFunc {
 	}
 }
 
-<<<<<<< HEAD
+// ProvideValidationMiddlewares son middlewares que validan payloads y headers.
 func ProvideValidationMiddlewares() []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		mdw.ValidateCredentials(),
-		mdw.ValidateUserIDHeader(),
-=======
-	validatedMiddlewares := []gin.HandlerFunc{
-		mdw.RequireAPIKey(),
->>>>>>> origin/develop
+		mwr.ValidateCredentials(),
+		mwr.ValidateUserIDHeader(),
+		mwr.RequireAPIKey(),
 	}
 }
 
+// ProvideJwtMiddleware devuelve el middleware de JWT (puede fallar si la config es errónea).
 func ProvideJwtMiddleware() (gin.HandlerFunc, error) {
-	return mdw.ValidateJWT(
-		utils.NewConfigFromEnv(),
-	), nil
+	return mwr.ValidateJWT(utils.NewConfigFromEnv()), nil
 }
 
+// ProvideProtectedMiddlewares empaqueta el validador de JWT en un slice.
 func ProvideProtectedMiddlewares(jwtMiddleware gin.HandlerFunc) []gin.HandlerFunc {
-	return []gin.HandlerFunc{
-		jwtMiddleware,
+	return []gin.HandlerFunc{jwtMiddleware}
+}
+
+// ProvideMiddlewares agrupa los tres slices en un struct único.
+func ProvideMiddlewares(
+	global []gin.HandlerFunc,
+	validation []gin.HandlerFunc,
+	protected []gin.HandlerFunc,
+) *mwr.Middlewares {
+	return &mwr.Middlewares{
+		Global:     global,
+		Validation: validation,
+		Auth:       protected,
 	}
 }
 
@@ -60,4 +77,6 @@ var ValidationMiddlewareSet = wire.NewSet(
 var AuthMiddlewareSet = wire.NewSet(
 	ProvideJwtMiddleware,
 	ProvideProtectedMiddlewares,
+	ProvideMiddlewares,
+	wire.Bind(new(MiddlewaresPort), new(*mwr.Middlewares)),
 )

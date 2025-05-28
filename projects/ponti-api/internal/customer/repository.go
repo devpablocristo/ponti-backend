@@ -5,26 +5,27 @@ import (
 	"errors"
 	"fmt"
 
-	gorm0 "gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 )
 
-type repository struct {
-	db gorm.Repository
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+type Repository struct {
+	db GormEnginePort
 }
 
-// NewRepository crea una instancia del adaptador GORM para customers.
-func NewRepository(db gorm.Repository) Repository {
-	return &repository{
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{
 		db: db,
 	}
 }
 
-func (r *repository) CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error) {
+func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error) {
 	if c == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "customer is nil", nil)
 	}
@@ -35,7 +36,7 @@ func (r *repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 	return model.ID, nil
 }
 
-func (r *repository) ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error) {
+func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error) {
 	var list []models.Customer
 	var total int64
 
@@ -67,11 +68,11 @@ func (r *repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 	return customers, total, nil
 }
 
-func (r *repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {
+func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {
 	var model models.Customer
 	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
-		if errors.Is(err, gorm0.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("customer with id %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get customer", err)
@@ -79,7 +80,7 @@ func (r *repository) GetCustomer(ctx context.Context, id int64) (*domain.Custome
 	return model.ToDomain(), nil
 }
 
-func (r *repository) UpdateCustomer(ctx context.Context, c *domain.Customer) error {
+func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) error {
 	if c == nil {
 		return pkgtypes.NewError(pkgtypes.ErrValidation, "customer is nil", nil)
 	}
@@ -96,7 +97,7 @@ func (r *repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 	return nil
 }
 
-func (r *repository) DeleteCustomer(ctx context.Context, id int64) error {
+func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Customer{}, "id = ?", id)
 	if result.Error != nil {

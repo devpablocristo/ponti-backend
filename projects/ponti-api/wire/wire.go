@@ -7,7 +7,7 @@ import (
 	"github.com/google/wire"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
@@ -21,78 +21,45 @@ import (
 )
 
 type Dependencies struct {
-	AppConfig      *config.ConfigSet
-	GinServer      *ginsrv.Server
-	GormRepository *gorm.Repository
+	Config      *config.ConfigSet
+	GinServer   *ginsrv.Server
+	GormRepo    *gorm.Repository
+	Middlewares *mwr.Middlewares
 
-	Middlewares *mdw.Middlewares
-
-	CropHandler     *crop.Handler
+	// Los Handlers que tu main va a montar en las rutas:
 	CustomerHandler *customer.Handler
-	ManagerHandler  *manager.Handler
-	FieldHandler    *field.Handler
 	InvestorHandler *investor.Handler
+	CropHandler     *crop.Handler
 	LotHandler      *lot.Handler
+	FieldHandler    *field.Handler
+	ManagerHandler  *manager.Handler
 	ProjectHandler  *project.Handler
-
-	CropUseCases     crop.UseCases
-	CustomerUseCases customer.UseCases
-	FieldUseCases    field.UseCases
-	InvestorUseCases investor.UseCases
-	LotUseCases      lot.UseCases
-	ProjectUseCases  project.UseCases
 }
 
 func Initialize(cfgSet *config.ConfigSet) (*Dependencies, error) {
 	wire.Build(
-		// Inyectamos la configuración cargada en main.go
+		// 1) Inyectar la config que ya cargaste en main.go
 		wire.Value(cfgSet),
 
-		// Servidor HTTP y repositorio
-		GinSet,
+		// 2) Infraestructuras compartidas
 		GormSet,
+		GinSet,
 
-		// Middlewares
+		// 3) Middlewares
 		GlobalMiddlewareSet,
 		ValidationMiddlewareSet,
 		AuthMiddlewareSet,
 
-		// Crop
-		ProvideCropRepository,
-		ProvideCropUseCases,
-		ProvideCropHandler,
+		// 4) Todos los dominios
+		CustomerSet,
+		InvestorSet,
+		CropSet,
+		LotSet,
+		FieldSet,
+		ManagerSet,
+		ProjectSet,
 
-		// Customer
-		ProvideCustomerRepository,
-		ProvideCustomerUseCases,
-		ProvideCustomerHandler,
-
-		// Manager
-		ProvideManagerRepository,
-		ProvideManagerUseCases,
-		ProvideManagerHandler,
-
-		// Field
-		ProvideFieldRepository,
-		ProvideFieldUseCases,
-		ProvideFieldHandler,
-
-		// Investor
-		ProvideInvestorRepository,
-		ProvideInvestorUseCases,
-		ProvideInvestorHandler,
-
-		// Lot
-		ProvideLotRepository,
-		ProvideLotUseCases,
-		ProvideLotHandler,
-
-		// Project
-		ProvideProjectRepository,
-		ProvideProjectUseCases,
-		ProvideProjectHandler,
-
-		// Construye el struct completo
+		// 5) Ensamblar el struct final
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

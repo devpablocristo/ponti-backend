@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -9,37 +10,58 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 )
 
-// Handler encapsula todas las dependencias para el HTTP handler de Manager.
-type Handler struct {
-	ucs UseCases
-	gsv gsv.Server
-	mws *mdw.Middlewares
+type UseCasesPort interface {
+	CreateManager(ctx context.Context, c *domain.Manager) (int64, error)
+	ListManagers(ctx context.Context) ([]domain.Manager, error)
+	GetManager(ctx context.Context, id int64) (*domain.Manager, error)
+	UpdateManager(ctx context.Context, c *domain.Manager) error
+	DeleteManager(ctx context.Context, id int64) error
 }
 
-// NewHandler crea un nuevo handler de Manager.
-func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
+type GinServerPort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+type MiddlewaresPort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// Handler encapsulates all dependencies for the Project HTTP handler.
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinServerPort
+	acf ConfigAPIPort
+	mws MiddlewaresPort
+}
+
+// NewHandler creates a new Project handler.
+func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,
+		acf: c,
 		mws: m,
 	}
 }
 
-// Routes registra todas las rutas de manager.
+// Routes registers all project routes.
 func (h *Handler) Routes() {
-	router := h.gsv.GetRouter()
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/managers"
 
-	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/managers"
-	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
-
-	public := router.Group(publicPrefix)
+	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateManager)       // Crear un manager
 		public.GET("", h.ListManagers)         // Listar todos los customers
@@ -47,19 +69,6 @@ func (h *Handler) Routes() {
 		public.PUT("/:id", h.UpdateManager)    // Actualizar un manager
 		public.DELETE("/:id", h.DeleteManager) // Eliminar un manager
 	}
-
-	// Rutas protegidas.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Endpoint de prueba protegido
-	}
-}
-
-func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
 }
 
 func (h *Handler) CreateManager(c *gin.Context) {

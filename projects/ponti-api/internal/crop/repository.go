@@ -5,25 +5,27 @@ import (
 	"errors"
 	"fmt"
 
-	gorm0 "gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 )
 
-type repository struct {
-	db gorm.Repository
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+type Repository struct {
+	db GormEnginePort
 }
 
-func NewRepository(db gorm.Repository) Repository {
-	return &repository{
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{
 		db: db,
 	}
 }
 
-func (r *repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, error) {
+func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, error) {
 	if c == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "crop is nil", nil)
 	}
@@ -34,7 +36,7 @@ func (r *repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 	return model.ID, nil
 }
 
-func (r *repository) ListCrops(ctx context.Context) ([]domain.Crop, error) {
+func (r *Repository) ListCrops(ctx context.Context) ([]domain.Crop, error) {
 	var list []models.Crop
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list crops", err)
@@ -46,11 +48,11 @@ func (r *repository) ListCrops(ctx context.Context) ([]domain.Crop, error) {
 	return result, nil
 }
 
-func (r *repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error) {
+func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error) {
 	var model models.Crop
 	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
-		if errors.Is(err, gorm0.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("crop with id %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get crop", err)
@@ -58,7 +60,7 @@ func (r *repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error
 	return model.ToDomain(), nil
 }
 
-func (r *repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
+func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	if c == nil {
 		return pkgtypes.NewError(pkgtypes.ErrValidation, "crop is nil", nil)
 	}
@@ -75,7 +77,7 @@ func (r *repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	return nil
 }
 
-func (r *repository) DeleteCrop(ctx context.Context, id int64) error {
+func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Crop{}, "id = ?", id)
 	if result.Error != nil {

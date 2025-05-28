@@ -1,6 +1,7 @@
 package customer
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -9,36 +10,58 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 )
 
-// Handler encapsula todas las dependencias para el HTTP handler de Customer.
-type Handler struct {
-	ucs UseCases
-	gsv gsv.Server
-	mws *mdw.Middlewares
+type UseCasesPort interface {
+	CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error)
+	ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error)
+	GetCustomer(ctx context.Context, id int64) (*domain.Customer, error)
+	UpdateCustomer(ctx context.Context, c *domain.Customer) error
+	DeleteCustomer(ctx context.Context, id int64) error
 }
 
-// NewHandler crea un nuevo handler de Customer.
-func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
+type GinServerPort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+type MiddlewaresPort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// Handler encapsulates all dependencies for the Project HTTP handler.
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinServerPort
+	acf ConfigAPIPort
+	mws MiddlewaresPort
+}
+
+// NewHandler creates a new Project handler.
+func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,
+		acf: c,
 		mws: m,
 	}
 }
 
-// Routes registra todas las rutas de customer.
+// Routes registers all project routes.
 func (h *Handler) Routes() {
-	router := h.gsv.GetRouter()
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/customers"
 
-	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/customers"
-	publicPrefix := apiBase + "/public"
-
-	public := router.Group(publicPrefix)
+	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateCustomer)       // Crear un customer
 		public.GET("", h.ListCustomers)         // Listar todos los customers
@@ -46,7 +69,6 @@ func (h *Handler) Routes() {
 		public.PUT("/:id", h.UpdateCustomer)    // Actualizar un customer
 		public.DELETE("/:id", h.DeleteCustomer) // Eliminar un customer
 	}
-
 }
 
 // CreateCustomer maneja la creación de un nuevo customer.

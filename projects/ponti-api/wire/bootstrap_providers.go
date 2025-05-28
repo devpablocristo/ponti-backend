@@ -5,7 +5,7 @@ import (
 
 	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 )
 
 type GormConfigPort interface {
@@ -46,10 +46,10 @@ func ProvideGinServer(cfg GinConfigPort) (*ginsrv.Server, error) {
 
 var GormSet = wire.NewSet(
 	ProvideGormRepository,
-	wire.Bind(new(GormConfigPort), new(*cfg.DB)),
+	wire.Bind(new(GormConfigPort), new(*config.ConfigSet)),
 )
 
 var GinSet = wire.NewSet(
 	ProvideGinServer,
-	wire.Bind(new(GinConfigPort), new(*cfg.HTTPServer)),
+	wire.Bind(new(GinConfigPort), new(*config.ConfigSet)),
 )

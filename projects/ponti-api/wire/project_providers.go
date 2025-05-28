@@ -1,12 +1,12 @@
+// File: wire/project_wire.go
 package wire
 
 import (
-	"errors"
-
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/google/wire"
+
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -16,41 +16,44 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
-// ProvideProjectRepository creates a Project repository instance.
-func ProvideProjectRepository(repo *gorm.Repository) (*project.Repository, error) {
-	if repo == nil {
-		return nil, errors.New("gorm repository cannot be nil")
-	}
-	return project.NewRepository(*repo), nil
+// ProvideProjectRepository crea la implementación concreta de project.Repository.
+func ProvideProjectRepository(repo project.GormEnginePort) *project.Repository {
+	return project.NewRepository(repo)
 }
 
-// ProvideProjectUseCases wires the Project use cases with its repository and required services.
+// ProvideProjectUseCases agrupa repos y usecases de otros dominios en project.UseCases.
 func ProvideProjectUseCases(
-	repo project.Repository,
-	customerUC customer.UseCases,
-	managerUC manager.UseCases,
-	investorUC investor.UseCases,
-	fieldUC field.UseCases,
-	lotUC lot.UseCases,
-) project.UseCases {
-	return project.NewUseCases(repo, customerUC, managerUC, investorUC, fieldUC, lotUC)
+	rep project.RepositoryPort,
+	suggester project.SuggesterPort,
+	cus customer.UseCases,
+	mgr manager.UseCases,
+	inv investor.UseCases,
+	fld field.UseCases,
+	lot lot.UseCases,
+) *project.UseCases {
+	return project.NewUseCases(rep, suggester, cus, mgr, inv, fld, lot)
 }
 
-// ProvideProjectHandler creates the HTTP handler for Project endpoints.
+// ProvideProjectHandler construye el handler HTTP para Project.
 func ProvideProjectHandler(
-	server ginsrv.Server,
-	projUC project.UseCases,
-	middlewares *mdw.Middlewares,
+	server project.GinServerPort,
+	UseCases project.UseCasesPort,
+	config project.ConfigAPIPort,
+	middlewares project.MiddlewaresPort,
 ) *project.Handler {
-	return project.NewHandler(server, projUC, middlewares)
+	return project.NewHandler(UseCases, server, config, middlewares)
 }
 
+// ProjectSet expone todos los providers y bindings necesarios para Project.
 var ProjectSet = wire.NewSet(
 	ProvideProjectRepository,
 	ProvideProjectUseCases,
 	ProvideProjectHandler,
 
-	wire.Bind(new(project.UseCases), new(*project.UseCases)),
-	wire.Bind(new(project.GinServerPort), new(ginsrv.Server)),
-	wire.Bind(new(project.MiddlewaresPort), new(*mdw.Middlewares)),
+	// Bindings de interfaces a implementaciones concretas
+	wire.Bind(new(project.RepositoryPort), new(*project.Repository)),
+	wire.Bind(new(project.UseCasesPort), new(*project.UseCases)),
+	wire.Bind(new(project.GinServerPort), new(*ginsrv.Server)),
+	wire.Bind(new(project.ConfigAPIPort), new(*cfg.API)),
+	wire.Bind(new(project.MiddlewaresPort), new(*mwr.Middlewares)),
 )

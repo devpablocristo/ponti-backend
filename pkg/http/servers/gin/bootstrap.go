@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Bootstrap(port, version string, isTest bool) (*Server, error) {
+func Bootstrap(port, apiVersion string, isTest bool) (*Server, error) {
 	if gin.Mode() == gin.TestMode {
 		return newTestServer()
 	}
@@ -17,13 +17,13 @@ func Bootstrap(port, version string, isTest bool) (*Server, error) {
 	if port == "" {
 		port = os.Getenv("HTTP_SERVER_PORT")
 	}
-	if version == "" {
-		version = os.Getenv("API_VERSION")
+	if apiVersion == "" {
+		apiVersion = os.Getenv("API_VERSION")
 	}
 
 	config := newConfig(
 		port,
-		version,
+		apiVersion,
 	)
 
 	if err := config.Validate(); err != nil {
@@ -37,7 +37,7 @@ func Bootstrap(port, version string, isTest bool) (*Server, error) {
 
 	r := Server.GetRouter()
 
-	api := r.Group(fmt.Sprintf("/api/%s", version))
+	api := r.Group(fmt.Sprintf("/api/%s", apiVersion))
 	{
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "pong"})

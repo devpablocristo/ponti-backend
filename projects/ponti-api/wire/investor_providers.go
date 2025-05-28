@@ -1,26 +1,47 @@
 package wire
 
 import (
-	"errors"
+	"github.com/google/wire"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 )
 
-func ProvideInvestorRepository(repo gorm.Repository) (investor.Repository, error) {
-	if repo == nil {
-		return nil, errors.New("gorm repository cannot be nil")
-	}
-	return investor.NewRepository(repo), nil
+// ProvideInvestorRepository crea la implementación concreta de investor.Repository.
+func ProvideInvestorRepository(repo investor.GormEnginePort) *investor.Repository {
+	return investor.NewRepository(repo)
 }
 
-func ProvideInvestorUseCases(repo investor.Repository) investor.UseCases {
-	return investor.NewUseCases(repo)
+// ProvideInvestorUseCases agrupa repositorio en investor.UseCases.
+func ProvideInvestorUseCases(
+	rep investor.RepositoryPort,
+) *investor.UseCases {
+	return investor.NewUseCases(rep)
 }
 
-func ProvideInvestorHandler(server ginsrv.Server, usecases investor.UseCases, middlewares *mdw.Middlewares) *investor.Handler {
-	return investor.NewHandler(server, usecases, middlewares)
+// ProvideInvestorHandler construye el handler HTTP para Investor.
+func ProvideInvestorHandler(
+	server investor.GinServerPort,
+	UseCases investor.UseCasesPort,
+	config investor.ConfigAPIPort,
+	middlewares investor.MiddlewaresPort,
+) *investor.Handler {
+	return investor.NewHandler(UseCases, server, config, middlewares)
 }
+
+// InvestorSet expone todos los providers y bindings necesarios para Investor.
+var InvestorSet = wire.NewSet(
+	ProvideInvestorRepository,
+	ProvideInvestorUseCases,
+	ProvideInvestorHandler,
+
+	// Bindings de interfaces a implementaciones concretas
+	wire.Bind(new(investor.RepositoryPort), new(*investor.Repository)),
+	wire.Bind(new(investor.UseCasesPort), new(*investor.UseCases)),
+	wire.Bind(new(investor.GinServerPort), new(*ginsrv.Server)),
+	wire.Bind(new(investor.ConfigAPIPort), new(*cfg.API)),
+	wire.Bind(new(investor.MiddlewaresPort), new(*mwr.Middlewares)),
+)

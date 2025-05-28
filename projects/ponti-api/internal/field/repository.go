@@ -1,4 +1,4 @@
-// File: internal/field/repository/repository.go
+// File: internal/field/Repository/Repository.go
 package field
 
 import (
@@ -6,23 +6,27 @@ import (
 	"errors"
 	"fmt"
 
-	gorm0 "gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 )
 
-type repository struct {
-	db gorm.Repository
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+type Repository struct {
+	db GormEnginePort
 }
 
-func NewRepository(db gorm.Repository) Repository {
-	return &repository{db: db}
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{
+		db: db,
+	}
 }
 
-func (r *repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
+func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	if f == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
 	}
@@ -33,7 +37,7 @@ func (r *repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	return model.ID, nil
 }
 
-func (r *repository) ListFields(ctx context.Context) ([]domain.Field, error) {
+func (r *Repository) ListFields(ctx context.Context) ([]domain.Field, error) {
 	var list []models.Field
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list fields", err)
@@ -46,11 +50,11 @@ func (r *repository) ListFields(ctx context.Context) ([]domain.Field, error) {
 }
 
 // GetField retrieves a field by its ID.
-func (r *repository) GetField(ctx context.Context, id int64) (*domain.Field, error) {
+func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, error) {
 	var model models.Field
 	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
-		if errors.Is(err, gorm0.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("field with id %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get field", err)
@@ -59,7 +63,7 @@ func (r *repository) GetField(ctx context.Context, id int64) (*domain.Field, err
 }
 
 // UpdateField updates an existing field.
-func (r *repository) UpdateField(ctx context.Context, f *domain.Field) error {
+func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if f == nil {
 		return pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
 	}
@@ -78,7 +82,7 @@ func (r *repository) UpdateField(ctx context.Context, f *domain.Field) error {
 }
 
 // DeleteField deletes a field by its ID.
-func (r *repository) DeleteField(ctx context.Context, id int64) error {
+func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Field{}, "id = ?", id)
 	if result.Error != nil {

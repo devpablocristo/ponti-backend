@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	// mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	// mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	// gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +15,7 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-type HandlerUseCasesPort interface {
+type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
@@ -32,37 +32,37 @@ type GinServerPort interface {
 
 type ConfigAPIPort interface {
 	APIVersion() string
-	BaseURL() string
+	APIBaseURL() string
 }
 
 type MiddlewaresPort interface {
-	AuthMiddleware() gin.HandlerFunc
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
-	ucs HandlerUseCasesPort
+	ucs UseCasesPort
 	gsv GinServerPort
 	acf ConfigAPIPort
-	//mws MiddlewaresPort
+	mws MiddlewaresPort
 }
 
 // NewHandler creates a new Project handler.
-// func NewHandler(u HandlerUseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
-func NewHandler(u HandlerUseCasesPort, s GinServerPort, c ConfigAPIPort) *Handler {
+func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,
 		acf: c,
-		//mws: m
+		mws: m,
 	}
 }
 
 // Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-
-	baseURL := h.acf.BaseURL() + "/projects"
+	baseURL := h.acf.APIBaseURL() + "/projects"
 
 	public := r.Group(baseURL)
 	{

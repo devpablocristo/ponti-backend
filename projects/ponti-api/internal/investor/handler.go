@@ -1,6 +1,7 @@
 package investor
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -9,37 +10,58 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 )
 
-// Handler encapsulates all dependencies for the Investor HTTP handler.
-type Handler struct {
-	ucs UseCases
-	gsv gsv.Server
-	mws *mdw.Middlewares
+type UseCasesPort interface {
+	CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error)
+	ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error)
+	GetInvestor(ctx context.Context, id int64) (*domain.Investor, error)
+	UpdateInvestor(ctx context.Context, inv *domain.Investor) error
+	DeleteInvestor(ctx context.Context, id int64) error
 }
 
-// NewHandler creates a new Investor handler.
-func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
+type GinServerPort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+type MiddlewaresPort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// Handler encapsulates all dependencies for the Project HTTP handler.
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinServerPort
+	acf ConfigAPIPort
+	mws MiddlewaresPort
+}
+
+// NewHandler creates a new Project handler.
+func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,
+		acf: c,
 		mws: m,
 	}
 }
 
-// Routes registers all investor routes.
+// Routes registers all project routes.
 func (h *Handler) Routes() {
-	router := h.gsv.GetRouter()
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/investors"
 
-	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/investors"
-	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
-
-	public := router.Group(publicPrefix)
+	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateInvestor)       // Create an investor
 		public.GET("", h.ListInvestors)         // List all investors
@@ -47,19 +69,6 @@ func (h *Handler) Routes() {
 		public.PUT("/:id", h.UpdateInvestor)    // Update an investor
 		public.DELETE("/:id", h.DeleteInvestor) // Delete an investor
 	}
-
-	// Protected routes.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Protected test endpoint
-	}
-}
-
-func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
 }
 
 // CreateInvestor handles the creation of a new investor.

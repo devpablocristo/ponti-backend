@@ -1,6 +1,7 @@
 package field
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -8,37 +9,58 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
-	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/handler/dto"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 )
 
-// Handler encapsulates all dependencies for the Field HTTP handler.
-type Handler struct {
-	ucs UseCases
-	gsv gsv.Server
-	mws *mdw.Middlewares
+type UseCasesPort interface {
+	CreateField(ctx context.Context, f *domain.Field) (int64, error)
+	ListFields(ctx context.Context) ([]domain.Field, error)
+	GetField(ctx context.Context, id int64) (*domain.Field, error)
+	UpdateField(ctx context.Context, f *domain.Field) error
+	DeleteField(ctx context.Context, id int64) error
 }
 
-// NewHandler creates a new Field handler.
-func NewHandler(s gsv.Server, u UseCases, m *mdw.Middlewares) *Handler {
+type GinServerPort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+type MiddlewaresPort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// Handler encapsulates all dependencies for the Project HTTP handler.
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinServerPort
+	acf ConfigAPIPort
+	mws MiddlewaresPort
+}
+
+// NewHandler creates a new Project handler.
+func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,
+		acf: c,
 		mws: m,
 	}
 }
 
-// Routes registers all field routes.
+// Routes registers all project routes.
 func (h *Handler) Routes() {
-	router := h.gsv.GetRouter()
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/fields"
 
-	apiVersion := h.gsv.GetApiVersion()
-	apiBase := "/api/" + apiVersion + "/fields"
-	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
-
-	public := router.Group(publicPrefix)
+	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateField)       // Create a field
 		public.GET("", h.ListFields)         // List all fields
@@ -46,19 +68,6 @@ func (h *Handler) Routes() {
 		public.PUT("/:id", h.UpdateField)    // Update a field
 		public.DELETE("/:id", h.DeleteField) // Delete a field
 	}
-
-	// Protected routes.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Protected test endpoint
-	}
-}
-
-func (h *Handler) ProtectedPing(c *gin.Context) {
-	c.JSON(http.StatusCreated, types.MessageResponse{
-		Message: "Protected Pong!",
-	})
 }
 
 // CreateField handles POST /fields

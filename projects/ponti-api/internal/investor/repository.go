@@ -5,26 +5,27 @@ import (
 	"errors"
 	"fmt"
 
-	gorm0 "gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 )
 
-type repository struct {
-	db gorm.Repository
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+type Repository struct {
+	db GormEnginePort
 }
 
-// NewRepository creates a new Investor repository instance.
-func NewRepository(db gorm.Repository) Repository {
-	return &repository{
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{
 		db: db,
 	}
 }
 
-func (r *repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error) {
+func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error) {
 	if inv == nil {
 		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "investor is nil", nil)
 	}
@@ -35,8 +36,8 @@ func (r *repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 	return model.ID, nil
 }
 
-// En internal/investor/repository.go
-func (r *repository) ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error) {
+// En internal/investor/Repository.go
+func (r *Repository) ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error) {
 	var list []models.Investor
 	if err := r.db.Client().
 		WithContext(ctx).
@@ -56,11 +57,11 @@ func (r *repository) ListInvestors(ctx context.Context) ([]domain.ListedInvestor
 	return result, nil
 }
 
-func (r *repository) GetInvestor(ctx context.Context, id int64) (*domain.Investor, error) {
+func (r *Repository) GetInvestor(ctx context.Context, id int64) (*domain.Investor, error) {
 	var model models.Investor
 	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
-		if errors.Is(err, gorm0.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("investor with id %d not found", id), err)
 		}
 		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get investor", err)
@@ -68,7 +69,7 @@ func (r *repository) GetInvestor(ctx context.Context, id int64) (*domain.Investo
 	return model.ToDomain(), nil
 }
 
-func (r *repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) error {
+func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) error {
 	if inv == nil {
 		return pkgtypes.NewError(pkgtypes.ErrValidation, "investor is nil", nil)
 	}
@@ -85,7 +86,7 @@ func (r *repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 	return nil
 }
 
-func (r *repository) DeleteInvestor(ctx context.Context, id int64) error {
+func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Investor{}, "id = ?", id)
 	if result.Error != nil {
