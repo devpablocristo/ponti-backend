@@ -10,20 +10,20 @@ import (
 )
 
 // pkg WordsSuggesters
-type SuggesterAdapterEnginePort interface {
+type SuggesterEnginePort interface {
 	Suggest(ctx context.Context, prefix string) ([]pgs.Suggestion, error)
 	Close() error
 	Health(ctx context.Context) error
 }
 
-// Suggester wraps a SuggesterAdapterEnginePort and adapts it to the project's needs.
+// Suggester wraps a SuggesterEnginePort and adapts it to the project's needs.
 type Suggester struct {
-	sugEng SuggesterAdapterEnginePort
+	sugEng SuggesterEnginePort
 }
 
-// NewSuggesterAdapter returns a SuggesterAdapterEnginePort implementation that converts
+// NewSuggesterAdapter returns a SuggesterEnginePort implementation that converts
 // external suggestions into domain.ListedProject entries.
-func NewSuggester(se SuggesterAdapterEnginePort) *Suggester {
+func NewSuggester(se SuggesterEnginePort) *Suggester {
 	return &Suggester{sugEng: se}
 }
 

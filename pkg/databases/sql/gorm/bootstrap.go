@@ -25,17 +25,15 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 		return nil, fmt.Errorf("unsupported DB_TYPE: %s", dbTypeStr)
 	}
 
-	var config Config
+	var config *Config
 	switch dbType {
 	case Postgres, MySQL:
 		if host == "" {
 			host = os.Getenv("GORM_HOST")
 		}
-
 		if sslMode == "" {
 			sslMode = os.Getenv("SSL_MODE")
 		}
-
 		if user == "" {
 			user = os.Getenv("GORM_USER")
 		}

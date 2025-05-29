@@ -23,9 +23,9 @@ type DB interface {
 	Error() error
 }
 
-type Option func(*config)
+type Option func(*Config)
 
-type config struct {
+type Config struct {
 	DB        DB
 	Table     string
 	Column    string
@@ -34,15 +34,15 @@ type config struct {
 	logger    Logger
 }
 
-func WithDB(db DB) Option            { return func(c *config) { c.DB = db } }
-func WithTable(name string) Option   { return func(c *config) { c.Table = name } }
-func WithColumn(name string) Option  { return func(c *config) { c.Column = name } }
-func WithLimit(n int) Option         { return func(c *config) { c.Limit = n } }
-func WithThreshold(t float64) Option { return func(c *config) { c.Threshold = t } }
-func WithLogger(l Logger) Option     { return func(c *config) { c.logger = l } }
+func WithDB(db DB) Option            { return func(c *Config) { c.DB = db } }
+func WithTable(name string) Option   { return func(c *Config) { c.Table = name } }
+func WithColumn(name string) Option  { return func(c *Config) { c.Column = name } }
+func WithLimit(n int) Option         { return func(c *Config) { c.Limit = n } }
+func WithThreshold(t float64) Option { return func(c *Config) { c.Threshold = t } }
+func WithLogger(l Logger) Option     { return func(c *Config) { c.logger = l } }
 
-func newConfig(opts ...Option) (*config, error) {
-	cfg := &config{
+func newConfig(opts ...Option) (*Config, error) {
+	cfg := &Config{
 		DB:        nil,
 		Table:     "",
 		Column:    "",
@@ -59,7 +59,7 @@ func newConfig(opts ...Option) (*config, error) {
 	return cfg, nil
 }
 
-func (c *config) validate() error {
+func (c *Config) validate() error {
 	if c.DB == nil {
 		return fmt.Errorf("must provide a DB via WithDB")
 	}

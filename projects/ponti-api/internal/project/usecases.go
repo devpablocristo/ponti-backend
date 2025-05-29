@@ -5,17 +5,44 @@ import (
 	"fmt"
 	"log"
 
-	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
-	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
-	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
-	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
-	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
+
+type InvestorsUseCasesPort interface {
+	CreateInvestor(ctx context.Context, inv *investordom.Investor) (int64, error)
+	ListInvestors(ctx context.Context) ([]investordom.ListedInvestor, error)
+	GetInvestor(ctx context.Context, id int64) (*investordom.Investor, error)
+	UpdateInvestor(ctx context.Context, inv *investordom.Investor) error
+	DeleteInvestor(ctx context.Context, id int64) error
+}
+
+type ManagerUseCasesPort interface {
+	CreateManager(ctx context.Context, c *managerdom.Manager) (int64, error)
+	ListManagers(ctx context.Context) ([]managerdom.Manager, error)
+	GetManager(ctx context.Context, id int64) (*managerdom.Manager, error)
+	UpdateManager(ctx context.Context, c *managerdom.Manager) error
+	DeleteManager(ctx context.Context, id int64) error
+}
+
+type FieldUseCasesPort interface {
+	CreateField(ctx context.Context, f *fielddom.Field) (int64, error)
+	ListFields(ctx context.Context) ([]fielddom.Field, error)
+	GetField(ctx context.Context, id int64) (*fielddom.Field, error)
+	UpdateField(ctx context.Context, f *fielddom.Field) error
+	DeleteField(ctx context.Context, id int64) error
+}
+
+type CustomerUseCasesPort interface {
+	CreateCustomer(ctx context.Context, c *customerdom.Customer) (int64, error)
+	ListCustomers(ctx context.Context, page, perPage int) ([]customerdom.ListedCustomer, int64, error)
+	GetCustomer(ctx context.Context, id int64) (*customerdom.Customer, error)
+	UpdateCustomer(ctx context.Context, c *customerdom.Customer) error
+	DeleteCustomer(ctx context.Context, id int64) error
+}
 
 type RepositoryPort interface {
 	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
@@ -35,21 +62,19 @@ type SuggesterPort interface {
 type UseCases struct {
 	repo      RepositoryPort
 	suggester SuggesterPort
-	customer  customer.UseCases
-	manager   manager.UseCases
-	investor  investor.UseCases
-	field     field.UseCases
-	lot       lot.UseCases
+	customer  CustomerUseCasesPort
+	manager   ManagerUseCasesPort
+	investor  InvestorsUseCasesPort
+	field     FieldUseCasesPort
 }
 
 func NewUseCases(
 	rp RepositoryPort,
 	sg SuggesterPort,
-	cu customer.UseCases,
-	ma manager.UseCases,
-	in investor.UseCases,
-	fu field.UseCases,
-	lo lot.UseCases,
+	cu CustomerUseCasesPort,
+	ma ManagerUseCasesPort,
+	in InvestorsUseCasesPort,
+	fu FieldUseCasesPort,
 ) *UseCases {
 	return &UseCases{
 		suggester: sg,
@@ -58,7 +83,6 @@ func NewUseCases(
 		manager:   ma,
 		investor:  in,
 		field:     fu,
-		lot:       lo,
 	}
 }
 

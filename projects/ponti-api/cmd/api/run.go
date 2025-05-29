@@ -28,11 +28,11 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	log.Println("Registering HTTP routes...")
 
-	// Configure global middlewares if any.
-	if len(deps.Middlewares.Global) > 0 {
-		deps.GinServer.GetRouter().Use(deps.Middlewares.Global...)
-		deps.GinServer.GetRouter().Use(deps.Middlewares.Validation...)
-	}
+	// // Configure global middlewares if any.
+	// if len(deps.Middlewares.GetGlobal()) > 0 {
+	// 	deps.GinServer.GetRouter().Use(deps.Middlewares.GetGlobal()...)
+	// 	deps.GinServer.GetRouter().Use(deps.Middlewares.Validation...)
+	// }
 
 	// Register all application routes.
 	log.Println("Starting HTTP Server...")

@@ -3,9 +3,10 @@ package wire
 import (
 	"github.com/google/wire"
 
+	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 )
@@ -15,6 +16,11 @@ func ProvideInvestorRepository(repo investor.GormEnginePort) *investor.Repositor
 	return investor.NewRepository(repo)
 }
 
+// ProvideInvestorRepositoryPort adapta *investor.Repository a la interfaz investor.RepositoryPort.
+func ProvideInvestorRepositoryPort(r *investor.Repository) investor.RepositoryPort {
+	return r
+}
+
 // ProvideInvestorUseCases agrupa repositorio en investor.UseCases.
 func ProvideInvestorUseCases(
 	rep investor.RepositoryPort,
@@ -22,26 +28,50 @@ func ProvideInvestorUseCases(
 	return investor.NewUseCases(rep)
 }
 
+// ProvideInvestorUseCasesPort adapta *investor.UseCases a la interfaz investor.UseCasesPort.
+func ProvideInvestorUseCasesPort(uc *investor.UseCases) investor.UseCasesPort {
+	return uc
+}
+
 // ProvideInvestorHandler construye el handler HTTP para Investor.
 func ProvideInvestorHandler(
 	server investor.GinServerPort,
-	UseCases investor.UseCasesPort,
-	config investor.ConfigAPIPort,
+	useCases investor.UseCasesPort,
+	cfg investor.ConfigAPIPort,
 	middlewares investor.MiddlewaresPort,
 ) *investor.Handler {
-	return investor.NewHandler(UseCases, server, config, middlewares)
+	return investor.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// InvestorSet expone todos los providers y bindings necesarios para Investor.
+// ProvideInvestorAPIConfig extrae la configuración específica de API para Investor.
+func ProvideInvestorAPIConfig(cfg *config.ConfigSet) investor.ConfigAPIPort {
+	return &cfg.API
+}
+
+// ProvideInvestorGormEnginePort adapta *pgorm.Repository a investor.GormEnginePort.
+func ProvideInvestorGormEnginePort(repo *pgorm.Repository) investor.GormEnginePort {
+	return repo
+}
+
+// ProvideInvestorGinServerPort adapta *pgin.Server a investor.GinServerPort.
+func ProvideInvestorGinServerPort(srv *pgin.Server) investor.GinServerPort {
+	return srv
+}
+
+// ProvideInvestorMiddlewaresPort adapta *mwr.Middlewares a investor.MiddlewaresPort.
+func ProvideInvestorMiddlewaresPort(m *mwr.Middlewares) investor.MiddlewaresPort {
+	return m
+}
+
+// InvestorSet expone todos los providers necesarios para Investor.
 var InvestorSet = wire.NewSet(
 	ProvideInvestorRepository,
+	ProvideInvestorRepositoryPort,
 	ProvideInvestorUseCases,
+	ProvideInvestorUseCasesPort,
 	ProvideInvestorHandler,
-
-	// Bindings de interfaces a implementaciones concretas
-	wire.Bind(new(investor.RepositoryPort), new(*investor.Repository)),
-	wire.Bind(new(investor.UseCasesPort), new(*investor.UseCases)),
-	wire.Bind(new(investor.GinServerPort), new(*ginsrv.Server)),
-	wire.Bind(new(investor.ConfigAPIPort), new(*cfg.API)),
-	wire.Bind(new(investor.MiddlewaresPort), new(*mwr.Middlewares)),
+	ProvideInvestorAPIConfig,
+	ProvideInvestorGormEnginePort,
+	ProvideInvestorGinServerPort,
+	ProvideInvestorMiddlewaresPort,
 )

@@ -5,9 +5,16 @@ import (
 	"fmt"
 
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
-	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
+
+type LotUseCasesPort interface {
+	CreateLot(context.Context, *lotdom.Lot) (int64, error)
+	ListLots(context.Context, int64) ([]lotdom.Lot, error)
+	GetLot(context.Context, int64) (*lotdom.Lot, error)
+	UpdateLot(context.Context, *lotdom.Lot) error
+	DeleteLot(context.Context, int64) error
+}
 
 type RepositoryPort interface {
 	CreateField(ctx context.Context, f *domain.Field) (int64, error)
@@ -19,10 +26,10 @@ type RepositoryPort interface {
 
 type UseCases struct {
 	repo RepositoryPort
-	lot  lot.UseCasesPort
+	lot  LotUseCasesPort
 }
 
-func NewUseCases(repo RepositoryPort, lot lot.UseCasesPort) *UseCases {
+func NewUseCases(repo RepositoryPort, lot LotUseCasesPort) *UseCases {
 	return &UseCases{
 		repo: repo,
 		lot:  lot,

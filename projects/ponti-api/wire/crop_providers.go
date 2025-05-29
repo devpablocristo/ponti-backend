@@ -3,9 +3,10 @@ package wire
 import (
 	"github.com/google/wire"
 
+	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 )
@@ -15,6 +16,11 @@ func ProvideCropRepository(repo crop.GormEnginePort) *crop.Repository {
 	return crop.NewRepository(repo)
 }
 
+// ProvideCropRepositoryPort adapta *crop.Repository a la interfaz crop.RepositoryPort.
+func ProvideCropRepositoryPort(r *crop.Repository) crop.RepositoryPort {
+	return r
+}
+
 // ProvideCropUseCases agrupa repositorios en crop.UseCases.
 func ProvideCropUseCases(
 	rep crop.RepositoryPort,
@@ -22,26 +28,50 @@ func ProvideCropUseCases(
 	return crop.NewUseCases(rep)
 }
 
+// ProvideCropUseCasesPort adapta *crop.UseCases a la interfaz crop.UseCasesPort.
+func ProvideCropUseCasesPort(uc *crop.UseCases) crop.UseCasesPort {
+	return uc
+}
+
 // ProvideCropHandler construye el handler HTTP para Crop.
 func ProvideCropHandler(
 	server crop.GinServerPort,
-	UseCases crop.UseCasesPort,
-	config crop.ConfigAPIPort,
+	useCases crop.UseCasesPort,
+	cfg crop.ConfigAPIPort,
 	middlewares crop.MiddlewaresPort,
 ) *crop.Handler {
-	return crop.NewHandler(UseCases, server, config, middlewares)
+	return crop.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// CropSet expone todos los providers y bindings necesarios para Crop.
+// ProvideCropAPIConfig extrae la configuración específica de API para Crop.
+func ProvideCropAPIConfig(cfg *config.ConfigSet) crop.ConfigAPIPort {
+	return &cfg.API
+}
+
+// ProvideCropGormEnginePort adapta *pgorm.Repository a crop.GormEnginePort.
+func ProvideCropGormEnginePort(repo *pgorm.Repository) crop.GormEnginePort {
+	return repo
+}
+
+// ProvideCropGinServerPort adapta *pgin.Server a crop.GinServerPort.
+func ProvideCropGinServerPort(srv *pgin.Server) crop.GinServerPort {
+	return srv
+}
+
+// ProvideCropMiddlewaresPort adapta *mwr.Middlewares a crop.MiddlewaresPort.
+func ProvideCropMiddlewaresPort(m *mwr.Middlewares) crop.MiddlewaresPort {
+	return m
+}
+
+// CropSet expone todos los providers necesarios para Crop.
 var CropSet = wire.NewSet(
 	ProvideCropRepository,
+	ProvideCropRepositoryPort,
 	ProvideCropUseCases,
+	ProvideCropUseCasesPort,
 	ProvideCropHandler,
-
-	// Bindings de interfaces a implementaciones concretas
-	wire.Bind(new(crop.RepositoryPort), new(*crop.Repository)),
-	wire.Bind(new(crop.UseCasesPort), new(*crop.UseCases)),
-	wire.Bind(new(crop.GinServerPort), new(*ginsrv.Server)),
-	wire.Bind(new(crop.ConfigAPIPort), new(*cfg.API)),
-	wire.Bind(new(crop.MiddlewaresPort), new(*mwr.Middlewares)),
+	ProvideCropAPIConfig,
+	ProvideCropGormEnginePort,
+	ProvideCropGinServerPort,
+	ProvideCropMiddlewaresPort,
 )

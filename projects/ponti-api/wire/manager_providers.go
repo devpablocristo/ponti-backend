@@ -3,9 +3,10 @@ package wire
 import (
 	"github.com/google/wire"
 
+	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 )
@@ -15,6 +16,11 @@ func ProvideManagerRepository(repo manager.GormEnginePort) *manager.Repository {
 	return manager.NewRepository(repo)
 }
 
+// ProvideManagerRepositoryPort adapta *manager.Repository a la interfaz manager.RepositoryPort.
+func ProvideManagerRepositoryPort(r *manager.Repository) manager.RepositoryPort {
+	return r
+}
+
 // ProvideManagerUseCases agrupa repositorio en manager.UseCases.
 func ProvideManagerUseCases(
 	rep manager.RepositoryPort,
@@ -22,26 +28,50 @@ func ProvideManagerUseCases(
 	return manager.NewUseCases(rep)
 }
 
+// ProvideManagerUseCasesPort adapta *manager.UseCases a la interfaz manager.UseCasesPort.
+func ProvideManagerUseCasesPort(uc *manager.UseCases) manager.UseCasesPort {
+	return uc
+}
+
 // ProvideManagerHandler construye el handler HTTP para Manager.
 func ProvideManagerHandler(
 	server manager.GinServerPort,
-	UseCases manager.UseCasesPort,
-	config manager.ConfigAPIPort,
+	useCases manager.UseCasesPort,
+	cfg manager.ConfigAPIPort,
 	middlewares manager.MiddlewaresPort,
 ) *manager.Handler {
-	return manager.NewHandler(UseCases, server, config, middlewares)
+	return manager.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ManagerSet expone todos los providers y bindings necesarios para Manager.
+// ProvideManagerAPIConfig extrae la configuración específica de API para Manager.
+func ProvideManagerAPIConfig(cfg *config.ConfigSet) manager.ConfigAPIPort {
+	return &cfg.API
+}
+
+// ProvideManagerGormEnginePort adapta *pgorm.Repository a manager.GormEnginePort.
+func ProvideManagerGormEnginePort(repo *pgorm.Repository) manager.GormEnginePort {
+	return repo
+}
+
+// ProvideManagerGinServerPort adapta *pgin.Server a manager.GinServerPort.
+func ProvideManagerGinServerPort(srv *pgin.Server) manager.GinServerPort {
+	return srv
+}
+
+// ProvideManagerMiddlewaresPort adapta *mwr.Middlewares a manager.MiddlewaresPort.
+func ProvideManagerMiddlewaresPort(m *mwr.Middlewares) manager.MiddlewaresPort {
+	return m
+}
+
+// ManagerSet expone todos los providers necesarios para Manager.
 var ManagerSet = wire.NewSet(
 	ProvideManagerRepository,
+	ProvideManagerRepositoryPort,
 	ProvideManagerUseCases,
+	ProvideManagerUseCasesPort,
 	ProvideManagerHandler,
-
-	// Bindings de interfaces a implementaciones concretas
-	wire.Bind(new(manager.RepositoryPort), new(*manager.Repository)),
-	wire.Bind(new(manager.UseCasesPort), new(*manager.UseCases)),
-	wire.Bind(new(manager.GinServerPort), new(*ginsrv.Server)),
-	wire.Bind(new(manager.ConfigAPIPort), new(*cfg.API)),
-	wire.Bind(new(manager.MiddlewaresPort), new(*mwr.Middlewares)),
+	ProvideManagerAPIConfig,
+	ProvideManagerGormEnginePort,
+	ProvideManagerGinServerPort,
+	ProvideManagerMiddlewaresPort,
 )

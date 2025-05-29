@@ -14,10 +14,8 @@ const (
 	SQLite   DBType = "sqlite"
 )
 
-
-
-// config es una implementación concreta de Config
-type config struct {
+// Config es una implementación concreta de Config
+type Config struct {
 	dbType     DBType
 	sslMode    string
 	host       string
@@ -29,8 +27,8 @@ type config struct {
 }
 
 // newConfig crea una nueva instancia de Config
-func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath, sslMode string) Config {
-	return &config{
+func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath, sslMode string) *Config {
+	return &Config{
 		dbType:     dbType,
 		sslMode:    sslMode,
 		host:       host,
@@ -42,44 +40,44 @@ func newConfig(dbType DBType, host, user, password, dbname string, port int, sql
 	}
 }
 
-// Métodos de `config` para implementar la interfaz Config
-func (c *config) GetDBType() DBType {
+// Métodos de `Config` para implementar la interfaz Config
+func (c *Config) GetDBType() DBType {
 	return c.dbType
 }
 
-func (c *config) GetHost() string {
+func (c *Config) GetHost() string {
 	return c.host
 }
 
-func (c *config) GetUser() string {
+func (c *Config) GetUser() string {
 	return c.user
 }
 
-func (c *config) GetSSLMode() string {
+func (c *Config) GetSSLMode() string {
 	return c.sslMode
 }
 
-func (c *config) GetPassword() string {
+func (c *Config) GetPassword() string {
 	return c.password
 }
 
-func (c *config) GetDBName() string {
+func (c *Config) GetDBName() string {
 	return c.dbname
 }
 
-func (c *config) GetPort() int {
+func (c *Config) GetPort() int {
 	return c.port
 }
 
-func (c *config) GetSQLitePath() string {
+func (c *Config) GetSQLitePath() string {
 	return c.sqlitePath
 }
 
-// Validate verifica si la configuración es válida
-func (c *config) Validate() error {
+// Validate verifica si la Configuración es válida
+func (c *Config) Validate() error {
 	if os.Getenv("K_SERVICE") != "" {
 		if c.user == "" || c.dbname == "" || os.Getenv("INSTANCE_CONNECTION_NAME") == "" {
-			return fmt.Errorf("incomplete %s configuration", c.dbType)
+			return fmt.Errorf("incomplete %s Configuration", c.dbType)
 		}
 		return nil
 	}
@@ -87,7 +85,7 @@ func (c *config) Validate() error {
 	switch c.dbType {
 	case Postgres, MySQL:
 		if c.host == "" || c.user == "" || c.password == "" || c.dbname == "" || c.port == 0 {
-			return fmt.Errorf("incomplete %s configuration", c.dbType)
+			return fmt.Errorf("incomplete %s Configuration", c.dbType)
 		}
 	case SQLite:
 		if c.sqlitePath == "" {

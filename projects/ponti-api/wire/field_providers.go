@@ -3,17 +3,23 @@ package wire
 import (
 	"github.com/google/wire"
 
+	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
-	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 )
 
 // ProvideFieldRepository crea la implementación concreta de field.Repository.
 func ProvideFieldRepository(repo field.GormEnginePort) *field.Repository {
 	return field.NewRepository(repo)
+}
+
+// ProvideFieldRepositoryPort adapta *field.Repository a la interfaz field.RepositoryPort.
+func ProvideFieldRepositoryPort(r *field.Repository) field.RepositoryPort {
+	return r
 }
 
 // ProvideFieldUseCases agrupa repositorios y servicios relacionados en field.UseCases.
@@ -24,26 +30,50 @@ func ProvideFieldUseCases(
 	return field.NewUseCases(rep, lotUC)
 }
 
+// ProvideFieldUseCasesPort adapta *field.UseCases a la interfaz field.UseCasesPort.
+func ProvideFieldUseCasesPort(uc *field.UseCases) field.UseCasesPort {
+	return uc
+}
+
 // ProvideFieldHandler construye el handler HTTP para Field.
 func ProvideFieldHandler(
 	server field.GinServerPort,
-	UseCases field.UseCasesPort,
-	config field.ConfigAPIPort,
+	useCases field.UseCasesPort,
+	cfg field.ConfigAPIPort,
 	middlewares field.MiddlewaresPort,
 ) *field.Handler {
-	return field.NewHandler(UseCases, server, config, middlewares)
+	return field.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// FieldSet expone todos los providers y bindings necesarios para Field.
+// ProvideFieldAPIConfig extrae la configuración específica de API para Field.
+func ProvideFieldAPIConfig(cfg *config.ConfigSet) field.ConfigAPIPort {
+	return &cfg.API
+}
+
+// ProvideFieldGormEnginePort adapta *pgorm.Repository a field.GormEnginePort.
+func ProvideFieldGormEnginePort(repo *pgorm.Repository) field.GormEnginePort {
+	return repo
+}
+
+// ProvideFieldGinServerPort adapta *pgin.Server a field.GinServerPort.
+func ProvideFieldGinServerPort(srv *pgin.Server) field.GinServerPort {
+	return srv
+}
+
+// ProvideFieldMiddlewaresPort adapta *mwr.Middlewares a field.MiddlewaresPort.
+func ProvideFieldMiddlewaresPort(m *mwr.Middlewares) field.MiddlewaresPort {
+	return m
+}
+
+// FieldSet expone todos los providers necesarios para Field.
 var FieldSet = wire.NewSet(
 	ProvideFieldRepository,
+	ProvideFieldRepositoryPort,
 	ProvideFieldUseCases,
+	ProvideFieldUseCasesPort,
 	ProvideFieldHandler,
-
-	// Bindings de interfaces a implementaciones concretas
-	wire.Bind(new(field.RepositoryPort), new(*field.Repository)),
-	wire.Bind(new(field.UseCasesPort), new(*field.UseCases)),
-	wire.Bind(new(field.GinServerPort), new(*ginsrv.Server)),
-	wire.Bind(new(field.ConfigAPIPort), new(*cfg.API)),
-	wire.Bind(new(field.MiddlewaresPort), new(*mwr.Middlewares)),
+	ProvideFieldAPIConfig,
+	ProvideFieldGormEnginePort,
+	ProvideFieldGinServerPort,
+	ProvideFieldMiddlewaresPort,
 )

@@ -1,18 +1,13 @@
-// File: wire/project_wire.go
 package wire
 
 import (
 	"github.com/google/wire"
 
+	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
-	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
-	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
-	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
-	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
-	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
@@ -21,39 +16,73 @@ func ProvideProjectRepository(repo project.GormEnginePort) *project.Repository {
 	return project.NewRepository(repo)
 }
 
+// ProvideProjectRepositoryPort adapta *project.Repository a project.RepositoryPort.
+func ProvideProjectRepositoryPort(r *project.Repository) project.RepositoryPort {
+	return r
+}
+
 // ProvideProjectUseCases agrupa repos y usecases de otros dominios en project.UseCases.
 func ProvideProjectUseCases(
 	rep project.RepositoryPort,
-	suggester project.SuggesterPort,
-	cus customer.UseCases,
-	mgr manager.UseCases,
-	inv investor.UseCases,
-	fld field.UseCases,
-	lot lot.UseCases,
+	sug project.SuggesterPort,
+	cus project.CustomerUseCasesPort,
+	mgr project.ManagerUseCasesPort,
+	inv project.InvestorsUseCasesPort,
+	fld project.FieldUseCasesPort,
 ) *project.UseCases {
-	return project.NewUseCases(rep, suggester, cus, mgr, inv, fld, lot)
+	return project.NewUseCases(rep, sug, cus, mgr, inv, fld)
+}
+
+// ProvideProjectUseCasesPort adapta *project.UseCases a project.UseCasesPort.
+func ProvideProjectUseCasesPort(uc *project.UseCases) project.UseCasesPort {
+	return uc
 }
 
 // ProvideProjectHandler construye el handler HTTP para Project.
 func ProvideProjectHandler(
 	server project.GinServerPort,
-	UseCases project.UseCasesPort,
-	config project.ConfigAPIPort,
+	useCases project.UseCasesPort,
+	cfg project.ConfigAPIPort,
 	middlewares project.MiddlewaresPort,
 ) *project.Handler {
-	return project.NewHandler(UseCases, server, config, middlewares)
+	return project.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProjectSet expone todos los providers y bindings necesarios para Project.
+// ProvideProjectAPIConfig extrae la configuración específica de API para Project.
+func ProvideProjectAPIConfig(cfg *config.ConfigSet) project.ConfigAPIPort {
+	return &cfg.API
+}
+
+// ProvideProjectGormEnginePort adapta *pgorm.Repository a project.GormEnginePort.
+func ProvideProjectGormEnginePort(repo *pgorm.Repository) project.GormEnginePort {
+	return repo
+}
+
+// ProvideProjectGinServerPort adapta *pgin.Server a project.GinServerPort.
+func ProvideProjectGinServerPort(srv *pgin.Server) project.GinServerPort {
+	return srv
+}
+
+// ProvideProjectMiddlewaresPort adapta *mwr.Middlewares a project.MiddlewaresPort.
+func ProvideProjectMiddlewaresPort(m *mwr.Middlewares) project.MiddlewaresPort {
+	return m
+}
+
+// ProvideProjectSuggesterPort permite el paso de un implementador de Suggester.
+func ProvideProjectSuggesterPort(s project.SuggesterPort) project.SuggesterPort {
+	return s
+}
+
+// ProjectSet expone todos los providers necesarios para Project.
 var ProjectSet = wire.NewSet(
 	ProvideProjectRepository,
+	ProvideProjectRepositoryPort,
 	ProvideProjectUseCases,
+	ProvideProjectUseCasesPort,
 	ProvideProjectHandler,
-
-	// Bindings de interfaces a implementaciones concretas
-	wire.Bind(new(project.RepositoryPort), new(*project.Repository)),
-	wire.Bind(new(project.UseCasesPort), new(*project.UseCases)),
-	wire.Bind(new(project.GinServerPort), new(*ginsrv.Server)),
-	wire.Bind(new(project.ConfigAPIPort), new(*cfg.API)),
-	wire.Bind(new(project.MiddlewaresPort), new(*mwr.Middlewares)),
+	ProvideProjectAPIConfig,
+	ProvideProjectGormEnginePort,
+	ProvideProjectGinServerPort,
+	ProvideProjectMiddlewaresPort,
+	ProvideProjectSuggesterPort,
 )

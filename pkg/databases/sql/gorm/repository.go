@@ -17,8 +17,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Config es la interfaz para manejar configuraciones del cliente GORM
-type Config interface {
+// ConfigPort es la interfaz para manejar configuraciones del cliente GORM
+type ConfigPort interface {
 	GetDBType() DBType
 	GetHost() string
 	GetUser() string
@@ -34,11 +34,11 @@ type Config interface {
 type Repository struct {
 	client  *gorm.DB
 	address string
-	config  Config
+	config  ConfigPort
 }
 
 // NewRepository inicializa un nuevo repositorio sin usar singleton
-func newRepository(c Config) (*Repository, error) {
+func newRepository(c ConfigPort) (*Repository, error) {
 	repo := &Repository{
 		config: c,
 	}
@@ -49,7 +49,7 @@ func newRepository(c Config) (*Repository, error) {
 }
 
 // Connect establece la conexión con la base de datos según el tipo
-func (r *Repository) Connect(config Config) error {
+func (r *Repository) Connect(config ConfigPort) error {
 	var db *gorm.DB
 	var err error
 
@@ -84,7 +84,7 @@ func (r *Repository) Connect(config Config) error {
 	return nil
 }
 
-func getDialector(config Config) (gorm.Dialector, error) {
+func getDialector(config ConfigPort) (gorm.Dialector, error) {
 	if os.Getenv("K_SERVICE") != "" {
 		return connectWithConnectorIAMAuthN(config)
 	}
@@ -112,7 +112,7 @@ func getDialector(config Config) (gorm.Dialector, error) {
 	return dialector, nil
 }
 
-func connectWithConnectorIAMAuthN(config Config) (gorm.Dialector, error) {
+func connectWithConnectorIAMAuthN(config ConfigPort) (gorm.Dialector, error) {
 	mustGetenv := func(k string) string {
 		v := os.Getenv(k)
 		if v == "" {
@@ -142,15 +142,15 @@ func connectWithConnectorIAMAuthN(config Config) (gorm.Dialector, error) {
 	}
 
 	dsn := fmt.Sprintf("user=%s database=%s", dbUser, dbName)
-	dbConfig, err := pgx.ParseConfig(dsn)
+	dbConfigPort, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	dbConfig.DialFunc = func(ctx context.Context, network, instance string) (net.Conn, error) {
+	dbConfigPort.DialFunc = func(ctx context.Context, network, instance string) (net.Conn, error) {
 		return d.Dial(ctx, instanceConnectionName, opts...)
 	}
-	dbURI := stdlib.RegisterConnConfig(dbConfig)
+	dbURI := stdlib.RegisterConnConfig(dbConfigPort)
 	sqlDB, err := sql.Open("pgx", dbURI)
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
@@ -171,7 +171,7 @@ func (r *Repository) AutoMigrate(models ...any) error {
 	return r.client.AutoMigrate(models...)
 }
 
-func (r *Repository) createDatabaseIfNotExists(config Config) error {
+func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 	if os.Getenv("K_SERVICE") != "" {
 		return nil
 	}
