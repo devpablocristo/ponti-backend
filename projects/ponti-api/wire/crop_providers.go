@@ -43,8 +43,8 @@ func ProvideCropHandler(
 	return crop.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideCropAPIConfig extrae la configuración específica de API para Crop.
-func ProvideCropAPIConfig(cfg *config.AllConfigs) crop.ConfigAPIPort {
+// ProvideCropConfigAPI extrae la configuración específica de API para Crop.
+func ProvideCropConfigAPI(cfg *config.AllConfigs) crop.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -70,7 +70,7 @@ var CropSet = wire.NewSet(
 	ProvideCropUseCases,
 	ProvideCropUseCasesPort,
 	ProvideCropHandler,
-	ProvideCropAPIConfig,
+	ProvideCropConfigAPI,
 	ProvideCropGormEnginePort,
 	ProvideCropGinEnginePort,
 	ProvideCropMiddlewaresEnginePort,

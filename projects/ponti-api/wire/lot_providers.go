@@ -45,8 +45,8 @@ func ProvideLotHandler(
 	return lot.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideLotAPIConfig extrae la configuración específica de API para Lot.
-func ProvideLotAPIConfig(cfg *config.AllConfigs) lot.ConfigAPIPort {
+// ProvideLotConfigAPI extrae la configuración específica de API para Lot.
+func ProvideLotConfigAPI(cfg *config.AllConfigs) lot.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -72,7 +72,7 @@ var LotSet = wire.NewSet(
 	ProvideLotUseCases,
 	ProvideLotUseCasesPort,
 	ProvideLotHandler,
-	ProvideLotAPIConfig,
+	ProvideLotConfigAPI,
 	ProvideLotGormEnginePort,
 	ProvideLotGinEnginePort,
 	ProvideLotMiddlewaresEnginePort,

@@ -43,8 +43,8 @@ func ProvideManagerHandler(
 	return manager.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideManagerAPIConfig extrae la configuración específica de API para Manager.
-func ProvideManagerAPIConfig(cfg *config.AllConfigs) manager.ConfigAPIPort {
+// ProvideManagerConfigAPI extrae la configuración específica de API para Manager.
+func ProvideManagerConfigAPI(cfg *config.AllConfigs) manager.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -70,7 +70,7 @@ var ManagerSet = wire.NewSet(
 	ProvideManagerUseCases,
 	ProvideManagerUseCasesPort,
 	ProvideManagerHandler,
-	ProvideManagerAPIConfig,
+	ProvideManagerConfigAPI,
 	ProvideManagerGormEnginePort,
 	ProvideManagerGinEnginePort,
 	ProvideManagerMiddlewaresEnginePort,

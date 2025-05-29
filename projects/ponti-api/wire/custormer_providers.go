@@ -43,8 +43,8 @@ func ProvideCustomerHandler(
 	return customer.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideCustomerAPIConfig extrae la configuración específica de API para Customer.
-func ProvideCustomerAPIConfig(cfg *config.AllConfigs) customer.ConfigAPIPort {
+// ProvideCustomerConfigAPI extrae la configuración específica de API para Customer.
+func ProvideCustomerConfigAPI(cfg *config.AllConfigs) customer.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -70,7 +70,7 @@ var CustomerSet = wire.NewSet(
 	ProvideCustomerUseCases,
 	ProvideCustomerUseCasesPort,
 	ProvideCustomerHandler,
-	ProvideCustomerAPIConfig,
+	ProvideCustomerConfigAPI,
 	ProvideCustomerGormEnginePort,
 	ProvideCustomerGinEnginePort,
 	ProvideCustomerMiddlewaresEnginePort,

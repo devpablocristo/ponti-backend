@@ -43,8 +43,8 @@ func ProvideInvestorHandler(
 	return investor.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideInvestorAPIConfig extrae la configuración específica de API para Investor.
-func ProvideInvestorAPIConfig(cfg *config.AllConfigs) investor.ConfigAPIPort {
+// ProvideInvestorConfigAPI extrae la configuración específica de API para Investor.
+func ProvideInvestorConfigAPI(cfg *config.AllConfigs) investor.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -70,7 +70,7 @@ var InvestorSet = wire.NewSet(
 	ProvideInvestorUseCases,
 	ProvideInvestorUseCasesPort,
 	ProvideInvestorHandler,
-	ProvideInvestorAPIConfig,
+	ProvideInvestorConfigAPI,
 	ProvideInvestorGormEnginePort,
 	ProvideInvestorGinEnginePort,
 	ProvideInvestorMiddlewaresEnginePort,

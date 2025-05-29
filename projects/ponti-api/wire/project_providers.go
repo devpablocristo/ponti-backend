@@ -28,8 +28,6 @@ func ProvideProjectRepositoryPort(r *project.Repository) project.RepositoryPort 
 	return r
 }
 
-
-
 // Suggester
 func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
 	return s
@@ -43,14 +41,10 @@ func ProvideProjectSuggesterPort(s *sug.Suggester) project.SuggesterEnginePort {
 	return s
 }
 
-
-
 // Http Server
 func ProvideProjectGinEnginePort(s *gin.Server) project.GinEnginePort {
 	return s
 }
-
-
 
 // ProvideProjectUseCases agrupa repos y usecases de otros dominios en project.UseCases.
 func ProvideProjectUseCases(
@@ -88,8 +82,6 @@ func ProvideProjectInvestorsUseCasesPort(i *investor.UseCases) project.Investors
 func ProvideProjectFieldUseCasesPort(f *field.UseCases) project.FieldUseCasesPort {
 	return f
 }
-
-
 
 // ProvideProjectMiddlewaresEnginePort adapta *mwr.Middlewares a project.MiddlewaresEnginePort.
 func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.MiddlewaresEnginePort {

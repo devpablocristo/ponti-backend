@@ -45,8 +45,8 @@ func ProvideFieldHandler(
 	return field.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideFieldAPIConfig extrae la configuración específica de API para Field.
-func ProvideFieldAPIConfig(cfg *config.AllConfigs) field.ConfigAPIPort {
+// ProvideFieldConfigAPI extrae la configuración específica de API para Field.
+func ProvideFieldConfigAPI(cfg *config.AllConfigs) field.ConfigAPIPort {
 	return &cfg.API
 }
 
@@ -72,7 +72,7 @@ var FieldSet = wire.NewSet(
 	ProvideFieldUseCases,
 	ProvideFieldUseCasesPort,
 	ProvideFieldHandler,
-	ProvideFieldAPIConfig,
+	ProvideFieldConfigAPI,
 	ProvideFieldGormEnginePort,
 	ProvideFieldGinEnginePort,
 	ProvideFieldMiddlewaresEnginePort,
