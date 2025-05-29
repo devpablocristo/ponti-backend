@@ -30,8 +30,8 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// // Configure global middlewares if any.
 	// if len(deps.Middlewares.GetGlobal()) > 0 {
-	// 	deps.GinServer.GetRouter().Use(deps.Middlewares.GetGlobal()...)
-	// 	deps.GinServer.GetRouter().Use(deps.Middlewares.Validation...)
+	// 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
+	// 	deps.GinEngine.GetRouter().Use(deps.Middlewares.Validation...)
 	// }
 
 	// Register all application routes.
@@ -39,7 +39,7 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	registerHttpRoutes(deps)
 
 	// Start the HTTP server (e.g., on port 8080).
-	return deps.GinServer.RunServer(ctx)
+	return deps.GinEngine.RunServer(ctx)
 }
 
 // registerHttpRoutes registers all application routes in the Gin router.

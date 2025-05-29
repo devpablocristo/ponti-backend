@@ -8,7 +8,7 @@ import (
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 )
 
-type MiddlewaresPort interface {
+type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
@@ -18,13 +18,13 @@ func ProvideMiddlewares() *mwr.Middlewares {
 	return mwr.NewDefaultMiddlewares()
 }
 
-// ProvideMiddlewaresPort convierte el *mwr.Middlewares en la interfaz MiddlewaresPort.
-func ProvideMiddlewaresPort(m *mwr.Middlewares) MiddlewaresPort {
+// ProvideMiddlewaresEnginePort convierte el *mwr.Middlewares en la interfaz MiddlewaresEnginePort.
+func ProvideMiddlewaresEnginePort(m *mwr.Middlewares) MiddlewaresEnginePort {
 	return m
 }
 
 // MiddlewareSet expone los dos providers necesarios.
 var MiddlewareSet = wire.NewSet(
 	ProvideMiddlewares,
-	ProvideMiddlewaresPort,
+	ProvideMiddlewaresEnginePort,
 )

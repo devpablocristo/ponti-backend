@@ -9,9 +9,11 @@ import (
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
+
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -21,10 +23,11 @@ import (
 )
 
 type Dependencies struct {
-	Config      *config.ConfigSet
-	GinServer   *gin.Server
+	Config      *config.AllConfigs
+	GinEngine   *gin.Server
 	GormRepo    *gorm.Repository
 	Middlewares *mwr.Middlewares
+	Suggester   *sug.Suggester
 
 	// Los Handlers que tu main va a montar en las rutas:
 	CustomerHandler *customer.Handler
@@ -36,12 +39,16 @@ type Dependencies struct {
 	ProjectHandler  *project.Handler
 }
 
-func Initialize(cfgSet *config.ConfigSet) (*Dependencies, error) {
+func Initialize( /*cfgSet *config.AllConfigs*/ ) (*Dependencies, error) {
 	wire.Build(
+		// Configuración
+		ConfigSet,
+
 		// Boostraps
 		GormSet,
 		GinSet,
 		MiddlewareSet,
+		SuggesterSet,
 
 		// dominios
 		CustomerSet,

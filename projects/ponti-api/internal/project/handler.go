@@ -25,7 +25,7 @@ type UseCasesPort interface {
 	DeleteProject(context.Context, int64) error
 }
 
-type GinServerPort interface {
+type GinEnginePort interface {
 	GetRouter() *gin.Engine
 	RunServer(ctx context.Context) error
 }
@@ -35,7 +35,7 @@ type ConfigAPIPort interface {
 	APIBaseURL() string
 }
 
-type MiddlewaresPort interface {
+type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
@@ -44,13 +44,13 @@ type MiddlewaresPort interface {
 // Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
-	gsv GinServerPort
+	gsv GinEnginePort
 	acf ConfigAPIPort
-	mws MiddlewaresPort
+	mws MiddlewaresEnginePort
 }
 
 // NewHandler creates a new Project handler.
-func NewHandler(u UseCasesPort, s GinServerPort, c ConfigAPIPort, m MiddlewaresPort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
 		gsv: s,

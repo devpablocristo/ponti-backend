@@ -1,51 +1,58 @@
-// File: suggester_adapter.go
 package project
 
 import (
 	"context"
 
 	pgs "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
-
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-// pkg WordsSuggesters
+// SuggesterEnginePort es la interfaz del motor externo de sugerencias.
 type SuggesterEnginePort interface {
-	Suggest(ctx context.Context, prefix string) ([]pgs.Suggestion, error)
+	Suggest(ctx context.Context, table, column, prefix string) ([]pgs.Suggestion, error)
 	Close() error
 	Health(ctx context.Context) error
 }
 
-// Suggester wraps a SuggesterEnginePort and adapts it to the project's needs.
+// Suggester adapta SuggesterEnginePort al puerto de dominio.
 type Suggester struct {
-	sugEng SuggesterEnginePort
+	eng    SuggesterEnginePort
+	table  string
+	column string
 }
 
-// NewSuggesterAdapter returns a SuggesterEnginePort implementation that converts
-// external suggestions into domain.ListedProject entries.
-func NewSuggester(se SuggesterEnginePort) *Suggester {
-	return &Suggester{sugEng: se}
+// NewSuggesterAdapter recibe el motor externo más la tabla/columna a usar.
+func NewSuggester(eng SuggesterEnginePort, table, column string) *Suggester {
+	return &Suggester{
+		eng:    eng,
+		table:  table,
+		column: column,
+	}
 }
 
-// Suggest delegates to the external sugEng and maps results to domain.ListedProject.
+// Suggest llama internamente a eng.Suggest con table y column "inyectados",
+// y mapea el resultado a domain.ListedProject.
 func (a *Suggester) Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error) {
-	suggestions, err := a.sugEng.Suggest(ctx, prefix)
+	ext, err := a.eng.Suggest(ctx, a.table, a.column, prefix)
 	if err != nil {
 		return nil, err
 	}
-	projects := make([]domain.ListedProject, len(suggestions))
-	for i, s := range suggestions {
-		projects[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Text}
+	out := make([]domain.ListedProject, len(ext))
+	for i, s := range ext {
+		out[i] = domain.ListedProject{
+			ID:   int64(s.ID),
+			Name: s.Text,
+		}
 	}
-	return projects, nil
+	return out, nil
 }
 
-// Close cleans up resources in the external sugEng.
+// Close delega el cierre de recursos al motor externo.
 func (a *Suggester) Close() error {
-	return a.sugEng.Close()
+	return a.eng.Close()
 }
 
-// Health checks the readiness of the external sugEng.
+// Health delega el chequeo de salud al motor externo.
 func (a *Suggester) Health(ctx context.Context) error {
-	return a.sugEng.Health(ctx)
+	return a.eng.Health(ctx)
 }

@@ -35,31 +35,31 @@ func ProvideCropUseCasesPort(uc *crop.UseCases) crop.UseCasesPort {
 
 // ProvideCropHandler construye el handler HTTP para Crop.
 func ProvideCropHandler(
-	server crop.GinServerPort,
+	server crop.GinEnginePort,
 	useCases crop.UseCasesPort,
 	cfg crop.ConfigAPIPort,
-	middlewares crop.MiddlewaresPort,
+	middlewares crop.MiddlewaresEnginePort,
 ) *crop.Handler {
 	return crop.NewHandler(useCases, server, cfg, middlewares)
 }
 
 // ProvideCropAPIConfig extrae la configuración específica de API para Crop.
-func ProvideCropAPIConfig(cfg *config.ConfigSet) crop.ConfigAPIPort {
+func ProvideCropAPIConfig(cfg *config.AllConfigs) crop.ConfigAPIPort {
 	return &cfg.API
 }
 
 // ProvideCropGormEnginePort adapta *pgorm.Repository a crop.GormEnginePort.
-func ProvideCropGormEnginePort(repo *pgorm.Repository) crop.GormEnginePort {
-	return repo
+func ProvideCropGormEnginePort(r *pgorm.Repository) crop.GormEnginePort {
+	return r
 }
 
-// ProvideCropGinServerPort adapta *pgin.Server a crop.GinServerPort.
-func ProvideCropGinServerPort(srv *pgin.Server) crop.GinServerPort {
-	return srv
+// ProvideCropGinEnginePort adapta *pgin.Server a crop.GinEnginePort.
+func ProvideCropGinEnginePort(s *pgin.Server) crop.GinEnginePort {
+	return s
 }
 
-// ProvideCropMiddlewaresPort adapta *mwr.Middlewares a crop.MiddlewaresPort.
-func ProvideCropMiddlewaresPort(m *mwr.Middlewares) crop.MiddlewaresPort {
+// ProvideCropMiddlewaresEnginePort adapta *mwr.Middlewares a crop.MiddlewaresEnginePort.
+func ProvideCropMiddlewaresEnginePort(m *mwr.Middlewares) crop.MiddlewaresEnginePort {
 	return m
 }
 
@@ -72,6 +72,6 @@ var CropSet = wire.NewSet(
 	ProvideCropHandler,
 	ProvideCropAPIConfig,
 	ProvideCropGormEnginePort,
-	ProvideCropGinServerPort,
-	ProvideCropMiddlewaresPort,
+	ProvideCropGinEnginePort,
+	ProvideCropMiddlewaresEnginePort,
 )

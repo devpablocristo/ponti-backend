@@ -35,31 +35,31 @@ func ProvideManagerUseCasesPort(uc *manager.UseCases) manager.UseCasesPort {
 
 // ProvideManagerHandler construye el handler HTTP para Manager.
 func ProvideManagerHandler(
-	server manager.GinServerPort,
+	server manager.GinEnginePort,
 	useCases manager.UseCasesPort,
 	cfg manager.ConfigAPIPort,
-	middlewares manager.MiddlewaresPort,
+	middlewares manager.MiddlewaresEnginePort,
 ) *manager.Handler {
 	return manager.NewHandler(useCases, server, cfg, middlewares)
 }
 
 // ProvideManagerAPIConfig extrae la configuración específica de API para Manager.
-func ProvideManagerAPIConfig(cfg *config.ConfigSet) manager.ConfigAPIPort {
+func ProvideManagerAPIConfig(cfg *config.AllConfigs) manager.ConfigAPIPort {
 	return &cfg.API
 }
 
 // ProvideManagerGormEnginePort adapta *pgorm.Repository a manager.GormEnginePort.
-func ProvideManagerGormEnginePort(repo *pgorm.Repository) manager.GormEnginePort {
-	return repo
+func ProvideManagerGormEnginePort(r *pgorm.Repository) manager.GormEnginePort {
+	return r
 }
 
-// ProvideManagerGinServerPort adapta *pgin.Server a manager.GinServerPort.
-func ProvideManagerGinServerPort(srv *pgin.Server) manager.GinServerPort {
-	return srv
+// ProvideManagerGinEnginePort adapta *pgin.Server a manager.GinEnginePort.
+func ProvideManagerGinEnginePort(s *pgin.Server) manager.GinEnginePort {
+	return s
 }
 
-// ProvideManagerMiddlewaresPort adapta *mwr.Middlewares a manager.MiddlewaresPort.
-func ProvideManagerMiddlewaresPort(m *mwr.Middlewares) manager.MiddlewaresPort {
+// ProvideManagerMiddlewaresEnginePort adapta *mwr.Middlewares a manager.MiddlewaresEnginePort.
+func ProvideManagerMiddlewaresEnginePort(m *mwr.Middlewares) manager.MiddlewaresEnginePort {
 	return m
 }
 
@@ -72,6 +72,6 @@ var ManagerSet = wire.NewSet(
 	ProvideManagerHandler,
 	ProvideManagerAPIConfig,
 	ProvideManagerGormEnginePort,
-	ProvideManagerGinServerPort,
-	ProvideManagerMiddlewaresPort,
+	ProvideManagerGinEnginePort,
+	ProvideManagerMiddlewaresEnginePort,
 )

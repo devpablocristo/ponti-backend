@@ -35,31 +35,31 @@ func ProvideInvestorUseCasesPort(uc *investor.UseCases) investor.UseCasesPort {
 
 // ProvideInvestorHandler construye el handler HTTP para Investor.
 func ProvideInvestorHandler(
-	server investor.GinServerPort,
+	server investor.GinEnginePort,
 	useCases investor.UseCasesPort,
 	cfg investor.ConfigAPIPort,
-	middlewares investor.MiddlewaresPort,
+	middlewares investor.MiddlewaresEnginePort,
 ) *investor.Handler {
 	return investor.NewHandler(useCases, server, cfg, middlewares)
 }
 
 // ProvideInvestorAPIConfig extrae la configuración específica de API para Investor.
-func ProvideInvestorAPIConfig(cfg *config.ConfigSet) investor.ConfigAPIPort {
+func ProvideInvestorAPIConfig(cfg *config.AllConfigs) investor.ConfigAPIPort {
 	return &cfg.API
 }
 
 // ProvideInvestorGormEnginePort adapta *pgorm.Repository a investor.GormEnginePort.
-func ProvideInvestorGormEnginePort(repo *pgorm.Repository) investor.GormEnginePort {
-	return repo
+func ProvideInvestorGormEnginePort(r *pgorm.Repository) investor.GormEnginePort {
+	return r
 }
 
-// ProvideInvestorGinServerPort adapta *pgin.Server a investor.GinServerPort.
-func ProvideInvestorGinServerPort(srv *pgin.Server) investor.GinServerPort {
-	return srv
+// ProvideInvestorGinEnginePort adapta *pgin.Server a investor.GinEnginePort.
+func ProvideInvestorGinEnginePort(s *pgin.Server) investor.GinEnginePort {
+	return s
 }
 
-// ProvideInvestorMiddlewaresPort adapta *mwr.Middlewares a investor.MiddlewaresPort.
-func ProvideInvestorMiddlewaresPort(m *mwr.Middlewares) investor.MiddlewaresPort {
+// ProvideInvestorMiddlewaresEnginePort adapta *mwr.Middlewares a investor.MiddlewaresEnginePort.
+func ProvideInvestorMiddlewaresEnginePort(m *mwr.Middlewares) investor.MiddlewaresEnginePort {
 	return m
 }
 
@@ -72,6 +72,6 @@ var InvestorSet = wire.NewSet(
 	ProvideInvestorHandler,
 	ProvideInvestorAPIConfig,
 	ProvideInvestorGormEnginePort,
-	ProvideInvestorGinServerPort,
-	ProvideInvestorMiddlewaresPort,
+	ProvideInvestorGinEnginePort,
+	ProvideInvestorMiddlewaresEnginePort,
 )

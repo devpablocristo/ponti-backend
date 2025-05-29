@@ -4,40 +4,35 @@ import (
 	"context"
 	"database/sql"
 
-	gorm "gorm.io/gorm"
+	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	"gorm.io/gorm"
 )
 
-type Gorm struct {
-	client *gorm.DB
+type repoAdapter struct {
+	repo *pkggorm.Repository
 }
 
-func NewGormAdapter(db *gorm.DB) *Gorm {
-	return &Gorm{client: db}
+func NewPkggormAdapter(r *pkggorm.Repository) DB {
+	return &repoAdapter{repo: r}
 }
 
-func (a *Gorm) WithContext(ctx context.Context) *miniGorm {
-	return &miniGorm{inner: a.client.WithContext(ctx)}
+func (a *repoAdapter) WithContext(ctx context.Context) *miniGorm {
+	return &miniGorm{inner: a.repo.Client().WithContext(ctx)}
 }
-
-func (a *Gorm) Exec(query string, args ...any) *miniGorm {
-	return &miniGorm{inner: a.client.Exec(query, args...)}
+func (a *repoAdapter) Exec(query string, args ...any) *miniGorm {
+	return &miniGorm{inner: a.repo.Client().Exec(query, args...)}
 }
-
-func (a *Gorm) Raw(query string, args ...any) *miniGorm {
-	return &miniGorm{inner: a.client.Raw(query, args...)}
+func (a *repoAdapter) Raw(query string, args ...any) *miniGorm {
+	return &miniGorm{inner: a.repo.Client().Raw(query, args...)}
 }
-
-func (a *Gorm) Scan(dest any) *miniGorm {
-	return &miniGorm{inner: a.client.Scan(dest)}
+func (a *repoAdapter) Scan(dest any) *miniGorm {
+	return &miniGorm{inner: a.repo.Client().Scan(dest)}
 }
-
-func (a *Gorm) DB() (*sql.DB, error) {
-	return a.client.DB()
+func (a *repoAdapter) DB() (*sql.DB, error) {
+	return a.repo.Client().DB()
 }
-
-// Return the last occurred error inside Gorm
-func (a *Gorm) Error() error {
-	return a.client.Error
+func (a *repoAdapter) Error() error {
+	return a.repo.Client().Error
 }
 
 type miniGorm struct {

@@ -8,36 +8,43 @@ import (
 )
 
 type Suggester struct {
-	db     DB
-	table  string
-	column string
-	limit  int
-	logger Logger
+	db        DB
+	limit     int
+	threshold float64
+	logger    Logger
 }
 
 func newSuggester(cfg *Config) *Suggester {
+	// Ajustar umbral global una vez
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = cfg.DB.WithContext(ctx).
 		Exec("SET pg_trgm.similarity_threshold = ?", cfg.Threshold).
-		Error() // ignore failure: logged internally
+		Error()
 	return &Suggester{
-		db:     cfg.DB,
-		table:  cfg.Table,
-		column: cfg.Column,
-		limit:  cfg.Limit,
-		logger: cfg.logger,
+		db:        cfg.DB,
+		limit:     cfg.Limit,
+		threshold: cfg.Threshold,
+		logger:    cfg.logger,
 	}
 }
 
-func (s *Suggester) Suggest(ctx context.Context, prefix string) ([]Suggestion, error) {
+// Suggest recibe tabla, columna y prefijo
+func (s *Suggester) Suggest(ctx context.Context, table, column, prefix string) ([]Suggestion, error) {
+	// Validar
+	if !validIdentifier.MatchString(table) {
+		return nil, fmt.Errorf("invalid table name: %s", table)
+	}
+	if !validIdentifier.MatchString(column) {
+		return nil, fmt.Errorf("invalid column name: %s", column)
+	}
 	q := strings.TrimSpace(prefix)
 	if q == "" {
 		return nil, nil
 	}
 	sqlStmt := fmt.Sprintf(
 		"SELECT id, %s AS text FROM %s WHERE %s ILIKE ? ORDER BY similarity(%s, ?) DESC LIMIT %d",
-		s.column, s.table, s.column, s.column, s.limit,
+		column, table, column, column, s.limit,
 	)
 	var out []Suggestion
 	start := time.Now()

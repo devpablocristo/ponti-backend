@@ -18,7 +18,7 @@ import (
 // 3) Procesa los structs con envconfig
 // 4) Construye valores derivados (API.URL)
 // 5) Valida con validator
-func LoadConfig() (*ConfigSet, error) {
+func LoadConfig() (*AllConfigs, error) {
 	// 1) Base
 	if err := envvars.LoadConfig(".env"); err != nil {
 		return nil, fmt.Errorf("could not load base .env: %w", err)
@@ -31,7 +31,7 @@ func LoadConfig() (*ConfigSet, error) {
 	}
 
 	// 3) Procesar cada sección
-	var cfg ConfigSet
+	var cfg AllConfigs
 	sections := []struct {
 		name string
 		tgt  any
@@ -41,6 +41,7 @@ func LoadConfig() (*ConfigSet, error) {
 		{"http server", &cfg.HTTPServer},
 		{"debugger", &cfg.Debugger},
 		{"db", &cfg.DB},
+		{"suggester", &cfg.Suggester},
 	}
 	for _, sec := range sections {
 		if err := envconfig.Process("", sec.tgt); err != nil {

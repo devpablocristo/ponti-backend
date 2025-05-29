@@ -54,9 +54,9 @@ type RepositoryPort interface {
 }
 
 type SuggesterPort interface {
-	Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error)
+	Suggest(context.Context, string) ([]domain.ListedProject, error)
 	Close() error
-	Health(ctx context.Context) error
+	Health(context.Context) error
 }
 
 type UseCases struct {

@@ -37,31 +37,31 @@ func ProvideFieldUseCasesPort(uc *field.UseCases) field.UseCasesPort {
 
 // ProvideFieldHandler construye el handler HTTP para Field.
 func ProvideFieldHandler(
-	server field.GinServerPort,
+	server field.GinEnginePort,
 	useCases field.UseCasesPort,
 	cfg field.ConfigAPIPort,
-	middlewares field.MiddlewaresPort,
+	middlewares field.MiddlewaresEnginePort,
 ) *field.Handler {
 	return field.NewHandler(useCases, server, cfg, middlewares)
 }
 
 // ProvideFieldAPIConfig extrae la configuración específica de API para Field.
-func ProvideFieldAPIConfig(cfg *config.ConfigSet) field.ConfigAPIPort {
+func ProvideFieldAPIConfig(cfg *config.AllConfigs) field.ConfigAPIPort {
 	return &cfg.API
 }
 
 // ProvideFieldGormEnginePort adapta *pgorm.Repository a field.GormEnginePort.
-func ProvideFieldGormEnginePort(repo *pgorm.Repository) field.GormEnginePort {
-	return repo
+func ProvideFieldGormEnginePort(r *pgorm.Repository) field.GormEnginePort {
+	return r
 }
 
-// ProvideFieldGinServerPort adapta *pgin.Server a field.GinServerPort.
-func ProvideFieldGinServerPort(srv *pgin.Server) field.GinServerPort {
-	return srv
+// ProvideFieldGinEnginePort adapta *pgin.Server a field.GinEnginePort.
+func ProvideFieldGinEnginePort(s *pgin.Server) field.GinEnginePort {
+	return s
 }
 
-// ProvideFieldMiddlewaresPort adapta *mwr.Middlewares a field.MiddlewaresPort.
-func ProvideFieldMiddlewaresPort(m *mwr.Middlewares) field.MiddlewaresPort {
+// ProvideFieldMiddlewaresEnginePort adapta *mwr.Middlewares a field.MiddlewaresEnginePort.
+func ProvideFieldMiddlewaresEnginePort(m *mwr.Middlewares) field.MiddlewaresEnginePort {
 	return m
 }
 
@@ -74,6 +74,6 @@ var FieldSet = wire.NewSet(
 	ProvideFieldHandler,
 	ProvideFieldAPIConfig,
 	ProvideFieldGormEnginePort,
-	ProvideFieldGinServerPort,
-	ProvideFieldMiddlewaresPort,
+	ProvideFieldGinEnginePort,
+	ProvideFieldMiddlewaresEnginePort,
 )

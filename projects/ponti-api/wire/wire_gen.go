@@ -10,38 +10,105 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 )
 
 // Injectors from wire.go:
 
-func Initialize(cfgSet *config.ConfigSet) (*Dependencies, error) {
-	server, err := ProvideGinServer(cfgSet)
+func Initialize() (*Dependencies, error) {
+	allConfigs, err := ProvideAllConfigs()
 	if err != nil {
 		return nil, err
 	}
-	db := ProvideConfigDB(cfgSet)
+	server, err := ProvideGinEngine(allConfigs)
+	if err != nil {
+		return nil, err
+	}
+	db := ProvideConfigDB(allConfigs)
 	repository, err := ProvideGormRepository(db)
 	if err != nil {
 		return nil, err
 	}
 	middlewares := ProvideMiddlewares()
-	ginServerPort := ProvideCropGinServerPort(server)
-	gormEnginePort := ProvideCropGormEnginePort(repository)
-	cropRepository := ProvideCropRepository(gormEnginePort)
-	repositoryPort := ProvideCropRepositoryPort(cropRepository)
-	useCases := ProvideCropUseCases(repositoryPort)
-	useCasesPort := ProvideCropUseCasesPort(useCases)
-	configAPIPort := ProvideCropAPIConfig(cfgSet)
-	middlewaresPort := ProvideCropMiddlewaresPort(middlewares)
-	handler := ProvideCropHandler(ginServerPort, useCasesPort, configAPIPort, middlewaresPort)
+	pkgsuggesterDB := ProvideSuggesterDB(repository)
+	suggester := ProvideConfigSuggester(allConfigs)
+	pkgsuggesterSuggester, err := ProvideSuggester(pkgsuggesterDB, suggester)
+	if err != nil {
+		return nil, err
+	}
+	ginEnginePort := ProvideCustomerGinEnginePort(server)
+	gormEnginePort := ProvideCustomerGormEnginePort(repository)
+	customerRepository := ProvideCustomerRepository(gormEnginePort)
+	repositoryPort := ProvideCustomerRepositoryPort(customerRepository)
+	useCases := ProvideCustomerUseCases(repositoryPort)
+	useCasesPort := ProvideCustomerUseCasesPort(useCases)
+	configAPIPort := ProvideCustomerAPIConfig(allConfigs)
+	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
+	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	investorGinEnginePort := ProvideInvestorGinEnginePort(server)
+	investorGormEnginePort := ProvideInvestorGormEnginePort(repository)
+	investorRepository := ProvideInvestorRepository(investorGormEnginePort)
+	investorRepositoryPort := ProvideInvestorRepositoryPort(investorRepository)
+	investorUseCases := ProvideInvestorUseCases(investorRepositoryPort)
+	investorUseCasesPort := ProvideInvestorUseCasesPort(investorUseCases)
+	investorConfigAPIPort := ProvideInvestorAPIConfig(allConfigs)
+	investorMiddlewaresEnginePort := ProvideInvestorMiddlewaresEnginePort(middlewares)
+	investorHandler := ProvideInvestorHandler(investorGinEnginePort, investorUseCasesPort, investorConfigAPIPort, investorMiddlewaresEnginePort)
+	cropGinEnginePort := ProvideCropGinEnginePort(server)
+	cropGormEnginePort := ProvideCropGormEnginePort(repository)
+	cropRepository := ProvideCropRepository(cropGormEnginePort)
+	cropRepositoryPort := ProvideCropRepositoryPort(cropRepository)
+	cropUseCases := ProvideCropUseCases(cropRepositoryPort)
+	cropUseCasesPort := ProvideCropUseCasesPort(cropUseCases)
+	cropConfigAPIPort := ProvideCropAPIConfig(allConfigs)
+	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
+	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
+	lotGinEnginePort := ProvideLotGinEnginePort(server)
+	lotGormEnginePort := ProvideLotGormEnginePort(repository)
+	lotRepository := ProvideLotRepository(lotGormEnginePort)
+	lotRepositoryPort := ProvideLotRepositoryPort(lotRepository)
+	lotUseCases := ProvideLotUseCases(lotRepositoryPort, cropUseCasesPort)
+	lotUseCasesPort := ProvideLotUseCasesPort(lotUseCases)
+	lotConfigAPIPort := ProvideLotAPIConfig(allConfigs)
+	lotMiddlewaresEnginePort := ProvideLotMiddlewaresEnginePort(middlewares)
+	lotHandler := ProvideLotHandler(lotGinEnginePort, lotUseCasesPort, lotConfigAPIPort, lotMiddlewaresEnginePort)
+	fieldGinEnginePort := ProvideFieldGinEnginePort(server)
+	fieldGormEnginePort := ProvideFieldGormEnginePort(repository)
+	fieldRepository := ProvideFieldRepository(fieldGormEnginePort)
+	fieldRepositoryPort := ProvideFieldRepositoryPort(fieldRepository)
+	fieldUseCases := ProvideFieldUseCases(fieldRepositoryPort, lotUseCasesPort)
+	fieldUseCasesPort := ProvideFieldUseCasesPort(fieldUseCases)
+	fieldConfigAPIPort := ProvideFieldAPIConfig(allConfigs)
+	fieldMiddlewaresEnginePort := ProvideFieldMiddlewaresEnginePort(middlewares)
+	fieldHandler := ProvideFieldHandler(fieldGinEnginePort, fieldUseCasesPort, fieldConfigAPIPort, fieldMiddlewaresEnginePort)
+	managerGinEnginePort := ProvideManagerGinEnginePort(server)
+	managerGormEnginePort := ProvideManagerGormEnginePort(repository)
+	managerRepository := ProvideManagerRepository(managerGormEnginePort)
+	managerRepositoryPort := ProvideManagerRepositoryPort(managerRepository)
+	managerUseCases := ProvideManagerUseCases(managerRepositoryPort)
+	managerUseCasesPort := ProvideManagerUseCasesPort(managerUseCases)
+	managerConfigAPIPort := ProvideManagerAPIConfig(allConfigs)
+	managerMiddlewaresEnginePort := ProvideManagerMiddlewaresEnginePort(middlewares)
+	managerHandler := ProvideManagerHandler(managerGinEnginePort, managerUseCasesPort, managerConfigAPIPort, managerMiddlewaresEnginePort)
 	dependencies := &Dependencies{
-		Config:      cfgSet,
-		GinServer:   server,
-		GormRepo:    repository,
-		Middlewares: middlewares,
-		CropHandler: handler,
+		Config:          allConfigs,
+		GinEngine:       server,
+		GormRepo:        repository,
+		Middlewares:     middlewares,
+		Suggester:       pkgsuggesterSuggester,
+		CustomerHandler: handler,
+		InvestorHandler: investorHandler,
+		CropHandler:     cropHandler,
+		LotHandler:      lotHandler,
+		FieldHandler:    fieldHandler,
+		ManagerHandler:  managerHandler,
 	}
 	return dependencies, nil
 }
@@ -49,13 +116,17 @@ func Initialize(cfgSet *config.ConfigSet) (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config      *config.ConfigSet
-	GinServer   *pkggin.Server
+	Config      *config.AllConfigs
+	GinEngine   *pkggin.Server
 	GormRepo    *pkggorm.Repository
 	Middlewares *pkgmwr.Middlewares
+	Suggester   *pkgsuggester.Suggester
 
 	// Los Handlers que tu main va a montar en las rutas:
-	// CustomerHandler *customer.Handler
-	// InvestorHandler *investor.Handler
-	CropHandler *crop.Handler
+	CustomerHandler *customer.Handler
+	InvestorHandler *investor.Handler
+	CropHandler     *crop.Handler
+	LotHandler      *lot.Handler
+	FieldHandler    *field.Handler
+	ManagerHandler  *manager.Handler
 }

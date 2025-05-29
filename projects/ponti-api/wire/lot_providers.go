@@ -37,31 +37,31 @@ func ProvideLotUseCasesPort(uc *lot.UseCases) lot.UseCasesPort {
 
 // ProvideLotHandler construye el handler HTTP para Lot.
 func ProvideLotHandler(
-	server lot.GinServerPort,
+	server lot.GinEnginePort,
 	useCases lot.UseCasesPort,
 	cfg lot.ConfigAPIPort,
-	middlewares lot.MiddlewaresPort,
+	middlewares lot.MiddlewaresEnginePort,
 ) *lot.Handler {
 	return lot.NewHandler(useCases, server, cfg, middlewares)
 }
 
 // ProvideLotAPIConfig extrae la configuración específica de API para Lot.
-func ProvideLotAPIConfig(cfg *config.ConfigSet) lot.ConfigAPIPort {
+func ProvideLotAPIConfig(cfg *config.AllConfigs) lot.ConfigAPIPort {
 	return &cfg.API
 }
 
 // ProvideLotGormEnginePort adapta *pgorm.Repository a lot.GormEnginePort.
-func ProvideLotGormEnginePort(repo *pgorm.Repository) lot.GormEnginePort {
-	return repo
+func ProvideLotGormEnginePort(r *pgorm.Repository) lot.GormEnginePort {
+	return r
 }
 
-// ProvideLotGinServerPort adapta *pgin.Server a lot.GinServerPort.
-func ProvideLotGinServerPort(srv *pgin.Server) lot.GinServerPort {
-	return srv
+// ProvideLotGinEnginePort adapta *pgin.Server a lot.GinEnginePort.
+func ProvideLotGinEnginePort(s *pgin.Server) lot.GinEnginePort {
+	return s
 }
 
-// ProvideLotMiddlewaresPort adapta *mwr.Middlewares a lot.MiddlewaresPort.
-func ProvideLotMiddlewaresPort(m *mwr.Middlewares) lot.MiddlewaresPort {
+// ProvideLotMiddlewaresEnginePort adapta *mwr.Middlewares a lot.MiddlewaresEnginePort.
+func ProvideLotMiddlewaresEnginePort(m *mwr.Middlewares) lot.MiddlewaresEnginePort {
 	return m
 }
 
@@ -74,6 +74,6 @@ var LotSet = wire.NewSet(
 	ProvideLotHandler,
 	ProvideLotAPIConfig,
 	ProvideLotGormEnginePort,
-	ProvideLotGinServerPort,
-	ProvideLotMiddlewaresPort,
+	ProvideLotGinEnginePort,
+	ProvideLotMiddlewaresEnginePort,
 )

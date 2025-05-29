@@ -17,55 +17,43 @@ import (
 
 // --- GORM ----
 
-// GormConfigPort define el contrato que necesita pgorm.Repository.
-type GormConfigPort interface {
+type GormEnginePort interface {
 	Address() string
 	AutoMigrate(...any) error
 	Client() *gorm.DB
 	Connect(pgorm.ConfigPort) error
 }
 
-// ProvideConfigDB extrae el sub-config.DB del ConfigSet general.
-func ProvideConfigDB(cfg *config.ConfigSet) *config.DB {
-	return &cfg.DB
-}
-
-// ProvideGormRepository crea el repositorio GORM a partir de *config.DB.
-func ProvideGormRepository(dbCfg *config.DB) (*pgorm.Repository, error) {
+func ProvideGormRepository(cfg *config.DB) (*pgorm.Repository, error) {
 	return pgorm.Bootstrap(
-		dbCfg.Type,
-		dbCfg.Host,
-		dbCfg.User,
-		dbCfg.Password,
-		dbCfg.Name,
-		dbCfg.SSLMode,
-		dbCfg.Port,
+		cfg.Type,
+		cfg.Host,
+		cfg.User,
+		cfg.Password,
+		cfg.Name,
+		cfg.SSLMode,
+		cfg.Port,
 	)
 }
 
-// ProvideGormConfigPort adapta *pgorm.Repository a la interfaz GormConfigPort.
-func ProvideGormConfigPort(repo *pgorm.Repository) GormConfigPort {
+func ProvideGormRepositoryPort(repo *pgorm.Repository) GormEnginePort {
 	return repo
 }
 
-// GormSet agrupa los providers necesarios para GORM.
 var GormSet = wire.NewSet(
-	ProvideConfigDB,
 	ProvideGormRepository,
-	ProvideGormConfigPort,
+	ProvideGormRepositoryPort,
 )
 
 // --- Gin Server ----
 
-// GinConfigPort define el contrato que necesita pgin.Server.
-type GinConfigPort interface {
+type GinEnginePort interface {
 	GetRouter() *gin.Engine
 	RunServer(ctx context.Context) error
 	WrapH(h http.Handler) gin.HandlerFunc
 }
 
-// ProvideGinServer arranca el servidor HTTP Gin usando la configuración del ConfigSet.
-func ProvideGinServer(cfg *config.ConfigSet) (*pgin.Server, error) {
+func ProvideGinEngine(cfg *config.AllConfigs) (*pgin.Server, error) {
 	return pgin.Bootstrap(
 		strconv.Itoa(cfg.HTTPServer.Port),
 		cfg.API.Version,
@@ -73,52 +61,41 @@ func ProvideGinServer(cfg *config.ConfigSet) (*pgin.Server, error) {
 	)
 }
 
-// ProvideGinConfigPort adapta *pgin.Server a la interfaz GinConfigPort.
-func ProvideGinConfigPort(srv *pgin.Server) GinConfigPort {
+func ProvideGinEnginePort(srv *pgin.Server) GinEnginePort {
 	return srv
 }
 
-// GinSet agrupa los providers necesarios para Gin.
 var GinSet = wire.NewSet(
-	ProvideGinServer,
-	ProvideGinConfigPort,
+	ProvideGinEngine,
+	ProvideGinEnginePort,
 )
 
-// --- Suggester Providers ---
+// --- Suggester Providers -------------------------------------------
 
-// ProvideGormDB extrae el *gorm.DB del repositorio GORM.
-func ProvideGormDB(repo *pgorm.Repository) *gorm.DB {
-	return repo.Client()
+type SuggesterEnginePort interface {
+	Suggest(context.Context, string, string, string) ([]sug.Suggestion, error)
+	Close() error
+	Health(ctx context.Context) error
 }
 
-// ProvideSuggesterAdapter envuelve *gorm.DB en el adaptador del Suggester.
-func ProvideSuggesterAdapter(db *gorm.DB) sug.DB {
-	return sug.NewGormAdapter(db)
+func ProvideSuggesterDB(repo *pgorm.Repository) sug.DB {
+	return sug.NewPkggormAdapter(repo)
 }
 
-// ProvideSuggester construye el Suggester usando la configuración del ConfigSet.
-func ProvideSuggester(
-	cfg *config.ConfigSet,
-	db sug.DB,
-) (*sug.Suggester, error) {
+func ProvideSuggester(db sug.DB, cfg *config.Suggester) (*sug.Suggester, error) {
 	return sug.Bootstrap(
 		sug.WithDB(db),
-		sug.WithTable(cfg.Suggester.Table),
-		sug.WithColumn(cfg.Suggester.Column),
-		sug.WithLimit(cfg.Suggester.Limit),
-		sug.WithThreshold(cfg.Suggester.Threshold),
+		sug.WithLimit(cfg.Limit),
+		sug.WithThreshold(cfg.Threshold),
 	)
 }
 
-// ProvideSuggesterPort adapta *sug.Suggester a su interfaz port.
-func ProvideSuggesterPort(s *sug.Suggester) sug.Port {
+func ProvideSuggesterEnginePort(s *sug.Suggester) SuggesterEnginePort {
 	return s
 }
 
-// SuggesterSet agrupa todos los providers necesarios para el Suggester.
 var SuggesterSet = wire.NewSet(
-	ProvideGormDB,
-	ProvideSuggesterAdapter,
+	ProvideSuggesterDB,
 	ProvideSuggester,
-	ProvideSuggesterPort,
+	ProvideSuggesterEnginePort,
 )
