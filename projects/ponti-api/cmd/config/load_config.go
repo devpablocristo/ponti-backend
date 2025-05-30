@@ -21,7 +21,7 @@ import (
 // 5) Valida con validator
 func LoadConfig() (*AllConfigs, error) {
 	// 1) Base
-	if err := envvars.LoadConfig(".env"); err != nil {
+	if err := envvars.LoadConfig("./projects/ponti-api/.env"); err != nil {
 		return nil, fmt.Errorf("could not load base .env: %w", err)
 	}
 

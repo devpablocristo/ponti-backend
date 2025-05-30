@@ -11,7 +11,7 @@ type Investor struct {
 	Name             string    `gorm:"type:varchar(255);not null"`
 	Contributions    float64   `gorm:"type:decimal(10,2);not null"`
 	ContributionDate time.Time `gorm:"not null"`
-	Percentage       int       `gorm:"not null"`
+	// Percentage       int       `gorm:"not null"`
 }
 
 func (i Investor) ToDomain() *domain.Investor {
@@ -20,7 +20,7 @@ func (i Investor) ToDomain() *domain.Investor {
 		Name:             i.Name,
 		Contributions:    i.Contributions,
 		ContributionDate: i.ContributionDate,
-		Percentage:       i.Percentage,
+		// Percentage:       i.Percentage,
 	}
 }
 
@@ -30,6 +30,6 @@ func FromDomain(d *domain.Investor) *Investor {
 		Name:             d.Name,
 		Contributions:    d.Contributions,
 		ContributionDate: d.ContributionDate,
-		Percentage:       d.Percentage,
+		// Percentage:       d.Percentage,
 	}
 }

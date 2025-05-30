@@ -18,8 +18,9 @@ func newSuggester(cfg *Config) *Suggester {
 	// Ajustar umbral global una vez
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	// CORREGIDO: Usar fmt.Sprintf para embedir el valor
 	_ = cfg.DB.WithContext(ctx).
-		Exec("SET pg_trgm.similarity_threshold = ?", cfg.Threshold).
+		Exec(fmt.Sprintf("SET pg_trgm.similarity_threshold = %f", cfg.Threshold)).
 		Error()
 	return &Suggester{
 		db:        cfg.DB,

@@ -32,10 +32,10 @@ type Manager struct {
 }
 
 type ProjectInvestor struct {
-	ProjectID  int64           `gorm:"primaryKey;column:project_id"`
-	InvestorID int64           `gorm:"primaryKey;column:investor_id"`
-	Percentage float64         `gorm:"not null"`
-	Investor   invmod.Investor `gorm:"foreignKey:InvestorID"`
+	ProjectID  int64   `gorm:"primaryKey;column:project_id"`
+	InvestorID int64   `gorm:"primaryKey;column:investor_id"`
+	Percentage float64 `gorm:"not null;default:0"`
+	Investor invmod.Investor `gorm:"foreignKey:InvestorID"`
 }
 
 // FromDomain convierte un domain.Project al modelo GORM Project.
