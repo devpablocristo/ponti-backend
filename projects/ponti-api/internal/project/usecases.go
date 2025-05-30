@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -20,6 +22,7 @@ import (
 type useCases struct {
 	repo     Repository
 	customer customer.UseCases
+	campaign campaign.UseCases
 	manager  manager.UseCases
 	investor investor.UseCases
 	field    field.UseCases
@@ -29,6 +32,7 @@ type useCases struct {
 func NewUseCases(
 	repo Repository,
 	cu customer.UseCases,
+	ca campaign.UseCases,
 	ma manager.UseCases,
 	in investor.UseCases,
 	fu field.UseCases,
@@ -37,6 +41,7 @@ func NewUseCases(
 	return &useCases{
 		repo:     repo,
 		customer: cu,
+		campaign: ca,
 		manager:  ma,
 		investor: in,
 		field:    fu,
@@ -53,6 +58,16 @@ func (u *useCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 			return 0, fmt.Errorf("create customer: %w", err)
 		}
 		p.Customer.ID = custID
+	} else {
+		// TODO: validar id
+	}
+
+	if p.Campaign.ID == 0 {
+		campID, err := u.campaign.CreateCampaign(ctx, &campaigndom.Campaign{Name: p.Campaign.Name})
+		if err != nil {
+			return 0, fmt.Errorf("create customer: %w", err)
+		}
+		p.Campaign.ID = campID
 	} else {
 		// TODO: validar id
 	}
@@ -194,29 +209,12 @@ func (u *useCases) enrichProject(ctx context.Context, p *domain.Project) error {
 	}
 	p.Customer = *cust
 
-	// Managers
-	// var mgrs []managerdom.Manager
-	// for _, m := range p.Managers {
-	// 	man, err := u.manager.GetManager(ctx, m.ID)
-	// 	if err != nil {
-	// 		return fmt.Errorf("fetch manager %d: %w", m.ID, err)
-	// 	}
-	// 	mgrs = append(mgrs, *man)
-	// }
-	// p.Managers = mgrs
+	camp, err := u.campaign.GetCampaign(ctx, p.Campaign.ID)
+	if err != nil {
+		return fmt.Errorf("fetch customer %d: %w", p.Customer.ID, err)
+	}
+	p.Campaign = *camp
 
-	// Investors
-	// var invs []investordom.Investor
-	// for _, inv := range p.Investors {
-	// 	i, err := u.investor.GetInvestor(ctx, inv.ID)
-	// 	if err != nil {
-	// 		return fmt.Errorf("fetch investor %d: %w", inv.ID, err)
-	// 	}
-	// 	invs = append(invs, *i)
-	// }
-	// p.Investors = invs
-
-	// Fields (incluye nested Lots)
 	var flds []fielddom.Field
 	for _, f := range p.Fields {
 		fld, err := u.field.GetField(ctx, f.ID)

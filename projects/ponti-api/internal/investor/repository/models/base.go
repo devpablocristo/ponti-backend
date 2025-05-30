@@ -6,7 +6,7 @@ import (
 
 type Investor struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement"`
-	Name string `gorm:"type:varchar(255);not null"`
+	Name string `gorm:"type:varchar(255);not null;unique"`
 }
 
 func (i Investor) ToDomain() *domain.Investor {

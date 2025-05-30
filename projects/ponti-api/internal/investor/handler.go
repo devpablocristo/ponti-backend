@@ -36,23 +36,14 @@ func (h *Handler) Routes() {
 
 	apiVersion := h.gsv.GetApiVersion()
 	apiBase := "/api/" + apiVersion + "/investors"
-	publicPrefix := apiBase + "/public"
-	protectedPrefix := apiBase + "/protected"
 
-	public := router.Group(publicPrefix)
+	public := router.Group(apiBase)
 	{
 		public.POST("", h.CreateInvestor)       // Create an investor
 		public.GET("", h.ListInvestors)         // List all investors
 		public.GET("/:id", h.GetInvestor)       // Get an investor by ID
 		public.PUT("/:id", h.UpdateInvestor)    // Update an investor
 		public.DELETE("/:id", h.DeleteInvestor) // Delete an investor
-	}
-
-	// Protected routes.
-	protected := router.Group(protectedPrefix)
-	{
-		protected.Use(h.mws.Protected...)
-		protected.GET("/ping", h.ProtectedPing) // Protected test endpoint
 	}
 }
 

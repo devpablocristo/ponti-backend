@@ -11,6 +11,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -83,8 +84,14 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	projectUseCases := ProvideProjectUseCases(projectRepository, customerUseCases, managerUseCases, investorUseCases, fieldUseCases, lotUseCases)
+	campaignRepository, err := ProvideCampaignRepository(repository)
+	if err != nil {
+		return nil, err
+	}
+	campaignUseCases := ProvideCampaignUseCases(campaignRepository)
+	projectUseCases := ProvideProjectUseCases(projectRepository, customerUseCases, campaignUseCases, managerUseCases, investorUseCases, fieldUseCases, lotUseCases)
 	projectHandler := ProvideProjectHandler(server, projectUseCases, middlewares)
+	campaignHandler := ProvideCampaigHandler(server, campaignUseCases)
 	dependencies := &Dependencies{
 		ConfigLoader:     loader,
 		GinServer:        server,
@@ -97,8 +104,10 @@ func Initialize() (*Dependencies, error) {
 		InvestorHandler:  investorHandler,
 		LotHandler:       lotHandler,
 		ProjectHandler:   projectHandler,
+		CampaignHandler:  campaignHandler,
 		CropUseCases:     useCases,
 		CustomerUseCases: customerUseCases,
+		CampaignUseCases: campaignUseCases,
 		FieldUseCases:    fieldUseCases,
 		InvestorUseCases: investorUseCases,
 		LotUseCases:      lotUseCases,
@@ -123,9 +132,12 @@ type Dependencies struct {
 	InvestorHandler *investor.Handler
 	LotHandler      *lot.Handler
 	ProjectHandler  *project.Handler
+	CampaignHandler *campaign.Handler
 
 	CropUseCases     crop.UseCases
 	CustomerUseCases customer.UseCases
+	CampaignUseCases campaign.UseCases
+
 	FieldUseCases    field.UseCases
 	InvestorUseCases investor.UseCases
 	LotUseCases      lot.UseCases

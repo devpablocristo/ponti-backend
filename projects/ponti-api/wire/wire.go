@@ -11,6 +11,7 @@ import (
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
+	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -34,9 +35,12 @@ type Dependencies struct {
 	InvestorHandler *investor.Handler
 	LotHandler      *lot.Handler
 	ProjectHandler  *project.Handler
+	CampaignHandler *campaign.Handler
 
 	CropUseCases     crop.UseCases
 	CustomerUseCases customer.UseCases
+	CampaignUseCases campaign.UseCases
+
 	FieldUseCases    field.UseCases
 	InvestorUseCases investor.UseCases
 	LotUseCases      lot.UseCases
@@ -58,6 +62,10 @@ func Initialize() (*Dependencies, error) {
 		ProvideCustomerRepository,
 		ProvideCustomerUseCases,
 		ProvideCustomerHandler,
+
+		ProvideCampaignRepository,
+		ProvideCampaignUseCases,
+		ProvideCampaigHandler,
 
 		ProvideManagerRepository,
 		ProvideManagerUseCases,

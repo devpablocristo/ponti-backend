@@ -7,6 +7,7 @@ import (
 	mdw "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	ginsrv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -27,12 +28,13 @@ func ProvideProjectRepository(repo gorm.Repository) (project.Repository, error) 
 func ProvideProjectUseCases(
 	repo project.Repository,
 	customerUC customer.UseCases,
+	campaignUC campaign.UseCases,
 	managerUC manager.UseCases,
 	investorUC investor.UseCases,
 	fieldUC field.UseCases,
 	lotUC lot.UseCases,
 ) project.UseCases {
-	return project.NewUseCases(repo, customerUC, managerUC, investorUC, fieldUC, lotUC)
+	return project.NewUseCases(repo, customerUC, campaignUC, managerUC, investorUC, fieldUC, lotUC)
 }
 
 // ProvideProjectHandler creates the HTTP handler for Project endpoints.

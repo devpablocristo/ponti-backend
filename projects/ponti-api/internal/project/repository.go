@@ -100,7 +100,7 @@ func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
-		Preload("Investors").
+		Preload("Investors.Investor").
 		Preload("Fields").
 		First(&m, id).Error
 	if err != nil {
@@ -116,11 +116,17 @@ func (r *repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 // UpdateProject updates a Project's main fields and relinks its ID-based relations.
 func (r *repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	m := models.FromDomain(d)
+	m.ID = d.ID
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm0.DB) error {
 		// update name and customer_id
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
-			Updates(map[string]any{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
+			Updates(map[string]any{
+				"name":        d.Name,
+				"customer_id": d.Customer.ID,
+				"campaign_id": d.Campaign.ID,
+				"admin_cost":  d.AdminCost,
+			}).Error; err != nil {
 			return err
 		}
 		// relink managers
