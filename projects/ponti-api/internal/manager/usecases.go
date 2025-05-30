@@ -7,11 +7,11 @@ import (
 )
 
 type RepositoryPort interface {
-	CreateManager(ctx context.Context, c *domain.Manager) (int64, error)
-	ListManagers(ctx context.Context) ([]domain.Manager, error)
-	GetManager(ctx context.Context, id int64) (*domain.Manager, error)
-	UpdateManager(ctx context.Context, c *domain.Manager) error
-	DeleteManager(ctx context.Context, id int64) error
+	CreateManager(context.Context, *domain.Manager) (int64, error)
+	ListManagers(context.Context) ([]domain.Manager, error)
+	GetManager(context.Context, int64) (*domain.Manager, error)
+	UpdateManager(context.Context, *domain.Manager) error
+	DeleteManager(context.Context, int64) error
 }
 
 type UseCases struct {

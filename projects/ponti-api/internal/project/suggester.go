@@ -9,9 +9,9 @@ import (
 
 // SuggesterEnginePort es la interfaz del motor externo de sugerencias.
 type SuggesterEnginePort interface {
-	Suggest(ctx context.Context, table, column, prefix string) ([]pgs.Suggestion, error)
+	Suggest(context.Context, string, string, string) ([]pgs.Suggestion, error)
 	Close() error
-	Health(ctx context.Context) error
+	Health(context.Context) error
 }
 
 // Suggester adapta SuggesterEnginePort al puerto de dominio.

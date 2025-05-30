@@ -13,44 +13,44 @@ import (
 )
 
 type InvestorsUseCasesPort interface {
-	CreateInvestor(ctx context.Context, inv *investordom.Investor) (int64, error)
-	ListInvestors(ctx context.Context) ([]investordom.ListedInvestor, error)
-	GetInvestor(ctx context.Context, id int64) (*investordom.Investor, error)
-	UpdateInvestor(ctx context.Context, inv *investordom.Investor) error
-	DeleteInvestor(ctx context.Context, id int64) error
+	CreateInvestor(context.Context, *investordom.Investor) (int64, error)
+	ListInvestors(context.Context) ([]investordom.ListedInvestor, error)
+	GetInvestor(context.Context, int64) (*investordom.Investor, error)
+	UpdateInvestor(context.Context, *investordom.Investor) error
+	DeleteInvestor(context.Context, int64) error
 }
 
 type ManagerUseCasesPort interface {
-	CreateManager(ctx context.Context, c *managerdom.Manager) (int64, error)
-	ListManagers(ctx context.Context) ([]managerdom.Manager, error)
-	GetManager(ctx context.Context, id int64) (*managerdom.Manager, error)
-	UpdateManager(ctx context.Context, c *managerdom.Manager) error
-	DeleteManager(ctx context.Context, id int64) error
+	CreateManager(context.Context, *managerdom.Manager) (int64, error)
+	ListManagers(context.Context) ([]managerdom.Manager, error)
+	GetManager(context.Context, int64) (*managerdom.Manager, error)
+	UpdateManager(context.Context, *managerdom.Manager) error
+	DeleteManager(context.Context, int64) error
 }
 
 type FieldUseCasesPort interface {
-	CreateField(ctx context.Context, f *fielddom.Field) (int64, error)
-	ListFields(ctx context.Context) ([]fielddom.Field, error)
-	GetField(ctx context.Context, id int64) (*fielddom.Field, error)
-	UpdateField(ctx context.Context, f *fielddom.Field) error
-	DeleteField(ctx context.Context, id int64) error
+	CreateField(context.Context, *fielddom.Field) (int64, error)
+	ListFields(context.Context) ([]fielddom.Field, error)
+	GetField(context.Context, int64) (*fielddom.Field, error)
+	UpdateField(context.Context, *fielddom.Field) error
+	DeleteField(context.Context, int64) error
 }
 
 type CustomerUseCasesPort interface {
-	CreateCustomer(ctx context.Context, c *customerdom.Customer) (int64, error)
-	ListCustomers(ctx context.Context, page, perPage int) ([]customerdom.ListedCustomer, int64, error)
-	GetCustomer(ctx context.Context, id int64) (*customerdom.Customer, error)
-	UpdateCustomer(ctx context.Context, c *customerdom.Customer) error
-	DeleteCustomer(ctx context.Context, id int64) error
+	CreateCustomer(context.Context, *customerdom.Customer) (int64, error)
+	ListCustomers(context.Context, int, int) ([]customerdom.ListedCustomer, int64, error)
+	GetCustomer(context.Context, int64) (*customerdom.Customer, error)
+	UpdateCustomer(context.Context, *customerdom.Customer) error
+	DeleteCustomer(context.Context, int64) error
 }
 
 type RepositoryPort interface {
-	CreateProject(ctx context.Context, p *domain.Project) (int64, error)
-	ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error)
-	ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error)
-	GetProject(ctx context.Context, id int64) (*domain.Project, error)
-	UpdateProject(ctx context.Context, p *domain.Project) error
-	DeleteProject(ctx context.Context, id int64) error
+	CreateProject(context.Context, *domain.Project) (int64, error)
+	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
+	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
+	GetProject(context.Context, int64) (*domain.Project, error)
+	UpdateProject(context.Context, *domain.Project) error
+	DeleteProject(context.Context, int64) error
 }
 
 type SuggesterPort interface {

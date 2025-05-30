@@ -7,11 +7,11 @@ import (
 )
 
 type RepositoryPort interface {
-	CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error)
-	ListCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error)
-	GetCustomer(ctx context.Context, id int64) (*domain.Customer, error)
-	UpdateCustomer(ctx context.Context, c *domain.Customer) error
-	DeleteCustomer(ctx context.Context, id int64) error
+	CreateCustomer(context.Context, *domain.Customer) (int64, error)
+	ListCustomers(context.Context, int, int) ([]domain.ListedCustomer, int64, error)
+	GetCustomer(context.Context, int64) (*domain.Customer, error)
+	UpdateCustomer(context.Context, *domain.Customer) error
+	DeleteCustomer(context.Context, int64) error
 }
 
 type UseCases struct {

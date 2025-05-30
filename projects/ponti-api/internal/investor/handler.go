@@ -15,11 +15,11 @@ import (
 )
 
 type UseCasesPort interface {
-	CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error)
-	ListInvestors(ctx context.Context) ([]domain.ListedInvestor, error)
-	GetInvestor(ctx context.Context, id int64) (*domain.Investor, error)
-	UpdateInvestor(ctx context.Context, inv *domain.Investor) error
-	DeleteInvestor(ctx context.Context, id int64) error
+	CreateInvestor(context.Context, *domain.Investor) (int64, error)
+	ListInvestors(context.Context) ([]domain.ListedInvestor, error)
+	GetInvestor(context.Context, int64) (*domain.Investor, error)
+	UpdateInvestor(context.Context, *domain.Investor) error
+	DeleteInvestor(context.Context, int64) error
 }
 
 type GinEnginePort interface {
