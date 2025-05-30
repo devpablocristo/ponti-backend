@@ -10,7 +10,7 @@ import (
 // Bootstrap inicializa la base de datos sin aplicar migraciones automáticamente.
 func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) (*Repository, error) {
 	if dbTypeStr == "" {
-		dbTypeStr = strings.ToLower(os.Getenv("GORM_TYPE"))
+		dbTypeStr = strings.ToLower(os.Getenv("DB_TYPE"))
 	}
 
 	var dbType DBType
@@ -29,22 +29,22 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 	switch dbType {
 	case Postgres, MySQL:
 		if host == "" {
-			host = os.Getenv("GORM_HOST")
+			host = os.Getenv("DB_HOST")
 		}
 		if sslMode == "" {
 			sslMode = os.Getenv("SSL_MODE")
 		}
 		if user == "" {
-			user = os.Getenv("GORM_USER")
+			user = os.Getenv("DB_USER")
 		}
 		if password == "" {
-			password = os.Getenv("GORM_PASSWORD")
+			password = os.Getenv("DB_PASSWORD")
 		}
 		if name == "" {
-			name = os.Getenv("GORM_NAME")
+			name = os.Getenv("DB_NAME")
 		}
 		if port == 0 {
-			port, _ = strconv.Atoi(os.Getenv("GORM_PORT"))
+			port, _ = strconv.Atoi(os.Getenv("DB_PORT"))
 		}
 
 		config = newConfig(

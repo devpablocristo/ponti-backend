@@ -16,7 +16,7 @@ func main() {
 	table := os.Getenv("SUGGESTER_TABLE")
 	column := os.Getenv("SUGGESTER_COLUMN")
 
-	// Inicializar repositorio GORM con pkggorm (usa variables GORM_*)
+	// Inicializar repositorio GORM con pkggorm (usa variables DB_*)
 	repo, err := pkggorm.Bootstrap("", "", "", "", "", "", 0)
 	if err != nil {
 		log.Fatalf("failed to initialize repository: %v", err)

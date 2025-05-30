@@ -8,7 +8,7 @@ services:
       - .env
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-      - "${DELVE_PORT}:${DELVE_PORT}"
+      - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
     volumes:
       - type: bind
         source: ../../
@@ -32,11 +32,11 @@ services:
   ponti-db:
     image: postgres:16.3
     ports:
-      - "${GORM_PORT}:${GORM_PORT}"
+      - "${DB_PORT}:${DB_PORT}"
     environment:
-      - POSTGRES_USER=${GORM_USER}
-      - POSTGRES_PASSWORD=${GORM_PASSWORD}
-      - POSTGRES_DB=${GORM_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - ponti-db_data:/var/lib/postgresql/data
@@ -46,10 +46,10 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${GORM_USER} -d ${GORM_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
-      retries: APP_MAX_RETRIES
+      retries: ${APP_MAX_RETRIES}
       start_period: 10s
 
   pgadmin:

@@ -6,9 +6,10 @@ import (
 	"os"
 	"strings"
 
-	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 	"github.com/go-playground/validator/v10"
 	"github.com/kelseyhightower/envconfig"
+
+	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 )
 
 // LoadConfig carga y valida toda la configuración de la aplicación.
