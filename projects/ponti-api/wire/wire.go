@@ -39,7 +39,7 @@ type Dependencies struct {
 	ProjectHandler  *project.Handler
 }
 
-func Initialize( /*cfgSet *config.AllConfigs*/ ) (*Dependencies, error) {
+func Initialize() (*Dependencies, error) {
 	wire.Build(
 		// Configuración
 		ConfigSet,
@@ -50,7 +50,7 @@ func Initialize( /*cfgSet *config.AllConfigs*/ ) (*Dependencies, error) {
 		MiddlewareSet,
 		SuggesterSet,
 
-		// dominios
+		// Domains
 		CustomerSet,
 		InvestorSet,
 		CropSet,

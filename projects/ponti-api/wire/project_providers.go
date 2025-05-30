@@ -3,11 +3,12 @@ package wire
 import (
 	"github.com/google/wire"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 
+	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -15,79 +16,46 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
-// Gorm
-func ProvideProjectGormEnginePort(r *gorm.Repository) project.GormEnginePort {
+// --- GORM & REPOSITORIO ---
+func ProvideProjectGormEnginePort(r *gormpkg.Repository) project.GormEnginePort {
 	return r
 }
-
 func ProvideProjectRepository(repo project.GormEnginePort) *project.Repository {
 	return project.NewRepository(repo)
 }
-
 func ProvideProjectRepositoryPort(r *project.Repository) project.RepositoryPort {
 	return r
 }
 
-// Suggester
-func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
+// --- CONFIG API ---
+func ProvideProjectConfigAPI(c *cfg.AllConfigs) project.ConfigAPIPort {
+	return &c.API
+}
+
+// --- HTTP & MIDDLEWARE ---
+func ProvideProjectGinEnginePort(s *pgin.Server) project.GinEnginePort {
 	return s
 }
-
-func ProvideProjectSuggester(suge project.SuggesterEnginePort, table, column string) *project.Suggester {
-	return project.NewSuggester(suge, table, column)
-}
-
-func ProvideProjectSuggesterPort(s *sug.Suggester) project.SuggesterEnginePort {
-	return s
-}
-
-// Http Server
-func ProvideProjectGinEnginePort(s *gin.Server) project.GinEnginePort {
-	return s
-}
-
-// ProvideProjectUseCases agrupa repos y usecases de otros dominios en project.UseCases.
-func ProvideProjectUseCases(
-	rep project.RepositoryPort,
-	sugPort project.SuggesterPort,
-	cusPort project.CustomerUseCasesPort,
-	mgrPort project.ManagerUseCasesPort,
-	invPort project.InvestorsUseCasesPort,
-	fldPort project.FieldUseCasesPort,
-) *project.UseCases {
-	return project.NewUseCases(rep, sugPort, cusPort, mgrPort, invPort, fldPort)
-}
-
-// ProvideProjectUseCasesPort adapta *project.UseCases a project.UseCasesPort.
-func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
-	return u
-}
-
-// ProvideProjectCustomerUseCasesPort adapta *customer.UseCases a project.CustomerUseCasesPort.
-func ProvideProjectCustomerUseCasesPort(c *customer.UseCases) project.CustomerUseCasesPort {
-	return c
-}
-
-// ProvideProjectManagerUseCasesPort adapta *manager.UseCases a project.ManagerUseCasesPort.
-func ProvideProjectManagerUseCasesPort(m *manager.UseCases) project.ManagerUseCasesPort {
-	return m
-}
-
-// ProvideProjectInvestorsUseCasesPort adapta *investor.UseCases a project.InvestorsUseCasesPort.
-func ProvideProjectInvestorsUseCasesPort(i *investor.UseCases) project.InvestorsUseCasesPort {
-	return i
-}
-
-// ProvideProjectFieldUseCasesPort adapta *field.UseCases a project.FieldUseCasesPort.
-func ProvideProjectFieldUseCasesPort(f *field.UseCases) project.FieldUseCasesPort {
-	return f
-}
-
-// ProvideProjectMiddlewaresEnginePort adapta *mwr.Middlewares a project.MiddlewaresEnginePort.
 func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.MiddlewaresEnginePort {
 	return m
 }
 
+// --- USE CASES ---
+func ProvideProjectUseCases(
+	rep project.RepositoryPort,
+	sug project.SuggesterPort,
+	cus customer.UseCasesPort,
+	mgr manager.UseCasesPort,
+	inv investor.UseCasesPort,
+	fld field.UseCasesPort,
+) *project.UseCases {
+	return project.NewUseCases(rep, sug, cus, mgr, inv, fld)
+}
+func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
+	return u
+}
+
+// --- HANDLER ---
 func ProvideProjectHandler(
 	server project.GinEnginePort,
 	useCases project.UseCasesPort,
@@ -97,19 +65,63 @@ func ProvideProjectHandler(
 	return project.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProjectSet expone todos los providers necesarios para Project.
+// --------------------------------------------------------------------------------
+// Ahora la parte “ad hoc” del Suggester para Project
+// --------------------------------------------------------------------------------
+
+// 1) Alias de tipo para desambiguar string
+type ProjectTableName string
+
+func ProvideProjectTableName() ProjectTableName { return ProjectTableName("projects") }
+
+type ProjectColumnName string
+
+func ProvideProjectColumnName() ProjectColumnName { return ProjectColumnName("name") }
+
+// 2) Motor común
+func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
+	return s
+}
+
+// 3) Proveedor específico inyectando table/column
+func ProvideProjectSuggester(
+	eng project.SuggesterEnginePort,
+	table ProjectTableName,
+	column ProjectColumnName,
+) *project.Suggester {
+	return project.NewSuggester(eng, string(table), string(column))
+}
+func ProvideProjectSuggesterPort(s *project.Suggester) project.SuggesterPort {
+	return s
+}
+
+// --------------------------------------------------------------------------------
+// El set completo
+// --------------------------------------------------------------------------------
 var ProjectSet = wire.NewSet(
+	// GORM & Repo
+	ProvideProjectGormEnginePort,
 	ProvideProjectRepository,
 	ProvideProjectRepositoryPort,
-	ProvideProjectUseCases,
-	ProvideProjectUseCasesPort,
-	ProvideProjectHandler,
-	ProvideProjectSuggesterPort,
-	ProvideProjectCustomerUseCasesPort,
-	ProvideProjectManagerUseCasesPort,
-	ProvideProjectInvestorsUseCasesPort,
-	ProvideProjectFieldUseCasesPort,
-	ProvideProjectGormEnginePort,
+
+	// Config API
+	ProvideProjectConfigAPI,
+
+	// HTTP & Middleware
 	ProvideProjectGinEnginePort,
 	ProvideProjectMiddlewaresEnginePort,
+
+	// Use Cases
+	ProvideProjectUseCases,
+	ProvideProjectUseCasesPort,
+
+	// Handler
+	ProvideProjectHandler,
+
+	// Suggester “ad hoc”
+	ProvideProjectTableName,
+	ProvideProjectColumnName,
+	ProvideProjectSuggesterEnginePort,
+	ProvideProjectSuggester,
+	ProvideProjectSuggesterPort,
 )
