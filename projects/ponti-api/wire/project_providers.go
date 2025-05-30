@@ -40,14 +40,9 @@ func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.Middlewares
 	return m
 }
 
-// --- SUGGESTER ENGINE ONLY ---
-func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
-	return s
-}
-
 // --- SUGGESTER PORT ---
-func ProvideProjectSuggesterPort(eng project.SuggesterEnginePort) project.SuggesterPort {
-	return project.NewSuggester(eng)
+func ProvideProjectSuggesterPort(s *sug.Suggester) project.SuggesterPort {
+	return project.NewSuggester(s)
 }
 
 // --- USE CASES ---
@@ -80,17 +75,13 @@ var ProjectSet = wire.NewSet(
 	ProvideProjectGormEnginePort,
 	ProvideProjectRepository,
 	ProvideProjectRepositoryPort,
-
 	ProvideProjectConfigAPI,
-
 	ProvideProjectGinEnginePort,
 	ProvideProjectMiddlewaresEnginePort,
 
-	ProvideProjectSuggesterEnginePort,
 	ProvideProjectSuggesterPort,
 
 	ProvideProjectUseCases,
 	ProvideProjectUseCasesPort,
-
 	ProvideProjectHandler,
 )

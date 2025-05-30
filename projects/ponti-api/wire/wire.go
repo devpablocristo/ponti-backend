@@ -13,7 +13,6 @@ import (
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
-
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -23,13 +22,11 @@ import (
 )
 
 type Dependencies struct {
-	Config      *config.AllConfigs
-	GinEngine   *gin.Server
-	GormRepo    *gorm.Repository
-	Middlewares *mwr.Middlewares
-	Suggester   *sug.Suggester
-
-	// Los Handlers que tu main va a montar en las rutas:
+	Config          *config.AllConfigs
+	GinEngine       *gin.Server
+	GormRepo        *gorm.Repository
+	Middlewares     *mwr.Middlewares
+	Suggester       *sug.Suggester
 	CustomerHandler *customer.Handler
 	InvestorHandler *investor.Handler
 	CropHandler     *crop.Handler
@@ -41,16 +38,11 @@ type Dependencies struct {
 
 func Initialize() (*Dependencies, error) {
 	wire.Build(
-		// Configuración
 		ConfigSet,
-
-		// Boostraps
 		GormSet,
 		GinSet,
 		MiddlewareSet,
 		SuggesterSet,
-
-		// Domains
 		CustomerSet,
 		InvestorSet,
 		CropSet,
@@ -58,7 +50,6 @@ func Initialize() (*Dependencies, error) {
 		FieldSet,
 		ManagerSet,
 		ProjectSet,
-
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
