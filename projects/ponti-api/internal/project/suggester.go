@@ -16,24 +16,20 @@ type SuggesterEnginePort interface {
 
 // Suggester adapta SuggesterEnginePort al puerto de dominio.
 type Suggester struct {
-	eng    SuggesterEnginePort
-	table  string
-	column string
+	eng SuggesterEnginePort
 }
 
 // NewSuggesterAdapter recibe el motor externo más la tabla/columna a usar.
-func NewSuggester(eng SuggesterEnginePort, table, column string) *Suggester {
+func NewSuggester(eng SuggesterEnginePort) *Suggester {
 	return &Suggester{
-		eng:    eng,
-		table:  table,
-		column: column,
+		eng: eng,
 	}
 }
 
 // Suggest llama internamente a eng.Suggest con table y column "inyectados",
 // y mapea el resultado a domain.ListedProject.
 func (a *Suggester) Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error) {
-	ext, err := a.eng.Suggest(ctx, a.table, a.column, prefix)
+	ext, err := a.eng.Suggest(ctx, "projects", "name", prefix)
 	if err != nil {
 		return nil, err
 	}

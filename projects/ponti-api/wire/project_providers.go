@@ -16,15 +16,15 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
-// --- GORM & REPOSITORIO ---
+// --- GORM & REPO ---
 func ProvideProjectGormEnginePort(r *gormpkg.Repository) project.GormEnginePort {
 	return r
 }
-func ProvideProjectRepository(repo project.GormEnginePort) *project.Repository {
-	return project.NewRepository(repo)
+func ProvideProjectRepository(r project.GormEnginePort) *project.Repository {
+	return project.NewRepository(r)
 }
-func ProvideProjectRepositoryPort(r *project.Repository) project.RepositoryPort {
-	return r
+func ProvideProjectRepositoryPort(repo *project.Repository) project.RepositoryPort {
+	return repo
 }
 
 // --- CONFIG API ---
@@ -40,16 +40,26 @@ func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.Middlewares
 	return m
 }
 
+// --- SUGGESTER ENGINE ONLY ---
+func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
+	return s
+}
+
+// --- SUGGESTER PORT ---
+func ProvideProjectSuggesterPort(eng project.SuggesterEnginePort) project.SuggesterPort {
+	return project.NewSuggester(eng)
+}
+
 // --- USE CASES ---
 func ProvideProjectUseCases(
 	rep project.RepositoryPort,
-	sug project.SuggesterPort,
+	sugg project.SuggesterPort,
 	cus customer.UseCasesPort,
 	mgr manager.UseCasesPort,
 	inv investor.UseCasesPort,
 	fld field.UseCasesPort,
 ) *project.UseCases {
-	return project.NewUseCases(rep, sug, cus, mgr, inv, fld)
+	return project.NewUseCases(rep, sugg, cus, mgr, inv, fld)
 }
 func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
 	return u
@@ -58,70 +68,29 @@ func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
 // --- HANDLER ---
 func ProvideProjectHandler(
 	server project.GinEnginePort,
-	useCases project.UseCasesPort,
+	ucs project.UseCasesPort,
 	cfg project.ConfigAPIPort,
-	middlewares project.MiddlewaresEnginePort,
+	mws project.MiddlewaresEnginePort,
 ) *project.Handler {
-	return project.NewHandler(useCases, server, cfg, middlewares)
+	return project.NewHandler(ucs, server, cfg, mws)
 }
 
-// --------------------------------------------------------------------------------
-// Ahora la parte “ad hoc” del Suggester para Project
-// --------------------------------------------------------------------------------
-
-// 1) Alias de tipo para desambiguar string
-type ProjectTableName string
-
-func ProvideProjectTableName() ProjectTableName { return ProjectTableName("projects") }
-
-type ProjectColumnName string
-
-func ProvideProjectColumnName() ProjectColumnName { return ProjectColumnName("name") }
-
-// 2) Motor común
-func ProvideProjectSuggesterEnginePort(s *sug.Suggester) project.SuggesterEnginePort {
-	return s
-}
-
-// 3) Proveedor específico inyectando table/column
-func ProvideProjectSuggester(
-	eng project.SuggesterEnginePort,
-	table ProjectTableName,
-	column ProjectColumnName,
-) *project.Suggester {
-	return project.NewSuggester(eng, string(table), string(column))
-}
-func ProvideProjectSuggesterPort(s *project.Suggester) project.SuggesterPort {
-	return s
-}
-
-// --------------------------------------------------------------------------------
-// El set completo
-// --------------------------------------------------------------------------------
+// --- WIRE SET ---
 var ProjectSet = wire.NewSet(
-	// GORM & Repo
 	ProvideProjectGormEnginePort,
 	ProvideProjectRepository,
 	ProvideProjectRepositoryPort,
 
-	// Config API
 	ProvideProjectConfigAPI,
 
-	// HTTP & Middleware
 	ProvideProjectGinEnginePort,
 	ProvideProjectMiddlewaresEnginePort,
 
-	// Use Cases
+	ProvideProjectSuggesterEnginePort,
+	ProvideProjectSuggesterPort,
+
 	ProvideProjectUseCases,
 	ProvideProjectUseCasesPort,
 
-	// Handler
 	ProvideProjectHandler,
-
-	// Suggester “ad hoc”
-	ProvideProjectTableName,
-	ProvideProjectColumnName,
-	ProvideProjectSuggesterEnginePort,
-	ProvideProjectSuggester,
-	ProvideProjectSuggesterPort,
 )
