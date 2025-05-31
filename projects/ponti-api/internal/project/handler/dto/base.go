@@ -1,6 +1,7 @@
 package dto
 
 import (
+	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
@@ -12,15 +13,23 @@ import (
 
 // Project DTO for create/update and response
 type Project struct {
+	// Si quieres manejar actualizaciones, podrías añadir aquí un campo Id:
+	ID              int64      `json:"id,omitempty"`
 	ProjectName     string     `json:"name" binding:"required"`
 	Customer        Customer   `json:"customer" binding:"required"`
+	AdminCost       int64      `json:"admin_cost" binding:"required"`
+	Campaign        Campaign   `json:"campaign" binding:"required"`
 	ProjectManagers []Manager  `json:"managers" binding:"required,dive,required"`
 	Investors       []Investor `json:"investors" binding:"required,dive,required"`
 	Fields          []Field    `json:"fields" binding:"required,dive,required"`
 }
 
-// Customer DTO
 type Customer struct {
+	ID   int64  `json:"id,omitempty"`
+	Name string `json:"name" binding:"required"`
+}
+
+type Campaign struct {
 	ID   int64  `json:"id,omitempty"`
 	Name string `json:"name" binding:"required"`
 }
@@ -66,6 +75,11 @@ func (r *Project) ToDomain() *domain.Project {
 			ID:   r.Customer.ID,
 			Name: r.Customer.Name,
 		},
+		Campaign: campdom.Campaign{
+			ID:   r.Campaign.ID,
+			Name: r.Campaign.Name,
+		},
+		AdminCost: r.AdminCost,
 	}
 
 	for _, mgr := range r.ProjectManagers {
@@ -105,8 +119,11 @@ func (r *Project) ToDomain() *domain.Project {
 // FromDomain maps a domain.Project to the DTO
 func FromDomain(d *domain.Project) *Project {
 	r := &Project{
+		ID:          d.ID,
 		ProjectName: d.Name,
 		Customer:    Customer{ID: d.Customer.ID, Name: d.Customer.Name},
+		Campaign:    Campaign{ID: d.Campaign.ID, Name: d.Campaign.Name},
+		AdminCost:   d.AdminCost,
 	}
 
 	for _, mgr := range d.Managers {

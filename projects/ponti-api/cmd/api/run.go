@@ -9,6 +9,7 @@ import (
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 
+	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
@@ -46,6 +47,7 @@ func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
+	deps.CampaignHandler.Routes()
 	deps.InvestorHandler.Routes()
 	deps.FieldHandler.Routes()
 	deps.ProjectHandler.Routes()
@@ -74,6 +76,7 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&projectmodels.Project{},
 		&projectmodels.ProjectInvestor{},
 		&managermodels.Manager{},
+		&campaignmodels.Campaign{},
 	}
 
 	start := time.Now()

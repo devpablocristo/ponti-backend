@@ -48,27 +48,24 @@ func newRepository(c ConfigPort) (*Repository, error) {
 	return repo, nil
 }
 
-// Connect establece la conexión con la base de datos según el tipo
 func (r *Repository) Connect(config ConfigPort) error {
-	var db *gorm.DB
-	var err error
+	// Primero crear la base si no existe
+	if err := r.createDatabaseIfNotExists(config); err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
+	}
 
 	dialector, err := getDialector(config)
 	if err != nil {
 		return err
 	}
 
-	db, err = gorm.Open(dialector, &gorm.Config{})
+	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
 		return err
 	}
 
 	r.client = db
 	r.address = config.GetHost()
-
-	if err := r.createDatabaseIfNotExists(config); err != nil {
-		return fmt.Errorf("failed to create database: %w", err)
-	}
 
 	if config.GetDBType() != SQLite {
 		sqlDB, err := db.DB()

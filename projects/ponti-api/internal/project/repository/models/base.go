@@ -1,9 +1,9 @@
-// File: repository/models/base.go
 package models
 
 import (
 	"time"
 
+	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
@@ -14,15 +14,16 @@ import (
 
 // Project es el modelo GORM para proyectos.
 type Project struct {
-	ID         int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	Name       string    `gorm:"size:100;not null;column:name"`
-	CustomerID int64     `gorm:"not null;index;column:customer_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
-
-	Managers  []Manager         `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Investors []ProjectInvestor `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Fields    []fieldmod.Field  `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID         int64             `gorm:"primaryKey;autoIncrement;column:id"`
+	Name       string            `gorm:"size:100;not null;column:name"`
+	CustomerID int64             `gorm:"not null;index;column:customer_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CampaignID int64             `gorm:"not null;index;column:campaign_id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	AdminCost  int64             `gorm:"not null;column:admin_cost"`
+	CreatedAt  time.Time         `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt  time.Time         `gorm:"autoUpdateTime;column:updated_at"`
+	Managers   []Manager         `gorm:"many2many:project_managers;association_autocreate:false;association_autoupdate:false;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Investors  []ProjectInvestor `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Fields     []fieldmod.Field  `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 // Manager sólo expone el ID para la tabla pivote project_managers.
@@ -32,10 +33,10 @@ type Manager struct {
 }
 
 type ProjectInvestor struct {
-	ProjectID  int64   `gorm:"primaryKey;column:project_id"`
-	InvestorID int64   `gorm:"primaryKey;column:investor_id"`
-	Percentage float64 `gorm:"not null;default:0"`
-	Investor invmod.Investor `gorm:"foreignKey:InvestorID"`
+	ProjectID  int64           `gorm:"primaryKey;column:project_id"`
+	InvestorID int64           `gorm:"primaryKey;column:investor_id"`
+	Percentage float64         `gorm:"not null;default:0"`
+	Investor   invmod.Investor `gorm:"foreignKey:InvestorID"`
 }
 
 // FromDomain convierte un domain.Project al modelo GORM Project.
@@ -43,6 +44,8 @@ func FromDomain(d *domain.Project) *Project {
 	m := &Project{
 		Name:       d.Name,
 		CustomerID: d.Customer.ID,
+		CampaignID: d.Campaign.ID,
+		AdminCost:  d.AdminCost,
 	}
 	for _, mgr := range d.Managers {
 		m.Managers = append(m.Managers, Manager{ID: mgr.ID})
@@ -59,10 +62,14 @@ func FromDomain(d *domain.Project) *Project {
 // ToDomain convierte el modelo GORM Project a domain.Project.
 func (m *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:        m.ID,
+		Name:      m.Name,
+		AdminCost: m.AdminCost,
 		Customer: customerdom.Customer{
 			ID: m.CustomerID,
+		},
+		Campaign: campaigndom.Campaign{
+			ID: m.CampaignID,
 		},
 	}
 	for _, mgr := range m.Managers {

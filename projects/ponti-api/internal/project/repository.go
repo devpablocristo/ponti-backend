@@ -7,7 +7,8 @@ import (
 
 	gorm "gorm.io/gorm"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
@@ -58,7 +59,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		return nil
 	})
 	if err != nil {
-		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("transaction failed for project creation: %v", err), err)
+		return 0, types.NewError(types.ErrInternal, fmt.Sprintf("transaction failed for project creation: %v", err), err)
 	}
 
 	return projectID, nil
@@ -74,7 +75,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 
 	// 1. Conteo total
 	if err := db0.Count(&total).Error; err != nil {
-		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to count projects", err)
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
 	// 2. Consulta ligera
@@ -83,7 +84,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
-		return nil, 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list light projects", err)
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list light projects", err)
 	}
 
 	return projects, total, nil
@@ -102,7 +103,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	// 1. Conteo total para ese cliente
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0,
-			pkgtypes.NewError(pkgtypes.ErrInternal, "failed to count projects by customer", err)
+			types.NewError(types.ErrInternal, "failed to count projects by customer", err)
 	}
 
 	// 2. Consulta ligera: sólo id y name
@@ -112,7 +113,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
 		return nil, 0,
-			pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list light projects by customer", err)
+			types.NewError(types.ErrInternal, "failed to list light projects by customer", err)
 	}
 
 	return projects, total, nil
@@ -123,14 +124,14 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
-		Preload("Investors").
+		Preload("Investors.Investor").
 		Preload("Fields").
 		First(&m, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
 		}
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
+		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
 	}
 	proj := m.ToDomain()
 	return proj, nil
@@ -139,11 +140,17 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 // UpdateProject updates a Project's main fields and relinks its ID-based relations.
 func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	m := models.FromDomain(d)
+	m.ID = d.ID
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// update name and customer_id
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
-			Updates(map[string]any{"name": d.Name, "customer_id": d.Customer.ID}).Error; err != nil {
+			Updates(map[string]any{
+				"name":        d.Name,
+				"customer_id": d.Customer.ID,
+				"campaign_id": d.Campaign.ID,
+				"admin_cost":  d.AdminCost,
+			}).Error; err != nil {
 			return err
 		}
 		// relink managers
@@ -161,7 +168,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		return nil
 	})
 	if err != nil {
-		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update project", err)
+		return types.NewError(types.ErrInternal, "failed to update project", err)
 	}
 	return nil
 }
@@ -188,7 +195,7 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		return nil
 	})
 	if err != nil {
-		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to delete project", err)
+		return types.NewError(types.ErrInternal, "failed to delete project", err)
 	}
 	return nil
 }

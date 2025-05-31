@@ -12,6 +12,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -53,6 +54,15 @@ func Initialize() (*Dependencies, error) {
 	configAPIPort := ProvideCustomerConfigAPI(allConfigs)
 	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
 	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	campaignGinEnginePort := ProvideCampaignGinEnginePort(server)
+	campaignGormEnginePort := ProvideCampaignGormEnginePort(repository)
+	campaignRepository := ProvideCampaignRepository(campaignGormEnginePort)
+	campaignRepositoryPort := ProvideCampaignRepositoryPort(campaignRepository)
+	campaignUseCases := ProvideCampaignUseCases(campaignRepositoryPort)
+	campaignUseCasesPort := ProvideCampaignUseCasesPort(campaignUseCases)
+	campaignConfigAPIPort := ProvideCampaignConfigAPI(allConfigs)
+	campaignMiddlewaresEnginePort := ProvideCampaignMiddlewaresEnginePort(middlewares)
+	campaignHandler := ProvideCampaignHandler(campaignGinEnginePort, campaignUseCasesPort, campaignConfigAPIPort, campaignMiddlewaresEnginePort)
 	investorGinEnginePort := ProvideInvestorGinEnginePort(server)
 	investorGormEnginePort := ProvideInvestorGormEnginePort(repository)
 	investorRepository := ProvideInvestorRepository(investorGormEnginePort)
@@ -103,7 +113,7 @@ func Initialize() (*Dependencies, error) {
 	projectRepository := ProvideProjectRepository(projectGormEnginePort)
 	projectRepositoryPort := ProvideProjectRepositoryPort(projectRepository)
 	suggesterPort := ProvideProjectSuggesterPort(pkgsuggesterSuggester)
-	projectUseCases := ProvideProjectUseCases(projectRepositoryPort, suggesterPort, useCasesPort, managerUseCasesPort, investorUseCasesPort, fieldUseCasesPort)
+	projectUseCases := ProvideProjectUseCases(projectRepositoryPort, suggesterPort, useCasesPort, campaignUseCasesPort, managerUseCasesPort, investorUseCasesPort, fieldUseCasesPort)
 	projectUseCasesPort := ProvideProjectUseCasesPort(projectUseCases)
 	projectConfigAPIPort := ProvideProjectConfigAPI(allConfigs)
 	projectMiddlewaresEnginePort := ProvideProjectMiddlewaresEnginePort(middlewares)
@@ -115,6 +125,7 @@ func Initialize() (*Dependencies, error) {
 		Middlewares:     middlewares,
 		Suggester:       pkgsuggesterSuggester,
 		CustomerHandler: handler,
+		CampaignHandler: campaignHandler,
 		InvestorHandler: investorHandler,
 		CropHandler:     cropHandler,
 		LotHandler:      lotHandler,
@@ -134,6 +145,7 @@ type Dependencies struct {
 	Middlewares     *pkgmwr.Middlewares
 	Suggester       *pkgsuggester.Suggester
 	CustomerHandler *customer.Handler
+	CampaignHandler *campaign.Handler
 	InvestorHandler *investor.Handler
 	CropHandler     *crop.Handler
 	LotHandler      *lot.Handler

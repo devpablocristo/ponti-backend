@@ -12,6 +12,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -28,6 +29,7 @@ type Dependencies struct {
 	Middlewares     *mwr.Middlewares
 	Suggester       *sug.Suggester
 	CustomerHandler *customer.Handler
+	CampaignHandler *campaign.Handler
 	InvestorHandler *investor.Handler
 	CropHandler     *crop.Handler
 	LotHandler      *lot.Handler
@@ -44,6 +46,7 @@ func Initialize() (*Dependencies, error) {
 		MiddlewareSet,
 		SuggesterSet,
 		CustomerSet,
+		CampaignSet,
 		InvestorSet,
 		CropSet,
 		LotSet,

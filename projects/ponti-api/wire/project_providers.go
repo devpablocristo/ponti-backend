@@ -9,6 +9,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
 
 	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -48,14 +49,16 @@ func ProvideProjectSuggesterPort(s *sug.Suggester) project.SuggesterPort {
 // --- USE CASES ---
 func ProvideProjectUseCases(
 	rep project.RepositoryPort,
-	sugg project.SuggesterPort,
+	sug project.SuggesterPort,
 	cus customer.UseCasesPort,
+	cam campaign.UseCasesPort,
 	mgr manager.UseCasesPort,
 	inv investor.UseCasesPort,
 	fld field.UseCasesPort,
 ) *project.UseCases {
-	return project.NewUseCases(rep, sugg, cus, mgr, inv, fld)
+	return project.NewUseCases(rep, sug, cus, cam, mgr, inv, fld)
 }
+
 func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
 	return u
 }

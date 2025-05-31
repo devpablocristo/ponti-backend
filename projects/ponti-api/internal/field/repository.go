@@ -8,7 +8,8 @@ import (
 
 	gorm "gorm.io/gorm"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 )
@@ -28,11 +29,11 @@ func NewRepository(db GormEnginePort) *Repository {
 
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	if f == nil {
-		return 0, pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
+		return 0, types.NewError(types.ErrValidation, "field is nil", nil)
 	}
 	model := models.FromDomain(f)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to create field", err)
+		return 0, types.NewError(types.ErrInternal, "failed to create field", err)
 	}
 	return model.ID, nil
 }
@@ -40,7 +41,7 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 func (r *Repository) ListFields(ctx context.Context) ([]domain.Field, error) {
 	var list []models.Field
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to list fields", err)
+		return nil, types.NewError(types.ErrInternal, "failed to list fields", err)
 	}
 	result := make([]domain.Field, 0, len(list))
 	for _, m := range list {
@@ -55,9 +56,9 @@ func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, err
 	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("field with id %d not found", id), err)
+			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("field with id %d not found", id), err)
 		}
-		return nil, pkgtypes.NewError(pkgtypes.ErrInternal, "failed to get field", err)
+		return nil, types.NewError(types.ErrInternal, "failed to get field", err)
 	}
 	return model.ToDomain(), nil
 }
@@ -65,7 +66,7 @@ func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, err
 // UpdateField updates an existing field.
 func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if f == nil {
-		return pkgtypes.NewError(pkgtypes.ErrValidation, "field is nil", nil)
+		return types.NewError(types.ErrValidation, "field is nil", nil)
 	}
 	model := models.FromDomain(f)
 	result := r.db.Client().WithContext(ctx).
@@ -73,10 +74,10 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 		Where("id = ?", f.ID).
 		Updates(model)
 	if result.Error != nil {
-		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to update field", result.Error)
+		return types.NewError(types.ErrInternal, "failed to update field", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("field with id %d does not exist", f.ID), nil)
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("field with id %d does not exist", f.ID), nil)
 	}
 	return nil
 }
@@ -86,10 +87,10 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Field{}, "id = ?", id)
 	if result.Error != nil {
-		return pkgtypes.NewError(pkgtypes.ErrInternal, "failed to delete field", result.Error)
+		return types.NewError(types.ErrInternal, "failed to delete field", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return pkgtypes.NewError(pkgtypes.ErrNotFound, fmt.Sprintf("field with id %d does not exist", id), nil)
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("field with id %d does not exist", id), nil)
 	}
 	return nil
 }
