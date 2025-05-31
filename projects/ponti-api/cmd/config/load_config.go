@@ -51,7 +51,7 @@ func LoadConfig() (*AllConfigs, error) {
 	}
 
 	// 4) Valores derivados
-	cfg.API.BaseURL = fmt.Sprintf("api/%s/projects", cfg.API.APIVersion())
+	cfg.API.BaseURL = fmt.Sprintf("api/%s", cfg.API.APIVersion())
 
 	// 5) Validación final
 	validate := validator.New()
