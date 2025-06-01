@@ -40,8 +40,8 @@ func Initialize() (*Dependencies, error) {
 	}
 	middlewares := ProvideMiddlewares()
 	pkgsuggesterDB := ProvideSuggesterDB(repository)
-	suggester := ProvideConfigSuggester(allConfigs)
-	pkgsuggesterSuggester, err := ProvideSuggester(pkgsuggesterDB, suggester)
+	wordsSuggester := ProvideConfigSuggester(allConfigs)
+	pkgsuggesterWordsSuggester, err := ProvideSuggester(pkgsuggesterDB, wordsSuggester)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func Initialize() (*Dependencies, error) {
 	projectGormEnginePort := ProvideProjectGormEnginePort(repository)
 	projectRepository := ProvideProjectRepository(projectGormEnginePort)
 	projectRepositoryPort := ProvideProjectRepositoryPort(projectRepository)
-	suggesterPort := ProvideProjectSuggesterPort(pkgsuggesterSuggester)
+	suggesterPort := ProvideProjectSuggesterPort(pkgsuggesterWordsSuggester)
 	projectUseCases := ProvideProjectUseCases(projectRepositoryPort, suggesterPort, useCasesPort, campaignUseCasesPort, managerUseCasesPort, investorUseCasesPort, fieldUseCasesPort)
 	projectUseCasesPort := ProvideProjectUseCasesPort(projectUseCases)
 	projectConfigAPIPort := ProvideProjectConfigAPI(allConfigs)
@@ -123,7 +123,7 @@ func Initialize() (*Dependencies, error) {
 		GinEngine:       server,
 		GormRepo:        repository,
 		Middlewares:     middlewares,
-		Suggester:       pkgsuggesterSuggester,
+		WordsSuggester:  pkgsuggesterWordsSuggester,
 		CustomerHandler: handler,
 		CampaignHandler: campaignHandler,
 		InvestorHandler: investorHandler,
@@ -143,7 +143,7 @@ type Dependencies struct {
 	GinEngine       *pkggin.Server
 	GormRepo        *pkggorm.Repository
 	Middlewares     *pkgmwr.Middlewares
-	Suggester       *pkgsuggester.Suggester
+	WordsSuggester  *pkgsuggester.WordsSuggester
 	CustomerHandler *customer.Handler
 	CampaignHandler *campaign.Handler
 	InvestorHandler *investor.Handler

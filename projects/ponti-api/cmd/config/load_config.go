@@ -25,7 +25,7 @@ func LoadConfig() (*AllConfigs, error) {
 		return nil, fmt.Errorf("could not load base .env: %w", err)
 	}
 
-	// 2) Override según DEPLOY_ENV 
+	// 2) Override según DEPLOY_ENV
 	env := strings.ToLower(os.Getenv("DEPLOY_ENV "))
 	if env != "" {
 		_ = envvars.LoadConfig(fmt.Sprintf(".env.%s", env))
@@ -42,7 +42,7 @@ func LoadConfig() (*AllConfigs, error) {
 		{"http server", &cfg.HTTPServer},
 		{"debugger", &cfg.Debugger},
 		{"db", &cfg.DB},
-		{"suggester", &cfg.Suggester},
+		{"suggester", &cfg.WordsSuggester},
 	}
 	for _, sec := range sections {
 		if err := envconfig.Process("", sec.tgt); err != nil {

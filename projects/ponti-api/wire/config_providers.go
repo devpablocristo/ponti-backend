@@ -15,9 +15,9 @@ func ProvideConfigDB(cfg *config.AllConfigs) *config.DB {
 	return &cfg.DB
 }
 
-// Extrae Suggester de la config
-func ProvideConfigSuggester(cfg *config.AllConfigs) *config.Suggester {
-	return &cfg.Suggester
+// Extrae WordsSuggester de la config
+func ProvideConfigSuggester(cfg *config.AllConfigs) *config.WordsSuggester {
+	return &cfg.WordsSuggester
 }
 
 // ProvideConfigAPI extrae cfg.API y satisface todos los ConfigAPIPort de los dominios.

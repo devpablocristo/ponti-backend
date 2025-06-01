@@ -27,7 +27,7 @@ type Dependencies struct {
 	GinEngine       *gin.Server
 	GormRepo        *gorm.Repository
 	Middlewares     *mwr.Middlewares
-	Suggester       *sug.Suggester
+	WordsSuggester  *sug.WordsSuggester
 	CustomerHandler *customer.Handler
 	CampaignHandler *campaign.Handler
 	InvestorHandler *investor.Handler

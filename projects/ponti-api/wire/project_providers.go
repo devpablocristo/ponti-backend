@@ -42,7 +42,7 @@ func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.Middlewares
 }
 
 // --- SUGGESTER PORT ---
-func ProvideProjectSuggesterPort(s *sug.Suggester) project.SuggesterPort {
+func ProvideProjectSuggesterPort(s *sug.WordsSuggester) project.SuggesterPort {
 	return project.NewSuggester(s)
 }
 

@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-type Suggester struct {
+type WordsSuggester struct {
 	db        DB
 	limit     int
 	threshold float64
 	logger    Logger
 }
 
-func newSuggester(cfg *Config) *Suggester {
+func newSuggester(cfg *Config) *WordsSuggester {
 	// Ajustar umbral global una vez
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -22,7 +22,7 @@ func newSuggester(cfg *Config) *Suggester {
 	_ = cfg.DB.WithContext(ctx).
 		Exec(fmt.Sprintf("SET pg_trgm.similarity_threshold = %f", cfg.Threshold)).
 		Error()
-	return &Suggester{
+	return &WordsSuggester{
 		db:        cfg.DB,
 		limit:     cfg.Limit,
 		threshold: cfg.Threshold,
@@ -31,7 +31,7 @@ func newSuggester(cfg *Config) *Suggester {
 }
 
 // Suggest recibe tabla, columna y prefijo
-func (s *Suggester) Suggest(ctx context.Context, table, column, prefix string) ([]Suggestion, error) {
+func (s *WordsSuggester) Suggest(ctx context.Context, table, column, prefix string) ([]Suggestion, error) {
 	// Validar
 	if !validIdentifier.MatchString(table) {
 		return nil, fmt.Errorf("invalid table name: %s", table)
@@ -60,7 +60,7 @@ func (s *Suggester) Suggest(ctx context.Context, table, column, prefix string) (
 	return out, nil
 }
 
-func (s *Suggester) Close() error {
+func (s *WordsSuggester) Close() error {
 	sqlDB, err := s.db.DB()
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (s *Suggester) Close() error {
 	return sqlDB.Close()
 }
 
-func (s *Suggester) Health(ctx context.Context) error {
+func (s *WordsSuggester) Health(ctx context.Context) error {
 	sqlDB, err := s.db.DB()
 	if err != nil {
 		return err

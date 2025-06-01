@@ -25,7 +25,7 @@ func main() {
 	// Crear adapter para el sugeridor
 	adapter := pgksuggester.NewPkggormAdapter(repo)
 
-	// Inicializar Suggester
+	// Inicializar WordsSuggester
 	suggester, err := pgksuggester.Bootstrap(
 		pgksuggester.WithDB(adapter),
 	)

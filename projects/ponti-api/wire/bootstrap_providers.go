@@ -70,7 +70,7 @@ var GinSet = wire.NewSet(
 	ProvideGinEnginePort,
 )
 
-// --- Suggester Providers -------------------------------------------
+// --- WordsSuggester Providers -------------------------------------------
 
 type SuggesterEnginePort interface {
 	Suggest(context.Context, string, string, string) ([]sug.Suggestion, error)
@@ -82,7 +82,7 @@ func ProvideSuggesterDB(repo *pgorm.Repository) sug.DB {
 	return sug.NewPkggormAdapter(repo)
 }
 
-func ProvideSuggester(db sug.DB, cfg *config.Suggester) (*sug.Suggester, error) {
+func ProvideSuggester(db sug.DB, cfg *config.WordsSuggester) (*sug.WordsSuggester, error) {
 	return sug.Bootstrap(
 		sug.WithDB(db),
 		sug.WithLimit(cfg.Limit),
@@ -90,7 +90,7 @@ func ProvideSuggester(db sug.DB, cfg *config.Suggester) (*sug.Suggester, error) 
 	)
 }
 
-func ProvideSuggesterEnginePort(s *sug.Suggester) SuggesterEnginePort {
+func ProvideSuggesterEnginePort(s *sug.WordsSuggester) SuggesterEnginePort {
 	return s
 }
 

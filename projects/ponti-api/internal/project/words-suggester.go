@@ -14,21 +14,21 @@ type SuggesterEnginePort interface {
 	Health(context.Context) error
 }
 
-// Suggester adapta SuggesterEnginePort al puerto de dominio.
-type Suggester struct {
+// WordsSuggester adapta SuggesterEnginePort al puerto de dominio.
+type WordsSuggester struct {
 	eng SuggesterEnginePort
 }
 
 // NewSuggesterAdapter recibe el motor externo más la tabla/columna a usar.
-func NewSuggester(eng SuggesterEnginePort) *Suggester {
-	return &Suggester{
+func NewSuggester(eng SuggesterEnginePort) *WordsSuggester {
+	return &WordsSuggester{
 		eng: eng,
 	}
 }
 
 // Suggest llama internamente a eng.Suggest con table y column "inyectados",
 // y mapea el resultado a domain.ListedProject.
-func (a *Suggester) Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error) {
+func (a *WordsSuggester) Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error) {
 	ext, err := a.eng.Suggest(ctx, "projects", "name", prefix)
 	if err != nil {
 		return nil, err
@@ -44,11 +44,11 @@ func (a *Suggester) Suggest(ctx context.Context, prefix string) ([]domain.Listed
 }
 
 // Close delega el cierre de recursos al motor externo.
-func (a *Suggester) Close() error {
+func (a *WordsSuggester) Close() error {
 	return a.eng.Close()
 }
 
 // Health delega el chequeo de salud al motor externo.
-func (a *Suggester) Health(ctx context.Context) error {
+func (a *WordsSuggester) Health(ctx context.Context) error {
 	return a.eng.Health(ctx)
 }
