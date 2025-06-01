@@ -6,8 +6,8 @@ import (
 	"unicode"
 )
 
-func ValidatePhone(phone string, digitsLen int) error {
-	// Eliminar cualquier carácter no numérico
+// ValidatePhone checks if the phone number has at least the required number of digits.
+func ValidatePhone(phone string, minDigits int) error {
 	digits := strings.Map(func(r rune) rune {
 		if unicode.IsDigit(r) {
 			return r
@@ -15,9 +15,8 @@ func ValidatePhone(phone string, digitsLen int) error {
 		return -1
 	}, phone)
 
-	if len(digits) < digitsLen {
-		return fmt.Errorf("phone number must have at least %d digits", digitsLen)
+	if len(digits) < minDigits {
+		return fmt.Errorf("phone number must have at least %d digits", minDigits)
 	}
-
 	return nil
 }

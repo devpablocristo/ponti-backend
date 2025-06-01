@@ -5,22 +5,18 @@ import (
 	"time"
 )
 
-func ValidateBirthDate(birthDate time.Time, age int) error {
-	calculatedAge := time.Now().Year() - birthDate.Year()
-
-	// Ajustar la edad si aún no ha pasado el cumpleaños este año
-	if time.Now().YearDay() < birthDate.YearDay() {
-		calculatedAge--
+// ValidateBirthDate checks if the birthDate is consistent with the provided age and not in the future.
+func ValidateBirthDate(birthDate time.Time, expectedAge int) error {
+	now := time.Now()
+	age := now.Year() - birthDate.Year()
+	if now.YearDay() < birthDate.YearDay() {
+		age--
 	}
-
-	if calculatedAge != age {
-		return fmt.Errorf("birth date does not match provided age")
+	if age != expectedAge {
+		return fmt.Errorf("birth date does not match the provided age")
 	}
-
-	// Verificar que la fecha no sea futura
-	if birthDate.After(time.Now()) {
+	if birthDate.After(now) {
 		return fmt.Errorf("birth date cannot be in the future")
 	}
-
 	return nil
 }

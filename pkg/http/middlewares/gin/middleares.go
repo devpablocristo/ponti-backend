@@ -1,24 +1,18 @@
 package pkgmwr
 
 import (
+	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 	"github.com/gin-gonic/gin"
-
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
-// Middlewares implementa el contrato agrupando tus tres etapas.
 type Middlewares struct {
 	global     []gin.HandlerFunc
 	validation []gin.HandlerFunc
 	protected  []gin.HandlerFunc
 }
 
-// NewDefaultMiddlewares construye el objeto completo.
-// Recibe la configuración en lugar de leer variables de entorno directamente.
 func NewDefaultMiddlewares() *Middlewares {
-	cfg := utils.NewConfigFromEnv()
-
-	// Global
+	cfg := pkgutils.NewConfigFromEnv()
 	global := []gin.HandlerFunc{
 		ErrorHandling(),
 		RequestAndResponseLogger(HttpLoggingOptions{
@@ -28,36 +22,20 @@ func NewDefaultMiddlewares() *Middlewares {
 			ExcludedPaths:  []string{"/health", "/ping", "/swagger/spec", "/swagger/ui/index.html"},
 		}),
 	}
-
-	// Validation
 	validation := []gin.HandlerFunc{
-		ValidateCredentials(),
-		ValidateUserIDHeader(),
+		RequireCredentials(),
+		RequireUserIDHeader(),
 		RequireAPIKey(),
 	}
-
-	// Protected (JWT)
-	jwtMw := ValidateJWT(cfg)
-	protected := []gin.HandlerFunc{jwtMw}
-
+	protected := []gin.HandlerFunc{
+		RequireJWT(cfg),
+	}
 	return &Middlewares{
 		global:     global,
 		validation: validation,
 		protected:  protected,
 	}
 }
-
-// GetGlobal devuelve los middlewares globales (logs, errores…)
-func (m *Middlewares) GetGlobal() []gin.HandlerFunc {
-	return m.global
-}
-
-// GetValidation devuelve los middlewares de validación (payload, headers…)
-func (m *Middlewares) GetValidation() []gin.HandlerFunc {
-	return m.validation
-}
-
-// GetProtected devuelve los middlewares de protección (JWT…)
-func (m *Middlewares) GetProtected() []gin.HandlerFunc {
-	return m.protected
-}
+func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }
+func (m *Middlewares) GetValidation() []gin.HandlerFunc { return m.validation }
+func (m *Middlewares) GetProtected() []gin.HandlerFunc  { return m.protected }

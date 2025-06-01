@@ -6,10 +6,9 @@ import (
 	"net/http"
 )
 
-// APIErrorType define los tipos de errores de API.
+// APIErrorType defines error types at the API layer.
 type APIErrorType string
 
-// Constantes para APIErrorType.
 const (
 	APIErrNotFound     APIErrorType = "NOT_FOUND"
 	APIErrConflict     APIErrorType = "CONFLICT"
@@ -22,7 +21,7 @@ const (
 	APIErrForbidden    APIErrorType = "FORBIDDEN"
 )
 
-// APIError representa un error de API.
+// APIError is a standardized API error.
 type APIError struct {
 	Type    APIErrorType   `json:"type"`
 	Code    int            `json:"code"`
@@ -31,7 +30,6 @@ type APIError struct {
 	Context map[string]any `json:"context,omitempty"`
 }
 
-// Error devuelve la representación en string del APIError.
 func (e *APIError) Error() string {
 	if e.Details != "" {
 		return fmt.Sprintf("%s: %s (%s)", e.Type, e.Message, e.Details)
@@ -39,7 +37,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
-// APIErrorResponse representa la estructura de respuesta de error para JSON.
+// APIErrorResponse is the canonical error JSON response.
 type APIErrorResponse struct {
 	Type    APIErrorType   `json:"type"`
 	Code    int            `json:"code"`
@@ -48,17 +46,10 @@ type APIErrorResponse struct {
 	Context map[string]any `json:"context,omitempty"`
 }
 
-// IsType comprueba si el error es de un determinado tipo.
-func (e *APIErrorResponse) IsType(t APIErrorType) bool {
-	return e.Type == t
-}
+func (e *APIErrorResponse) IsType(t APIErrorType) bool { return e.Type == t }
+func (e *APIErrorResponse) HasCode(code int) bool      { return e.Code == code }
 
-// HasCode comprueba si el error tiene el código HTTP especificado.
-func (e *APIErrorResponse) HasCode(code int) bool {
-	return e.Code == code
-}
-
-// Mapeo entre errores de dominio y errores de API.
+// Domain->API mapping and status codes.
 var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrNotFound:        APIErrNotFound,
 	ErrConflict:        APIErrConflict,
@@ -75,7 +66,6 @@ var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrMissingField:    APIErrBadRequest,
 }
 
-// Mapear APIErrorType a códigos HTTP.
 var httpStatus = map[APIErrorType]int{
 	APIErrBadRequest:   http.StatusBadRequest,
 	APIErrNotFound:     http.StatusNotFound,
@@ -88,7 +78,7 @@ var httpStatus = map[APIErrorType]int{
 	APIErrForbidden:    http.StatusForbidden,
 }
 
-// NewAPIError convierte un error de dominio a un APIError junto con el código HTTP.
+// NewAPIError converts a domain error to an APIError with the proper HTTP code.
 func NewAPIError(err error) (*APIError, int) {
 	var domainErr *Error
 	if errors.As(err, &domainErr) {
@@ -108,8 +98,6 @@ func NewAPIError(err error) (*APIError, int) {
 		}
 		return apiError, code
 	}
-
-	// Para errores no manejados, se considera error interno.
 	return &APIError{
 		Type:    APIErrInternal,
 		Code:    http.StatusInternalServerError,
@@ -118,7 +106,6 @@ func NewAPIError(err error) (*APIError, int) {
 	}, http.StatusInternalServerError
 }
 
-// ToResponse convierte un APIError a un APIErrorResponse.
 func (e *APIError) ToResponse() *APIErrorResponse {
 	return &APIErrorResponse{
 		Type:    e.Type,

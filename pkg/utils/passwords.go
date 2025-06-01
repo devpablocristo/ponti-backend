@@ -8,54 +8,39 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HashPassword hashea una contraseña utilizando bcrypt. Permite especificar el coste (rounds) o usar el valor por defecto.
-// El coste determina el número de iteraciones del algoritmo y afecta tanto la seguridad como el rendimiento.
-// Un valor común de coste es 10-12. A mayor coste, más seguro pero más lento.
+// HashPassword hashes a password using bcrypt.
 func HashPassword(password string, cost int) (string, error) {
-	// Si no se especifica un coste válido, usamos el coste por defecto de bcrypt
 	if cost <= 0 {
 		cost = bcrypt.DefaultCost
 	}
-
-	// Generar el hash de la contraseña
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
-		log.Printf("Error al hashear la contraseña: %v", err)
-		return "", errors.New("error al hashear la contraseña")
+		log.Printf("error hashing password: %v", err)
+		return "", errors.New("error hashing password")
 	}
-
-	// Retornar el hash en formato string
 	return string(hashedPassword), nil
 }
 
-// VerifyPassword verifica si una contraseña en texto plano coincide con su hash almacenado.
-// Retorna true si coinciden, y false si no.
+// VerifyPassword checks if the password matches the hashed password.
 func VerifyPassword(password, hashedPassword string) (bool, error) {
-	// Comparar el hash almacenado con la contraseña ingresada
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			// Si las contraseñas no coinciden, retornamos false sin error
 			return false, nil
 		}
-		// Si ocurre otro tipo de error, lo registramos
-		log.Printf("Error al verificar la contraseña: %v", err)
-		return false, errors.New("error al verificar la contraseña")
+		log.Printf("error verifying password: %v", err)
+		return false, errors.New("error verifying password")
 	}
-
-	// Si coinciden, retornamos true
 	return true, nil
 }
 
-// ValidatePasswordComplexity valida que la contraseña cumpla con los criterios de complejidad
+// ValidatePasswordComplexity enforces strong password requirements.
 func ValidatePasswordComplexity(password string) error {
 	var hasMinLen, hasUpper, hasLower, hasNumber, hasSpecial bool
-	const minLen = 8 // Longitud mínima de la contraseña
-
+	const minLen = 8
 	if len(password) >= minLen {
 		hasMinLen = true
 	}
-
 	for _, char := range password {
 		switch {
 		case unicode.IsUpper(char):
@@ -68,23 +53,20 @@ func ValidatePasswordComplexity(password string) error {
 			hasSpecial = true
 		}
 	}
-
-	// Definir los criterios de complejidad
 	if !hasMinLen {
-		return errors.New("la contraseña debe tener al menos 8 caracteres")
+		return errors.New("password must have at least 8 characters")
 	}
 	if !hasUpper {
-		return errors.New("la contraseña debe tener al menos una letra mayúscula")
+		return errors.New("password must have at least one uppercase letter")
 	}
 	if !hasLower {
-		return errors.New("la contraseña debe tener al menos una letra minúscula")
+		return errors.New("password must have at least one lowercase letter")
 	}
 	if !hasNumber {
-		return errors.New("la contraseña debe tener al menos un número")
+		return errors.New("password must have at least one number")
 	}
 	if !hasSpecial {
-		return errors.New("la contraseña debe tener al menos un carácter especial")
+		return errors.New("password must have at least one special character")
 	}
-
 	return nil
 }

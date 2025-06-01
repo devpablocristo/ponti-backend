@@ -66,12 +66,12 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateProject)                        // Create a project
-		public.GET("", h.ListProjects)                          // List all projects
-		public.GET("/customer/:id", h.ListProjectsByCustomerID) // List projects by customer ID
-		public.GET("/:id", h.GetProject)                        // Get a project by ID
-		public.PUT("/:id", h.UpdateProject)                     // Update a project
-		public.DELETE("/:id", h.DeleteProject)                  // Delete a project
+		public.POST("", h.CreateProject)
+		public.GET("", h.ListProjects)
+		public.GET("/customer/:id", h.ListProjectsByCustomerID)
+		public.GET("/:id", h.GetProject)
+		public.PUT("/:id", h.UpdateProject)
+		public.DELETE("/:id", h.DeleteProject)
 	}
 }
 

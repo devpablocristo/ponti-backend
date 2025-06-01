@@ -25,20 +25,13 @@ func main() {
 		cancel()
 	}()
 
-	// // Load configuration
-	// cfgSet, err := config.LoadConfig()
-	// if err != nil {
-	// 	log.Fatalf("unable to load config: %v", err)
-	// }
-
-	// Initialize dependencies using Wire
-	deps, err := wire.Initialize() //cfgSet)
+	deps, err := wire.Initialize()
 	if err != nil {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
 	// Set environment
-	currentEnv := env.GetFromString(deps.Config.General.Environment) //cfgSet.General.Environment)
+	currentEnv := env.GetFromString(deps.Config.General.Environment)
 	switch currentEnv {
 	case env.Local, env.Dev:
 		if err := RunGormMigrations(ctx, deps.GormRepo); err != nil {

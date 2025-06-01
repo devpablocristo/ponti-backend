@@ -3,23 +3,22 @@ package pkgutils
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
-// ValidateEmail checks if the email format is valid
+// ValidateEmail checks if the email format is valid.
 func ValidateEmail(email string) error {
+	email = strings.TrimSpace(email)
 	if email == "" {
 		return fmt.Errorf("email cannot be empty")
 	}
-
-	if len(email) > 254 { // RFC 5321
+	if len(email) > 254 {
 		return fmt.Errorf("email exceeds maximum length of 254 characters")
 	}
-
 	if !emailRegex.MatchString(email) {
 		return fmt.Errorf("invalid email format: %s", email)
 	}
-
 	return nil
 }
