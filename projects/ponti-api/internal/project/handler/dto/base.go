@@ -11,9 +11,7 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-// Project DTO for create/update and response
 type Project struct {
-	// Si quieres manejar actualizaciones, podrías añadir aquí un campo Id:
 	ID              int64      `json:"id,omitempty"`
 	ProjectName     string     `json:"name" binding:"required"`
 	Customer        Customer   `json:"customer" binding:"required"`
@@ -47,15 +45,13 @@ type Investor struct {
 	Percentage int    `json:"percentage" binding:"required"`
 }
 
-// Field DTO including nested lots
 type Field struct {
-	ID          int64  `json:"id,omitempty"` // opcional para updates
+	ID          int64  `json:"id,omitempty"`
 	Name        string `json:"name" binding:"required"`
 	LeaseTypeID int64  `json:"lease_type_id" binding:"required"`
 	Lots        []Lot  `json:"lots" binding:"required,dive,required"`
 }
 
-// Lot DTO referencing crops by ID
 type Lot struct {
 	ID               int64   `json:"id,omitempty"`
 	Name             string  `json:"name" binding:"required"`
@@ -67,7 +63,6 @@ type Lot struct {
 	Season           string  `json:"season" binding:"required"`
 }
 
-// ToDomain maps the DTO to the domain.Project
 func (r *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
 		Name: r.ProjectName,
@@ -96,13 +91,13 @@ func (r *Project) ToDomain() *domain.Project {
 
 	for _, f := range r.Fields {
 		fld := fielddom.Field{
-			ID:          f.ID, // ahora respetas el ID (0 = nuevo)
+			ID:          f.ID,
 			Name:        f.Name,
 			LeaseTypeID: f.LeaseTypeID,
 		}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
-				ID:           lt.ID, // idem
+				ID:           lt.ID,
 				Name:         lt.Name,
 				Hectares:     lt.Hectares,
 				PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID},
@@ -116,7 +111,6 @@ func (r *Project) ToDomain() *domain.Project {
 	return d
 }
 
-// FromDomain maps a domain.Project to the DTO
 func FromDomain(d *domain.Project) *Project {
 	r := &Project{
 		ID:          d.ID,

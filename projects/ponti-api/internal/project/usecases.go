@@ -2,8 +2,6 @@ package project
 
 import (
 	"context"
-	"fmt"
-	"log"
 
 	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
@@ -97,120 +95,11 @@ func NewUseCases(
 }
 
 func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
-	var createdMgrs, createdInvs, createdFields []int64
-
-	if p.Customer.ID == 0 {
-		custID, err := u.customer.CreateCustomer(ctx, &customerdom.Customer{Name: p.Customer.Name})
-		if err != nil {
-			return 0, fmt.Errorf("create customer: %w", err)
-		}
-		p.Customer.ID = custID
-	} else {
-		// TODO: validar id
-	}
-
-	if p.Campaign.ID == 0 {
-		campID, err := u.campaign.CreateCampaign(ctx, &campaigndom.Campaign{Name: p.Campaign.Name})
-		if err != nil {
-			return 0, fmt.Errorf("create customer: %w", err)
-		}
-		p.Campaign.ID = campID
-	} else {
-		// TODO: validar id
-	}
-
-	for i := range p.Managers {
-		m := &p.Managers[i]
-		if m.ID == 0 {
-			id, err := u.manager.CreateManager(ctx, &managerdom.Manager{Name: m.Name})
-			if err != nil {
-				for _, mgrID := range createdMgrs {
-					if delErr := u.manager.DeleteManager(ctx, mgrID); delErr != nil {
-						log.Printf("rollback manager %d failed: %v", mgrID, delErr)
-					}
-				}
-				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
-				return 0, fmt.Errorf("create manager %q: %w", m.Name, err)
-			}
-			createdMgrs = append(createdMgrs, id)
-			m.ID = id
-		}
-	}
-
-	for i := range p.Investors {
-		inv := &p.Investors[i]
-		if inv.ID == 0 {
-			id, err := u.investor.CreateInvestor(ctx, &investordom.Investor{Name: inv.Name, Percentage: inv.Percentage})
-			if err != nil {
-				// rollback investors
-				for _, invID := range createdInvs {
-					_ = u.investor.DeleteInvestor(ctx, invID)
-				}
-				// rollback managers
-				for _, mgrID := range createdMgrs {
-					_ = u.manager.DeleteManager(ctx, mgrID)
-				}
-				// rollback customer
-				_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
-				return 0, fmt.Errorf("create investor %q: %w", inv.Name, err)
-			}
-			createdInvs = append(createdInvs, id)
-			inv.ID = id
-		}
-	}
-
-	projID, err := u.repo.CreateProject(ctx, p)
-	if err != nil {
-		// full rollback: project, fields, investors, managers, customer
-		_ = u.repo.DeleteProject(ctx, projID)
-		for _, invID := range createdInvs {
-			_ = u.investor.DeleteInvestor(ctx, invID)
-		}
-		for _, mgrID := range createdMgrs {
-			_ = u.manager.DeleteManager(ctx, mgrID)
-		}
-		_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
-		return 0, fmt.Errorf("create project: %w", err)
-	}
-
-	for i := range p.Fields {
-		f := &p.Fields[i]
-		f.ProjectID = projID
-		fid, err := u.field.CreateField(ctx, f)
-		if err != nil {
-			// rollback fields
-			for _, fldID := range createdFields {
-				_ = u.field.DeleteField(ctx, fldID)
-			}
-			// rollback investors
-			for _, invID := range createdInvs {
-				_ = u.investor.DeleteInvestor(ctx, invID)
-			}
-			// rollback managers
-			for _, mgrID := range createdMgrs {
-				_ = u.manager.DeleteManager(ctx, mgrID)
-			}
-			// rollback customer
-			_ = u.customer.DeleteCustomer(ctx, p.Customer.ID)
-			_ = u.repo.DeleteProject(ctx, projID)
-			return 0, fmt.Errorf("create field %q: %w", f.Name, err)
-		}
-		createdFields = append(createdFields, fid)
-		f.ID = fid
-	}
-
-	return projID, nil
+	return u.repo.CreateProject(ctx, p)
 }
 
 func (u *UseCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
-	proj, err := u.repo.GetProject(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := u.enrichProject(ctx, proj); err != nil {
-		return nil, err
-	}
-	return proj, nil
+	return u.repo.GetProject(ctx, id)
 }
 
 func (u *UseCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
@@ -229,46 +118,14 @@ func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)
 }
 
-// helpers
-func (u *UseCases) enrichProject(ctx context.Context, p *domain.Project) error {
-	// Customer
-	cust, err := u.customer.GetCustomer(ctx, p.Customer.ID)
-	if err != nil {
-		return fmt.Errorf("fetch customer %d: %w", p.Customer.ID, err)
-	}
-	p.Customer = *cust
-
-	camp, err := u.campaign.GetCampaign(ctx, p.Campaign.ID)
-	if err != nil {
-		return fmt.Errorf("fetch customer %d: %w", p.Customer.ID, err)
-	}
-	p.Campaign = *camp
-
-	var flds []fielddom.Field
-	for _, f := range p.Fields {
-		fld, err := u.field.GetField(ctx, f.ID)
-		if err != nil {
-			return fmt.Errorf("fetch field %d: %w", f.ID, err)
-		}
-		flds = append(flds, *fld)
-	}
-	p.Fields = flds
-
-	return nil
-}
-
 func (u *UseCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {
-	// Use pg_trgm suggester
-	results, err := u.suggester.Suggest(ctx, name)
+	results, total, err := u.suggester.Suggest(ctx, name, page, perPage)
 	if err != nil {
 		return nil, 0, err
 	}
-	// Convert Suggestion to domain.ListedProject
 	items := make([]domain.ListedProject, len(results))
 	for i, s := range results {
 		items[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Name}
 	}
-	total := int64(len(items))
-	// Note: pagination beyond first page not supported; page and perPage currently ignored.
 	return items, total, nil
 }

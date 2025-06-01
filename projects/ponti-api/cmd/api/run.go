@@ -71,7 +71,6 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&investormodels.Investor{},
 		&lotmodels.Lot{},
 		&projectmodels.Project{},
-		&projectmodels.ProjectInvestor{},
 		&managermodels.Manager{},
 		&campaignmodels.Campaign{},
 	}

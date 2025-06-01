@@ -26,12 +26,23 @@ func NewSuggester(eng SuggesterEnginePort) *WordsSuggester {
 	}
 }
 
-// Suggest llama internamente a eng.Suggest con table y column "inyectados",
-// y mapea el resultado a domain.ListedProject.
-func (a *WordsSuggester) Suggest(ctx context.Context, prefix string) ([]domain.ListedProject, error) {
-	ext, err := a.eng.Suggest(ctx, "projects", "name", prefix)
+func (a *WordsSuggester) Suggest(
+	ctx context.Context,
+	prefix string,
+	page, perPage int, // parámetros de paginación
+) ([]domain.ListedProject, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
+	}
+	offset := (page - 1) * perPage
+
+	// Buscar sugerencias y cantidad total
+	ext, total, err := a.eng.Suggest(ctx, "projects", "name", prefix, perPage, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]domain.ListedProject, len(ext))
 	for i, s := range ext {
@@ -40,7 +51,7 @@ func (a *WordsSuggester) Suggest(ctx context.Context, prefix string) ([]domain.L
 			Name: s.Text,
 		}
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // Close delega el cierre de recursos al motor externo.

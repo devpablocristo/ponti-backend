@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	gorm "gorm.io/gorm"
-
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	gorm "gorm.io/gorm"
 
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
@@ -16,55 +15,70 @@ import (
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
+
 type Repository struct {
 	db GormEnginePort
 }
 
 func NewRepository(db GormEnginePort) *Repository {
-	return &Repository{
-		db: db,
-	}
+	return &Repository{db: db}
 }
 
-// CreateProject persists a project and all its associations in a single transaction.
+// --- CREATE ---
 func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
+
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Crear el modelo de project desde el dominio
 		m := models.FromDomain(p)
 
+		// Crear proyecto principal
 		if err := tx.Omit("Managers", "Investors", "Fields").Create(&m).Error; err != nil {
 			return fmt.Errorf("failed to create project: %w", err)
 		}
 		projectID = m.ID
 
-		for _, mgr := range m.Managers {
+		// Asociar managers por IDs (project_managers tabla pivote)
+		for _, mgr := range p.Managers {
 			if err := tx.Exec(
-				"INSERT INTO project_managers (project_id, manager_id) SELECT ?, id FROM managers WHERE id = ?",
+				"INSERT INTO project_managers (project_id, manager_id) VALUES (?, ?)",
 				projectID, mgr.ID,
 			).Error; err != nil {
 				return fmt.Errorf("failed to associate manager %d: %w", mgr.ID, err)
 			}
 		}
 
-		for _, inv := range m.Investors {
+		// Asociar investors por IDs (project_investors tabla pivote)
+		for _, inv := range p.Investors {
 			if err := tx.Exec(
-				`INSERT INTO project_investors (project_id, investor_id, percentage)
-     			SELECT ?, id, ? FROM investors WHERE id = ?`,
-				projectID, inv.Percentage, inv.InvestorID,
+				"INSERT INTO project_investors (project_id, investor_id) VALUES (?, ?)",
+				projectID, inv.ID,
 			).Error; err != nil {
-				return fmt.Errorf("failed to associate investor %d: %w", inv.InvestorID, err)
+				return fmt.Errorf("failed to associate investor %d: %w", inv.ID, err)
 			}
 		}
 
-		return nil
+		// Crear fields hijos (fields con project_id)
+		for _, fld := range p.Fields {
+			fieldModel := models.Field{
+				Name:      fld.Name,
+				ProjectID: projectID,
+				// ... asignar otros campos de field si corresponde
+			}
+			if err := tx.Create(&fieldModel).Error; err != nil {
+				return fmt.Errorf("failed to create field '%s': %w", fld.Name, err)
+			}
+		}
+		return nil // Si ocurre un error, GORM hará rollback automáticamente
 	})
-	if err != nil {
-		return 0, types.NewError(types.ErrInternal, fmt.Sprintf("transaction failed for project creation: %v", err), err)
-	}
 
+	if err != nil {
+		return 0, fmt.Errorf("transaction failed for project creation: %w", err)
+	}
 	return projectID, nil
 }
 
+// --- LIST ---
 func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
 	var projects []domain.ListedProject
 	var total int64
@@ -73,18 +87,16 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		WithContext(ctx).
 		Model(&models.Project{})
 
-	// 1. Conteo total
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
-	// 2. Consulta ligera
 	if err := db0.
 		Select("id, name").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list light projects", err)
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
 	}
 
 	return projects, total, nil
@@ -94,37 +106,32 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	var projects []domain.ListedProject
 	var total int64
 
-	// Base de la consulta filtrada por customer_id
 	db0 := r.db.Client().
 		WithContext(ctx).
 		Model(&models.Project{}).
 		Where("customer_id = ?", customerID)
 
-	// 1. Conteo total para ese cliente
 	if err := db0.Count(&total).Error; err != nil {
-		return nil, 0,
-			types.NewError(types.ErrInternal, "failed to count projects by customer", err)
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects by customer", err)
 	}
 
-	// 2. Consulta ligera: sólo id y name
 	if err := db0.
 		Select("id, name").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
-		return nil, 0,
-			types.NewError(types.ErrInternal, "failed to list light projects by customer", err)
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects by customer", err)
 	}
 
 	return projects, total, nil
 }
 
-// GetProject retrieves a single project by ID.
+// --- GET ---
 func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
-		Preload("Investors.Investor").
+		Preload("Investors").
 		Preload("Fields").
 		First(&m, id).Error
 	if err != nil {
@@ -137,12 +144,13 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	return proj, nil
 }
 
-// UpdateProject updates a Project's main fields and relinks its ID-based relations.
+// --- UPDATE ---
 func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	m := models.FromDomain(d)
 	m.ID = d.ID
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// update name and customer_id
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Update campos principales
 		if err := tx.Model(&models.Project{}).
 			Where("id = ?", d.ID).
 			Updates(map[string]any{
@@ -153,39 +161,61 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			}).Error; err != nil {
 			return err
 		}
-		// relink managers
-		if err := tx.Model(&models.Project{ID: d.ID}).Association("Managers").Replace(m.Managers); err != nil {
+
+		// -- Relink managers (delete & insert) --
+		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", d.ID).Error; err != nil {
 			return err
 		}
-		// relink investors
-		if err := tx.Model(&models.Project{ID: d.ID}).Association("Investors").Replace(m.Investors); err != nil {
+		for _, mgr := range m.Managers {
+			if err := tx.Exec(
+				"INSERT INTO project_managers (project_id, manager_id) VALUES (?, ?)",
+				d.ID, mgr.ID,
+			).Error; err != nil {
+				return err
+			}
+		}
+
+		// -- Relink investors (delete & insert) --
+		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", d.ID).Error; err != nil {
 			return err
 		}
-		// relink fields
-		if err := tx.Model(&models.Project{ID: d.ID}).Association("Fields").Replace(m.Fields); err != nil {
+		for _, inv := range m.Investors {
+			if err := tx.Exec(
+				"INSERT INTO project_investors (project_id, investor_id) VALUES (?, ?)",
+				d.ID, inv.ID,
+			).Error; err != nil {
+				return err
+			}
+		}
+
+		// -- Relink fields --
+		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", d.ID).Error; err != nil {
 			return err
 		}
+		for _, fld := range m.Fields {
+			fld.ProjectID = d.ID
+			if err := tx.Create(&fld).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
-	if err != nil {
-		return types.NewError(types.ErrInternal, "failed to update project", err)
-	}
-	return nil
 }
 
-// DeleteProject removes a project and clears all its ID-based relations.
+// --- DELETE ---
 func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// clear managers
-		if err := tx.Model(&models.Project{ID: id}).Association("Managers").Clear(); err != nil {
+		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", id).Error; err != nil {
 			return err
 		}
 		// clear investors
-		if err := tx.Model(&models.Project{ID: id}).Association("Investors").Clear(); err != nil {
+		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", id).Error; err != nil {
 			return err
 		}
 		// clear fields
-		if err := tx.Model(&models.Project{ID: id}).Association("Fields").Clear(); err != nil {
+		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", id).Error; err != nil {
 			return err
 		}
 		// delete project
@@ -194,8 +224,4 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return types.NewError(types.ErrInternal, "failed to delete project", err)
-	}
-	return nil
 }
