@@ -9,7 +9,7 @@ services:
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
-      - APP_ENV=stg
+      - DEPLOY_ENV =stg
       - APP_ROOT=/app
       - GO111MODULE=on
       - GIN_MODE=release

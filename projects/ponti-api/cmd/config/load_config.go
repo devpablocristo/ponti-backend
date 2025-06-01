@@ -15,7 +15,7 @@ import (
 // LoadConfig carga y valida toda la configuración de la aplicación.
 // Hace:
 // 1) Carga base desde ".env"
-// 2) Override con ".env.<APP_ENV>" si existe
+// 2) Override con ".env.<DEPLOY_ENV >" si existe
 // 3) Procesa los structs con envconfig
 // 4) Construye valores derivados (API.URL)
 // 5) Valida con validator
@@ -25,8 +25,8 @@ func LoadConfig() (*AllConfigs, error) {
 		return nil, fmt.Errorf("could not load base .env: %w", err)
 	}
 
-	// 2) Override según APP_ENV
-	env := strings.ToLower(os.Getenv("APP_ENV"))
+	// 2) Override según DEPLOY_ENV 
+	env := strings.ToLower(os.Getenv("DEPLOY_ENV "))
 	if env != "" {
 		_ = envvars.LoadConfig(fmt.Sprintf(".env.%s", env))
 	}
