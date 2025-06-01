@@ -3,8 +3,9 @@ package pkgmwr
 import (
 	"net/http"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
+
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // RequireCredentials validates the login payload for user authentication.

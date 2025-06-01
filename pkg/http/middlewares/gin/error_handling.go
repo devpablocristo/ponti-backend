@@ -4,8 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
+
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // ErrorHandling handles Gin context errors and responds with formatted JSON.

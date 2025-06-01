@@ -1,8 +1,9 @@
 package pkgmwr
 
 import (
-	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 	"github.com/gin-gonic/gin"
+
+	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
 type Middlewares struct {
