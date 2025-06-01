@@ -9,7 +9,7 @@ import (
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
+	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"

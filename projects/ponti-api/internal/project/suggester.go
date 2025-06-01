@@ -3,7 +3,7 @@ package project
 import (
 	"context"
 
-	pgs "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
+	pgs "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 

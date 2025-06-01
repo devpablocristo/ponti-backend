@@ -10,7 +10,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
+	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
