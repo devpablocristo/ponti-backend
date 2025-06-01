@@ -8,7 +8,7 @@ import (
 	"os"
 
 	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pgksuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/pg_trgm-gin"
+	pgksuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 )
 
 func main() {

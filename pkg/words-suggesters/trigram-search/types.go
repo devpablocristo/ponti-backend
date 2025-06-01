@@ -8,7 +8,7 @@ type Suggestion struct {
 type Logger interface {
 	Debug(msg string)
 	Error(msg string, err error)
-}	
+}
 
 type noopLogger struct{}
 

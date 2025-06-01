@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	"gorm.io/gorm"
+
+	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 )
 
 type repoAdapter struct {

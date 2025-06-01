@@ -1,5 +1,3 @@
-// ----------------------------
-// File: config.go
 package pkgsuggester
 
 import (
