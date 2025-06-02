@@ -58,25 +58,25 @@ type RepositoryPort interface {
 	DeleteProject(context.Context, int64) error
 }
 
-type SuggesterPort interface {
-	Suggest(context.Context, string) ([]domain.ListedProject, error)
+type WordsSuggesterPort interface {
+	Suggest(ctx context.Context, prefix string, page, perPage int) ([]domain.ListedProject, int64, error)
 	Close() error
 	Health(context.Context) error
 }
 
 type UseCases struct {
-	repo      RepositoryPort
-	suggester SuggesterPort
-	customer  CustomerUseCasesPort
-	campaign  CampaignUseCasesPort
-	manager   ManagerUseCasesPort
-	investor  InvestorsUseCasesPort
-	field     FieldUseCasesPort
+	repo           RepositoryPort
+	wordsSuggester WordsSuggesterPort
+	customer       CustomerUseCasesPort
+	campaign       CampaignUseCasesPort
+	manager        ManagerUseCasesPort
+	investor       InvestorsUseCasesPort
+	field          FieldUseCasesPort
 }
 
 func NewUseCases(
 	rp RepositoryPort,
-	sg SuggesterPort,
+	sg WordsSuggesterPort,
 	cu CustomerUseCasesPort,
 	ca CampaignUseCasesPort,
 	ma ManagerUseCasesPort,
@@ -84,13 +84,13 @@ func NewUseCases(
 	fu FieldUseCasesPort,
 ) *UseCases {
 	return &UseCases{
-		suggester: sg,
-		repo:      rp,
-		customer:  cu,
-		campaign:  ca,
-		manager:   ma,
-		investor:  in,
-		field:     fu,
+		wordsSuggester: sg,
+		repo:           rp,
+		customer:       cu,
+		campaign:       ca,
+		manager:        ma,
+		investor:       in,
+		field:          fu,
 	}
 }
 
@@ -119,13 +119,5 @@ func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
 }
 
 func (u *UseCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {
-	results, total, err := u.suggester.Suggest(ctx, name, page, perPage)
-	if err != nil {
-		return nil, 0, err
-	}
-	items := make([]domain.ListedProject, len(results))
-	for i, s := range results {
-		items[i] = domain.ListedProject{ID: int64(s.ID), Name: s.Name}
-	}
-	return items, total, nil
+	return u.wordsSuggester.Suggest(ctx, name, page, perPage)
 }

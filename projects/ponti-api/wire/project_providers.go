@@ -9,7 +9,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 
 	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -42,14 +42,14 @@ func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.Middlewares
 }
 
 // --- SUGGESTER PORT ---
-func ProvideProjectSuggesterPort(s *sug.WordsSuggester) project.SuggesterPort {
-	return project.NewSuggester(s)
+func ProvideProjectSuggesterPort(s *sug.WordsSuggester) project.WordsSuggesterPort {
+	return project.NewWordsSuggester(s)
 }
 
 // --- USE CASES ---
 func ProvideProjectUseCases(
 	rep project.RepositoryPort,
-	sug project.SuggesterPort,
+	sug project.WordsSuggesterPort,
 	cus customer.UseCasesPort,
 	cam campaign.UseCasesPort,
 	mgr manager.UseCasesPort,

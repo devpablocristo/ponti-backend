@@ -65,14 +65,14 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 	}
 
 	models := []any{
+		&campaignmodels.Campaign{}, // primero
+		&customermodels.Customer{},
+		&managermodels.Manager{},
+		&investormodels.Investor{},
 		&cropmodels.Crop{},
 		&fieldmodels.Field{},
-		&customermodels.Customer{},
-		&investormodels.Investor{},
 		&lotmodels.Lot{},
-		&projectmodels.Project{},
-		&managermodels.Manager{},
-		&campaignmodels.Campaign{},
+		&projectmodels.Project{}, // último
 	}
 
 	start := time.Now()

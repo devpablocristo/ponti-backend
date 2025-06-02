@@ -5,9 +5,9 @@ import (
 )
 
 type Customer struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(100);not null"`
-	Type string `gorm:"type:varchar(100);not null"`
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"type:varchar(255);not null;unique"`
+	Type string `gorm:"size:50;not null;column:type"`
 }
 
 func (c Customer) ToDomain() *domain.Customer {
@@ -19,9 +19,12 @@ func (c Customer) ToDomain() *domain.Customer {
 }
 
 func FromDomain(d *domain.Customer) *Customer {
-	return &Customer{
-		ID:   d.ID,
+	m := &Customer{
 		Name: d.Name,
 		Type: d.Type,
 	}
+	if d.ID > 0 {
+		m.ID = d.ID
+	}
+	return m
 }

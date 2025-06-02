@@ -72,8 +72,8 @@ var GinSet = wire.NewSet(
 
 // --- WordsSuggester Providers -------------------------------------------
 
-type SuggesterEnginePort interface {
-	Suggest(context.Context, string, string, string) ([]sug.Suggestion, error)
+type WordsSuggesterEnginePort interface {
+	Suggest(context.Context, string, string, string, int, int) ([]sug.Suggestion, int64, error)
 	Close() error
 	Health(ctx context.Context) error
 }
@@ -90,7 +90,7 @@ func ProvideSuggester(db sug.DB, cfg *config.WordsSuggester) (*sug.WordsSuggeste
 	)
 }
 
-func ProvideSuggesterEnginePort(s *sug.WordsSuggester) SuggesterEnginePort {
+func ProvideSuggesterEnginePort(s *sug.WordsSuggester) WordsSuggesterEnginePort {
 	return s
 }
 

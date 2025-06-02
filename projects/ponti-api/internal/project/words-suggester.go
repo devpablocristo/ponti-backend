@@ -7,20 +7,20 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
-// SuggesterEnginePort es la interfaz del motor externo de sugerencias.
-type SuggesterEnginePort interface {
-	Suggest(context.Context, string, string, string) ([]pgs.Suggestion, error)
+// WordsSuggesterEnginePort es la interfaz del motor externo de sugerencias.
+type WordsSuggesterEnginePort interface {
+	Suggest(context.Context, string, string, string, int, int) ([]pgs.Suggestion, int64, error)
 	Close() error
 	Health(context.Context) error
 }
 
-// WordsSuggester adapta SuggesterEnginePort al puerto de dominio.
+// WordsSuggester adapta WordsSuggesterEnginePort al puerto de dominio.
 type WordsSuggester struct {
-	eng SuggesterEnginePort
+	eng WordsSuggesterEnginePort
 }
 
-// NewSuggesterAdapter recibe el motor externo más la tabla/columna a usar.
-func NewSuggester(eng SuggesterEnginePort) *WordsSuggester {
+// NewWordsSuggester recibe el motor externo más la tabla/columna a usar.
+func NewWordsSuggester(eng WordsSuggesterEnginePort) *WordsSuggester {
 	return &WordsSuggester{
 		eng: eng,
 	}

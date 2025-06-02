@@ -23,39 +23,46 @@ type Project struct {
 	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
 
 	// Relaciones
-	Customer  Customer   `gorm:"foreignKey:CustomerID;references:ID"`
-	Campaign  Campaign   `gorm:"foreignKey:CampaignID;references:ID"`
-	Managers  []Manager  `gorm:"many2many:project_managers;"`
-	Investors []Investor `gorm:"many2many:project_investors;"`
-	Fields    []Field    `gorm:"foreignKey:ProjectID"`
+	Customer  Customer          `gorm:"foreignKey:CustomerID;references:ID"`
+	Campaign  Campaign          `gorm:"foreignKey:CampaignID;references:ID"`
+	Managers  []Manager         `gorm:"many2many:project_managers;"`
+	Investors []ProjectInvestor `gorm:"foreignKey:ProjectID;references:ID"`
+	Fields    []Field           `gorm:"foreignKey:ProjectID"`
 }
 
-// Solo el ID para las relaciones many-to-many
+// Manager y Customer solo usan el ID para las relaciones
 type Manager struct {
+	ID int64 `gorm:"primaryKey;autoIncrement;column:id"`
+}
+
+type Customer struct {
+	ID int64 `gorm:"primaryKey;autoIncrement;column:id"`
+}
+
+type Campaign struct {
 	ID int64 `gorm:"primaryKey;autoIncrement:false;column:id"`
 }
 
 type Investor struct {
-	ID int64 `gorm:"primaryKey;autoIncrement:false;column:id"`
-}
-
-// Solo el ID y el Name para relaciones 1-N simples
-type Customer struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement:false;column:id"`
-	Name string `gorm:"size:100;not null;column:name"`
+	Name string `gorm:"size:255;not null;column:name"`
 }
 
-type Campaign struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement:false;column:id"`
-	Name string `gorm:"size:100;not null;column:name"`
+// Tabla pivote con campo extra "Percentage"
+type ProjectInvestor struct {
+	ProjectID  int64 `gorm:"primaryKey;autoIncrement:false;column:project_id"`
+	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
+	Percentage int   `gorm:"not null;column:percentage"`
+
+	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
-// Field como hijo real del proyecto
+// Field como hijo real del proyecto (agregá más campos según tu dominio)
 type Field struct {
 	ID        int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name      string `gorm:"size:100;not null;column:name"`
 	ProjectID int64  `gorm:"not null;index;column:project_id"`
-	// Agrega aquí más campos propios de Field si los necesitas
+	// Otros campos de Field si hay...
 }
 
 // --- FROM DOMAIN ---
@@ -68,32 +75,39 @@ func FromDomain(d *domain.Project) *Project {
 		CampaignID: d.Campaign.ID,
 		AdminCost:  d.AdminCost,
 		Customer: Customer{
-			ID:   d.Customer.ID,
-			Name: d.Customer.Name,
+			ID: d.Customer.ID,
 		},
 		Campaign: Campaign{
-			ID:   d.Campaign.ID,
-			Name: d.Campaign.Name,
+			ID: d.Campaign.ID,
 		},
 		Managers:  make([]Manager, 0, len(d.Managers)),
-		Investors: make([]Investor, 0, len(d.Investors)),
+		Investors: make([]ProjectInvestor, 0, len(d.Investors)),
 		Fields:    make([]Field, 0, len(d.Fields)),
 	}
 
-	// Many2Many sólo ID
+	// Many2Many: Managers solo IDs
 	for _, mgr := range d.Managers {
 		m.Managers = append(m.Managers, Manager{ID: mgr.ID})
 	}
+	// ProjectInvestors: asignar percentage también
 	for _, inv := range d.Investors {
-		m.Investors = append(m.Investors, Investor{ID: inv.ID})
+		m.Investors = append(m.Investors, ProjectInvestor{
+			ProjectID:  d.ID, // GORM la pone igual, pero por las dudas
+			InvestorID: inv.ID,
+			Percentage: inv.Percentage,
+			Investor: Investor{
+				ID: inv.ID,
+				// Name no siempre disponible acá, solo para preload/join
+			},
+		})
 	}
-	// Fields hijos completos
+	// Fields hijos completos (sumá más campos si corresponde)
 	for _, f := range d.Fields {
 		m.Fields = append(m.Fields, Field{
 			ID:        f.ID,
 			Name:      f.Name,
-			ProjectID: m.ID,
-			// Si Field tiene más campos, agregalos acá.
+			ProjectID: d.ID,
+			// Otros campos si hay...
 		})
 	}
 	return m
@@ -106,8 +120,8 @@ func (m *Project) ToDomain() *domain.Project {
 		ID:        m.ID,
 		Name:      m.Name,
 		AdminCost: m.AdminCost,
-		Customer:  customerdom.Customer{ID: m.Customer.ID, Name: m.Customer.Name},
-		Campaign:  campaigndom.Campaign{ID: m.Campaign.ID, Name: m.Campaign.Name},
+		Customer:  customerdom.Customer{ID: m.Customer.ID},
+		Campaign:  campaigndom.Campaign{ID: m.Campaign.ID},
 		Managers:  make([]managerdom.Manager, 0, len(m.Managers)),
 		Investors: make([]investordom.Investor, 0, len(m.Investors)),
 		Fields:    make([]fielddom.Field, 0, len(m.Fields)),
@@ -116,15 +130,19 @@ func (m *Project) ToDomain() *domain.Project {
 	for _, mgr := range m.Managers {
 		d.Managers = append(d.Managers, managerdom.Manager{ID: mgr.ID})
 	}
-	for _, inv := range m.Investors {
-		d.Investors = append(d.Investors, investordom.Investor{ID: inv.ID})
+	for _, piv := range m.Investors {
+		d.Investors = append(d.Investors, investordom.Investor{
+			ID:         piv.InvestorID,
+			Name:       piv.Investor.Name, // solo si preload
+			Percentage: piv.Percentage,
+		})
 	}
 	for _, f := range m.Fields {
 		d.Fields = append(d.Fields, fielddom.Field{
 			ID:        f.ID,
 			Name:      f.Name,
 			ProjectID: f.ProjectID,
-			// Si Field tiene más campos, agregalos acá.
+			// Otros campos...
 		})
 	}
 	return d

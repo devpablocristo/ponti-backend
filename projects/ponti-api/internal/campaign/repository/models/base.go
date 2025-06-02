@@ -5,8 +5,8 @@ import (
 )
 
 type Campaign struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(100);not null"`
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"type:varchar(255);not null;unique"`
 }
 
 func (c Campaign) ToDomain() *domain.Campaign {

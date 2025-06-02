@@ -15,6 +15,8 @@ func main() {
 	// Leer configuraciones de entorno
 	table := os.Getenv("SUGGESTER_TABLE")
 	column := os.Getenv("SUGGESTER_COLUMN")
+	limit := 10 // resultados por página
+	offset := 0 // desde el primer resultado
 
 	// Inicializar repositorio GORM con pkggorm (usa variables DB_*)
 	repo, err := pkggorm.Bootstrap("", "", "", "", "", "", 0)
@@ -38,13 +40,14 @@ func main() {
 		}
 	}()
 
-	// Ejecutar sugerencias
+	// Ejecutar sugerencias con paginado
 	ctx := context.Background()
-	results, err := suggester.Suggest(ctx, table, column, "pab")
+	results, total, err := suggester.Suggest(ctx, table, column, "pab", limit, offset)
 	if err != nil {
 		log.Fatalf("suggest error: %v", err)
 	}
 
+	fmt.Printf("Total resultados posibles: %d\n", total)
 	for _, r := range results {
 		fmt.Printf("ID:%d Text:%s\n", r.ID, r.Text)
 	}

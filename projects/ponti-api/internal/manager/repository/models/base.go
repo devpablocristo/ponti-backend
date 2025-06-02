@@ -5,9 +5,9 @@ import (
 )
 
 type Manager struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"column:name;type:varchar(100);not null"`
-	Type string `gorm:"column:type;type:varchar(50);not null"`
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"type:varchar(255);not null;unique"`
+	Type string `gorm:"column:type"`
 }
 
 func (c Manager) ToDomain() *domain.Manager {
@@ -18,10 +18,14 @@ func (c Manager) ToDomain() *domain.Manager {
 	}
 }
 
+// Solo pasa ID si es mayor a 0 (evita null value en insert)
 func FromDomain(d *domain.Manager) *Manager {
-	return &Manager{
-		ID:   d.ID,
+	m := &Manager{
 		Name: d.Name,
 		Type: d.Type,
 	}
+	if d.ID > 0 {
+		m.ID = d.ID
+	}
+	return m
 }
