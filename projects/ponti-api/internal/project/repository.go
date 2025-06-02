@@ -15,6 +15,7 @@ import (
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 )
 
@@ -45,12 +46,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					if err := tx.Create(&cust).Error; err != nil {
 						return fmt.Errorf("failed to create customer: %w", err)
 					}
-					// p.Customer.ID = cust.ID // opcional
 				} else {
 					return fmt.Errorf("failed to check customer: %w", err)
 				}
 			}
-			// Si existe, opcional: p.Customer.ID = existing.ID
 		} else {
 			var existing cusmod.Customer
 			if err := tx.First(&existing, p.Customer.ID).Error; err != nil {
@@ -62,7 +61,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					if err := tx.Create(&cust).Error; err != nil {
 						return fmt.Errorf("failed to create customer: %w", err)
 					}
-					// p.Customer.ID = cust.ID // opcional
 				} else {
 					return fmt.Errorf("failed to get customer: %w", err)
 				}
@@ -80,12 +78,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					if err := tx.Create(&camp).Error; err != nil {
 						return fmt.Errorf("failed to create campaign: %w", err)
 					}
-					// p.Campaign.ID = camp.ID // opcional
 				} else {
 					return fmt.Errorf("failed to check campaign: %w", err)
 				}
 			}
-			// Si existe, opcional: p.Campaign.ID = existing.ID
 		} else {
 			var existing casmod.Campaign
 			if err := tx.First(&existing, p.Campaign.ID).Error; err != nil {
@@ -96,7 +92,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					if err := tx.Create(&camp).Error; err != nil {
 						return fmt.Errorf("failed to create campaign: %w", err)
 					}
-					// p.Campaign.ID = camp.ID // opcional
 				} else {
 					return fmt.Errorf("failed to get campaign: %w", err)
 				}
@@ -115,12 +110,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 						if err := tx.Create(&mgrModel).Error; err != nil {
 							return fmt.Errorf("failed to create manager: %w", err)
 						}
-						// mgr.ID = mgrModel.ID // opcional
 					} else {
 						return fmt.Errorf("failed to check manager: %w", err)
 					}
 				}
-				// Si existe, opcional: mgr.ID = existing.ID
 			} else {
 				var existing manmod.Manager
 				if err := tx.First(&existing, mgr.ID).Error; err != nil {
@@ -131,7 +124,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 						if err := tx.Create(&mgrModel).Error; err != nil {
 							return fmt.Errorf("failed to create manager: %w", err)
 						}
-						// mgr.ID = mgrModel.ID // opcional
 					} else {
 						return fmt.Errorf("failed to get manager: %w", err)
 					}
@@ -151,12 +143,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 						if err := tx.Create(&invModel).Error; err != nil {
 							return fmt.Errorf("failed to create investor: %w", err)
 						}
-						// inv.ID = invModel.ID // opcional
 					} else {
 						return fmt.Errorf("failed to check investor: %w", err)
 					}
 				}
-				// Si existe, opcional: inv.ID = existing.ID
 			} else {
 				var existing invmod.Investor
 				if err := tx.First(&existing, inv.ID).Error; err != nil {
@@ -167,7 +157,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 						if err := tx.Create(&invModel).Error; err != nil {
 							return fmt.Errorf("failed to create investor: %w", err)
 						}
-						// inv.ID = invModel.ID // opcional
 					} else {
 						return fmt.Errorf("failed to get investor: %w", err)
 					}
@@ -175,8 +164,9 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			}
 		}
 
-		// --- FIELDS (no cambian, solo se crean si ID==0) ---
+		// --- FIELDS Y LOTS ---
 		for _, f := range p.Fields {
+			var fieldID int64
 			if f.ID == 0 {
 				fieldModel := fldmod.Field{
 					Name:        f.Name,
@@ -184,6 +174,27 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				}
 				if err := tx.Create(&fieldModel).Error; err != nil {
 					return fmt.Errorf("failed to create field: %w", err)
+				}
+				fieldID = fieldModel.ID
+			} else {
+				fieldID = f.ID
+			}
+
+			// --- LOTS ---
+			for _, lot := range f.Lots {
+				if lot.ID == 0 {
+					lotModel := lotmod.Lot{
+						Name:           lot.Name,
+						FieldID:        fieldID,
+						Hectares:       lot.Hectares,
+						PreviousCropID: lot.PreviousCrop.ID,
+						CurrentCropID:  lot.CurrentCrop.ID,
+						Season:         lot.Season,
+						// CreatedAt y UpdatedAt los maneja GORM automáticamente
+					}
+					if err := tx.Create(&lotModel).Error; err != nil {
+						return fmt.Errorf("failed to create lot: %w", err)
+					}
 				}
 			}
 		}

@@ -9,10 +9,9 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
-// Lot is the GORM model for a land parcel, storing only foreign-key references.
 type Lot struct {
 	ID             int64          `gorm:"primaryKey;autoIncrement"`
-	Name           string         `gorm:"size:100;not null"`
+	Name           string         `gorm:"type:varchar(255);not null"`
 	FieldID        int64          `gorm:"not null;index;column:field_id"`
 	Field          fieldmod.Field `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 	Hectares       float64        `gorm:"not null"`
