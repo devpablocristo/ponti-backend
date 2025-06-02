@@ -16,6 +16,7 @@ import (
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
@@ -72,6 +73,7 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&cropmodels.Crop{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
+		&models.ProjectInvestor{},
 		&projectmodels.Project{}, // último
 	}
 
