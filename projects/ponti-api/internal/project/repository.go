@@ -31,6 +31,7 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
+// TODO: revisar y borrar
 // func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 // 	var projectID int64
 
@@ -155,6 +156,7 @@ func NewRepository(db GormEnginePort) *Repository {
 // 	return projectID, nil
 // }
 
+// TODO: revisar y borrar
 // func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 // 	var projectID int64
 
@@ -379,136 +381,7 @@ func NewRepository(db GormEnginePort) *Repository {
 // 	return projectID, nil
 // }
 
-// --- HELPERS ---
-
-func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
-	if c.ID != 0 {
-		var existing cusmod.Customer
-		if err := tx.First(&existing, c.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check customer: %w", err)
-		}
-	}
-	var existing cusmod.Customer
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check customer: %w", err)
-	}
-	if err := tx.Create(c).Error; err != nil {
-		return 0, fmt.Errorf("failed to create customer: %w", err)
-	}
-	return c.ID, nil
-}
-
-func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
-	if c.ID != 0 {
-		var existing casmod.Campaign
-		if err := tx.First(&existing, c.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check campaign: %w", err)
-		}
-	}
-	var existing casmod.Campaign
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check campaign: %w", err)
-	}
-	if err := tx.Create(c).Error; err != nil {
-		return 0, fmt.Errorf("failed to create campaign: %w", err)
-	}
-	return c.ID, nil
-}
-
-func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
-	if m.ID != 0 {
-		var existing manmod.Manager
-		if err := tx.First(&existing, m.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check manager: %w", err)
-		}
-	}
-	var existing manmod.Manager
-	if err := tx.Where("name = ?", m.Name).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check manager: %w", err)
-	}
-	if err := tx.Create(m).Error; err != nil {
-		return 0, fmt.Errorf("failed to create manager: %w", err)
-	}
-	return m.ID, nil
-}
-
-func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
-	if i.ID != 0 {
-		var existing invmod.Investor
-		if err := tx.First(&existing, i.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check investor: %w", err)
-		}
-	}
-	var existing invmod.Investor
-	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check investor: %w", err)
-	}
-	if err := tx.Create(i).Error; err != nil {
-		return 0, fmt.Errorf("failed to create investor: %w", err)
-	}
-	return i.ID, nil
-}
-
-func ensureField(tx *gorm.DB, f *fldmod.Field) (int64, error) {
-	if f.ID != 0 {
-		var existing fldmod.Field
-		if err := tx.First(&existing, f.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check field: %w", err)
-		}
-	}
-	var existing fldmod.Field
-	if err := tx.Where("name = ? AND lease_type_id = ?", f.Name, f.LeaseTypeID).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check field: %w", err)
-	}
-	if err := tx.Create(f).Error; err != nil {
-		return 0, fmt.Errorf("failed to create field: %w", err)
-	}
-	return f.ID, nil
-}
-
-func ensureLot(tx *gorm.DB, l *lotmod.Lot, fieldID int64) (int64, error) {
-	if l.ID != 0 {
-		var existing lotmod.Lot
-		if err := tx.First(&existing, l.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check lot: %w", err)
-		}
-	}
-	var existing lotmod.Lot
-	if err := tx.Where("name = ? AND field_id = ?", l.Name, fieldID).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check lot: %w", err)
-	}
-	l.FieldID = fieldID
-	if err := tx.Create(l).Error; err != nil {
-		return 0, fmt.Errorf("failed to create lot: %w", err)
-	}
-	return l.ID, nil
-}
-
-// --- MÉTODO PRINCIPAL ---
+// --- CREATE ---
 
 func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
@@ -806,4 +679,133 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// --- HELPERS ---
+
+func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
+	if c.ID != 0 {
+		var existing cusmod.Customer
+		if err := tx.First(&existing, c.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check customer: %w", err)
+		}
+	}
+	var existing cusmod.Customer
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check customer: %w", err)
+	}
+	if err := tx.Create(c).Error; err != nil {
+		return 0, fmt.Errorf("failed to create customer: %w", err)
+	}
+	return c.ID, nil
+}
+
+func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
+	if c.ID != 0 {
+		var existing casmod.Campaign
+		if err := tx.First(&existing, c.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check campaign: %w", err)
+		}
+	}
+	var existing casmod.Campaign
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check campaign: %w", err)
+	}
+	if err := tx.Create(c).Error; err != nil {
+		return 0, fmt.Errorf("failed to create campaign: %w", err)
+	}
+	return c.ID, nil
+}
+
+func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
+	if m.ID != 0 {
+		var existing manmod.Manager
+		if err := tx.First(&existing, m.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check manager: %w", err)
+		}
+	}
+	var existing manmod.Manager
+	if err := tx.Where("name = ?", m.Name).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check manager: %w", err)
+	}
+	if err := tx.Create(m).Error; err != nil {
+		return 0, fmt.Errorf("failed to create manager: %w", err)
+	}
+	return m.ID, nil
+}
+
+func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
+	if i.ID != 0 {
+		var existing invmod.Investor
+		if err := tx.First(&existing, i.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check investor: %w", err)
+		}
+	}
+	var existing invmod.Investor
+	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check investor: %w", err)
+	}
+	if err := tx.Create(i).Error; err != nil {
+		return 0, fmt.Errorf("failed to create investor: %w", err)
+	}
+	return i.ID, nil
+}
+
+func ensureField(tx *gorm.DB, f *fldmod.Field) (int64, error) {
+	if f.ID != 0 {
+		var existing fldmod.Field
+		if err := tx.First(&existing, f.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check field: %w", err)
+		}
+	}
+	var existing fldmod.Field
+	if err := tx.Where("name = ? AND lease_type_id = ?", f.Name, f.LeaseTypeID).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check field: %w", err)
+	}
+	if err := tx.Create(f).Error; err != nil {
+		return 0, fmt.Errorf("failed to create field: %w", err)
+	}
+	return f.ID, nil
+}
+
+func ensureLot(tx *gorm.DB, l *lotmod.Lot, fieldID int64) (int64, error) {
+	if l.ID != 0 {
+		var existing lotmod.Lot
+		if err := tx.First(&existing, l.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check lot: %w", err)
+		}
+	}
+	var existing lotmod.Lot
+	if err := tx.Where("name = ? AND field_id = ?", l.Name, fieldID).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check lot: %w", err)
+	}
+	l.FieldID = fieldID
+	if err := tx.Create(l).Error; err != nil {
+		return 0, fmt.Errorf("failed to create lot: %w", err)
+	}
+	return l.ID, nil
 }
