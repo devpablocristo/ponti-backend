@@ -15,13 +15,31 @@ type WordsSuggester struct {
 }
 
 func newSuggester(cfg *Config) *WordsSuggester {
-	// Ajustar umbral global una vez
+	// Habilitar extensiones necesarias (pg_trgm, unaccent) al inicializar.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	// CORREGIDO: Usar fmt.Sprintf para embedir el valor
+
+	// Instalar pg_trgm
+	errTrgm := cfg.DB.WithContext(ctx).
+		Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").
+		Error()
+	if errTrgm != nil {
+		cfg.logger.Error("failed to create pg_trgm extension", errTrgm)
+	}
+
+	// Instalar unaccent
+	errUnaccent := cfg.DB.WithContext(ctx).
+		Exec("CREATE EXTENSION IF NOT EXISTS unaccent").
+		Error()
+	if errUnaccent != nil {
+		cfg.logger.Error("failed to create unaccent extension", errUnaccent)
+	}
+
+	// Ajustar umbral global de similitud
 	_ = cfg.DB.WithContext(ctx).
 		Exec(fmt.Sprintf("SET pg_trgm.similarity_threshold = %f", cfg.Threshold)).
 		Error()
+
 	return &WordsSuggester{
 		db:        cfg.DB,
 		limit:     cfg.Limit,

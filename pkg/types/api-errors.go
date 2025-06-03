@@ -64,6 +64,7 @@ var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrUnavailable:     APIErrUnavailable,
 	ErrTokenNotFound:   APIErrUnauthorized,
 	ErrMissingField:    APIErrBadRequest,
+	ErrBadRequest:      APIErrBadRequest,
 }
 
 var httpStatus = map[APIErrorType]int{

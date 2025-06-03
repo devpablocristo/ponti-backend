@@ -23,6 +23,7 @@ const (
 	ErrUnavailable     ErrorType = "SERVICE_UNAVAILABLE"
 	ErrTokenNotFound   ErrorType = "TOKEN_NOT_FOUND"
 	ErrMissingField    ErrorType = "MISSING_FIELD"
+	ErrBadRequest      ErrorType = "BAD_REQUEST"
 )
 
 // Error is a domain-level error with type, message, details and optional context.

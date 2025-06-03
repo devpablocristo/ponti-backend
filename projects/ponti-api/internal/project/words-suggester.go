@@ -29,7 +29,7 @@ func NewWordsSuggester(eng WordsSuggesterEnginePort) *WordsSuggester {
 func (a *WordsSuggester) Suggest(
 	ctx context.Context,
 	prefix string,
-	page, perPage int, // parámetros de paginación
+	page, perPage int,
 ) ([]domain.ListedProject, int64, error) {
 	if page < 1 {
 		page = 1

@@ -72,6 +72,7 @@ func (h *Handler) Routes() {
 		public.GET("/:id", h.GetProject)
 		public.PUT("/:id", h.UpdateProject)
 		public.DELETE("/:id", h.DeleteProject)
+		public.GET("/search", h.ListProjectsByName)
 	}
 }
 
