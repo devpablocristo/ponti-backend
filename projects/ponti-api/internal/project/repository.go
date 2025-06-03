@@ -31,6 +31,130 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
+// func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+// 	var projectID int64
+
+// 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+// 		// CUSTOMER
+// 		if p.Customer.ID == 0 {
+// 			var existing cusmod.Customer
+// 			if err := tx.Where("name = ?", p.Customer.Name).First(&existing).Error; err != nil {
+// 				if errors.Is(err, gorm.ErrRecordNotFound) {
+// 					cust := cusmod.Customer{Name: p.Customer.Name, Type: p.Customer.Type}
+// 					if err := tx.Create(&cust).Error; err != nil {
+// 						return fmt.Errorf("failed to create customer: %w", err)
+// 					}
+// 					p.Customer.ID = cust.ID
+// 				} else {
+// 					return fmt.Errorf("failed to check customer: %w", err)
+// 				}
+// 			} else {
+// 				p.Customer.ID = existing.ID
+// 			}
+// 		}
+// 		// CAMPAIGN
+// 		if p.Campaign.ID == 0 {
+// 			var existing casmod.Campaign
+// 			if err := tx.Where("name = ?", p.Campaign.Name).First(&existing).Error; err != nil {
+// 				if errors.Is(err, gorm.ErrRecordNotFound) {
+// 					camp := casmod.Campaign{Name: p.Campaign.Name}
+// 					if err := tx.Create(&camp).Error; err != nil {
+// 						return fmt.Errorf("failed to create campaign: %w", err)
+// 					}
+// 					p.Campaign.ID = camp.ID
+// 				} else {
+// 					return fmt.Errorf("failed to check campaign: %w", err)
+// 				}
+// 			} else {
+// 				p.Campaign.ID = existing.ID
+// 			}
+// 		}
+// 		// MANAGERS
+// 		for i, mgr := range p.Managers {
+// 			if mgr.ID == 0 {
+// 				var existing manmod.Manager
+// 				if err := tx.Where("name = ?", mgr.Name).First(&existing).Error; err != nil {
+// 					if errors.Is(err, gorm.ErrRecordNotFound) {
+// 						mgrModel := manmod.Manager{Name: mgr.Name}
+// 						if err := tx.Create(&mgrModel).Error; err != nil {
+// 							return fmt.Errorf("failed to create manager: %w", err)
+// 						}
+// 						p.Managers[i].ID = mgrModel.ID
+// 					} else {
+// 						return fmt.Errorf("failed to check manager: %w", err)
+// 					}
+// 				} else {
+// 					p.Managers[i].ID = existing.ID
+// 				}
+// 			}
+// 		}
+// 		// INVESTORS
+// 		for i, inv := range p.Investors {
+// 			if inv.ID == 0 {
+// 				var existing invmod.Investor
+// 				if err := tx.Where("name = ?", inv.Name).First(&existing).Error; err != nil {
+// 					if errors.Is(err, gorm.ErrRecordNotFound) {
+// 						invModel := invmod.Investor{Name: inv.Name}
+// 						if err := tx.Create(&invModel).Error; err != nil {
+// 							return fmt.Errorf("failed to create investor: %w", err)
+// 						}
+// 						p.Investors[i].ID = invModel.ID
+// 					} else {
+// 						return fmt.Errorf("failed to check investor: %w", err)
+// 					}
+// 				} else {
+// 					p.Investors[i].ID = existing.ID
+// 				}
+// 			}
+// 		}
+// 		// FIELDS Y LOTS
+// 		for i, f := range p.Fields {
+// 			var fieldID int64
+// 			if f.ID == 0 {
+// 				fieldModel := fldmod.Field{
+// 					Name:        f.Name,
+// 					LeaseTypeID: f.LeaseTypeID,
+// 				}
+// 				if err := tx.Create(&fieldModel).Error; err != nil {
+// 					return fmt.Errorf("failed to create field: %w", err)
+// 				}
+// 				fieldID = fieldModel.ID
+// 				p.Fields[i].ID = fieldID
+// 			} else {
+// 				fieldID = f.ID
+// 			}
+// 			// LOTS
+// 			for j, lot := range f.Lots {
+// 				if lot.ID == 0 {
+// 					lotModel := lotmod.Lot{
+// 						Name:           lot.Name,
+// 						FieldID:        fieldID,
+// 						Hectares:       lot.Hectares,
+// 						PreviousCropID: lot.PreviousCrop.ID,
+// 						CurrentCropID:  lot.CurrentCrop.ID,
+// 						Season:         lot.Season,
+// 					}
+// 					if err := tx.Create(&lotModel).Error; err != nil {
+// 						return fmt.Errorf("failed to create lot: %w", err)
+// 					}
+// 					p.Fields[i].Lots[j].ID = lotModel.ID
+// 				}
+// 			}
+// 		}
+// 		// PROJECT
+// 		projectModel := models.FromDomain(p)
+// 		if err := tx.Create(projectModel).Error; err != nil {
+// 			return fmt.Errorf("failed to create project: %w", err)
+// 		}
+// 		projectID = projectModel.ID
+// 		return nil
+// 	})
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	return projectID, nil
+// }
+
 func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
 
@@ -51,7 +175,22 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			} else {
 				p.Customer.ID = existing.ID
 			}
+		} else {
+			var existing cusmod.Customer
+			if err := tx.First(&existing, p.Customer.ID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					cust := cusmod.Customer{Name: p.Customer.Name, Type: p.Customer.Type}
+					if err := tx.Create(&cust).Error; err != nil {
+						return fmt.Errorf("failed to create customer: %w", err)
+					}
+					p.Customer.ID = cust.ID
+				} else {
+					return fmt.Errorf("failed to check customer: %w", err)
+				}
+			}
+			// Si existe, no hace nada
 		}
+
 		// CAMPAIGN
 		if p.Campaign.ID == 0 {
 			var existing casmod.Campaign
@@ -68,7 +207,22 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			} else {
 				p.Campaign.ID = existing.ID
 			}
+		} else {
+			var existing casmod.Campaign
+			if err := tx.First(&existing, p.Campaign.ID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					camp := casmod.Campaign{Name: p.Campaign.Name}
+					if err := tx.Create(&camp).Error; err != nil {
+						return fmt.Errorf("failed to create campaign: %w", err)
+					}
+					p.Campaign.ID = camp.ID
+				} else {
+					return fmt.Errorf("failed to check campaign: %w", err)
+				}
+			}
+			// Si existe, no hace nada
 		}
+
 		// MANAGERS
 		for i, mgr := range p.Managers {
 			if mgr.ID == 0 {
@@ -86,8 +240,23 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				} else {
 					p.Managers[i].ID = existing.ID
 				}
+			} else {
+				var existing manmod.Manager
+				if err := tx.First(&existing, mgr.ID).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						mgrModel := manmod.Manager{Name: mgr.Name}
+						if err := tx.Create(&mgrModel).Error; err != nil {
+							return fmt.Errorf("failed to create manager: %w", err)
+						}
+						p.Managers[i].ID = mgrModel.ID
+					} else {
+						return fmt.Errorf("failed to check manager: %w", err)
+					}
+				}
+				// Si existe, no hace nada
 			}
 		}
+
 		// INVESTORS
 		for i, inv := range p.Investors {
 			if inv.ID == 0 {
@@ -105,8 +274,23 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				} else {
 					p.Investors[i].ID = existing.ID
 				}
+			} else {
+				var existing invmod.Investor
+				if err := tx.First(&existing, inv.ID).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						invModel := invmod.Investor{Name: inv.Name}
+						if err := tx.Create(&invModel).Error; err != nil {
+							return fmt.Errorf("failed to create investor: %w", err)
+						}
+						p.Investors[i].ID = invModel.ID
+					} else {
+						return fmt.Errorf("failed to check investor: %w", err)
+					}
+				}
+				// Si existe, no hace nada
 			}
 		}
+
 		// FIELDS Y LOTS
 		for i, f := range p.Fields {
 			var fieldID int64
@@ -121,7 +305,24 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				fieldID = fieldModel.ID
 				p.Fields[i].ID = fieldID
 			} else {
-				fieldID = f.ID
+				var existing fldmod.Field
+				if err := tx.First(&existing, f.ID).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						fieldModel := fldmod.Field{
+							Name:        f.Name,
+							LeaseTypeID: f.LeaseTypeID,
+						}
+						if err := tx.Create(&fieldModel).Error; err != nil {
+							return fmt.Errorf("failed to create field: %w", err)
+						}
+						fieldID = fieldModel.ID
+						p.Fields[i].ID = fieldID
+					} else {
+						return fmt.Errorf("failed to check field: %w", err)
+					}
+				} else {
+					fieldID = f.ID
+				}
 			}
 			// LOTS
 			for j, lot := range f.Lots {
@@ -138,9 +339,31 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 						return fmt.Errorf("failed to create lot: %w", err)
 					}
 					p.Fields[i].Lots[j].ID = lotModel.ID
+				} else {
+					var existing lotmod.Lot
+					if err := tx.First(&existing, lot.ID).Error; err != nil {
+						if errors.Is(err, gorm.ErrRecordNotFound) {
+							lotModel := lotmod.Lot{
+								Name:           lot.Name,
+								FieldID:        fieldID,
+								Hectares:       lot.Hectares,
+								PreviousCropID: lot.PreviousCrop.ID,
+								CurrentCropID:  lot.CurrentCrop.ID,
+								Season:         lot.Season,
+							}
+							if err := tx.Create(&lotModel).Error; err != nil {
+								return fmt.Errorf("failed to create lot: %w", err)
+							}
+							p.Fields[i].Lots[j].ID = lotModel.ID
+						} else {
+							return fmt.Errorf("failed to check lot: %w", err)
+						}
+					}
+					// Si existe, no hace nada
 				}
 			}
 		}
+
 		// PROJECT
 		projectModel := models.FromDomain(p)
 		if err := tx.Create(projectModel).Error; err != nil {
@@ -149,6 +372,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		projectID = projectModel.ID
 		return nil
 	})
+
 	if err != nil {
 		return 0, err
 	}
