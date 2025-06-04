@@ -94,7 +94,7 @@ func Initialize() (*Dependencies, error) {
 	fieldGormEnginePort := ProvideFieldGormEnginePort(repository)
 	fieldRepository := ProvideFieldRepository(fieldGormEnginePort)
 	fieldRepositoryPort := ProvideFieldRepositoryPort(fieldRepository)
-	fieldUseCases := ProvideFieldUseCases(fieldRepositoryPort, lotUseCasesPort)
+	fieldUseCases := ProvideFieldUseCases(fieldRepositoryPort)
 	fieldUseCasesPort := ProvideFieldUseCasesPort(fieldUseCases)
 	fieldConfigAPIPort := ProvideFieldConfigAPI(allConfigs)
 	fieldMiddlewaresEnginePort := ProvideFieldMiddlewaresEnginePort(middlewares)
