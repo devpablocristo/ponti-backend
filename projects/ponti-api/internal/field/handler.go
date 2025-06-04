@@ -5,12 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	"github.com/gin-gonic/gin"
 )
 
 type UseCasesPort interface {
@@ -37,7 +35,6 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -45,7 +42,6 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -55,24 +51,22 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/fields"
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateField)       // Create a field
-		public.GET("", h.ListFields)         // List all fields
-		public.GET("/:id", h.GetField)       // Get a field by ID
-		public.PUT("/:id", h.UpdateField)    // Update a field
-		public.DELETE("/:id", h.DeleteField) // Delete a field
+		public.POST("", h.CreateField)
+		public.GET("", h.ListFields)
+		public.GET("/:id", h.GetField)
+		public.PUT("/:id", h.UpdateField)
+		public.DELETE("/:id", h.DeleteField)
 	}
 }
 
-// CreateField handles POST /fields
 func (h *Handler) CreateField(c *gin.Context) {
-	var req dto.CreateFieldRequest
+	var req dto.Field
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
@@ -85,7 +79,6 @@ func (h *Handler) CreateField(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.CreateFieldResponse{Message: "Field created", ID: id})
 }
 
-// ListFields handles GET /fields
 func (h *Handler) ListFields(c *gin.Context) {
 	fields, err := h.ucs.ListFields(c.Request.Context())
 	if err != nil {
@@ -99,7 +92,6 @@ func (h *Handler) ListFields(c *gin.Context) {
 	c.JSON(http.StatusOK, dtos)
 }
 
-// GetField handles GET /fields/:id
 func (h *Handler) GetField(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	f, err := h.ucs.GetField(c.Request.Context(), id)
@@ -110,7 +102,6 @@ func (h *Handler) GetField(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDomain(*f))
 }
 
-// UpdateField handles PUT /fields/:id
 func (h *Handler) UpdateField(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var req dto.UpdateField
@@ -127,7 +118,6 @@ func (h *Handler) UpdateField(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field updated"})
 }
 
-// DeleteField handles DELETE /fields/:id
 func (h *Handler) DeleteField(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {

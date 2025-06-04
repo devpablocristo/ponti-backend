@@ -18,7 +18,6 @@ type UseCases struct {
 	repo RepositoryPort
 }
 
-// NewUseCases creates a new instance of Investor use cases.
 func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }

@@ -9,7 +9,6 @@ import (
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 )
 
 // ProvideFieldRepository crea la implementación concreta de field.Repository.
@@ -23,11 +22,8 @@ func ProvideFieldRepositoryPort(r *field.Repository) field.RepositoryPort {
 }
 
 // ProvideFieldUseCases agrupa repositorios y servicios relacionados en field.UseCases.
-func ProvideFieldUseCases(
-	rep field.RepositoryPort,
-	lotUC lot.UseCasesPort,
-) *field.UseCases {
-	return field.NewUseCases(rep, lotUC)
+func ProvideFieldUseCases(rep field.RepositoryPort) *field.UseCases {
+	return field.NewUseCases(rep)
 }
 
 // ProvideFieldUseCasesPort adapta *field.UseCases a la interfaz field.UseCasesPort.

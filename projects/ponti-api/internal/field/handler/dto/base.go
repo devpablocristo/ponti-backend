@@ -6,7 +6,19 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
-// Field represents a field payload with its related lots.
+// Lot DTO para Field, enriquecido
+type Lot struct {
+	ID               int64   `json:"id,omitempty"`
+	Name             string  `json:"name" binding:"required"`
+	Hectares         float64 `json:"hectares" binding:"required"`
+	PreviousCropID   int64   `json:"previous_crop_id" binding:"required"`
+	PreviousCropName string  `json:"previous_crop_name,omitempty"`
+	CurrentCropID    int64   `json:"current_crop_id" binding:"required"`
+	CurrentCropName  string  `json:"current_crop_name,omitempty"`
+	Season           string  `json:"season" binding:"required"`
+}
+
+// Field DTO
 type Field struct {
 	ID          int64  `json:"id,omitempty"`
 	Name        string `json:"name" binding:"required"`
@@ -14,17 +26,7 @@ type Field struct {
 	Lots        []Lot  `json:"lots" binding:"required,dive,required"`
 }
 
-// Lot represents a lot within a field payload.
-type Lot struct {
-	Name           string  `json:"name" binding:"required"`
-	Hectares       float64 `json:"hectares" binding:"required"`
-	PreviousCropID int64   `json:"previous_crop_id" binding:"required"`
-	CurrentCropID  int64   `json:"current_crop_id" binding:"required"`
-	Season         string  `json:"season" binding:"required"`
-}
-
-// ToDomain converts the Field DTO to a domain.Field, including nested lots.
-func (f Field) ToDomain() *fielddom.Field {
+func (f *Field) ToDomain() *fielddom.Field {
 	d := &fielddom.Field{
 		ID:          f.ID,
 		Name:        f.Name,
@@ -32,17 +34,17 @@ func (f Field) ToDomain() *fielddom.Field {
 	}
 	for _, lt := range f.Lots {
 		d.Lots = append(d.Lots, lotdom.Lot{
+			ID:           lt.ID,
 			Name:         lt.Name,
 			Hectares:     lt.Hectares,
-			PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID},
-			CurrentCrop:  cropdom.Crop{ID: lt.CurrentCropID},
+			PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID, Name: lt.PreviousCropName},
+			CurrentCrop:  cropdom.Crop{ID: lt.CurrentCropID, Name: lt.CurrentCropName},
 			Season:       lt.Season,
 		})
 	}
 	return d
 }
 
-// FromDomain converts a domain.Field to the Field DTO, including nested lots.
 func FromDomain(d fielddom.Field) Field {
 	r := Field{
 		ID:          d.ID,
@@ -51,11 +53,14 @@ func FromDomain(d fielddom.Field) Field {
 	}
 	for _, ld := range d.Lots {
 		r.Lots = append(r.Lots, Lot{
-			Name:           ld.Name,
-			Hectares:       ld.Hectares,
-			PreviousCropID: ld.PreviousCrop.ID,
-			CurrentCropID:  ld.CurrentCrop.ID,
-			Season:         ld.Season,
+			ID:               ld.ID,
+			Name:             ld.Name,
+			Hectares:         ld.Hectares,
+			PreviousCropID:   ld.PreviousCrop.ID,
+			PreviousCropName: ld.PreviousCrop.Name,
+			CurrentCropID:    ld.CurrentCrop.ID,
+			CurrentCropName:  ld.CurrentCrop.Name,
+			Season:           ld.Season,
 		})
 	}
 	return r
