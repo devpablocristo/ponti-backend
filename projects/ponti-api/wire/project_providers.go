@@ -9,11 +9,6 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 
 	cfg "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
-	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
-	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
-	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
-	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
-	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
@@ -47,16 +42,8 @@ func ProvideProjectSuggesterPort(s *sug.WordsSuggester) project.WordsSuggesterPo
 }
 
 // --- USE CASES ---
-func ProvideProjectUseCases(
-	rep project.RepositoryPort,
-	sug project.WordsSuggesterPort,
-	cus customer.UseCasesPort,
-	cam campaign.UseCasesPort,
-	mgr manager.UseCasesPort,
-	inv investor.UseCasesPort,
-	fld field.UseCasesPort,
-) *project.UseCases {
-	return project.NewUseCases(rep, sug, cus, cam, mgr, inv, fld)
+func ProvideProjectUseCases(rep project.RepositoryPort, sug project.WordsSuggesterPort) *project.UseCases {
+	return project.NewUseCases(rep, sug)
 }
 
 func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {

@@ -1,8 +1,6 @@
 package domain
 
-import (
-	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
-)
+import lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 
 type Field struct {
 	ID          int64

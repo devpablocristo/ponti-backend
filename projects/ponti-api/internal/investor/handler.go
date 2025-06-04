@@ -73,7 +73,7 @@ func (h *Handler) Routes() {
 
 // CreateInvestor handles the creation of a new investor.
 func (h *Handler) CreateInvestor(c *gin.Context) {
-	var req dto.CreateInvestor
+	var req dto.Investor
 	if err := utils.ValidateRequest(c, &req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

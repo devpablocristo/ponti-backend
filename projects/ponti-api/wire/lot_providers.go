@@ -8,7 +8,6 @@ import (
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 
-	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 )
 
@@ -25,9 +24,8 @@ func ProvideLotRepositoryPort(r *lot.Repository) lot.RepositoryPort {
 // ProvideLotUseCases agrupa repositorio y servicio de crop en lot.UseCases.
 func ProvideLotUseCases(
 	rep lot.RepositoryPort,
-	cropUC crop.UseCasesPort,
 ) *lot.UseCases {
-	return lot.NewUseCases(rep, cropUC)
+	return lot.NewUseCases(rep)
 }
 
 // ProvideLotUseCasesPort adapta *lot.UseCases a la interfaz lot.UseCasesPort.
