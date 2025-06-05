@@ -19,6 +19,7 @@ import (
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 )
 
+// TODO: aplicar custom errors
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
