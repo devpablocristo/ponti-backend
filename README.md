@@ -120,6 +120,12 @@ INSERT INTO crops (id, name) VALUES
 (9, 'Centeno'),
 (10, 'Avena');
 
+INSERT INTO lease_types (name) VALUES
+('% INGRESO NETO'),
+('% UTILIDAD'),
+('ARRIENDO FIJO'),
+('ARRIENDO FIJO + % INGRESO NETO');
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "crops" TO "cloudrun-service-account@soalen-app.iam";
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "customers" TO "cloudrun-service-account@soalen-app.iam";
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "projects" TO "cloudrun-service-account@soalen-app.iam";
