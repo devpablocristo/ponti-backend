@@ -17,25 +17,27 @@ import (
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
 type Dependencies struct {
-	Config          *config.AllConfigs
-	GinEngine       *gin.Server
-	GormRepo        *gorm.Repository
-	Middlewares     *mwr.Middlewares
-	WordsSuggester  *sug.WordsSuggester
-	CustomerHandler *customer.Handler
-	CampaignHandler *campaign.Handler
-	InvestorHandler *investor.Handler
-	CropHandler     *crop.Handler
-	LotHandler      *lot.Handler
-	FieldHandler    *field.Handler
-	ManagerHandler  *manager.Handler
-	ProjectHandler  *project.Handler
+	Config           *config.AllConfigs
+	GinEngine        *gin.Server
+	GormRepo         *gorm.Repository
+	Middlewares      *mwr.Middlewares
+	WordsSuggester   *sug.WordsSuggester
+	CustomerHandler  *customer.Handler
+	CampaignHandler  *campaign.Handler
+	InvestorHandler  *investor.Handler
+	CropHandler      *crop.Handler
+	LotHandler       *lot.Handler
+	FieldHandler     *field.Handler
+	ManagerHandler   *manager.Handler
+	ProjectHandler   *project.Handler
+	LeaseTypeHandler *leasetype.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -53,6 +55,7 @@ func Initialize() (*Dependencies, error) {
 		FieldSet,
 		ManagerSet,
 		ProjectSet,
+		LeaseTypeSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

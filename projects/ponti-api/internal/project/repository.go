@@ -13,9 +13,7 @@ import (
 
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
-	fldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
-	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 )
 
@@ -437,37 +435,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			p.Investors[i].ID = invID
 		}
 
-		// FIELDS Y LOTS
-		for i := range p.Fields {
-			field := &fldmod.Field{
-				ID:          p.Fields[i].ID,
-				Name:        p.Fields[i].Name,
-				LeaseTypeID: p.Fields[i].LeaseTypeID,
-			}
-			fieldID, err := ensureField(tx, field)
-			if err != nil {
-				return err
-			}
-			p.Fields[i].ID = fieldID
-
-			// LOTS
-			for j := range p.Fields[i].Lots {
-				lot := &lotmod.Lot{
-					ID:             p.Fields[i].Lots[j].ID,
-					Name:           p.Fields[i].Lots[j].Name,
-					Hectares:       p.Fields[i].Lots[j].Hectares,
-					PreviousCropID: p.Fields[i].Lots[j].PreviousCrop.ID,
-					CurrentCropID:  p.Fields[i].Lots[j].CurrentCrop.ID,
-					Season:         p.Fields[i].Lots[j].Season,
-				}
-				lotID, err := ensureLot(tx, lot, fieldID)
-				if err != nil {
-					return err
-				}
-				p.Fields[i].Lots[j].ID = lotID
-			}
-		}
-
 		// PROJECT
 		projectModel := models.FromDomain(p)
 		if err := tx.Create(&projectModel).Error; err != nil {
@@ -515,6 +482,46 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
+func (r *Repository) GetProjects(ctx context.Context, page, perPage int) ([]domain.Project, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
+	}
+
+	var projects []models.Project
+	var total int64
+
+	if err := r.db.Client().
+		WithContext(ctx).
+		Model(&models.Project{}).
+		Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
+	}
+
+	if err := r.db.Client().
+		WithContext(ctx).
+		Model(&models.Project{}).
+		Preload("Customer").
+		Preload("Campaign").
+		Preload("Managers").
+		Preload("Investors.Investor").
+		Order("id DESC").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Find(&projects).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
+	}
+
+	var projectList []domain.Project
+	for _, p := range projects {
+		projectList = append(projectList, *p.ToDomain())
+	}
+
+	return projectList, total, nil
+}
+
 func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
 	if page < 1 {
 		page = 1
@@ -558,10 +565,14 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 
 	var m models.Project
 	err := r.db.Client().WithContext(ctx).
+		Preload("Customer").
+		Preload("Campaign").
 		Preload("Managers").
 		Preload("Investors.Investor").
 		Preload("Fields").
-		// .Preload("Fields.Lots"). // si querés traer lotes en cascada
+		Preload("Fields.Lots").
+		Preload("Fields.Lots.PreviousCrop").
+		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
 
 	if err != nil {
@@ -570,8 +581,8 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		}
 		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
 	}
-	proj := m.ToDomain()
-	return proj, nil
+
+	return m.ToDomain(), nil
 }
 
 // --- UPDATE ---
@@ -766,47 +777,4 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 		return 0, fmt.Errorf("failed to create investor: %w", err)
 	}
 	return i.ID, nil
-}
-
-func ensureField(tx *gorm.DB, f *fldmod.Field) (int64, error) {
-	if f.ID != 0 {
-		var existing fldmod.Field
-		if err := tx.First(&existing, f.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check field: %w", err)
-		}
-	}
-	var existing fldmod.Field
-	if err := tx.Where("name = ? AND lease_type_id = ?", f.Name, f.LeaseTypeID).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check field: %w", err)
-	}
-	if err := tx.Create(f).Error; err != nil {
-		return 0, fmt.Errorf("failed to create field: %w", err)
-	}
-	return f.ID, nil
-}
-
-func ensureLot(tx *gorm.DB, l *lotmod.Lot, fieldID int64) (int64, error) {
-	if l.ID != 0 {
-		var existing lotmod.Lot
-		if err := tx.First(&existing, l.ID).Error; err == nil {
-			return existing.ID, nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check lot: %w", err)
-		}
-	}
-	var existing lotmod.Lot
-	if err := tx.Where("name = ? AND field_id = ?", l.Name, fieldID).First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check lot: %w", err)
-	}
-	l.FieldID = fieldID
-	if err := tx.Create(l).Error; err != nil {
-		return 0, fmt.Errorf("failed to create lot: %w", err)
-	}
-	return l.ID, nil
 }

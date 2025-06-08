@@ -101,7 +101,9 @@ func (h *Handler) ListCrops(c *gin.Context) {
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, crops)
+
+	resp := dto.NewListCropsResponse(crops)
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetCrop retrieves a crop by its ID.

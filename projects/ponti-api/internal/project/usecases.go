@@ -9,6 +9,7 @@ import (
 type RepositoryPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
+	GetProjects(context.Context, int, int) ([]domain.Project, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
@@ -42,6 +43,10 @@ func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 
 func (u *UseCases) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	return u.repo.GetProject(ctx, id)
+}
+
+func (u *UseCases) GetProjects(ctx context.Context, page, perPage int) ([]domain.Project, int64, error) {
+	return u.repo.GetProjects(ctx, page, perPage)
 }
 
 func (u *UseCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {

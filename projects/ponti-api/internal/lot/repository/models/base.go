@@ -3,20 +3,23 @@ package models
 import (
 	"time"
 
+	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
 type Lot struct {
-	ID             int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	Name           string    `gorm:"type:varchar(100);not null;column:name"`
-	FieldID        int64     `gorm:"not null;index;column:field_id"`
-	Hectares       float64   `gorm:"not null;column:hectares"`
-	PreviousCropID int64     `gorm:"not null;index;column:previous_crop_id"`
-	CurrentCropID  int64     `gorm:"not null;index;column:current_crop_id"`
-	Season         string    `gorm:"size:20;not null;column:season"`
-	CreatedAt      time.Time `gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt      time.Time `gorm:"autoUpdateTime;column:updated_at"`
+	ID             int64        `gorm:"primaryKey;autoIncrement;column:id"`
+	Name           string       `gorm:"type:varchar(100);not null;column:name"`
+	FieldID        int64        `gorm:"not null;index;column:field_id"`
+	Hectares       float64      `gorm:"not null;column:hectares"`
+	PreviousCropID int64        `gorm:"not null;index;column:previous_crop_id"`
+	CurrentCropID  int64        `gorm:"not null;index;column:current_crop_id"`
+	Season         string       `gorm:"size:20;not null;column:season"`
+	CreatedAt      time.Time    `gorm:"autoCreateTime;column:created_at"`
+	UpdatedAt      time.Time    `gorm:"autoUpdateTime;column:updated_at"`
+	PreviousCrop   cropmod.Crop `gorm:"foreignKey:PreviousCropID;references:ID"`
+	CurrentCrop    cropmod.Crop `gorm:"foreignKey:CurrentCropID;references:ID"`
 }
 
 func (m *Lot) ToDomain() *domain.Lot {

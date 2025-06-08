@@ -14,11 +14,11 @@ import (
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
-
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
 
@@ -51,6 +51,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.ProjectHandler.Routes()
 	deps.CropHandler.Routes()
 	deps.ManagerHandler.Routes()
+	deps.LeaseTypeHandler.Routes()
 }
 
 // RunGormMigrations runs SQL migrations using GORM.
@@ -66,7 +67,7 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 	}
 
 	models := []any{
-		&campaignmodels.Campaign{}, // primero
+		&campaignmodels.Campaign{},
 		&customermodels.Customer{},
 		&managermodels.Manager{},
 		&investormodels.Investor{},
@@ -74,7 +75,8 @@ func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
 		&models.ProjectInvestor{},
-		&projectmodels.Project{}, // último
+		&projectmodels.Project{},
+		&leasetypemodels.LeaseType{},
 	}
 
 	start := time.Now()

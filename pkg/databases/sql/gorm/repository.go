@@ -175,8 +175,8 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 
 	switch config.GetDBType() {
 	case Postgres:
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=postgres port=%d sslmode=disable",
-			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetPort())
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable",
+			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetDBName(), config.GetPort())
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		if err != nil {
 			return fmt.Errorf("failed to connect to PostgreSQL server: %w", err)

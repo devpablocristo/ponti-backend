@@ -25,3 +25,19 @@ func FromDomain(d domain.Crop) *Crop {
 		Name: d.Name,
 	}
 }
+
+func NewListCropsResponse(crops []domain.Crop) *ListCropsResponse {
+	var convertedCrops []Crop
+	for _, crop := range crops {
+		convertedCrops = append(convertedCrops, *FromDomain(crop))
+	}
+	return &ListCropsResponse{
+		Crops: convertedCrops,
+	}
+}
+
+// ListCropsResponse represents a list of crops for data transfer.
+
+type ListCropsResponse struct {
+	Crops []Crop `json:"data"`
+}

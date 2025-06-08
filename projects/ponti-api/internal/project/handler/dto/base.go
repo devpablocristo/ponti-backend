@@ -46,10 +46,12 @@ type Investor struct {
 }
 
 type Field struct {
-	ID          int64  `json:"id,omitempty"`
-	Name        string `json:"name" binding:"required"`
-	LeaseTypeID int64  `json:"lease_type_id" binding:"required"`
-	Lots        []Lot  `json:"lots" binding:"required,dive,required"`
+	ID               int64    `json:"id,omitempty"`
+	Name             string   `json:"name" binding:"required"`
+	LeaseTypeID      int64    `json:"lease_type_id" binding:"required"`
+	LeaseTypePercent *float64 `json:"lease_type_percent"`
+	LeaseTypeValue   *float64 `json:"lease_type_value"`
+	Lots             []Lot    `json:"lots" binding:"required,dive,required"`
 }
 
 type Lot struct {
@@ -91,9 +93,11 @@ func (r *Project) ToDomain() *domain.Project {
 
 	for _, f := range r.Fields {
 		fld := fielddom.Field{
-			ID:          f.ID,
-			Name:        f.Name,
-			LeaseTypeID: f.LeaseTypeID,
+			ID:               f.ID,
+			Name:             f.Name,
+			LeaseTypeID:      f.LeaseTypeID,
+			LeaseTypePercent: f.LeaseTypePercent,
+			LeaseTypeValue:   f.LeaseTypeValue,
 		}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
@@ -133,7 +137,14 @@ func FromDomain(d *domain.Project) *Project {
 	}
 
 	for _, fld := range d.Fields {
-		dtoF := Field{ID: fld.ID, Name: fld.Name, LeaseTypeID: fld.LeaseTypeID}
+		dtoF := Field{
+			ID:               fld.ID,
+			Name:             fld.Name,
+			LeaseTypeID:      fld.LeaseTypeID,
+			LeaseTypePercent: fld.LeaseTypePercent,
+			LeaseTypeValue:   fld.LeaseTypeValue,
+		}
+
 		for _, lt := range fld.Lots {
 			dtoF.Lots = append(dtoF.Lots, Lot{
 				ID:               lt.ID,

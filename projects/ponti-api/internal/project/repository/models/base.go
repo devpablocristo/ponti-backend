@@ -4,9 +4,13 @@ import (
 	"time"
 
 	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
+	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
+	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
@@ -27,7 +31,7 @@ type Project struct {
 	Campaign  Campaign          `gorm:"foreignKey:CampaignID;references:ID"`
 	Managers  []Manager         `gorm:"many2many:project_managers;"`
 	Investors []ProjectInvestor `gorm:"foreignKey:ProjectID;references:ID"`
-	Fields    []Field           `gorm:"foreignKey:ProjectID"`
+	Fields    []fieldmod.Field  `gorm:"foreignKey:ProjectID"`
 }
 
 type Manager struct {
@@ -59,14 +63,6 @@ type ProjectInvestor struct {
 	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
-type Field struct {
-	ID          int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name        string `gorm:"size:100;not null;column:name"`
-	ProjectID   int64  `gorm:"not null;index;column:project_id"`
-	LeaseTypeID int64  `gorm:"not null;column:lease_type_id"`
-	// Agregá más campos y relación a Lots si es necesario
-}
-
 // --- FROM DOMAIN (para INSERT, no setees relaciones embebidas) ---
 
 func FromDomain(d *domain.Project) *Project {
@@ -78,7 +74,7 @@ func FromDomain(d *domain.Project) *Project {
 		AdminCost:  d.AdminCost,
 		Managers:   make([]Manager, 0, len(d.Managers)),
 		Investors:  make([]ProjectInvestor, 0, len(d.Investors)),
-		Fields:     make([]Field, 0, len(d.Fields)),
+		Fields:     make([]fieldmod.Field, 0, len(d.Fields)),
 	}
 
 	for _, mgr := range d.Managers {
@@ -90,14 +86,28 @@ func FromDomain(d *domain.Project) *Project {
 			Percentage: inv.Percentage,
 		})
 	}
-	for _, f := range d.Fields {
-		m.Fields = append(m.Fields, Field{
-			ID:          f.ID,
-			Name:        f.Name,
-			ProjectID:   d.ID,
-			LeaseTypeID: f.LeaseTypeID,
-			// otros campos...
+	for key, f := range d.Fields {
+		m.Fields = append(m.Fields, fieldmod.Field{
+			ID:               f.ID,
+			Name:             f.Name,
+			ProjectID:        d.ID,
+			LeaseTypeID:      f.LeaseTypeID,
+			LeaseTypePercent: f.LeaseTypePercent,
+			LeaseTypeValue:   f.LeaseTypeValue,
+			Lots:             make([]lotmod.Lot, 0, len(f.Lots)),
 		})
+
+		for _, l := range f.Lots {
+			m.Fields[key].Lots = append(m.Fields[key].Lots, lotmod.Lot{
+				ID:             l.ID,
+				Name:           l.Name,
+				FieldID:        d.ID,
+				Hectares:       l.Hectares,
+				Season:         l.Season,
+				PreviousCropID: l.PreviousCrop.ID,
+				CurrentCropID:  l.CurrentCrop.ID,
+			})
+		}
 	}
 	return m
 }
@@ -111,12 +121,12 @@ func (m *Project) ToDomain() *domain.Project {
 		AdminCost: m.AdminCost,
 		Customer: customerdom.Customer{
 			ID:   m.CustomerID,
-			Name: m.Customer.Name, // Si hiciste preload, lo tendrás
+			Name: m.Customer.Name,
 			Type: m.Customer.Type,
 		},
 		Campaign: campaigndom.Campaign{
 			ID:   m.CampaignID,
-			Name: m.Campaign.Name, // Si hiciste preload, lo tendrás
+			Name: m.Campaign.Name,
 		},
 		Managers:  make([]managerdom.Manager, 0, len(m.Managers)),
 		Investors: make([]investordom.Investor, 0, len(m.Investors)),
@@ -132,18 +142,40 @@ func (m *Project) ToDomain() *domain.Project {
 	for _, piv := range m.Investors {
 		d.Investors = append(d.Investors, investordom.Investor{
 			ID:         piv.InvestorID,
-			Name:       piv.Investor.Name, // Solo si preload
+			Name:       piv.Investor.Name,
 			Percentage: piv.Percentage,
 		})
 	}
 	for _, f := range m.Fields {
-		d.Fields = append(d.Fields, fielddom.Field{
-			ID:          f.ID,
-			Name:        f.Name,
-			ProjectID:   f.ProjectID,
-			LeaseTypeID: f.LeaseTypeID,
-			// otros campos...
-		})
+		field := fielddom.Field{
+			ID:               f.ID,
+			Name:             f.Name,
+			ProjectID:        f.ProjectID,
+			LeaseTypeID:      f.LeaseTypeID,
+			LeaseTypePercent: f.LeaseTypePercent,
+			LeaseTypeValue:   f.LeaseTypeValue,
+			Lots:             make([]lotdom.Lot, 0, len(f.Lots)),
+		}
+
+		for _, l := range f.Lots {
+			field.Lots = append(field.Lots, lotdom.Lot{
+				ID:       l.ID,
+				Name:     l.Name,
+				FieldID:  l.FieldID,
+				Hectares: l.Hectares,
+				Season:   l.Season,
+				PreviousCrop: cropdom.Crop{
+					ID:   l.PreviousCrop.ID,
+					Name: l.PreviousCrop.Name,
+				},
+				CurrentCrop: cropdom.Crop{
+					ID:   l.CurrentCrop.ID,
+					Name: l.CurrentCrop.Name,
+				},
+			})
+		}
+
+		d.Fields = append(d.Fields, field)
 	}
 	return d
 }

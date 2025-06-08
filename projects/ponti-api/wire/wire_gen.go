@@ -17,6 +17,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
@@ -118,20 +119,30 @@ func Initialize() (*Dependencies, error) {
 	projectConfigAPIPort := ProvideProjectConfigAPI(allConfigs)
 	projectMiddlewaresEnginePort := ProvideProjectMiddlewaresEnginePort(middlewares)
 	projectHandler := ProvideProjectHandler(projectGinEnginePort, projectUseCasesPort, projectConfigAPIPort, projectMiddlewaresEnginePort)
+	leasetypeGinEnginePort := ProvideLeaseTypeGinEnginePort(server)
+	leasetypeGormEnginePort := ProvideLeaseTypeGormEnginePort(repository)
+	leasetypeRepository := ProvideLeaseTypeRepository(leasetypeGormEnginePort)
+	leasetypeRepositoryPort := ProvideLeaseTypeRepositoryPort(leasetypeRepository)
+	leasetypeUseCases := ProvideLeaseTypeUseCases(leasetypeRepositoryPort)
+	leasetypeUseCasesPort := ProvideLeaseTypeUseCasesPort(leasetypeUseCases)
+	leasetypeConfigAPIPort := ProvideLeaseTypeConfigAPI(allConfigs)
+	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
+	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
 	dependencies := &Dependencies{
-		Config:          allConfigs,
-		GinEngine:       server,
-		GormRepo:        repository,
-		Middlewares:     middlewares,
-		WordsSuggester:  pkgsuggesterWordsSuggester,
-		CustomerHandler: handler,
-		CampaignHandler: campaignHandler,
-		InvestorHandler: investorHandler,
-		CropHandler:     cropHandler,
-		LotHandler:      lotHandler,
-		FieldHandler:    fieldHandler,
-		ManagerHandler:  managerHandler,
-		ProjectHandler:  projectHandler,
+		Config:           allConfigs,
+		GinEngine:        server,
+		GormRepo:         repository,
+		Middlewares:      middlewares,
+		WordsSuggester:   pkgsuggesterWordsSuggester,
+		CustomerHandler:  handler,
+		CampaignHandler:  campaignHandler,
+		InvestorHandler:  investorHandler,
+		CropHandler:      cropHandler,
+		LotHandler:       lotHandler,
+		FieldHandler:     fieldHandler,
+		ManagerHandler:   managerHandler,
+		ProjectHandler:   projectHandler,
+		LeaseTypeHandler: leasetypeHandler,
 	}
 	return dependencies, nil
 }
@@ -139,17 +150,18 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config          *config.AllConfigs
-	GinEngine       *pkggin.Server
-	GormRepo        *pkggorm.Repository
-	Middlewares     *pkgmwr.Middlewares
-	WordsSuggester  *pkgsuggester.WordsSuggester
-	CustomerHandler *customer.Handler
-	CampaignHandler *campaign.Handler
-	InvestorHandler *investor.Handler
-	CropHandler     *crop.Handler
-	LotHandler      *lot.Handler
-	FieldHandler    *field.Handler
-	ManagerHandler  *manager.Handler
-	ProjectHandler  *project.Handler
+	Config           *config.AllConfigs
+	GinEngine        *pkggin.Server
+	GormRepo         *pkggorm.Repository
+	Middlewares      *pkgmwr.Middlewares
+	WordsSuggester   *pkgsuggester.WordsSuggester
+	CustomerHandler  *customer.Handler
+	CampaignHandler  *campaign.Handler
+	InvestorHandler  *investor.Handler
+	CropHandler      *crop.Handler
+	LotHandler       *lot.Handler
+	FieldHandler     *field.Handler
+	ManagerHandler   *manager.Handler
+	ProjectHandler   *project.Handler
+	LeaseTypeHandler *leasetype.Handler
 }

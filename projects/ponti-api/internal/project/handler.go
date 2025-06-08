@@ -17,6 +17,7 @@ import (
 
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
+	GetProjects(context.Context, int, int) ([]domain.Project, int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
@@ -68,6 +69,7 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateProject)
 		public.GET("", h.ListProjects)
+		public.GET("/dropdown", h.ListProjectsDropdown)
 		public.GET("/customer/:id", h.ListProjectsByCustomerID)
 		public.GET("/:id", h.GetProject)
 		public.PUT("/:id", h.UpdateProject)
@@ -92,8 +94,24 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ProjectID: pID})
 }
 
-// ListProjects maneja el endpoint GET /projects con paginación ligera
 func (h *Handler) ListProjects(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+
+	// Obtener los proyectos ligeros y total
+	items, total, err := h.ucs.GetProjects(c.Request.Context(), page, perPage)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Construir y devolver la respuesta paginada
+	resp := dto.NewProjectsResponse(items, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
+}
+
+// ListProjects maneja el endpoint GET /projects con paginación ligera
+func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
