@@ -9,6 +9,7 @@ import (
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
+	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
@@ -91,7 +92,7 @@ func FromDomain(d *domain.Project) *Project {
 			ID:               f.ID,
 			Name:             f.Name,
 			ProjectID:        d.ID,
-			LeaseTypeID:      f.LeaseTypeID,
+			LeaseTypeID:      f.LeaseType.ID,
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotmod.Lot, 0, len(f.Lots)),
@@ -111,8 +112,6 @@ func FromDomain(d *domain.Project) *Project {
 	}
 	return m
 }
-
-// --- TO DOMAIN (aprovecha preload si existen) ---
 
 func (m *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
@@ -151,7 +150,7 @@ func (m *Project) ToDomain() *domain.Project {
 			ID:               f.ID,
 			Name:             f.Name,
 			ProjectID:        f.ProjectID,
-			LeaseTypeID:      f.LeaseTypeID,
+			LeaseType:        &leasetypedom.LeaseType{ID: f.LeaseTypeID, Name: f.LeaseType.Name},
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotdom.Lot, 0, len(f.Lots)),

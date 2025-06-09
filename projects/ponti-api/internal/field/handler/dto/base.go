@@ -3,6 +3,7 @@ package dto
 import (
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -28,9 +29,9 @@ type Field struct {
 
 func (f *Field) ToDomain() *fielddom.Field {
 	d := &fielddom.Field{
-		ID:          f.ID,
-		Name:        f.Name,
-		LeaseTypeID: f.LeaseTypeID,
+		ID:        f.ID,
+		Name:      f.Name,
+		LeaseType: &leasetypedom.LeaseType{ID: f.LeaseTypeID},
 	}
 	for _, lt := range f.Lots {
 		d.Lots = append(d.Lots, lotdom.Lot{
@@ -49,7 +50,7 @@ func FromDomain(d fielddom.Field) Field {
 	r := Field{
 		ID:          d.ID,
 		Name:        d.Name,
-		LeaseTypeID: d.LeaseTypeID,
+		LeaseTypeID: d.LeaseType.ID,
 	}
 	for _, ld := range d.Lots {
 		r.Lots = append(r.Lots, Lot{

@@ -570,6 +570,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Managers").
 		Preload("Investors.Investor").
 		Preload("Fields").
+		Preload("Fields.LeaseType").
 		Preload("Fields.Lots").
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop").

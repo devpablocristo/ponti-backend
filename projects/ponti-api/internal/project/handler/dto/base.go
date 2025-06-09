@@ -6,6 +6,7 @@ import (
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
+	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
@@ -48,6 +49,7 @@ type Investor struct {
 type Field struct {
 	ID               int64    `json:"id,omitempty"`
 	Name             string   `json:"name" binding:"required"`
+	LeaseTypeName    string   `json:"lease_type_name"`
 	LeaseTypeID      int64    `json:"lease_type_id" binding:"required"`
 	LeaseTypePercent *float64 `json:"lease_type_percent"`
 	LeaseTypeValue   *float64 `json:"lease_type_value"`
@@ -95,7 +97,7 @@ func (r *Project) ToDomain() *domain.Project {
 		fld := fielddom.Field{
 			ID:               f.ID,
 			Name:             f.Name,
-			LeaseTypeID:      f.LeaseTypeID,
+			LeaseType:        &leasetypedom.LeaseType{ID: f.LeaseTypeID},
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 		}
@@ -140,7 +142,8 @@ func FromDomain(d *domain.Project) *Project {
 		dtoF := Field{
 			ID:               fld.ID,
 			Name:             fld.Name,
-			LeaseTypeID:      fld.LeaseTypeID,
+			LeaseTypeID:      fld.LeaseType.ID,
+			LeaseTypeName:    fld.LeaseType.Name,
 			LeaseTypePercent: fld.LeaseTypePercent,
 			LeaseTypeValue:   fld.LeaseTypeValue,
 		}

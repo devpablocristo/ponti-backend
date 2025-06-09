@@ -102,7 +102,7 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 			Where("id = ?", f.ID).
 			Updates(map[string]any{
 				"name":          f.Name,
-				"lease_type_id": f.LeaseTypeID,
+				"lease_type_id": f.LeaseType.ID,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update field", err)
 		}
