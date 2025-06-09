@@ -21,12 +21,14 @@ import (
 // 5) Valida con validator
 func LoadConfig() (*AllConfigs, error) {
 	// 1) Base
-	if err := envvars.LoadConfig("./projects/ponti-api/.env"); err != nil {
-		return nil, fmt.Errorf("could not load base .env: %w", err)
+	if os.Getenv("GO_ENVIRONMENT") == "" {
+		if err := envvars.LoadConfig("./projects/ponti-api/.env"); err != nil {
+			return nil, fmt.Errorf("could not load base .env: %w", err)
+		}
 	}
 
 	// 2) Override según DEPLOY_ENV
-	env := strings.ToLower(os.Getenv("DEPLOY_ENV "))
+	env := strings.ToLower(os.Getenv("DEPLOY_ENV"))
 	if env != "" {
 		_ = envvars.LoadConfig(fmt.Sprintf(".env.%s", env))
 	}
