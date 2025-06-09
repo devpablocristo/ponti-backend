@@ -3,7 +3,7 @@ name: Build, Push to Artifact Registry, and Deploy to Cloud Run
 on:
   push:
     branches:
-      - main
+      - develop
 
 env:
   GCP_PROJECT_ID: soalen-app
