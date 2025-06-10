@@ -11,6 +11,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
+	projectmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 )
 
 type GormEnginePort interface {
@@ -37,8 +38,26 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 	return model.ID, nil
 }
 
-func (r *Repository) ListCampaigns(ctx context.Context) ([]domain.Campaign, error) {
+func (r *Repository) ListCampaigns(ctx context.Context, projectName string) ([]domain.Campaign, error) {
+	var campaignList []int64
+	if projectName != "" {
+		if err := r.db.Client().WithContext(ctx).Model(&projectmod.Project{}).Select("campaign_id").Where("name = ?", projectName).Scan(&campaignList).Error; err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
+		}
+	}
+
 	var list []models.Campaign
+	if len(campaignList) > 0 {
+		if err := r.db.Client().WithContext(ctx).Where("id IN (?)", campaignList).Find(&list).Error; err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
+		}
+		result := make([]domain.Campaign, 0, len(list))
+		for _, c := range list {
+			result = append(result, *c.ToDomain())
+		}
+		return result, nil
+	}
+
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
 	}

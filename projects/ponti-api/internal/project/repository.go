@@ -482,7 +482,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
-func (r *Repository) GetProjects(ctx context.Context, page, perPage int) ([]domain.Project, int64, error) {
+func (r *Repository) GetProjects(ctx context.Context, customerID int64, page, perPage int) ([]domain.Project, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -493,16 +493,17 @@ func (r *Repository) GetProjects(ctx context.Context, page, perPage int) ([]doma
 	var projects []models.Project
 	var total int64
 
-	if err := r.db.Client().
-		WithContext(ctx).
-		Model(&models.Project{}).
+	client := r.db.Client().WithContext(ctx).Model(&models.Project{})
+	if customerID > 0 {
+		client = client.Where("customer_id = ?", customerID)
+	}
+
+	if err := client.
 		Count(&total).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
-	if err := r.db.Client().
-		WithContext(ctx).
-		Model(&models.Project{}).
+	if err := client.
 		Preload("Customer").
 		Preload("Campaign").
 		Preload("Managers").
@@ -529,25 +530,26 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	if perPage < 1 {
 		perPage = 10
 	}
-	if customerID == 0 {
-		return nil, 0, types.NewError(types.ErrBadRequest, "customerID is required", nil)
-	}
 
 	var projects []domain.ListedProject
 	var total int64
 
 	base := r.db.Client().
 		WithContext(ctx).
-		Model(&models.Project{}).
-		Where("customer_id = ?", customerID)
+		Model(&models.Project{})
+
+	if customerID > 0 {
+		base = base.Where("customer_id = ?", customerID)
+	}
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects by customer", err)
 	}
 
 	if err := base.
-		Select("id, name").
-		Order("id DESC").
+		Select("name").
+		Group("name").
+		Order("name ASC").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
