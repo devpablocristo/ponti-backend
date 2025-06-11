@@ -3,6 +3,7 @@ package campaign
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,7 +13,7 @@ import (
 
 type UseCasesPort interface {
 	CreateCampaign(context.Context, *domain.Campaign) (int64, error)
-	ListCampaigns(context.Context, string) ([]domain.Campaign, error)
+	ListCampaigns(context.Context, int64) ([]domain.Campaign, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
 }
 
@@ -59,7 +60,19 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
-	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), c.Query("project_name"))
+	var customerID int64
+	customerIDQuery := c.Query("customer_id")
+	if customerIDQuery != "" {
+		var err error
+		customerID, err = strconv.ParseInt(customerIDQuery, 10, 64)
+		if err != nil {
+			apiErr, _ := types.NewAPIError(err)
+			c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+			return
+		}
+	}
+
+	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), customerID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

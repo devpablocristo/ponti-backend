@@ -8,7 +8,7 @@ import (
 
 type RepositoryPort interface {
 	CreateCampaign(context.Context, *domain.Campaign) (int64, error)
-	ListCampaigns(context.Context, string) ([]domain.Campaign, error)
+	ListCampaigns(context.Context, int64) ([]domain.Campaign, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
 }
 
@@ -24,8 +24,8 @@ func (u *UseCases) CreateCampaign(ctx context.Context, c *domain.Campaign) (int6
 	return u.repo.CreateCampaign(ctx, c)
 }
 
-func (u *UseCases) ListCampaigns(ctx context.Context, projectName string) ([]domain.Campaign, error) {
-	return u.repo.ListCampaigns(ctx, projectName)
+func (u *UseCases) ListCampaigns(ctx context.Context, customerID int64) ([]domain.Campaign, error) {
+	return u.repo.ListCampaigns(ctx, customerID)
 }
 
 func (u *UseCases) GetCampaign(ctx context.Context, id int64) (*domain.Campaign, error) {
