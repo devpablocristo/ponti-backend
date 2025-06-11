@@ -29,7 +29,7 @@ func NewListProjectsResponse(
 ) ListProjectsResponse {
 	out := make([]ListedProject, len(items))
 	for i, p := range items {
-		out[i] = ListedProject{ID: p.ID, Name: p.Name}
+		out[i] = ListedProject{ID: int64(i + 1), Name: p.Name}
 	}
 
 	maxPage := int((total + int64(perPage) - 1) / int64(perPage))
