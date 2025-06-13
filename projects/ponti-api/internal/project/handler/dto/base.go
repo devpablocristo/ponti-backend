@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"strings"
+
 	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
@@ -69,7 +71,7 @@ type Lot struct {
 
 func (r *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
-		Name: r.ProjectName,
+		Name: strings.TrimSpace(r.ProjectName),
 		Customer: customerdom.Customer{
 			ID:   r.Customer.ID,
 			Name: r.Customer.Name,

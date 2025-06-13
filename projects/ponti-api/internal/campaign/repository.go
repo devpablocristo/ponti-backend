@@ -38,10 +38,16 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 	return model.ID, nil
 }
 
-func (r *Repository) ListCampaigns(ctx context.Context, customerID int64) ([]domain.Campaign, error) {
+func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projectName string) ([]domain.Campaign, error) {
 	var campaignList []int64
-	if customerID != 0 {
-		if err := r.db.Client().WithContext(ctx).Model(&projectmod.Project{}).Select("campaign_id").Where("customer_id = ?", customerID).Scan(&campaignList).Error; err != nil {
+	if customerID != 0 && projectName != "" {
+		if err := r.db.Client().
+			WithContext(ctx).
+			Model(&projectmod.Project{}).
+			Select("campaign_id").
+			Where("customer_id = ?", customerID).
+			Where("name = ?", projectName).
+			Scan(&campaignList).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
 		}
 	}

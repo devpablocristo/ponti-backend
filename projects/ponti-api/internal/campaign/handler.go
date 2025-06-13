@@ -13,7 +13,7 @@ import (
 
 type UseCasesPort interface {
 	CreateCampaign(context.Context, *domain.Campaign) (int64, error)
-	ListCampaigns(context.Context, int64) ([]domain.Campaign, error)
+	ListCampaigns(context.Context, int64, string) ([]domain.Campaign, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
 }
 
@@ -72,7 +72,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 		}
 	}
 
-	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), customerID)
+	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), customerID, c.Query("project_name"))
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
@@ -12,6 +13,7 @@ type RepositoryPort interface {
 	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
+	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
 }
@@ -38,6 +40,15 @@ func NewUseCases(
 }
 
 func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
+	exist, err := u.repo.GetProjectByNameAndCampaignID(ctx, p.Name, p.Campaign.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	if exist != nil {
+		return 0, errors.New("project already exists")
+	}
+
 	return u.repo.CreateProject(ctx, p)
 }
 
