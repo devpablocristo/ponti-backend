@@ -11,7 +11,7 @@ import (
 type Lot struct {
 	ID             int64        `gorm:"primaryKey;autoIncrement;column:id"`
 	Name           string       `gorm:"type:varchar(100);not null;column:name"`
-	FieldID        int64        `gorm:"not null;index;column:field_id"`
+	FieldID        int64        `gorm:"not null;index;constraint:OnDelete:CASCADE;"`
 	Hectares       float64      `gorm:"not null;column:hectares"`
 	PreviousCropID int64        `gorm:"not null;index;column:previous_crop_id"`
 	CurrentCropID  int64        `gorm:"not null;index;column:current_crop_id"`

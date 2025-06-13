@@ -705,14 +705,9 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			}
 		}
 
-		for _, fld := range m.Fields {
-			if err := tx.Exec("DELETE FROM lots WHERE field_id = ?", fld.ID).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to clear lots", err)
-			}
-		}
 		// Relink fields
 		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", d.ID).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear fields", err)
+			return types.NewError(types.ErrInternal, fmt.Sprintf("failed to clear fields %d", d.ID), err)
 		}
 		for _, fld := range m.Fields {
 			fld.ProjectID = d.ID

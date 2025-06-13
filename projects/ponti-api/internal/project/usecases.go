@@ -2,8 +2,8 @@ package project
 
 import (
 	"context"
-	"errors"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
@@ -46,7 +46,7 @@ func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 	}
 
 	if exist != nil {
-		return 0, errors.New("project already exists")
+		return 0, types.NewError(types.ErrConflict, "project already exists", nil)
 	}
 
 	return u.repo.CreateProject(ctx, p)

@@ -88,8 +88,14 @@ func (h *Handler) CreateProject(c *gin.Context) {
 	}
 	pID, err := h.ucs.CreateProject(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
+		switch {
+		case types.IsConflict(err):
+			c.JSON(http.StatusConflict, types.ErrorResponse{Error: err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+			return
+		}
 	}
 	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ProjectID: pID})
 }
