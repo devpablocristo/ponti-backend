@@ -46,8 +46,9 @@ func NewListProjectsResponse(
 }
 
 type ProjectsResponse struct {
-	Data     []Project `json:"data"`
-	PageInfo PageInfo  `json:"page_info"`
+	Data          []Project `json:"data"`
+	TotalHectares float64   `json:"total_hectares"`
+	PageInfo      PageInfo  `json:"page_info"`
 }
 
 func NewProjectsResponse(

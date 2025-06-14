@@ -17,7 +17,7 @@ import (
 
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
-	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, int64, error)
+	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, float64, int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
@@ -108,7 +108,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
 
 	// Obtener los proyectos ligeros y total
-	items, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerID, campaignID, page, perPage)
+	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerID, campaignID, page, perPage)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -116,6 +116,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 
 	// Construir y devolver la respuesta paginada
 	resp := dto.NewProjectsResponse(items, page, perPage, total)
+	resp.TotalHectares = totalHectares
 	c.JSON(http.StatusOK, resp)
 }
 

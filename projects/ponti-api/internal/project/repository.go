@@ -482,7 +482,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
-func (r *Repository) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, int64, error) {
+func (r *Repository) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, float64, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -493,23 +493,37 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	var projects []models.Project
 	var total int64
 
-	client := r.db.Client().WithContext(ctx).Model(&models.Project{})
+	baseClient := r.db.Client().WithContext(ctx).Model(&models.Project{})
+	sumClient := r.db.Client().WithContext(ctx).Model(&models.Project{})
 	if name != "" {
-		client = client.Where("name = ?", name)
+		baseClient = baseClient.Where("projects.name = ?", name)
+		sumClient = sumClient.Where("projects.name = ?", name)
 	}
 	if customerID > 0 {
-		client = client.Where("customer_id = ?", customerID)
+		baseClient = baseClient.Where("customer_id = ?", customerID)
+		sumClient = sumClient.Where("customer_id = ?", customerID)
 	}
 	if campaignID > 0 {
-		client = client.Where("campaign_id = ?", campaignID)
+		baseClient = baseClient.Where("campaign_id = ?", campaignID)
+		sumClient = sumClient.Where("campaign_id = ?", campaignID)
 	}
 
-	if err := client.
+	if err := baseClient.
 		Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
+		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
-	if err := client.
+	var totalHectares float64
+
+	if err := sumClient.
+		Joins("JOIN fields ON fields.project_id = projects.id").
+		Joins("JOIN lots ON lots.field_id = fields.id").
+		Select("SUM(lots.hectares)").
+		Scan(&totalHectares).Error; err != nil {
+		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
+	}
+
+	if err := baseClient.
 		Preload("Customer").
 		Preload("Campaign").
 		Preload("Managers").
@@ -518,7 +532,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&projects).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
+		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
 	}
 
 	var projectList []domain.Project
@@ -526,7 +540,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 		projectList = append(projectList, *p.ToDomain())
 	}
 
-	return projectList, total, nil
+	return projectList, totalHectares, total, nil
 }
 
 func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
