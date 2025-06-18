@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	gorm "gorm.io/gorm"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
-	gorm "gorm.io/gorm"
 )
 
 type GormEnginePort interface {
@@ -127,4 +128,60 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
+	var lots []models.Lot
+	err := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ?", projectID).
+		Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, fieldID int64) ([]domain.Lot, error) {
+	var lots []models.Lot
+	err := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ? AND fields.id = ?", projectID, fieldID).
+		Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project and field", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
+	var lots []models.Lot
+	db := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ? AND fields.id = ?", projectID, fieldID)
+	switch cropType {
+	case "current":
+		db = db.Where("lots.current_crop_id = ?", cropID)
+	case "previous":
+		db = db.Where("lots.previous_crop_id = ?", cropID)
+	case "both":
+		db = db.Where("lots.current_crop_id = ? OR lots.previous_crop_id = ?", cropID, cropID)
+	}
+	err := db.Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project, field and crop", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
 }

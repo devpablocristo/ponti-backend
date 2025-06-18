@@ -2,17 +2,17 @@ services:
   ponti-api:
     build:
       context: ../../
-      dockerfile: ./projects/ponti-api/Dockerfile.stg
+      dockerfile: ./projects/ponti-api/Dockerfile.test
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
-      - DEPLOY_ENV=stg
+      - DEPLOY_ENV=test
       - APP_ROOT=/app
       - GO111MODULE=on
-      - GIN_MODE=release
+      - GIN_MODE=debug
     depends_on:
       ponti-db:
         condition: service_healthy

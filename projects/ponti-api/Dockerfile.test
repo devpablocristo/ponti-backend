@@ -1,7 +1,7 @@
 # ---------------------------------------------------
 # Etapa 1: Builder (compilación)
 # ---------------------------------------------------
-    FROM golang:1.23-alpine AS builder
+    FROM golang:1.24-alpine AS builder
 
     # Configurar zona horaria y agregar paquetes necesarios para compilar
     ENV TZ=America/Argentina/Buenos_Aires
@@ -36,10 +36,10 @@
     
     # Compilar el binario para Linux (se habilita CGO por requerir dependencias como SQLite)
     # Nota: Al estar en /app/projects/ponti-api, la ruta al main es relativa a este directorio.
-    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/staging_binary ./cmd/api/
+    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/test_binary ./cmd/api/
     
     # ---------------------------------------------------
-    # Etapa 2: Imagen final para staging
+    # Etapa 2: Imagen final para test
     # ---------------------------------------------------
     FROM alpine:latest
     
@@ -52,7 +52,7 @@
     
     # Copiar el binario compilado desde la etapa builder
     COPY --from=builder /app/pkg  /app/pkg
-    COPY --from=builder /app/staging_binary /app/staging_binary
+    COPY --from=builder /app/test_binary /app/test_binary
     # Copiar el archivo .env desde el módulo ponti-api (o desde donde lo tengas ubicado)
     COPY --from=builder /app/projects/ponti-api/.env /app/projects/ponti-api/.env
     
@@ -60,4 +60,4 @@
     EXPOSE 8080
     
     # Comando de inicio de la aplicación
-    CMD ["/app/staging_binary"]
+    CMD ["/app/test_binary"]

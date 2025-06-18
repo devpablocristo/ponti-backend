@@ -21,7 +21,7 @@ services:
     environment:
       - GO111MODULE=on
       - BUILDING_FILES=/app/cmd/api/main.go
-      - APP_NAME=qh
+      - APP_NAME=${APP_NAME}
     depends_on:
       - ponti-db
     networks:

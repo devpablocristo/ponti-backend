@@ -13,15 +13,18 @@ import (
 
 type UseCasesPort interface {
 	CreateLot(context.Context, *domain.Lot) (int64, error)
-	ListLots(context.Context, int64) ([]domain.Lot, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
+	ListLots(context.Context, int64) ([]domain.Lot, error)
+	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
+	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
+	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
 }
 
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
-	RunServer(ctx context.Context) error
+	RunServer(context.Context) error
 }
 
 type ConfigAPIPort interface {
@@ -80,12 +83,36 @@ func (h *Handler) CreateLot(c *gin.Context) {
 }
 
 func (h *Handler) ListLots(c *gin.Context) {
-	fieldID, err := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
+	currentCropID, _ := strconv.ParseInt(c.Query("current_crop_id"), 10, 64)
+	previousCropID, _ := strconv.ParseInt(c.Query("previous_crop_id"), 10, 64)
+
+	var (
+		lots []domain.Lot
+		err  error
+	)
+
+	switch {
+	// Caso 3: proyecto, campo y cultivo
+	case projectID > 0 && fieldID > 0 && currentCropID > 0:
+		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, currentCropID, "current")
+	case projectID > 0 && fieldID > 0 && previousCropID > 0:
+		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, previousCropID, "previous")
+
+	// Caso 2: proyecto y campo
+	case projectID > 0 && fieldID > 0:
+		lots, err = h.ucs.ListLotsByProjectAndField(c.Request.Context(), projectID, fieldID)
+
+	// Caso 1: solo proyecto
+	case projectID > 0:
+		lots, err = h.ucs.ListLotsByProject(c.Request.Context(), projectID)
+
+	default:
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Missing required parameters"})
 		return
 	}
-	lots, err := h.ucs.ListLots(c.Request.Context(), fieldID)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
