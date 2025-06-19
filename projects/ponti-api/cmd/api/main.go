@@ -31,10 +31,17 @@ func main() {
 	}
 
 	currentEnv := env.GetFromString(deps.Config.General.Environment)
-	if currentEnv == env.Local || currentEnv == env.Stage {
+	switch currentEnv {
+	case env.Local, env.Dev:
 		if err := runMigrations(deps.Config.DB); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
+	case env.Stage, env.Prod:
+		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB()); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
+		}
+	default:
+		log.Fatalf("Unsupported environment: %s", currentEnv)
 	}
 
 	// Run the HTTP server
