@@ -69,6 +69,14 @@ func (u *UseCases) ListProjectsByCustomerID(ctx context.Context, customerID int6
 }
 
 func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
+	exist, err := u.repo.GetProjectByNameAndCampaignID(ctx, p.Name, p.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	if exist != nil && exist.ID != p.ID {
+		return types.NewError(types.ErrConflict, "project already exists", nil)
+	}
 	return u.repo.UpdateProject(ctx, p)
 }
 

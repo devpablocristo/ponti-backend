@@ -1,8 +1,7 @@
 package models
 
 import (
-	"time"
-
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
@@ -19,13 +18,12 @@ import (
 // --------- MODELOS ---------
 
 type Project struct {
-	ID         int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	Name       string    `gorm:"size:100;not null;column:name"`
-	CustomerID int64     `gorm:"not null;index;column:customer_id"`
-	CampaignID int64     `gorm:"not null;index;column:campaign_id"`
-	AdminCost  int64     `gorm:"not null;column:admin_cost"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
+	ID         int64  `gorm:"primaryKey;autoIncrement;column:id"`
+	Name       string `gorm:"size:100;not null;column:name"`
+	CustomerID int64  `gorm:"not null;index;column:customer_id"`
+	CampaignID int64  `gorm:"not null;index;column:campaign_id"`
+	AdminCost  int64  `gorm:"not null;column:admin_cost"`
+	base.BaseModel
 
 	// Relaciones (SOLO para preload/query, no setear manual en insert)
 	Customer  Customer          `gorm:"foreignKey:CustomerID;references:ID"`
@@ -38,6 +36,7 @@ type Project struct {
 type Manager struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
+	base.BaseModel
 }
 
 type Customer struct {
@@ -60,7 +59,7 @@ type ProjectInvestor struct {
 	ProjectID  int64 `gorm:"primaryKey;autoIncrement:false;column:project_id"`
 	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
 	Percentage int   `gorm:"not null;column:percentage"`
-
+	base.BaseModel
 	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
@@ -76,15 +75,26 @@ func FromDomain(d *domain.Project) *Project {
 		Managers:   make([]Manager, 0, len(d.Managers)),
 		Investors:  make([]ProjectInvestor, 0, len(d.Investors)),
 		Fields:     make([]fieldmod.Field, 0, len(d.Fields)),
+		BaseModel:  base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 	}
 
 	for _, mgr := range d.Managers {
-		m.Managers = append(m.Managers, Manager{ID: mgr.ID})
+		m.Managers = append(m.Managers, Manager{
+			ID: mgr.ID,
+			BaseModel: base.BaseModel{
+				CreatedBy: d.CreatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
+		})
 	}
 	for _, inv := range d.Investors {
 		m.Investors = append(m.Investors, ProjectInvestor{
 			InvestorID: inv.ID,
 			Percentage: inv.Percentage,
+			BaseModel: base.BaseModel{
+				CreatedBy: d.CreatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
 		})
 	}
 	for key, f := range d.Fields {
@@ -96,6 +106,7 @@ func FromDomain(d *domain.Project) *Project {
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotmod.Lot, 0, len(f.Lots)),
+			BaseModel:        base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 		})
 
 		for _, l := range f.Lots {
@@ -107,6 +118,7 @@ func FromDomain(d *domain.Project) *Project {
 				Season:         l.Season,
 				PreviousCropID: l.PreviousCrop.ID,
 				CurrentCropID:  l.CurrentCrop.ID,
+				BaseModel:      base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 			})
 		}
 	}
@@ -130,6 +142,9 @@ func (m *Project) ToDomain() *domain.Project {
 		Managers:  make([]managerdom.Manager, 0, len(m.Managers)),
 		Investors: make([]investordom.Investor, 0, len(m.Investors)),
 		Fields:    make([]fielddom.Field, 0, len(m.Fields)),
+		UpdatedAt: &m.UpdatedAt,
+		CreatedBy: m.CreatedBy,
+		UpdatedBy: m.UpdatedBy,
 	}
 
 	for _, mgr := range m.Managers {

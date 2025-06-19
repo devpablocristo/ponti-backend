@@ -4,17 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
+	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	gorm "gorm.io/gorm"
-
-	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
-
+	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	gorm "gorm.io/gorm"
 )
 
 // TODO: aplicar custom errors
@@ -30,367 +33,24 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-// TODO: revisar y borrar
-// func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
-// 	var projectID int64
-
-// 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-// 		// CUSTOMER
-// 		if p.Customer.ID == 0 {
-// 			var existing cusmod.Customer
-// 			if err := tx.Where("name = ?", p.Customer.Name).First(&existing).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					cust := cusmod.Customer{Name: p.Customer.Name, Type: p.Customer.Type}
-// 					if err := tx.Create(&cust).Error; err != nil {
-// 						return fmt.Errorf("failed to create customer: %w", err)
-// 					}
-// 					p.Customer.ID = cust.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check customer: %w", err)
-// 				}
-// 			} else {
-// 				p.Customer.ID = existing.ID
-// 			}
-// 		}
-// 		// CAMPAIGN
-// 		if p.Campaign.ID == 0 {
-// 			var existing casmod.Campaign
-// 			if err := tx.Where("name = ?", p.Campaign.Name).First(&existing).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					camp := casmod.Campaign{Name: p.Campaign.Name}
-// 					if err := tx.Create(&camp).Error; err != nil {
-// 						return fmt.Errorf("failed to create campaign: %w", err)
-// 					}
-// 					p.Campaign.ID = camp.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check campaign: %w", err)
-// 				}
-// 			} else {
-// 				p.Campaign.ID = existing.ID
-// 			}
-// 		}
-// 		// MANAGERS
-// 		for i, mgr := range p.Managers {
-// 			if mgr.ID == 0 {
-// 				var existing manmod.Manager
-// 				if err := tx.Where("name = ?", mgr.Name).First(&existing).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						mgrModel := manmod.Manager{Name: mgr.Name}
-// 						if err := tx.Create(&mgrModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create manager: %w", err)
-// 						}
-// 						p.Managers[i].ID = mgrModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check manager: %w", err)
-// 					}
-// 				} else {
-// 					p.Managers[i].ID = existing.ID
-// 				}
-// 			}
-// 		}
-// 		// INVESTORS
-// 		for i, inv := range p.Investors {
-// 			if inv.ID == 0 {
-// 				var existing invmod.Investor
-// 				if err := tx.Where("name = ?", inv.Name).First(&existing).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						invModel := invmod.Investor{Name: inv.Name}
-// 						if err := tx.Create(&invModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create investor: %w", err)
-// 						}
-// 						p.Investors[i].ID = invModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check investor: %w", err)
-// 					}
-// 				} else {
-// 					p.Investors[i].ID = existing.ID
-// 				}
-// 			}
-// 		}
-// 		// FIELDS Y LOTS
-// 		for i, f := range p.Fields {
-// 			var fieldID int64
-// 			if f.ID == 0 {
-// 				fieldModel := fldmod.Field{
-// 					Name:        f.Name,
-// 					LeaseTypeID: f.LeaseTypeID,
-// 				}
-// 				if err := tx.Create(&fieldModel).Error; err != nil {
-// 					return fmt.Errorf("failed to create field: %w", err)
-// 				}
-// 				fieldID = fieldModel.ID
-// 				p.Fields[i].ID = fieldID
-// 			} else {
-// 				fieldID = f.ID
-// 			}
-// 			// LOTS
-// 			for j, lot := range f.Lots {
-// 				if lot.ID == 0 {
-// 					lotModel := lotmod.Lot{
-// 						Name:           lot.Name,
-// 						FieldID:        fieldID,
-// 						Hectares:       lot.Hectares,
-// 						PreviousCropID: lot.PreviousCrop.ID,
-// 						CurrentCropID:  lot.CurrentCrop.ID,
-// 						Season:         lot.Season,
-// 					}
-// 					if err := tx.Create(&lotModel).Error; err != nil {
-// 						return fmt.Errorf("failed to create lot: %w", err)
-// 					}
-// 					p.Fields[i].Lots[j].ID = lotModel.ID
-// 				}
-// 			}
-// 		}
-// 		// PROJECT
-// 		projectModel := models.FromDomain(p)
-// 		if err := tx.Create(projectModel).Error; err != nil {
-// 			return fmt.Errorf("failed to create project: %w", err)
-// 		}
-// 		projectID = projectModel.ID
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	return projectID, nil
-// }
-
-// TODO: revisar y borrar
-// func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
-// 	var projectID int64
-
-// 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-// 		// CUSTOMER
-// 		if p.Customer.ID == 0 {
-// 			var existing cusmod.Customer
-// 			if err := tx.Where("name = ?", p.Customer.Name).First(&existing).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					cust := cusmod.Customer{Name: p.Customer.Name, Type: p.Customer.Type}
-// 					if err := tx.Create(&cust).Error; err != nil {
-// 						return fmt.Errorf("failed to create customer: %w", err)
-// 					}
-// 					p.Customer.ID = cust.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check customer: %w", err)
-// 				}
-// 			} else {
-// 				p.Customer.ID = existing.ID
-// 			}
-// 		} else {
-// 			var existing cusmod.Customer
-// 			if err := tx.First(&existing, p.Customer.ID).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					cust := cusmod.Customer{Name: p.Customer.Name, Type: p.Customer.Type}
-// 					if err := tx.Create(&cust).Error; err != nil {
-// 						return fmt.Errorf("failed to create customer: %w", err)
-// 					}
-// 					p.Customer.ID = cust.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check customer: %w", err)
-// 				}
-// 			}
-// 			// Si existe, no hace nada
-// 		}
-
-// 		// CAMPAIGN
-// 		if p.Campaign.ID == 0 {
-// 			var existing casmod.Campaign
-// 			if err := tx.Where("name = ?", p.Campaign.Name).First(&existing).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					camp := casmod.Campaign{Name: p.Campaign.Name}
-// 					if err := tx.Create(&camp).Error; err != nil {
-// 						return fmt.Errorf("failed to create campaign: %w", err)
-// 					}
-// 					p.Campaign.ID = camp.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check campaign: %w", err)
-// 				}
-// 			} else {
-// 				p.Campaign.ID = existing.ID
-// 			}
-// 		} else {
-// 			var existing casmod.Campaign
-// 			if err := tx.First(&existing, p.Campaign.ID).Error; err != nil {
-// 				if errors.Is(err, gorm.ErrRecordNotFound) {
-// 					camp := casmod.Campaign{Name: p.Campaign.Name}
-// 					if err := tx.Create(&camp).Error; err != nil {
-// 						return fmt.Errorf("failed to create campaign: %w", err)
-// 					}
-// 					p.Campaign.ID = camp.ID
-// 				} else {
-// 					return fmt.Errorf("failed to check campaign: %w", err)
-// 				}
-// 			}
-// 			// Si existe, no hace nada
-// 		}
-
-// 		// MANAGERS
-// 		for i, mgr := range p.Managers {
-// 			if mgr.ID == 0 {
-// 				var existing manmod.Manager
-// 				if err := tx.Where("name = ?", mgr.Name).First(&existing).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						mgrModel := manmod.Manager{Name: mgr.Name}
-// 						if err := tx.Create(&mgrModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create manager: %w", err)
-// 						}
-// 						p.Managers[i].ID = mgrModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check manager: %w", err)
-// 					}
-// 				} else {
-// 					p.Managers[i].ID = existing.ID
-// 				}
-// 			} else {
-// 				var existing manmod.Manager
-// 				if err := tx.First(&existing, mgr.ID).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						mgrModel := manmod.Manager{Name: mgr.Name}
-// 						if err := tx.Create(&mgrModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create manager: %w", err)
-// 						}
-// 						p.Managers[i].ID = mgrModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check manager: %w", err)
-// 					}
-// 				}
-// 				// Si existe, no hace nada
-// 			}
-// 		}
-
-// 		// INVESTORS
-// 		for i, inv := range p.Investors {
-// 			if inv.ID == 0 {
-// 				var existing invmod.Investor
-// 				if err := tx.Where("name = ?", inv.Name).First(&existing).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						invModel := invmod.Investor{Name: inv.Name}
-// 						if err := tx.Create(&invModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create investor: %w", err)
-// 						}
-// 						p.Investors[i].ID = invModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check investor: %w", err)
-// 					}
-// 				} else {
-// 					p.Investors[i].ID = existing.ID
-// 				}
-// 			} else {
-// 				var existing invmod.Investor
-// 				if err := tx.First(&existing, inv.ID).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						invModel := invmod.Investor{Name: inv.Name}
-// 						if err := tx.Create(&invModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create investor: %w", err)
-// 						}
-// 						p.Investors[i].ID = invModel.ID
-// 					} else {
-// 						return fmt.Errorf("failed to check investor: %w", err)
-// 					}
-// 				}
-// 				// Si existe, no hace nada
-// 			}
-// 		}
-
-// 		// FIELDS Y LOTS
-// 		for i, f := range p.Fields {
-// 			var fieldID int64
-// 			if f.ID == 0 {
-// 				fieldModel := fldmod.Field{
-// 					Name:        f.Name,
-// 					LeaseTypeID: f.LeaseTypeID,
-// 				}
-// 				if err := tx.Create(&fieldModel).Error; err != nil {
-// 					return fmt.Errorf("failed to create field: %w", err)
-// 				}
-// 				fieldID = fieldModel.ID
-// 				p.Fields[i].ID = fieldID
-// 			} else {
-// 				var existing fldmod.Field
-// 				if err := tx.First(&existing, f.ID).Error; err != nil {
-// 					if errors.Is(err, gorm.ErrRecordNotFound) {
-// 						fieldModel := fldmod.Field{
-// 							Name:        f.Name,
-// 							LeaseTypeID: f.LeaseTypeID,
-// 						}
-// 						if err := tx.Create(&fieldModel).Error; err != nil {
-// 							return fmt.Errorf("failed to create field: %w", err)
-// 						}
-// 						fieldID = fieldModel.ID
-// 						p.Fields[i].ID = fieldID
-// 					} else {
-// 						return fmt.Errorf("failed to check field: %w", err)
-// 					}
-// 				} else {
-// 					fieldID = f.ID
-// 				}
-// 			}
-// 			// LOTS
-// 			for j, lot := range f.Lots {
-// 				if lot.ID == 0 {
-// 					lotModel := lotmod.Lot{
-// 						Name:           lot.Name,
-// 						FieldID:        fieldID,
-// 						Hectares:       lot.Hectares,
-// 						PreviousCropID: lot.PreviousCrop.ID,
-// 						CurrentCropID:  lot.CurrentCrop.ID,
-// 						Season:         lot.Season,
-// 					}
-// 					if err := tx.Create(&lotModel).Error; err != nil {
-// 						return fmt.Errorf("failed to create lot: %w", err)
-// 					}
-// 					p.Fields[i].Lots[j].ID = lotModel.ID
-// 				} else {
-// 					var existing lotmod.Lot
-// 					if err := tx.First(&existing, lot.ID).Error; err != nil {
-// 						if errors.Is(err, gorm.ErrRecordNotFound) {
-// 							lotModel := lotmod.Lot{
-// 								Name:           lot.Name,
-// 								FieldID:        fieldID,
-// 								Hectares:       lot.Hectares,
-// 								PreviousCropID: lot.PreviousCrop.ID,
-// 								CurrentCropID:  lot.CurrentCrop.ID,
-// 								Season:         lot.Season,
-// 							}
-// 							if err := tx.Create(&lotModel).Error; err != nil {
-// 								return fmt.Errorf("failed to create lot: %w", err)
-// 							}
-// 							p.Fields[i].Lots[j].ID = lotModel.ID
-// 						} else {
-// 							return fmt.Errorf("failed to check lot: %w", err)
-// 						}
-// 					}
-// 					// Si existe, no hace nada
-// 				}
-// 			}
-// 		}
-
-// 		// PROJECT
-// 		projectModel := models.FromDomain(p)
-// 		if err := tx.Create(projectModel).Error; err != nil {
-// 			return fmt.Errorf("failed to create project: %w", err)
-// 		}
-// 		projectID = projectModel.ID
-// 		return nil
-// 	})
-
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	return projectID, nil
-// }
-
-// --- CREATE ---
-
 func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
 	var projectID int64
 
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// CUSTOMER
+		userID, err := convertStringToID(ctx)
+		if err != nil {
+			return err
+		}
+		p.CreatedBy = &userID
+		p.UpdatedBy = &userID
+
 		customer := &cusmod.Customer{
 			ID:   p.Customer.ID,
 			Name: p.Customer.Name,
-			Type: p.Customer.Type,
+			BaseModel: base.BaseModel{
+				CreatedBy: p.CreatedBy,
+				UpdatedBy: p.UpdatedBy,
+			},
 		}
 		custID, err := ensureCustomer(tx, customer)
 		if err != nil {
@@ -398,10 +58,13 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		}
 		p.Customer.ID = custID
 
-		// CAMPAIGN
 		campaign := &casmod.Campaign{
 			ID:   p.Campaign.ID,
 			Name: p.Campaign.Name,
+			BaseModel: base.BaseModel{
+				CreatedBy: p.CreatedBy,
+				UpdatedBy: p.UpdatedBy,
+			},
 		}
 		campID, err := ensureCampaign(tx, campaign)
 		if err != nil {
@@ -409,11 +72,14 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		}
 		p.Campaign.ID = campID
 
-		// MANAGERS
 		for i := range p.Managers {
 			manager := &manmod.Manager{
 				ID:   p.Managers[i].ID,
 				Name: p.Managers[i].Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: p.CreatedBy,
+					UpdatedBy: p.UpdatedBy,
+				},
 			}
 			mgrID, err := ensureManager(tx, manager)
 			if err != nil {
@@ -422,11 +88,14 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			p.Managers[i].ID = mgrID
 		}
 
-		// INVESTORS
 		for i := range p.Investors {
 			investor := &invmod.Investor{
 				ID:   p.Investors[i].ID,
 				Name: p.Investors[i].Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: p.CreatedBy,
+					UpdatedBy: p.UpdatedBy,
+				},
 			}
 			invID, err := ensureInvestor(tx, investor)
 			if err != nil {
@@ -435,7 +104,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			p.Investors[i].ID = invID
 		}
 
-		// PROJECT
 		projectModel := models.FromDomain(p)
 		if err := tx.Create(&projectModel).Error; err != nil {
 			return fmt.Errorf("failed to create project: %w", err)
@@ -518,7 +186,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	if err := sumClient.
 		Joins("JOIN fields ON fields.project_id = projects.id").
 		Joins("JOIN lots ON lots.field_id = fields.id").
-		Select("SUM(lots.hectares)").
+		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
 		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
 	}
@@ -591,9 +259,13 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Campaign").
 		Preload("Managers").
 		Preload("Investors.Investor").
-		Preload("Fields").
+		Preload("Fields", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Fields.LeaseType").
-		Preload("Fields.Lots").
+		Preload("Fields.Lots", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
@@ -631,103 +303,102 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", d.ID), nil)
 	}
 
+	var existing models.Project
+	err := r.db.Client().WithContext(ctx).
+		Preload("Managers").
+		Preload("Investors.Investor").
+		Preload("Fields").
+		Preload("Fields.Lots").
+		Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
+		First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return types.NewError(types.ErrNotFound, "registro desactualizado o no encontrado", nil)
+	}
+	if err != nil {
+		return types.NewError(types.ErrInternal, "error buscando proyecto", err)
+	}
+
+	userID, err := convertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+	d.UpdatedBy = &userID
+	d.CreatedBy = existing.CreatedBy
 	m := models.FromDomain(d)
 	m.ID = d.ID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.Project{}).Where("id = ?", d.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check project existence", err)
-		}
-		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", d.ID), nil)
+		updates := map[string]any{
+			"updated_by": d.UpdatedBy,
 		}
 
-		customer := &cusmod.Customer{
-			ID:   d.Customer.ID,
-			Name: d.Customer.Name,
-		}
-		custID, err := ensureCustomer(tx, customer)
-		if err != nil {
-			return err
-		}
-		d.Customer.ID = custID
-
-		// CAMPAIGN
-		campaign := &casmod.Campaign{
-			ID:   d.Campaign.ID,
-			Name: d.Campaign.Name,
-		}
-		campID, err := ensureCampaign(tx, campaign)
-		if err != nil {
-			return err
-		}
-		d.Campaign.ID = campID
-
-		if err := tx.Model(&models.Project{}).
-			Where("id = ?", d.ID).
-			Updates(map[string]any{
-				"name":        d.Name,
-				"customer_id": d.Customer.ID,
-				"campaign_id": d.Campaign.ID,
-				"admin_cost":  d.AdminCost,
-			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update project", err)
-		}
-
-		// Relink managers
-		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", d.ID).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear managers", err)
-		}
-		for _, mgr := range m.Managers {
-			manager := &manmod.Manager{
-				ID:   mgr.ID,
-				Name: mgr.Name,
+		if existing.CustomerID != d.Customer.ID {
+			customer := &cusmod.Customer{
+				ID:   d.Customer.ID,
+				Name: d.Customer.Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
 			}
-			mgrID, err := ensureManager(tx, manager)
+			custID, err := ensureCustomer(tx, customer)
 			if err != nil {
 				return err
 			}
-
-			if err := tx.Exec(
-				"INSERT INTO project_managers (project_id, manager_id) VALUES (?, ?)",
-				d.ID, mgrID,
-			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add manager", err)
-			}
+			d.Customer.ID = custID
+			updates["customer_id"] = custID
 		}
 
-		// Relink investors
-		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", d.ID).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear investors", err)
-		}
-		for _, inv := range d.Investors {
-			investor := &invmod.Investor{
-				ID:   inv.ID,
-				Name: inv.Name,
+		if existing.CampaignID != d.Campaign.ID {
+			campaign := &casmod.Campaign{
+				ID:   d.Campaign.ID,
+				Name: d.Campaign.Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
 			}
-			invID, err := ensureInvestor(tx, investor)
+			campID, err := ensureCampaign(tx, campaign)
 			if err != nil {
 				return err
 			}
+			d.Campaign.ID = campID
+			updates["campaign_id"] = campID
+		}
 
-			if err := tx.Exec(
-				"INSERT INTO project_investors (project_id, investor_id, percentage) VALUES (?, ?, ?)",
-				d.ID, invID, inv.Percentage,
-			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add investor", err)
+		if existing.Name != d.Name {
+			updates["name"] = d.Name
+		}
+
+		if existing.AdminCost != d.AdminCost {
+			updates["admin_cost"] = d.AdminCost
+		}
+
+		if len(updates) > 0 {
+			result := tx.Model(&models.Project{}).
+				Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
+				Updates(updates)
+			if result.Error != nil {
+				return types.NewError(types.ErrInternal, "failed to update project", result.Error)
+			}
+
+			if result.RowsAffected == 0 {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", d.ID), nil)
 			}
 		}
 
-		// Relink fields
-		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", d.ID).Error; err != nil {
-			return types.NewError(types.ErrInternal, fmt.Sprintf("failed to clear fields %d", d.ID), err)
+		err := relinkManagers(tx, existing, d)
+		if err != nil {
+			return err
 		}
-		for _, fld := range m.Fields {
-			fld.ProjectID = d.ID
-			if err := tx.Create(&fld).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add field", err)
-			}
+
+		err = relinkInvestors(tx, existing, d)
+		if err != nil {
+			return err
+		}
+
+		if err := relinkFieldsAndLots(tx, existing, m.Fields); err != nil {
+			return err
 		}
 
 		return nil
@@ -787,6 +458,7 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check customer: %w", err)
 	}
+
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create customer: %w", err)
 	}
@@ -808,6 +480,7 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check campaign: %w", err)
 	}
+
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create campaign: %w", err)
 	}
@@ -829,6 +502,7 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check manager: %w", err)
 	}
+
 	if err := tx.Create(m).Error; err != nil {
 		return 0, fmt.Errorf("failed to create manager: %w", err)
 	}
@@ -850,8 +524,256 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check investor: %w", err)
 	}
+
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create investor: %w", err)
 	}
 	return i.ID, nil
+}
+
+func convertStringToID(ctx context.Context) (int64, error) {
+	userID := ctx.Value(pkgmwr.ContextUserID)
+	if s, ok := userID.(string); ok {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i, nil
+		} else {
+			return 0, fmt.Errorf("failed to parse user ID: %w", err)
+		}
+	}
+	return 0, fmt.Errorf("user ID is not a string")
+}
+
+func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	existingManagerIDs := make(map[int64]struct{})
+	for _, m := range existing.Managers {
+		existingManagerIDs[m.ID] = struct{}{}
+	}
+
+	newManagerIDs := make(map[int64]struct{})
+	for i, m := range d.Managers {
+		if m.ID != 0 {
+			newManagerIDs[m.ID] = struct{}{}
+		} else {
+			manager := &manmod.Manager{
+				Name: m.Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			}
+			mgrID, err := ensureManager(tx, manager)
+			if err != nil {
+				return err
+			}
+			newManagerIDs[mgrID] = struct{}{}
+			d.Managers[i].ID = mgrID
+		}
+	}
+
+	for _, m := range d.Managers {
+		if _, exists := existingManagerIDs[m.ID]; !exists {
+			if err := tx.Exec(
+				"INSERT INTO project_managers (project_id, manager_id, created_by, updated_by) VALUES (?, ?, ?, ?)",
+				d.ID, m.ID, d.UpdatedBy, d.UpdatedBy,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to add manager", err)
+			}
+		}
+	}
+
+	for _, m := range existing.Managers {
+		if _, exists := newManagerIDs[m.ID]; !exists {
+			if err := tx.Exec(
+				"DELETE FROM project_managers WHERE project_id = ? AND manager_id = ?",
+				d.ID, m.ID,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove manager", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	existingInvestorIDs := make(map[int64]struct{})
+	for _, i := range existing.Investors {
+		existingInvestorIDs[i.InvestorID] = struct{}{}
+	}
+
+	newInvestorIDs := make(map[int64]struct{})
+	for k, i := range d.Investors {
+		if i.ID != 0 {
+			newInvestorIDs[i.ID] = struct{}{}
+		} else {
+			invID, err := ensureInvestor(tx, &invmod.Investor{
+				Name: i.Name,
+				BaseModel: base.BaseModel{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			newInvestorIDs[invID] = struct{}{}
+			d.Investors[k].ID = invID
+		}
+	}
+
+	for _, i := range d.Investors {
+		if _, exists := existingInvestorIDs[i.ID]; !exists {
+			if err := tx.Exec(
+				"INSERT INTO project_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
+				d.ID, i.ID, i.Percentage, d.UpdatedBy, d.UpdatedBy,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to add investor", err)
+			}
+		}
+	}
+
+	for _, i := range existing.Investors {
+		if _, exists := newInvestorIDs[i.InvestorID]; !exists {
+			if err := tx.Exec(
+				"DELETE FROM project_investors WHERE project_id = ? AND investor_id = ?",
+				d.ID, i.InvestorID,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove investor", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod.Field) error {
+	// Mapear fields existentes y nuevos por ID
+	existingFieldMap := make(map[int64]fieldmod.Field)
+	for _, f := range existing.Fields {
+		existingFieldMap[f.ID] = f
+	}
+	newFieldMap := make(map[int64]fieldmod.Field)
+	for i, f := range fields {
+		if f.ID != 0 {
+			newFieldMap[f.ID] = f
+		} else {
+			f.ProjectID = existing.ID
+			if err := tx.Create(&f).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to add field", err)
+			}
+			newFieldMap[f.ID] = f
+			fields[i] = f
+		}
+	}
+
+	for _, f := range fields {
+		if ef, exists := existingFieldMap[f.ID]; exists {
+			updates := map[string]any{}
+			if ef.Name != f.Name {
+				updates["name"] = f.Name
+			}
+			if ef.LeaseTypeID != f.LeaseTypeID {
+				updates["lease_type_id"] = f.LeaseTypeID
+			}
+			if *ef.LeaseTypePercent != *f.LeaseTypePercent {
+				updates["lease_type_percent"] = *f.LeaseTypePercent
+			}
+			if *ef.LeaseTypeValue != *f.LeaseTypeValue {
+				updates["lease_type_value"] = *f.LeaseTypeValue
+			}
+			if len(updates) > 0 {
+				updates["updated_by"] = f.UpdatedBy
+				if err := tx.Model(&fieldmod.Field{}).
+					Where("id = ?", f.ID).
+					Updates(updates).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to update field", err)
+				}
+			}
+			if err := relinkLots(tx, ef, f); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, ef := range existing.Fields {
+		if _, exists := newFieldMap[ef.ID]; !exists {
+			if err := tx.Exec("DELETE FROM lots WHERE field_id = ?", ef.ID).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove lots", err)
+			}
+			if err := tx.Exec("DELETE FROM fields WHERE id = ?", ef.ID).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove field", err)
+			}
+		}
+	}
+	return nil
+}
+
+func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
+	existingLotsByID := make(map[int64]lotmod.Lot)
+	for _, l := range existingField.Lots {
+		existingLotsByID[l.ID] = l
+	}
+
+	newLotIDs := make(map[int64]struct{})
+	for i, l := range newField.Lots {
+		if l.ID != 0 {
+			newLotIDs[l.ID] = struct{}{}
+		} else {
+			lot := lotmod.Lot{
+				FieldID:        newField.ID,
+				Name:           l.Name,
+				Hectares:       l.Hectares,
+				PreviousCropID: l.PreviousCropID,
+				CurrentCropID:  l.CurrentCropID,
+				Season:         l.Season,
+				BaseModel: base.BaseModel{
+					CreatedBy: l.CreatedBy,
+					UpdatedBy: l.CreatedBy,
+				},
+			}
+			if err := tx.Create(&lot).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to add lot", err)
+			}
+			newLotIDs[lot.ID] = struct{}{}
+			newField.Lots[i] = lot
+		}
+	}
+
+	for _, l := range newField.Lots {
+		if el, exists := existingLotsByID[l.ID]; exists {
+			updates := map[string]any{}
+			if l.Name != el.Name {
+				updates["name"] = l.Name
+			}
+			if l.Hectares != el.Hectares {
+				updates["hectares"] = l.Hectares
+			}
+			if l.PreviousCropID != el.PreviousCropID {
+				updates["previous_crop_id"] = l.PreviousCropID
+			}
+			if l.CurrentCropID != el.CurrentCropID {
+				updates["current_crop_id"] = l.CurrentCropID
+			}
+			if l.Season != el.Season {
+				updates["season"] = l.Season
+			}
+			if len(updates) > 0 {
+				updates["updated_by"] = newField.UpdatedBy
+				if err := tx.Model(&lotmod.Lot{}).
+					Where("id = ?", l.ID).
+					Updates(updates).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to update lot", err)
+				}
+			}
+		}
+	}
+
+	for _, l := range existingField.Lots {
+		if _, exists := newLotIDs[l.ID]; !exists {
+			if err := tx.Exec("DELETE FROM lots WHERE id = ?", l.ID).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove lot", err)
+			}
+		}
+	}
+	return nil
 }

@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fieldom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
@@ -17,6 +19,10 @@ type Project struct {
 	Managers  []managerdom.Manager   // many-to-many relation
 	Investors []investordom.Investor // pivot relation with extra field
 	Fields    []fieldom.Field        // child fields
+	CreatedAt time.Time
+	UpdatedAt *time.Time
+	CreatedBy *int64
+	UpdatedBy *int64
 }
 
 type ListedProject struct {

@@ -24,7 +24,6 @@ func NewDefaultMiddlewares() *Middlewares {
 		}),
 	}
 	validation := []gin.HandlerFunc{
-		RequireCredentials(),
 		RequireUserIDHeader(),
 		RequireAPIKey(),
 	}

@@ -55,6 +55,10 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/lots"
 
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateLot)
