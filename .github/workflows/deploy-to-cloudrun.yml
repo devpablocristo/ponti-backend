@@ -75,11 +75,8 @@ jobs:
 
           echo "SOCKET_PATH: $SOCKET_PATH"
 
-          ENCODED_SOCKET_PATH=$(echo "$SOCKET_PATH" | sed 's/\//%2F/g')
-          echo "ENCODED_SOCKET_PATH: $ENCODED_SOCKET_PATH"
-
           migrate -path ./projects/ponti-api/migrations \
-              -database "postgres://$DB_USER@unix($ENCODED_SOCKET_PATH)/$DB_NAME?sslmode=disable" up
+            -database "postgresql://$DB_USER@/$DB_NAME?host=$SOCKET_PATH&sslmode=disable" up
 
       - name: Deploy to Cloud Run
         run: |
