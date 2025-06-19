@@ -69,7 +69,7 @@ jobs:
       - name: Run database migrations
         run: |
           migrate -path ./projects/ponti-api/migrations \
-            -database "postgres://${{ secrets.DB_USER }}@unix(./cloudsql/${{ secrets.INSTANCE_CONNECTION_NAME }})/${{ secrets.DB_NAME }}?sslmode=disable" up
+            -database "postgres://cloudrun-service-account@soalen-app.iam@unix(./cloudsql/soalen-app:us-central1:soalen-db)/authdb?sslmode=disable" up
 
       - name: Deploy to Cloud Run
         run: |
