@@ -46,7 +46,6 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 }
 
 func runMigrations(dbConfig config.DB) error {
-	return nil
 	m, err := migrate.New(
 		"file://migrations",
 		buildMigrateDatabaseURL(dbConfig),
