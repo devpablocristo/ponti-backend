@@ -31,7 +31,7 @@ func main() {
 	}
 
 	currentEnv := env.GetFromString(deps.Config.General.Environment)
-	if currentEnv == env.Local {
+	if currentEnv == env.Local || currentEnv == env.Stage {
 		if err := runMigrations(deps.Config.DB); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
