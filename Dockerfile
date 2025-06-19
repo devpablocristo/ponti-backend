@@ -34,6 +34,7 @@ WORKDIR /app
 
 COPY --from=builder /app/pkg  /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
+COPY --from=builder /app/projects/ponti-api/migrations /app/migrations
 
 EXPOSE 8080
 
