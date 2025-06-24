@@ -104,6 +104,13 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			p.Investors[i].ID = invID
 		}
 
+		for key := range p.Fields {
+			p.Fields[key].ID = 0
+			for key2 := range p.Fields[key].Lots {
+				p.Fields[key].Lots[key2].ID = 0
+			}
+		}
+
 		projectModel := models.FromDomain(p)
 		if err := tx.Create(&projectModel).Error; err != nil {
 			return fmt.Errorf("failed to create project: %w", err)
