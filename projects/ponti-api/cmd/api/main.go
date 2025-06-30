@@ -30,13 +30,18 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	// Set environment
 	currentEnv := env.GetFromString(deps.Config.General.Environment)
 	switch currentEnv {
 	case env.Local, env.Dev:
-		if err := RunGormMigrations(ctx, deps.GormRepo); err != nil {
-			log.Fatalf("Failed to run Gorm migrations: %v", err)
+		if err := runMigrations(deps.Config.DB); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
+	case env.Stage, env.Prod:
+		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB()); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
+		}
+	default:
+		log.Fatalf("Unsupported environment: %s", currentEnv)
 	}
 
 	// Run the HTTP server

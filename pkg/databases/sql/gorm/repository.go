@@ -35,6 +35,7 @@ type Repository struct {
 	client  *gorm.DB
 	address string
 	config  ConfigPort
+	sqlDB   *sql.DB
 }
 
 // NewRepository inicializa un nuevo repositorio sin usar singleton
@@ -75,6 +76,7 @@ func (r *Repository) Connect(config ConfigPort) error {
 		if err := sqlDB.Ping(); err != nil {
 			return fmt.Errorf("failed to ping database: %w", err)
 		}
+		r.sqlDB = sqlDB
 	}
 
 	log.Printf("Gorm successfully connected to %s database: %s", config.GetDBType(), config.GetDBName())
@@ -158,6 +160,10 @@ func connectWithConnectorIAMAuthN(config ConfigPort) (gorm.Dialector, error) {
 
 func (r *Repository) Client() *gorm.DB {
 	return r.client
+}
+
+func (r *Repository) GetSQLDB() *sql.DB {
+	return r.sqlDB
 }
 
 func (r *Repository) Address() string {

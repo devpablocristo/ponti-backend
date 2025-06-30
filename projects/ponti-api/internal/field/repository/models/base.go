@@ -1,8 +1,7 @@
 package models
 
 import (
-	"time"
-
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	leasetypemod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
@@ -10,16 +9,15 @@ import (
 )
 
 type Field struct {
-	ID               int64                   `gorm:"primaryKey;autoIncrement;column:id"`
-	Name             string                  `gorm:"size:100;not null;column:name"`
-	ProjectID        int64                   `gorm:"not null;index;column:project_id"`
-	LeaseTypeID      int64                   `gorm:"not null;column:lease_type_id"`
-	LeaseTypePercent *float64                `gorm:"column:lease_type_percent"`
-	LeaseTypeValue   *float64                `gorm:"column:lease_type_value"`
-	LeaseType        *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
-	CreatedAt        time.Time               `gorm:"autoCreateTime;column:created_at"`
-	UpdatedAt        time.Time               `gorm:"autoUpdateTime;column:updated_at"`
-	Lots             []lotmod.Lot            `gorm:"foreignKey:FieldID"`
+	ID               int64    `gorm:"primaryKey;autoIncrement;column:id"`
+	Name             string   `gorm:"size:100;not null;column:name"`
+	ProjectID        int64    `gorm:"not null;index;column:project_id"`
+	LeaseTypeID      int64    `gorm:"not null;column:lease_type_id"`
+	LeaseTypePercent *float64 `gorm:"column:lease_type_percent"`
+	LeaseTypeValue   *float64 `gorm:"column:lease_type_value"`
+	base.BaseModel
+	Lots      []lotmod.Lot            `gorm:"foreignKey:FieldID"`
+	LeaseType *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
 }
 
 // FROM DOMAIN (para INSERT: solo escalares)
@@ -31,8 +29,10 @@ func FromDomain(d *fielddom.Field) *Field {
 		LeaseTypeID:      d.LeaseType.ID,
 		LeaseTypePercent: d.LeaseTypePercent,
 		LeaseTypeValue:   d.LeaseTypeValue,
-		CreatedAt:        d.CreatedAt,
-		UpdatedAt:        d.UpdatedAt,
+		BaseModel: base.BaseModel{
+			CreatedAt: d.CreatedAt,
+			UpdatedAt: d.UpdatedAt,
+		},
 	}
 }
 

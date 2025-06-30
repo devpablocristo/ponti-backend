@@ -2,6 +2,7 @@ package dto
 
 import (
 	"strings"
+	"time"
 
 	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
@@ -23,6 +24,9 @@ type Project struct {
 	ProjectManagers []Manager  `json:"managers" binding:"required,dive,required"`
 	Investors       []Investor `json:"investors" binding:"required,dive,required"`
 	Fields          []Field    `json:"fields" binding:"required,dive,required"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	CreatedBy       *int64     `json:"created_by,omitempty"`
+	UpdatedBy       *int64     `json:"updated_by,omitempty"`
 }
 
 type Customer struct {
@@ -81,6 +85,7 @@ func (r *Project) ToDomain() *domain.Project {
 			Name: r.Campaign.Name,
 		},
 		AdminCost: r.AdminCost,
+		UpdatedAt: r.UpdatedAt,
 	}
 
 	for _, mgr := range r.ProjectManagers {
@@ -126,6 +131,9 @@ func FromDomain(d *domain.Project) *Project {
 		Customer:    Customer{ID: d.Customer.ID, Name: d.Customer.Name},
 		Campaign:    Campaign{ID: d.Campaign.ID, Name: d.Campaign.Name},
 		AdminCost:   d.AdminCost,
+		CreatedBy:   d.CreatedBy,
+		UpdatedBy:   d.UpdatedBy,
+		UpdatedAt:   d.UpdatedAt,
 	}
 
 	for _, mgr := range d.Managers {

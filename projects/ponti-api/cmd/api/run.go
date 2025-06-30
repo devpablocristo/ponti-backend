@@ -2,24 +2,16 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-
-	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
-	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
-	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
-	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
-	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
-	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
-	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
-	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
-	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 // RunHttpServer registers routes in the Gin router and starts the HTTP server.
@@ -54,40 +46,50 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.LeaseTypeHandler.Routes()
 }
 
-// RunGormMigrations runs SQL migrations using GORM.
-func RunGormMigrations(ctx context.Context, repo *gorm.Repository) error {
-	log.Println("Starting GORM migrations...")
-
-	sqlDB, err := repo.Client().DB()
+func runMigrations(dbConfig config.DB) error {
+	m, err := migrate.New(
+		"file://migrations",
+		buildMigrateDatabaseURL(dbConfig),
+	)
 	if err != nil {
-		return fmt.Errorf("failed to get database connection: %w", err)
+		return fmt.Errorf("error creating migrate instance: %w", err)
 	}
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("database connection failed: %w", err)
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("error applying migrations: %w", err)
+	}
+	return nil
+}
+
+func runMigrationsWithInstance(sqlDB *sql.DB) error {
+	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("creating postgres driver: %w", err)
 	}
 
-	models := []any{
-		&campaignmodels.Campaign{},
-		&customermodels.Customer{},
-		&managermodels.Manager{},
-		&investormodels.Investor{},
-		&cropmodels.Crop{},
-		&fieldmodels.Field{},
-		&lotmodels.Lot{},
-		&models.ProjectInvestor{},
-		&projectmodels.Project{},
-		&leasetypemodels.LeaseType{},
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return fmt.Errorf("creating migrate instance: %w", err)
 	}
 
-	start := time.Now()
-	for _, model := range models {
-		fmt.Printf("Migrating model: %T\n", model)
-		if err := repo.AutoMigrate(model); err != nil {
-			return fmt.Errorf("failed to migrate %T: %w", model, err)
-		}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("running migrations: %w", err)
 	}
-	duration := time.Since(start)
-	log.Printf("GORM migrations completed successfully in %s.", duration)
 
 	return nil
+}
+
+func buildMigrateDatabaseURL(config config.DB) string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		config.User,
+		config.Password,
+		config.Host,
+		config.Port,
+		config.Name,
+		config.SSLMode,
+	)
 }

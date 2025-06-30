@@ -65,6 +65,10 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/projects"
 
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateProject)
@@ -86,7 +90,8 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	pID, err := h.ucs.CreateProject(c.Request.Context(), req.ToDomain())
+
+	pID, err := h.ucs.CreateProject(c, req.ToDomain())
 	if err != nil {
 		switch {
 		case types.IsConflict(err):
@@ -108,7 +113,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
 
 	// Obtener los proyectos ligeros y total
-	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerID, campaignID, page, perPage)
+	items, totalHectares, total, err := h.ucs.GetProjects(c, name, customerID, campaignID, page, perPage)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -189,9 +194,15 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 	}
 	dom := req.ToDomain()
 	dom.ID = id
-	if err := h.ucs.UpdateProject(c.Request.Context(), dom); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
+	if err := h.ucs.UpdateProject(c, dom); err != nil {
+		switch {
+		case types.IsNotFound(err):
+			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "updated"})
 }
@@ -204,9 +215,15 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
+	if err := h.ucs.DeleteProject(c, id); err != nil {
+		switch {
+		case types.IsNotFound(err):
+			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
 }
@@ -222,7 +239,7 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 	)
 	if name != "" {
 		// Delegate to use case ListProjectsByName
-		list, t, errName := h.ucs.ListProjectsByName(c.Request.Context(), name, page, perPage)
+		list, t, errName := h.ucs.ListProjectsByName(c, name, page, perPage)
 		if errName != nil {
 			err = errName
 		} else {
@@ -234,7 +251,7 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 		}
 	} else {
 		// existing ListProjects
-		list, t, errList := h.ucs.ListProjects(c.Request.Context(), page, perPage)
+		list, t, errList := h.ucs.ListProjects(c, page, perPage)
 		if errList != nil {
 			err = errList
 		} else {
