@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -418,8 +419,13 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
 	}
 
+	userID, err := convertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := userID
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Verifica que el proyecto exista antes de borrar
 		var count int64
 		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check project existence", err)
@@ -429,21 +435,54 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		}
 
 		// clear managers
-		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", id).Error; err != nil {
+		if err := tx.Exec("UPDATE project_managers SET deleted_at = ?, deleted_by = ? WHERE project_id = ?", time.Now(), deletedBy, id).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to clear managers", err)
 		}
+
 		// clear investors
-		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", id).Error; err != nil {
+		if err := tx.Model(&models.ProjectInvestor{}).Where("project_id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to clear investors", err)
 		}
+
 		// clear fields
-		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear fields", err)
+		var fieldIDs []int64
+		if err := tx.Model(&fieldmod.Field{}).
+			Where("project_id = ?", id).
+			Pluck("id", &fieldIDs).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to get field ids", err)
 		}
+
+		if len(fieldIDs) > 0 {
+			if err := tx.Model(&lotmod.Lot{}).
+				Where("field_id IN ?", fieldIDs).
+				Updates(map[string]any{
+					"deleted_at": time.Now(),
+					"deleted_by": deletedBy,
+				}).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to soft delete lots", err)
+			}
+		}
+
+		if err := tx.Model(&fieldmod.Field{}).
+			Where("id IN ?", fieldIDs).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete fields", err)
+		}
+
 		// delete project
-		if err := tx.Delete(&models.Project{}, id).Error; err != nil {
+		if err := tx.Model(&models.Project{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete project", err)
 		}
+
 		return nil
 	})
 }
