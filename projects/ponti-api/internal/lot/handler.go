@@ -20,6 +20,8 @@ type UseCasesPort interface {
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
+	GetLotKPIs(context.Context, int64, int64, int64, string) (*domain.LotKPIs, error)
+	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
 }
 
 type GinEnginePort interface {
@@ -173,4 +175,59 @@ func (h *Handler) DeleteLot(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot deleted successfully"})
+}
+
+func (h *Handler) GetLotKPIs(c *gin.Context) {
+	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
+	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
+	cropType := c.DefaultQuery("crop_type", "current") // current | previous | both
+
+	if projectID <= 0 {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id is required"})
+		return
+	}
+
+	kpis, err := h.ucs.GetLotKPIs(c.Request.Context(), projectID, fieldID, cropID, cropType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, dto.FromDomainKPIs(kpis))
+}
+
+func (h *Handler) ListLotsTable(c *gin.Context) {
+	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
+	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
+	cropType := c.DefaultQuery("crop_type", "current")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	rows, total, sumSowed, sumCost, err := h.ucs.ListLotsTable(c.Request.Context(), projectID, fieldID, cropID, cropType, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	// Map domain → dto
+	dtoRows := make([]dto.LotTable, len(rows))
+	for i, row := range rows {
+		dtoRows[i] = dto.LotTable{
+			ProjectName:    row.ProjectName,
+			FieldName:      row.FieldName,
+			LotName:        row.LotName,
+			PreviousCrop:   row.PreviousCrop,
+			CurrentCrop:    row.CurrentCrop,
+			Variety:        row.Variety,
+			SowedArea:      row.SowedArea,
+			SowingDate:     row.SowingDate,
+			CostPerHectare: row.CostPerHectare,
+		}
+	}
+	c.JSON(http.StatusOK, dto.LotTableResponse{
+		Rows:         dtoRows,
+		Total:        total,
+		SumSowedArea: sumSowed,
+		SumCost:      sumCost,
+	})
 }

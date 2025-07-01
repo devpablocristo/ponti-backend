@@ -11,3 +11,10 @@ type Lot struct {
 	CurrentCrop  cropdom.Crop
 	Season       string
 }
+
+type LotKPIs struct {
+	SeededArea     float64
+	HarvestedArea  float64
+	YieldTnPerHa   float64
+	CostPerHectare float64
+}

@@ -185,3 +185,142 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	}
 	return res, nil
 }
+
+func (r *Repository) GetLotKPIs(ctx context.Context, projectID, fieldID, cropID int64, cropType string) (*domain.LotKPIs, error) {
+	db := r.db.Client().WithContext(ctx).Table("lots").
+		Joins("JOIN fields ON lots.field_id = fields.id")
+
+	db = db.Where("fields.project_id = ?", projectID)
+	if fieldID > 0 {
+		db = db.Where("fields.id = ?", fieldID)
+	}
+	if cropID > 0 {
+		switch cropType {
+		case "previous":
+			db = db.Where("lots.previous_crop_id = ?", cropID)
+		case "both":
+			db = db.Where("lots.previous_crop_id = ? OR lots.current_crop_id = ?", cropID, cropID)
+		default:
+			db = db.Where("lots.current_crop_id = ?", cropID)
+		}
+	}
+
+	var seededArea, harvestedArea, yieldTn, hectaresHarvested, totalCost, hectaresTotal float64
+
+	// Superficie sembrada (todas las hectáreas)
+	if err := db.Select("COALESCE(SUM(lots.hectares),0)").Scan(&seededArea).Error; err != nil {
+		return nil, err
+	}
+
+	// Superficie cosechada
+	if err := db.Where("lots.is_harvested = ?", true).
+		Select("COALESCE(SUM(lots.hectares),0)").Scan(&harvestedArea).Error; err != nil {
+		return nil, err
+	}
+
+	// Toneladas cosechadas y superficie cosechada
+	if err := db.Where("lots.is_harvested = ?", true).
+		Select("COALESCE(SUM(lots.yield_tn),0)").Scan(&yieldTn).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Where("lots.is_harvested = ?", true).
+		Select("COALESCE(SUM(lots.hectares),0)").Scan(&hectaresHarvested).Error; err != nil {
+		return nil, err
+	}
+
+	// Costos
+	if err := db.Select("COALESCE(SUM(lots.cost),0)").Scan(&totalCost).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Select("COALESCE(SUM(lots.hectares),0)").Scan(&hectaresTotal).Error; err != nil {
+		return nil, err
+	}
+
+	kpis := &domain.LotKPIs{
+		SeededArea:     seededArea,
+		HarvestedArea:  harvestedArea,
+		YieldTnPerHa:   0,
+		CostPerHectare: 0,
+	}
+	if hectaresHarvested > 0 {
+		kpis.YieldTnPerHa = yieldTn / hectaresHarvested
+	}
+	if hectaresTotal > 0 {
+		kpis.CostPerHectare = totalCost / hectaresTotal
+	}
+
+	return kpis, nil
+}
+
+func (r *Repository) ListLotsTable(
+	ctx context.Context,
+	projectID, fieldID, cropID int64, cropType string,
+	page, pageSize int,
+) ([]domain.LotTable, int, float64, float64, error) {
+
+	// Build base query builder con los filtros (SIN select ni scan aún)
+	base := r.db.Client().WithContext(ctx).Table("lots").
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Joins("JOIN projects ON fields.project_id = projects.id")
+
+	base = base.Where("fields.project_id = ?", projectID)
+	if fieldID > 0 {
+		base = base.Where("fields.id = ?", fieldID)
+	}
+	if cropID > 0 {
+		switch cropType {
+		case "previous":
+			base = base.Where("lots.previous_crop_id = ?", cropID)
+		case "both":
+			base = base.Where("lots.previous_crop_id = ? OR lots.current_crop_id = ?", cropID, cropID)
+		default:
+			base = base.Where("lots.current_crop_id = ?", cropID)
+		}
+	}
+
+	// --- TOTAL count ---
+	var total int64
+	if err := base.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// --- SUMAS ---
+	var sumSowedArea float64
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(lots.hectares),0)").Scan(&sumSowedArea).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+	var sumCost float64
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(lots.cost),0)").Scan(&sumCost).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// --- PAGINADO ---
+	offset := (page - 1) * pageSize
+	var rows []models.LotTable // tu struct temporal con los campos
+
+	if err := base.Session(&gorm.Session{}).
+		Select(`
+			projects.name as project_name,
+			fields.name as field_name,
+			lots.name as lot_name,
+			previous_crop.name as previous_crop,
+			current_crop.name as current_crop,
+			lots.variety as variety,
+			lots.hectares as sowed_area,
+			lots.sowing_date as sowing_date,
+			lots.cost as cost_per_hectare
+		`).
+		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
+		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").
+		Limit(pageSize).Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// Mapear a dominio y devolver
+	domainRows := make([]domain.LotTable, len(rows))
+	for i := range rows {
+		domainRows[i] = rows[i].ToDomain()
+	}
+	return domainRows, int(total), sumSowedArea, sumCost, nil
+}

@@ -15,6 +15,8 @@ type RepositoryPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
+	GetLotKPIs(context.Context, int64, int64, int64, string) (*domain.LotKPIs, error)
+	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
 }
 
 type UseCases struct {
@@ -55,4 +57,15 @@ func (u *UseCases) ListLotsByProjectAndField(ctx context.Context, projectID, fie
 
 func (u *UseCases) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
 	return u.repo.ListLotsByProjectFieldAndCrop(ctx, projectID, fieldID, cropID, cropType)
+}
+
+func (u *UseCases) GetLotKPIs(ctx context.Context, projectID, fieldID, cropID int64, cropType string) (*domain.LotKPIs, error) {
+	return u.repo.GetLotKPIs(ctx, projectID, fieldID, cropID, cropType)
+}
+
+func (u *UseCases) ListLotsTable(ctx context.Context,
+	projectID, fieldID, cropID int64, cropType string,
+	page, pageSize int,
+) ([]domain.LotTable, int, float64, float64, error) {
+	return u.repo.ListLotsTable(ctx, projectID, fieldID, cropID, cropType, page, pageSize)
 }

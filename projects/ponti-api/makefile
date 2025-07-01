@@ -5,7 +5,7 @@ ROOT_DIR := $(shell pwd)
 VERSION := 1.0
 BUILD_DIR := $(ROOT_DIR)/bin
 DOCKER_COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
-DOCKER_COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
+DOCKER_COMPOSE_TEST := $(ROOT_DIR)/docker-compose.test.yml
 DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
 MIGRATIONS_DIR := ./migrations
 MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
