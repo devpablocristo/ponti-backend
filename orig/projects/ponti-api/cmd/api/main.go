@@ -1,0 +1,61 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
+	env "github.com/alphacodinggroup/ponti-backend/pkg/config/env"
+	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
+)
+
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		<-sigChan
+		log.Println("Received termination signal. Shutting down the application...")
+		cancel()
+	}()
+
+	deps, err := wire.Initialize()
+	if err != nil {
+		log.Fatalf("Error initializing dependencies: %s", err)
+	}
+
+	currentEnv := env.GetFromString(deps.Config.General.Environment)
+	switch currentEnv {
+	case env.Local, env.Dev:
+		if err := runMigrations(deps.Config.DB); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
+		}
+	case env.Test, env.Prod:
+		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB()); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
+		}
+	default:
+		log.Fatalf("Unsupported environment: %s", currentEnv)
+	}
+
+	// Run the HTTP server
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		if err := RunHttpServer(ctx, deps); err != nil {
+			log.Fatalf("Error running HTTP server: %v", err)
+		}
+	}()
+
+	wg.Wait()
+
+	log.Println("Application terminated successfully.")
+}

@@ -1,0 +1,59 @@
+services:
+  ponti-api:
+    build:
+      context: ../../
+      dockerfile: ./projects/ponti-api/Dockerfile.test
+    image: "ponti-api:${APP_VERSION}"
+    env_file:
+      - .env
+    ports:
+      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
+    environment:
+      - DEPLOY_ENV=test
+      - APP_ROOT=/app
+      - GO111MODULE=on
+      - GIN_MODE=debug
+    depends_on:
+      ponti-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep tail || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+ 
+  ponti-db:
+    image: postgres:16.3
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ponti-db_data:/var/lib/postgresql/data
+      - ./infra/postgres-storage:/storage
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: ${APP_MAX_RETRIES}
+      start_period: 10s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  ponti-db_data:
