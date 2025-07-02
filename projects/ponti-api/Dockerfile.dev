@@ -25,12 +25,6 @@ WORKDIR /app
 # Copiar TODO el repo (incluyendo migraciones)
 COPY . .
 
-# Copia la carpeta de migraciones al contenedor
-# COPY projects/ponti-api/migrations /app/migrations
-
-# Opcional: mostrar los archivos copiados (debug)
-# RUN ls -lh /app/migrations
-
 # Instalar dependencias Go del proyecto principal y de pkg
 WORKDIR /app/projects/ponti-api
 RUN go mod download && go mod verify
