@@ -1,4 +1,27 @@
 services:
+  ponti-api:
+    build:
+      context: ../../
+      dockerfile: ./projects/ponti-api/Dockerfile.stg
+    image: "ponti-api:${APP_VERSION}"
+    env_file:
+      - .env
+    ports:
+      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
+    environment:
+      - DEPLOY_ENV=${DEPLOY_ENV}
+      - APP_ROOT=/app
+      - GO111MODULE=on
+      - GIN_MODE=debug
+    depends_on:
+      ponti-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    user: "1000:1000"
+    command: ["/app/stg_binary"]
+
   ponti-db:
     image: postgres:16.3
     ports:
@@ -16,10 +39,10 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"]
       interval: 5s
       timeout: 5s
-      retries: ${APP_MAX_RETRIES}
+      retries: 5
       start_period: 10s
 
   migrate:
@@ -29,6 +52,13 @@ services:
         condition: service_healthy
     volumes:
       - ./projects/ponti-api/migrations:/migrations
+    environment:
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
     command: [
       "-path", "/migrations",
       "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}",
@@ -36,36 +66,6 @@ services:
     ]
     networks:
       - app-network
-
-  ponti-api:
-    build:
-      context: ../../
-      dockerfile: ./projects/ponti-api/Dockerfile.test
-    image: "ponti-api:${APP_VERSION}"
-    env_file:
-      - .env
-    ports:
-      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-    environment:
-      - DEPLOY_ENV=test
-      - APP_ROOT=/app
-      - GO111MODULE=on
-      - GIN_MODE=debug
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      ponti-db:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: unless-stopped
-    user: "1000:1000"
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep tail || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
 
 networks:
   app-network:

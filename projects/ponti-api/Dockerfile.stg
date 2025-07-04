@@ -18,10 +18,7 @@
     
     # Copiar todo el código del monorepo (asegúrate de que se incluya el archivo go.mod correcto)
     COPY . .
-    
-    # (Opcional) Si manejas un monorepo multi-módulo y tienes un go.work, también cópialo:
-    # COPY go.work .
-    
+       
     # Instalar dependencias de Go para el módulo de ponti-api
     WORKDIR /app/projects/ponti-api
     RUN go mod download && go mod verify
@@ -36,10 +33,10 @@
     
     # Compilar el binario para Linux (se habilita CGO por requerir dependencias como SQLite)
     # Nota: Al estar en /app/projects/ponti-api, la ruta al main es relativa a este directorio.
-    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/test_binary ./cmd/api/
+    RUN CGO_ENABLED=1 GOOS=linux go build -o /app/stg_binary ./cmd/api/
     
     # ---------------------------------------------------
-    # Etapa 2: Imagen final para test
+    # Etapa 2: Imagen final para staging
     # ---------------------------------------------------
     FROM alpine:latest
     
@@ -52,12 +49,13 @@
     
     # Copiar el binario compilado desde la etapa builder
     COPY --from=builder /app/pkg  /app/pkg
-    COPY --from=builder /app/test_binary /app/test_binary
+    COPY --from=builder /app/stg_binary /app/stg_binary
     # Copiar el archivo .env desde el módulo ponti-api (o desde donde lo tengas ubicado)
     COPY --from=builder /app/projects/ponti-api/.env /app/projects/ponti-api/.env
+    COPY --from=builder /app/projects/ponti-api/migrations /app/migrations
     
     # Exponer el puerto que utilice la aplicación (ajustá si es necesario)
     EXPOSE 8080
     
     # Comando de inicio de la aplicación
-    CMD ["/app/test_binary"]
+    CMD ["/app/stg_binary"]

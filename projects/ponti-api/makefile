@@ -3,200 +3,81 @@ SHELL := /bin/bash
 # Variables
 ROOT_DIR := $(shell pwd)
 BUILD_DIR := $(ROOT_DIR)/bin
-DOCKER_COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
-DOCKER_COMPOSE_TEST := $(ROOT_DIR)/docker-compose.test.yml
+COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
+COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
 
-# Phony targets
 .PHONY: all build run test clean lint \
 	dev-build dev-up dev-down dev-reset dev-logs \
-	test-build test-up test-down test-logs
+	stg-build stg-up stg-down stg-logs
 
 # Default target
 all: build run
 
-# Core commands
+# --- Go Core ---
 build:
-	@echo "Building the project..."
+	@echo "🔨 Build..."
 	@mkdir -p $(BUILD_DIR)
-	APP_NAME=main go build -gcflags "all=-N -l" -o $(BUILD_DIR)/main -ldflags "-X main.Version=$(VERSION)" $(ROOT_DIR)/cmd/
+	go build -o $(BUILD_DIR)/main -gcflags "all=-N -l" -ldflags "-X main.Version=$(VERSION)" ./cmd/
 
 run:
-	@echo "Running the project..."
-	@go run $(ROOT_DIR)/cmd/
+	@echo "🚀 Run..."
+	go run ./cmd/
 
 test:
-	@echo "Running tests..."
-	@go test ./...
+	@echo "🧪 Test..."
+	go test ./...
 
 clean:
-	@echo "Cleaning up..."
-	@rm -f $(BUILD_DIR)/main
+	@echo "🧹 Clean..."
+	rm -f $(BUILD_DIR)/main
 
 lint:
-	@echo "Linting the project..."
-	@golangci-lint run --config .golangci.yml --verbose
+	@echo "🔍 Lint..."
+	golangci-lint run --config .golangci.yml --verbose
 
 run-api:
-	@echo "Starting API..."
+	@echo "🚦 Run API..."
 	go run ./cmd/api/
 
-# ----------- Docker Compose Commands -----------
+# --- Docker Compose Helpers ---
 
-# Development
+define compose_cmd
+	@echo "$(2) services ($(1))..."
+	docker compose -f $($(1)) $(3)
+endef
+
+# --- Dev ---
 dev-build:
-	@echo "Building services in dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) up --build -d
+	$(call compose_cmd,COMPOSE_DEV,Building,up --build -d)
 	@$(MAKE) dev-logs
 
 dev-up:
-	@echo "Starting services in dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) up -d
+	$(call compose_cmd,COMPOSE_DEV,Starting,up -d)
 	@$(MAKE) dev-logs
 
 dev-down:
-	@echo "Stopping services in dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) down --remove-orphans
+	$(call compose_cmd,COMPOSE_DEV,Stopping,down --remove-orphans)
 
 dev-reset:
-	@echo "⚠️  Limpiando volúmenes y levantando todo de nuevo (esto borra la base de datos)..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) down -v --remove-orphans
-	docker compose -f $(DOCKER_COMPOSE_DEV) up --build -d
+	@echo "⚠️  Limpiando volúmenes y recreando (esto borra la base de datos)..."
+	docker compose -f $(COMPOSE_DEV) down -v --remove-orphans
+	docker compose -f $(COMPOSE_DEV) up --build -d
 	@$(MAKE) dev-logs
 
 dev-logs:
-	@echo "Fetching logs for dev services..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) logs -f
+	$(call compose_cmd,COMPOSE_DEV,Logs,logs -f)
 
-# Test
-test-build:
-	@echo "Building services in test mode..."
-	docker compose -f $(DOCKER_COMPOSE_TEST) up --build -d
-	@$(MAKE) test-logs
+# --- Staging/Test ---
+stg-build:
+	$(call compose_cmd,COMPOSE_STG,Building,up --build -d)
+	@$(MAKE) stg-logs
 
-test-up:
-	@echo "Starting services in test mode..."
-	docker compose -f $(DOCKER_COMPOSE_TEST) up -d
-	@$(MAKE) test-logs
+stg-up:
+	$(call compose_cmd,COMPOSE_STG,Starting,up -d)
+	@$(MAKE) stg-logs
 
-test-down:
-	@echo "Stopping services in test mode..."
-	docker compose -f $(DOCKER_COMPOSE_TEST) down --remove-orphans
+stg-down:
+	$(call compose_cmd,COMPOSE_STG,Stopping,down --remove-orphans)
 
-test-logs:
-	@echo "Fetching logs for test services..."
-	docker compose -f $(DOCKER_COMPOSE_TEST) logs -f
-
-
-
-
-
-# SHELL := /bin/bash
-
-# # Variables
-# ROOT_DIR := $(shell pwd)
-# VERSION := 1.0
-# BUILD_DIR := $(ROOT_DIR)/bin
-# DOCKER_COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
-# DOCKER_COMPOSE_TEST := $(ROOT_DIR)/docker-compose.test.yml
-# DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
-# MIGRATIONS_DIR := ./migrations
-# MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
-# MIGRATIONS_NAME=$(name)
-
-# # Phony targets
-# .PHONY: all build run test clean lint \
-# 	docker-dev-build docker-dev-up docker-dev-down docker-dev-logs \
-# 	docker-stg-build docker-stg-up docker-stg-down docker-stg-logs \
-# 	migrate-up migrate-down migrate-force migrate-version
-
-# # Migrations
-# # migrate -path ./migrations -database "postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable" up
-# migrate-up: 
-# 	@echo "Running migrations..."
-# 	@$(MIGRATE) up
-
-# # migrate -path ./migrations -database "postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable" down 1
-# migrate-down: 
-# 	@echo "Running migrations down..."
-# 	@$(MIGRATE) down
-
-# migrate-create:
-# 	@echo "Creating migration..."
-# 	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
-
-# migrate-force:
-# 	@echo "Forcing migration..."
-# 	@$(MIGRATE) force -1
-
-# migrate-version:
-# 	@echo "Getting migration version..."
-# 	@$(MIGRATE) version
-
-# # Default target
-# all: build run
-
-# # Core commands
-# build:
-# 	@echo "Building the project..."
-# 	@mkdir -p $(BUILD_DIR)
-# 	APP_NAME=main go build -gcflags "all=-N -l" -o $(BUILD_DIR)/main -ldflags "-X main.Version=$(VERSION)" $(ROOT_DIR)/cmd/
-
-# run:
-# 	@echo "Running the project..."
-# 	@go run $(ROOT_DIR)/cmd/
-
-# test:
-# 	@echo "Running tests..."
-# 	@go test ./...
-
-# clean:
-# 	@echo "Cleaning up..."
-# 	@rm -f $(BUILD_DIR)/main
-
-# lint:
-# 	@echo "Linting the project..."
-# 	@golangci-lint run --config .golangci.yml --verbose
-
-# run-api:
-# 	@echo "Starting API..."
-# 	go run ./cmd/api/
-
-# # ----------- Docker Compose Commands -----------
-
-# # Development
-# dev-build:
-# 	@echo "Building services in dev mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_DEV) up --build -d
-# 	@$(MAKE) dev-logs
-
-# dev-up:
-# 	@echo "Starting services in dev mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_DEV) up -d
-# 	@$(MAKE) dev-logs
-
-# dev-down:
-# 	@echo "Stopping services in dev mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_DEV) down --remove-orphans
-
-# dev-logs:
-# 	@echo "Fetching logs for dev services..."
-# 	docker compose -f $(DOCKER_COMPOSE_DEV) logs -f
-
-# # Test
-# test-build:
-# 	@echo "Building services in test mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_TEST) up --build -d
-# 	@$(MAKE) test-logs
-
-# test-up:
-# 	@echo "Starting services in test mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_TEST) up -d
-# 	@$(MAKE) test-logs
-
-# test-down:
-# 	@echo "Stopping services in test mode..."
-# 	docker compose -f $(DOCKER_COMPOSE_TEST) down --remove-orphans
-
-# test-logs:
-# 	@echo "Fetching logs for test services..."
-# 	docker compose -f $(DOCKER_COMPOSE_TEST) logs -f
+stg-logs:
+	$(call compose_cmd,COMPOSE_STG,Logs,logs -f)
