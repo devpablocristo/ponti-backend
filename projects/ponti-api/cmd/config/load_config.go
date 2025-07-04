@@ -45,6 +45,7 @@ func LoadConfig() (*AllConfigs, error) {
 		{"http server", &cfg.HTTPServer},
 		{"debugger", &cfg.Debugger},
 		{"db", &cfg.DB},
+		{"migrations", &cfg.Migrations},
 		{"suggester", &cfg.WordsSuggester},
 	}
 	for _, sec := range sections {

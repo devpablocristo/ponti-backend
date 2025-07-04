@@ -32,12 +32,12 @@ func main() {
 
 	currentEnv := env.GetFromString(deps.Config.General.Environment)
 	switch currentEnv {
-	case env.Local, env.Dev:
-		if err := runMigrations(deps.Config.DB); err != nil {
+	case env.Local:
+		if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
-	case env.Staging, env.Prod:
-		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB()); err != nil {
+	case env.Dev, env.Staging:
+		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
 	default:

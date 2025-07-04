@@ -52,7 +52,7 @@
     COPY --from=builder /app/stg_binary /app/stg_binary
     # Copiar el archivo .env desde el módulo ponti-api (o desde donde lo tengas ubicado)
     COPY --from=builder /app/projects/ponti-api/.env /app/projects/ponti-api/.env
-    COPY --from=builder /app/projects/ponti-api/migrations /app/migrations
+    COPY --from=builder /app/projects/ponti-api/migrations  /app/projects/ponti-api/migrations
     
     # Exponer el puerto que utilice la aplicación (ajustá si es necesario)
     EXPOSE 8080

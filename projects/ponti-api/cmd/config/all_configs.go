@@ -8,4 +8,5 @@ type AllConfigs struct {
 	Debugger       Debugger       // configuración del debugger
 	DB             DB             // configuración de la base de datos
 	WordsSuggester WordsSuggester // configuración del sugeridor
+	Migrations     Migrations     // configuración de las migraciones
 }

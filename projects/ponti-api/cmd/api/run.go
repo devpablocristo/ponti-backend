@@ -46,9 +46,14 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.LeaseTypeHandler.Routes()
 }
 
-func runMigrations(dbConfig config.DB) error {
+func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
+	// m, err := migrate.New(
+	// 	"file://migrations",
+	// 	buildMigrateDatabaseURL(dbConfig),
+	// )
+
 	m, err := migrate.New(
-		"file://migrations",
+		migConfig.Dir,
 		buildMigrateDatabaseURL(dbConfig),
 	)
 	if err != nil {
@@ -60,15 +65,15 @@ func runMigrations(dbConfig config.DB) error {
 	return nil
 }
 
-func runMigrationsWithInstance(sqlDB *sql.DB) error {
+func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
 	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("creating postgres driver: %w", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://migrations",
-		"postgres",
+		migConfig.Dir,
+		dbConfig.Name,
 		driver,
 	)
 	if err != nil {
