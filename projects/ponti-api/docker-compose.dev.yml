@@ -59,7 +59,7 @@ services:
       ponti-db:
         condition: service_healthy
     volumes:
-      - ./projects/ponti-api/migrations:/migrations
+      - ./migrations:/migrations
     environment:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
