@@ -54,7 +54,7 @@ services:
       start_period: 10s
 
   migrate:
-    image: migrate/migrate
+    image: migrate/migrate:v4.17.1
     depends_on:
       ponti-db:
         condition: service_healthy
