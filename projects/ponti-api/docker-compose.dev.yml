@@ -56,7 +56,7 @@ services:
   migrate:
     image: migrate/migrate
     depends_on:
-      notifications_bot-db:
+      ponti-db:
         condition: service_healthy
     volumes:
       - ./migrations:/migrations
@@ -66,9 +66,10 @@ services:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
       - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
     command: [
       "-path", "/migrations",
-      "-database", "mysql://${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}?multiStatements=true",
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}",
       "up"
     ]
     networks:
