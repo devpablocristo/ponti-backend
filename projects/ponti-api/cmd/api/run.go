@@ -14,8 +14,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-// RunHttpServer registers routes in the Gin router and starts the HTTP server.
-func RunHttpServer(ctx context.Context, deps *wire.Dependencies) error {
+// runHttpServer registers routes in the Gin router and starts the HTTP server.
+func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
@@ -47,11 +47,6 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 }
 
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
-	// m, err := migrate.New(
-	// 	"file://migrations",
-	// 	buildMigrateDatabaseURL(dbConfig),
-	// )
-
 	m, err := migrate.New(
 		migConfig.Dir,
 		buildMigrateDatabaseURL(dbConfig),
