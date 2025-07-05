@@ -36,7 +36,7 @@ func main() {
 		if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
-	case env.Dev, env.Staging:
+	case env.Dev, env.Staging, env.Cloud:
 		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
