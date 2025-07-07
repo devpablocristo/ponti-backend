@@ -47,24 +47,15 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 }
 
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
-	m, err := migrate.New(
-		"file://migrations",               //<--- migConfig.Dir, directorio de migraciones
-		buildMigrateDatabaseURL(dbConfig), //<--- dbConfig, variables de entorno de la db
-	)
-
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-
 	// m, err := migrate.New(
-	// 	migConfig.Dir,
-	// 	buildMigrateDatabaseURL(dbConfig),
+	// 	"file://migrations",               //<--- migConfig.Dir, directorio de migraciones
+	// 	buildMigrateDatabaseURL(dbConfig), //<--- dbConfig, variables de entorno de la db
 	// )
+
+	m, err := migrate.New(
+		migConfig.Dir,
+		buildMigrateDatabaseURL(dbConfig),
+	)
 	if err != nil {
 		return fmt.Errorf("error creating migrate instance: %w", err)
 	}
@@ -80,26 +71,17 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 		return fmt.Errorf("creating postgres driver: %w", err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://migrations", //<--- migConfig.Dir, directorio de migraciones
-		"postgres",          //<--- dbConfig.Name, nombre de la db
-		driver,
-	)
-
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-	fmt.Println(migConfig.Dir)
-
 	// m, err := migrate.NewWithDatabaseInstance(
-	// 	migConfig.Dir,
-	// 	dbConfig.Name,
+	// 	"file://migrations", //<--- migConfig.Dir, directorio de migraciones
+	// 	"postgres",          //<--- dbConfig.Name, nombre de la db
 	// 	driver,
 	// )
+
+	m, err := migrate.NewWithDatabaseInstance(
+		migConfig.Dir,
+		dbConfig.Name,
+		driver,
+	)
 	if err != nil {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}
