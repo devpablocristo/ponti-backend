@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -37,6 +38,14 @@ func main() {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
 	case env.Dev, env.Staging, env.Cloud:
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+		fmt.Println(deps.Config.Migrations)
+
 		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
