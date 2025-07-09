@@ -9,7 +9,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/wire v0.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.30.0
 )
 
 require (
@@ -87,7 +87,7 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.5.7 // indirect
-	gorm.io/driver/postgres v1.5.10 // indirect
+	gorm.io/driver/postgres v1.6.0 // indirect
 	gorm.io/driver/sqlite v1.5.7 // indirect
 )
 
