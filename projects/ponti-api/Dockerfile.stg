@@ -36,7 +36,7 @@
     RUN CGO_ENABLED=1 GOOS=linux go build -o /app/stg_binary ./cmd/api/
     
     # ---------------------------------------------------
-    # Etapa 2: Imagen final para staging
+    # Etapa 2: Imagen final para stg
     # ---------------------------------------------------
     FROM alpine:latest
     

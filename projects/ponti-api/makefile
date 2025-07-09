@@ -67,7 +67,7 @@ dev-reset:
 dev-logs:
 	$(call compose_cmd,COMPOSE_DEV,Logs,logs -f)
 
-# --- Staging/Test ---
+# --- Stg/Test ---
 stg-build:
 	$(call compose_cmd,COMPOSE_STG,Building,up --build -d)
 	@$(MAKE) stg-logs

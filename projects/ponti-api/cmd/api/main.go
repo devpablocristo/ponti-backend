@@ -37,8 +37,8 @@ func main() {
 		if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
-	case env.Dev, env.Staging:
-		// INFO: las vars se cargan desde env.dev y env.staging
+	case env.Dev, env.Stg:
+		// INFO: las vars se cargan desde env.dev y env.stg
 		if err := runGormMigrations(ctx, deps.GormRepo); err != nil {
 			log.Fatalf("Failed to run Gorm migrations: %v", err)
 		}

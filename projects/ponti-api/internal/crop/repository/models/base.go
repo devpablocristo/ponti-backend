@@ -8,7 +8,7 @@ import (
 // Crop represents a type of crop.
 type Crop struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
-	Name string `gorm:"size:50;not null" json:"name"`
+	Name string `gorm:"uniqueIndex;size:50;not null" json:"name"`
 	base.BaseModel
 }
 

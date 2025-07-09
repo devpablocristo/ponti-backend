@@ -7,7 +7,7 @@ type Environment int
 const (
 	Local Environment = iota
 	Dev
-	Staging
+	Stg
 	Cloud
 	Prod
 )
@@ -15,7 +15,7 @@ const (
 var envNames = [...]string{
 	"local",
 	"dev",
-	"staging",
+	"stg",
 	"cloud",
 	"prod",
 }
@@ -31,8 +31,8 @@ func GetFromString(s string) Environment {
 	switch strings.ToLower(s) {
 	case "prod":
 		return Prod
-	case "staging":
-		return Staging
+	case "stg":
+		return Stg
 	case "dev":
 		return Dev
 	case "cloud":
