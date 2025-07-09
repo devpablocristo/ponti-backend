@@ -1,0 +1,35 @@
+{
+  "name": "Ponti API Dev Container",
+  "dockerComposeFile": ["../projects/ponti-api/docker-compose.yml"],
+  "service": "ponti-api",
+  "workspaceFolder": "/app",
+  "forwardPorts": [
+    2345,
+    8080
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "ms-azuretools.vscode-containers",
+        "ms-vscode-remote.remote-containers",
+        "eamodio.gitlens",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "GO111MODULE": "on"
+  },
+  "settings": {
+    "go.useLanguageServer": true
+  },
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp=unconfined",
+    "--volume=/var/run/docker.sock:/var/run/docker.sock"
+  ],
+  "postStartCommand": "go mod download"
+}

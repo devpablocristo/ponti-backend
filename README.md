@@ -273,3 +273,7 @@ Customer (1)──────(∞) Project (∞)──────(1) Campaign
 - **Field** (campo): cada proyecto tiene uno o más campos agrícolas.
 - **Lot** (lote): cada campo tiene múltiples lotes (parcelas).
 - **Crop** (cultivo): un lote puede tener asociado un cultivo actual y uno anterior.
+
+
+X-API-KEY abc123secreta
+X-USER-ID 123

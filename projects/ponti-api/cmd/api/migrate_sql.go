@@ -1,52 +1,18 @@
 package main
 
 import (
-	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"log"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
-	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 )
 
-// runHttpServer registers routes in the Gin router and starts the HTTP server.
-func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
-	if deps == nil {
-		return errors.New("dependencies cannot be nil")
-	}
-
-	log.Println("Registering HTTP routes...")
-
-	// Set up the Gin router with global middlewares
-	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
-
-	// Register all application routes.
-	log.Println("Starting HTTP Server...")
-	registerHttpRoutes(deps)
-
-	// Start the HTTP server (e.g., on port 8080).
-	return deps.GinEngine.RunServer(ctx)
-}
-
-// registerHttpRoutes registers all application routes in the Gin router.
-func registerHttpRoutes(deps *wire.Dependencies) {
-	deps.LotHandler.Routes()
-	deps.CustomerHandler.Routes()
-	deps.CampaignHandler.Routes()
-	deps.InvestorHandler.Routes()
-	deps.FieldHandler.Routes()
-	deps.ProjectHandler.Routes()
-	deps.CropHandler.Routes()
-	deps.ManagerHandler.Routes()
-	deps.LeaseTypeHandler.Routes()
-}
-
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
+	// INFO: las vars se cargan desde env.local
 	// m, err := migrate.New(
 	// 	"file://migrations",               //<--- migConfig.Dir, directorio de migraciones
 	// 	buildMigrateDatabaseURL(dbConfig), //<--- dbConfig, variables de entorno de la db
@@ -71,6 +37,7 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 		return fmt.Errorf("creating postgres driver: %w", err)
 	}
 
+	// TODO: de referencia para ver como estaba hecha con config anterior
 	// m, err := migrate.NewWithDatabaseInstance(
 	// 	"file://migrations", //<--- migConfig.Dir, directorio de migraciones
 	// 	"postgres",          //<--- dbConfig.Name, nombre de la db

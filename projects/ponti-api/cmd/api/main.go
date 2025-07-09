@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -37,14 +36,19 @@ func main() {
 		if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
-	case env.Dev, env.Staging, env.Cloud:
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
-		fmt.Println(deps.Config.Migrations)
+	case env.Dev, env.Staging:
+		if err := runGormMigrations(ctx, deps.GormRepo); err != nil {
+			log.Fatalf("Failed to run Gorm migrations: %v", err)
+		}
+		if err := seedDatabase(ctx, deps.GormRepo); err != nil {
+			log.Fatalf("Failed to run database seeders: %v", err)
+		}
+	case env.Cloud:
+		// TODO: configurar las vars en GCP
+		// TODO: las vars deberian cargarse en el paquete config
+		// TODO: harcodeo los valores que estaban antes de los cambios
+		deps.Config.DB.Name = "postgres"
+		deps.Config.Migrations.Dir = "file://migrations"
 
 		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 			log.Fatalf("Failed to run SQL migrations: %v", err)
