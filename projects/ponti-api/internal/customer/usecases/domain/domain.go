@@ -11,4 +11,5 @@ type Customer struct {
 type ListedCustomer struct {
 	ID   int64  // Llave primaria (numérica)
 	Name string // Nombre del customer
+	Type string
 }

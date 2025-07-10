@@ -5,9 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	// mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	// gsv "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"

@@ -3,21 +3,190 @@ package main
 import (
 	"context"
 	"fmt"
-
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"math/rand"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-
+	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
+	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
+	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 )
 
 func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
+	if err := seedCustomers(repo); err != nil {
+		return err
+	}
+	if err := seedCampaigns(repo); err != nil {
+		return err
+	}
+	if err := seedManagers(repo); err != nil {
+		return err
+	}
+	if err := seedInvestors(repo); err != nil {
+		return err
+	}
 	if err := seedCrops(repo); err != nil {
 		return err
 	}
 	if err := seedLeaseTypes(repo); err != nil {
 		return err
+	}
+	if err := seedProjects(repo); err != nil {
+		return err
+	}
+	return nil
+}
+
+func seedCustomers(repo *gorm.Repository) error {
+	customers := []customermodels.Customer{
+		{Name: "Cliente A", Type: "empresa"},
+		{Name: "Cliente B", Type: "persona"},
+		{Name: "Cliente C", Type: "empresa"},
+		{Name: "Cliente D", Type: "persona"},
+		{Name: "Cliente E", Type: "empresa"},
+	}
+	for _, c := range customers {
+		if err := repo.Client().FirstOrCreate(&c, customermodels.Customer{Name: c.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed customer %s: %w", c.Name, err)
+		}
+	}
+	return nil
+}
+
+func seedCampaigns(repo *gorm.Repository) error {
+	campaigns := []campaignmodels.Campaign{
+		{Name: "Campaña 2024"},
+		{Name: "Campaña 2025"},
+	}
+	for _, c := range campaigns {
+		if err := repo.Client().FirstOrCreate(&c, campaignmodels.Campaign{Name: c.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed campaign %s: %w", c.Name, err)
+		}
+	}
+	return nil
+}
+
+func seedManagers(repo *gorm.Repository) error {
+	managers := []managermodels.Manager{
+		{Name: "Manager Uno"},
+		{Name: "Manager Dos"},
+	}
+	for _, m := range managers {
+		if err := repo.Client().FirstOrCreate(&m, managermodels.Manager{Name: m.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed manager %s: %w", m.Name, err)
+		}
+	}
+	return nil
+}
+
+func seedInvestors(repo *gorm.Repository) error {
+	investors := []investormodels.Investor{
+		{Name: "Investor Uno"},
+		{Name: "Investor Dos"},
+	}
+	for _, i := range investors {
+		if err := repo.Client().FirstOrCreate(&i, investormodels.Investor{Name: i.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed investor %s: %w", i.Name, err)
+		}
+	}
+	return nil
+}
+
+// Projects (crea todo lo necesario para los projects)
+func seedProjects(repo *gorm.Repository) error {
+	db := repo.Client()
+
+	// Get data for relations
+	var customers []customermodels.Customer
+	var campaigns []campaignmodels.Campaign
+	var managers []managermodels.Manager
+	var investors []investormodels.Investor
+	var leaseTypes []leasetypemodels.LeaseType
+	var crops []cropmodels.Crop
+
+	db.Find(&customers)
+	db.Find(&campaigns)
+	db.Find(&managers)
+	db.Find(&investors)
+	db.Find(&leaseTypes)
+	db.Find(&crops)
+
+	if len(customers) == 0 || len(campaigns) == 0 || len(managers) == 0 || len(investors) == 0 || len(leaseTypes) == 0 || len(crops) < 2 {
+		return fmt.Errorf("missing seed data dependencies")
+	}
+
+	// Convertimos []managermodels.Manager a []projectmodels.Manager
+	var projectManagers []projectmodels.Manager
+	for _, m := range managers {
+		projectManagers = append(projectManagers, projectmodels.Manager{
+			ID:   m.ID,
+			Name: m.Name,
+		})
+	}
+
+	for i := 1; i <= 5; i++ {
+		projectName := fmt.Sprintf("Proyecto Demo %d", i)
+
+		// Evitar duplicados
+		var exists projectmodels.Project
+		if err := db.Where("name = ?", projectName).First(&exists).Error; err == nil {
+			continue
+		}
+
+		// Project (relación managers tipo projectmodels.Manager)
+		project := projectmodels.Project{
+			Name:       projectName,
+			CustomerID: customers[i%len(customers)].ID,
+			CampaignID: campaigns[i%len(campaigns)].ID,
+			AdminCost:  int64(rand.Intn(10000) + 1000),
+			Managers:   []projectmodels.Manager{projectManagers[i%len(projectManagers)]},
+		}
+		if err := db.Create(&project).Error; err != nil {
+			return fmt.Errorf("failed to seed project: %w", err)
+		}
+
+		// Project Investors
+		piv := projectmodels.ProjectInvestor{
+			ProjectID:  project.ID,
+			InvestorID: investors[i%len(investors)].ID,
+			Percentage: 50,
+		}
+		if err := db.Create(&piv).Error; err != nil {
+			return fmt.Errorf("failed to seed project investor: %w", err)
+		}
+
+		// Fields and Lots
+		for j := 1; j <= 2; j++ {
+			field := fieldmodels.Field{
+				Name:             fmt.Sprintf("Field %d Proj %d", j, i),
+				ProjectID:        project.ID,
+				LeaseTypeID:      leaseTypes[j%len(leaseTypes)].ID,
+				LeaseTypePercent: floatPtr(10.0 * float64(j)),
+				LeaseTypeValue:   floatPtr(500 * float64(j)),
+			}
+			if err := db.Create(&field).Error; err != nil {
+				return fmt.Errorf("failed to seed field: %w", err)
+			}
+			// Lots
+			for k := 1; k <= 2; k++ {
+				lot := lotmodels.Lot{
+					Name:           fmt.Sprintf("Lote %d Field %d Proj %d", k, j, i),
+					FieldID:        field.ID,
+					Hectares:       float64(10 * k),
+					PreviousCropID: crops[(k-1)%len(crops)].ID,
+					CurrentCropID:  crops[k%len(crops)].ID,
+					Season:         fmt.Sprintf("202%d", 3+k),
+				}
+				if err := db.Create(&lot).Error; err != nil {
+					return fmt.Errorf("failed to seed lot: %w", err)
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -51,3 +220,5 @@ func seedLeaseTypes(repo *gorm.Repository) error {
 	fmt.Println("Finished seeding lease types")
 	return nil
 }
+
+func floatPtr(f float64) *float64 { return &f }

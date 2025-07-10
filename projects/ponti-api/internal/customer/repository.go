@@ -8,7 +8,7 @@ import (
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	
+
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 )
@@ -50,7 +50,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 
 	// Consulta ligera: sólo id y name
 	if err := db0.
-		Select("id, name").
+		Select("id, name, type").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -63,6 +63,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 		customers[i] = domain.ListedCustomer{
 			ID:   m.ID,
 			Name: m.Name,
+			Type: m.Type,
 		}
 	}
 
