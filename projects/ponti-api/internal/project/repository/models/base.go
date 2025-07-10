@@ -133,7 +133,6 @@ func (m *Project) ToDomain() *domain.Project {
 		Customer: customerdom.Customer{
 			ID:   m.CustomerID,
 			Name: m.Customer.Name,
-			Type: m.Customer.Type,
 		},
 		Campaign: campaigndom.Campaign{
 			ID:   m.CampaignID,

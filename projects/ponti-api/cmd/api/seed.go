@@ -47,11 +47,11 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 
 func seedCustomers(repo *gorm.Repository) error {
 	customers := []customermodels.Customer{
-		{Name: "Cliente A", Type: "empresa"},
-		{Name: "Cliente B", Type: "persona"},
-		{Name: "Cliente C", Type: "empresa"},
-		{Name: "Cliente D", Type: "persona"},
-		{Name: "Cliente E", Type: "empresa"},
+		{Name: "Cliente A"},
+		{Name: "Cliente B"},
+		{Name: "Cliente C"},
+		{Name: "Cliente D"},
+		{Name: "Cliente E"},
 	}
 	for _, c := range customers {
 		if err := repo.Client().FirstOrCreate(&c, customermodels.Customer{Name: c.Name}).Error; err != nil {

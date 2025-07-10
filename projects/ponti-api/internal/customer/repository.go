@@ -50,7 +50,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 
 	// Consulta ligera: sólo id y name
 	if err := db0.
-		Select("id, name, type").
+		Select("id, name").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -63,7 +63,6 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 		customers[i] = domain.ListedCustomer{
 			ID:   m.ID,
 			Name: m.Name,
-			Type: m.Type,
 		}
 	}
 
