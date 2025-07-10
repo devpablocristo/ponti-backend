@@ -16,7 +16,7 @@ type UseCasesPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
-	ListLots(context.Context, int64) ([]domain.Lot, error)
+	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
@@ -67,12 +67,16 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateLot)
-		public.GET("", h.ListLots)
+		public.GET("", h.ListLots)            // ÚNICO endpoint de lista
+		public.GET("/kpis", h.GetLotKPIs)     // KPIs endpoint
+		public.GET("/table", h.ListLotsTable) // Table endpoint
 		public.GET("/:id", h.GetLot)
 		public.PUT("/:id", h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
 	}
 }
+
+// --- Handlers ---
 
 func (h *Handler) CreateLot(c *gin.Context) {
 	var req dto.Lot
@@ -100,20 +104,16 @@ func (h *Handler) ListLots(c *gin.Context) {
 	)
 
 	switch {
-	// Caso 3: proyecto, campo y cultivo
 	case projectID > 0 && fieldID > 0 && currentCropID > 0:
 		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, currentCropID, "current")
 	case projectID > 0 && fieldID > 0 && previousCropID > 0:
 		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, previousCropID, "previous")
-
-	// Caso 2: proyecto y campo
 	case projectID > 0 && fieldID > 0:
 		lots, err = h.ucs.ListLotsByProjectAndField(c.Request.Context(), projectID, fieldID)
-
-	// Caso 1: solo proyecto
 	case projectID > 0:
 		lots, err = h.ucs.ListLotsByProject(c.Request.Context(), projectID)
-
+	case fieldID > 0:
+		lots, err = h.ucs.ListLotsByField(c.Request.Context(), fieldID)
 	default:
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Missing required parameters"})
 		return

@@ -6,6 +6,7 @@ services:
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
+      - .env.dev
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
       - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
@@ -34,6 +35,9 @@ services:
     image: postgres:16.3
     ports:
       - "${DB_PORT}:${DB_PORT}"
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -56,6 +60,9 @@ services:
     depends_on:
       ponti-db:
         condition: service_healthy
+    env_file:
+      - .env
+      - .env.dev
     volumes:
       - ./migrations:/migrations
     environment:
@@ -77,6 +84,9 @@ services:
     image: dpage/pgadmin4:8.12
     ports:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}

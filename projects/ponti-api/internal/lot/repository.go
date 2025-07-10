@@ -8,6 +8,7 @@ import (
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
@@ -51,7 +52,7 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 }
 
 // --- LIST ---
-func (r *Repository) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
+func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
 	if err := r.db.Client().WithContext(ctx).
 		Where("field_id = ?", fieldID).
@@ -103,6 +104,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 				"previous_crop_id": l.PreviousCrop.ID,
 				"current_crop_id":  l.CurrentCrop.ID,
 				"season":           l.Season,
+				"status":           l.Status,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", err)
 		}
@@ -186,11 +188,11 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	return res, nil
 }
 
-func (r *Repository) GetLotKPIs(ctx context.Context, projectID, fieldID, cropID int64, cropType string) (*domain.LotKPIs, error) {
-	db := r.db.Client().WithContext(ctx).Table("lots").
-		Joins("JOIN fields ON lots.field_id = fields.id")
+func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
+	db := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ?", projectID)
 
-	db = db.Where("fields.project_id = ?", projectID)
 	if fieldID > 0 {
 		db = db.Where("fields.id = ?", fieldID)
 	}
@@ -205,51 +207,27 @@ func (r *Repository) GetLotKPIs(ctx context.Context, projectID, fieldID, cropID 
 		}
 	}
 
-	var seededArea, harvestedArea, yieldTn, hectaresHarvested, totalCost, hectaresTotal float64
-
-	// Superficie sembrada (todas las hectáreas)
-	if err := db.Select("COALESCE(SUM(lots.hectares),0)").Scan(&seededArea).Error; err != nil {
-		return nil, err
+	var lots []models.Lot
+	if err := db.Find(&lots).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots for KPI", err)
 	}
 
-	// Superficie cosechada
-	if err := db.Where("lots.is_harvested = ?", true).
-		Select("COALESCE(SUM(lots.hectares),0)").Scan(&harvestedArea).Error; err != nil {
-		return nil, err
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = domain.Lot{
+			ID:            lots[i].ID,
+			Name:          lots[i].Name,
+			FieldID:       lots[i].FieldID,
+			Hectares:      lots[i].Hectares,
+			PreviousCrop:  cropdom.Crop{ID: lots[i].PreviousCropID},
+			CurrentCrop:   cropdom.Crop{ID: lots[i].CurrentCropID},
+			Season:        lots[i].Season,
+			Status:        lots[i].Status,
+			Cost:          lots[i].Cost,
+			HarvestedTons: lots[i].HarvestedTons,
+		}
 	}
-
-	// Toneladas cosechadas y superficie cosechada
-	if err := db.Where("lots.is_harvested = ?", true).
-		Select("COALESCE(SUM(lots.yield_tn),0)").Scan(&yieldTn).Error; err != nil {
-		return nil, err
-	}
-	if err := db.Where("lots.is_harvested = ?", true).
-		Select("COALESCE(SUM(lots.hectares),0)").Scan(&hectaresHarvested).Error; err != nil {
-		return nil, err
-	}
-
-	// Costos
-	if err := db.Select("COALESCE(SUM(lots.cost),0)").Scan(&totalCost).Error; err != nil {
-		return nil, err
-	}
-	if err := db.Select("COALESCE(SUM(lots.hectares),0)").Scan(&hectaresTotal).Error; err != nil {
-		return nil, err
-	}
-
-	kpis := &domain.LotKPIs{
-		SeededArea:     seededArea,
-		HarvestedArea:  harvestedArea,
-		YieldTnPerHa:   0,
-		CostPerHectare: 0,
-	}
-	if hectaresHarvested > 0 {
-		kpis.YieldTnPerHa = yieldTn / hectaresHarvested
-	}
-	if hectaresTotal > 0 {
-		kpis.CostPerHectare = totalCost / hectaresTotal
-	}
-
-	return kpis, nil
+	return res, nil
 }
 
 func (r *Repository) ListLotsTable(

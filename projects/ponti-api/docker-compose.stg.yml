@@ -6,6 +6,7 @@ services:
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
+      - .env.stg
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
@@ -26,6 +27,9 @@ services:
     image: postgres:16.3
     ports:
       - "${DB_PORT}:${DB_PORT}"
+    env_file:
+      - .env
+      - .env.stg
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -48,6 +52,9 @@ services:
     depends_on:
       ponti-db:
         condition: service_healthy
+    env_file:
+      - .env
+      - .env.stg
     volumes:
       - ./migrations:/migrations
     environment:

@@ -39,6 +39,9 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 	if err := seedProjects(repo); err != nil {
 		return err
 	}
+	if err := seedTestProjectAndLots(repo); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -129,6 +132,8 @@ func seedProjects(repo *gorm.Repository) error {
 		})
 	}
 
+	statuses := []string{"planted", "harvested"}
+
 	for i := 1; i <= 5; i++ {
 		projectName := fmt.Sprintf("Proyecto Demo %d", i)
 
@@ -181,6 +186,7 @@ func seedProjects(repo *gorm.Repository) error {
 					PreviousCropID: crops[(k-1)%len(crops)].ID,
 					CurrentCropID:  crops[k%len(crops)].ID,
 					Season:         fmt.Sprintf("202%d", 3+k),
+					Status:         statuses[(k-1)%len(statuses)],
 				}
 				if err := db.Create(&lot).Error; err != nil {
 					return fmt.Errorf("failed to seed lot: %w", err)
@@ -218,6 +224,91 @@ func seedLeaseTypes(repo *gorm.Repository) error {
 		}
 	}
 	fmt.Println("Finished seeding lease types")
+	return nil
+}
+
+func seedTestProjectAndLots(repo *gorm.Repository) error {
+	db := repo.Client()
+
+	// Buscar customer y campaign reales
+	var customer customermodels.Customer
+	if err := db.First(&customer).Error; err != nil {
+		return fmt.Errorf("failed to get customer for test: %w", err)
+	}
+	var campaign campaignmodels.Campaign
+	if err := db.First(&campaign).Error; err != nil {
+		return fmt.Errorf("failed to get campaign for test: %w", err)
+	}
+	// Buscar lease type real
+	var leaseType leasetypemodels.LeaseType
+	if err := db.First(&leaseType).Error; err != nil {
+		return fmt.Errorf("failed to get lease type for test: %w", err)
+	}
+
+	// Crear Proyecto Test
+	project := projectmodels.Project{
+		Name:       "Proyecto Test KPIs",
+		CustomerID: customer.ID,
+		CampaignID: campaign.ID,
+		AdminCost:  1000,
+	}
+	if err := db.Create(&project).Error; err != nil {
+		return fmt.Errorf("failed to seed test project: %w", err)
+	}
+
+	// Crear Field Test con LeaseType válido
+	field := fieldmodels.Field{
+		Name:             "Field Test KPIs",
+		ProjectID:        project.ID,
+		LeaseTypeID:      leaseType.ID,
+		LeaseTypePercent: floatPtr(15.0),
+		LeaseTypeValue:   floatPtr(750.0),
+	}
+	if err := db.Create(&field).Error; err != nil {
+		return fmt.Errorf("failed to seed test field: %w", err)
+	}
+
+	// Crear crops por si no existen
+	var crop1, crop2 cropmodels.Crop
+	if err := db.FirstOrCreate(&crop1, cropmodels.Crop{Name: "TestCrop1"}).Error; err != nil {
+		return fmt.Errorf("failed to seed test crop1: %w", err)
+	}
+	if err := db.FirstOrCreate(&crop2, cropmodels.Crop{Name: "TestCrop2"}).Error; err != nil {
+		return fmt.Errorf("failed to seed test crop2: %w", err)
+	}
+
+	// Crear dos lots: uno sembrado y otro cosechado
+	lots := []lotmodels.Lot{
+		{
+			Name:           "Lot Sembrado",
+			FieldID:        field.ID,
+			Hectares:       15, // Sembrado
+			PreviousCropID: crop1.ID,
+			CurrentCropID:  crop2.ID,
+			Season:         "2024",
+			Status:         "planted", // Este NO suma en harvested_area
+			Cost:           500,
+			HarvestedTons:  0,
+		},
+		{
+			Name:           "Lot Cosechado",
+			FieldID:        field.ID,
+			Hectares:       25, // Cosechado
+			PreviousCropID: crop2.ID,
+			CurrentCropID:  crop1.ID,
+			Season:         "2024",
+			Status:         "harvested", // Este suma en harvested_area
+			Cost:           800,         // Ejemplo: costo mayor para el lote cosechado
+			HarvestedTons:  60,          // Ejemplo: 60 toneladas cosechadas
+		},
+	}
+	for _, l := range lots {
+		if err := db.Create(&l).Error; err != nil {
+			return fmt.Errorf("failed to seed test lot %s: %w", l.Name, err)
+		}
+	}
+
+	fmt.Printf(">>> Proyecto Test KPIs: project_id=%d, field_id=%d\n", project.ID, field.ID)
 	return nil
 }
 
