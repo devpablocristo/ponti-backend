@@ -5,6 +5,7 @@ ROOT_DIR := $(shell pwd)
 BUILD_DIR := $(ROOT_DIR)/bin
 COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
 COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
+COMPOSE_LOCAL := $(ROOT_DIR)/docker-compose.local.yml
 DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
 MIGRATIONS_DIR := ./migrations
 MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
@@ -13,6 +14,7 @@ MIGRATIONS_NAME=$(name)
 .PHONY: all build run test clean lint \
 	dev-build dev-up dev-down dev-reset dev-logs \
 	stg-build stg-up stg-down stg-logs \
+	local-build local-up local-down local-reset local-logs \
 	migrate-up migrate-down migrate-force migrate-version migrate-create
 
 # Migrations
@@ -66,7 +68,6 @@ run-api:
 	go run ./cmd/api/
 
 # --- Docker Compose Helpers ---
-
 define compose_cmd
 	@echo "$(2) services ($(1))..."
 	docker compose -f $($(1)) $(3)
@@ -107,3 +108,24 @@ stg-down:
 
 stg-logs:
 	$(call compose_cmd,COMPOSE_STG,Logs,logs -f)
+
+# --- Local ---
+local-build:
+	$(call compose_cmd,COMPOSE_LOCAL,Building,up --build -d)
+	@$(MAKE) local-logs
+
+local-up:
+	$(call compose_cmd,COMPOSE_LOCAL,Starting,up -d)
+	@$(MAKE) local-logs
+
+local-down:
+	$(call compose_cmd,COMPOSE_LOCAL,Stopping,down --remove-orphans)
+
+local-reset:
+	@echo "⚠️  Limpiando volúmenes y recreando (esto borra la base de datos)..."
+	docker compose -f $(COMPOSE_LOCAL) down -v --remove-orphans
+	docker compose -f $(COMPOSE_LOCAL) up --build -d
+	@$(MAKE) local-logs
+
+local-logs:
+	$(call compose_cmd,COMPOSE_LOCAL,Logs,logs -f)

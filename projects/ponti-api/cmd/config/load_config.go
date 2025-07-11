@@ -28,10 +28,22 @@ func LoadConfig() (*AllConfigs, error) {
 	}
 
 	// 2) Override según DEPLOY_ENV
+	// 2) Ahora que el entorno ya tiene DEPLOY_ENV (si estaba en .env), lo leemos
 	env := strings.ToLower(os.Getenv("DEPLOY_ENV"))
 	if env != "" {
-		envFile := fmt.Sprintf("./projects/ponti-api/.env.%s", env)
-		_ = envvars.OverloadConfig(envFile)
+		envFile := fmt.Sprintf(".env.%s", env)
+		if _, err := os.Stat(envFile); err == nil {
+			// El archivo existe, se carga y sobrescribe variables
+			if err := envvars.OverloadConfig(envFile); err != nil {
+				return nil, fmt.Errorf("error overloading config from %v env file: %w", envFile, err)
+			}
+		} else if os.IsNotExist(err) {
+			// El archivo no existe, solo loguea advertencia (no error)
+			fmt.Printf("Advertencia: el archivo %s no existe, se omite override\n", envFile)
+		} else {
+			// Otro error al intentar acceder el archivo
+			return nil, fmt.Errorf("error checking existence of %v: %w", envFile, err)
+		}
 	}
 
 	// 3) Procesar cada sección

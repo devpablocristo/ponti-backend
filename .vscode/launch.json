@@ -8,6 +8,21 @@
       "mode": "auto",
       "program": "${workspaceFolder}/projects/ponti-api/cmd/api/",
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Debug Ponti API (local)",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/api/",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/projects/ponti-api/.env",   
+      "env": {
+        "APP_ROOT": "."
+      },
+      "args": [],
+      "showLog": true,
+      "trace": "verbose"
     }
   ]
 }
