@@ -132,7 +132,7 @@ func seedProjects(repo *gorm.Repository) error {
 		})
 	}
 
-	statuses := []string{"planted", "harvested"}
+	//statuses := []string{"planted", "harvested"}
 
 	for i := 1; i <= 5; i++ {
 		projectName := fmt.Sprintf("Proyecto Demo %d", i)
@@ -186,7 +186,7 @@ func seedProjects(repo *gorm.Repository) error {
 					PreviousCropID: crops[(k-1)%len(crops)].ID,
 					CurrentCropID:  crops[k%len(crops)].ID,
 					Season:         fmt.Sprintf("202%d", 3+k),
-					Status:         statuses[(k-1)%len(statuses)],
+					//Status:         statuses[(k-1)%len(statuses)],
 				}
 				if err := db.Create(&lot).Error; err != nil {
 					return fmt.Errorf("failed to seed lot: %w", err)
@@ -286,9 +286,9 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 			PreviousCropID: crop1.ID,
 			CurrentCropID:  crop2.ID,
 			Season:         "2024",
-			Status:         "planted", // Este NO suma en harvested_area
-			Cost:           500,
-			HarvestedTons:  0,
+			// Status:         "planted", // Este NO suma en harvested_area
+			// Cost:           500,
+			// HarvestedTons:  0,
 		},
 		{
 			Name:           "Lot Cosechado",
@@ -297,9 +297,9 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 			PreviousCropID: crop2.ID,
 			CurrentCropID:  crop1.ID,
 			Season:         "2024",
-			Status:         "harvested", // Este suma en harvested_area
-			Cost:           800,         // Ejemplo: costo mayor para el lote cosechado
-			HarvestedTons:  60,          // Ejemplo: 60 toneladas cosechadas
+			// Status:         "harvested", // Este suma en harvested_area
+			// Cost:           800,         // Ejemplo: costo mayor para el lote cosechado
+			// HarvestedTons:  60,          // Ejemplo: 60 toneladas cosechadas
 		},
 	}
 	for _, l := range lots {

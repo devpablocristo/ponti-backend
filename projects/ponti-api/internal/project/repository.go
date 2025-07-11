@@ -13,6 +13,7 @@ import (
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	invmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
@@ -303,6 +304,24 @@ func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name str
 	}
 
 	return m.ToDomain(), nil
+}
+
+func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error) {
+	var fields []fieldmod.Field
+	err := r.db.Client().WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Find(&fields).Error
+
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get fields for project %d", projectID), err)
+	}
+
+	var fieldList []domainField.Field
+	for _, f := range fields {
+		fieldList = append(fieldList, *f.ToDomain())
+	}
+
+	return fieldList, nil
 }
 
 // --- UPDATE ---

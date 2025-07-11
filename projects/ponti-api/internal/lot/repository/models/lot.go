@@ -15,9 +15,6 @@ type Lot struct {
 	PreviousCropID int64   `gorm:"not null;index;column:previous_crop_id"`
 	CurrentCropID  int64   `gorm:"not null;index;column:current_crop_id"`
 	Season         string  `gorm:"size:20;not null;column:season"`
-	Status         string  `gorm:"type:varchar(30);not null;default:'sembrado';column:status"`
-	Cost           float64 `gorm:"not null;default:0;column:cost"`           // <-- Costo por hectárea
-	HarvestedTons  float64 `gorm:"not null;default:0;column:harvested_tons"` // <-- Toneladas cosechadas
 	base.BaseModel
 	PreviousCrop cropmod.Crop `gorm:"foreignKey:PreviousCropID;references:ID"`
 	CurrentCrop  cropmod.Crop `gorm:"foreignKey:CurrentCropID;references:ID"`
@@ -35,10 +32,7 @@ func (m *Lot) ToDomain() *domain.Lot {
 		CurrentCrop: cropdom.Crop{
 			ID: m.CurrentCropID,
 		},
-		Season:        m.Season,
-		Status:        m.Status,
-		Cost:          m.Cost,
-		HarvestedTons: m.HarvestedTons,
+		Season: m.Season,
 	}
 }
 
@@ -51,8 +45,5 @@ func FromDomain(d *domain.Lot) *Lot {
 		PreviousCropID: d.PreviousCrop.ID,
 		CurrentCropID:  d.CurrentCrop.ID,
 		Season:         d.Season,
-		Status:         d.Status,
-		Cost:           d.Cost,
-		HarvestedTons:  d.HarvestedTons,
 	}
 }

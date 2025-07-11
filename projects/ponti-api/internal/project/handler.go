@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
@@ -18,6 +19,7 @@ type UseCasesPort interface {
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
+	GetFieldsByProjectNameAndCampaignID(ctx context.Context, name string, campaignID int64) ([]domainField.Field, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
@@ -70,6 +72,7 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateProject)
 		public.GET("", h.ListProjects)
+		public.GET("/fields/:project_name/:campaign_id", h.GetFieldsByProjectNameAndCampaignID)
 		public.GET("/dropdown", h.ListProjectsDropdown)
 		public.GET("/customer/:id", h.ListProjectsByCustomerID)
 		public.GET("/:id", h.GetProject)
@@ -120,6 +123,25 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	resp := dto.NewProjectsResponse(items, page, perPage, total)
 	resp.TotalHectares = totalHectares
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) GetFieldsByProjectNameAndCampaignID(c *gin.Context) {
+	name := c.Param("project_name")
+	campaignID, err := strconv.ParseInt(c.Param("campaign_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	fields, err := h.ucs.GetFieldsByProjectNameAndCampaignID(c.Request.Context(), name, campaignID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	dtos := make([]dto.Field, len(fields))
+	for i, f := range fields {
+		dtos[i] = dto.FieldsFromDomain(f)
+	}
+	c.JSON(http.StatusOK, dtos)
 }
 
 // ListProjects maneja el endpoint GET /projects con paginación ligera

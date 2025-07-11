@@ -215,16 +215,16 @@ func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cro
 	res := make([]domain.Lot, len(lots))
 	for i := range lots {
 		res[i] = domain.Lot{
-			ID:            lots[i].ID,
-			Name:          lots[i].Name,
-			FieldID:       lots[i].FieldID,
-			Hectares:      lots[i].Hectares,
-			PreviousCrop:  cropdom.Crop{ID: lots[i].PreviousCropID},
-			CurrentCrop:   cropdom.Crop{ID: lots[i].CurrentCropID},
-			Season:        lots[i].Season,
-			Status:        lots[i].Status,
-			Cost:          lots[i].Cost,
-			HarvestedTons: lots[i].HarvestedTons,
+			ID:           lots[i].ID,
+			Name:         lots[i].Name,
+			FieldID:      lots[i].FieldID,
+			Hectares:     lots[i].Hectares,
+			PreviousCrop: cropdom.Crop{ID: lots[i].PreviousCropID},
+			CurrentCrop:  cropdom.Crop{ID: lots[i].CurrentCropID},
+			Season:       lots[i].Season,
+			// Status:        lots[i].Status,
+			// Cost:          lots[i].Cost,
+			// HarvestedTons: lots[i].HarvestedTons,
 		}
 	}
 	return res, nil
@@ -241,10 +241,12 @@ func (r *Repository) ListLotsTable(
 		Joins("JOIN fields ON lots.field_id = fields.id").
 		Joins("JOIN projects ON fields.project_id = projects.id")
 
-	base = base.Where("fields.project_id = ?", projectID)
 	if fieldID > 0 {
 		base = base.Where("fields.id = ?", fieldID)
+	} else {
+		return nil, 0, 0, 0, types.NewError(types.ErrInvalidID, "field_id is required", nil)
 	}
+
 	if cropID > 0 {
 		switch cropType {
 		case "previous":
@@ -268,7 +270,7 @@ func (r *Repository) ListLotsTable(
 		return nil, 0, 0, 0, err
 	}
 	var sumCost float64
-	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(lots.cost),0)").Scan(&sumCost).Error; err != nil {
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(projects.admin_cost),0)").Scan(&sumCost).Error; err != nil {
 		return nil, 0, 0, 0, err
 	}
 
@@ -286,7 +288,7 @@ func (r *Repository) ListLotsTable(
 			lots.variety as variety,
 			lots.hectares as sowed_area,
 			lots.sowing_date as sowing_date,
-			lots.cost as cost_per_hectare
+			projects.admin_cost as cost_per_hectare
 		`).
 		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
 		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").

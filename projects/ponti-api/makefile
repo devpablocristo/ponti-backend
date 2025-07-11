@@ -5,10 +5,36 @@ ROOT_DIR := $(shell pwd)
 BUILD_DIR := $(ROOT_DIR)/bin
 COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
 COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
+DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
+MIGRATIONS_DIR := ./migrations
+MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
+MIGRATIONS_NAME=$(name)
 
 .PHONY: all build run test clean lint \
 	dev-build dev-up dev-down dev-reset dev-logs \
-	stg-build stg-up stg-down stg-logs
+	stg-build stg-up stg-down stg-logs \
+	migrate-up migrate-down migrate-force migrate-version migrate-create
+
+# Migrations
+migrate-up: 
+	@echo "Running migrations..."
+	@$(MIGRATE) up
+
+migrate-down: 
+	@echo "Running migrations down..."
+	@$(MIGRATE) down
+
+migrate-create:
+	@echo "Creating migration..."
+	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
+
+migrate-force:
+	@echo "Forcing migration..."
+	@$(MIGRATE) force -1
+
+migrate-version:
+	@echo "Getting migration version..."
+	@$(MIGRATE) version
 
 # Default target
 all: build run

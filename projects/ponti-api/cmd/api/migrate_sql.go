@@ -12,12 +12,6 @@ import (
 )
 
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
-	// TODO: de referencia para ver como estaba hecha con config anterior
-	// m, err := migrate.New(
-	// 	"file://migrations",               //<--- migConfig.Dir, directorio de migraciones
-	// 	buildMigrateDatabaseURL(dbConfig), //<--- dbConfig, variables de entorno de la db
-	// )
-
 	m, err := migrate.New(
 		migConfig.Dir,
 		buildMigrateDatabaseURL(dbConfig),
