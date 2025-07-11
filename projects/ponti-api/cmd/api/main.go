@@ -8,7 +8,6 @@ import (
 	"sync"
 	"syscall"
 
-	env "github.com/alphacodinggroup/ponti-backend/pkg/config/env"
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
 
@@ -30,19 +29,7 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	currentEnv := env.GetFromString(deps.Config.General.Environment)
-	switch currentEnv {
-	case env.Local, env.Dev:
-		if err := runMigrations(deps.Config.DB); err != nil {
-			log.Fatalf("Failed to run SQL migrations: %v", err)
-		}
-	case env.Stage, env.Prod:
-		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB()); err != nil {
-			log.Fatalf("Failed to run SQL migrations: %v", err)
-		}
-	default:
-		log.Fatalf("Unsupported environment: %s", currentEnv)
-	}
+	setEnv(ctx, deps)
 
 	// Run the HTTP server
 	var wg sync.WaitGroup
@@ -50,7 +37,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		if err := RunHttpServer(ctx, deps); err != nil {
+		if err := runHttpServer(ctx, deps); err != nil {
 			log.Fatalf("Error running HTTP server: %v", err)
 		}
 	}()

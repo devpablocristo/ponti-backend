@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	gorm "gorm.io/gorm"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
-	gorm "gorm.io/gorm"
 )
 
 type GormEnginePort interface {
@@ -50,7 +52,7 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 }
 
 // --- LIST ---
-func (r *Repository) ListLots(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
+func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
 	if err := r.db.Client().WithContext(ctx).
 		Where("field_id = ?", fieldID).
@@ -102,6 +104,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 				"previous_crop_id": l.PreviousCrop.ID,
 				"current_crop_id":  l.CurrentCrop.ID,
 				"season":           l.Season,
+				"status":           l.Status,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", err)
 		}
@@ -127,4 +130,177 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
+	var lots []models.Lot
+	err := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ?", projectID).
+		Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, fieldID int64) ([]domain.Lot, error) {
+	var lots []models.Lot
+	err := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ? AND fields.id = ?", projectID, fieldID).
+		Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project and field", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
+	var lots []models.Lot
+	db := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ? AND fields.id = ?", projectID, fieldID)
+	switch cropType {
+	case "current":
+		db = db.Where("lots.current_crop_id = ?", cropID)
+	case "previous":
+		db = db.Where("lots.previous_crop_id = ?", cropID)
+	case "both":
+		db = db.Where("lots.current_crop_id = ? OR lots.previous_crop_id = ?", cropID, cropID)
+	}
+	err := db.Find(&lots).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots by project, field and crop", err)
+	}
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
+	db := r.db.Client().WithContext(ctx).
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Where("fields.project_id = ?", projectID)
+
+	if fieldID > 0 {
+		db = db.Where("fields.id = ?", fieldID)
+	}
+	if cropID > 0 {
+		switch cropType {
+		case "previous":
+			db = db.Where("lots.previous_crop_id = ?", cropID)
+		case "both":
+			db = db.Where("lots.previous_crop_id = ? OR lots.current_crop_id = ?", cropID, cropID)
+		default:
+			db = db.Where("lots.current_crop_id = ?", cropID)
+		}
+	}
+
+	var lots []models.Lot
+	if err := db.Find(&lots).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list lots for KPI", err)
+	}
+
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = domain.Lot{
+			ID:           lots[i].ID,
+			Name:         lots[i].Name,
+			FieldID:      lots[i].FieldID,
+			Hectares:     lots[i].Hectares,
+			PreviousCrop: cropdom.Crop{ID: lots[i].PreviousCropID},
+			CurrentCrop:  cropdom.Crop{ID: lots[i].CurrentCropID},
+			Season:       lots[i].Season,
+			// Status:        lots[i].Status,
+			// Cost:          lots[i].Cost,
+			// HarvestedTons: lots[i].HarvestedTons,
+		}
+	}
+	return res, nil
+}
+
+func (r *Repository) ListLotsTable(
+	ctx context.Context,
+	projectID, fieldID, cropID int64, cropType string,
+	page, pageSize int,
+) ([]domain.LotTable, int, float64, float64, error) {
+
+	// Build base query builder con los filtros (SIN select ni scan aún)
+	base := r.db.Client().WithContext(ctx).Table("lots").
+		Joins("JOIN fields ON lots.field_id = fields.id").
+		Joins("JOIN projects ON fields.project_id = projects.id")
+
+	if fieldID > 0 {
+		base = base.Where("fields.id = ?", fieldID)
+	} else {
+		return nil, 0, 0, 0, types.NewError(types.ErrInvalidID, "field_id is required", nil)
+	}
+
+	if cropID > 0 {
+		switch cropType {
+		case "previous":
+			base = base.Where("lots.previous_crop_id = ?", cropID)
+		case "both":
+			base = base.Where("lots.previous_crop_id = ? OR lots.current_crop_id = ?", cropID, cropID)
+		default:
+			base = base.Where("lots.current_crop_id = ?", cropID)
+		}
+	}
+
+	// --- TOTAL count ---
+	var total int64
+	if err := base.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// --- SUMAS ---
+	var sumSowedArea float64
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(lots.hectares),0)").Scan(&sumSowedArea).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+	var sumCost float64
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(projects.admin_cost),0)").Scan(&sumCost).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// --- PAGINADO ---
+	offset := (page - 1) * pageSize
+	var rows []models.LotTable // tu struct temporal con los campos
+
+	if err := base.Session(&gorm.Session{}).
+		Select(`
+			projects.name as project_name,
+			fields.name as field_name,
+			lots.name as lot_name,
+			previous_crop.name as previous_crop,
+			current_crop.name as current_crop,
+			lots.variety as variety,
+			lots.hectares as sowed_area,
+			lots.sowing_date as sowing_date,
+			projects.admin_cost as cost_per_hectare
+		`).
+		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
+		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").
+		Limit(pageSize).Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, 0, 0, err
+	}
+
+	// Mapear a dominio y devolver
+	domainRows := make([]domain.LotTable, len(rows))
+	for i := range rows {
+		domainRows[i] = rows[i].ToDomain()
+	}
+	return domainRows, int(total), sumSowedArea, sumCost, nil
 }

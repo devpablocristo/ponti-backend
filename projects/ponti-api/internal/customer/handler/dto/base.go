@@ -8,7 +8,6 @@ import (
 type Customer struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	Type string `json:"type"`
 }
 
 // ToDomain convierte el DTO Customer a la entidad de dominio.
@@ -16,7 +15,6 @@ func (c Customer) ToDomain() *domain.Customer {
 	return &domain.Customer{
 		ID:   c.ID,
 		Name: c.Name,
-		Type: c.Type,
 	}
 }
 
@@ -25,6 +23,5 @@ func FromDomain(d domain.Customer) *Customer {
 	return &Customer{
 		ID:   d.ID,
 		Name: d.Name,
-		Type: d.Type,
 	}
 }

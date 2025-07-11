@@ -4,6 +4,7 @@ import (
 	"context"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
@@ -16,6 +17,7 @@ type RepositoryPort interface {
 	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
+	GetFieldsByProjectID(context.Context, int64) ([]domainField.Field, error)
 }
 
 type WordsSuggesterPort interface {
@@ -62,6 +64,15 @@ func (u *UseCases) GetProjects(ctx context.Context, name string, customerID int6
 
 func (u *UseCases) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
 	return u.repo.ListProjects(ctx, page, perPage)
+}
+
+func (u *UseCases) GetFieldsByProjectNameAndCampaignID(ctx context.Context, name string, campaignID int64) ([]domainField.Field, error) {
+	project, err := u.repo.GetProjectByNameAndCampaignID(ctx, name, campaignID)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.repo.GetFieldsByProjectID(ctx, project.ID)
 }
 
 func (u *UseCases) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {

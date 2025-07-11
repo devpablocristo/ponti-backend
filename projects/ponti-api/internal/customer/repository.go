@@ -8,7 +8,7 @@ import (
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	
+
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 )

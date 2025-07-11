@@ -38,6 +38,22 @@ func FromDomain(d *fielddom.Field) *Field {
 
 // TO DOMAIN (sin preload de lots)
 func (m *Field) ToDomain() *fielddom.Field {
+	if m.LeaseType == nil {
+		return &fielddom.Field{
+			ID:        m.ID,
+			Name:      m.Name,
+			ProjectID: m.ProjectID,
+			LeaseType: &leasetypedom.LeaseType{
+				ID:   m.LeaseTypeID,
+				Name: "",
+			},
+			LeaseTypePercent: m.LeaseTypePercent,
+			LeaseTypeValue:   m.LeaseTypeValue,
+			CreatedAt:        m.CreatedAt,
+			UpdatedAt:        m.UpdatedAt,
+		}
+	}
+
 	return &fielddom.Field{
 		ID:        m.ID,
 		Name:      m.Name,

@@ -39,12 +39,15 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 }
 
 func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projectName string) ([]domain.Campaign, error) {
-	var campaignList []int64
+	var campaignList []struct {
+		ProjectID  int64 `gorm:"column:id"`
+		CampaignID int64
+	}
 	if customerID != 0 && projectName != "" {
 		if err := r.db.Client().
 			WithContext(ctx).
 			Model(&projectmod.Project{}).
-			Select("campaign_id").
+			Select("id, campaign_id").
 			Where("customer_id = ?", customerID).
 			Where("name = ?", projectName).
 			Scan(&campaignList).Error; err != nil {
@@ -54,12 +57,27 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 
 	var list []models.Campaign
 	if len(campaignList) > 0 {
-		if err := r.db.Client().WithContext(ctx).Where("id IN (?)", campaignList).Find(&list).Error; err != nil {
+		campaignIDs := make([]int64, len(campaignList))
+		campaignsProject := make(map[int64]int64)
+		for i, c := range campaignList {
+			campaignIDs[i] = c.CampaignID
+			campaignsProject[c.CampaignID] = c.ProjectID
+		}
+		if err := r.db.Client().WithContext(ctx).Where("id IN (?)", campaignIDs).Find(&list).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
 		}
+
 		result := make([]domain.Campaign, 0, len(list))
 		for _, c := range list {
-			result = append(result, *c.ToDomain())
+			projectID, ok := campaignsProject[c.ID]
+			if !ok {
+				continue
+			}
+			result = append(result, domain.Campaign{
+				ID:        c.ID,
+				Name:      c.Name,
+				ProjectID: projectID,
+			})
 		}
 		return result, nil
 	}

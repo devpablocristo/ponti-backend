@@ -6,6 +6,7 @@ services:
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
+      - .env.dev
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
       - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
@@ -21,9 +22,10 @@ services:
     environment:
       - GO111MODULE=on
       - BUILDING_FILES=/app/cmd/api/main.go
-      - APP_NAME=qh
+      - APP_NAME=${APP_NAME}
     depends_on:
-      - ponti-db
+      ponti-db:
+        condition: service_healthy
     networks:
       - app-network
     restart: on-failure
@@ -33,6 +35,9 @@ services:
     image: postgres:16.3
     ports:
       - "${DB_PORT}:${DB_PORT}"
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -40,22 +45,48 @@ services:
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - ponti-db_data:/var/lib/postgresql/data
-      - ./infra/postgres-storage:/storage
-      - ./infra/postgres-init:/docker-entrypoint-initdb.d
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"]
       interval: 5s
       timeout: 5s
-      retries: ${APP_MAX_RETRIES}
+      retries: 5
       start_period: 10s
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      ponti-db:
+        condition: service_healthy
+    env_file:
+      - .env
+      - .env.dev
+    volumes:
+      - ./migrations:/migrations
+    environment:
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}",
+      "up"
+    ]
+    networks:
+      - app-network
 
   pgadmin:
     image: dpage/pgadmin4:8.12
     ports:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}

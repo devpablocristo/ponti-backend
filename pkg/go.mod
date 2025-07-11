@@ -31,9 +31,9 @@ require (
 	go.mongodb.org/mongo-driver v1.16.0
 	google.golang.org/grpc v1.72.0
 	gorm.io/driver/mysql v1.5.7
-	gorm.io/driver/postgres v1.5.10
+	gorm.io/driver/postgres v1.4.0
 	gorm.io/driver/sqlite v1.5.7
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.30.0
 )
 
 require (
@@ -59,8 +59,6 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
-	github.com/jackc/pgx/v5 v5.7.4 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

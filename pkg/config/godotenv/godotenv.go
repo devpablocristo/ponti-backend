@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/joho/godotenv"
-
 	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
+	"github.com/joho/godotenv"
 )
 
-func LoadConfig(filePaths ...string) error {
+// core loader (privada)
+func loadEnvFiles(filePaths []string, overload bool) error {
 	if len(filePaths) == 0 {
 		return errors.New("no environment file paths provided")
 	}
@@ -23,9 +23,25 @@ func LoadConfig(filePaths ...string) error {
 		return errors.New("no environment files found to load")
 	}
 
-	if err := godotenv.Load(foundFiles...); err != nil {
-		return fmt.Errorf("error loading environment files: %w", err)
+	if overload {
+		if err := godotenv.Overload(foundFiles...); err != nil {
+			return fmt.Errorf("error loading environment files: %w", err)
+		}
+	} else {
+		if err := godotenv.Load(foundFiles...); err != nil {
+			return fmt.Errorf("error loading environment files: %w", err)
+		}
 	}
 
 	return nil
+}
+
+// Pública: no sobrescribe
+func LoadConfig(filePaths ...string) error {
+	return loadEnvFiles(filePaths, false)
+}
+
+// Pública: sobrescribe siempre
+func OverloadConfig(filePaths ...string) error {
+	return loadEnvFiles(filePaths, true)
 }

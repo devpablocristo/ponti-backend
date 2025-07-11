@@ -15,6 +15,7 @@ type Lot struct {
 	CurrentCropID    int64   `json:"current_crop_id" binding:"required"`
 	CurrentCropName  string  `json:"current_crop_name,omitempty"`
 	Season           string  `json:"season" binding:"required"`
+	Status           string  `json:"status" binding:"required"`
 }
 
 func (d *Lot) ToDomain() *domain.Lot {
@@ -26,6 +27,7 @@ func (d *Lot) ToDomain() *domain.Lot {
 		PreviousCrop: cropdom.Crop{ID: d.PreviousCropID, Name: d.PreviousCropName},
 		CurrentCrop:  cropdom.Crop{ID: d.CurrentCropID, Name: d.CurrentCropName},
 		Season:       d.Season,
+		Status:       d.Status,
 	}
 }
 
@@ -40,5 +42,6 @@ func FromDomain(l *domain.Lot) *Lot {
 		CurrentCropID:    l.CurrentCrop.ID,
 		CurrentCropName:  l.CurrentCrop.Name,
 		Season:           l.Season,
+		Status:           l.Status,
 	}
 }

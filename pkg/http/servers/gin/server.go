@@ -36,6 +36,18 @@ func newServer(config ConfigPort) (*Server, error) {
 		}
 
 		r := gin.New()
+
+		r.GET("/healthz", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"status":    "healthy",
+				"timestamp": time.Now(),
+			})
+		})
+
+		r.GET("/ping", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "pong"})
+		})
+
 		instance = &Server{
 			config: config,
 			router: r,

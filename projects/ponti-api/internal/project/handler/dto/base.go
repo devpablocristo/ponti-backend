@@ -54,6 +54,7 @@ type Investor struct {
 
 type Field struct {
 	ID               int64    `json:"id,omitempty"`
+	ProjectID        int64    `json:"project_id,omitempty"`
 	Name             string   `json:"name" binding:"required"`
 	LeaseTypeName    string   `json:"lease_type_name"`
 	LeaseTypeID      int64    `json:"lease_type_id" binding:"required"`
@@ -173,5 +174,27 @@ func FromDomain(d *domain.Project) *Project {
 		r.Fields = append(r.Fields, dtoF)
 	}
 
+	return r
+}
+
+func FieldsFromDomain(d fielddom.Field) Field {
+	r := Field{
+		ID:          d.ID,
+		Name:        d.Name,
+		LeaseTypeID: d.LeaseType.ID,
+		ProjectID:   d.ProjectID,
+	}
+	for _, ld := range d.Lots {
+		r.Lots = append(r.Lots, Lot{
+			ID:               ld.ID,
+			Name:             ld.Name,
+			Hectares:         ld.Hectares,
+			PreviousCropID:   ld.PreviousCrop.ID,
+			PreviousCropName: ld.PreviousCrop.Name,
+			CurrentCropID:    ld.CurrentCrop.ID,
+			CurrentCropName:  ld.CurrentCrop.Name,
+			Season:           ld.Season,
+		})
+	}
 	return r
 }

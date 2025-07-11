@@ -181,12 +181,15 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 
 	switch config.GetDBType() {
 	case Postgres:
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable",
-			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetDBName(), config.GetPort())
-		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-		if err != nil {
-			return fmt.Errorf("failed to connect to PostgreSQL server: %w", err)
-		}
+		dsn := fmt.Sprintf(
+			"host=%s user=%s password=%s dbname=postgres port=%d sslmode=%s",
+			config.GetHost(), config.GetUser(), config.GetPassword(),
+			config.GetPort(), config.GetSSLMode(),
+		)
+		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
+
 		sqlDB, err := db.DB()
 		if err != nil {
 			return fmt.Errorf("failed to get sql.DB: %w", err)
@@ -205,10 +208,14 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 			}
 		}
 	case MySQL:
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local",
-			config.GetUser(), config.GetPassword(), config.GetHost(), config.GetPort())
-
-		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		dsn := fmt.Sprintf(
+			"%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local",
+			config.GetUser(), config.GetPassword(),
+			config.GetHost(), config.GetPort(),
+		)
+		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to connect to MySQL server: %w", err)
 		}

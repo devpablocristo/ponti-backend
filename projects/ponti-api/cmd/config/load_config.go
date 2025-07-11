@@ -30,7 +30,8 @@ func LoadConfig() (*AllConfigs, error) {
 	// 2) Override según DEPLOY_ENV
 	env := strings.ToLower(os.Getenv("DEPLOY_ENV"))
 	if env != "" {
-		_ = envvars.LoadConfig(fmt.Sprintf(".env.%s", env))
+		envFile := fmt.Sprintf("./projects/ponti-api/.env.%s", env)
+		_ = envvars.OverloadConfig(envFile)
 	}
 
 	// 3) Procesar cada sección
@@ -44,6 +45,7 @@ func LoadConfig() (*AllConfigs, error) {
 		{"http server", &cfg.HTTPServer},
 		{"debugger", &cfg.Debugger},
 		{"db", &cfg.DB},
+		{"migrations", &cfg.Migrations},
 		{"suggester", &cfg.WordsSuggester},
 	}
 	for _, sec := range sections {
