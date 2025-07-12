@@ -6,11 +6,11 @@ on:
       - develop
 
 env:
-  GCP_PROJECT_ID: soalen-app
+  GCP_PROJECT_ID: pontisoft
   GCP_REGION: us-central1
-  REPOSITORY_NAME: ponti-backend
-  SERVICE_NAME: ponti-backend-api
-  IMAGE_NAME: ponti-backend-api
+  REPOSITORY_NAME: ponti-api-registry
+  SERVICE_NAME: ponti-api
+  IMAGE_NAME: ponti-api
 
 jobs:
   build-and-deploy:
