@@ -67,8 +67,8 @@ type Lot struct {
 	ID               int64   `json:"id,omitempty"`
 	Name             string  `json:"name" binding:"required"`
 	Hectares         float64 `json:"hectares" binding:"required"`
-	PreviousCropID   int64   `json:"previous_crop_id" binding:"required"`
-	CurrentCropID    int64   `json:"current_crop_id" binding:"required"`
+	PreviousCropID   int64   `json:"previous_crop_id"`
+	CurrentCropID    int64   `json:"current_crop_id"`
 	PreviousCropName string  `json:"previous_crop_name"`
 	CurrentCropName  string  `json:"current_crop_name"`
 	Season           string  `json:"season" binding:"required"`
@@ -111,12 +111,18 @@ func (r *Project) ToDomain() *domain.Project {
 		}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
-				ID:           lt.ID,
-				Name:         lt.Name,
-				Hectares:     lt.Hectares,
-				PreviousCrop: cropdom.Crop{ID: lt.PreviousCropID},
-				CurrentCrop:  cropdom.Crop{ID: lt.CurrentCropID},
-				Season:       lt.Season,
+				ID:       lt.ID,
+				Name:     lt.Name,
+				Hectares: lt.Hectares,
+				PreviousCrop: cropdom.Crop{
+					ID:   lt.PreviousCropID,
+					Name: lt.PreviousCropName,
+				},
+				CurrentCrop: cropdom.Crop{
+					ID:   lt.CurrentCropID,
+					Name: lt.CurrentCropName,
+				},
+				Season: lt.Season,
 			})
 		}
 		d.Fields = append(d.Fields, fld)

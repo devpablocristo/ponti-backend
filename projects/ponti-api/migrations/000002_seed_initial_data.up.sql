@@ -17,6 +17,6 @@ INSERT INTO lease_types (name) VALUES
 ('ARRIENDO FIJO + % INGRESO NETO');
 
 INSERT INTO campaigns (name) VALUES
-('Campaña 2024'),
-('Campaña 2025'),
-('Campaña 2026');
+('2024-2025'),
+('2025-2026'),
+('2026-2027');

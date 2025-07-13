@@ -84,7 +84,6 @@ func (h *Handler) Routes() {
 
 // CreateProject handles project creation.
 func (h *Handler) CreateProject(c *gin.Context) {
-	//var req dto.CreateProject
 	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})

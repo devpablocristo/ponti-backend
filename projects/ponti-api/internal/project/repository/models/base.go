@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
+	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
@@ -118,6 +119,8 @@ func FromDomain(d *domain.Project) *Project {
 				Season:         l.Season,
 				PreviousCropID: l.PreviousCrop.ID,
 				CurrentCropID:  l.CurrentCrop.ID,
+				PreviousCrop:   cropmod.Crop{ID: l.PreviousCrop.ID, Name: l.PreviousCrop.Name},
+				CurrentCrop:    cropmod.Crop{ID: l.CurrentCrop.ID, Name: l.CurrentCrop.Name},
 				BaseModel:      base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 			})
 		}
