@@ -11,6 +11,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
+	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
@@ -108,7 +109,23 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 
 		for key := range p.Fields {
 			p.Fields[key].ID = 0
-			for key2 := range p.Fields[key].Lots {
+			for key2, lot := range p.Fields[key].Lots {
+				currentCropID, err := ensureCrop(tx, &cropmod.Crop{
+					ID:   lot.CurrentCrop.ID,
+					Name: lot.CurrentCrop.Name,
+				})
+				if err != nil {
+					return err
+				}
+				p.Fields[key].Lots[key2].CurrentCrop.ID = currentCropID
+				previousCropID, err := ensureCrop(tx, &cropmod.Crop{
+					ID:   lot.PreviousCrop.ID,
+					Name: lot.PreviousCrop.Name,
+				})
+				if err != nil {
+					return err
+				}
+				p.Fields[key].Lots[key2].PreviousCrop.ID = previousCropID
 				p.Fields[key].Lots[key2].ID = 0
 			}
 		}
@@ -596,6 +613,33 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	return i.ID, nil
 }
 
+func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
+	if c.ID != 0 {
+		var existing cropmod.Crop
+		if err := tx.First(&existing, c.ID).Error; err == nil {
+			return existing.ID, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("failed to check crop: %w", err)
+		}
+	}
+
+	if c.Name == "" {
+		return 0, fmt.Errorf("crop name is required")
+	}
+
+	var existing cropmod.Crop
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check crop: %w", err)
+	}
+
+	if err := tx.Create(c).Error; err != nil {
+		return 0, fmt.Errorf("failed to create crop: %w", err)
+	}
+	return c.ID, nil
+}
+
 func convertStringToID(ctx context.Context) (int64, error) {
 	userID := ctx.Value(pkgmwr.ContextUserID)
 	if s, ok := userID.(string); ok {
@@ -784,6 +828,22 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 		if l.ID != 0 {
 			newLotIDs[l.ID] = struct{}{}
 		} else {
+			currentCropID, err := ensureCrop(tx, &cropmod.Crop{
+				ID:   l.CurrentCrop.ID,
+				Name: l.CurrentCrop.Name,
+			})
+			if err != nil {
+				return err
+			}
+			l.CurrentCropID = currentCropID
+			previousCropID, err := ensureCrop(tx, &cropmod.Crop{
+				ID:   l.PreviousCrop.ID,
+				Name: l.PreviousCrop.Name,
+			})
+			if err != nil {
+				return err
+			}
+			l.PreviousCropID = previousCropID
 			lot := lotmod.Lot{
 				FieldID:        newField.ID,
 				Name:           l.Name,
@@ -814,9 +874,25 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 				updates["hectares"] = l.Hectares
 			}
 			if l.PreviousCropID != el.PreviousCropID {
+				previousCropID, err := ensureCrop(tx, &cropmod.Crop{
+					ID:   l.PreviousCrop.ID,
+					Name: l.PreviousCrop.Name,
+				})
+				if err != nil {
+					return err
+				}
+				l.PreviousCropID = previousCropID
 				updates["previous_crop_id"] = l.PreviousCropID
 			}
 			if l.CurrentCropID != el.CurrentCropID {
+				currentCropID, err := ensureCrop(tx, &cropmod.Crop{
+					ID:   l.CurrentCropID,
+					Name: l.CurrentCrop.Name,
+				})
+				if err != nil {
+					return err
+				}
+				l.CurrentCropID = currentCropID
 				updates["current_crop_id"] = l.CurrentCropID
 			}
 			if l.Season != el.Season {

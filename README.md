@@ -137,9 +137,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "fields" TO "cloudrun-service-acco
 
 GRANT USAGE, SELECT ON SEQUENCE fields_id_seq TO "cloudrun-service-account@soalen-app.iam";
 
-docker build -t us-central1-docker.pkg.dev/soalen-app/ponti-backend/ponti-backend-api:0.0.8 .
+docker build -t us-central1-docker.pkg.dev/pontisoft/ponti-api-registry/ponti-api:0.0.1 .
 
-docker push us-central1-docker.pkg.dev/soalen-app/ponti-backend/ponti-backend-api:0.0.8
+docker push us-central1-docker.pkg.dev/pontisoft/ponti-api-registry/ponti-api:0.0.1
 
 ## **Mapa completo de relaciones entre las entidades**
 
@@ -273,7 +273,6 @@ Customer (1)──────(∞) Project (∞)──────(1) Campaign
 - **Field** (campo): cada proyecto tiene uno o más campos agrícolas.
 - **Lot** (lote): cada campo tiene múltiples lotes (parcelas).
 - **Crop** (cultivo): un lote puede tener asociado un cultivo actual y uno anterior.
-
 
 X-API-KEY abc123secreta
 X-USER-ID 123
