@@ -88,7 +88,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 	}
 
 	// mapeo los domains a DTOs
-	resp := make([]dto.RecordResponse, len(items))
+	resp := make([]dto.MonthResponse, len(items))
 	for i, d := range items {
 		resp[i] = dto.FromDomain(&d)
 	}
