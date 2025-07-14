@@ -11,7 +11,7 @@ type MonthResponse struct {
 	AverageValue float64 `json:"average_value"`
 }
 
-func FromDomain(d *domain.DollarAverage) MonthResponse {
+func FromDomainMonth(d *domain.DollarAverage) MonthResponse {
 	return MonthResponse{
 		Month:        d.Month,
 		StartValue:   d.StartValue,

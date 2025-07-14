@@ -24,12 +24,12 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ListByProject(ctx context.Context, projecID int64) ([]domain.DollarAverage, error) {
+func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]domain.DollarAverage, error) {
 	// preparo la consulta filtrando por project_id
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.ProjectDollarValue{}).
-		Where("project_id = ?", projecID)
+		Where("project_id = ?", projectID)
 
 	var rows []models.ProjectDollarValue
 	// Ejecuto la consulta
@@ -46,8 +46,8 @@ func (r *Repository) ListByProject(ctx context.Context, projecID int64) ([]domai
 	return out, nil
 }
 
-func (r *Repository) Create(ctx context.Context, items *domain.DollarAverage) (int64, error) {
-	m := models.FromDomain(items)
+func (r *Repository) Create(ctx context.Context, item *domain.DollarAverage) (int64, error) {
+	m := models.FromDomain(item)
 
 	// inserto el registro
 	if err := r.db.Client().WithContext(ctx).Create(m).Error; err != nil {
