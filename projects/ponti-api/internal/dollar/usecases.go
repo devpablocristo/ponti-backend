@@ -9,7 +9,7 @@ import (
 )
 
 type RepositoryPort interface {
-	ListByProject(ctx context.Context, projectID int64) ([]domain.DollarAverage, error)
+	ListByProject(context.Context, int64) ([]domain.DollarAverage, error)
 	Create(context.Context, *domain.DollarAverage) (int64, error)
 	Update(context.Context, *domain.DollarAverage) error
 	GetByComposite(ctx context.Context, projectID, year int64, month string) (*domain.DollarAverage, error)
