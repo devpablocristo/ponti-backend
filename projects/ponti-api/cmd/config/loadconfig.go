@@ -51,25 +51,9 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	// 3) Procesar cada sección de la config con envconfig
 	var cfg Config
-	sections := []struct {
-		name string
-		tgt  any
-	}{
-		{"app", &cfg.App},
-		{"api", &cfg.API},
-		{"http server", &cfg.HTTPServer},
-		{"debugger", &cfg.Debugger},
-		{"db", &cfg.DB},
-		{"migrations", &cfg.Migrations},
-		{"suggester", &cfg.WordsSuggester},
-		{"deploy", &cfg.Deploy},
-	}
-	for _, sec := range sections {
-		if err := envconfig.Process("", sec.tgt); err != nil {
-			return nil, fmt.Errorf("failed to process %s config: %w", sec.name, err)
-		}
+	if err := envconfig.Process("", &cfg); err != nil {
+		return nil, fmt.Errorf("failed to process config: %w", err)
 	}
 
 	// 4) Valores derivados
