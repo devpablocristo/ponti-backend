@@ -13,6 +13,7 @@ import (
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
@@ -42,6 +43,7 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&cropmodels.Crop{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
+		&dollarmodels.ProjectDollarValue{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.Project{}, // último
 	}

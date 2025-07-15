@@ -15,6 +15,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
@@ -128,6 +129,15 @@ func Initialize() (*Dependencies, error) {
 	leasetypeConfigAPIPort := ProvideLeaseTypeConfigAPI(allConfigs)
 	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
 	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
+	dollarGinEnginePort := ProvideDollarGinEnginePort(server)
+	dollarGormEnginePort := ProvideDollarGormEnginePort(repository)
+	dollarRepository := ProvideDollarRepository(dollarGormEnginePort)
+	dollarRepositoryPort := ProvideDollarRepositoryPort(dollarRepository)
+	dollarUseCases := ProvideDollarUseCases(dollarRepositoryPort)
+	useCasePort := ProvideDollarUseCasePort(dollarUseCases)
+	dollarConfigAPIPort := ProvideDollarConfigAPI(allConfigs)
+	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
+	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:           allConfigs,
 		GinEngine:        server,
@@ -143,6 +153,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerHandler:   managerHandler,
 		ProjectHandler:   projectHandler,
 		LeaseTypeHandler: leasetypeHandler,
+		DollarHandler:    dollarHandler,
 	}
 	return dependencies, nil
 }
@@ -164,4 +175,5 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	DollarHandler    *dollar.Handler
 }
