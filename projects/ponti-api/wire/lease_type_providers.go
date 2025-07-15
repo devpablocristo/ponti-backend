@@ -22,7 +22,7 @@ func ProvideLeaseTypeRepositoryPort(repo *leasetype.Repository) leasetype.Reposi
 }
 
 // --- CONFIG API ---
-func ProvideLeaseTypeConfigAPI(c *cfg.AllConfigs) leasetype.ConfigAPIPort {
+func ProvideLeaseTypeConfigAPI(c *cfg.Config) leasetype.ConfigAPIPort {
 	return &c.API
 }
 

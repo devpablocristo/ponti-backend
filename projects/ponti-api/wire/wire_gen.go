@@ -7,10 +7,10 @@
 package wire
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	pkggin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pkgsuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
@@ -150,7 +150,7 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config           *config.AllConfigs
+	Config           *config.Config
 	GinEngine        *pkggin.Server
 	GormRepo         *pkggorm.Repository
 	Middlewares      *pkgmwr.Middlewares

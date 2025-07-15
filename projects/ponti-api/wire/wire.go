@@ -24,7 +24,7 @@ import (
 )
 
 type Dependencies struct {
-	Config           *config.AllConfigs
+	Config           *config.Config
 	GinEngine        *gin.Server
 	GormRepo         *gorm.Repository
 	Middlewares      *mwr.Middlewares

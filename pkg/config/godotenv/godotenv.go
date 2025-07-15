@@ -33,6 +33,9 @@ func loadEnvFiles(filePaths []string, overload bool) error {
 		}
 	}
 
+	fmt.Printf("Searching files: %v\n", filePaths)
+	fmt.Printf("Found files: %v\n", foundFiles)
+
 	return nil
 }
 

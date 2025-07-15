@@ -2,130 +2,105 @@ SHELL := /bin/bash
 
 # Variables
 ROOT_DIR := $(shell pwd)
+VERSION := 1.0
 BUILD_DIR := $(ROOT_DIR)/bin
-COMPOSE_DEV := $(ROOT_DIR)/docker-compose.dev.yml
-COMPOSE_STG := $(ROOT_DIR)/docker-compose.stg.yml
-COMPOSE_LOCAL := $(ROOT_DIR)/docker-compose.local.yml
-DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
-MIGRATIONS_DIR := ./migrations
-MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
-MIGRATIONS_NAME=$(name)
+DOCKER_COMPOSE_MIX_DEV := $(ROOT_DIR)/docker-compose.mix.dev.yml
+DOCKER_COMPOSE_DOCKER_DEV := $(ROOT_DIR)/docker-compose.docker.dev.yml
+DOCKER_COMPOSE_DOCKER_STG := $(ROOT_DIR)/docker-compose.docker.stg.yml
 
+# Phony targets
 .PHONY: all build run test clean lint \
-	dev-build dev-up dev-down dev-reset dev-logs \
-	stg-build stg-up stg-down stg-logs \
-	local-build local-up local-down local-reset local-logs \
-	migrate-up migrate-down migrate-force migrate-version migrate-create
-
-# Migrations
-migrate-up: 
-	@echo "Running migrations..."
-	@$(MIGRATE) up
-
-migrate-down: 
-	@echo "Running migrations down..."
-	@$(MIGRATE) down
-
-migrate-create:
-	@echo "Creating migration..."
-	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
-
-migrate-force:
-	@echo "Forcing migration..."
-	@$(MIGRATE) force -1
-
-migrate-version:
-	@echo "Getting migration version..."
-	@$(MIGRATE) version
+	mix-dev-build mix-dev-up mix-dev-down mix-dev-logs \
+	docker-dev-build docker-dev-up docker-dev-down docker-dev-logs \
+	docker-stg-build docker-stg-up docker-stg-down docker-stg-logs \
+	run-api seed
 
 # Default target
 all: build run
 
-# --- Go Core ---
+# Core commands
 build:
-	@echo "🔨 Build..."
+	@echo "Building the project..."
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/main -gcflags "all=-N -l" -ldflags "-X main.Version=$(VERSION)" ./cmd/
+	APP_NAME=ponti-api go build -gcflags "all=-N -l" -o $(BUILD_DIR)/ponti-api -ldflags "-X main.Version=$(VERSION)" $(ROOT_DIR)/cmd/
 
 run:
-	@echo "🚀 Run..."
-	go run ./cmd/
+	@echo "Running the project..."
+	@go run $(ROOT_DIR)/cmd/
 
 test:
-	@echo "🧪 Test..."
-	go test ./...
+	@echo "Running tests..."
+	@go test ./...
 
 clean:
-	@echo "🧹 Clean..."
-	rm -f $(BUILD_DIR)/main
+	@echo "Cleaning up..."
+	@rm -rf $(BUILD_DIR)
 
 lint:
-	@echo "🔍 Lint..."
-	golangci-lint run --config .golangci.yml --verbose
+	@echo "Linting the project..."
+	@golangci-lint run --config .golangci.yml --verbose
 
 run-api:
-	@echo "🚦 Run API..."
+	@echo "Starting API..."
 	go run ./cmd/api/
 
-# --- Docker Compose Helpers ---
-define compose_cmd
-	@echo "$(2) services ($(1))..."
-	docker compose -f $($(1)) $(3)
-endef
+seed:
+	@echo "Seeding database..."
+	go run ./cmd/seed/main.go
 
-# --- Dev ---
-dev-build:
-	$(call compose_cmd,COMPOSE_DEV,Building,up --build -d)
-	@$(MAKE) dev-logs
+# Mix Dev Docker commands (antes 'local')
+mix-dev-build:
+	@echo "Building services in mix.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up --build -d
+	@$(MAKE) mix-dev-logs
 
-dev-up:
-	$(call compose_cmd,COMPOSE_DEV,Starting,up -d)
-	@$(MAKE) dev-logs
+mix-dev-up:
+	@echo "Starting services in mix.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up -d
+	@$(MAKE) mix-dev-logs
 
-dev-down:
-	$(call compose_cmd,COMPOSE_DEV,Stopping,down --remove-orphans)
+mix-dev-down:
+	@echo "Stopping services in mix.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) down --remove-orphans
 
-dev-reset:
-	@echo "⚠️  Limpiando volúmenes y recreando (esto borra la base de datos)..."
-	docker compose -f $(COMPOSE_DEV) down -v --remove-orphans
-	docker compose -f $(COMPOSE_DEV) up --build -d
-	@$(MAKE) dev-logs
+mix-dev-logs:
+	@echo "Fetching logs for mix.dev services..."
+	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) logs -f
 
-dev-logs:
-	$(call compose_cmd,COMPOSE_DEV,Logs,logs -f)
+# Docker Dev commands (antes 'dev')
+docker-dev-build:
+	@echo "Building services in docker.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) up --build -d
+	@$(MAKE) docker-dev-logs
 
-# --- Stg/Test ---
-stg-build:
-	$(call compose_cmd,COMPOSE_STG,Building,up --build -d)
-	@$(MAKE) stg-logs
+docker-dev-up:
+	@echo "Starting services in docker.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) up -d
+	@$(MAKE) docker-dev-logs
 
-stg-up:
-	$(call compose_cmd,COMPOSE_STG,Starting,up -d)
-	@$(MAKE) stg-logs
+docker-dev-down:
+	@echo "Stopping services in docker.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) down --remove-orphans
 
-stg-down:
-	$(call compose_cmd,COMPOSE_STG,Stopping,down --remove-orphans)
+docker-dev-logs:
+	@echo "Fetching logs for docker.dev services..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) logs -f
 
-stg-logs:
-	$(call compose_cmd,COMPOSE_STG,Logs,logs -f)
+# Docker Stg commands (antes 'stg')
+docker-stg-build:
+	@echo "Building services in docker.stg mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_STG) up --build -d
+	@$(MAKE) docker-stg-logs
 
-# --- Local ---
-local-build:
-	$(call compose_cmd,COMPOSE_LOCAL,Building,up --build -d)
-	@$(MAKE) local-logs
+docker-stg-up:
+	@echo "Starting services in docker.stg mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_STG) up -d
+	@$(MAKE) docker-stg-logs
 
-local-up:
-	$(call compose_cmd,COMPOSE_LOCAL,Starting,up -d)
-	@$(MAKE) local-logs
+docker-stg-down:
+	@echo "Stopping services in docker.stg mode..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_STG) down --remove-orphans
 
-local-down:
-	$(call compose_cmd,COMPOSE_LOCAL,Stopping,down --remove-orphans)
-
-local-reset:
-	@echo "⚠️  Limpiando volúmenes y recreando (esto borra la base de datos)..."
-	docker compose -f $(COMPOSE_LOCAL) down -v --remove-orphans
-	docker compose -f $(COMPOSE_LOCAL) up --build -d
-	@$(MAKE) local-logs
-
-local-logs:
-	$(call compose_cmd,COMPOSE_LOCAL,Logs,logs -f)
+docker-stg-logs:
+	@echo "Fetching logs for docker.stg services..."
+	docker compose -f $(DOCKER_COMPOSE_DOCKER_STG) logs -f
