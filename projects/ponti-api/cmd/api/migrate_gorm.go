@@ -34,14 +34,14 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 	}
 
 	models := []any{
-		&campaignmodels.Campaign{}, // primero
-		&customermodels.Customer{},
+		&campaignmodels.Campaign{}, // primero4
 		&leasetypemodels.LeaseType{},
 		&managermodels.Manager{},
 		&investormodels.Investor{},
 		&cropmodels.Crop{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
+		&customermodels.Customer{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.Project{}, // último
 	}

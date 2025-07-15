@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	gorm "gorm.io/gorm"
+
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
@@ -20,7 +21,9 @@ import (
 	manmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
-	gorm "gorm.io/gorm"
+	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+
 )
 
 // TODO: aplicar custom errors
@@ -50,7 +53,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		customer := &cusmod.Customer{
 			ID:   p.Customer.ID,
 			Name: p.Customer.Name,
-			BaseModel: base.BaseModel{
+			Base: sharedmodels.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
 			},
@@ -64,7 +67,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		campaign := &casmod.Campaign{
 			ID:   p.Campaign.ID,
 			Name: p.Campaign.Name,
-			BaseModel: base.BaseModel{
+			Base: base.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
 			},
@@ -79,7 +82,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			manager := &manmod.Manager{
 				ID:   p.Managers[i].ID,
 				Name: p.Managers[i].Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
 				},
@@ -95,7 +98,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			investor := &invmod.Investor{
 				ID:   p.Investors[i].ID,
 				Name: p.Investors[i].Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
 				},
@@ -380,7 +383,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			customer := &cusmod.Customer{
 				ID:   d.Customer.ID,
 				Name: d.Customer.Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
 				},
@@ -397,7 +400,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			campaign := &casmod.Campaign{
 				ID:   d.Campaign.ID,
 				Name: d.Campaign.Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
 				},
@@ -665,7 +668,7 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 		} else {
 			manager := &manmod.Manager{
 				Name: m.Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
 				},
@@ -717,7 +720,7 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 		} else {
 			invID, err := ensureInvestor(tx, &invmod.Investor{
 				Name: i.Name,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
 				},
@@ -851,7 +854,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 				PreviousCropID: l.PreviousCropID,
 				CurrentCropID:  l.CurrentCropID,
 				Season:         l.Season,
-				BaseModel: base.BaseModel{
+				Base: base.Base{
 					CreatedBy: l.CreatedBy,
 					UpdatedBy: l.CreatedBy,
 				},

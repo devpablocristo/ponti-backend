@@ -1,4 +1,4 @@
-package base
+package sharedmodels
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type BaseModel struct {
+type Base struct {
 	CreatedAt time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `gorm:"index"`

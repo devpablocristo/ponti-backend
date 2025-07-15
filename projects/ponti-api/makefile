@@ -8,17 +8,14 @@ DOCKER_COMPOSE_MIX_DEV := $(ROOT_DIR)/docker-compose.mix.dev.yml
 DOCKER_COMPOSE_DOCKER_DEV := $(ROOT_DIR)/docker-compose.docker.dev.yml
 DOCKER_COMPOSE_DOCKER_STG := $(ROOT_DIR)/docker-compose.docker.stg.yml
 
-# Phony targets
 .PHONY: all build run test clean lint \
 	mix-dev-build mix-dev-up mix-dev-down mix-dev-logs \
 	docker-dev-build docker-dev-up docker-dev-down docker-dev-logs \
 	docker-stg-build docker-stg-up docker-stg-down docker-stg-logs \
 	run-api seed
 
-# Default target
 all: build run
 
-# Core commands
 build:
 	@echo "Building the project..."
 	@mkdir -p $(BUILD_DIR)
@@ -48,7 +45,7 @@ seed:
 	@echo "Seeding database..."
 	go run ./cmd/seed/main.go
 
-# Mix Dev Docker commands (antes 'local')
+# Mix Dev Docker commands
 mix-dev-build:
 	@echo "Building services in mix.dev mode..."
 	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up --build -d
@@ -67,7 +64,7 @@ mix-dev-logs:
 	@echo "Fetching logs for mix.dev services..."
 	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) logs -f
 
-# Docker Dev commands (antes 'dev')
+# Docker Dev commands
 docker-dev-build:
 	@echo "Building services in docker.dev mode..."
 	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) up --build -d
@@ -86,7 +83,7 @@ docker-dev-logs:
 	@echo "Fetching logs for docker.dev services..."
 	docker compose -f $(DOCKER_COMPOSE_DOCKER_DEV) logs -f
 
-# Docker Stg commands (antes 'stg')
+# Docker Stg commands
 docker-stg-build:
 	@echo "Building services in docker.stg mode..."
 	docker compose -f $(DOCKER_COMPOSE_DOCKER_STG) up --build -d

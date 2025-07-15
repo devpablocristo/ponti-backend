@@ -5,7 +5,7 @@ services:
       - "${DB_PORT}:${DB_PORT}"
     env_file:
       - .env
-      - .env.dev
+      - .env.mix.dev
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.dev
+      - .env.mix.dev
     volumes:
       - ./migrations:/migrations
     environment:
@@ -54,7 +54,7 @@ services:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
     env_file:
       - .env
-      - .env.dev
+      - .env.mix.dev
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}

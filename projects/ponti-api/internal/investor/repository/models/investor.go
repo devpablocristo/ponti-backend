@@ -1,14 +1,14 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Investor struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (i Investor) ToDomain() *domain.Investor {

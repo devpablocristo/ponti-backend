@@ -1,14 +1,15 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
+
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Customer struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (c Customer) ToDomain() *domain.Customer {

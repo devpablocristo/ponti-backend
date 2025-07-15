@@ -2,11 +2,11 @@ services:
   ponti-api:
     build:
       context: ../../
-      dockerfile: ./projects/ponti-api/Dockerfile.stg
+      dockerfile: ./projects/ponti-api/Dockerfile.docker.stg
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
-      - .env.stg
+      - .env.docker.stg
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
@@ -29,7 +29,7 @@ services:
       - "${DB_PORT}:${DB_PORT}"
     env_file:
       - .env
-      - .env.stg
+      - .env.docker.stg
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -54,7 +54,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.stg
+      - .env.docker.stg
     volumes:
       - ./migrations:/migrations
     environment:

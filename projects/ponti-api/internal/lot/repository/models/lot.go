@@ -1,10 +1,10 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	sheredmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Lot struct {
@@ -15,7 +15,7 @@ type Lot struct {
 	PreviousCropID int64   `gorm:"not null;index;column:previous_crop_id"`
 	CurrentCropID  int64   `gorm:"not null;index;column:current_crop_id"`
 	Season         string  `gorm:"size:20;not null;column:season"`
-	base.BaseModel
+	sheredmodels.Base
 	PreviousCrop cropmod.Crop `gorm:"foreignKey:PreviousCropID;references:ID"`
 	CurrentCrop  cropmod.Crop `gorm:"foreignKey:CurrentCropID;references:ID"`
 }

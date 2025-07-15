@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	campaigndom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
@@ -14,6 +13,7 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 // --------- MODELOS ---------
@@ -24,7 +24,7 @@ type Project struct {
 	CustomerID int64  `gorm:"not null;index;column:customer_id"`
 	CampaignID int64  `gorm:"not null;index;column:campaign_id"`
 	AdminCost  int64  `gorm:"not null;column:admin_cost"`
-	base.BaseModel
+	sharedmodels.Base
 
 	// Relaciones (SOLO para preload/query, no setear manual en insert)
 	Customer  Customer          `gorm:"foreignKey:CustomerID;references:ID"`
@@ -37,13 +37,12 @@ type Project struct {
 type Manager struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
-	base.BaseModel
+	sharedmodels.Base
 }
 
 type Customer struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
-	Type string `gorm:"size:50;not null;column:type"`
 }
 
 type Campaign struct {
@@ -60,7 +59,7 @@ type ProjectInvestor struct {
 	ProjectID  int64 `gorm:"primaryKey;autoIncrement:false;column:project_id"`
 	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
 	Percentage int   `gorm:"not null;column:percentage"`
-	base.BaseModel
+	sharedmodels.Base
 	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
@@ -76,13 +75,13 @@ func FromDomain(d *domain.Project) *Project {
 		Managers:   make([]Manager, 0, len(d.Managers)),
 		Investors:  make([]ProjectInvestor, 0, len(d.Investors)),
 		Fields:     make([]fieldmod.Field, 0, len(d.Fields)),
-		BaseModel:  base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+		Base:       sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 	}
 
 	for _, mgr := range d.Managers {
 		m.Managers = append(m.Managers, Manager{
 			ID: mgr.ID,
-			BaseModel: base.BaseModel{
+			Base: sharedmodels.Base{
 				CreatedBy: d.CreatedBy,
 				UpdatedBy: d.UpdatedBy,
 			},
@@ -92,7 +91,7 @@ func FromDomain(d *domain.Project) *Project {
 		m.Investors = append(m.Investors, ProjectInvestor{
 			InvestorID: inv.ID,
 			Percentage: inv.Percentage,
-			BaseModel: base.BaseModel{
+			Base: sharedmodels.Base{
 				CreatedBy: d.CreatedBy,
 				UpdatedBy: d.UpdatedBy,
 			},
@@ -107,7 +106,7 @@ func FromDomain(d *domain.Project) *Project {
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotmod.Lot, 0, len(f.Lots)),
-			BaseModel:        base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+			Base:             sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 		})
 
 		for _, l := range f.Lots {
@@ -121,7 +120,7 @@ func FromDomain(d *domain.Project) *Project {
 				CurrentCropID:  l.CurrentCrop.ID,
 				PreviousCrop:   cropmod.Crop{ID: l.PreviousCrop.ID, Name: l.PreviousCrop.Name},
 				CurrentCrop:    cropmod.Crop{ID: l.CurrentCrop.ID, Name: l.CurrentCrop.Name},
-				BaseModel:      base.BaseModel{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+				Base:      sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
 			})
 		}
 	}

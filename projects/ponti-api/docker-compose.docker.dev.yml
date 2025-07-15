@@ -2,11 +2,11 @@ services:
   ponti-api:
     build:
       context: ../../
-      dockerfile: ./projects/ponti-api/Dockerfile.dev
+      dockerfile: ./projects/ponti-api/Dockerfile.docker.dev
     image: "ponti-api:${APP_VERSION}"
     env_file:
       - .env
-      - .env.dev
+      - .env.docker.dev
     ports:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
       - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
@@ -37,7 +37,7 @@ services:
       - "${DB_PORT}:${DB_PORT}"
     env_file:
       - .env
-      - .env.dev
+      - .env.docker.dev
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -62,7 +62,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.dev
+      - .env.docker.dev
     volumes:
       - ./migrations:/migrations
     environment:
@@ -86,7 +86,7 @@ services:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
     env_file:
       - .env
-      - .env.dev
+      - .env.docker.dev
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}

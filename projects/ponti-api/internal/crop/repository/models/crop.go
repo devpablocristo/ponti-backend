@@ -1,15 +1,16 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
+
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 // Crop represents a type of crop.
 type Crop struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	Name string `gorm:"uniqueIndex:idx_crops_name;size:50;not null"`
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (Crop) TableName() string {

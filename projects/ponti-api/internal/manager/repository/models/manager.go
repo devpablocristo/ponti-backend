@@ -1,18 +1,16 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
-
-	// Importá el modelo Project para referencia cruzada
 	projectmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Manager struct {
 	ID       int64                `gorm:"primaryKey;autoIncrement"`
 	Name     string               `gorm:"type:varchar(255);not null;unique"`
 	Projects []projectmod.Project `gorm:"many2many:project_managers;"` // <<--- AGREGAR ESTA LINEA
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (c Manager) ToDomain() *domain.Manager {

@@ -1,7 +1,8 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	leasetypemod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
@@ -15,7 +16,7 @@ type Field struct {
 	LeaseTypeID      int64    `gorm:"not null;column:lease_type_id"`
 	LeaseTypePercent *float64 `gorm:"column:lease_type_percent"`
 	LeaseTypeValue   *float64 `gorm:"column:lease_type_value"`
-	base.BaseModel
+	sharedmodels.Base
 	Lots      []lotmod.Lot            `gorm:"foreignKey:FieldID"`
 	LeaseType *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
 }
@@ -29,7 +30,7 @@ func FromDomain(d *fielddom.Field) *Field {
 		LeaseTypeID:      d.LeaseType.ID,
 		LeaseTypePercent: d.LeaseTypePercent,
 		LeaseTypeValue:   d.LeaseTypeValue,
-		BaseModel: base.BaseModel{
+		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,
 			UpdatedAt: d.UpdatedAt,
 		},
