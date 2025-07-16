@@ -1,13 +1,26 @@
 package domain
 
+import "time"
+
 type LotTable struct {
+	ID             int64
 	ProjectName    string
 	FieldName      string
 	LotName        string
 	PreviousCrop   string
+	PreviousCropID int64
 	CurrentCrop    string
+	CurrentCropID  int64
 	Variety        string
 	SowedArea      float64
-	SowingDate     string // o time.Time, según cómo lo quieras en tu app
+	Season         string
+	Dates          []LotDates
+	UpdatedAt      *time.Time
 	CostPerHectare float64
+}
+
+type LotDates struct {
+	SowingDate  time.Time
+	HarvestDate *time.Time
+	Sequence    int
 }
