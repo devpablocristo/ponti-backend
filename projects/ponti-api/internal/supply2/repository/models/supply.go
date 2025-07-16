@@ -1,7 +1,7 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply2/usecases/domain"
 )
 
 type Supply struct {

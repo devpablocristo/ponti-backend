@@ -17,7 +17,8 @@ import (
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
-	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models" // Import for unit models
+	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
+	    classtypemodels      "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
 )
 
 // Ejecuta todos los seeders en orden
@@ -53,6 +54,9 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 		return err
 	}
 	if err := seedUnits(repo); err != nil {
+		return err
+	}
+	if err := seedClassTypes(repo); err != nil {
 		return err
 	}
 	fmt.Println("Database seeded successfully")
@@ -492,6 +496,26 @@ func seedUnits(repo *gorm.Repository) error {
 		}
 	}
 	fmt.Println("Finished seeding units")
+	return nil
+}
+
+/*
+seedClassTypes crea los tipos de clase iniciales (e.g. "Agroquímicos", "Fertilizantes").
+Sigue el patrón FirstOrCreate para evitar duplicados.
+*/
+func seedClassTypes(repo *gorm.Repository) error {
+	classTypes := []classtypemodels.ClassType{
+		{Name: "Agroquímicos"},
+		{Name: "Fertilizantes"},
+	}
+	for _, ct := range classTypes {
+		if err := repo.Client().
+			FirstOrCreate(&ct, classtypemodels.ClassType{Name: ct.Name}).
+			Error; err != nil {
+			return fmt.Errorf("failed to seed class type %s: %w", ct.Name, err)
+		}
+	}
+	fmt.Println("Finished seeding class types")
 	return nil
 }
 

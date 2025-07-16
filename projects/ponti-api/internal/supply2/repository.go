@@ -9,8 +9,8 @@ import (
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply2/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply2/usecases/domain"
 )
 
 // SupplyFilters defines filters for searching and pagination
