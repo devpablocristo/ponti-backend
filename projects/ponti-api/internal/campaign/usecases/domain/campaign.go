@@ -11,4 +11,4 @@ type Campaign struct {
 
 	shareddomain.Base // Embedding Base struct for common fields
 
-}
+}.
