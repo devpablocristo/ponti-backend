@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CategoryUseCasesPort expects domain.Category, not dto.Category
-type CategoryUseCasesPort interface {
+// UseCasesPort expects domain.Category, not dto.Category
+type UseCasesPort interface {
 	ListCategories(context.Context) ([]domain.Category, error)
 	CreateCategory(context.Context, *domain.Category) (int64, error)
 	UpdateCategory(context.Context, *domain.Category) error
@@ -37,14 +37,14 @@ type MiddlewaresEnginePort interface {
 
 // Handler encapsulates all dependencies for the Category HTTP handler.
 type Handler struct {
-	categoryUC CategoryUseCasesPort
+	categoryUC UseCasesPort
 	gsv        GinEnginePort
 	acf        ConfigAPIPort
 	mws        MiddlewaresEnginePort
 }
 
 // NewHandler creates a new Category handler.
-func NewHandler(u CategoryUseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		categoryUC: u,
 		gsv:        s,

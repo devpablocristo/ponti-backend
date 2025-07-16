@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ClassTypeUseCasesPort expects domain.ClassType, not dto.ClassType
-type ClassTypeUseCasesPort interface {
+// UseCasesPort expects domain.ClassType, not dto.ClassType
+type UseCasesPort interface {
 	ListClassTypes(context.Context) ([]domain.ClassType, error)
 	CreateClassType(context.Context, *domain.ClassType) (int64, error)
 	UpdateClassType(context.Context, *domain.ClassType) error
@@ -34,14 +34,14 @@ type MiddlewaresEnginePort interface {
 
 // Handler encapsulates all dependencies for the ClassType HTTP handler.
 type Handler struct {
-	classTypeUC ClassTypeUseCasesPort
+	classTypeUC UseCasesPort
 	gsv         GinEnginePort
 	acf         ConfigAPIPort
 	mws         MiddlewaresEnginePort
 }
 
 // NewHandler creates a new ClassType handler.
-func NewHandler(u ClassTypeUseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		classTypeUC: u,
 		gsv:         s,

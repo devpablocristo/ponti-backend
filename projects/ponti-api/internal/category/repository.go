@@ -15,15 +15,15 @@ type GormEnginePort interface {
 	Client() *gorm.DB
 }
 
-type CategoryRepository struct {
+type Repository struct {
 	db GormEnginePort
 }
 
-func NewCategoryRepository(db GormEnginePort) *CategoryRepository {
-	return &CategoryRepository{db: db}
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *CategoryRepository) ListCategories(ctx context.Context) ([]domain.Category, error) {
+func (r *Repository) ListCategories(ctx context.Context) ([]domain.Category, error) {
 	var categories []models.Category
 	if err := r.db.Client().WithContext(ctx).Find(&categories).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list categories", err)
@@ -35,7 +35,7 @@ func (r *CategoryRepository) ListCategories(ctx context.Context) ([]domain.Categ
 	return res, nil
 }
 
-func (r *CategoryRepository) CreateCategory(ctx context.Context, c *domain.Category) (int64, error) {
+func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (int64, error) {
 	model := models.FromDomain(c)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create category", err)
@@ -43,7 +43,7 @@ func (r *CategoryRepository) CreateCategory(ctx context.Context, c *domain.Categ
 	return model.ID, nil
 }
 
-func (r *CategoryRepository) UpdateCategory(ctx context.Context, c *domain.Category) error {
+func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Category{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
@@ -61,7 +61,7 @@ func (r *CategoryRepository) UpdateCategory(ctx context.Context, c *domain.Categ
 	})
 }
 
-func (r *CategoryRepository) DeleteCategory(ctx context.Context, id int64) error {
+func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Category{}).Where("id = ?", id).Count(&count).Error; err != nil {

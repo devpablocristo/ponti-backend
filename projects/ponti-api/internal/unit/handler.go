@@ -12,8 +12,8 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/usecases/domain"
 )
 
-// UnitUseCasesPort expects domain.Unit, not dto.Unit
-type UnitUseCasesPort interface {
+// UseCases expects domain.Unit, not dto.Unit
+type UseCasesPort interface {
 	ListUnits(context.Context) ([]domain.Unit, error)
 	CreateUnit(context.Context, *domain.Unit) (int64, error)
 	UpdateUnit(context.Context, *domain.Unit) error
@@ -38,14 +38,14 @@ type MiddlewaresEnginePort interface {
 
 // Handler encapsulates all dependencies for the Unit HTTP handler.
 type Handler struct {
-	unitUC UnitUseCasesPort
+	unitUC UseCasesPort
 	gsv    GinEnginePort
 	acf    ConfigAPIPort
 	mws    MiddlewaresEnginePort
 }
 
 // NewHandler creates a new Unit handler.
-func NewHandler(u UnitUseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		unitUC: u,
 		gsv:    s,

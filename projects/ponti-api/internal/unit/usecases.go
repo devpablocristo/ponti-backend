@@ -6,31 +6,31 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/usecases/domain"
 )
 
-// UnitRepositoryPort is the repository contract for Unit.
-type UnitRepositoryPort interface {
+// RepositoryPort is the repository contract for Unit.
+type RepositoryPort interface {
 	ListUnits(context.Context) ([]domain.Unit, error)
 	CreateUnit(context.Context, *domain.Unit) (int64, error)
 	UpdateUnit(context.Context, *domain.Unit) error
 	DeleteUnit(context.Context, int64) error
 }
 
-type UnitUseCases struct {
-	repo UnitRepositoryPort
+type UseCases struct {
+	repo RepositoryPort
 }
 
-func NewUnitUseCases(repo UnitRepositoryPort) *UnitUseCases {
-	return &UnitUseCases{repo: repo}
+func NewUseCases(repo RepositoryPort) *UseCases {
+	return &UseCases{repo: repo}
 }
 
-func (u *UnitUseCases) ListUnits(ctx context.Context) ([]domain.Unit, error) {
+func (u *UseCases) ListUnits(ctx context.Context) ([]domain.Unit, error) {
 	return u.repo.ListUnits(ctx)
 }
-func (u *UnitUseCases) CreateUnit(ctx context.Context, unit *domain.Unit) (int64, error) {
+func (u *UseCases) CreateUnit(ctx context.Context, unit *domain.Unit) (int64, error) {
 	return u.repo.CreateUnit(ctx, unit)
 }
-func (u *UnitUseCases) UpdateUnit(ctx context.Context, unit *domain.Unit) error {
+func (u *UseCases) UpdateUnit(ctx context.Context, unit *domain.Unit) error {
 	return u.repo.UpdateUnit(ctx, unit)
 }
-func (u *UnitUseCases) DeleteUnit(ctx context.Context, id int64) error {
+func (u *UseCases) DeleteUnit(ctx context.Context, id int64) error {
 	return u.repo.DeleteUnit(ctx, id)
 }

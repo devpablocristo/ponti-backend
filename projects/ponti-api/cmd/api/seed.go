@@ -7,6 +7,7 @@ import (
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
+	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
@@ -16,6 +17,7 @@ import (
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models" // Import for unit models
 )
 
 // Ejecuta todos los seeders en orden
@@ -47,6 +49,13 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 	if err := seedTestProjectAndLots(repo); err != nil {
 		return err
 	}
+	if err := seedCategories(repo); err != nil {
+		return err
+	}
+	if err := seedUnits(repo); err != nil {
+		return err
+	}
+	fmt.Println("Database seeded successfully")
 	return nil
 }
 
@@ -432,6 +441,57 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 	}
 
 	fmt.Printf(">>> Proyecto Test KPIs: project_id=%d, field_id=%d\n", project.ID, field.ID)
+	return nil
+}
+
+// seedCategories seeds initial data for the Category model.
+func seedCategories(repo *gorm.Repository) error {
+	categories := []categorymodels.Category{
+		{Name: "Fertilizer"},
+		{Name: "Seed"},
+		{Name: "Herbicide"},
+		{Name: "Pesticide"},
+		{Name: "Fuel"},
+		{Name: "Machinery Rental"},
+		{Name: "Labor"},
+		{Name: "Insurance"},
+		{Name: "Services"},
+		{Name: "Other"},
+	}
+
+	for _, c := range categories {
+		// Use FirstOrCreate to avoid duplicates based on the 'Name' field.
+		// If a category with the same name already exists, it will not be created.
+		if err := repo.Client().FirstOrCreate(&c, categorymodels.Category{Name: c.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed category %s: %w", c.Name, err)
+		}
+	}
+	fmt.Println("Finished seeding categories")
+	return nil
+}
+
+// seedUnits seeds initial data for the Unit model.
+func seedUnits(repo *gorm.Repository) error {
+	units := []unitmodels.Unit{
+		{Name: "kg"},
+		{Name: "lt"},
+		{Name: "ton"},
+		{Name: "ha"},
+		{Name: "bag"},
+		{Name: "unit"},
+		{Name: "box"},
+		{Name: "m2"},
+		{Name: "m3"},
+	}
+
+	for _, u := range units {
+		// Use FirstOrCreate to avoid duplicates based on the 'Name' field.
+		// If a unit with the same name already exists, it will not be created.
+		if err := repo.Client().FirstOrCreate(&u, unitmodels.Unit{Name: u.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed unit %s: %w", u.Name, err)
+		}
+	}
+	fmt.Println("Finished seeding units")
 	return nil
 }
 

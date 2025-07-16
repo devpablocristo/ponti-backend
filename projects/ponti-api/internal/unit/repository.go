@@ -15,15 +15,15 @@ type GormEnginePort interface {
 	Client() *gorm.DB
 }
 
-type UnitRepository struct {
+type Repository struct {
 	db GormEnginePort
 }
 
-func NewUnitRepository(db GormEnginePort) *UnitRepository {
-	return &UnitRepository{db: db}
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *UnitRepository) ListUnits(ctx context.Context) ([]domain.Unit, error) {
+func (r *Repository) ListUnits(ctx context.Context) ([]domain.Unit, error) {
 	var units []models.Unit
 	if err := r.db.Client().WithContext(ctx).Find(&units).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list units", err)
@@ -35,7 +35,7 @@ func (r *UnitRepository) ListUnits(ctx context.Context) ([]domain.Unit, error) {
 	return res, nil
 }
 
-func (r *UnitRepository) CreateUnit(ctx context.Context, u *domain.Unit) (int64, error) {
+func (r *Repository) CreateUnit(ctx context.Context, u *domain.Unit) (int64, error) {
 	model := models.FromDomain(u)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create unit", err)
@@ -43,7 +43,7 @@ func (r *UnitRepository) CreateUnit(ctx context.Context, u *domain.Unit) (int64,
 	return model.ID, nil
 }
 
-func (r *UnitRepository) UpdateUnit(ctx context.Context, u *domain.Unit) error {
+func (r *Repository) UpdateUnit(ctx context.Context, u *domain.Unit) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Unit{}).Where("id = ?", u.ID).Count(&count).Error; err != nil {
@@ -61,7 +61,7 @@ func (r *UnitRepository) UpdateUnit(ctx context.Context, u *domain.Unit) error {
 	})
 }
 
-func (r *UnitRepository) DeleteUnit(ctx context.Context, id int64) error {
+func (r *Repository) DeleteUnit(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Unit{}).Where("id = ?", id).Count(&count).Error; err != nil {

@@ -13,6 +13,8 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
@@ -22,6 +24,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 )
 
 // Injectors from wire.go:
@@ -138,6 +141,33 @@ func Initialize() (*Dependencies, error) {
 	supplyConfigAPIPort := ProvideSupplyConfigAPI(config)
 	supplyMiddlewaresEnginePort := ProvideSupplyMiddlewaresEnginePort(middlewares)
 	supplyHandler := ProvideSupplyHandler(supplyGinEnginePort, supplyUseCasesPort, supplyConfigAPIPort, supplyMiddlewaresEnginePort)
+	categoryGinEnginePort := ProvideCategoryGinEnginePort(server)
+	categoryGormEnginePort := ProvideCategoryGormEnginePort(repository)
+	categoryRepository := ProvideCategoryRepository(categoryGormEnginePort)
+	categoryRepositoryPort := ProvideCategoryRepositoryPort(categoryRepository)
+	categoryUseCases := ProvideCategoryUseCases(categoryRepositoryPort)
+	categoryUseCasesPort := ProvideCategoryUseCasesPort(categoryUseCases)
+	categoryConfigAPIPort := ProvideCategoryConfigAPI(config)
+	categoryMiddlewaresEnginePort := ProvideCategoryMiddlewaresEnginePort(middlewares)
+	categoryHandler := ProvideCategoryHandler(categoryGinEnginePort, categoryUseCasesPort, categoryConfigAPIPort, categoryMiddlewaresEnginePort)
+	unitGinEnginePort := ProvideUnitGinEnginePort(server)
+	unitGormEnginePort := ProvideUnitGormEnginePort(repository)
+	unitRepository := ProvideUnitRepository(unitGormEnginePort)
+	unitRepositoryPort := ProvideUnitRepositoryPort(unitRepository)
+	unitUseCases := ProvideUnitUseCases(unitRepositoryPort)
+	unitUseCasesPort := ProvideUnitUseCasesPort(unitUseCases)
+	unitConfigAPIPort := ProvideUnitConfigAPI(config)
+	unitMiddlewaresEnginePort := ProvideUnitMiddlewaresEnginePort(middlewares)
+	unitHandler := ProvideUnitHandler(unitGinEnginePort, unitUseCasesPort, unitConfigAPIPort, unitMiddlewaresEnginePort)
+	classtypeGinEnginePort := ProvideClassTypeGinEnginePort(server)
+	classtypeGormEnginePort := ProvideClassTypeGormEnginePort(repository)
+	classtypeRepository := ProvideClassTypeRepository(classtypeGormEnginePort)
+	classtypeRepositoryPort := ProvideClassTypeRepositoryPort(classtypeRepository)
+	classtypeUseCases := ProvideClassTypeUseCases(classtypeRepositoryPort)
+	classtypeUseCasesPort := ProvideClassTypeUseCasesPort(classtypeUseCases)
+	classtypeConfigAPIPort := ProvideClassTypeConfigAPI(config)
+	classtypeMiddlewaresEnginePort := ProvideClassTypeMiddlewaresEnginePort(middlewares)
+	classtypeHandler := ProvideClassTypeHandler(classtypeGinEnginePort, classtypeUseCasesPort, classtypeConfigAPIPort, classtypeMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -154,6 +184,9 @@ func Initialize() (*Dependencies, error) {
 		ProjectHandler:   projectHandler,
 		LeaseTypeHandler: leasetypeHandler,
 		SupplyHandler:    supplyHandler,
+		CategoryHandler:  categoryHandler,
+		UnitHandler:      unitHandler,
+		ClassTypeHandler: classtypeHandler,
 	}
 	return dependencies, nil
 }
@@ -176,4 +209,7 @@ type Dependencies struct {
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
 	SupplyHandler    *supply.Handler
+	CategoryHandler  *category.Handler
+	UnitHandler      *unit.Handler
+	ClassTypeHandler *classtype.Handler
 }

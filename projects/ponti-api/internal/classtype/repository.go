@@ -14,14 +14,14 @@ import (
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
-type ClassTypeRepository struct {
+type Repository struct {
 	db GormEnginePort
 }
 
-func NewClassTypeRepository(db GormEnginePort) *ClassTypeRepository {
-	return &ClassTypeRepository{db: db}
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{db: db}
 }
-func (r *ClassTypeRepository) ListClassTypes(ctx context.Context) ([]domain.ClassType, error) {
+func (r *Repository) ListClassTypes(ctx context.Context) ([]domain.ClassType, error) {
 	var classTypes []models.ClassType
 	if err := r.db.Client().WithContext(ctx).Find(&classTypes).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list class types", err)
@@ -32,14 +32,14 @@ func (r *ClassTypeRepository) ListClassTypes(ctx context.Context) ([]domain.Clas
 	}
 	return res, nil
 }
-func (r *ClassTypeRepository) CreateClassType(ctx context.Context, c *domain.ClassType) (int64, error) {
+func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (int64, error) {
 	model := models.FromDomain(c)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create class type", err)
 	}
 	return model.ID, nil
 }
-func (r *ClassTypeRepository) UpdateClassType(ctx context.Context, c *domain.ClassType) error {
+func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.ClassType{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
@@ -56,7 +56,7 @@ func (r *ClassTypeRepository) UpdateClassType(ctx context.Context, c *domain.Cla
 		return nil
 	})
 }
-func (r *ClassTypeRepository) DeleteClassType(ctx context.Context, id int64) error {
+func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.ClassType{}).Where("id = ?", id).Count(&count).Error; err != nil {
