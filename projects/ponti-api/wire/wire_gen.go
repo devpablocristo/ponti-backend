@@ -17,6 +17,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
@@ -168,6 +169,15 @@ func Initialize() (*Dependencies, error) {
 	classtypeConfigAPIPort := ProvideClassTypeConfigAPI(config)
 	classtypeMiddlewaresEnginePort := ProvideClassTypeMiddlewaresEnginePort(middlewares)
 	classtypeHandler := ProvideClassTypeHandler(classtypeGinEnginePort, classtypeUseCasesPort, classtypeConfigAPIPort, classtypeMiddlewaresEnginePort)
+	dollarGinEnginePort := ProvideDollarGinEnginePort(server)
+	dollarGormEnginePort := ProvideDollarGormEnginePort(repository)
+	dollarRepository := ProvideDollarRepository(dollarGormEnginePort)
+	dollarRepositoryPort := ProvideDollarRepositoryPort(dollarRepository)
+	dollarUseCases := ProvideDollarUseCases(dollarRepositoryPort)
+	useCasePort := ProvideDollarUseCasePort(dollarUseCases)
+	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
+	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
+	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -187,6 +197,7 @@ func Initialize() (*Dependencies, error) {
 		CategoryHandler:  categoryHandler,
 		UnitHandler:      unitHandler,
 		ClassTypeHandler: classtypeHandler,
+		DollarHandler:    dollarHandler,
 	}
 	return dependencies, nil
 }
@@ -212,4 +223,5 @@ type Dependencies struct {
 	CategoryHandler  *category.Handler
 	UnitHandler      *unit.Handler
 	ClassTypeHandler *classtype.Handler
+	DollarHandler    *dollar.Handler
 }

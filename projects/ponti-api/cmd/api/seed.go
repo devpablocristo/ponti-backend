@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	gormofficial "gorm.io/gorm"
+
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
+	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
@@ -18,8 +23,9 @@ import (
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
-	    classtypemodels      "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
 )
+
+func floatPtr(f float64) *float64 { return &f }
 
 // Ejecuta todos los seeders en orden
 func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
@@ -57,6 +63,9 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 		return err
 	}
 	if err := seedClassTypes(repo); err != nil {
+		return err
+	}
+	if err := seedProjectDollarValues(repo); err != nil {
 		return err
 	}
 	fmt.Println("Database seeded successfully")
@@ -519,4 +528,51 @@ func seedClassTypes(repo *gorm.Repository) error {
 	return nil
 }
 
-func floatPtr(f float64) *float64 { return &f }
+func seedProjectDollarValues(repo *gorm.Repository) error {
+	db := repo.Client()
+
+	var projects []projectmodels.Project
+	if err := db.Find(&projects).Error; err != nil {
+		return fmt.Errorf("failed to fetch projects for dollar values: %w", err)
+	}
+	if len(projects) == 0 {
+		return fmt.Errorf("no projects found, can't seed dollar values")
+	}
+
+	// Meses de ejemplo
+	months := []string{"June", "July", "August"}
+	year := int64(2025)
+
+	for _, project := range projects {
+		for i, month := range months {
+			start := 850.0 + float64(project.ID)*10 + float64(i)*25
+			end := start + 45 + float64(i)*10
+			avg := (start + end) / 2
+
+			value := dollarmodels.ProjectDollarValue{
+				ProjectID:    project.ID,
+				Year:         year,
+				Month:        month,
+				StartValue:   start,
+				EndValue:     end,
+				AverageValue: avg,
+				CreatedAt:    time.Now(),
+				UpdatedAt:    time.Now(),
+			}
+
+			var existing dollarmodels.ProjectDollarValue
+			err := db.Where("project_id = ? AND year = ? AND month = ?", value.ProjectID, value.Year, value.Month).First(&existing).Error
+			if err == gormofficial.ErrRecordNotFound {
+				if err := db.Create(&value).Error; err != nil {
+					return fmt.Errorf("failed to seed ProjectDollarValue for project_id=%d, year=%d, month=%s: %w", value.ProjectID, value.Year, value.Month, err)
+				}
+				fmt.Printf("Seeded ProjectDollarValue: project_id=%d, year=%d, month=%s\n", value.ProjectID, value.Year, value.Month)
+			} else if err != nil {
+				return fmt.Errorf("failed to check existing ProjectDollarValue: %w", err)
+			} else {
+				fmt.Printf("ProjectDollarValue already exists: project_id=%d, year=%d, month=%s\n", value.ProjectID, value.Year, value.Month)
+			}
+		}
+	}
+	return nil
+}
