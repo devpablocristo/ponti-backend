@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
 	gorm "gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
+	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
@@ -85,26 +90,54 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	if l.ID <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", l.ID), nil)
 	}
+
+	userID, err := convertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+
 	model := models.FromDomain(l)
 	model.ID = l.ID
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Lot{}).Where("id = ?", l.ID).Count(&count).Error; err != nil {
+		if err := tx.Model(&models.Lot{}).Where("id = ? AND updated_at = ?", l.ID, l.UpdatedAt).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
 		}
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", l.ID), nil)
 		}
+
+		for _, date := range l.Dates {
+			lotDate := models.LotDates{
+				LotID:       l.ID,
+				SowingDate:  date.SowingDate,
+				HarvestDate: date.HarvestDate,
+				Sequence:    date.Sequence,
+				BaseModel: base.BaseModel{
+					CreatedBy: &userID,
+					UpdatedBy: &userID,
+					UpdatedAt: time.Now(),
+				},
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "lot_id"}, {Name: "sequence"}},
+				DoUpdates: clause.AssignmentColumns([]string{"sowing_date", "harvest_date", "updated_by", "updated_at"}),
+			}).Create(&lotDate).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to upsert lot dates", err)
+			}
+		}
+
 		if err := tx.Model(&models.Lot{}).
-			Where("id = ?", l.ID).
+			Where("id = ? AND updated_at = ?", l.ID, l.UpdatedAt).
 			Updates(map[string]any{
 				"name":             l.Name,
-				"field_id":         l.FieldID,
 				"hectares":         l.Hectares,
 				"previous_crop_id": l.PreviousCrop.ID,
 				"current_crop_id":  l.CurrentCrop.ID,
 				"season":           l.Season,
-				"status":           l.Status,
+				"variety":          l.Variety,
+				"updated_by":       &userID,
+				"updated_at":       time.Now(),
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", err)
 		}
@@ -284,10 +317,15 @@ func (r *Repository) ListLotsTable(
 			fields.name as field_name,
 			lots.name as lot_name,
 			previous_crop.name as previous_crop,
+			previous_crop.id as previous_crop_id,
 			current_crop.name as current_crop,
+			current_crop.id as current_crop_id,
+			lots.id as id,
 			lots.variety as variety,
 			lots.hectares as sowed_area,
 			lots.sowing_date as sowing_date,
+			lots.season,
+			lots.updated_at,
 			projects.admin_cost as cost_per_hectare
 		`).
 		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
@@ -300,7 +338,26 @@ func (r *Repository) ListLotsTable(
 	// Mapear a dominio y devolver
 	domainRows := make([]domain.LotTable, len(rows))
 	for i := range rows {
-		domainRows[i] = rows[i].ToDomain()
+		var lotDates []models.LotDates
+		if err := r.db.Client().WithContext(ctx).Table("lot_dates").
+			Where("lot_id = ?", rows[i].ID).
+			Scan(&lotDates).Error; err != nil {
+			return nil, 0, 0, 0, err
+		}
+
+		domainRows[i] = rows[i].ToDomain(lotDates)
 	}
 	return domainRows, int(total), sumSowedArea, sumCost, nil
+}
+
+func convertStringToID(ctx context.Context) (int64, error) {
+	userID := ctx.Value(pkgmwr.ContextUserID)
+	if s, ok := userID.(string); ok {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i, nil
+		} else {
+			return 0, fmt.Errorf("failed to parse user ID: %w", err)
+		}
+	}
+	return 0, fmt.Errorf("user ID is not a string")
 }
