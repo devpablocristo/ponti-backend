@@ -1,6 +1,8 @@
 package models
 
 import (
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 )
 
@@ -13,6 +15,8 @@ type Supply struct {
 	Price      float64 `gorm:"not null"`
 	Category   string  `gorm:"type:varchar(50);not null"`
 	Type       string  `gorm:"type:varchar(50);not null"`
+
+	sharedmodels.Base // Audit fields
 }
 
 func (m *Supply) ToDomain() *domain.Supply {
@@ -25,6 +29,12 @@ func (m *Supply) ToDomain() *domain.Supply {
 		Price:      m.Price,
 		Category:   m.Category,
 		Type:       m.Type,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
+		},
 	}
 }
 
@@ -38,5 +48,9 @@ func FromDomain(d *domain.Supply) *Supply {
 		Price:      d.Price,
 		Category:   d.Category,
 		Type:       d.Type,
+		Base: sharedmodels.Base{
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
 	}
 }

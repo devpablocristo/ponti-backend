@@ -13,6 +13,7 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
@@ -75,7 +76,12 @@ func FromDomain(d *domain.Project) *Project {
 		Managers:   make([]Manager, 0, len(d.Managers)),
 		Investors:  make([]ProjectInvestor, 0, len(d.Investors)),
 		Fields:     make([]fieldmod.Field, 0, len(d.Fields)),
-		Base:       sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+		Base: sharedmodels.Base{
+			CreatedAt: d.CreatedAt,
+			UpdatedAt: d.UpdatedAt,
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
 	}
 
 	for _, mgr := range d.Managers {
@@ -106,7 +112,10 @@ func FromDomain(d *domain.Project) *Project {
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotmod.Lot, 0, len(f.Lots)),
-			Base:             sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+			Base: sharedmodels.Base{
+				CreatedBy: d.CreatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
 		})
 
 		for _, l := range f.Lots {
@@ -120,7 +129,10 @@ func FromDomain(d *domain.Project) *Project {
 				CurrentCropID:  l.CurrentCrop.ID,
 				PreviousCrop:   cropmod.Crop{ID: l.PreviousCrop.ID, Name: l.PreviousCrop.Name},
 				CurrentCrop:    cropmod.Crop{ID: l.CurrentCrop.ID, Name: l.CurrentCrop.Name},
-				Base:      sharedmodels.Base{CreatedBy: d.CreatedBy, UpdatedBy: d.UpdatedBy},
+				Base: sharedmodels.Base{
+					CreatedBy: d.CreatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
 			})
 		}
 	}
@@ -143,9 +155,12 @@ func (m *Project) ToDomain() *domain.Project {
 		Managers:  make([]managerdom.Manager, 0, len(m.Managers)),
 		Investors: make([]investordom.Investor, 0, len(m.Investors)),
 		Fields:    make([]fielddom.Field, 0, len(m.Fields)),
-		UpdatedAt: &m.UpdatedAt,
-		CreatedBy: m.CreatedBy,
-		UpdatedBy: m.UpdatedBy,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
+		},
 	}
 
 	for _, mgr := range m.Managers {
@@ -170,6 +185,12 @@ func (m *Project) ToDomain() *domain.Project {
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
 			Lots:             make([]lotdom.Lot, 0, len(f.Lots)),
+			Base: shareddomain.Base{
+				CreatedAt: f.CreatedAt,
+				UpdatedAt: f.UpdatedAt,
+				CreatedBy: f.CreatedBy,
+				UpdatedBy: f.UpdatedBy,
+			},
 		}
 
 		for _, l := range f.Lots {
@@ -186,6 +207,12 @@ func (m *Project) ToDomain() *domain.Project {
 				CurrentCrop: cropdom.Crop{
 					ID:   l.CurrentCrop.ID,
 					Name: l.CurrentCrop.Name,
+				},
+				Base: shareddomain.Base{
+					CreatedAt: l.CreatedAt,
+					UpdatedAt: l.UpdatedAt,
+					CreatedBy: l.CreatedBy,
+					UpdatedBy: l.UpdatedBy,
 				},
 			})
 		}

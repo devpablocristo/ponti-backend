@@ -4,7 +4,6 @@ import (
 	"context"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
 )
 
@@ -27,7 +26,6 @@ func (u *UseCases) ListByProject(ctx context.Context, projectID int64) ([]domain
 	if projectID == 0 {
 		return nil, types.NewError(types.ErrInvalidID, "projectID is required", nil)
 	}
-
 	return u.repo.ListByProject(ctx, projectID)
 }
 
@@ -36,28 +34,23 @@ func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.Dollar
 		return types.NewError(types.ErrInternal, "no values provided", nil)
 	}
 
-	// tomo de referencia el primer elemento para ProjectID y Year
 	base := items[0]
 	seen := make(map[string]bool)
 
 	for _, d := range items {
-		// valido que todos los datos pertenezcan al mismo proyecto y al mismo año
 		if d.ProjectID != base.ProjectID || d.Year != base.Year {
 			return types.NewError(types.ErrBadRequest, "all items must share projectID and year", nil)
 		}
-		// valido que los meses no esten duplicados
 		if seen[d.Month] {
 			return types.NewError(types.ErrValidation, "duplicate month", nil)
 		}
 		seen[d.Month] = true
 
-		// compruebo que los datos ingresados existan en la DB
 		existing, err := u.repo.GetByComposite(ctx, d.ProjectID, d.Year, d.Month)
 		if err != nil {
 			return types.NewError(types.ErrInternal, "error checking existence for month", err)
 		}
 
-		// si no existen creo uno
 		if existing == nil {
 			id, err := u.repo.Create(ctx, &d)
 			if err != nil {
@@ -65,7 +58,6 @@ func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.Dollar
 			}
 			d.ID = id
 		} else {
-			// si existen lo actualizo
 			d.ID = existing.ID
 			if err := u.repo.Update(ctx, &d); err != nil {
 				return types.NewError(types.ErrInternal, "error updating month", err)

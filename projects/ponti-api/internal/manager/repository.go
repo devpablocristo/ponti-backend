@@ -31,6 +31,8 @@ func (r *Repository) CreateManager(ctx context.Context, c *domain.Manager) (int6
 		return 0, types.NewError(types.ErrValidation, "manager is nil", nil)
 	}
 	model := models.FromDomain(c)
+	model.CreatedBy = c.CreatedBy
+	model.UpdatedBy = c.UpdatedBy
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create manager", err)
 	}

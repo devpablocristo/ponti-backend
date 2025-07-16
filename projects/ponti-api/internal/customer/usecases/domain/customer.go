@@ -1,13 +1,17 @@
 package domain
 
-// Customer representa una entidad de customer.
+import (
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+)
+
 type Customer struct {
 	ID   int64
 	Name string
+
+	shareddomain.Base
 }
 
-// Customer representa una entidad de customer.
 type ListedCustomer struct {
-	ID   int64  // Llave primaria (numérica)
-	Name string // Nombre del customer
+	ID   int64
+	Name string
 }

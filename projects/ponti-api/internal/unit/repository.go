@@ -11,7 +11,6 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/usecases/domain"
 )
 
-// GormEnginePort exposes the required DB interface.
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
@@ -53,9 +52,13 @@ func (r *Repository) UpdateUnit(ctx context.Context, u *domain.Unit) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("unit %d not found", u.ID), nil)
 		}
+		updates := map[string]interface{}{
+			"name":       u.Name,
+			"updated_by": u.UpdatedBy,
+		}
 		if err := tx.Model(&models.Unit{}).
 			Where("id = ?", u.ID).
-			Update("name", u.Name).Error; err != nil {
+			Updates(updates).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update unit", err)
 		}
 		return nil

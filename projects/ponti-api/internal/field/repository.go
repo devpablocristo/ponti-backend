@@ -16,6 +16,7 @@ import (
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
+
 type Repository struct {
 	db GormEnginePort
 }
@@ -106,7 +107,6 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update field", err)
 		}
-		// Opcional: actualizar lots (acá podes limpiar y reinsertar, depende la lógica)
 		return nil
 	})
 }

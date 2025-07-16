@@ -2,6 +2,7 @@ package dto
 
 import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type Supply struct {
@@ -13,6 +14,11 @@ type Supply struct {
 	Price      float64 `json:"price"`
 	Category   string  `json:"category"`
 	Type       string  `json:"type"`
+	// Audit fields opcionales (si querés exponerlos en la API, sino omití)
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+	CreatedBy *int64 `json:"created_by,omitempty"`
+	UpdatedBy *int64 `json:"updated_by,omitempty"`
 }
 
 func (d *Supply) ToDomain() *domain.Supply {
@@ -25,6 +31,10 @@ func (d *Supply) ToDomain() *domain.Supply {
 		Price:      d.Price,
 		Category:   d.Category,
 		Type:       d.Type,
+		Base: shareddomain.Base{
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
 	}
 }
 
@@ -38,5 +48,7 @@ func FromDomain(s *domain.Supply) *Supply {
 		Price:      s.Price,
 		Category:   s.Category,
 		Type:       s.Type,
+		CreatedBy:  s.CreatedBy,
+		UpdatedBy:  s.UpdatedBy,
 	}
 }

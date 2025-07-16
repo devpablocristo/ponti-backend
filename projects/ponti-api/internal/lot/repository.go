@@ -33,7 +33,6 @@ func NewRepository(db GormEnginePort) *Repository {
 // --- CREATE ---
 func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	var lotID int64
-
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing models.Lot
 		if err := tx.Where("name = ? AND field_id = ?", l.Name, l.FieldID).
@@ -44,6 +43,9 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 			return types.NewError(types.ErrInternal, "failed to check lot", err)
 		}
 		model := models.FromDomain(l)
+		model.CreatedBy = l.CreatedBy
+		model.UpdatedBy = l.UpdatedBy
+
 		if err := tx.Create(model).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to create lot", err)
 		}

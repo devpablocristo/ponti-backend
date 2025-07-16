@@ -26,6 +26,7 @@ func NewRepository(db GormEnginePort) *Repository {
 // --- CREATE ---
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	model := models.FromDomain(s)
+	// Podés setear aquí CreatedBy/UpdatedBy si viene desde el domain o contexto (opcional)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create supply", err)
 	}
@@ -56,17 +57,19 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
 		}
+		updates := map[string]any{
+			"name":        s.Name,
+			"unit":        s.Unit,
+			"price":       s.Price,
+			"category":    s.Category,
+			"type":        s.Type,
+			"project_id":  s.ProjectID,
+			"campaign_id": s.CampaignID,
+			"updated_by":  s.UpdatedBy,
+		}
 		if err := tx.Model(&models.Supply{}).
 			Where("id = ?", s.ID).
-			Updates(map[string]any{
-				"name":        s.Name,
-				"unit":        s.Unit,
-				"price":       s.Price,
-				"category":    s.Category,
-				"type":        s.Type,
-				"project_id":  s.ProjectID,
-				"campaign_id": s.CampaignID,
-			}).Error; err != nil {
+			Updates(updates).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update supply", err)
 		}
 		return nil

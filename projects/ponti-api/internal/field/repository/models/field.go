@@ -1,12 +1,12 @@
 package models
 
 import (
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	leasetypemod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Field struct {
@@ -39,33 +39,29 @@ func FromDomain(d *fielddom.Field) *Field {
 
 // TO DOMAIN (sin preload de lots)
 func (m *Field) ToDomain() *fielddom.Field {
+	base := shareddomain.Base{
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+		// Agrega otros campos si existen
+	}
 	if m.LeaseType == nil {
 		return &fielddom.Field{
-			ID:        m.ID,
-			Name:      m.Name,
-			ProjectID: m.ProjectID,
-			LeaseType: &leasetypedom.LeaseType{
-				ID:   m.LeaseTypeID,
-				Name: "",
-			},
+			ID:               m.ID,
+			Name:             m.Name,
+			ProjectID:        m.ProjectID,
+			LeaseType:        &leasetypedom.LeaseType{ID: m.LeaseTypeID, Name: ""},
 			LeaseTypePercent: m.LeaseTypePercent,
 			LeaseTypeValue:   m.LeaseTypeValue,
-			CreatedAt:        m.CreatedAt,
-			UpdatedAt:        m.UpdatedAt,
+			Base:             base,
 		}
 	}
-
 	return &fielddom.Field{
-		ID:        m.ID,
-		Name:      m.Name,
-		ProjectID: m.ProjectID,
-		LeaseType: &leasetypedom.LeaseType{
-			ID:   m.LeaseTypeID,
-			Name: m.LeaseType.Name,
-		},
+		ID:               m.ID,
+		Name:             m.Name,
+		ProjectID:        m.ProjectID,
+		LeaseType:        &leasetypedom.LeaseType{ID: m.LeaseTypeID, Name: m.LeaseType.Name},
 		LeaseTypePercent: m.LeaseTypePercent,
 		LeaseTypeValue:   m.LeaseTypeValue,
-		CreatedAt:        m.CreatedAt,
-		UpdatedAt:        m.UpdatedAt,
+		Base:             base,
 	}
 }

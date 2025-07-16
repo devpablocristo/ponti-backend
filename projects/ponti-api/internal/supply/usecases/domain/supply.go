@@ -1,5 +1,9 @@
 package domain
 
+import (
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+)
+
 type Supply struct {
 	ID         int64   // id único
 	ProjectID  int64   // proyecto asociado
@@ -9,4 +13,6 @@ type Supply struct {
 	Price      float64 // precio unitario
 	Category   string  // rubro
 	Type       string  // tipo o clase
+
+	shareddomain.Base // Audit fields
 }

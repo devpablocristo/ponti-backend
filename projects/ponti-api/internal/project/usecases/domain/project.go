@@ -1,28 +1,25 @@
 package domain
 
 import (
-	"time"
-
 	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	customerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
 	fieldom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type Project struct {
-	ID        int64  // primary key
-	Name      string // project name
+	ID        int64
+	Name      string
 	AdminCost int64
-	Customer  customerdom.Customer // loaded client
+	Customer  customerdom.Customer
 	Campaign  campdom.Campaign
-	Managers  []managerdom.Manager   // many-to-many relation
-	Investors []investordom.Investor // pivot relation with extra field
-	Fields    []fieldom.Field        // child fields
-	CreatedAt time.Time
-	UpdatedAt *time.Time
-	CreatedBy *int64
-	UpdatedBy *int64
+	Managers  []managerdom.Manager
+	Investors []investordom.Investor
+	Fields    []fieldom.Field
+
+	shareddomain.Base
 }
 
 type ListedProject struct {

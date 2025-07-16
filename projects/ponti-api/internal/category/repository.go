@@ -1,3 +1,5 @@
+// File: ./repository.go
+
 package category
 
 import (
@@ -7,6 +9,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"gorm.io/gorm"
 )
 
@@ -37,6 +40,11 @@ func (r *Repository) ListCategories(ctx context.Context) ([]domain.Category, err
 
 func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (int64, error) {
 	model := models.FromDomain(c)
+	// Se asegura de setear CreatedBy y UpdatedBy (otros campos los setea GORM)
+	model.Base = sharedmodels.Base{
+		CreatedBy: c.CreatedBy,
+		UpdatedBy: c.UpdatedBy,
+	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create category", err)
 	}
@@ -52,9 +60,13 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", c.ID), nil)
 		}
+		// Solo actualiza el nombre (puedes extender para UpdatedBy, etc. si lo necesitas)
 		if err := tx.Model(&models.Category{}).
 			Where("id = ?", c.ID).
-			Update("name", c.Name).Error; err != nil {
+			Updates(map[string]interface{}{
+				"name":       c.Name,
+				"updated_by": c.UpdatedBy,
+			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update category", err)
 		}
 		return nil

@@ -4,7 +4,8 @@ import (
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
-	sheredmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Lot struct {
@@ -15,29 +16,35 @@ type Lot struct {
 	PreviousCropID int64   `gorm:"not null;index;column:previous_crop_id"`
 	CurrentCropID  int64   `gorm:"not null;index;column:current_crop_id"`
 	Season         string  `gorm:"size:20;not null;column:season"`
-	sheredmodels.Base
-	Variety      string       `gorm:"size:20;not null;column:variety"`
+	Variety        string  `gorm:"size:20;not null;column:variety"`
+
+	sharedmodels.Base // <-- embebe campos GORM de auditoría
+
 	PreviousCrop cropmod.Crop `gorm:"foreignKey:PreviousCropID;references:ID"`
 	CurrentCrop  cropmod.Crop `gorm:"foreignKey:CurrentCropID;references:ID"`
 }
 
+// Mapeo Model → Domain
 func (m *Lot) ToDomain() *domain.Lot {
 	return &domain.Lot{
-		ID:       m.ID,
-		Name:     m.Name,
-		FieldID:  m.FieldID,
-		Hectares: m.Hectares,
-		PreviousCrop: cropdom.Crop{
-			ID: m.PreviousCropID,
+		ID:           m.ID,
+		Name:         m.Name,
+		FieldID:      m.FieldID,
+		Hectares:     m.Hectares,
+		PreviousCrop: cropdom.Crop{ID: m.PreviousCropID},
+		CurrentCrop:  cropdom.Crop{ID: m.CurrentCropID},
+		Season:       m.Season,
+		Variety:      m.Variety,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
 		},
-		CurrentCrop: cropdom.Crop{
-			ID: m.CurrentCropID,
-		},
-		Season:  m.Season,
-		Variety: m.Variety,
 	}
 }
 
+// Mapeo Domain → Model
 func FromDomain(d *domain.Lot) *Lot {
 	return &Lot{
 		ID:             d.ID,
@@ -47,5 +54,10 @@ func FromDomain(d *domain.Lot) *Lot {
 		PreviousCropID: d.PreviousCrop.ID,
 		CurrentCropID:  d.CurrentCrop.ID,
 		Season:         d.Season,
+		Variety:        d.Variety,
+		Base: sharedmodels.Base{
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
 	}
 }

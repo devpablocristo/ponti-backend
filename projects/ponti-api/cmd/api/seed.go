@@ -21,11 +21,14 @@ import (
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
 )
 
 func floatPtr(f float64) *float64 { return &f }
+
+var defaultUser int64 = 1 // El usuario "system" que crea los datos de semilla
 
 // Ejecuta todos los seeders en orden
 func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
@@ -74,11 +77,11 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 
 func seedCustomers(repo *gorm.Repository) error {
 	clientes := []customermodels.Customer{
-		{Name: "Cliente A"},
-		{Name: "Cliente B"},
-		{Name: "Cliente C"},
-		{Name: "Cliente D"},
-		{Name: "Cliente E"},
+		{Name: "Cliente A", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Cliente B", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Cliente C", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Cliente D", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Cliente E", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, c := range clientes {
 		if err := repo.Client().FirstOrCreate(&c, customermodels.Customer{Name: c.Name}).Error; err != nil {
@@ -90,13 +93,13 @@ func seedCustomers(repo *gorm.Repository) error {
 
 func seedCampaigns(repo *gorm.Repository) error {
 	campañas := []campaignmodels.Campaign{
-		{Name: "Campaña 2024"},
-		{Name: "Campaña 2025"},
-		{Name: "Campaña 2026"},
-		{Name: "Campaña Maíz 2025"},
-		{Name: "Campaña Soja 2025"},
-		{Name: "Campaña Trigo 2024"},
-		{Name: "Campaña Relacional"}, // ESPECIAL para la prueba de relación
+		{Name: "Campaña 2024", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña 2025", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña 2026", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña Maíz 2025", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña Soja 2025", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña Trigo 2024", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Campaña Relacional", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, c := range campañas {
 		if err := repo.Client().FirstOrCreate(&c, campaignmodels.Campaign{Name: c.Name}).Error; err != nil {
@@ -108,8 +111,8 @@ func seedCampaigns(repo *gorm.Repository) error {
 
 func seedManagers(repo *gorm.Repository) error {
 	managers := []managermodels.Manager{
-		{Name: "Manager Uno"},
-		{Name: "Manager Dos"},
+		{Name: "Manager Uno", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Manager Dos", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, m := range managers {
 		if err := repo.Client().FirstOrCreate(&m, managermodels.Manager{Name: m.Name}).Error; err != nil {
@@ -121,8 +124,8 @@ func seedManagers(repo *gorm.Repository) error {
 
 func seedInvestors(repo *gorm.Repository) error {
 	inversores := []investormodels.Investor{
-		{Name: "Investor Uno"},
-		{Name: "Investor Dos"},
+		{Name: "Investor Uno", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Investor Dos", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, i := range inversores {
 		if err := repo.Client().FirstOrCreate(&i, investormodels.Investor{Name: i.Name}).Error; err != nil {
@@ -134,9 +137,9 @@ func seedInvestors(repo *gorm.Repository) error {
 
 func seedCrops(repo *gorm.Repository) error {
 	cultivos := []cropmodels.Crop{
-		{Name: "Maize"},
-		{Name: "Soy"},
-		{Name: "Wheat"},
+		{Name: "Maize", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Soy", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Wheat", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, c := range cultivos {
 		if err := repo.Client().FirstOrCreate(&c, cropmodels.Crop{Name: c.Name}).Error; err != nil {
@@ -148,8 +151,8 @@ func seedCrops(repo *gorm.Repository) error {
 
 func seedLeaseTypes(repo *gorm.Repository) error {
 	tiposLease := []leasetypemodels.LeaseType{
-		{Name: "Cash Lease"},
-		{Name: "Share Lease"},
+		{Name: "Cash Lease", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Share Lease", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, l := range tiposLease {
 		fmt.Printf("Seeding lease type: %s\n", l.Name)
@@ -183,37 +186,33 @@ func seedProjects(repo *gorm.Repository) error {
 		return fmt.Errorf("missing seed data dependencies")
 	}
 
-	// OBTENER la campaña especial para probar la relación 1-N
 	var campaignRelacional campaignmodels.Campaign
 	if err := db.Where("name = ?", "Campaña Relacional").First(&campaignRelacional).Error; err != nil {
 		return fmt.Errorf("no existe Campaña Relacional: %w", err)
 	}
 
-	// managers como ProjectManagers
 	var projectManagers []projectmodels.Manager
 	for _, m := range managers {
 		projectManagers = append(projectManagers, projectmodels.Manager{
 			ID:   m.ID,
 			Name: m.Name,
+			Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		})
 	}
 
-	// Generar varios proyectos para la campaña "Campaña Relacional"
 	for i := 1; i <= 3; i++ {
 		projectName := fmt.Sprintf("Proyecto Relacional %d", i)
-
-		// Evitar duplicados
 		var exists projectmodels.Project
 		if err := db.Where("name = ?", projectName).First(&exists).Error; err == nil {
 			continue
 		}
-
 		project := projectmodels.Project{
 			Name:       projectName,
 			CustomerID: customers[i%len(customers)].ID,
 			CampaignID: campaignRelacional.ID,
 			AdminCost:  int64(rand.Intn(10000) + 1000),
 			Managers:   []projectmodels.Manager{projectManagers[i%len(projectManagers)]},
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		}
 		if err := db.Create(&project).Error; err != nil {
 			return fmt.Errorf("failed to seed project: %w", err)
@@ -223,12 +222,12 @@ func seedProjects(repo *gorm.Repository) error {
 			ProjectID:  project.ID,
 			InvestorID: investors[i%len(investors)].ID,
 			Percentage: 50,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		}
 		if err := db.Create(&piv).Error; err != nil {
 			return fmt.Errorf("failed to seed project investor: %w", err)
 		}
 
-		// Crear fields y lots asociados
 		for j := 1; j <= 2; j++ {
 			field := fieldmodels.Field{
 				Name:             fmt.Sprintf("Field %d Relacional %d", j, i),
@@ -236,6 +235,7 @@ func seedProjects(repo *gorm.Repository) error {
 				LeaseTypeID:      leaseTypes[j%len(leaseTypes)].ID,
 				LeaseTypePercent: floatPtr(10.0 * float64(j)),
 				LeaseTypeValue:   floatPtr(500 * float64(j)),
+				Base:             sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 			}
 			if err := db.Create(&field).Error; err != nil {
 				return fmt.Errorf("failed to seed field: %w", err)
@@ -248,6 +248,7 @@ func seedProjects(repo *gorm.Repository) error {
 					PreviousCropID: crops[(k-1)%len(crops)].ID,
 					CurrentCropID:  crops[k%len(crops)].ID,
 					Season:         fmt.Sprintf("202%d", 3+k),
+					Base:           sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 				}
 				if err := db.Create(&lot).Error; err != nil {
 					return fmt.Errorf("failed to seed lot: %w", err)
@@ -255,8 +256,6 @@ func seedProjects(repo *gorm.Repository) error {
 			}
 		}
 	}
-
-	// Puedes agregar aquí otros proyectos para otras campañas si lo deseas (copiando el bloque anterior pero cambiando CampaignID)
 	return nil
 }
 
@@ -277,7 +276,6 @@ func seedSupplies(repo *gorm.Repository) error {
 
 	var supplies []supplymodels.Supply
 
-	// Supplies SOLO POR PROJECT (sin campaign, para testear filtro por project)
 	for i, p := range projects {
 		supplies = append(supplies, supplymodels.Supply{
 			Name:      fmt.Sprintf("OnlyProject_%d", i+1),
@@ -286,11 +284,10 @@ func seedSupplies(repo *gorm.Repository) error {
 			Category:  "CategoryProject",
 			Type:      "TypeProject",
 			ProjectID: p.ID,
-			// CampaignID: 0
+			Base:      sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		})
 	}
 
-	// Supplies POR PROJECT + CAMPAIGN (para testear filtro combinado)
 	for i, p := range projects {
 		for j, c := range campaigns {
 			supplies = append(supplies, supplymodels.Supply{
@@ -301,11 +298,11 @@ func seedSupplies(repo *gorm.Repository) error {
 				Type:       "TypeCombo",
 				ProjectID:  p.ID,
 				CampaignID: c.ID,
+				Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 			})
 		}
 	}
 
-	// Ejemplos originales y conocidos
 	supplies = append(supplies,
 		supplymodels.Supply{
 			Name:       "Urea Fertilizer",
@@ -315,6 +312,7 @@ func seedSupplies(repo *gorm.Repository) error {
 			Type:       "Chemical",
 			ProjectID:  projects[0].ID,
 			CampaignID: campaigns[0].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 		supplymodels.Supply{
 			Name:       "Corn Seed",
@@ -324,6 +322,7 @@ func seedSupplies(repo *gorm.Repository) error {
 			Type:       "Grain",
 			ProjectID:  projects[0].ID,
 			CampaignID: campaigns[0].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 		supplymodels.Supply{
 			Name:       "Glyphosate Herbicide",
@@ -333,10 +332,10 @@ func seedSupplies(repo *gorm.Repository) error {
 			Type:       "Chemical",
 			ProjectID:  projects[len(projects)-1].ID,
 			CampaignID: campaigns[len(campaigns)-1].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 	)
 
-	// Opcional: Si existe la campaña "Campaña Relacional", agregar supplies especiales para todos sus proyectos
 	var campaignRel campaignmodels.Campaign
 	if err := db.Where("name = ?", "Campaña Relacional").First(&campaignRel).Error; err == nil {
 		var relProjects []projectmodels.Project
@@ -356,8 +355,8 @@ func seedSupplies(repo *gorm.Repository) error {
 						Type:       desc[3],
 						ProjectID:  p.ID,
 						CampaignID: campaignRel.ID,
+						Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 					}
-					// Evita duplicados por name/project/campaign
 					var existing supplymodels.Supply
 					if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", sup.Name, sup.ProjectID, sup.CampaignID).
 						First(&existing).Error; err == nil {
@@ -369,7 +368,6 @@ func seedSupplies(repo *gorm.Repository) error {
 		}
 	}
 
-	// Insertar evitando duplicados
 	for _, s := range supplies {
 		var existing supplymodels.Supply
 		if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", s.Name, s.ProjectID, s.CampaignID).
@@ -405,6 +403,7 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 		CustomerID: customer.ID,
 		CampaignID: campaign.ID,
 		AdminCost:  1000,
+		Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 	}
 	if err := db.Create(&project).Error; err != nil {
 		return fmt.Errorf("failed to seed test project: %w", err)
@@ -416,6 +415,7 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 		LeaseTypeID:      leaseType.ID,
 		LeaseTypePercent: floatPtr(15.0),
 		LeaseTypeValue:   floatPtr(750.0),
+		Base:             sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 	}
 	if err := db.Create(&field).Error; err != nil {
 		return fmt.Errorf("failed to seed test field: %w", err)
@@ -437,6 +437,7 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 			PreviousCropID: crop1.ID,
 			CurrentCropID:  crop2.ID,
 			Season:         "2024",
+			Base:           sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 		{
 			Name:           "Lot Cosechado",
@@ -445,6 +446,7 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 			PreviousCropID: crop2.ID,
 			CurrentCropID:  crop1.ID,
 			Season:         "2024",
+			Base:           sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 	}
 	for _, l := range lots {
@@ -457,24 +459,21 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 	return nil
 }
 
-// seedCategories seeds initial data for the Category model.
 func seedCategories(repo *gorm.Repository) error {
 	categories := []categorymodels.Category{
-		{Name: "Fertilizer"},
-		{Name: "Seed"},
-		{Name: "Herbicide"},
-		{Name: "Pesticide"},
-		{Name: "Fuel"},
-		{Name: "Machinery Rental"},
-		{Name: "Labor"},
-		{Name: "Insurance"},
-		{Name: "Services"},
-		{Name: "Other"},
+		{Name: "Fertilizer", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Seed", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Herbicide", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Pesticide", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Fuel", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Machinery Rental", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Labor", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Insurance", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Services", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Other", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 
 	for _, c := range categories {
-		// Use FirstOrCreate to avoid duplicates based on the 'Name' field.
-		// If a category with the same name already exists, it will not be created.
 		if err := repo.Client().FirstOrCreate(&c, categorymodels.Category{Name: c.Name}).Error; err != nil {
 			return fmt.Errorf("failed to seed category %s: %w", c.Name, err)
 		}
@@ -483,23 +482,20 @@ func seedCategories(repo *gorm.Repository) error {
 	return nil
 }
 
-// seedUnits seeds initial data for the Unit model.
 func seedUnits(repo *gorm.Repository) error {
 	units := []unitmodels.Unit{
-		{Name: "kg"},
-		{Name: "lt"},
-		{Name: "ton"},
-		{Name: "ha"},
-		{Name: "bag"},
-		{Name: "unit"},
-		{Name: "box"},
-		{Name: "m2"},
-		{Name: "m3"},
+		{Name: "kg", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "lt", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "ton", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "ha", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "bag", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "unit", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "box", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "m2", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "m3", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 
 	for _, u := range units {
-		// Use FirstOrCreate to avoid duplicates based on the 'Name' field.
-		// If a unit with the same name already exists, it will not be created.
 		if err := repo.Client().FirstOrCreate(&u, unitmodels.Unit{Name: u.Name}).Error; err != nil {
 			return fmt.Errorf("failed to seed unit %s: %w", u.Name, err)
 		}
@@ -508,14 +504,10 @@ func seedUnits(repo *gorm.Repository) error {
 	return nil
 }
 
-/*
-seedClassTypes crea los tipos de clase iniciales (e.g. "Agroquímicos", "Fertilizantes").
-Sigue el patrón FirstOrCreate para evitar duplicados.
-*/
 func seedClassTypes(repo *gorm.Repository) error {
 	classTypes := []classtypemodels.ClassType{
-		{Name: "Agroquímicos"},
-		{Name: "Fertilizantes"},
+		{Name: "Agroquímicos", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+		{Name: "Fertilizantes", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 	}
 	for _, ct := range classTypes {
 		if err := repo.Client().
@@ -539,7 +531,6 @@ func seedProjectDollarValues(repo *gorm.Repository) error {
 		return fmt.Errorf("no projects found, can't seed dollar values")
 	}
 
-	// Meses de ejemplo
 	months := []string{"June", "July", "August"}
 	year := int64(2025)
 
@@ -556,8 +547,11 @@ func seedProjectDollarValues(repo *gorm.Repository) error {
 				StartValue:   start,
 				EndValue:     end,
 				AverageValue: avg,
-				CreatedAt:    time.Now(),
-				UpdatedAt:    time.Now(),
+				Base: sharedmodels.Base{
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+					CreatedBy: &defaultUser,
+					UpdatedBy: &defaultUser},
 			}
 
 			var existing dollarmodels.ProjectDollarValue
