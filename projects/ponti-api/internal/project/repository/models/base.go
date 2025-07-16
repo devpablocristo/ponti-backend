@@ -43,7 +43,6 @@ type Manager struct {
 type Customer struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(255);not null;unique"`
-	Type string `gorm:"size:50;not null;column:type"`
 }
 
 type Campaign struct {
