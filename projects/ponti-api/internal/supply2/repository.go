@@ -4,13 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
+	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
-	gorm "gorm.io/gorm"
 )
 
+// SupplyFilters defines filters for searching and pagination
+type SupplyFilters struct {
+	ProjectID    int64
+	CampaignID   int64
+	FieldID      int64
+	InvestorID   int64
+	EntryType    string
+	Provider     string
+	DeliveryNote string
+	Search       string // general search (by name, etc.)
+	Limit        int
+	Offset       int
+	Sort         string // column
+	Order        string // asc/desc
+}
+
+// GormEnginePort defines the minimal DB interface required
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
@@ -23,7 +42,6 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-// --- CREATE ---
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	model := models.FromDomain(s)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
@@ -32,7 +50,6 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 	return model.ID, nil
 }
 
-// --- GET ---
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
 	if err := r.db.Client().WithContext(ctx).First(&m, id).Error; err != nil {
@@ -44,7 +61,6 @@ func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, e
 	return m.ToDomain(), nil
 }
 
-// --- UPDATE ---
 func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	model := models.FromDomain(s)
 	model.ID = s.ID
@@ -59,13 +75,21 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		if err := tx.Model(&models.Supply{}).
 			Where("id = ?", s.ID).
 			Updates(map[string]any{
-				"name":        s.Name,
-				"unit":        s.Unit,
-				"price":       s.Price,
-				"category":    s.Category,
-				"type":        s.Type,
-				"project_id":  s.ProjectID,
-				"campaign_id": s.CampaignID,
+				"delivery_note": s.DeliveryNote,
+				"date":          s.Date,
+				"entry_type":    s.EntryType,
+				"name":          s.Name,
+				"unit":          s.Unit,
+				"amount":        s.Amount,
+				"price":         s.Price,
+				"category":      s.Category,
+				"type":          s.Type,
+				"provider":      s.Provider,
+				"total_usd":     s.TotalUSD,
+				"project_id":    s.ProjectID,
+				"campaign_id":   s.CampaignID,
+				"field_id":      s.FieldID,
+				"investor_id":   s.InvestorID,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update supply", err)
 		}
@@ -73,7 +97,6 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	})
 }
 
-// --- DELETE ---
 func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
@@ -90,58 +113,53 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	})
 }
 
-// --- LIST por Project ---
-func (r *Repository) ListSuppliesByProject(ctx context.Context, projectID int64) ([]domain.Supply, error) {
-	var supplies []models.Supply
-	if err := r.db.Client().WithContext(ctx).
-		Where("project_id = ?", projectID).
-		Find(&supplies).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list supplies by project", err)
+// ListSupplies is a flexible search/pagination method for supplies
+func (r *Repository) ListSupplies(ctx context.Context, f SupplyFilters) ([]domain.Supply, error) {
+	db := r.db.Client().WithContext(ctx).Model(&models.Supply{})
+	if f.ProjectID > 0 {
+		db = db.Where("project_id = ?", f.ProjectID)
 	}
-	res := make([]domain.Supply, len(supplies))
-	for i := range supplies {
-		res[i] = *supplies[i].ToDomain()
+	if f.CampaignID > 0 {
+		db = db.Where("campaign_id = ?", f.CampaignID)
 	}
-	return res, nil
-}
+	if f.FieldID > 0 {
+		db = db.Where("field_id = ?", f.FieldID)
+	}
+	if f.InvestorID > 0 {
+		db = db.Where("investor_id = ?", f.InvestorID)
+	}
+	if f.EntryType != "" {
+		db = db.Where("entry_type = ?", f.EntryType)
+	}
+	if f.Provider != "" {
+		db = db.Where("provider = ?", f.Provider)
+	}
+	if f.DeliveryNote != "" {
+		db = db.Where("delivery_note = ?", f.DeliveryNote)
+	}
+	if f.Search != "" {
+		search := "%" + strings.ToLower(f.Search) + "%"
+		db = db.Where("LOWER(name) LIKE ? OR LOWER(delivery_note) LIKE ?", search, search)
+	}
+	if f.Sort != "" {
+		order := f.Sort
+		if f.Order == "desc" {
+			order += " desc"
+		} else {
+			order += " asc"
+		}
+		db = db.Order(order)
+	}
+	if f.Limit > 0 {
+		db = db.Limit(f.Limit)
+	}
+	if f.Offset > 0 {
+		db = db.Offset(f.Offset)
+	}
 
-// --- LIST por Project y Campaign ---
-func (r *Repository) ListSuppliesByProjectAndCampaign(ctx context.Context, projectID, campaignID int64) ([]domain.Supply, error) {
 	var supplies []models.Supply
-	if err := r.db.Client().WithContext(ctx).
-		Where("project_id = ? AND campaign_id = ?", projectID, campaignID).
-		Find(&supplies).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list supplies by project and campaign", err)
-	}
-	res := make([]domain.Supply, len(supplies))
-	for i := range supplies {
-		res[i] = *supplies[i].ToDomain()
-	}
-	return res, nil
-}
-
-// --- LIST por Project o Campaign ---
-func (r *Repository) ListSuppliesByProjectOrCampaign(ctx context.Context, projectID, campaignID int64) ([]domain.Supply, error) {
-	var supplies []models.Supply
-	if err := r.db.Client().WithContext(ctx).
-		Where("project_id = ? OR campaign_id = ?", projectID, campaignID).
-		Find(&supplies).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list supplies by project OR campaign", err)
-	}
-	res := make([]domain.Supply, len(supplies))
-	for i := range supplies {
-		res[i] = *supplies[i].ToDomain()
-	}
-	return res, nil
-}
-
-// --- LIST por Campaign ---
-func (r *Repository) ListSuppliesByCampaign(ctx context.Context, campaignID int64) ([]domain.Supply, error) {
-	var supplies []models.Supply
-	if err := r.db.Client().WithContext(ctx).
-		Where("campaign_id = ?", campaignID).
-		Find(&supplies).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list supplies by campaign", err)
+	if err := db.Find(&supplies).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list supplies", err)
 	}
 	res := make([]domain.Supply, len(supplies))
 	for i := range supplies {

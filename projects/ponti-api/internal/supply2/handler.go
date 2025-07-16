@@ -16,10 +16,7 @@ type UseCasesPort interface {
 	GetSupply(context.Context, int64) (*domain.Supply, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
-	ListSuppliesByProject(context.Context, int64) ([]domain.Supply, error)
-	ListSuppliesByProjectAndCampaign(context.Context, int64, int64) ([]domain.Supply, error)
-	ListSuppliesByProjectOrCampaign(context.Context, int64, int64) ([]domain.Supply, error)
-	ListSuppliesByCampaign(context.Context, int64) ([]domain.Supply, error)
+	ListSupplies(context.Context, SupplyFilters) ([]domain.Supply, error)
 }
 
 type GinEnginePort interface {
@@ -38,7 +35,6 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -46,7 +42,6 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -56,7 +51,6 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/supplies"
@@ -71,6 +65,34 @@ func (h *Handler) Routes() {
 	}
 }
 
+func (h *Handler) ListSupplies(c *gin.Context) {
+	var filters SupplyFilters
+
+	filters.ProjectID, _ = strconv.ParseInt(c.Query("project_id"), 10, 64)
+	filters.CampaignID, _ = strconv.ParseInt(c.Query("campaign_id"), 10, 64)
+	filters.FieldID, _ = strconv.ParseInt(c.Query("field_id"), 10, 64)
+	filters.InvestorID, _ = strconv.ParseInt(c.Query("investor_id"), 10, 64)
+	filters.EntryType = c.Query("entry_type")
+	filters.Provider = c.Query("provider")
+	filters.DeliveryNote = c.Query("delivery_note")
+	filters.Search = c.Query("search")
+	filters.Sort = c.Query("sort")
+	filters.Order = c.DefaultQuery("order", "asc")
+	filters.Limit, _ = strconv.Atoi(c.DefaultQuery("limit", "10"))
+	filters.Offset, _ = strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	supplies, err := h.ucs.ListSupplies(c.Request.Context(), filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	out := make([]dto.Supply, len(supplies))
+	for i := range supplies {
+		out[i] = *dto.FromDomain(&supplies[i])
+	}
+	c.JSON(http.StatusOK, out)
+}
+
 func (h *Handler) CreateSupply(c *gin.Context) {
 	var req dto.Supply
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -83,40 +105,6 @@ func (h *Handler) CreateSupply(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "Supply created successfully", "id": newID})
-}
-
-func (h *Handler) ListSupplies(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
-	mode := c.Query("mode") // "and" (default) o "or"
-
-	var (
-		supplies []domain.Supply
-		err      error
-	)
-	switch {
-	case projectID > 0 && campaignID > 0 && mode == "or":
-		supplies, err = h.ucs.ListSuppliesByProjectOrCampaign(c.Request.Context(), projectID, campaignID)
-	case projectID > 0 && campaignID > 0: // AND es default
-		supplies, err = h.ucs.ListSuppliesByProjectAndCampaign(c.Request.Context(), projectID, campaignID)
-	case projectID > 0:
-		supplies, err = h.ucs.ListSuppliesByProject(c.Request.Context(), projectID)
-	case campaignID > 0:
-		supplies, err = h.ucs.ListSuppliesByCampaign(c.Request.Context(), campaignID)
-	default:
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Missing required parameters"})
-		return
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
-	}
-	out := make([]dto.Supply, len(supplies))
-	for i := range supplies {
-		out[i] = *dto.FromDomain(&supplies[i])
-	}
-	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {

@@ -19,6 +19,7 @@ import (
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 )
 
 // RunGormMigrations runs SQL migrations using GORM.
@@ -42,6 +43,7 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
 		&customermodels.Customer{},
+		&supplymodels.Supply{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.Project{}, // último
 	}

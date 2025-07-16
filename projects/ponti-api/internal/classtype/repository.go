@@ -1,0 +1,73 @@
+package classtype
+
+import (
+	"context"
+	"fmt"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/usecases/domain"
+	"gorm.io/gorm"
+)
+
+// GormEnginePort exposes the required DB interface.
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+type ClassTypeRepository struct {
+	db GormEnginePort
+}
+
+func NewClassTypeRepository(db GormEnginePort) *ClassTypeRepository {
+	return &ClassTypeRepository{db: db}
+}
+func (r *ClassTypeRepository) ListClassTypes(ctx context.Context) ([]domain.ClassType, error) {
+	var classTypes []models.ClassType
+	if err := r.db.Client().WithContext(ctx).Find(&classTypes).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list class types", err)
+	}
+	res := make([]domain.ClassType, len(classTypes))
+	for i := range classTypes {
+		res[i] = *classTypes[i].ToDomain()
+	}
+	return res, nil
+}
+func (r *ClassTypeRepository) CreateClassType(ctx context.Context, c *domain.ClassType) (int64, error) {
+	model := models.FromDomain(c)
+	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		return 0, types.NewError(types.ErrInternal, "failed to create class type", err)
+	}
+	return model.ID, nil
+}
+func (r *ClassTypeRepository) UpdateClassType(ctx context.Context, c *domain.ClassType) error {
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.ClassType{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check class type existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", c.ID), nil)
+		}
+		if err := tx.Model(&models.ClassType{}).
+			Where("id = ?", c.ID).
+			Update("name", c.Name).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update class type", err)
+		}
+		return nil
+	})
+}
+func (r *ClassTypeRepository) DeleteClassType(ctx context.Context, id int64) error {
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.ClassType{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check class type existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", id), nil)
+		}
+		if err := tx.Delete(&models.ClassType{}, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete class type", err)
+		}
+		return nil
+	})
+}

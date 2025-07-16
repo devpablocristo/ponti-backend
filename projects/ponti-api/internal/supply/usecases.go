@@ -13,6 +13,8 @@ type RepositoryPort interface {
 	DeleteSupply(context.Context, int64) error
 	ListSuppliesByProject(context.Context, int64) ([]domain.Supply, error)
 	ListSuppliesByProjectAndCampaign(context.Context, int64, int64) ([]domain.Supply, error)
+	ListSuppliesByProjectOrCampaign(context.Context, int64, int64) ([]domain.Supply, error)
+	ListSuppliesByCampaign(context.Context, int64) ([]domain.Supply, error)
 }
 
 type UseCases struct {
@@ -45,4 +47,12 @@ func (u *UseCases) ListSuppliesByProject(ctx context.Context, projectID int64) (
 
 func (u *UseCases) ListSuppliesByProjectAndCampaign(ctx context.Context, projectID, campaignID int64) ([]domain.Supply, error) {
 	return u.repo.ListSuppliesByProjectAndCampaign(ctx, projectID, campaignID)
+}
+
+func (u *UseCases) ListSuppliesByProjectOrCampaign(ctx context.Context, projectID, campaignID int64) ([]domain.Supply, error) {
+	return u.repo.ListSuppliesByProjectOrCampaign(ctx, projectID, campaignID)
+}
+
+func (u *UseCases) ListSuppliesByCampaign(ctx context.Context, campaignID int64) ([]domain.Supply, error) {
+	return u.repo.ListSuppliesByCampaign(ctx, campaignID)
 }

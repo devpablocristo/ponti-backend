@@ -21,6 +21,7 @@ import (
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 )
 
 type Dependencies struct {
@@ -38,6 +39,7 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	SupplyHandler    *supply.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -56,6 +58,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProjectSet,
 		LeaseTypeSet,
+		SupplySet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
