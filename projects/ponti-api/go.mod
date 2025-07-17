@@ -1,6 +1,6 @@
 module github.com/alphacodinggroup/ponti-backend/projects/ponti-api
 
-go 1.23.4
+go 1.24.5
 
 require (
 	github.com/alphacodinggroup/ponti-backend/pkg v0.0.0
