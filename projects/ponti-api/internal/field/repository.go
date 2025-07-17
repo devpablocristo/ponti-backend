@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
@@ -116,8 +118,17 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid field id: %d", id), nil)
 	}
+
+	deletedBy, err := base.ConvertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&models.Field{}, id).Error; err != nil {
+		if err := tx.Model(&models.Field{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete field", err)
 		}
 		return nil

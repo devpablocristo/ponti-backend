@@ -4,6 +4,7 @@ import "time"
 
 type LotTable struct {
 	ID             int64
+	ProjectID      int64
 	ProjectName    string
 	FieldName      string
 	LotName        string
@@ -20,7 +21,7 @@ type LotTable struct {
 }
 
 type LotDates struct {
-	SowingDate  time.Time
+	SowingDate  *time.Time
 	HarvestDate *time.Time
 	Sequence    int
 }

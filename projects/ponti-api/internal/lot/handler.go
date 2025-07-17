@@ -229,8 +229,12 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 			if date.HarvestDate != nil {
 				harvestDate = date.HarvestDate.Format("2006-01-02")
 			}
+			sowingDate := ""
+			if date.SowingDate != nil {
+				sowingDate = date.SowingDate.Format("2006-01-02")
+			}
 			dateMap[date.Sequence] = dto.LotDates{
-				SowingDate:  date.SowingDate.Format("2006-01-02"),
+				SowingDate:  sowingDate,
 				HarvestDate: harvestDate,
 				Sequence:    date.Sequence,
 			}
@@ -249,6 +253,7 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 
 		dtoRows[i] = dto.LotTable{
 			ID:             row.ID,
+			ProjectID:      row.ProjectID,
 			ProjectName:    row.ProjectName,
 			FieldName:      row.FieldName,
 			LotName:        row.LotName,
