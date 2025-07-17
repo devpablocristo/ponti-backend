@@ -277,7 +277,11 @@ func (r *Repository) ListLotsTable(
 	if fieldID > 0 {
 		base = base.Where("fields.id = ?", fieldID)
 	} else {
-		return nil, 0, 0, 0, types.NewError(types.ErrInvalidID, "field_id is required", nil)
+		if projectID > 0 {
+			base = base.Where("fields.project_id = ?", projectID)
+		} else {
+			return nil, 0, 0, 0, types.NewError(types.ErrInvalidID, "field_id or project_id is required", nil)
+		}
 	}
 
 	if cropID > 0 {
@@ -314,6 +318,7 @@ func (r *Repository) ListLotsTable(
 	if err := base.Session(&gorm.Session{}).
 		Select(`
 			projects.name as project_name,
+			projects.id as project_id,
 			fields.name as field_name,
 			lots.name as lot_name,
 			previous_crop.name as previous_crop,
