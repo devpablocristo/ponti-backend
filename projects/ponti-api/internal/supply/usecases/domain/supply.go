@@ -5,14 +5,14 @@ import (
 )
 
 type Supply struct {
-	ID         int64   // id único
-	ProjectID  int64   // proyecto asociado
-	CampaignID int64   // campaña asociada (puede ser 0/null si no aplica)
-	Name       string  // nombre del insumo
-	Unit       string  // unidad (Lts, Kg, etc.)
-	Price      float64 // precio unitario
-	Category   string  // rubro
-	Type       string  // tipo o clase
+	ID         int64
+	ProjectID  int64
+	CampaignID int64
+	Name       string
+	UnitID     int64
+	Price      float64
+	CategoryID int64
+	TypeID     int64
 
 	shareddomain.Base // Audit fields
 }

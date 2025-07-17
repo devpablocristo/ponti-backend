@@ -53,9 +53,6 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 	if err := seedProjects(repo); err != nil {
 		return err
 	}
-	if err := seedSupplies(repo); err != nil {
-		return err
-	}
 	if err := seedTestProjectAndLots(repo); err != nil {
 		return err
 	}
@@ -66,6 +63,12 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 		return err
 	}
 	if err := seedClassTypes(repo); err != nil {
+		return err
+	}
+	if err := seedSupplyAuxTables(repo); err != nil {
+		return err
+	}
+	if err := seedSupplies(repo); err != nil {
 		return err
 	}
 	if err := seedProjectDollarValues(repo); err != nil {
@@ -259,129 +262,6 @@ func seedProjects(repo *gorm.Repository) error {
 	return nil
 }
 
-func seedSupplies(repo *gorm.Repository) error {
-	db := repo.Client()
-
-	var projects []projectmodels.Project
-	var campaigns []campaignmodels.Campaign
-	if err := db.Find(&projects).Error; err != nil {
-		return fmt.Errorf("failed to fetch projects: %w", err)
-	}
-	if err := db.Find(&campaigns).Error; err != nil {
-		return fmt.Errorf("failed to fetch campaigns: %w", err)
-	}
-	if len(projects) == 0 || len(campaigns) == 0 {
-		return fmt.Errorf("need at least one project and campaign for seeding supplies")
-	}
-
-	var supplies []supplymodels.Supply
-
-	for i, p := range projects {
-		supplies = append(supplies, supplymodels.Supply{
-			Name:      fmt.Sprintf("OnlyProject_%d", i+1),
-			Unit:      "unit",
-			Price:     100 + float64(i)*10,
-			Category:  "CategoryProject",
-			Type:      "TypeProject",
-			ProjectID: p.ID,
-			Base:      sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-		})
-	}
-
-	for i, p := range projects {
-		for j, c := range campaigns {
-			supplies = append(supplies, supplymodels.Supply{
-				Name:       fmt.Sprintf("BothProjectAndCampaign_%d_%d", p.ID, c.ID),
-				Unit:       "unit",
-				Price:      200 + float64(i)*10 + float64(j)*5,
-				Category:   "CategoryCombo",
-				Type:       "TypeCombo",
-				ProjectID:  p.ID,
-				CampaignID: c.ID,
-				Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-			})
-		}
-	}
-
-	supplies = append(supplies,
-		supplymodels.Supply{
-			Name:       "Urea Fertilizer",
-			Unit:       "kg",
-			Price:      400.50,
-			Category:   "Fertilizer",
-			Type:       "Chemical",
-			ProjectID:  projects[0].ID,
-			CampaignID: campaigns[0].ID,
-			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-		},
-		supplymodels.Supply{
-			Name:       "Corn Seed",
-			Unit:       "bag",
-			Price:      3200,
-			Category:   "Seed",
-			Type:       "Grain",
-			ProjectID:  projects[0].ID,
-			CampaignID: campaigns[0].ID,
-			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-		},
-		supplymodels.Supply{
-			Name:       "Glyphosate Herbicide",
-			Unit:       "lt",
-			Price:      180,
-			Category:   "Herbicide",
-			Type:       "Chemical",
-			ProjectID:  projects[len(projects)-1].ID,
-			CampaignID: campaigns[len(campaigns)-1].ID,
-			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-		},
-	)
-
-	var campaignRel campaignmodels.Campaign
-	if err := db.Where("name = ?", "Campaña Relacional").First(&campaignRel).Error; err == nil {
-		var relProjects []projectmodels.Project
-		if err := db.Where("campaign_id = ?", campaignRel.ID).Find(&relProjects).Error; err == nil && len(relProjects) > 0 {
-			for idx, p := range relProjects {
-				tipos := [][]string{
-					{"Rel-Urea Fertilizer", "kg", "Fertilizer", "Chemical"},
-					{"Rel-Corn Seed", "bag", "Seed", "Grain"},
-					{"Rel-Glyphosate", "lt", "Herbicide", "Chemical"},
-				}
-				for t, desc := range tipos {
-					sup := supplymodels.Supply{
-						Name:       desc[0],
-						Unit:       desc[1],
-						Price:      120 + float64(idx*37+t*19),
-						Category:   desc[2],
-						Type:       desc[3],
-						ProjectID:  p.ID,
-						CampaignID: campaignRel.ID,
-						Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-					}
-					var existing supplymodels.Supply
-					if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", sup.Name, sup.ProjectID, sup.CampaignID).
-						First(&existing).Error; err == nil {
-						continue
-					}
-					supplies = append(supplies, sup)
-				}
-			}
-		}
-	}
-
-	for _, s := range supplies {
-		var existing supplymodels.Supply
-		if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", s.Name, s.ProjectID, s.CampaignID).
-			First(&existing).Error; err == nil {
-			continue
-		}
-		if err := db.Create(&s).Error; err != nil {
-			return fmt.Errorf("failed to seed supply %s: %w", s.Name, err)
-		}
-	}
-	fmt.Println("Supplies seeded successfully")
-	return nil
-}
-
 func seedTestProjectAndLots(repo *gorm.Repository) error {
 	db := repo.Client()
 
@@ -566,6 +446,209 @@ func seedProjectDollarValues(repo *gorm.Repository) error {
 			} else {
 				fmt.Printf("ProjectDollarValue already exists: project_id=%d, year=%d, month=%s\n", value.ProjectID, value.Year, value.Month)
 			}
+		}
+	}
+	return nil
+}
+
+func seedSupplies(repo *gorm.Repository) error {
+	db := repo.Client()
+
+	// Buscar proyectos y campañas existentes
+	var projects []projectmodels.Project
+	var campaigns []campaignmodels.Campaign
+	if err := db.Find(&projects).Error; err != nil {
+		return fmt.Errorf("failed to fetch projects: %w", err)
+	}
+	if err := db.Find(&campaigns).Error; err != nil {
+		return fmt.Errorf("failed to fetch campaigns: %w", err)
+	}
+	if len(projects) == 0 || len(campaigns) == 0 {
+		return fmt.Errorf("need at least one project and campaign for seeding supplies")
+	}
+
+	// Buscar unidades, categorías y tipos base
+	var units []supplymodels.SupplyUnit
+	var categories []supplymodels.SupplyCategory
+	var types []supplymodels.SupplyType
+	if err := db.Find(&units).Error; err != nil || len(units) == 0 {
+		return fmt.Errorf("need units to seed supplies")
+	}
+	if err := db.Find(&categories).Error; err != nil || len(categories) == 0 {
+		return fmt.Errorf("need categories to seed supplies")
+	}
+	if err := db.Find(&types).Error; err != nil || len(types) == 0 {
+		return fmt.Errorf("need types to seed supplies")
+	}
+
+	// Helpers para buscar ID por nombre
+	unitID := func(name string) uint {
+		for _, u := range units {
+			if u.Name == name {
+				return u.ID
+			}
+		}
+		return units[0].ID
+	}
+	categoryID := func(name string) uint {
+		for _, c := range categories {
+			if c.Name == name {
+				return c.ID
+			}
+		}
+		return categories[0].ID
+	}
+	typeID := func(name string) uint {
+		for _, t := range types {
+			if t.Name == name {
+				return t.ID
+			}
+		}
+		return types[0].ID
+	}
+
+	var supplies []supplymodels.Supply
+
+	for i, p := range projects {
+		supplies = append(supplies, supplymodels.Supply{
+			Name:       fmt.Sprintf("OnlyProject_%d", i+1),
+			UnitID:     unitID("kg"),
+			Price:      100 + float64(i)*10,
+			CategoryID: categoryID("Fertilizer"), // Usá el nombre real existente en la tabla Category
+			TypeID:     typeID("Chemical"),       // Usá el nombre real existente en SupplyType
+			ProjectID:  p.ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+		})
+	}
+
+	for i, p := range projects {
+		for j, c := range campaigns {
+			supplies = append(supplies, supplymodels.Supply{
+				Name:       fmt.Sprintf("BothProjectAndCampaign_%d_%d", p.ID, c.ID),
+				UnitID:     unitID("kg"),
+				Price:      200 + float64(i)*10 + float64(j)*5,
+				CategoryID: categoryID("Fertilizer"),
+				TypeID:     typeID("Chemical"),
+				ProjectID:  p.ID,
+				CampaignID: c.ID,
+				Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+			})
+		}
+	}
+
+	supplies = append(supplies,
+		supplymodels.Supply{
+			Name:       "Urea Fertilizer",
+			UnitID:     unitID("kg"),
+			Price:      400.50,
+			CategoryID: categoryID("Fertilizer"),
+			TypeID:     typeID("Chemical"),
+			ProjectID:  projects[0].ID,
+			CampaignID: campaigns[0].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+		},
+		supplymodels.Supply{
+			Name:       "Corn Seed",
+			UnitID:     unitID("bag"),
+			Price:      3200,
+			CategoryID: categoryID("Seed"),
+			TypeID:     typeID("Grain"),
+			ProjectID:  projects[0].ID,
+			CampaignID: campaigns[0].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+		},
+		supplymodels.Supply{
+			Name:       "Glyphosate Herbicide",
+			UnitID:     unitID("lt"),
+			Price:      180,
+			CategoryID: categoryID("Herbicide"),
+			TypeID:     typeID("Chemical"),
+			ProjectID:  projects[len(projects)-1].ID,
+			CampaignID: campaigns[len(campaigns)-1].ID,
+			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+		},
+	)
+
+	// Opcional: supplies relacionales
+	var campaignRel campaignmodels.Campaign
+	if err := db.Where("name = ?", "Campaña Relacional").First(&campaignRel).Error; err == nil {
+		var relProjects []projectmodels.Project
+		if err := db.Where("campaign_id = ?", campaignRel.ID).Find(&relProjects).Error; err == nil && len(relProjects) > 0 {
+			for idx, p := range relProjects {
+				typesArr := [][]string{
+					{"Rel-Urea Fertilizer", "kg", "Fertilizer", "Chemical"},
+					{"Rel-Corn Seed", "bag", "Seed", "Grain"},
+					{"Rel-Glyphosate", "lt", "Herbicide", "Chemical"},
+				}
+				for t, desc := range typesArr {
+					sup := supplymodels.Supply{
+						Name:       desc[0],
+						UnitID:     unitID(desc[1]),
+						Price:      120 + float64(idx*37+t*19),
+						CategoryID: categoryID(desc[2]),
+						TypeID:     typeID(desc[3]),
+						ProjectID:  p.ID,
+						CampaignID: campaignRel.ID,
+						Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+					}
+					var existing supplymodels.Supply
+					if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", sup.Name, sup.ProjectID, sup.CampaignID).
+						First(&existing).Error; err == nil {
+						continue
+					}
+					supplies = append(supplies, sup)
+				}
+			}
+		}
+	}
+
+	for _, s := range supplies {
+		var existing supplymodels.Supply
+		if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", s.Name, s.ProjectID, s.CampaignID).
+			First(&existing).Error; err == nil {
+			continue
+		}
+		if err := db.Create(&s).Error; err != nil {
+			return fmt.Errorf("failed to seed supply %s: %w", s.Name, err)
+		}
+	}
+	fmt.Println("Supplies seeded successfully")
+	return nil
+}
+
+func seedSupplyAuxTables(repo *gorm.Repository) error {
+	db := repo.Client()
+	// Seed Units
+	units := []supplymodels.SupplyUnit{
+		{Name: "kg"},
+		{Name: "lt"},
+		{Name: "ton"},
+		{Name: "bag"},
+	}
+	for _, u := range units {
+		if err := db.FirstOrCreate(&u, supplymodels.SupplyUnit{Name: u.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed supply unit %s: %w", u.Name, err)
+		}
+	}
+	// Seed Categories
+	categories := []supplymodels.SupplyCategory{
+		{Name: "Fertilizer"},
+		{Name: "Seed"},
+		{Name: "Herbicide"},
+	}
+	for _, c := range categories {
+		if err := db.FirstOrCreate(&c, supplymodels.SupplyCategory{Name: c.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed supply category %s: %w", c.Name, err)
+		}
+	}
+	// Seed Types
+	types := []supplymodels.SupplyType{
+		{Name: "Chemical"},
+		{Name: "Grain"},
+	}
+	for _, t := range types {
+		if err := db.FirstOrCreate(&t, supplymodels.SupplyType{Name: t.Name}).Error; err != nil {
+			return fmt.Errorf("failed to seed supply type %s: %w", t.Name, err)
 		}
 	}
 	return nil

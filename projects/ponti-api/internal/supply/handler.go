@@ -5,21 +5,28 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
-	"github.com/gin-gonic/gin"
 )
 
 type UseCasesPort interface {
-	CreateSupply(context.Context, *domain.Supply) (int64, error)
-	GetSupply(context.Context, int64) (*domain.Supply, error)
-	UpdateSupply(context.Context, *domain.Supply) error
-	DeleteSupply(context.Context, int64) error
-	ListSuppliesByProject(context.Context, int64) ([]domain.Supply, error)
-	ListSuppliesByProjectAndCampaign(context.Context, int64, int64) ([]domain.Supply, error)
-	ListSuppliesByProjectOrCampaign(context.Context, int64, int64) ([]domain.Supply, error)
-	ListSuppliesByCampaign(context.Context, int64) ([]domain.Supply, error)
+	CreateSupply(ctx context.Context, s *domain.Supply) (int64, error)
+	CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
+	GetSupply(ctx context.Context, id int64) (*domain.Supply, error)
+	UpdateSupply(ctx context.Context, s *domain.Supply) error
+	DeleteSupply(ctx context.Context, id int64) error
+	ListSuppliesPaginated(
+		ctx context.Context,
+		projectID int64,
+		campaignID int64,
+		page int,
+		perPage int,
+		mode string,
+	) ([]domain.Supply, int64, error)
+	UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
 }
 
 type GinEnginePort interface {
@@ -64,10 +71,12 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateSupply)
+		public.POST("/bulk", h.CreateSuppliesBulk)
 		public.GET("", h.ListSupplies)
 		public.GET("/:id", h.GetSupply)
 		public.PUT("/:id", h.UpdateSupply)
 		public.DELETE("/:id", h.DeleteSupply)
+		public.PUT("/bulk", h.UpdateSuppliesBulk)
 	}
 }
 
@@ -85,38 +94,44 @@ func (h *Handler) CreateSupply(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Supply created successfully", "id": newID})
 }
 
+func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
+	var req []dto.Supply
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	supplies := make([]domain.Supply, len(req))
+	for i := range req {
+		supplies[i] = *req[i].ToDomain()
+	}
+	if err := h.ucs.CreateSuppliesBulk(c.Request.Context(), supplies); err != nil {
+		code := http.StatusInternalServerError
+		if types.IsErrInvalidInput(err) {
+			code = http.StatusBadRequest
+		}
+		c.JSON(code, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Supplies created successfully"})
+}
+
 func (h *Handler) ListSupplies(c *gin.Context) {
 	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
 	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
-	mode := c.Query("mode") // "and" (default) o "or"
+	mode := c.Query("mode") // "and" o "or"
 
-	var (
-		supplies []domain.Supply
-		err      error
-	)
-	switch {
-	case projectID > 0 && campaignID > 0 && mode == "or":
-		supplies, err = h.ucs.ListSuppliesByProjectOrCampaign(c.Request.Context(), projectID, campaignID)
-	case projectID > 0 && campaignID > 0: // AND es default
-		supplies, err = h.ucs.ListSuppliesByProjectAndCampaign(c.Request.Context(), projectID, campaignID)
-	case projectID > 0:
-		supplies, err = h.ucs.ListSuppliesByProject(c.Request.Context(), projectID)
-	case campaignID > 0:
-		supplies, err = h.ucs.ListSuppliesByCampaign(c.Request.Context(), campaignID)
-	default:
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Missing required parameters"})
-		return
-	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
 
+	// Debes tener tu UC adaptado a paginar y devolver total
+	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), projectID, campaignID, page, perPage, mode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	out := make([]dto.Supply, len(supplies))
-	for i := range supplies {
-		out[i] = *dto.FromDomain(&supplies[i])
-	}
-	c.JSON(http.StatusOK, out)
+
+	resp := dto.NewListSuppliesResponse(supplies, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {
@@ -164,4 +179,25 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supply deleted successfully"})
+}
+
+func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
+	var req []dto.Supply
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	supplies := make([]domain.Supply, len(req))
+	for i := range req {
+		supplies[i] = *req[i].ToDomain()
+	}
+	if err := h.ucs.UpdateSuppliesBulk(c.Request.Context(), supplies); err != nil {
+		code := http.StatusInternalServerError
+		if types.IsErrInvalidInput(err) {
+			code = http.StatusBadRequest
+		}
+		c.JSON(code, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supplies updated successfully"})
 }
