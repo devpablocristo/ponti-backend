@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
@@ -22,11 +23,11 @@ func NewRepository(db GormEnginePort) *Repository {
 	}
 }
 
-func (r *Repository) CreateLabor(ctx context.Context, inv *domain.Labor) (int64, error) {
-	if inv == nil {
+func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
+	if labor == nil {
 		return 0, types.NewError(types.ErrValidation, "labor is nil", nil)
 	}
-	model := models.FromDomain(inv)
+	model := models.FromDomain(labor)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create labor", err)
 	}

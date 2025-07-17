@@ -2,6 +2,8 @@ package labor
 
 import (
 	"context"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
@@ -64,7 +66,6 @@ func (h *Handler) Routes() {
 	{
 		public.POST("projects/:idProject/labors", h.CreateLabor) // Create an investor
 		public.GET("projects/:idProject/labors", h.ListLabor)    // List all investors
-		public.GET("/:id", h.GetInvestor)                        // Get an investor by ID
 	}
 }
 
@@ -80,7 +81,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	_, err := h.ucps.GetProject(ctx, projectId)
+	_, err = h.ucps.GetProject(ctx, projectId)
 
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
@@ -94,22 +95,33 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		return
 	}
 
-	var responsesIDs []int64
+	var labors []dto.CreateLabor
 
 	for _, labor := range req.Labors {
+		var laborResponse dto.CreateLabor
+
 		laborId, err := h.ucs.CreateLabor(ctx, labor.ToDomain(projectId))
 		if err != nil {
-			apiErr, _ := types.NewAPIError(err)
-			c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-			return
+			laborResponse = dto.CreateLabor{
+				LaborID:     0,
+				LaborName:   labor.Name,
+				IsSaved:     false,
+				ErrorDetail: err.Error(),
+			}
+		} else {
+			laborResponse = dto.CreateLabor{
+				LaborID:   laborId,
+				LaborName: labor.Name,
+				IsSaved:   true,
+			}
 		}
 
-		responsesIDs = append(responsesIDs, laborId)
+		labors = append(labors, laborResponse)
 	}
 
-	c.JSON(http.StatusCreated, dto.CreateLaborsResponse{
-		Message:   "labors created successfully",
-		LaborsIds: responsesIDs,
+	c.JSON(http.StatusMultiStatus, dto.CreateLaborsResponse{
+		Message: "labors created",
+		Labors:  labors,
 	})
 }
 
@@ -129,6 +141,15 @@ func (h *Handler) ListLabor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
+	projectIdStr := c.Param("idProject")
+
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
@@ -140,7 +161,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain()); err != nil {
+	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain(projectId)); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
@@ -149,6 +170,15 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCustomer(c *gin.Context) {
+	projectIdStr := c.Param("idProject")
+
+	_, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
@@ -159,5 +189,5 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lavor deleted successfully"})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
 }
