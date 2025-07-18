@@ -4,6 +4,7 @@ import "time"
 
 type LotTable struct {
 	ID             int64      `json:"id"`
+	ProjectID      int64      `json:"project_id"`
 	PreviousCropID int64      `json:"previous_crop_id"`
 	CurrentCropID  int64      `json:"current_crop_id"`
 	ProjectName    string     `json:"project_name"`

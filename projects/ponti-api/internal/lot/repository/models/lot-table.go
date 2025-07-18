@@ -9,6 +9,7 @@ import (
 
 type LotTable struct {
 	ID             int64
+	ProjectID      int64 `gorm:"project_id"`
 	ProjectName    string
 	FieldName      string
 	LotName        string
@@ -19,13 +20,13 @@ type LotTable struct {
 	Variety        string
 	SowedArea      float64
 	Season         string
-	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
+	UpdatedAt      *time.Time `gorm:"updated_at,omitempty"`
 	CostPerHectare float64
 }
 
 type LotDates struct {
 	LotID       int64      `gorm:"lot_id"`
-	SowingDate  time.Time  `gorm:"sowing_date"`
+	SowingDate  *time.Time `gorm:"sowing_date"`
 	HarvestDate *time.Time `gorm:"harvest_date"`
 	Sequence    int
 	sharedmodels.Base
@@ -43,6 +44,7 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 
 	return domain.LotTable{
 		ID:             m.ID,
+		ProjectID:      m.ProjectID,
 		ProjectName:    m.ProjectName,
 		FieldName:      m.FieldName,
 		LotName:        m.LotName,

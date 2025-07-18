@@ -28,9 +28,13 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 	dates := make([]domain.LotDates, len(d.Dates))
 
 	for i, date := range d.Dates {
-		sowingDate, err := time.Parse("2006-01-02", date.SowingDate)
-		if err != nil {
-			return nil, err
+		var sowingDatePtr *time.Time
+		if date.SowingDate != "" {
+			sowingDate, err := time.Parse("2006-01-02", date.SowingDate)
+			if err != nil {
+				return nil, err
+			}
+			sowingDatePtr = &sowingDate
 		}
 
 		var harvestDatePtr *time.Time
@@ -45,7 +49,7 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 		}
 
 		dates[i] = domain.LotDates{
-			SowingDate:  sowingDate,
+			SowingDate:  sowingDatePtr,
 			HarvestDate: harvestDatePtr,
 			Sequence:    date.Sequence,
 		}
