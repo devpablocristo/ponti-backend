@@ -4,16 +4,17 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 type ProjectDollarValue struct {
-	ID           int64   `gorm:"primaryKey;autoIncrement"`
-	ProjectID    int64   `gorm:"not null;index"`
-	Year         int64   `gorm:"not null;index"`
-	Month        string  `gorm:"size:20;not null;index"`
-	StartValue   float64 `gorm:"type:numeric(12,2);not null"`
-	EndValue     float64 `gorm:"type:numeric(12,2);not null"`
-	AverageValue float64 `gorm:"type:numeric(12,2);not null"`
+	ID           int64           `gorm:"primaryKey;autoIncrement"`
+	ProjectID    int64           `gorm:"not null;index"`
+	Year         int64           `gorm:"not null;index"`
+	Month        string          `gorm:"size:20;not null;index"`
+	StartValue   decimal.Decimal `gorm:"type:numeric(12,2);not null"`
+	EndValue     decimal.Decimal `gorm:"type:numeric(12,2);not null"`
+	AverageValue decimal.Decimal `gorm:"type:numeric(12,2);not null"`
 	sharedmodels.Base
 }
 

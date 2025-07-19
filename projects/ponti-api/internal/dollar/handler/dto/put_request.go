@@ -1,12 +1,15 @@
 package dto
 
-import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
+import (
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
+	"github.com/shopspring/decimal"
+)
 
 type DollarAverageItem struct {
-	Month        string  `json:"month" binding:"required"`
-	StartValue   float64 `json:"start_value" binding:"required"`
-	EndValue     float64 `json:"end_value" binding:"required"`
-	AverageValue float64 `json:"average_value" binding:"required"`
+	Month        string          `json:"month" binding:"required"`
+	StartValue   decimal.Decimal `json:"start_value" binding:"required"`
+	EndValue     decimal.Decimal `json:"end_value" binding:"required"`
+	AverageValue decimal.Decimal `json:"average_value" binding:"required"`
 }
 
 type BulkDollarAverageRequest struct {

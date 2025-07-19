@@ -7,12 +7,38 @@ BUILD_DIR := $(ROOT_DIR)/bin
 DOCKER_COMPOSE_MIX_DEV := $(ROOT_DIR)/docker-compose.mix.dev.yml
 DOCKER_COMPOSE_DOCKER_DEV := $(ROOT_DIR)/docker-compose.docker.dev.yml
 DOCKER_COMPOSE_DOCKER_STG := $(ROOT_DIR)/docker-compose.docker.stg.yml
+DB_URL=postgres://admin:admin@localhost:5432/ponti_api_db?sslmode=disable
+MIGRATIONS_DIR := ./migrations
+MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(DB_URL)
+MIGRATIONS_NAME=$(name)
 
 .PHONY: all build run test clean lint \
 	mix-dev-build mix-dev-up mix-dev-down mix-dev-logs \
 	docker-dev-build docker-dev-up docker-dev-down docker-dev-logs \
 	docker-stg-build docker-stg-up docker-stg-down docker-stg-logs \
-	run-api seed
+	run-api seed \
+	migrate-up migrate-down migrate-force migrate-version migrate-create
+
+# Migrations
+migrate-up: 
+	@echo "Running migrations..."
+	@$(MIGRATE) up
+
+migrate-down: 
+	@echo "Running migrations down..."
+	@$(MIGRATE) down
+
+migrate-create:
+	@echo "Creating migration..."
+	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
+
+migrate-force:
+	@echo "Forcing migration..."
+	@$(MIGRATE) force -1
+
+migrate-version:
+	@echo "Getting migration version..."
+	@$(MIGRATE) version
 
 all: build run
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 	"gorm.io/gorm"
@@ -38,10 +39,15 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 }
 
 func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+	userID, err := sharedmodels.ConvertStringToID(ctx)
+	if err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		modelsSlice := make([]*models.Supply, len(supplies))
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
+			modelsSlice[i].CreatedBy = &userID
 		}
 		if err := tx.Create(modelsSlice).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to bulk create supplies", err)
@@ -54,7 +60,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
 	if err := r.db.Client().WithContext(ctx).
-		Preload("Unit").
+		//Preload("Unit").
 		Preload("Category").
 		Preload("Type").
 		First(&m, id).Error; err != nil {
@@ -83,7 +89,6 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"category_id": uint(s.CategoryID),
 			"type_id":     uint(s.TypeID),
 			"project_id":  s.ProjectID,
-			"campaign_id": s.CampaignID,
 			"updated_by":  s.UpdatedBy,
 		}
 		if err := tx.Model(&models.Supply{}).
@@ -123,21 +128,13 @@ func (r *Repository) ListSuppliesPaginated(
 	var total int64
 
 	db := r.db.Client().WithContext(ctx).Model(&models.Supply{}).
-		Preload("Unit").
+		//Preload("Unit").
 		Preload("Category").
 		Preload("Type")
 
 	// Filtrado flexible
-	if projectID > 0 && campaignID > 0 {
-		if mode == "or" {
-			db = db.Where("project_id = ? OR campaign_id = ?", projectID, campaignID)
-		} else {
-			db = db.Where("project_id = ? AND campaign_id = ?", projectID, campaignID)
-		}
-	} else if projectID > 0 {
+	if projectID > 0 {
 		db = db.Where("project_id = ?", projectID)
-	} else if campaignID > 0 {
-		db = db.Where("campaign_id = ?", campaignID)
 	}
 
 	// Total para paginación
@@ -167,7 +164,6 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 				"category_id": uint(supplies[i].CategoryID),
 				"type_id":     uint(supplies[i].TypeID),
 				"project_id":  supplies[i].ProjectID,
-				"campaign_id": supplies[i].CampaignID,
 				"updated_by":  supplies[i].UpdatedBy,
 			}
 			res := tx.Model(&models.Supply{}).

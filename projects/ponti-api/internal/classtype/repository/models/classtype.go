@@ -13,6 +13,10 @@ type ClassType struct {
 	sharedmodels.Base
 }
 
+func (ClassType) TableName() string {
+	return "types"
+}
+
 func (m *ClassType) ToDomain() *domain.ClassType {
 	return &domain.ClassType{
 		ID:   m.ID,

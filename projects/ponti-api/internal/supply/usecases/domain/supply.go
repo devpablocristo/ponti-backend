@@ -7,7 +7,6 @@ import (
 type Supply struct {
 	ID         int64
 	ProjectID  int64
-	CampaignID int64
 	Name       string
 	UnitID     int64
 	Price      float64

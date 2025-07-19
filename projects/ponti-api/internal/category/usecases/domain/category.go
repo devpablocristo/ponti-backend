@@ -5,8 +5,9 @@ import (
 )
 
 type Category struct {
-	ID   int64  // unique id
-	Name string // category name (e.g., "Herbicides", "Fertilizers", etc.)
+	ID     int64
+	Name   string
+	TypeID int64
 
 	shareddomain.Base
 }

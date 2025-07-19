@@ -63,7 +63,7 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	for _, s := range supplies {
 		for _, e := range existing {
 			if e.Name == s.Name {
-				return types.NewError(types.ErrInvalidInput, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
+				return types.NewError(types.ErrConflict, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
 			}
 		}
 	}

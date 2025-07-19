@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	"github.com/shopspring/decimal"
 	gormofficial "gorm.io/gorm"
 
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
@@ -424,9 +425,9 @@ func seedProjectDollarValues(repo *gorm.Repository) error {
 				ProjectID:    project.ID,
 				Year:         year,
 				Month:        month,
-				StartValue:   start,
-				EndValue:     end,
-				AverageValue: avg,
+				StartValue:   decimal.NewFromFloat(start),
+				EndValue:     decimal.NewFromFloat(end),
+				AverageValue: decimal.NewFromFloat(avg),
 				Base: sharedmodels.Base{
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),
@@ -456,21 +457,17 @@ func seedSupplies(repo *gorm.Repository) error {
 
 	// Buscar proyectos y campañas existentes
 	var projects []projectmodels.Project
-	var campaigns []campaignmodels.Campaign
 	if err := db.Find(&projects).Error; err != nil {
 		return fmt.Errorf("failed to fetch projects: %w", err)
 	}
-	if err := db.Find(&campaigns).Error; err != nil {
-		return fmt.Errorf("failed to fetch campaigns: %w", err)
-	}
-	if len(projects) == 0 || len(campaigns) == 0 {
-		return fmt.Errorf("need at least one project and campaign for seeding supplies")
+	if len(projects) == 0 {
+		return fmt.Errorf("need at least one project for seeding supplies")
 	}
 
 	// Buscar unidades, categorías y tipos base
 	var units []supplymodels.SupplyUnit
-	var categories []supplymodels.SupplyCategory
-	var types []supplymodels.SupplyType
+	var categories []categorymodels.Category
+	var types []classtypemodels.ClassType
 	if err := db.Find(&units).Error; err != nil || len(units) == 0 {
 		return fmt.Errorf("need units to seed supplies")
 	}
@@ -485,7 +482,7 @@ func seedSupplies(repo *gorm.Repository) error {
 	unitID := func(name string) uint {
 		for _, u := range units {
 			if u.Name == name {
-				return u.ID
+				return uint(u.ID)
 			}
 		}
 		return units[0].ID
@@ -493,18 +490,18 @@ func seedSupplies(repo *gorm.Repository) error {
 	categoryID := func(name string) uint {
 		for _, c := range categories {
 			if c.Name == name {
-				return c.ID
+				return uint(c.ID)
 			}
 		}
-		return categories[0].ID
+		return uint(categories[0].ID)
 	}
 	typeID := func(name string) uint {
 		for _, t := range types {
 			if t.Name == name {
-				return t.ID
+				return uint(t.ID)
 			}
 		}
-		return types[0].ID
+		return uint(types[0].ID)
 	}
 
 	var supplies []supplymodels.Supply
@@ -521,21 +518,6 @@ func seedSupplies(repo *gorm.Repository) error {
 		})
 	}
 
-	for i, p := range projects {
-		for j, c := range campaigns {
-			supplies = append(supplies, supplymodels.Supply{
-				Name:       fmt.Sprintf("BothProjectAndCampaign_%d_%d", p.ID, c.ID),
-				UnitID:     unitID("kg"),
-				Price:      200 + float64(i)*10 + float64(j)*5,
-				CategoryID: categoryID("Fertilizer"),
-				TypeID:     typeID("Chemical"),
-				ProjectID:  p.ID,
-				CampaignID: c.ID,
-				Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-			})
-		}
-	}
-
 	supplies = append(supplies,
 		supplymodels.Supply{
 			Name:       "Urea Fertilizer",
@@ -544,7 +526,6 @@ func seedSupplies(repo *gorm.Repository) error {
 			CategoryID: categoryID("Fertilizer"),
 			TypeID:     typeID("Chemical"),
 			ProjectID:  projects[0].ID,
-			CampaignID: campaigns[0].ID,
 			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 		supplymodels.Supply{
@@ -554,7 +535,6 @@ func seedSupplies(repo *gorm.Repository) error {
 			CategoryID: categoryID("Seed"),
 			TypeID:     typeID("Grain"),
 			ProjectID:  projects[0].ID,
-			CampaignID: campaigns[0].ID,
 			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 		supplymodels.Supply{
@@ -564,7 +544,6 @@ func seedSupplies(repo *gorm.Repository) error {
 			CategoryID: categoryID("Herbicide"),
 			TypeID:     typeID("Chemical"),
 			ProjectID:  projects[len(projects)-1].ID,
-			CampaignID: campaigns[len(campaigns)-1].ID,
 			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		},
 	)
@@ -588,11 +567,10 @@ func seedSupplies(repo *gorm.Repository) error {
 						CategoryID: categoryID(desc[2]),
 						TypeID:     typeID(desc[3]),
 						ProjectID:  p.ID,
-						CampaignID: campaignRel.ID,
 						Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 					}
 					var existing supplymodels.Supply
-					if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", sup.Name, sup.ProjectID, sup.CampaignID).
+					if err := db.Where("name = ? AND project_id = ?", sup.Name, sup.ProjectID).
 						First(&existing).Error; err == nil {
 						continue
 					}
@@ -604,7 +582,7 @@ func seedSupplies(repo *gorm.Repository) error {
 
 	for _, s := range supplies {
 		var existing supplymodels.Supply
-		if err := db.Where("name = ? AND project_id = ? AND campaign_id = ?", s.Name, s.ProjectID, s.CampaignID).
+		if err := db.Where("name = ? AND project_id = ?", s.Name, s.ProjectID).
 			First(&existing).Error; err == nil {
 			continue
 		}
@@ -631,23 +609,23 @@ func seedSupplyAuxTables(repo *gorm.Repository) error {
 		}
 	}
 	// Seed Categories
-	categories := []supplymodels.SupplyCategory{
+	categories := []categorymodels.Category{
 		{Name: "Fertilizer"},
 		{Name: "Seed"},
 		{Name: "Herbicide"},
 	}
 	for _, c := range categories {
-		if err := db.FirstOrCreate(&c, supplymodels.SupplyCategory{Name: c.Name}).Error; err != nil {
+		if err := db.FirstOrCreate(&c, categorymodels.Category{Name: c.Name}).Error; err != nil {
 			return fmt.Errorf("failed to seed supply category %s: %w", c.Name, err)
 		}
 	}
 	// Seed Types
-	types := []supplymodels.SupplyType{
+	types := []classtypemodels.ClassType{
 		{Name: "Chemical"},
 		{Name: "Grain"},
 	}
 	for _, t := range types {
-		if err := db.FirstOrCreate(&t, supplymodels.SupplyType{Name: t.Name}).Error; err != nil {
+		if err := db.FirstOrCreate(&t, classtypemodels.ClassType{Name: t.Name}).Error; err != nil {
 			return fmt.Errorf("failed to seed supply type %s: %w", t.Name, err)
 		}
 	}

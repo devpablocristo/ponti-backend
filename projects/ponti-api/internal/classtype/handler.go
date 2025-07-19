@@ -53,7 +53,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 // Routes registers all class type routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/tipos-clases"
+	baseURL := h.acf.APIBaseURL() + "/types"
 	group := r.Group(baseURL)
 	{
 		group.GET("", h.ListClassTypes)

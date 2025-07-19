@@ -9,11 +9,10 @@ import (
 
 // DTO para entrada y salida (puedes separarlo si quieres)
 type Supply struct {
-	ID         int64   `json:"id,omitempty"`
-	ProjectID  int64   `json:"project_id"`
-	CampaignID int64   `json:"campaign_id,omitempty"`
-	Name       string  `json:"name"`
-	Price      float64 `json:"price"`
+	ID        int64   `json:"id,omitempty"`
+	ProjectID int64   `json:"project_id"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`
 
 	UnitID     int64 `json:"unit_id"`
 	CategoryID int64 `json:"category_id"`
@@ -31,7 +30,6 @@ func (d *Supply) ToDomain() *domain.Supply {
 	return &domain.Supply{
 		ID:         d.ID,
 		ProjectID:  d.ProjectID,
-		CampaignID: d.CampaignID,
 		Name:       d.Name,
 		Price:      d.Price,
 		UnitID:     d.UnitID,
@@ -49,7 +47,6 @@ func FromDomain(s *domain.Supply) *Supply {
 	return &Supply{
 		ID:         s.ID,
 		ProjectID:  s.ProjectID,
-		CampaignID: s.CampaignID,
 		Name:       s.Name,
 		Price:      s.Price,
 		UnitID:     s.UnitID,

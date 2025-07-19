@@ -9,10 +9,10 @@ import (
 	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type GormEnginePort interface {
@@ -119,7 +119,7 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid field id: %d", id), nil)
 	}
 
-	deletedBy, err := base.ConvertStringToID(ctx)
+	deletedBy, err := sharedmodels.ConvertStringToID(ctx)
 	if err != nil {
 		return err
 	}

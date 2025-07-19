@@ -104,10 +104,12 @@ func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 	for i := range req {
 		supplies[i] = *req[i].ToDomain()
 	}
-	if err := h.ucs.CreateSuppliesBulk(c.Request.Context(), supplies); err != nil {
+	if err := h.ucs.CreateSuppliesBulk(c, supplies); err != nil {
 		code := http.StatusInternalServerError
 		if types.IsErrInvalidInput(err) {
 			code = http.StatusBadRequest
+		} else if types.IsConflict(err) {
+			code = http.StatusConflict
 		}
 		c.JSON(code, types.ErrorResponse{Error: err.Error()})
 		return

@@ -7,16 +7,18 @@ import (
 )
 
 type Category struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(50);unique;not null"`
+	ID     int64  `gorm:"primaryKey;autoIncrement;column:id"`
+	Name   string `gorm:"type:varchar(50);unique;not null"`
+	TypeID int64  `gorm:"not null;column:type_id"`
 
 	sharedmodels.Base
 }
 
 func (m *Category) ToDomain() *domain.Category {
 	return &domain.Category{
-		ID:   m.ID,
-		Name: m.Name,
+		ID:     m.ID,
+		Name:   m.Name,
+		TypeID: m.TypeID,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -28,8 +30,9 @@ func (m *Category) ToDomain() *domain.Category {
 
 func FromDomain(d *domain.Category) *Category {
 	return &Category{
-		ID:   d.ID,
-		Name: d.Name,
+		ID:     d.ID,
+		Name:   d.Name,
+		TypeID: d.TypeID,
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
