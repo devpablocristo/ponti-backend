@@ -4,15 +4,16 @@ import (
 	"time"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type MonthResponse struct {
-	Month        string    `json:"month"`
-	StartValue   float64   `json:"start_value"`
-	EndValue     float64   `json:"end_value"`
-	AverageValue float64   `json:"average_value"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Month        string          `json:"month"`
+	StartValue   decimal.Decimal `json:"start_value"`
+	EndValue     decimal.Decimal `json:"end_value"`
+	AverageValue decimal.Decimal `json:"average_value"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
 }
 
 func FromDomainMonth(d *domain.DollarAverage) MonthResponse {

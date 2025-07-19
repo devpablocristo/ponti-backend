@@ -24,7 +24,7 @@ func ProvideProjectRepositoryPort(repo *project.Repository) project.RepositoryPo
 }
 
 // --- CONFIG API ---
-func ProvideProjectConfigAPI(c *cfg.AllConfigs) project.ConfigAPIPort {
+func ProvideProjectConfigAPI(c *cfg.Config) project.ConfigAPIPort {
 	return &c.API
 }
 

@@ -44,7 +44,7 @@ func ProvideManagerHandler(
 }
 
 // ProvideManagerConfigAPI extrae la configuración específica de API para Manager.
-func ProvideManagerConfigAPI(cfg *config.AllConfigs) manager.ConfigAPIPort {
+func ProvideManagerConfigAPI(cfg *config.Config) manager.ConfigAPIPort {
 	return &cfg.API
 }
 

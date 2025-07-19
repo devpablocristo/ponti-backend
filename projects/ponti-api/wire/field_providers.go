@@ -42,7 +42,7 @@ func ProvideFieldHandler(
 }
 
 // ProvideFieldConfigAPI extrae la configuración específica de API para Field.
-func ProvideFieldConfigAPI(cfg *config.AllConfigs) field.ConfigAPIPort {
+func ProvideFieldConfigAPI(cfg *config.Config) field.ConfigAPIPort {
 	return &cfg.API
 }
 

@@ -3,8 +3,8 @@ package models
 import (
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type LotTable struct {
@@ -29,7 +29,7 @@ type LotDates struct {
 	SowingDate  *time.Time `gorm:"sowing_date"`
 	HarvestDate *time.Time `gorm:"harvest_date"`
 	Sequence    int
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {

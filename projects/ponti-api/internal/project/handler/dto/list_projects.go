@@ -1,4 +1,3 @@
-// File: handler/dto/list_projects.go
 package dto
 
 import (

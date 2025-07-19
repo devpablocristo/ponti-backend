@@ -44,7 +44,7 @@ func ProvideCampaignHandler(
 }
 
 // ProvideCampaignConfigAPI extrae la configuración específica de API para Campaign.
-func ProvideCampaignConfigAPI(cfg *config.AllConfigs) campaign.ConfigAPIPort {
+func ProvideCampaignConfigAPI(cfg *config.Config) campaign.ConfigAPIPort {
 	return &cfg.API
 }
 

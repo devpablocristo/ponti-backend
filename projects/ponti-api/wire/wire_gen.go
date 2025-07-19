@@ -13,6 +13,8 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
@@ -22,27 +24,29 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 )
 
 // Injectors from wire.go:
 
 func Initialize() (*Dependencies, error) {
-	allConfigs, err := ProvideAllConfigs()
+	config, err := ProvideAllConfigs()
 	if err != nil {
 		return nil, err
 	}
-	server, err := ProvideGinEngine(allConfigs)
+	server, err := ProvideGinEngine(config)
 	if err != nil {
 		return nil, err
 	}
-	db := ProvideConfigDB(allConfigs)
+	db := ProvideConfigDB(config)
 	repository, err := ProvideGormRepository(db)
 	if err != nil {
 		return nil, err
 	}
 	middlewares := ProvideMiddlewares()
 	pkgsuggesterDB := ProvideSuggesterDB(repository)
-	wordsSuggester := ProvideConfigSuggester(allConfigs)
+	wordsSuggester := ProvideConfigSuggester(config)
 	pkgsuggesterWordsSuggester, err := ProvideSuggester(pkgsuggesterDB, wordsSuggester)
 	if err != nil {
 		return nil, err
@@ -53,7 +57,7 @@ func Initialize() (*Dependencies, error) {
 	repositoryPort := ProvideCustomerRepositoryPort(customerRepository)
 	useCases := ProvideCustomerUseCases(repositoryPort)
 	useCasesPort := ProvideCustomerUseCasesPort(useCases)
-	configAPIPort := ProvideCustomerConfigAPI(allConfigs)
+	configAPIPort := ProvideCustomerConfigAPI(config)
 	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
 	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
 	campaignGinEnginePort := ProvideCampaignGinEnginePort(server)
@@ -62,7 +66,7 @@ func Initialize() (*Dependencies, error) {
 	campaignRepositoryPort := ProvideCampaignRepositoryPort(campaignRepository)
 	campaignUseCases := ProvideCampaignUseCases(campaignRepositoryPort)
 	campaignUseCasesPort := ProvideCampaignUseCasesPort(campaignUseCases)
-	campaignConfigAPIPort := ProvideCampaignConfigAPI(allConfigs)
+	campaignConfigAPIPort := ProvideCampaignConfigAPI(config)
 	campaignMiddlewaresEnginePort := ProvideCampaignMiddlewaresEnginePort(middlewares)
 	campaignHandler := ProvideCampaignHandler(campaignGinEnginePort, campaignUseCasesPort, campaignConfigAPIPort, campaignMiddlewaresEnginePort)
 	investorGinEnginePort := ProvideInvestorGinEnginePort(server)
@@ -71,7 +75,7 @@ func Initialize() (*Dependencies, error) {
 	investorRepositoryPort := ProvideInvestorRepositoryPort(investorRepository)
 	investorUseCases := ProvideInvestorUseCases(investorRepositoryPort)
 	investorUseCasesPort := ProvideInvestorUseCasesPort(investorUseCases)
-	investorConfigAPIPort := ProvideInvestorConfigAPI(allConfigs)
+	investorConfigAPIPort := ProvideInvestorConfigAPI(config)
 	investorMiddlewaresEnginePort := ProvideInvestorMiddlewaresEnginePort(middlewares)
 	investorHandler := ProvideInvestorHandler(investorGinEnginePort, investorUseCasesPort, investorConfigAPIPort, investorMiddlewaresEnginePort)
 	cropGinEnginePort := ProvideCropGinEnginePort(server)
@@ -80,7 +84,7 @@ func Initialize() (*Dependencies, error) {
 	cropRepositoryPort := ProvideCropRepositoryPort(cropRepository)
 	cropUseCases := ProvideCropUseCases(cropRepositoryPort)
 	cropUseCasesPort := ProvideCropUseCasesPort(cropUseCases)
-	cropConfigAPIPort := ProvideCropConfigAPI(allConfigs)
+	cropConfigAPIPort := ProvideCropConfigAPI(config)
 	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
 	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
 	lotGinEnginePort := ProvideLotGinEnginePort(server)
@@ -89,7 +93,7 @@ func Initialize() (*Dependencies, error) {
 	lotRepositoryPort := ProvideLotRepositoryPort(lotRepository)
 	lotUseCases := ProvideLotUseCases(lotRepositoryPort)
 	lotUseCasesPort := ProvideLotUseCasesPort(lotUseCases)
-	lotConfigAPIPort := ProvideLotConfigAPI(allConfigs)
+	lotConfigAPIPort := ProvideLotConfigAPI(config)
 	lotMiddlewaresEnginePort := ProvideLotMiddlewaresEnginePort(middlewares)
 	lotHandler := ProvideLotHandler(lotGinEnginePort, lotUseCasesPort, lotConfigAPIPort, lotMiddlewaresEnginePort)
 	fieldGinEnginePort := ProvideFieldGinEnginePort(server)
@@ -98,7 +102,7 @@ func Initialize() (*Dependencies, error) {
 	fieldRepositoryPort := ProvideFieldRepositoryPort(fieldRepository)
 	fieldUseCases := ProvideFieldUseCases(fieldRepositoryPort)
 	fieldUseCasesPort := ProvideFieldUseCasesPort(fieldUseCases)
-	fieldConfigAPIPort := ProvideFieldConfigAPI(allConfigs)
+	fieldConfigAPIPort := ProvideFieldConfigAPI(config)
 	fieldMiddlewaresEnginePort := ProvideFieldMiddlewaresEnginePort(middlewares)
 	fieldHandler := ProvideFieldHandler(fieldGinEnginePort, fieldUseCasesPort, fieldConfigAPIPort, fieldMiddlewaresEnginePort)
 	managerGinEnginePort := ProvideManagerGinEnginePort(server)
@@ -107,7 +111,7 @@ func Initialize() (*Dependencies, error) {
 	managerRepositoryPort := ProvideManagerRepositoryPort(managerRepository)
 	managerUseCases := ProvideManagerUseCases(managerRepositoryPort)
 	managerUseCasesPort := ProvideManagerUseCasesPort(managerUseCases)
-	managerConfigAPIPort := ProvideManagerConfigAPI(allConfigs)
+	managerConfigAPIPort := ProvideManagerConfigAPI(config)
 	managerMiddlewaresEnginePort := ProvideManagerMiddlewaresEnginePort(middlewares)
 	managerHandler := ProvideManagerHandler(managerGinEnginePort, managerUseCasesPort, managerConfigAPIPort, managerMiddlewaresEnginePort)
 	projectGinEnginePort := ProvideProjectGinEnginePort(server)
@@ -117,7 +121,7 @@ func Initialize() (*Dependencies, error) {
 	wordsSuggesterPort := ProvideProjectSuggesterPort(pkgsuggesterWordsSuggester)
 	projectUseCases := ProvideProjectUseCases(projectRepositoryPort, wordsSuggesterPort)
 	projectUseCasesPort := ProvideProjectUseCasesPort(projectUseCases)
-	projectConfigAPIPort := ProvideProjectConfigAPI(allConfigs)
+	projectConfigAPIPort := ProvideProjectConfigAPI(config)
 	projectMiddlewaresEnginePort := ProvideProjectMiddlewaresEnginePort(middlewares)
 	projectHandler := ProvideProjectHandler(projectGinEnginePort, projectUseCasesPort, projectConfigAPIPort, projectMiddlewaresEnginePort)
 	leasetypeGinEnginePort := ProvideLeaseTypeGinEnginePort(server)
@@ -126,20 +130,56 @@ func Initialize() (*Dependencies, error) {
 	leasetypeRepositoryPort := ProvideLeaseTypeRepositoryPort(leasetypeRepository)
 	leasetypeUseCases := ProvideLeaseTypeUseCases(leasetypeRepositoryPort)
 	leasetypeUseCasesPort := ProvideLeaseTypeUseCasesPort(leasetypeUseCases)
-	leasetypeConfigAPIPort := ProvideLeaseTypeConfigAPI(allConfigs)
+	leasetypeConfigAPIPort := ProvideLeaseTypeConfigAPI(config)
 	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
 	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
+	supplyGinEnginePort := ProvideSupplyGinEnginePort(server)
+	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
+	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
+	supplyRepositoryPort := ProvideSupplyRepositoryPort(supplyRepository)
+	supplyUseCases := ProvideSupplyUseCases(supplyRepositoryPort)
+	supplyUseCasesPort := ProvideSupplyUseCasesPort(supplyUseCases)
+	supplyConfigAPIPort := ProvideSupplyConfigAPI(config)
+	supplyMiddlewaresEnginePort := ProvideSupplyMiddlewaresEnginePort(middlewares)
+	supplyHandler := ProvideSupplyHandler(supplyGinEnginePort, supplyUseCasesPort, supplyConfigAPIPort, supplyMiddlewaresEnginePort)
+	categoryGinEnginePort := ProvideCategoryGinEnginePort(server)
+	categoryGormEnginePort := ProvideCategoryGormEnginePort(repository)
+	categoryRepository := ProvideCategoryRepository(categoryGormEnginePort)
+	categoryRepositoryPort := ProvideCategoryRepositoryPort(categoryRepository)
+	categoryUseCases := ProvideCategoryUseCases(categoryRepositoryPort)
+	categoryUseCasesPort := ProvideCategoryUseCasesPort(categoryUseCases)
+	categoryConfigAPIPort := ProvideCategoryConfigAPI(config)
+	categoryMiddlewaresEnginePort := ProvideCategoryMiddlewaresEnginePort(middlewares)
+	categoryHandler := ProvideCategoryHandler(categoryGinEnginePort, categoryUseCasesPort, categoryConfigAPIPort, categoryMiddlewaresEnginePort)
+	unitGinEnginePort := ProvideUnitGinEnginePort(server)
+	unitGormEnginePort := ProvideUnitGormEnginePort(repository)
+	unitRepository := ProvideUnitRepository(unitGormEnginePort)
+	unitRepositoryPort := ProvideUnitRepositoryPort(unitRepository)
+	unitUseCases := ProvideUnitUseCases(unitRepositoryPort)
+	unitUseCasesPort := ProvideUnitUseCasesPort(unitUseCases)
+	unitConfigAPIPort := ProvideUnitConfigAPI(config)
+	unitMiddlewaresEnginePort := ProvideUnitMiddlewaresEnginePort(middlewares)
+	unitHandler := ProvideUnitHandler(unitGinEnginePort, unitUseCasesPort, unitConfigAPIPort, unitMiddlewaresEnginePort)
+	classtypeGinEnginePort := ProvideClassTypeGinEnginePort(server)
+	classtypeGormEnginePort := ProvideClassTypeGormEnginePort(repository)
+	classtypeRepository := ProvideClassTypeRepository(classtypeGormEnginePort)
+	classtypeRepositoryPort := ProvideClassTypeRepositoryPort(classtypeRepository)
+	classtypeUseCases := ProvideClassTypeUseCases(classtypeRepositoryPort)
+	classtypeUseCasesPort := ProvideClassTypeUseCasesPort(classtypeUseCases)
+	classtypeConfigAPIPort := ProvideClassTypeConfigAPI(config)
+	classtypeMiddlewaresEnginePort := ProvideClassTypeMiddlewaresEnginePort(middlewares)
+	classtypeHandler := ProvideClassTypeHandler(classtypeGinEnginePort, classtypeUseCasesPort, classtypeConfigAPIPort, classtypeMiddlewaresEnginePort)
 	dollarGinEnginePort := ProvideDollarGinEnginePort(server)
 	dollarGormEnginePort := ProvideDollarGormEnginePort(repository)
 	dollarRepository := ProvideDollarRepository(dollarGormEnginePort)
 	dollarRepositoryPort := ProvideDollarRepositoryPort(dollarRepository)
 	dollarUseCases := ProvideDollarUseCases(dollarRepositoryPort)
 	useCasePort := ProvideDollarUseCasePort(dollarUseCases)
-	dollarConfigAPIPort := ProvideDollarConfigAPI(allConfigs)
+	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	dependencies := &Dependencies{
-		Config:           allConfigs,
+		Config:           config,
 		GinEngine:        server,
 		GormRepo:         repository,
 		Middlewares:      middlewares,
@@ -153,6 +193,10 @@ func Initialize() (*Dependencies, error) {
 		ManagerHandler:   managerHandler,
 		ProjectHandler:   projectHandler,
 		LeaseTypeHandler: leasetypeHandler,
+		SupplyHandler:    supplyHandler,
+		CategoryHandler:  categoryHandler,
+		UnitHandler:      unitHandler,
+		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
 	}
 	return dependencies, nil
@@ -161,7 +205,7 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config           *config.AllConfigs
+	Config           *config.Config
 	GinEngine        *pkggin.Server
 	GormRepo         *pkggorm.Repository
 	Middlewares      *pkgmwr.Middlewares
@@ -175,5 +219,9 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	SupplyHandler    *supply.Handler
+	CategoryHandler  *category.Handler
+	UnitHandler      *unit.Handler
+	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
 }

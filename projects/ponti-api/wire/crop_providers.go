@@ -44,7 +44,7 @@ func ProvideCropHandler(
 }
 
 // ProvideCropConfigAPI extrae la configuración específica de API para Crop.
-func ProvideCropConfigAPI(cfg *config.AllConfigs) crop.ConfigAPIPort {
+func ProvideCropConfigAPI(cfg *config.Config) crop.ConfigAPIPort {
 	return &cfg.API
 }
 

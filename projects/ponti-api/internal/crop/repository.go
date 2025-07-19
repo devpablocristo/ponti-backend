@@ -5,25 +5,23 @@ import (
 	"errors"
 	"fmt"
 
-	gorm "gorm.io/gorm"
-
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"gorm.io/gorm"
 )
 
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
+
 type Repository struct {
 	db GormEnginePort
 }
 
 func NewRepository(db GormEnginePort) *Repository {
-	return &Repository{
-		db: db,
-	}
+	return &Repository{db: db}
 }
 
 func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, error) {
@@ -31,6 +29,10 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 		return 0, types.NewError(types.ErrValidation, "crop is nil", nil)
 	}
 	model := models.FromDomainCrop(c)
+	model.Base = sharedmodels.Base{
+		CreatedBy: c.CreatedBy,
+		UpdatedBy: c.UpdatedBy,
+	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create crop", err)
 	}

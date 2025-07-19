@@ -9,6 +9,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/wire v0.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/shopspring/decimal v1.2.0
 	gorm.io/gorm v1.30.0
 )
 
