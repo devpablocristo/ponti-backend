@@ -1,5 +1,36 @@
 -- 001_init_schema.up.sql
 
+CREATE OR REPLACE FUNCTION update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE users (
+                       id BIGSERIAL PRIMARY KEY,
+                       email TEXT NOT NULL,
+                       username TEXT UNIQUE NOT NULL,
+                       password TEXT NOT NULL,
+                       token_hash TEXT NOT NULL,
+                       refresh_tokens TEXT[] DEFAULT ARRAY[]::TEXT[],
+                       id_rol INT NOT NULL,
+                       is_verified BOOLEAN DEFAULT FALSE,
+                       active BOOLEAN DEFAULT TRUE,
+                       created_by INT NOT NULL,
+                       updated_by INT NOT NULL,
+                       deleted_by INT NULL,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       deleted_at TIMESTAMP NULL
+);
+
+CREATE TRIGGER set_timestamp
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
 CREATE TABLE campaigns (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE,
@@ -167,3 +198,27 @@ CREATE TABLE project_managers (
   CONSTRAINT fk_project_managers_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_managers_manager FOREIGN KEY (manager_id) REFERENCES managers(id)
 );
+
+CREATE TABLE labor_types (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    deleted_by VARCHAR(255)
+);
+CREATE TABLE labor_categories (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    type_id INTEGER NOT NULL REFERENCES labor_types(id),
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    deleted_by VARCHAR(255)
+);
+
+

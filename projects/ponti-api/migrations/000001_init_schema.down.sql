@@ -11,4 +11,6 @@ DROP TABLE IF EXISTS managers;
 DROP TABLE IF EXISTS investors;
 DROP TABLE IF EXISTS crops;
 DROP TABLE IF EXISTS lease_types;
+DROP TABLE IF EXISTS labor_categories;
+DROP TABLE IF EXISTS labor_types;
 
