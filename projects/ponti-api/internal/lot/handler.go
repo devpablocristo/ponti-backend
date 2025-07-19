@@ -84,7 +84,13 @@ func (h *Handler) CreateLot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	newID, err := h.ucs.CreateLot(c.Request.Context(), req.ToDomain())
+
+	lotDomain, err := req.ToDomain()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	newID, err := h.ucs.CreateLot(c.Request.Context(), lotDomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -155,9 +161,14 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	dom := req.ToDomain()
+
+	dom, err := req.ToDomain()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
 	dom.ID = id
-	if err := h.ucs.UpdateLot(c.Request.Context(), dom); err != nil {
+	if err := h.ucs.UpdateLot(c, dom); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -170,7 +181,7 @@ func (h *Handler) DeleteLot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
 		return
 	}
-	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteLot(c, id); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -188,7 +199,7 @@ func (h *Handler) GetLotKPIs(c *gin.Context) {
 		return
 	}
 
-	kpis, err := h.ucs.GetLotKPIs(c.Request.Context(), projectID, fieldID, cropID, cropType)
+	kpis, err := h.ucs.GetLotKPIs(c, projectID, fieldID, cropID, cropType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -204,7 +215,7 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
-	rows, total, sumSowed, sumCost, err := h.ucs.ListLotsTable(c.Request.Context(), projectID, fieldID, cropID, cropType, page, pageSize)
+	rows, total, sumSowed, sumCost, err := h.ucs.ListLotsTable(c, projectID, fieldID, cropID, cropType, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -212,15 +223,49 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 	// Map domain → dto
 	dtoRows := make([]dto.LotTable, len(rows))
 	for i, row := range rows {
+		dateMap := make(map[int]dto.LotDates)
+		for _, date := range row.Dates {
+			harvestDate := ""
+			if date.HarvestDate != nil {
+				harvestDate = date.HarvestDate.Format("2006-01-02")
+			}
+			sowingDate := ""
+			if date.SowingDate != nil {
+				sowingDate = date.SowingDate.Format("2006-01-02")
+			}
+			dateMap[date.Sequence] = dto.LotDates{
+				SowingDate:  sowingDate,
+				HarvestDate: harvestDate,
+				Sequence:    date.Sequence,
+			}
+		}
+
+		dates := make([]dto.LotDates, 3)
+		for seq := 1; seq <= 3; seq++ {
+			if d, ok := dateMap[seq]; ok {
+				dates[seq-1] = d
+			} else {
+				dates[seq-1] = dto.LotDates{
+					Sequence: seq,
+				}
+			}
+		}
+
 		dtoRows[i] = dto.LotTable{
+			ID:             row.ID,
+			ProjectID:      row.ProjectID,
 			ProjectName:    row.ProjectName,
 			FieldName:      row.FieldName,
 			LotName:        row.LotName,
+			PreviousCropID: row.PreviousCropID,
+			CurrentCropID:  row.CurrentCropID,
 			PreviousCrop:   row.PreviousCrop,
 			CurrentCrop:    row.CurrentCrop,
 			Variety:        row.Variety,
 			SowedArea:      row.SowedArea,
-			SowingDate:     row.SowingDate,
+			Season:         row.Season,
+			Dates:          dates,
+			UpdatedAt:      row.UpdatedAt,
 			CostPerHectare: row.CostPerHectare,
 		}
 	}
