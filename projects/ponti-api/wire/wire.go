@@ -4,6 +4,7 @@
 package wire
 
 import (
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/google/wire"
 
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
@@ -38,6 +39,7 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	LaborTypeHandler *labor.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -56,6 +58,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProjectSet,
 		LeaseTypeSet,
+		LaborSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

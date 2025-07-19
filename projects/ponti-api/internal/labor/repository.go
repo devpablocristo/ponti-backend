@@ -38,7 +38,7 @@ func (r *Repository) deleteLabor(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Labor{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete investor", result.Error)
+		return types.NewError(types.ErrInternal, "failed to delete labor", result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("labor with id %d does not exist", id), nil)
@@ -48,7 +48,7 @@ func (r *Repository) deleteLabor(ctx context.Context, id int64) error {
 
 func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
 	if labor == nil {
-		return types.NewError(types.ErrValidation, "investor is nil", nil)
+		return types.NewError(types.ErrValidation, "labor is nil", nil)
 	}
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
@@ -58,12 +58,12 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 		return types.NewError(types.ErrInternal, "failed to update labor", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d does not exist", labor.ID), nil)
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("labor with id %d does not exist", labor.ID), nil)
 	}
 	return nil
 }
 
-func (r *Repository) ListLabor(ctx context.Context, page, perPage int) ([]domain.ListedLabor, int64, error) {
+func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId int64) ([]domain.ListedLabor, int64, error) {
 	var list []models.Labor
 	var total int64
 
@@ -76,6 +76,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int) ([]domain
 
 	if err := db0.
 		Select("id, name, contractor_name, price, category_id").
+		Where("project_id = ?", projectId).
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -86,11 +87,11 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int) ([]domain
 	labors := make([]domain.ListedLabor, len(list))
 	for i, labor := range list {
 		labors[i] = domain.ListedLabor{
-			ID:              labor.ID,
-			Name:            labor.Name,
-			Price:           labor.Price,
-			ContractorName:  labor.ContractorName,
-			LaborCategoryId: labor.LaborCategoryID,
+			ID:             labor.ID,
+			Name:           labor.Name,
+			Price:          labor.Price,
+			ContractorName: labor.ContractorName,
+			CategoryId:     labor.LaborCategoryID,
 		}
 	}
 

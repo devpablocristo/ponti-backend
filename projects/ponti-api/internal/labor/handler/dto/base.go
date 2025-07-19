@@ -7,6 +7,7 @@ type Labor struct {
 	Name           string  `json:"name"`
 	ContractorName string  `json:"contractor_name"`
 	Price          float64 `json:"price"`
+	CategoryId     int64   `json:"category_id"`
 }
 
 type LaborList struct {
@@ -20,6 +21,7 @@ func (l Labor) ToDomain(projectId int64) *domain.Labor {
 		ContractorName: l.ContractorName,
 		Price:          l.Price,
 		ProjectId:      projectId,
+		CategoryId:     l.CategoryId,
 	}
 }
 

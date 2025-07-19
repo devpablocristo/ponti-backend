@@ -17,6 +17,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
@@ -128,6 +129,16 @@ func Initialize() (*Dependencies, error) {
 	leasetypeConfigAPIPort := ProvideLeaseTypeConfigAPI(allConfigs)
 	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
 	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
+	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
+	laborRepository := ProvideLaborRepository(laborGormEnginePort)
+	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
+	laborUseCases := ProvideLaborUseCases(laborRepositoryPort)
+	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
+	laborConfigAPIPort := ProvideLaborConfigAPI(allConfigs)
+	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
+	laborGinEnginePort := ProvideLaborGinEnginePort(server)
+	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
+
 	dependencies := &Dependencies{
 		Config:           allConfigs,
 		GinEngine:        server,
@@ -143,6 +154,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerHandler:   managerHandler,
 		ProjectHandler:   projectHandler,
 		LeaseTypeHandler: leasetypeHandler,
+		LaborHandler: laborHandler,
 	}
 	return dependencies, nil
 }
@@ -164,4 +176,5 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	LaborHandler *labor.Handler
 }

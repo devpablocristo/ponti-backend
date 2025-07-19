@@ -37,7 +37,7 @@ func NewListLaborsResponse(
 		out[i] = ListedLabor{
 			ID:             l.ID,
 			Name:           l.Name,
-			CategoryId:     l.LaborCategoryId,
+			CategoryId:     l.CategoryId,
 			Price:          l.Price,
 			ContractorName: l.ContractorName,
 			UpdatedAt:      l.UpdatedAt,

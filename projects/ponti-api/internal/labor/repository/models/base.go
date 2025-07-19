@@ -33,12 +33,12 @@ type LaborType struct {
 
 func (l Labor) ToDomain() *domain.Labor {
 	return &domain.Labor{
-		ID:              l.ID,
-		Name:            l.Name,
-		ContractorName:  l.ContractorName,
-		Price:           l.Price,
-		ProjectId:       l.ProjectId,
-		LaborCategoryId: l.LaborCategoryID,
+		ID:             l.ID,
+		Name:           l.Name,
+		ContractorName: l.ContractorName,
+		Price:          l.Price,
+		ProjectId:      l.ProjectId,
+		CategoryId:     l.LaborCategoryID,
 	}
 }
 
@@ -49,6 +49,6 @@ func FromDomain(d *domain.Labor) *Labor {
 		ContractorName:  d.ContractorName,
 		Price:           d.Price,
 		ProjectId:       d.ProjectId,
-		LaborCategoryID: d.LaborCategoryId,
+		LaborCategoryID: d.CategoryId,
 	}
 }

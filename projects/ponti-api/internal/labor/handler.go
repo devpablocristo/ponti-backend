@@ -15,8 +15,8 @@ import (
 
 type UseCasesPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
-	ListLabor(context.Context, int, int) ([]domain.ListedLabor, int64, error)
-	deleteLabor(context.Context, int64) error
+	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
+	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 }
 
@@ -45,18 +45,19 @@ type Handler struct {
 	ucps project.UseCasesPort
 }
 
-func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort, up project.UseCasesPort) *Handler {
 	return &Handler{
-		ucs: u,
-		gsv: s,
-		acf: c,
-		mws: m,
+		ucs:  u,
+		gsv:  s,
+		acf:  c,
+		mws:  m,
+		ucps: up,
 	}
 }
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/labor"
+	baseURL := h.acf.APIBaseURL() + "/projects/:id/labors"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -64,14 +65,16 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("projects/:idProject/labors", h.CreateLabor) // Create an investor
-		public.GET("projects/:idProject/labors", h.ListLabor)    // List all investors
+		public.POST("", h.CreateLabor)
+		public.GET("", h.ListLabor)
+		public.DELETE("/:idLabor", h.DeleteLabor)
+		public.PUT("/:idLabor", h.UpdateLabor)
 	}
 }
 
 func (h *Handler) CreateLabor(c *gin.Context) {
 	var req dto.LaborList
-	projectIdStr := c.Param("idProject")
+	projectIdStr := c.Param("id")
 
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
 	if err != nil {
@@ -129,7 +132,16 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
-	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage)
+	projectIdStr := c.Param("id")
+
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage, projectId)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -141,7 +153,7 @@ func (h *Handler) ListLabor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
-	projectIdStr := c.Param("idProject")
+	projectIdStr := c.Param("id")
 
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
 	if err != nil {
@@ -150,7 +162,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
 		return
@@ -169,8 +181,8 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor updated successfully"})
 }
 
-func (h *Handler) DeleteCustomer(c *gin.Context) {
-	projectIdStr := c.Param("idProject")
+func (h *Handler) DeleteLabor(c *gin.Context) {
+	projectIdStr := c.Param("id")
 
 	_, err := strconv.ParseInt(projectIdStr, 10, 64)
 	if err != nil {
@@ -179,12 +191,12 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
 		return
 	}
-	if err := h.ucs.deleteLabor(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
