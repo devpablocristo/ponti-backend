@@ -67,7 +67,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 		// Map ONLY the updatable fields (GORM will update Base automatically)
 		if err := tx.Model(&models.ProjectDollarValue{}).
 			Where("id = ?", item.ID).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"project_id":    item.ProjectID,
 				"year":          item.Year,
 				"month":         item.Month,
