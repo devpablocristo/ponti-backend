@@ -13,6 +13,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
@@ -138,22 +139,32 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(allConfigs)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
+	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
+	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
+	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
+	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
+	commercializationUseCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
+	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(allConfigs)
+	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
+	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, commercializationUseCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
 	dependencies := &Dependencies{
-		Config:           allConfigs,
-		GinEngine:        server,
-		GormRepo:         repository,
-		Middlewares:      middlewares,
-		WordsSuggester:   pkgsuggesterWordsSuggester,
-		CustomerHandler:  handler,
-		CampaignHandler:  campaignHandler,
-		InvestorHandler:  investorHandler,
-		CropHandler:      cropHandler,
-		LotHandler:       lotHandler,
-		FieldHandler:     fieldHandler,
-		ManagerHandler:   managerHandler,
-		ProjectHandler:   projectHandler,
-		LeaseTypeHandler: leasetypeHandler,
-		DollarHandler:    dollarHandler,
+		Config:            allConfigs,
+		GinEngine:         server,
+		GormRepo:          repository,
+		Middlewares:       middlewares,
+		WordsSuggester:    pkgsuggesterWordsSuggester,
+		CustomerHandler:   handler,
+		CampaignHandler:   campaignHandler,
+		InvestorHandler:   investorHandler,
+		CropHandler:       cropHandler,
+		LotHandler:        lotHandler,
+		FieldHandler:      fieldHandler,
+		ManagerHandler:    managerHandler,
+		ProjectHandler:    projectHandler,
+		LeaseTypeHandler:  leasetypeHandler,
+		DollarHandler:     dollarHandler,
+		Commercialization: commercializationHandler,
 	}
 	return dependencies, nil
 }
@@ -161,19 +172,20 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config           *config.AllConfigs
-	GinEngine        *pkggin.Server
-	GormRepo         *pkggorm.Repository
-	Middlewares      *pkgmwr.Middlewares
-	WordsSuggester   *pkgsuggester.WordsSuggester
-	CustomerHandler  *customer.Handler
-	CampaignHandler  *campaign.Handler
-	InvestorHandler  *investor.Handler
-	CropHandler      *crop.Handler
-	LotHandler       *lot.Handler
-	FieldHandler     *field.Handler
-	ManagerHandler   *manager.Handler
-	ProjectHandler   *project.Handler
-	LeaseTypeHandler *leasetype.Handler
-	DollarHandler    *dollar.Handler
+	Config            *config.AllConfigs
+	GinEngine         *pkggin.Server
+	GormRepo          *pkggorm.Repository
+	Middlewares       *pkgmwr.Middlewares
+	WordsSuggester    *pkgsuggester.WordsSuggester
+	CustomerHandler   *customer.Handler
+	CampaignHandler   *campaign.Handler
+	InvestorHandler   *investor.Handler
+	CropHandler       *crop.Handler
+	LotHandler        *lot.Handler
+	FieldHandler      *field.Handler
+	ManagerHandler    *manager.Handler
+	ProjectHandler    *project.Handler
+	LeaseTypeHandler  *leasetype.Handler
+	DollarHandler     *dollar.Handler
+	Commercialization *commercialization.Handler
 }
