@@ -81,7 +81,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
-	}
+	} //
 
 	ctx := c.Request.Context()
 	_, err = h.ucps.GetProject(ctx, projectId)
