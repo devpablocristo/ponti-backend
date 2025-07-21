@@ -1,6 +1,6 @@
 package domain
 
-import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
+import shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 
 type Labor struct {
 	ID             int64
@@ -10,7 +10,7 @@ type Labor struct {
 	ProjectId      int64
 	CategoryId     int64
 
-	base.BaseModel
+	shareddomain.Base
 }
 
 type ListedLabor struct {
@@ -18,8 +18,8 @@ type ListedLabor struct {
 	Name           string
 	ContractorName string
 	Price          float64
-	projectId      int64
+	ProjectId      int64
 	CategoryId     int64
 
-	base.BaseModel
+	shareddomain.Base
 }

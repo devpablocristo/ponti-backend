@@ -44,7 +44,7 @@ func ProvideLotHandler(
 }
 
 // ProvideLotConfigAPI extrae la configuración específica de API para Lot.
-func ProvideLotConfigAPI(cfg *config.AllConfigs) lot.ConfigAPIPort {
+func ProvideLotConfigAPI(cfg *config.Config) lot.ConfigAPIPort {
 	return &cfg.API
 }
 

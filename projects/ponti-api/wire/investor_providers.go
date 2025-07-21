@@ -44,7 +44,7 @@ func ProvideInvestorHandler(
 }
 
 // ProvideInvestorConfigAPI extrae la configuración específica de API para Investor.
-func ProvideInvestorConfigAPI(cfg *config.AllConfigs) investor.ConfigAPIPort {
+func ProvideInvestorConfigAPI(cfg *config.Config) investor.ConfigAPIPort {
 	return &cfg.API
 }
 

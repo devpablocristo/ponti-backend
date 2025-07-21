@@ -44,7 +44,7 @@ func ProvideCustomerHandler(
 }
 
 // ProvideCustomerConfigAPI extrae la configuración específica de API para Customer.
-func ProvideCustomerConfigAPI(cfg *config.AllConfigs) customer.ConfigAPIPort {
+func ProvideCustomerConfigAPI(cfg *config.Config) customer.ConfigAPIPort {
 	return &cfg.API
 }
 

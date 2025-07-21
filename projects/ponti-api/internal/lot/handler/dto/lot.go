@@ -5,6 +5,7 @@ import (
 
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type Lot struct {
@@ -65,7 +66,9 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 		Variety:      d.Variety,
 		Dates:        dates,
 		Status:       d.Status,
-		UpdatedAt:    d.UpdatedAt,
+		Base: shareddomain.Base{
+			UpdatedAt: d.UpdatedAt,
+		},
 	}, nil
 }
 

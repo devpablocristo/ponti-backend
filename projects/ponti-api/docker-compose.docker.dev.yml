@@ -1,0 +1,109 @@
+services:
+  ponti-api:
+    build:
+      context: ../../
+      dockerfile: ./projects/ponti-api/Dockerfile.docker.dev
+    image: "ponti-api:${APP_VERSION}"
+    env_file:
+      - .env
+      - .env.docker.dev
+    ports:
+      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
+      - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
+    volumes:
+      - type: bind
+        source: ../../
+        target: /app
+      - /var/run/docker.sock:/var/run/docker.sock
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - GO111MODULE=on
+      - BUILDING_FILES=/app/cmd/api/main.go
+      - APP_NAME=${APP_NAME}
+    depends_on:
+      ponti-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: on-failure
+    command: tail -f /dev/null
+
+  ponti-db:
+    image: postgres:16.3
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    env_file:
+      - .env
+      - .env.docker.dev
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ponti-db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      ponti-db:
+        condition: service_healthy
+    env_file:
+      - .env
+      - .env.docker.dev
+    volumes:
+      - ./migrations:/migrations
+    environment:
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}",
+      "up"
+    ]
+    networks:
+      - app-network
+
+  pgadmin:
+    image: dpage/pgadmin4:8.12
+    ports:
+      - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
+    env_file:
+      - .env
+      - .env.docker.dev
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    logging:
+      driver: "json-file"
+    depends_on:
+      - ponti-db
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  ponti-db_data:
+  pgadmin_data:

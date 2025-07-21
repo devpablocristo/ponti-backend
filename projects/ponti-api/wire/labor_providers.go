@@ -37,7 +37,7 @@ func ProvideLaborHandler(
 	return labor.NewHandler(useCases, server, cfg, middlewares, useCaseProject)
 }
 
-func ProvideLaborConfigAPI(cfg *config.AllConfigs) labor.ConfigAPIPort {
+func ProvideLaborConfigAPI(cfg *config.Config) labor.ConfigAPIPort {
 	return &cfg.API
 }
 

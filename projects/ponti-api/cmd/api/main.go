@@ -29,7 +29,7 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	setEnv(ctx, deps)
+	setDeployEnv(ctx, deps)
 
 	// Run the HTTP server
 	var wg sync.WaitGroup

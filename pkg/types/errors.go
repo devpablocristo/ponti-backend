@@ -155,3 +155,9 @@ func GetErrorContext(err error) (map[string]any, bool) {
 	}
 	return nil, false
 }
+
+func IsErrInvalidInput(err error) bool {
+	var e *Error
+	return errors.As(err, &e) &&
+		(e.Type == ErrInvalidInput || e.Type == ErrInvalidID || e.Type == ErrBadRequest)
+}

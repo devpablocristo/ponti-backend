@@ -26,7 +26,7 @@ func ProvideDollarRepositoryPort(r *dollar.Repository) dollar.RepositoryPort {
 
 // ---- CONFIG API ----
 
-func ProvideDollarConfigAPI(c *cfg.AllConfigs) dollar.ConfigAPIPort {
+func ProvideDollarConfigAPI(c *cfg.Config) dollar.ConfigAPIPort {
 	return &c.API
 }
 

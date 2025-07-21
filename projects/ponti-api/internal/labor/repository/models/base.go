@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/base"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type Labor struct {
@@ -13,7 +13,7 @@ type Labor struct {
 	ProjectId       int64   `gorm:"not null;column:project_id"`
 	LaborCategoryID int64   `gorm:"not null;column:category_id"`
 
-	base.BaseModel
+	sharedmodels.Base
 }
 
 type LaborCategory struct {
@@ -21,14 +21,14 @@ type LaborCategory struct {
 	Name        string `gorm:"not null;column:name"`
 	LaborTypeId int64  `gorm:"not null;column:name"`
 
-	base.BaseModel
+	sharedmodels.Base
 }
 
 type LaborType struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement"`
 	Name string `gorm:"not null;column:name"`
 
-	base.BaseModel
+	sharedmodels.Base
 }
 
 func (l Labor) ToDomain() *domain.Labor {

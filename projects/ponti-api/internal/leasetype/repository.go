@@ -29,6 +29,9 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		return 0, types.NewError(types.ErrValidation, "lease type is nil", nil)
 	}
 	model := models.FromDomainLeaseType(lt)
+	model.CreatedBy = lt.CreatedBy
+	model.UpdatedBy = lt.UpdatedBy
+
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create lease type", err)
 	}

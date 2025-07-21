@@ -10,6 +10,8 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
+	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
@@ -20,11 +22,13 @@ import (
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
+	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 	"github.com/google/wire"
 )
 
 type Dependencies struct {
-	Config           *config.AllConfigs
+	Config           *config.Config
 	GinEngine        *gin.Server
 	GormRepo         *gorm.Repository
 	Middlewares      *mwr.Middlewares
@@ -38,8 +42,12 @@ type Dependencies struct {
 	ManagerHandler   *manager.Handler
 	ProjectHandler   *project.Handler
 	LeaseTypeHandler *leasetype.Handler
+	SupplyHandler    *supply.Handler
+	CategoryHandler  *category.Handler
+	UnitHandler      *unit.Handler
+	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
-	LaborTypeHandler *labor.Handler
+	LaborHandler     *labor.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -58,6 +66,10 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProjectSet,
 		LeaseTypeSet,
+		SupplySet,
+		CategorySet,
+		UnitSet,
+		ClassTypeSet,
 		DollarSet,
 		LaborSet,
 		wire.Struct(new(Dependencies), "*"),

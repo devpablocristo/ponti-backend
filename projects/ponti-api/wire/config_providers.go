@@ -6,22 +6,22 @@ import (
 )
 
 // Provee toda la config
-func ProvideAllConfigs() (*config.AllConfigs, error) {
+func ProvideAllConfigs() (*config.Config, error) {
 	return config.LoadConfig()
 }
 
 // Extrae DB de la config
-func ProvideConfigDB(cfg *config.AllConfigs) *config.DB {
+func ProvideConfigDB(cfg *config.Config) *config.DB {
 	return &cfg.DB
 }
 
 // Extrae WordsSuggester de la config
-func ProvideConfigSuggester(cfg *config.AllConfigs) *config.WordsSuggester {
+func ProvideConfigSuggester(cfg *config.Config) *config.WordsSuggester {
 	return &cfg.WordsSuggester
 }
 
 // ProvideConfigAPI extrae cfg.API y satisface todos los ConfigAPIPort de los dominios.
-func ProvideConfigAPI(cfg *config.AllConfigs) *config.API {
+func ProvideConfigAPI(cfg *config.Config) *config.API {
 	return &cfg.API
 }
 
