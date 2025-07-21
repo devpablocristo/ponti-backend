@@ -7,13 +7,13 @@ import (
 )
 
 type CommercializationResponse struct {
-	CropName       string    `json:"crop_name"`
-	BoardPrice     float64   `json:"board_price"`
-	FreightCost    float64   `json:"freigth_cost"`
-	CommercialCost float64   `json:"commercial_cost"`
-	NetPrice       float64   `json:"net_price"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	CropName       string  `json:"crop_name"`
+	BoardPrice     float64 `json:"board_price"`
+	FreightCost    float64 `json:"freigth_cost"`
+	CommercialCost float64 `json:"commercial_cost"`
+	NetPrice       float64 `json:"net_price"`
+
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func FromDomain(d *domain.CropCommercialization) CommercializationResponse {
@@ -24,6 +24,5 @@ func FromDomain(d *domain.CropCommercialization) CommercializationResponse {
 		CommercialCost: d.CommercialCost,
 		NetPrice:       d.NetPrice,
 		CreatedAt:      d.CreatedAt,
-		UpdatedAt:      d.UpdatedAt,
 	}
 }

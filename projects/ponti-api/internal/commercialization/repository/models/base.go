@@ -1,21 +1,21 @@
 package models
 
 import (
-	"time"
-
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type CropCommercialization struct {
-	ID             int64     `gorm:"primaryKey;autoIncrement"`
-	ProjectID      int64     `gorm:"not null;index"`
-	CropName       string    `gorm:"type:varchar(100);not null"`
-	BoardPrice     float64   `gorm:"not null"`
-	FreightCost    float64   `gorm:"not null"`
-	CommercialCost float64   `gorm:"not null"`
-	NetPrice       float64   `gorm:"not null"`
-	CreatedAt      time.Time `gorm:"autoCreateTime"`
-	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
+	ID             int64   `gorm:"primaryKey;autoIncrement"`
+	ProjectID      int64   `gorm:"not null;index"`
+	CropName       string  `gorm:"type:varchar(100);not null"`
+	BoardPrice     float64 `gorm:"not null"`
+	FreightCost    float64 `gorm:"not null"`
+	CommercialCost float64 `gorm:"not null"`
+	NetPrice       float64 `gorm:"not null"`
+
+	sharedmodels.Base
 }
 
 func FromDomain(cc *domain.CropCommercialization) *CropCommercialization {
@@ -27,8 +27,10 @@ func FromDomain(cc *domain.CropCommercialization) *CropCommercialization {
 		FreightCost:    cc.FreightCost,
 		CommercialCost: cc.CommercialCost,
 		NetPrice:       cc.NetPrice,
-		CreatedAt:      cc.CreatedAt,
-		UpdatedAt:      cc.UpdatedAt,
+		Base: sharedmodels.Base{
+			CreatedAt: cc.CreatedAt,
+			CreatedBy: cc.CreatedBy,
+		},
 	}
 }
 
@@ -41,7 +43,9 @@ func (m *CropCommercialization) ToDomain() *domain.CropCommercialization {
 		FreightCost:    m.FreightCost,
 		CommercialCost: m.CommercialCost,
 		NetPrice:       m.NetPrice,
-		CreatedAt:      m.CreatedAt,
-		UpdatedAt:      m.UpdatedAt,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			CreatedBy: m.CreatedBy,
+		},
 	}
 }
