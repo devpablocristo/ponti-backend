@@ -53,7 +53,7 @@ type GinEnginePort interface {
 	WrapH(h http.Handler) gin.HandlerFunc
 }
 
-func ProvideGinEngine(cfg *config.AllConfigs) (*pgin.Server, error) {
+func ProvideGinEngine(cfg *config.Config) (*pgin.Server, error) {
 	return pgin.Bootstrap(
 		strconv.Itoa(cfg.HTTPServer.Port),
 		cfg.API.Version,

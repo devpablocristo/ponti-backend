@@ -2,17 +2,20 @@ package supply
 
 import (
 	"context"
+	"fmt"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 )
 
 type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
+	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
-	ListSuppliesByProject(context.Context, int64) ([]domain.Supply, error)
-	ListSuppliesByProjectAndCampaign(context.Context, int64, int64) ([]domain.Supply, error)
+	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
+	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 }
 
 type UseCases struct {
@@ -24,7 +27,48 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 }
 
 func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
+	if s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+		return 0, types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+	}
 	return u.repo.CreateSupply(ctx, s)
+}
+
+func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+	if len(supplies) == 0 {
+		return types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
+	}
+
+	seen := map[string]bool{}
+	projectID := supplies[0].ProjectID
+
+	for _, s := range supplies {
+		key := fmt.Sprintf("%d:%s", s.ProjectID, s.Name)
+		if seen[key] {
+			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply name in request: %s", s.Name), nil)
+		}
+		seen[key] = true
+		if s.ProjectID != projectID {
+			return types.NewError(types.ErrInvalidInput, "all supplies must have the same project_id", nil)
+		}
+		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply: %s", s.Name), nil)
+		}
+	}
+
+	// Chequeo adicional: podés optimizarlo usando un repo más específico
+	existing, _, err := u.repo.ListSuppliesPaginated(ctx, projectID, 0, "", 1, 10000)
+	if err != nil {
+		return err
+	}
+	for _, s := range supplies {
+		for _, e := range existing {
+			if e.Name == s.Name {
+				return types.NewError(types.ErrConflict, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
+			}
+		}
+	}
+
+	return u.repo.CreateSuppliesBulk(ctx, supplies)
 }
 
 func (u *UseCases) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
@@ -32,6 +76,9 @@ func (u *UseCases) GetSupply(ctx context.Context, id int64) (*domain.Supply, err
 }
 
 func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
+	if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+		return types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+	}
 	return u.repo.UpdateSupply(ctx, s)
 }
 
@@ -39,10 +86,34 @@ func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
 	return u.repo.DeleteSupply(ctx, id)
 }
 
-func (u *UseCases) ListSuppliesByProject(ctx context.Context, projectID int64) ([]domain.Supply, error) {
-	return u.repo.ListSuppliesByProject(ctx, projectID)
+func (u *UseCases) ListSuppliesPaginated(
+	ctx context.Context,
+	projectID, campaignID int64,
+	page, perPage int,
+	mode string,
+) ([]domain.Supply, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage <= 0 || perPage > 100 {
+		perPage = 20
+	}
+	return u.repo.ListSuppliesPaginated(ctx, projectID, campaignID, mode, page, perPage)
 }
 
-func (u *UseCases) ListSuppliesByProjectAndCampaign(ctx context.Context, projectID, campaignID int64) ([]domain.Supply, error) {
-	return u.repo.ListSuppliesByProjectAndCampaign(ctx, projectID, campaignID)
+func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+	if len(supplies) == 0 {
+		return types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
+	}
+	seen := map[int64]bool{}
+	for _, s := range supplies {
+		if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply id: %d", s.ID), nil)
+		}
+		if seen[s.ID] {
+			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply id in request: %d", s.ID), nil)
+		}
+		seen[s.ID] = true
+	}
+	return u.repo.UpdateSuppliesBulk(ctx, supplies)
 }

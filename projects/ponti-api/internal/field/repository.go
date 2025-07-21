@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	gorm "gorm.io/gorm"
 
@@ -11,11 +12,13 @@ import (
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
+
 type Repository struct {
 	db GormEnginePort
 }
@@ -106,7 +109,6 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update field", err)
 		}
-		// Opcional: actualizar lots (acá podes limpiar y reinsertar, depende la lógica)
 		return nil
 	})
 }
@@ -116,8 +118,17 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid field id: %d", id), nil)
 	}
+
+	deletedBy, err := sharedmodels.ConvertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&models.Field{}, id).Error; err != nil {
+		if err := tx.Model(&models.Field{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete field", err)
 		}
 		return nil

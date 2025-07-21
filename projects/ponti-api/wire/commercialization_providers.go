@@ -26,7 +26,7 @@ func ProvideCommercializationRepositoryPort(r *commercialization.Repository) com
 
 // ---- CONFIG API ----
 
-func ProvideCommercializationConfigAPI(c *cfg.AllConfigs) commercialization.ConfigAPIPort {
+func ProvideCommercializationConfigAPI(c *cfg.Config) commercialization.ConfigAPIPort {
 	return &c.API
 }
 

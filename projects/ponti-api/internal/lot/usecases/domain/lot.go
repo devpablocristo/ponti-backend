@@ -2,6 +2,7 @@ package domain
 
 import (
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type Lot struct {
@@ -11,10 +12,14 @@ type Lot struct {
 	Hectares      float64
 	PreviousCrop  cropdom.Crop
 	CurrentCrop   cropdom.Crop
+	Variety       string
 	Season        string
 	Status        string
+	Dates         []LotDates
 	Cost          float64 // Costo por hectárea
 	HarvestedTons float64 // Toneladas cosechadas
+
+	shareddomain.Base // <-- embebe campos de auditoría
 }
 
 type LotKPIs struct {

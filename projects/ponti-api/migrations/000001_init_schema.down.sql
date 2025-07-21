@@ -1,5 +1,6 @@
 -- 001_init_schema.down.sql
 
+DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS project_managers;
 DROP TABLE IF EXISTS project_investors;
 DROP TABLE IF EXISTS lots;

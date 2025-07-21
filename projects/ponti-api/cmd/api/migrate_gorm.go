@@ -10,6 +10,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
+	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
+	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
 	commercializationmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
@@ -20,6 +22,8 @@ import (
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
 )
 
 // RunGormMigrations runs SQL migrations using GORM.
@@ -35,8 +39,7 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 	}
 
 	models := []any{
-		&campaignmodels.Campaign{}, // primero
-		&customermodels.Customer{},
+		&campaignmodels.Campaign{}, // primero4
 		&leasetypemodels.LeaseType{},
 		&managermodels.Manager{},
 		&investormodels.Investor{},
@@ -44,6 +47,11 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&commercializationmodels.CropCommercialization{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
+		&customermodels.Customer{},
+		&supplymodels.Supply{},
+		&categorymodels.Category{},
+		&classtypemodels.ClassType{},
+		&unitmodels.Unit{},
 		&dollarmodels.ProjectDollarValue{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.Project{}, // último
