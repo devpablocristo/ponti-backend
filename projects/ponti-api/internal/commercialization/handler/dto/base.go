@@ -9,7 +9,7 @@ import (
 type CommercializationResponse struct {
 	CropName       string  `json:"crop_name"`
 	BoardPrice     float64 `json:"board_price"`
-	FreightCost    float64 `json:"freigth_cost"`
+	FreightCost    float64 `json:"freight_cost"`
 	CommercialCost float64 `json:"commercial_cost"`
 	NetPrice       float64 `json:"net_price"`
 

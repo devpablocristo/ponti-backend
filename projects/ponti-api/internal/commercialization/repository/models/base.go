@@ -28,7 +28,6 @@ func FromDomain(cc *domain.CropCommercialization) *CropCommercialization {
 		CommercialCost: cc.CommercialCost,
 		NetPrice:       cc.NetPrice,
 		Base: sharedmodels.Base{
-			CreatedAt: cc.CreatedAt,
 			CreatedBy: cc.CreatedBy,
 		},
 	}

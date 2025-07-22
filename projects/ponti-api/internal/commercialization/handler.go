@@ -52,7 +52,7 @@ func NewHandler(u UseCasePort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEn
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.cfg.APIBaseURL() + "/projects/:id/commercialization"
+	baseURL := h.cfg.APIBaseURL() + "/projects/:id/commercializations"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
