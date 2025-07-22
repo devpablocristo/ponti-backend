@@ -9,7 +9,6 @@ type Labor struct {
 	Price          float64
 	ProjectId      int64
 	CategoryId     int64
-
 	shareddomain.Base
 }
 

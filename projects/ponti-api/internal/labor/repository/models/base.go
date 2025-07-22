@@ -16,21 +16,6 @@ type Labor struct {
 	sharedmodels.Base
 }
 
-type LaborCategory struct {
-	ID          int64  `gorm:"primaryKey;autoIncrement"`
-	Name        string `gorm:"not null;column:name"`
-	LaborTypeId int64  `gorm:"not null;column:name"`
-
-	sharedmodels.Base
-}
-
-type LaborType struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement"`
-	Name string `gorm:"not null;column:name"`
-
-	sharedmodels.Base
-}
-
 func (l Labor) ToDomain() *domain.Labor {
 	return &domain.Labor{
 		ID:             l.ID,

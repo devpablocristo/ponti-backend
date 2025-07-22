@@ -97,3 +97,30 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 
 	return labors, total, nil
 }
+
+func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int64) ([]domain.LaborCategory, error) {
+	var laborCategoriesModels []models.LaborCategory
+	db0 :=
+		r.db.
+			Client().
+			WithContext(ctx).
+			Model(&models.LaborCategory{}).
+			Where("type_id = ?", typeId)
+
+	if err := db0.Find(&laborCategoriesModels).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list labor categories", err)
+	}
+
+	laborCategories := make([]domain.LaborCategory, len(laborCategoriesModels))
+	for i, laborCategory := range laborCategories {
+		laborCategories[i] = domain.LaborCategory{
+			ID:   laborCategory.ID,
+			Name: laborCategory.Name,
+			LaborType: domain.LaborType{
+				ID:   laborCategory.LaborType.ID,
+				Name: laborCategory.LaborType.Name,
+			},
+		}
+	}
+	return laborCategories, nil
+}
