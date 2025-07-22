@@ -3,14 +3,15 @@ package dto
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type CreateLaborRequest struct {
-	Name           string  `json:"name"`
-	ContractorName string  `json:"contractor_name"`
-	Price          float64 `json:"price"`
-	CategoryId     int64   `json:"category_id"`
-	CreatedBy      int64   `json:"created_by"`
+	Name           string          `json:"name"`
+	ContractorName string          `json:"contractor_name"`
+	Price          decimal.Decimal `json:"price"`
+	CategoryId     int64           `json:"category_id"`
+	CreatedBy      int64           `json:"created_by"`
 }
 
 type CreateLaborsResponse struct {

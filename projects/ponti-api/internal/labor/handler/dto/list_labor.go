@@ -1,17 +1,19 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"time"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type ListedLabor struct {
-	ID             int64     `json:"id"`
-	Name           string    `json:"name"`
-	CategoryId     int64     `json:"category_id"`
-	Price          float64   `json:"price"`
-	ContractorName string    `json:"contractor_name"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	CategoryId     int64           `json:"category_id"`
+	Price          decimal.Decimal `json:"price"`
+	ContractorName string          `json:"contractor_name"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 // PageInfo contiene metadata de paginación.
