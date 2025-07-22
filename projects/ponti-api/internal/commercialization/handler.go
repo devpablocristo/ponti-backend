@@ -10,6 +10,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type UseCasePort interface {
@@ -71,6 +72,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{
 			Error: types.NewError(types.ErrInvalidID, "projectID is required", err).Error(),
 		})
+		return
 	}
 
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
@@ -104,6 +106,14 @@ func (h *Handler) CreateBulk(c *gin.Context) {
 		return
 	}
 
+	userID, err := sharedmodels.ConvertStringToID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
+			Error: types.NewError(types.ErrAuthorization, "invalid userID", err).Error(),
+		})
+		return
+	}
+
 	var body dto.BulkCommercializationRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{
@@ -112,7 +122,7 @@ func (h *Handler) CreateBulk(c *gin.Context) {
 		return
 	}
 
-	items := body.ToDomainSlice(projectID)
+	items := body.ToDomainSlice(projectID, userID)
 	if err := h.ucs.Create(c.Request.Context(), items); err != nil {
 		switch {
 		case types.IsValidationError(err):
@@ -123,6 +133,7 @@ func (h *Handler) CreateBulk(c *gin.Context) {
 		default:
 			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		}
+		return
 	}
 
 	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Crop commercialization saved"})

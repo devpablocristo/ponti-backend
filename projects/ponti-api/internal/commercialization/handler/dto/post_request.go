@@ -1,6 +1,9 @@
 package dto
 
-import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
+import (
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+)
 
 type CropCommercialization struct {
 	CropName       string  `json:"crop_name" binding:"required"`
@@ -14,7 +17,7 @@ type BulkCommercializationRequest struct {
 	Values []CropCommercialization `json:"values" binding:"required,dive"`
 }
 
-func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64) []domain.CropCommercialization {
+func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int64) []domain.CropCommercialization {
 	out := make([]domain.CropCommercialization, len(b.Values))
 	for i, item := range b.Values {
 		out[i] = domain.CropCommercialization{
@@ -24,6 +27,9 @@ func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64) []domain.Cr
 			FreightCost:    item.FreightCost,
 			CommercialCost: item.CommercialCost,
 			NetPrice:       item.NetPrice,
+			Base: shareddomain.Base{
+				CreatedBy: &userID,
+			},
 		}
 	}
 	return out
