@@ -112,7 +112,7 @@ func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int
 	}
 
 	laborCategories := make([]domain.LaborCategory, len(laborCategoriesModels))
-	for i, laborCategory := range laborCategories {
+	for i, laborCategory := range laborCategoriesModels {
 		laborCategories[i] = domain.LaborCategory{
 			ID:   laborCategory.ID,
 			Name: laborCategory.Name,

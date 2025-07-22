@@ -38,6 +38,7 @@ func (l CreateLaborRequest) ToDomain(projectId int64, userId int64) *domain.Labo
 		CategoryId:     l.CategoryId,
 		Base: shareddomain.Base{
 			CreatedBy: &userId,
+			UpdatedBy: &userId,
 		},
 	}
 }
@@ -49,4 +50,3 @@ func CreateLaborRequestFromDomain(d domain.Labor) *CreateLaborRequest {
 		Price:          d.Price,
 	}
 }
-

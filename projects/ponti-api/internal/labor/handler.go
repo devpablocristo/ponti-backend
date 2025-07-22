@@ -71,7 +71,7 @@ func (h *Handler) Routes() {
 		public.GET("", h.ListLabor)
 		public.DELETE("/:idLabor", h.DeleteLabor)
 		public.PUT("/:idLabor", h.UpdateLabor)
-		public.GET("labor-categories/:typeId", h.ListLaborCategories)
+		public.GET("/labor-categories/:typeId", h.ListLaborCategories)
 	}
 }
 

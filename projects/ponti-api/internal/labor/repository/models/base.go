@@ -35,5 +35,9 @@ func FromDomain(d *domain.Labor) *Labor {
 		Price:           d.Price,
 		ProjectId:       d.ProjectId,
 		LaborCategoryID: d.CategoryId,
+		Base: sharedmodels.Base{
+			CreatedBy: d.Base.CreatedBy,
+			UpdatedBy: d.Base.UpdatedBy,
+		},
 	}
 }

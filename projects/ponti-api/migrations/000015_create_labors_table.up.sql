@@ -1,3 +1,4 @@
+
 CREATE TABLE labors (
   id BIGSERIAL PRIMARY KEY,
   project_id BIGINT NOT NULL,

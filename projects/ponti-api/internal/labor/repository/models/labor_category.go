@@ -8,8 +8,8 @@ import (
 type LaborCategory struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement"`
 	Name        string    `gorm:"not null;column:name"`
-	LaborTypeId int64     `gorm:"not null;column:name"`
-	LaborType   LaborType `gorm:"foreignKey:LaborTypeId;references:ID"`
+	LaborTypeId int64     `gorm:"not null;column:type_id"`
+	LaborType   LaborType `gorm:"foreignKey:type_id;references:ID"`
 
 	sharedmodels.Base
 }
