@@ -20,6 +20,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
@@ -178,6 +179,15 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	laborGinEnginePort := ProvideLaborGinEnginePort(server)
+	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
+	laborRepository := ProvideLaborRepository(laborGormEnginePort)
+	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
+	laborUseCases := ProvideLaborUseCases(laborRepositoryPort)
+	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
+	laborConfigAPIPort := ProvideLaborConfigAPI(config)
+	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
+	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -198,6 +208,7 @@ func Initialize() (*Dependencies, error) {
 		UnitHandler:      unitHandler,
 		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
+		LaborHandler:     laborHandler,
 	}
 	return dependencies, nil
 }
@@ -224,4 +235,5 @@ type Dependencies struct {
 	UnitHandler      *unit.Handler
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
+	LaborHandler     *labor.Handler
 }
