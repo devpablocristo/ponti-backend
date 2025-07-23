@@ -3,7 +3,7 @@ package models
 // WorkOrder tabla principal usando Number como primary key,
 // sin embebido de gorm.Model.
 type WorkOrder struct {
-	Number       string          `gorm:"primaryKey;column:number"`
+	Number       string          `gorm:"primaryKey;column:number;uniqueIndex"`
 	ProjectID    int64           `gorm:"not null"`
 	FieldID      int64           `gorm:"not null"`
 	LotID        int64           `gorm:"not null"`
