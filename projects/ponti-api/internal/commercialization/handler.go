@@ -14,7 +14,7 @@ import (
 )
 
 type UseCasePort interface {
-	Create(context.Context, []domain.CropCommercialization) error
+	CreateBulk(context.Context, []domain.CropCommercialization) error
 	ListByProject(context.Context, int64) ([]domain.CropCommercialization, error)
 }
 
@@ -67,24 +67,14 @@ func (h *Handler) Routes() {
 
 // Listar por proyecto
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || projectID == 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrInvalidID, "projectID is required", err).Error(),
-		})
+	projectID, ok := parseParamID(c, "id")
+	if !ok {
 		return
 	}
 
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
-		switch {
-		case types.IsNotFound(err):
-			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
-		case types.IsValidationError(err):
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		}
+		respondError(c, err)
 		return
 	}
 
@@ -98,19 +88,12 @@ func (h *Handler) ListByProject(c *gin.Context) {
 
 // Crear proyecto
 func (h *Handler) CreateBulk(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil || projectID == 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrInvalidID, "projectId is required", err).Error(),
-		})
+	projectID, ok := parseParamID(c, "id")
+	if !ok {
 		return
 	}
-
-	userID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
-			Error: types.NewError(types.ErrAuthorization, "invalid userID", err).Error(),
-		})
+	userID, ok := parseUserID(c)
+	if !ok {
 		return
 	}
 
@@ -123,18 +106,50 @@ func (h *Handler) CreateBulk(c *gin.Context) {
 	}
 
 	items := body.ToDomainSlice(projectID, userID)
-	if err := h.ucs.Create(c.Request.Context(), items); err != nil {
-		switch {
-		case types.IsValidationError(err):
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		case types.IsConflict(err):
-			c.JSON(http.StatusConflict, types.ErrorResponse{Error: err.Error()})
-
-		default:
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		}
+	if err := h.ucs.CreateBulk(c.Request.Context(), items); err != nil {
+		respondError(c, err)
 		return
 	}
-
 	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Crop commercialization saved"})
+}
+
+// ---- HELPERS -----
+
+// Lee y valida el parametro en la ruta de tipo int64
+func parseParamID(c *gin.Context, param string) (int64, bool) {
+	raw := c.Param(param)
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{
+			Error: types.NewError(types.ErrInvalidID, param+" is required", err).Error(),
+		})
+		return 0, false
+	}
+	return id, true
+}
+
+// extrae userID usando Sharemodels.ConvertStringToID
+func parseUserID(c *gin.Context) (int64, bool) {
+	UserID, err := sharedmodels.ConvertStringToID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
+			Error: types.NewError(types.ErrAuthorization, "invalid userID", err).Error(),
+		})
+		return 0, false
+	}
+	return UserID, true
+}
+
+// unifica el switch de errores
+func respondError(c *gin.Context, err error) {
+	switch {
+	case types.IsNotFound(err):
+		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+	case types.IsValidationError(err):
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+	case types.IsConflict(err):
+		c.JSON(http.StatusConflict, types.ErrorResponse{Error: err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+	}
 }

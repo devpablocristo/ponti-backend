@@ -21,7 +21,7 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
 
-func (u *UseCases) Create(ctx context.Context, items []domain.CropCommercialization) error {
+func (u *UseCases) CreateBulk(ctx context.Context, items []domain.CropCommercialization) error {
 	if len(items) == 0 {
 		return types.NewError(types.ErrInvalidInput, "no items provided", nil)
 	}

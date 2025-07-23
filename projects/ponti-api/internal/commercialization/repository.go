@@ -52,6 +52,10 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 		return nil, types.NewError(types.ErrInternal, "failed to list crop commercialization", err)
 	}
 
+	if len(rows) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "no commercializations found for this project", nil)
+	}
+
 	out := make([]domain.CropCommercialization, len(rows))
 	for i, m := range rows {
 		out[i] = *m.ToDomain()
