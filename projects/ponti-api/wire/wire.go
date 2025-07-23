@@ -8,8 +8,6 @@ import (
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
-	"github.com/google/wire"
-
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
@@ -19,6 +17,7 @@ import (
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	labor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
@@ -26,6 +25,7 @@ import (
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
+	"github.com/google/wire"
 )
 
 type Dependencies struct {
@@ -49,6 +49,7 @@ type Dependencies struct {
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
 	WorkorderHandler *workorder.Handler
+	LaborHandler     *labor.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -73,6 +74,7 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeSet,
 		DollarSet,
 		WorkorderSet,
+		LaborSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
