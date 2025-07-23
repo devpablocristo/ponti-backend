@@ -7,10 +7,10 @@
 package wire
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	pkggin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pkgsuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
@@ -179,15 +179,15 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
-	workorderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
-	gormEngine := ProvideWorkOrderGormEnginePort(repository)
-	workorderRepository := ProvideWorkOrderRepository(gormEngine)
-	workorderRepositoryPort := ProvideWorkOrderRepositoryPort(workorderRepository)
-	workorderUseCases := ProvideWorkOrderUseCases(workorderRepositoryPort)
-	workorderUseCasesPort := ProvideWorkOrderUseCasesPort(workorderUseCases)
-	workorderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
-	workorderMiddlewaresEnginePort := ProvideWorkOrderMiddlewaresEnginePort(middlewares)
-	workorderHandler := ProvideWorkOrderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
+	workorderGinEnginePort := ProvideWorkorderGinEnginePort(server)
+	gormEngine := ProvideWorkorderGormEnginePort(repository)
+	workorderRepository := ProvideWorkorderRepository(gormEngine)
+	workorderRepositoryPort := ProvideWorkorderRepositoryPort(workorderRepository)
+	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort)
+	workorderUseCasesPort := ProvideWorkorderUseCasesPort(workorderUseCases)
+	workorderConfigAPIPort := ProvideWorkorderConfigAPI(config)
+	workorderMiddlewaresEnginePort := ProvideWorkorderMiddlewaresEnginePort(middlewares)
+	workorderHandler := ProvideWorkorderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -208,7 +208,7 @@ func Initialize() (*Dependencies, error) {
 		UnitHandler:      unitHandler,
 		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
-		WorkOrderHandler: workorderHandler,
+		WorkorderHandler: workorderHandler,
 	}
 	return dependencies, nil
 }
@@ -235,5 +235,5 @@ type Dependencies struct {
 	UnitHandler      *unit.Handler
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
-	WorkOrderHandler *workorder.Handler
+	WorkorderHandler *workorder.Handler
 }

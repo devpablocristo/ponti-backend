@@ -73,13 +73,13 @@ func seedDatabase(ctx context.Context, repo *gormrepo.Repository) error {
 	if err := seedSupplyAuxTables(repo); err != nil {
 		return err
 	}
-	if err := seedWorkOrder(repo); err != nil {
-		return err
-	}
 	if err := seedSupplies(repo); err != nil {
 		return err
 	}
 	if err := seedSupply(repo); err != nil {
+		return err
+	}
+	if err := seedWorkorder(repo); err != nil {
 		return err
 	}
 	if err := seedProjectDollarValues(repo); err != nil {
@@ -663,51 +663,55 @@ func seedSupply(repo *gormrepo.Repository) error {
 	return nil
 }
 
-// seedWorkOrders inserta un ejemplo de orden y sus items
-func seedWorkOrders(repo *gormrepo.Repository) error {
+func seedWorkorders(repo *gormrepo.Repository) error {
 	db := repo.Client()
 
 	// 1) Obtén entidades existentes
 	var project projectmodels.Project
 	if err := db.First(&project).Error; err != nil {
-		return fmt.Errorf("no hay proyectos: %w", err)
+		return fmt.Errorf("no projects found: %w", err)
 	}
 	var field fieldmodels.Field
 	if err := db.Where("project_id = ?", project.ID).First(&field).Error; err != nil {
-		return fmt.Errorf("no hay campos para proyecto %d: %w", project.ID, err)
+		return fmt.Errorf("no fields for project %d: %w", project.ID, err)
 	}
 	var lot lotmodels.Lot
 	if err := db.Where("field_id = ?", field.ID).First(&lot).Error; err != nil {
-		return fmt.Errorf("no hay lotes para campo %d: %w", field.ID, err)
+		return fmt.Errorf("no lots for field %d: %w", field.ID, err)
 	}
 	var crop cropmodels.Crop
 	if err := db.First(&crop).Error; err != nil {
-		return fmt.Errorf("no hay cultivos: %w", err)
-	}
-	var supplies []supplymodels.Supply
-	if err := db.Limit(2).Find(&supplies).Error; err != nil || len(supplies) < 1 {
-		return fmt.Errorf("no hay insumos suficientes: %w", err)
+		return fmt.Errorf("no crops found: %w", err)
 	}
 
-	// 2) Crea o recupera la orden de trabajo
-	ord := workordermodels.WorkOrder{
+	// 2) Obtén hasta 2 supplies y comprueba errores por separado
+	var supplies []supplymodels.Supply
+	if err := db.Limit(2).Find(&supplies).Error; err != nil {
+		return fmt.Errorf("failed to query supplies: %w", err)
+	}
+	if len(supplies) < 1 {
+		return fmt.Errorf("not enough supplies: found %d", len(supplies))
+	}
+
+	// 3) Crea o recupera la orden de trabajo
+	ord := workordermodels.Workorder{
 		Number:       "0001",
 		ProjectID:    project.ID,
 		FieldID:      field.ID,
 		LotID:        lot.ID,
 		CropID:       crop.ID,
 		LaborID:      1, // ajusta si tienes tabla de labor
-		Contractor:   "Proveedor Demo",
-		Observations: "Seed automático de prueba",
+		Contractor:   "Demo Supplier",
+		Observations: "Automatic test seed",
 	}
-	if err := db.FirstOrCreate(&ord, workordermodels.WorkOrder{Number: ord.Number}).Error; err != nil {
+	if err := db.FirstOrCreate(&ord, workordermodels.Workorder{Number: ord.Number}).Error; err != nil {
 		return fmt.Errorf("failed to seed work order %s: %w", ord.Number, err)
 	}
 
-	// 3) Crea items asociados
+	// 4) Crea items asociados
 	for i, s := range supplies {
-		item := workordermodels.WorkOrderItem{
-			WorkOrderNumber: ord.Number,
+		item := workordermodels.WorkorderItem{
+			WorkorderNumber: ord.Number,
 			SupplyID:        s.ID,
 			TotalUsed:       float64((i + 1) * 10),
 			EffectiveArea:   5.0,
@@ -715,8 +719,8 @@ func seedWorkOrders(repo *gormrepo.Repository) error {
 		}
 		if err := db.FirstOrCreate(
 			&item,
-			workordermodels.WorkOrderItem{
-				WorkOrderNumber: item.WorkOrderNumber,
+			workordermodels.WorkorderItem{
+				WorkorderNumber: item.WorkorderNumber,
 				SupplyID:        item.SupplyID,
 			},
 		).Error; err != nil {
@@ -724,16 +728,16 @@ func seedWorkOrders(repo *gormrepo.Repository) error {
 		}
 	}
 
-	log.Printf("WorkOrder %s seeded with %d items\n", ord.Number, len(supplies))
+	log.Printf("Workorder %s seeded with %d items\n", ord.Number, len(supplies))
 	return nil
 }
 
-// seedWorkOrder corre migración y seeds de ejemplo
-func seedWorkOrder(repo *gormrepo.Repository) error {
-	log.Println("Seeding WorkOrders...")
-	if err := seedWorkOrders(repo); err != nil {
+// seedWorkorder corre migración y seeds de ejemplo
+func seedWorkorder(repo *gormrepo.Repository) error {
+	log.Println("Seeding Workorders...")
+	if err := seedWorkorders(repo); err != nil {
 		return err
 	}
-	log.Println("WorkOrder seeds completed")
+	log.Println("Workorder seeds completed")
 	return nil
 }

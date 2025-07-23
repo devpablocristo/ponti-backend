@@ -2,8 +2,8 @@ package dto
 
 import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 
-// WorkOrderRequest para POST y PUT
-type WorkOrderRequest struct {
+// WorkorderRequest para POST y PUT
+type WorkorderRequest struct {
 	Number       string             `json:"number" binding:"required"`
 	ProjectID    int64              `json:"project_id" binding:"required"`
 	FieldID      int64              `json:"field_id" binding:"required"`
@@ -12,18 +12,18 @@ type WorkOrderRequest struct {
 	LaborID      int64              `json:"labor_id" binding:"required"`
 	Contractor   string             `json:"contractor"`
 	Observations string             `json:"observations"`
-	Items        []WorkOrderItemDTO `json:"items" binding:"required,dive"`
+	Items        []WorkorderItemDTO `json:"items" binding:"required,dive"`
 }
 
-type WorkOrderItemDTO struct {
+type WorkorderItemDTO struct {
 	SupplyID      int64   `json:"supply_id" binding:"required"`
 	TotalUsed     float64 `json:"total_used" binding:"required"`
 	EffectiveArea float64 `json:"effective_area" binding:"required"`
 	FinalDose     float64 `json:"final_dose" binding:"required"`
 }
 
-func (r *WorkOrderRequest) ToDomain() *domain.WorkOrder {
-	o := &domain.WorkOrder{
+func (r *WorkorderRequest) ToDomain() *domain.Workorder {
+	o := &domain.Workorder{
 		Number:       r.Number,
 		ProjectID:    r.ProjectID,
 		FieldID:      r.FieldID,
@@ -34,7 +34,7 @@ func (r *WorkOrderRequest) ToDomain() *domain.WorkOrder {
 		Observations: r.Observations,
 	}
 	for _, it := range r.Items {
-		o.Items = append(o.Items, domain.WorkOrderItem{
+		o.Items = append(o.Items, domain.WorkorderItem{
 			SupplyID:      it.SupplyID,
 			TotalUsed:     it.TotalUsed,
 			EffectiveArea: it.EffectiveArea,
@@ -44,8 +44,8 @@ func (r *WorkOrderRequest) ToDomain() *domain.WorkOrder {
 	return o
 }
 
-// WorkOrderDetail para GET /workorders/:number
-type WorkOrderDetail struct {
+// WorkorderDetail para GET /workorders/:number
+type WorkorderDetail struct {
 	Number       string             `json:"number"`
 	ProjectID    int64              `json:"project_id"`
 	FieldID      int64              `json:"field_id"`
@@ -54,11 +54,11 @@ type WorkOrderDetail struct {
 	LaborID      int64              `json:"labor_id"`
 	Contractor   string             `json:"contractor"`
 	Observations string             `json:"observations"`
-	Items        []WorkOrderItemDTO `json:"items"`
+	Items        []WorkorderItemDTO `json:"items"`
 }
 
-func FromDomain(o *domain.WorkOrder) *WorkOrderDetail {
-	d := &WorkOrderDetail{
+func FromDomain(o *domain.Workorder) *WorkorderDetail {
+	d := &WorkorderDetail{
 		Number:       o.Number,
 		ProjectID:    o.ProjectID,
 		FieldID:      o.FieldID,
@@ -69,7 +69,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrderDetail {
 		Observations: o.Observations,
 	}
 	for _, it := range o.Items {
-		d.Items = append(d.Items, WorkOrderItemDTO{
+		d.Items = append(d.Items, WorkorderItemDTO{
 			SupplyID:      it.SupplyID,
 			TotalUsed:     it.TotalUsed,
 			EffectiveArea: it.EffectiveArea,
@@ -79,8 +79,8 @@ func FromDomain(o *domain.WorkOrder) *WorkOrderDetail {
 	return d
 }
 
-// WorkOrderResponse para POST (creación/duplicado)
-type WorkOrderResponse struct {
+// WorkorderResponse para POST (creación/duplicado)
+type WorkorderResponse struct {
 	Message string `json:"message"`
 	Number  string `json:"number"`
 }

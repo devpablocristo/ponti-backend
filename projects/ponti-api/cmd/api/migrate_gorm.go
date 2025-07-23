@@ -28,7 +28,7 @@ import (
 )
 
 // runGormMigrations runs GORM AutoMigrate on all models and ensures
-// the workorder_number_seq exists for the WorkOrder table.
+// the workorder_number_seq exists for the Workorder table.
 func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 	log.Println("Starting GORM migrations...")
 
@@ -57,8 +57,8 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&supplymodels.SupplyUnit{},
 		&supplymodels.Supply{},
 		&dollarmodels.ProjectDollarValue{},
-		&workordermodels.WorkOrder{},
-		&workordermodels.WorkOrderItem{},
+		&workordermodels.Workorder{},
+		&workordermodels.WorkorderItem{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.Project{},
 	}
@@ -70,8 +70,8 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 			return fmt.Errorf("failed to migrate %T: %w", m, err)
 		}
 
-		// Después de migrar WorkOrder, creamos la secuencia si falta
-		if _, ok := m.(*workordermodels.WorkOrder); ok {
+		// Después de migrar Workorder, creamos la secuencia si falta
+		if _, ok := m.(*workordermodels.Workorder); ok {
 			sql := `
                 CREATE SEQUENCE IF NOT EXISTS workorder_number_seq
                   START WITH 1

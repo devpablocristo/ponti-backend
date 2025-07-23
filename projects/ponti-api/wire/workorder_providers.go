@@ -11,30 +11,30 @@ import (
 	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
-// ProvideWorkOrderRepository crea la implementación concreta de workorder.Repository.
-func ProvideWorkOrderRepository(repo workorder.GormEngine) *workorder.Repository {
+// ProvideWorkorderRepository crea la implementación concreta de workorder.Repository.
+func ProvideWorkorderRepository(repo workorder.GormEngine) *workorder.Repository {
 	return workorder.NewRepository(repo)
 }
 
-// ProvideWorkOrderRepositoryPort adapta *workorder.Repository a la interfaz workorder.RepositoryPort.
-func ProvideWorkOrderRepositoryPort(r *workorder.Repository) workorder.RepositoryPort {
+// ProvideWorkorderRepositoryPort adapta *workorder.Repository a la interfaz workorder.RepositoryPort.
+func ProvideWorkorderRepositoryPort(r *workorder.Repository) workorder.RepositoryPort {
 	return r
 }
 
-// ProvideWorkOrderUseCases agrupa repositorios en workorder.UseCases.
-func ProvideWorkOrderUseCases(
+// ProvideWorkorderUseCases agrupa repositorios en workorder.UseCases.
+func ProvideWorkorderUseCases(
 	repo workorder.RepositoryPort,
 ) *workorder.UseCases {
 	return workorder.NewUseCases(repo)
 }
 
-// ProvideWorkOrderUseCasesPort adapta *workorder.UseCases a la interfaz workorder.UseCasesPort.
-func ProvideWorkOrderUseCasesPort(uc *workorder.UseCases) workorder.UseCasesPort {
+// ProvideWorkorderUseCasesPort adapta *workorder.UseCases a la interfaz workorder.UseCasesPort.
+func ProvideWorkorderUseCasesPort(uc *workorder.UseCases) workorder.UseCasesPort {
 	return uc
 }
 
-// ProvideWorkOrderHandler construye el handler HTTP para WorkOrder.
-func ProvideWorkOrderHandler(
+// ProvideWorkorderHandler construye el handler HTTP para Workorder.
+func ProvideWorkorderHandler(
 	server workorder.GinEnginePort,
 	useCases workorder.UseCasesPort,
 	cfg workorder.ConfigAPIPort,
@@ -43,35 +43,35 @@ func ProvideWorkOrderHandler(
 	return workorder.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideWorkOrderConfigAPI extrae la configuración específica de API para WorkOrder.
-func ProvideWorkOrderConfigAPI(cfg *config.Config) workorder.ConfigAPIPort {
+// ProvideWorkorderConfigAPI extrae la configuración específica de API para Workorder.
+func ProvideWorkorderConfigAPI(cfg *config.Config) workorder.ConfigAPIPort {
 	return &cfg.API
 }
 
-// ProvideWorkOrderGormEnginePort adapta *pgorm.Repository a workorder.GormEngine.
-func ProvideWorkOrderGormEnginePort(r *pgorm.Repository) workorder.GormEngine {
+// ProvideWorkorderGormEnginePort adapta *pgorm.Repository a workorder.GormEngine.
+func ProvideWorkorderGormEnginePort(r *pgorm.Repository) workorder.GormEngine {
 	return r
 }
 
-// ProvideWorkOrderGinEnginePort adapta *pgin.Server a workorder.GinEnginePort.
-func ProvideWorkOrderGinEnginePort(s *pgin.Server) workorder.GinEnginePort {
+// ProvideWorkorderGinEnginePort adapta *pgin.Server a workorder.GinEnginePort.
+func ProvideWorkorderGinEnginePort(s *pgin.Server) workorder.GinEnginePort {
 	return s
 }
 
-// ProvideWorkOrderMiddlewaresEnginePort adapta *mwr.Middlewares a workorder.MiddlewaresEnginePort.
-func ProvideWorkOrderMiddlewaresEnginePort(m *mwr.Middlewares) workorder.MiddlewaresEnginePort {
+// ProvideWorkorderMiddlewaresEnginePort adapta *mwr.Middlewares a workorder.MiddlewaresEnginePort.
+func ProvideWorkorderMiddlewaresEnginePort(m *mwr.Middlewares) workorder.MiddlewaresEnginePort {
 	return m
 }
 
-// WorkOrderSet expone todos los providers necesarios para WorkOrder.
-var WorkOrderSet = wire.NewSet(
-	ProvideWorkOrderRepository,
-	ProvideWorkOrderRepositoryPort,
-	ProvideWorkOrderUseCases,
-	ProvideWorkOrderUseCasesPort,
-	ProvideWorkOrderHandler,
-	ProvideWorkOrderConfigAPI,
-	ProvideWorkOrderGormEnginePort,
-	ProvideWorkOrderGinEnginePort,
-	ProvideWorkOrderMiddlewaresEnginePort,
+// WorkorderSet expone todos los providers necesarios para Workorder.
+var WorkorderSet = wire.NewSet(
+	ProvideWorkorderRepository,
+	ProvideWorkorderRepositoryPort,
+	ProvideWorkorderUseCases,
+	ProvideWorkorderUseCasesPort,
+	ProvideWorkorderHandler,
+	ProvideWorkorderConfigAPI,
+	ProvideWorkorderGormEnginePort,
+	ProvideWorkorderGinEnginePort,
+	ProvideWorkorderMiddlewaresEnginePort,
 )
