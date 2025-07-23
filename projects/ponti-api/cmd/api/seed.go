@@ -23,6 +23,7 @@ import (
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
 )
 
@@ -65,12 +66,12 @@ func seedDatabase(ctx context.Context, repo *gorm.Repository) error {
 	if err := seedClassTypes(repo); err != nil {
 		return err
 	}
-	/* if err := seedSupplyAuxTables(repo); err != nil {
+	if err := seedSupplyAuxTables(repo); err != nil {
 		return err
 	}
 	if err := seedSupplies(repo); err != nil {
 		return err
-	} */
+	}
 	if err := seedProjectDollarValues(repo); err != nil {
 		return err
 	}
@@ -451,7 +452,7 @@ func seedProjectDollarValues(repo *gorm.Repository) error {
 	return nil
 }
 
-/* func seedSupplies(repo *gorm.Repository) error {
+func seedSupplies(repo *gorm.Repository) error {
 	db := repo.Client()
 
 	// Buscar proyectos y campañas existentes
@@ -630,4 +631,3 @@ func seedSupplyAuxTables(repo *gorm.Repository) error {
 	}
 	return nil
 }
-*/

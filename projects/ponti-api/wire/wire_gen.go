@@ -21,6 +21,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
@@ -88,6 +89,15 @@ func Initialize() (*Dependencies, error) {
 	cropConfigAPIPort := ProvideCropConfigAPI(config)
 	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
 	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
+	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
+	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
+	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
+	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
+	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
+	useCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
+	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(config)
+	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
+	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, useCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
 	lotGinEnginePort := ProvideLotGinEnginePort(server)
 	lotGormEnginePort := ProvideLotGormEnginePort(repository)
 	lotRepository := ProvideLotRepository(lotGormEnginePort)
@@ -175,19 +185,19 @@ func Initialize() (*Dependencies, error) {
 	dollarRepository := ProvideDollarRepository(dollarGormEnginePort)
 	dollarRepositoryPort := ProvideDollarRepositoryPort(dollarRepository)
 	dollarUseCases := ProvideDollarUseCases(dollarRepositoryPort)
-	useCasePort := ProvideDollarUseCasePort(dollarUseCases)
+	dollarUseCasePort := ProvideDollarUseCasePort(dollarUseCases)
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
-	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
-	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
-	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
-	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
-	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
-	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
-	commercializationUseCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
-	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(config)
-	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
-	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, commercializationUseCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
+	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, dollarUseCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	laborGinEnginePort := ProvideLaborGinEnginePort(server)
+	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
+	laborRepository := ProvideLaborRepository(laborGormEnginePort)
+	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
+	laborUseCases := ProvideLaborUseCases(laborRepositoryPort)
+	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
+	laborConfigAPIPort := ProvideLaborConfigAPI(config)
+	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
+	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
 	dependencies := &Dependencies{
 		Config:                   config,
 		GinEngine:                server,
@@ -198,6 +208,7 @@ func Initialize() (*Dependencies, error) {
 		CampaignHandler:          campaignHandler,
 		InvestorHandler:          investorHandler,
 		CropHandler:              cropHandler,
+		CommercializationHandler: commercializationHandler,
 		LotHandler:               lotHandler,
 		FieldHandler:             fieldHandler,
 		ManagerHandler:           managerHandler,
@@ -208,7 +219,7 @@ func Initialize() (*Dependencies, error) {
 		UnitHandler:              unitHandler,
 		ClassTypeHandler:         classtypeHandler,
 		DollarHandler:            dollarHandler,
-		CommercializationHandler: commercializationHandler,
+		LaborHandler:             laborHandler,
 	}
 	return dependencies, nil
 }
@@ -225,6 +236,7 @@ type Dependencies struct {
 	CampaignHandler          *campaign.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
+	CommercializationHandler *commercialization.Handler
 	LotHandler               *lot.Handler
 	FieldHandler             *field.Handler
 	ManagerHandler           *manager.Handler
@@ -235,5 +247,5 @@ type Dependencies struct {
 	UnitHandler              *unit.Handler
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
-	CommercializationHandler *commercialization.Handler
+	LaborHandler             *labor.Handler
 }

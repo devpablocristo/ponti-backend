@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION update_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
+RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -26,9 +26,9 @@ CREATE TABLE users (
 );
 
 CREATE TRIGGER set_timestamp
-BEFORE UPDATE ON users
-FOR EACH ROW
-EXECUTE FUNCTION update_timestamp();
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
 
 CREATE TABLE campaigns (
   id BIGSERIAL PRIMARY KEY,
@@ -197,3 +197,28 @@ CREATE TABLE project_managers (
   CONSTRAINT fk_project_managers_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_managers_manager FOREIGN KEY (manager_id) REFERENCES managers(id)
 );
+
+CREATE TABLE labor_types (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    deleted_by VARCHAR(255)
+);
+CREATE TABLE labor_categories (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    type_id INTEGER NOT NULL REFERENCES labor_types(id),
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    deleted_at TIMESTAMPTZ,
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    deleted_by VARCHAR(255)
+);
+
+
+
