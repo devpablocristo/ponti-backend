@@ -42,23 +42,6 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 	}
 
 	modelsList := []any{
-		// &campaignmodels.Campaign{},
-		// &leasetypemodels.LeaseType{},
-		// &managermodels.Manager{},
-		// &investormodels.Investor{},
-		// &cropmodels.Crop{},
-		// &fieldmodels.Field{},
-		// &lotmodels.Lot{},
-		// &customermodels.Customer{},
-		// &supplymodels.Supply{},
-		// &categorymodels.Category{},
-		// &classtypemodels.ClassType{},
-		// &unitmodels.Unit{},
-		// &dollarmodels.ProjectDollarValue{},
-		// &workordermodels.WorkOrder{}, // aquí migramos la tabla
-		// &projectmodels.ProjectInvestor{},
-		// &projectmodels.Project{},
-
 		&customermodels.Customer{},
 		&campaignmodels.Campaign{},
 		&leasetypemodels.LeaseType{},
