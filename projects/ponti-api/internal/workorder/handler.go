@@ -6,14 +6,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
 
 type UseCasesPort interface {
 	CreateWorkOrder(context.Context, *domain.WorkOrder) (string, error)
-	GetOrder(context.Context, string) (*domain.WorkOrder, error)
-	DuplicateOrder(context.Context, string) (string, error)
+	GetWorkOrder(context.Context, string) (*domain.WorkOrder, error)
+	DuplicateWorkOrder(context.Context, string) (string, error)
+	UpdateWorkOrder(context.Context, *domain.WorkOrder) error
+	DeleteWorkOrder(context.Context, string) error
 }
 
 type GinEnginePort interface {
@@ -40,66 +43,90 @@ type Handler struct {
 }
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
-	return &Handler{
-		ucs: u,
-		gsv: s,
-		acf: c,
-		mws: m,
-	}
+	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
 }
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/workorders"
-
-	group := r.Group(baseURL)
+	base := h.acf.APIBaseURL() + "/workorders"
+	grp := r.Group(base)
 	{
-		group.POST("", h.CreateWorkOrder)
-		group.GET(":number", h.GetOrder)
-		group.POST(":number/duplicar", h.DuplicateOrder)
+		grp.POST("", h.CreateWorkOrder)
+		grp.GET("/:number", h.GetWorkOrder)
+		grp.POST("/:number/duplicate", h.DuplicateWorkOrder)
+		grp.PUT("/:number", h.UpdateWorkOrder)
+		grp.DELETE("/:number", h.DeleteWorkOrder)
 	}
 }
 
 func (h *Handler) CreateWorkOrder(c *gin.Context) {
-	var req dto.WorkOrder
+	var req dto.WorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		domErr := pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := pkgtypes.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-
-	number, err := h.ucs.CreateWorkOrder(c.Request.Context(), req.ToDomain())
+	num, err := h.ucs.CreateWorkOrder(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apiErr, status := pkgtypes.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-
 	c.JSON(http.StatusCreated, dto.WorkOrderResponse{
 		Message: "WorkOrder created",
-		Number:  number,
+		Number:  num,
 	})
 }
 
-func (h *Handler) GetOrder(c *gin.Context) {
+func (h *Handler) GetWorkOrder(c *gin.Context) {
 	number := c.Param("number")
-	ord, err := h.ucs.GetOrder(c.Request.Context(), number)
+	ord, err := h.ucs.GetWorkOrder(c.Request.Context(), number)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		apiErr, status := pkgtypes.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-
-	c.JSON(http.StatusOK, ord)
+	c.JSON(http.StatusOK, dto.FromDomain(ord))
 }
 
-func (h *Handler) DuplicateOrder(c *gin.Context) {
+func (h *Handler) DuplicateWorkOrder(c *gin.Context) {
 	orig := c.Param("number")
-	newNum, err := h.ucs.DuplicateOrder(c.Request.Context(), orig)
+	newNum, err := h.ucs.DuplicateWorkOrder(c.Request.Context(), orig)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apiErr, status := pkgtypes.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-
 	c.JSON(http.StatusCreated, dto.WorkOrderResponse{
 		Message: "WorkOrder duplicated",
 		Number:  newNum,
 	})
+}
+
+func (h *Handler) UpdateWorkOrder(c *gin.Context) {
+	var req dto.WorkOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		domErr := pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := pkgtypes.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	req.Number = c.Param("number")
+	if err := h.ucs.UpdateWorkOrder(c.Request.Context(), req.ToDomain()); err != nil {
+		apiErr, status := pkgtypes.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteWorkOrder(c *gin.Context) {
+	number := c.Param("number")
+	if err := h.ucs.DeleteWorkOrder(c.Request.Context(), number); err != nil {
+		apiErr, status := pkgtypes.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

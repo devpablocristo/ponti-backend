@@ -1,10 +1,7 @@
 package models
 
-import (
-	"gorm.io/gorm"
-)
-
-// WorkOrder tabla principal
+// WorkOrder tabla principal usando Number como primary key,
+// sin embebido de gorm.Model.
 type WorkOrder struct {
 	Number       string          `gorm:"primaryKey;column:number"`
 	ProjectID    int64           `gorm:"not null"`
@@ -15,10 +12,9 @@ type WorkOrder struct {
 	Contractor   string          `gorm:"size:100"`
 	Observations string          `gorm:"size:1000"`
 	Items        []WorkOrderItem `gorm:"foreignKey:WorkOrderNumber;references:Number"`
-	gorm.Model
 }
 
-// WorkOrderItem detalla los insumos
+// WorkOrderItem detalla los insumos de la orden
 type WorkOrderItem struct {
 	ID              int64   `gorm:"primaryKey;autoIncrement"`
 	WorkOrderNumber string  `gorm:"column:order_number;index"`

@@ -2,12 +2,11 @@ package workorder
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
@@ -16,7 +15,6 @@ type GormEngine interface {
 	Client() *gorm.DB
 }
 
-// Repository implementa domain.RepositoryPort
 type Repository struct {
 	db GormEngine
 }
@@ -25,7 +23,6 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-// CreateWorkOrder crea la orden y sus ítems en una transacción
 func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (string, error) {
 	ord := models.WorkOrder{
 		Number:       o.Number,
@@ -58,13 +55,12 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	return ord.Number, err
 }
 
-// GetOrder obtiene la orden con sus ítems (solo lectura)
-func (r *Repository) GetOrder(ctx context.Context, number string) (*domain.WorkOrder, error) {
+func (r *Repository) GetWorkOrder(ctx context.Context, number string) (*domain.WorkOrder, error) {
 	var ord models.WorkOrder
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Items").
 		First(&ord, "number = ?", number).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err == gorm.ErrRecordNotFound {
 			return nil, types.NewError(types.ErrNotFound, "order not found", err)
 		}
 		return nil, types.NewError(types.ErrInternal, "failed to get order", err)
@@ -91,10 +87,8 @@ func (r *Repository) GetOrder(ctx context.Context, number string) (*domain.WorkO
 	}, nil
 }
 
-// UpdateWorkOrder actualiza cabecera e ítems en una sola transacción
 func (r *Repository) UpdateWorkOrder(ctx context.Context, o *domain.WorkOrder) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1) Verificar existencia
 		var count int64
 		if err := tx.Model(&models.WorkOrder{}).
 			Where("number = ?", o.Number).
@@ -105,7 +99,6 @@ func (r *Repository) UpdateWorkOrder(ctx context.Context, o *domain.WorkOrder) e
 			return types.NewError(types.ErrNotFound, "order not found", nil)
 		}
 
-		// 2) Actualizar campos de la orden
 		if err := tx.Model(&models.WorkOrder{}).
 			Where("number = ?", o.Number).
 			Updates(map[string]any{
@@ -120,7 +113,6 @@ func (r *Repository) UpdateWorkOrder(ctx context.Context, o *domain.WorkOrder) e
 			return types.NewError(types.ErrInternal, "failed to update order", err)
 		}
 
-		// 3) Reemplazar ítems: eliminar antiguos y crear nuevos
 		if err := tx.Where("order_number = ?", o.Number).
 			Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete old order items", err)
@@ -137,15 +129,12 @@ func (r *Repository) UpdateWorkOrder(ctx context.Context, o *domain.WorkOrder) e
 				return types.NewError(types.ErrInternal, "failed to create updated order item", err)
 			}
 		}
-
 		return nil
 	})
 }
 
-// DeleteWorkOrder borra la orden e ítems en una transacción
 func (r *Repository) DeleteWorkOrder(ctx context.Context, number string) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1) Verificar existencia
 		var count int64
 		if err := tx.Model(&models.WorkOrder{}).
 			Where("number = ?", number).
@@ -156,13 +145,10 @@ func (r *Repository) DeleteWorkOrder(ctx context.Context, number string) error {
 			return types.NewError(types.ErrNotFound, "order not found", nil)
 		}
 
-		// 2) Eliminar ítems
 		if err := tx.Where("order_number = ?", number).
 			Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete order items", err)
 		}
-
-		// 3) Eliminar orden
 		if err := tx.Delete(&models.WorkOrder{}, "number = ?", number).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete order", err)
 		}
@@ -170,14 +156,25 @@ func (r *Repository) DeleteWorkOrder(ctx context.Context, number string) error {
 	})
 }
 
-// DuplicateOrder reutiliza CreateWorkOrder, que internamente maneja su propia transacción
-func (r *Repository) DuplicateOrder(ctx context.Context, number string) (string, error) {
-	orig, err := r.GetOrder(ctx, number)
+func (r *Repository) DuplicateWorkOrder(ctx context.Context, number string) (string, error) {
+	orig, err := r.GetWorkOrder(ctx, number)
 	if err != nil {
 		return "", err
 	}
-	// TODO: lógica para generar nuevo número (p.ej. secuencia +1)
-	newNumber := "0000-0002"
-	orig.Number = newNumber
+	newSeq, err := getNextNumber(ctx, r.db.Client())
+	if err != nil {
+		return "", err
+	}
+	orig.Number = newSeq
 	return r.CreateWorkOrder(ctx, orig)
+}
+
+func getNextNumber(ctx context.Context, db *gorm.DB) (string, error) {
+	var seq int64
+	if err := db.WithContext(ctx).
+		Raw("SELECT nextval('workorder_number_seq')").
+		Scan(&seq).Error; err != nil {
+		return "", types.NewError(types.ErrInternal, "failed to get next work order number from sequence", err)
+	}
+	return fmt.Sprintf("%04d", seq), nil
 }

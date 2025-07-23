@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	gormRepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
@@ -27,10 +27,12 @@ import (
 	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 )
 
-// RunGormMigrations runs SQL migrations using GORM.
-func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
+// runGormMigrations runs GORM AutoMigrate on all models and ensures
+// the workorder_number_seq exists for the WorkOrder table.
+func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 	log.Println("Starting GORM migrations...")
 
+	// Verify DB connection
 	sqlDB, err := repo.Client().DB()
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
@@ -39,8 +41,8 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 
-	models := []any{
-		&campaignmodels.Campaign{}, // primero4
+	modelsList := []any{
+		&campaignmodels.Campaign{},
 		&leasetypemodels.LeaseType{},
 		&managermodels.Manager{},
 		&investormodels.Investor{},
@@ -53,20 +55,34 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&classtypemodels.ClassType{},
 		&unitmodels.Unit{},
 		&dollarmodels.ProjectDollarValue{},
-		&workordermodels.WorkOrder{},
+		&workordermodels.WorkOrder{}, // aquí migramos la tabla
 		&projectmodels.ProjectInvestor{},
-		&projectmodels.Project{}, // último
+		&projectmodels.Project{},
 	}
 
 	start := time.Now()
-	for _, model := range models {
-		fmt.Printf("Migrating model: %T\n", model)
-		if err := repo.AutoMigrate(model); err != nil {
-			return fmt.Errorf("failed to migrate %T: %w", model, err)
+	for _, m := range modelsList {
+		fmt.Printf("Migrating model: %T\n", m)
+		if err := repo.AutoMigrate(m); err != nil {
+			return fmt.Errorf("failed to migrate %T: %w", m, err)
+		}
+
+		// Después de migrar WorkOrder, creamos la secuencia si falta
+		if _, ok := m.(*workordermodels.WorkOrder); ok {
+			sql := `
+                CREATE SEQUENCE IF NOT EXISTS workorder_number_seq
+                  START WITH 1
+                  INCREMENT BY 1
+                  NO MINVALUE
+                  NO MAXVALUE
+                  CACHE 1;
+            `
+			if execErr := repo.Client().Exec(sql).Error; execErr != nil {
+				return fmt.Errorf("failed to ensure sequence workorder_number_seq: %w", execErr)
+			}
+			log.Println("Ensured sequence workorder_number_seq exists")
 		}
 	}
-	duration := time.Since(start)
-	log.Printf("GORM migrations completed successfully in %s.", duration)
-
+	log.Printf("GORM migrations completed successfully in %s.", time.Since(start))
 	return nil
 }
