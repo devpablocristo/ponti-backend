@@ -25,6 +25,7 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
+	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
 type Dependencies struct {
@@ -47,6 +48,7 @@ type Dependencies struct {
 	UnitHandler      *unit.Handler
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
+	WorkOrderHandler *workorder.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -70,6 +72,7 @@ func Initialize() (*Dependencies, error) {
 		UnitSet,
 		ClassTypeSet,
 		DollarSet,
+		WorkOrderSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

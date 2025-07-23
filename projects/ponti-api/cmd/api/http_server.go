@@ -44,6 +44,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.CategoryHandler.Routes()
 	deps.ClassTypeHandler.Routes()
 	deps.UnitHandler.Routes()
+	deps.WorkOrderHandler.Routes()
 	deps.DollarHandler.Routes()
 
 	log.Println("HTTP routes registered successfully.")

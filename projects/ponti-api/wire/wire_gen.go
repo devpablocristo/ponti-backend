@@ -26,6 +26,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
 // Injectors from wire.go:
@@ -178,6 +179,15 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	workorderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
+	gormEngine := ProvideWorkOrderGormEnginePort(repository)
+	workorderRepository := ProvideWorkOrderRepository(gormEngine)
+	workorderRepositoryPort := ProvideWorkOrderRepositoryPort(workorderRepository)
+	workorderUseCases := ProvideWorkOrderUseCases(workorderRepositoryPort)
+	workorderUseCasesPort := ProvideWorkOrderUseCasesPort(workorderUseCases)
+	workorderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
+	workorderMiddlewaresEnginePort := ProvideWorkOrderMiddlewaresEnginePort(middlewares)
+	workorderHandler := ProvideWorkOrderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -198,6 +208,7 @@ func Initialize() (*Dependencies, error) {
 		UnitHandler:      unitHandler,
 		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
+		WorkOrderHandler: workorderHandler,
 	}
 	return dependencies, nil
 }
@@ -224,4 +235,5 @@ type Dependencies struct {
 	UnitHandler      *unit.Handler
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
+	WorkOrderHandler *workorder.Handler
 }
