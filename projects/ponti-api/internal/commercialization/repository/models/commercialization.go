@@ -4,16 +4,17 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	decimal "github.com/shopspring/decimal"
 )
 
 type CropCommercialization struct {
-	ID             int64   `gorm:"primaryKey;autoIncrement"`
-	ProjectID      int64   `gorm:"not null;index"`
-	CropName       string  `gorm:"type:varchar(100);not null"`
-	BoardPrice     float64 `gorm:"not null"`
-	FreightCost    float64 `gorm:"not null"`
-	CommercialCost float64 `gorm:"not null"`
-	NetPrice       float64 `gorm:"not null"`
+	ID             int64           `gorm:"primaryKey;autoIncrement"`
+	ProjectID      int64           `gorm:"not null;index"`
+	CropName       string          `gorm:"type:varchar(100);not null"`
+	BoardPrice     decimal.Decimal `gorm:"type:numeric(12,2);not null"`
+	FreightCost    decimal.Decimal `gorm:"type:numeric(12,2);not null"`
+	CommercialCost float64         `gorm:"not null"`
+	NetPrice       decimal.Decimal `gorm:"type:numeric(12,2);not null"`
 
 	sharedmodels.Base
 }
