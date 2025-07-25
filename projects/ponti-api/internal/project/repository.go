@@ -22,8 +22,6 @@ import (
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-
 )
 
 // TODO: aplicar custom errors
@@ -53,7 +51,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		customer := &cusmod.Customer{
 			ID:   p.Customer.ID,
 			Name: p.Customer.Name,
-			Base: sharedmodels.Base{
+			Base: base.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
 			},

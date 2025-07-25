@@ -18,6 +18,7 @@ type Lot struct {
 	Dates         []LotDates
 	Cost          float64 // Costo por hectárea
 	HarvestedTons float64 // Toneladas cosechadas
+	Tons          int     // Toneladas cosechadas
 
 	shareddomain.Base // <-- embebe campos de auditoría
 }
