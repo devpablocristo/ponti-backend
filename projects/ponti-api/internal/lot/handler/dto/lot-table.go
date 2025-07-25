@@ -15,6 +15,7 @@ type LotTable struct {
 	Variety        string     `json:"variety"`
 	SowedArea      float64    `json:"sowed_area"`
 	Season         string     `json:"season"`
+	Tons           int        `json:"tons"`
 	Dates          []LotDates `json:"dates"` // ISO 8601 o el formato que uses
 	CostPerHectare float64    `json:"cost_per_hectare"`
 	UpdatedAt      *time.Time `json:"updated_at,omitempty"`

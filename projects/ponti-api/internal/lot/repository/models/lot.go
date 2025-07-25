@@ -17,6 +17,7 @@ type Lot struct {
 	CurrentCropID  int64   `gorm:"not null;index;column:current_crop_id"`
 	Season         string  `gorm:"size:20;not null;column:season"`
 	Variety        string  `gorm:"size:20;not null;column:variety"`
+	Tons           int     `gorm:"column:tons"`
 
 	sharedmodels.Base // <-- embebe campos GORM de auditoría
 
@@ -55,6 +56,7 @@ func FromDomain(d *domain.Lot) *Lot {
 		CurrentCropID:  d.CurrentCrop.ID,
 		Season:         d.Season,
 		Variety:        d.Variety,
+		Tons:           d.Tons,
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
