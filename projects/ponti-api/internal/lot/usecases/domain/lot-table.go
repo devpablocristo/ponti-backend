@@ -15,6 +15,7 @@ type LotTable struct {
 	Variety        string
 	SowedArea      float64
 	Season         string
+	Tons           int
 	Dates          []LotDates
 	UpdatedAt      *time.Time
 	CostPerHectare float64

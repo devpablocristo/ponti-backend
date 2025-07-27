@@ -17,6 +17,7 @@ type RepositoryPort interface {
 	DeleteLot(context.Context, int64) error
 	ListLotsForKPI(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
 	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
+	UpdateLotTons(context.Context, int64, int) error
 }
 
 type UseCases struct {
@@ -41,6 +42,10 @@ func (u *UseCases) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 
 func (u *UseCases) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	return u.repo.UpdateLot(ctx, l)
+}
+
+func (u *UseCases) UpdateLotTons(ctx context.Context, id int64, tons int) error {
+	return u.repo.UpdateLotTons(ctx, id, tons)
 }
 
 func (u *UseCases) DeleteLot(ctx context.Context, id int64) error {

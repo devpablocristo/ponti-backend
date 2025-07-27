@@ -147,6 +147,29 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	})
 }
 
+func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons int) error {
+	if id <= 0 {
+		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", id), nil)
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.Lot{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", id), nil)
+		}
+		if err := tx.Model(&models.Lot{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"tons": tons,
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update lot tons", err)
+		}
+		return nil
+	})
+}
+
 // --- DELETE ---
 func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	if id <= 0 {
@@ -333,10 +356,12 @@ func (r *Repository) ListLotsTable(
 			lots.sowing_date as sowing_date,
 			lots.season,
 			lots.updated_at,
+			lots.tons,
 			projects.admin_cost as cost_per_hectare
 		`).
 		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
 		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").
+		Order("lots.id DESC").
 		Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {
 		return nil, 0, 0, 0, err
