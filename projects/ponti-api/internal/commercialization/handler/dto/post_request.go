@@ -11,7 +11,6 @@ type CropCommercialization struct {
 	BoardPrice     decimal.Decimal `json:"board_price" binding:"required"`
 	FreightCost    decimal.Decimal `json:"freight_cost" binding:"required"`
 	CommercialCost float64         `json:"commercial_cost" binding:"required"`
-	NetPrice       decimal.Decimal `json:"net_price" binding:"required"`
 }
 
 type BulkCommercializationRequest struct {
@@ -27,7 +26,6 @@ func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int6
 			BoardPrice:     item.BoardPrice,
 			FreightCost:    item.FreightCost,
 			CommercialCost: item.CommercialCost,
-			NetPrice:       item.NetPrice,
 			Base: shareddomain.Base{
 				CreatedBy: &userID,
 			},

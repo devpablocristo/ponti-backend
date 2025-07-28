@@ -25,6 +25,11 @@ func (u *UseCases) CreateBulk(ctx context.Context, items []domain.CropCommercial
 	if len(items) == 0 {
 		return types.NewError(types.ErrInvalidInput, "no items provided", nil)
 	}
+
+	for i := range items {
+		items[i].NetPrice = items[i].CalculateNetPrice()
+	}
+
 	return u.repo.CreateBulk(ctx, items)
 }
 
