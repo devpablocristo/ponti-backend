@@ -8,13 +8,13 @@ import (
 )
 
 type CropCommercialization struct {
-	ID             int64           `gorm:"primaryKey;autoIncrement"`
-	ProjectID      int64           `gorm:"not null;index"`
-	CropName       string          `gorm:"type:varchar(100);not null"`
-	BoardPrice     decimal.Decimal `gorm:"type:numeric(12,2);not null"`
-	FreightCost    decimal.Decimal `gorm:"type:numeric(12,2);not null"`
-	CommercialCost float64         `gorm:"not null"`
-	NetPrice       decimal.Decimal `gorm:"type:numeric(12,2);not null"`
+	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID      int64           `gorm:"not null;index;column:project_id"`
+	CropName       string          `gorm:"type:varchar(100);not null;column:crop_name"`
+	BoardPrice     decimal.Decimal `gorm:"type:numeric(12,2);not null;column:board_price"`
+	FreightCost    decimal.Decimal `gorm:"type:numeric(12,2);not null;column:freight_cost"`
+	CommercialCost float64         `gorm:"not null;column:commercial_cost"`
+	NetPrice       decimal.Decimal `gorm:"type:numeric(12,2);not null;column:net_price"`
 
 	sharedmodels.Base
 }

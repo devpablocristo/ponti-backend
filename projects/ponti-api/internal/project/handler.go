@@ -19,7 +19,7 @@ type UseCasesPort interface {
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
-	GetFieldsByProjectNameAndCampaignID(ctx context.Context, name string, campaignID int64) ([]domainField.Field, error)
+	GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
@@ -72,7 +72,7 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateProject)
 		public.GET("", h.ListProjects)
-		public.GET("/fields/:project_name/:campaign_id", h.GetFieldsByProjectNameAndCampaignID)
+		public.GET("/:id/fields", h.GetFieldsByProjectID)
 		public.GET("/dropdown", h.ListProjectsDropdown)
 		public.GET("/customer/:id", h.ListProjectsByCustomerID)
 		public.GET("/:id", h.GetProject)
@@ -124,14 +124,13 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (h *Handler) GetFieldsByProjectNameAndCampaignID(c *gin.Context) {
-	name := c.Param("project_name")
-	campaignID, err := strconv.ParseInt(c.Param("campaign_id"), 10, 64)
+func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
+	projectID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	fields, err := h.ucs.GetFieldsByProjectNameAndCampaignID(c.Request.Context(), name, campaignID)
+	fields, err := h.ucs.GetFieldsByProjectID(c.Request.Context(), projectID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return

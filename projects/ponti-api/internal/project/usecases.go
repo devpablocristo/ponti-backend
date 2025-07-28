@@ -66,13 +66,8 @@ func (u *UseCases) ListProjects(ctx context.Context, page, perPage int) ([]domai
 	return u.repo.ListProjects(ctx, page, perPage)
 }
 
-func (u *UseCases) GetFieldsByProjectNameAndCampaignID(ctx context.Context, name string, campaignID int64) ([]domainField.Field, error) {
-	project, err := u.repo.GetProjectByNameAndCampaignID(ctx, name, campaignID)
-	if err != nil {
-		return nil, err
-	}
-
-	return u.repo.GetFieldsByProjectID(ctx, project.ID)
+func (u *UseCases) GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error) {
+	return u.repo.GetFieldsByProjectID(ctx, projectID)
 }
 
 func (u *UseCases) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
