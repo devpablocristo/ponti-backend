@@ -25,6 +25,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 )
@@ -188,6 +189,15 @@ func Initialize() (*Dependencies, error) {
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
 	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
+	StockGinEnginePort := ProvideStockGinEnginePort(server)
+	StockGormEnginePort := ProvideStockGormEnginePort(repository)
+	StockRepository := ProvideStockRepository(StockGormEnginePort)
+	StockRepositoryPort := ProvideStockRepositoryPort(StockRepository)
+	StockUseCases := ProvideStockUseCases(StockRepositoryPort)
+	StockUseCasesPort := ProvideStockUseCasesPort(StockUseCases)
+	StockConfigAPIPort := ProvideStockConfigAPI(config)
+	StockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
+	StockHandler := ProvideStockHandler(StockGinEnginePort, StockUseCasesPort, StockConfigAPIPort, StockMiddlewaresEnginePort, projectUseCasesPort)
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -209,6 +219,7 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
 		LaborHandler:     laborHandler,
+		StockHandler:     StockHandler,
 	}
 	return dependencies, nil
 }
@@ -236,4 +247,5 @@ type Dependencies struct {
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
 	LaborHandler     *labor.Handler
+	StockHandler     *stock.Handler
 }

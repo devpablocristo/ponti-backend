@@ -59,9 +59,9 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateField)
 		public.GET("", h.ListFields)
-		public.GET("/:id", h.GetField)
-		public.PUT("/:id", h.UpdateField)
-		public.DELETE("/:id", h.DeleteField)
+		public.GET("/:idField", h.GetField)
+		public.PUT("/:idField", h.UpdateField)
+		public.DELETE("/:idField", h.DeleteField)
 	}
 }
 
@@ -93,7 +93,7 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, _ := strconv.ParseInt(c.Param("idField"), 10, 64)
 	f, err := h.ucs.GetField(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -103,7 +103,7 @@ func (h *Handler) GetField(c *gin.Context) {
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, _ := strconv.ParseInt(c.Param("idField"), 10, 64)
 	var req dto.UpdateField
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
@@ -119,7 +119,7 @@ func (h *Handler) UpdateField(c *gin.Context) {
 }
 
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
 		return

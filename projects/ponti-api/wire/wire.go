@@ -48,6 +48,7 @@ type Dependencies struct {
 	ClassTypeHandler *classtype.Handler
 	DollarHandler    *dollar.Handler
 	LaborHandler     *labor.Handler
+	StockHandler     *stock.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -72,6 +73,8 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeSet,
 		DollarSet,
 		LaborSet,
+		HandlerSet,
+		StockSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
