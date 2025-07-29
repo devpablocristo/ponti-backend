@@ -16,6 +16,9 @@ import (
 type UseCasesPort interface {
 	GetStocksSummary(context.Context, int64, int64, time.Time) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
+	UpdateCloseDateByProjectAndField(context.Context, int64, int64, *domain.Stock) error
+	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
+	GetStockById(context.Context, int64) (*domain.Stock, error)
 }
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
@@ -65,6 +68,9 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL)
 	public.GET("/summary", h.getStocks)
 	public.POST("", h.CreateStock)
+	public.PUT("/close-date", h.UpdateStocksCloseDate)
+	public.PUT("/real-stock/:stockId", h.UpdateRealStock)
+	public.GET("/:stockId", h.GetStockById)
 }
 
 func (h *Handler) getStocks(c *gin.Context) {
@@ -172,4 +178,102 @@ func (h *Handler) CreateStock(c *gin.Context) {
 		responses = append(responses, resp)
 	}
 	c.JSON(http.StatusMultiStatus, gin.H{"stocks": responses, "message": "stocks created"})
+}
+
+// UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
+func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectIdStr := c.Param("id")
+	fieldIdStr := c.Param("idField")
+	var req dto.UpdateCloseDateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	userID, err := sharedmodels.ConvertStringToID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
+		return
+	}
+	req.UpdatedBy = &userID
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	_, err = h.ucps.GetProject(ctx, projectId)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	err = h.ucs.UpdateCloseDateByProjectAndField(ctx, projectId, fieldId, req.ToDomain())
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, dto.UpdateCloseDateResponse{Message: "close_date updated successfully"})
+}
+
+func (h *Handler) UpdateRealStock(c *gin.Context) {
+	ctx := c.Request.Context()
+	stockIdStr := c.Param("stockId")
+	var req dto.UpdateRealStockRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	userID, err := sharedmodels.ConvertStringToID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
+		return
+	}
+	req.UpdatedBy = &userID
+	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	stockDomain, err := h.ucs.GetStockById(ctx, stockId)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	stockDomain.RealStockUnits = req.RealStockUnits
+	err = h.ucs.UpdateRealStockUnits(ctx, stockId, stockDomain)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, dto.UpdateRealStockResponse{Message: "real_stock_units updated successfully"})
+}
+
+func (h *Handler) GetStockById(c *gin.Context) {
+	ctx := c.Request.Context()
+	stockIdStr := c.Param("stockId")
+	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid stock id"})
+		return
+	}
+	stock, err := h.ucs.GetStockById(ctx, stockId)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	resp := dto.NewGetStockByIdResponse(stock)
+	c.JSON(http.StatusOK, resp)
 }

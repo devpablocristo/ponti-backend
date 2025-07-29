@@ -15,7 +15,7 @@ type Stock struct {
 	Field          *fielddom.Field
 	Supply         *supplydomain.Supply
 	Investor       *domain.Investor
-	CloseDate      time.Time
+	CloseDate      *time.Time
 	UnitsEntered   int64
 	UnitsConsumed  int64
 	RealStockUnits int64
@@ -31,5 +31,5 @@ func (s *Stock) GetStockUnits() int64 {
 }
 
 func (s *Stock) GetStockDifference() int64 {
-	return s.GetStockUnits() - s.RealStockUnits
+	return s.RealStockUnits - s.GetStockUnits()
 }

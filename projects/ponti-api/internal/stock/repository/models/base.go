@@ -30,12 +30,19 @@ type Stock struct {
 
 // ToDomain convierte el modelo Stock a la entidad de dominio
 func (m *Stock) ToDomain() *domain.Stock {
+	var timeZero time.Time
+	var closeDateNil *time.Time
+	if m.CloseDate == timeZero {
+		closeDateNil = nil
+	} else {
+		closeDateNil = &m.CloseDate
+	}
 	return &domain.Stock{
 		ID:             m.ID,
 		Project:        m.Project.ToDomain(),
 		Field:          m.Field.ToDomain(),
 		Supply:         m.Supply.ToDomain(),
-		CloseDate:      m.CloseDate,
+		CloseDate:      closeDateNil,
 		UnitsEntered:   m.UnitsEntered,
 		UnitsConsumed:  m.UnitsConsumed,
 		RealStockUnits: m.RealStockUnits,
@@ -54,16 +61,12 @@ func FromDomain(d *domain.Stock) *Stock {
 	return &Stock{
 		ID:        d.ID,
 		ProjectID: d.Project.ID,
-		Project:   *projmod.FromDomain(d.Project),
 		FieldID:   d.Field.ID,
 		Field: fieldmod.Field{
 			ID: d.Field.ID,
 		},
 		SupplyID:       d.Supply.ID,
-		Supply:         *supplymod.FromDomain(d.Supply),
 		InvestorID:     d.Investor.ID,
-		Investor:       *investormod.FromDomain(d.Investor),
-		CloseDate:      d.CloseDate,
 		RealStockUnits: d.RealStockUnits,
 		UnitsEntered:   d.UnitsEntered,
 		UnitsConsumed:  d.UnitsConsumed,
