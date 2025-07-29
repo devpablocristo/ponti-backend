@@ -8,10 +8,10 @@ import (
 )
 
 type CommercializationResponse struct {
-	CropName       string          `json:"crop_name"`
+	CropID         int64           `json:"crop_id"`
 	BoardPrice     decimal.Decimal `json:"board_price"`
 	FreightCost    decimal.Decimal `json:"freight_cost"`
-	CommercialCost float64         `json:"commercial_cost"`
+	CommercialCost decimal.Decimal `json:"commercial_cost"`
 	NetPrice       decimal.Decimal `json:"net_price"`
 
 	CreatedAt time.Time `json:"created_at"`
@@ -19,7 +19,7 @@ type CommercializationResponse struct {
 
 func FromDomain(d *domain.CropCommercialization) CommercializationResponse {
 	return CommercializationResponse{
-		CropName:       d.CropName,
+		CropID:         d.CropID,
 		BoardPrice:     d.BoardPrice,
 		FreightCost:    d.FreightCost,
 		CommercialCost: d.CommercialCost,

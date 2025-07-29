@@ -8,22 +8,21 @@ import (
 type CropCommercialization struct {
 	ID             int64           // ID de cada registro
 	ProjectID      int64           // ID del Proyecto
-	CropName       string          // nombre del cultivo
+	CropID         int64           // ID del cultivo
 	BoardPrice     decimal.Decimal // Precio en pizarra
 	FreightCost    decimal.Decimal // Costo de flete
-	CommercialCost float64         // Gasto comerciales (%)
+	CommercialCost decimal.Decimal // Gasto comerciales (%)
 	NetPrice       decimal.Decimal // Precio neto
 
 	shareddomain.Base
 }
 
 func (cc *CropCommercialization) CalculateNetPrice() decimal.Decimal {
-	// boardPrice * commercialCost(%) / 100
-	DecimalCommercialCost := decimal.NewFromFloat(cc.CommercialCost)
-	boardPercentage := cc.BoardPrice.Mul(DecimalCommercialCost).Div(decimal.NewFromInt(100)).Round(2)
+	// boardPrice * commercialCost(%) / 100  = boardPricePercentage
+	boardPricePercentage := cc.BoardPrice.Mul(cc.CommercialCost).Div(decimal.NewFromInt(100))
 
-	// boardPrice - freigthCost - boardPercentage
-	netPrice := cc.BoardPrice.Sub(cc.FreightCost).Sub(boardPercentage).Round(2)
+	// boardPrice - freigthCost - boardPricePercentage = NetPrice
+	netPrice := cc.BoardPrice.Sub(cc.FreightCost).Sub(boardPricePercentage).Round(2)
 
 	return netPrice
 }

@@ -51,6 +51,7 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&supplymodels.Supply{},
 		&categorymodels.Category{},
 		&classtypemodels.ClassType{},
+		&supplymodels.SupplyUnit{},
 		&unitmodels.Unit{},
 		&dollarmodels.ProjectDollarValue{},
 		&projectmodels.ProjectInvestor{},

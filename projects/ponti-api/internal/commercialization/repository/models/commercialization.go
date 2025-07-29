@@ -10,10 +10,10 @@ import (
 type CropCommercialization struct {
 	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
 	ProjectID      int64           `gorm:"not null;index;column:project_id"`
-	CropName       string          `gorm:"type:varchar(100);not null;column:crop_name"`
+	CropID         int64           `gorm:"not null;column:crop_id"`
 	BoardPrice     decimal.Decimal `gorm:"type:numeric(12,2);not null;column:board_price"`
 	FreightCost    decimal.Decimal `gorm:"type:numeric(12,2);not null;column:freight_cost"`
-	CommercialCost float64         `gorm:"not null;column:commercial_cost"`
+	CommercialCost decimal.Decimal `gorm:"type:numeric(12,2);not null;column:commercial_cost"`
 	NetPrice       decimal.Decimal `gorm:"type:numeric(12,2);not null;column:net_price"`
 
 	sharedmodels.Base
@@ -23,7 +23,7 @@ func FromDomain(cc *domain.CropCommercialization) *CropCommercialization {
 	return &CropCommercialization{
 		ID:             cc.ID,
 		ProjectID:      cc.ProjectID,
-		CropName:       cc.CropName,
+		CropID:         cc.CropID,
 		BoardPrice:     cc.BoardPrice,
 		FreightCost:    cc.FreightCost,
 		CommercialCost: cc.CommercialCost,
@@ -38,7 +38,7 @@ func (m *CropCommercialization) ToDomain() *domain.CropCommercialization {
 	return &domain.CropCommercialization{
 		ID:             m.ID,
 		ProjectID:      m.ProjectID,
-		CropName:       m.CropName,
+		CropID:         m.CropID,
 		BoardPrice:     m.BoardPrice,
 		FreightCost:    m.FreightCost,
 		CommercialCost: m.CommercialCost,

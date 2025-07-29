@@ -7,10 +7,10 @@ import (
 )
 
 type CropCommercialization struct {
-	CropName       string          `json:"crop_name" binding:"required"`
+	CropID         int64           `json:"crop_id" binding:"required,gt=0"`
 	BoardPrice     decimal.Decimal `json:"board_price" binding:"required"`
 	FreightCost    decimal.Decimal `json:"freight_cost" binding:"required"`
-	CommercialCost float64         `json:"commercial_cost" binding:"required"`
+	CommercialCost decimal.Decimal `json:"commercial_cost" binding:"required"`
 }
 
 type BulkCommercializationRequest struct {
@@ -22,7 +22,7 @@ func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int6
 	for i, item := range b.Values {
 		out[i] = domain.CropCommercialization{
 			ProjectID:      projecID,
-			CropName:       item.CropName,
+			CropID:         item.CropID,
 			BoardPrice:     item.BoardPrice,
 			FreightCost:    item.FreightCost,
 			CommercialCost: item.CommercialCost,
