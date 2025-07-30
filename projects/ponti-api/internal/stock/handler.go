@@ -14,9 +14,9 @@ import (
 )
 
 type UseCasesPort interface {
-	GetStocksSummary(context.Context, int64, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksSummary(context.Context, int64, int64, int64, int64, time.Time) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
-	UpdateCloseDateByProjectAndField(context.Context, int64, int64, *domain.Stock) error
+	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 }
@@ -78,41 +78,42 @@ func (h *Handler) getStocks(c *gin.Context) {
 	projectIdStr := c.Param("id")
 	fieldIdStr := c.Param("idField")
 
+	monthPeriod, err := getMonthPeriodOrDefault(c)
+	if handleError(err, c) {
+		return
+	}
+	yearPeriod, err := getYearPeriodOrDefault(c)
+	if handleError(err, c) {
+		return
+	}
+
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	_, err = h.ucps.GetProject(ctx, projectId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
 
 	cutoffDateStr := c.Query("cutoff_date")
-
 	var cutoffDate time.Time
-
 	if cutoffDateStr != "" {
 		cutoffDate, err := time.Parse("2006-01-02", cutoffDateStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cutoff_date format, expected YYYY-MM-DD"})
+		if handleError(err, c) {
 			return
 		}
 		cutoffDate.UTC()
 	}
 
-	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, fieldId, cutoffDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, fieldId, monthPeriod, yearPeriod, cutoffDate)
+	if handleError(err, c) {
 		return
 	}
 
@@ -127,54 +128,52 @@ func (h *Handler) CreateStock(c *gin.Context) {
 	fieldIdStr := c.Param("idField")
 
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
 	_, err = h.ucps.GetProject(ctx, projectId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	userID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	_, err = h.ucps.GetProject(ctx, projectId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
+
 	var responses []dto.CreateStocksResponse
 	for _, stockReq := range req.Stocks {
-		stockReq.ProjectID = projectId
-		stockReq.FieldID = fieldId
-		stockReq.CreatedBy = &userID
-		stockReq.UpdatedBy = &userID
-		stockId, err := h.ucs.CreateStock(ctx, stockReq.ToDomain())
-		resp := dto.CreateStocksResponse{
-			StockID:  stockId,
-			SupplyID: stockReq.SupplyID,
-			IsSaved:  err == nil,
-		}
+		var resp dto.CreateStocksResponse
+		err := stockReq.Validate()
 		if err != nil {
-			resp.ErrorDetail = err.Error()
+			resp = dto.CreateStocksResponse{
+				StockID:     0,
+				SupplyID:    stockReq.SupplyID,
+				IsSaved:     false,
+				ErrorDetail: err.Error(),
+			}
+		} else {
+			stockId, err := h.ucs.CreateStock(ctx, stockReq.ToDomain(projectId, fieldId, &userID))
+			resp = dto.CreateStocksResponse{
+				StockID:  stockId,
+				SupplyID: stockReq.SupplyID,
+				IsSaved:  err == nil,
+			}
+			if err != nil {
+				resp.ErrorDetail = err.Error()
+			}
 		}
+
 		responses = append(responses, resp)
 	}
 	c.JSON(http.StatusMultiStatus, gin.H{"stocks": responses, "message": "stocks created"})
@@ -185,6 +184,17 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
 	fieldIdStr := c.Param("idField")
+
+	monthPeriod, err := getMonthPeriod(c)
+	if handleError(err, c) {
+		return
+	}
+
+	yearPeriod, err := getYearPeriod(c)
+	if handleError(err, c) {
+		return
+	}
+
 	var req dto.UpdateCloseDateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
@@ -195,31 +205,38 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
 		return
 	}
-	req.UpdatedBy = &userID
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	_, err = h.ucps.GetProject(ctx, projectId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
+
 	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
-	err = h.ucs.UpdateCloseDateByProjectAndField(ctx, projectId, fieldId, req.ToDomain())
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+
+	if err := req.Validate(); handleError(err, c) {
 		return
 	}
+
+	err = h.ucs.UpdateCloseDateByProjectAndField(
+		ctx,
+		projectId,
+		fieldId,
+		monthPeriod,
+		yearPeriod,
+		req.ToDomain(&userID),
+	)
+
+	if handleError(err, c) {
+		return
+	}
+
 	c.JSON(http.StatusOK, dto.UpdateCloseDateResponse{Message: "close_date updated successfully"})
 }
 
@@ -236,25 +253,22 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
 		return
 	}
-	req.UpdatedBy = &userID
+
 	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		handleError(err, c)
 		return
 	}
 	stockDomain, err := h.ucs.GetStockById(ctx, stockId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
 
 	stockDomain.RealStockUnits = req.RealStockUnits
+	stockDomain.UpdatedBy = &userID
+
 	err = h.ucs.UpdateRealStockUnits(ctx, stockId, stockDomain)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.UpdateRealStockResponse{Message: "real_stock_units updated successfully"})
@@ -269,11 +283,69 @@ func (h *Handler) GetStockById(c *gin.Context) {
 		return
 	}
 	stock, err := h.ucs.GetStockById(ctx, stockId)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if handleError(err, c) {
 		return
 	}
-	resp := dto.NewGetStockByIdResponse(stock)
+	resp := dto.StockByIdResponseFromDomain(stock)
 	c.JSON(http.StatusOK, resp)
+}
+
+func handleError(err error, c *gin.Context) bool {
+	if err == nil {
+		return false
+	}
+	apiErr, _ := types.NewAPIError(err)
+	c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	return true
+}
+
+func getMonthPeriodOrDefault(c *gin.Context) (int64, error) {
+	monthPeriodStr := c.Query("month_period")
+	if monthPeriodStr == "" {
+		return int64(time.Now().Month()), nil
+	}
+	monthPeriod, err := strconv.ParseInt(monthPeriodStr, 10, 64)
+	if err != nil {
+		return 0, types.NewError(types.ErrValidation, "Month period is in invalid format", nil)
+	}
+
+	if monthPeriod < 1 || monthPeriod > 12 {
+		return 0, types.NewError(types.ErrValidation, "Month period must be between 1 and 12", nil)
+	}
+	return monthPeriod, nil
+}
+
+func getYearPeriodOrDefault(c *gin.Context) (int64, error) {
+	yearPeriodStr := c.Query("year_period")
+	if yearPeriodStr == "" {
+		return int64(time.Now().Year()), nil
+	}
+	yearPeriod, err := strconv.ParseInt(yearPeriodStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	if yearPeriod < 0 {
+		return 0, types.NewError(types.ErrValidation, "Year period must be greater than 0", nil)
+	}
+
+	return yearPeriod, nil
+}
+
+func getMonthPeriod(c *gin.Context) (int64, error) {
+	monthPeriodStr := c.Query("month_period")
+
+	if monthPeriodStr == "" {
+		return 0, types.NewMissingFieldError("month_period")
+	}
+	return getMonthPeriodOrDefault(c)
+}
+
+func getYearPeriod(c *gin.Context) (int64, error) {
+	yearPeriodStr := c.Query("year_period")
+
+	if yearPeriodStr == "" {
+		return 0, types.NewMissingFieldError("year_period")
+	}
+	return getYearPeriodOrDefault(c)
 }

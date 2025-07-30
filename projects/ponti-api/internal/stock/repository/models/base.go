@@ -22,6 +22,8 @@ type Stock struct {
 	InvestorID     int64                `gorm:"not null;index;column:investor_id"`
 	Investor       investormod.Investor `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	CloseDate      time.Time            `gorm:"not null;column:close_date"`
+	YearPeriod     int64                `gorm:"not null;column:year_period"`
+	MonthPeriod    int64                `gorm:"not null;column:month_period"`
 	UnitsEntered   int64                `gorm:"not null;column:units_entered"`
 	UnitsConsumed  int64                `gorm:"not null;column:units_consumed"`
 	RealStockUnits int64                `gorm:"not null;column:real_stock_units"`
@@ -46,6 +48,8 @@ func (m *Stock) ToDomain() *domain.Stock {
 		UnitsEntered:   m.UnitsEntered,
 		UnitsConsumed:  m.UnitsConsumed,
 		RealStockUnits: m.RealStockUnits,
+		YearPeriod:     m.YearPeriod,
+		MonthPeriod:    m.MonthPeriod,
 		Investor:       m.Investor.ToDomain(),
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
@@ -70,6 +74,8 @@ func FromDomain(d *domain.Stock) *Stock {
 		RealStockUnits: d.RealStockUnits,
 		UnitsEntered:   d.UnitsEntered,
 		UnitsConsumed:  d.UnitsConsumed,
+		YearPeriod:     d.YearPeriod,
+		MonthPeriod:    d.MonthPeriod,
 		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,
 			UpdatedAt: d.UpdatedAt,

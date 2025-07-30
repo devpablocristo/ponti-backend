@@ -24,7 +24,7 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 // GetStocks retorna stocks filtrando por nombre de proyecto, nombre de field y opcionalmente por fecha de corte
-func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int64, closeDate time.Time) ([]*domain.Stock, error) {
+func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, closeDate time.Time) ([]*domain.Stock, error) {
 	db := r.db.Client().WithContext(ctx)
 	var t time.Time
 
@@ -36,7 +36,9 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int
 		Joins("JOIN projects ON projects.id = stocks.project_id").
 		Joins("JOIN fields ON fields.id = stocks.field_id").
 		Where("projects.id = ?", projectId).
-		Where("fields.id = ?", fieldId)
+		Where("fields.id = ?", fieldId).
+		Where("stocks.month_period = ?", monthPeriod).
+		Where("stocks.year_period = ?", yearPeriod)
 
 	if closeDate != t {
 		query.Where("stocks.close_date < ?", closeDate)
@@ -65,12 +67,16 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 	return model.ID, nil
 }
 
-func (r *Repository) UpdateCloseDateByProjectAndField(ctx context.Context, projectId int64, fieldId int64, stock *domain.Stock) error {
+func (r *Repository) UpdateCloseDateByProjectAndField(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
 	stockUpdate := modelupdates.StockUpdateCloseDateFromDomain(stock)
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
-		Where("project_id = ? AND field_id = ?", projectId, fieldId).
+		Where("project_id = ?", projectId).
+		Where("field_id = ?", fieldId).
+		Where("year_period = ?", yearPeriod).
+		Where("month_period = ?", monthPeriod).
 		Updates(stockUpdate)
+
 	if result.Error != nil {
 		return result.Error
 	}
@@ -101,6 +107,7 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 		Preload("Project").
 		Preload("Field").
 		Preload("Supply").
+		Preload("Supply.Type").
 		Preload("Investor").
 		First(&stockModel, stockId).Error
 	if err != nil {

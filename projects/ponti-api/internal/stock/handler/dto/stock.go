@@ -20,6 +20,7 @@ type GetStock struct {
 	RealStockUnits  int64      `json:"real_stock_units"`
 	StockDifference int64      `json:"stock_difference"`
 	TotalUSD        float64    `json:"total_usd"`
+	ClassType       string     `json:"class_type"`
 	CloseDate       *time.Time `json:"close_date"`
 }
 
@@ -36,6 +37,7 @@ func FromDomain(s *domain.Stock) *GetStock {
 		TotalUSD:        s.GetTotalUSD(),
 		StockDifference: s.GetStockDifference(),
 		CloseDate:       s.CloseDate,
+		ClassType:       s.Supply.Type.Name,
 	}
 }
 

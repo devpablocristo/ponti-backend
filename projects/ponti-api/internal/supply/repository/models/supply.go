@@ -3,9 +3,10 @@ package models
 import (
 	catmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	classdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 )
 
 // Tablas auxiliares normalizadas
@@ -43,7 +44,10 @@ func (m *Supply) ToDomain() *domain.Supply {
 		UnitID:     int64(m.UnitID),
 		Price:      m.Price,
 		CategoryID: int64(m.CategoryID),
-		TypeID:     int64(m.TypeID),
+		Type: classdomain.ClassType{
+			ID:   int64(m.TypeID),
+			Name: m.Type.Name,
+		},
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -61,7 +65,7 @@ func FromDomain(d *domain.Supply) *Supply {
 		Price:      d.Price,
 		UnitID:     uint(d.UnitID),
 		CategoryID: uint(d.CategoryID),
-		TypeID:     uint(d.TypeID),
+		TypeID:     uint(d.Type.ID),
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,

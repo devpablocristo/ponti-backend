@@ -10,6 +10,8 @@ CREATE TABLE stocks (
     units_entered BIGINT NOT NULL,
     units_consumed BIGINT NOT NULL,
     real_stock_units BIGINT NOT NULL,
+    year_period INTEGER NOT NULL,
+    month_period INTEGER NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP,

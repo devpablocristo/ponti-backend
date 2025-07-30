@@ -1,20 +1,19 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 )
 
 type UpdateRealStockRequest struct {
-	RealStockUnits int64  `json:"real_stock_units"`
-	UpdatedBy      *int64 `json:"updated_by"`
+	RealStockUnits int64 `json:"real_stock_units"`
 }
 
-func (r *UpdateRealStockRequest) ToDomain() *domain.Stock {
+func (r *UpdateRealStockRequest) ToDomain(updatedBy *int64) *domain.Stock {
 	return &domain.Stock{
 		RealStockUnits: r.RealStockUnits,
 		Base: shareddomain.Base{
-			UpdatedBy: r.UpdatedBy,
+			UpdatedBy: updatedBy,
 		},
 	}
 }

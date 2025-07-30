@@ -1,6 +1,7 @@
 package dto
 
 import (
+	domainclasstype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/usecases/domain"
 	"time"
 
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
@@ -34,7 +35,9 @@ func (d *Supply) ToDomain() *domain.Supply {
 		Price:      d.Price,
 		UnitID:     d.UnitID,
 		CategoryID: d.CategoryID,
-		TypeID:     d.TypeID,
+		Type: domainclasstype.ClassType{
+			ID: d.TypeID,
+		},
 		Base: shareddomain.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
@@ -51,7 +54,7 @@ func FromDomain(s *domain.Supply) *Supply {
 		Price:      s.Price,
 		UnitID:     s.UnitID,
 		CategoryID: s.CategoryID,
-		TypeID:     s.TypeID,
+		TypeID:     s.Type.ID,
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 		CreatedBy:  s.CreatedBy,

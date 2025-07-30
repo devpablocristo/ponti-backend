@@ -1,0 +1,330 @@
+openapi: 3.0.0
+info:
+  title: Ponti API
+  version: 1.0.0
+  description: |
+    Central API documentation for the Ponti backend. This file is designed to grow as more endpoints and modules are added. Validation rules and examples are based on the latest backend logic and will be updated as the API evolves.
+servers:
+  - url: /api/v1
+paths:
+  /projects/{id}/fields/{idField}/stock/summary:
+    get:
+      summary: Get stock summary
+      description: |
+        Requires period parameters (month_period, year_period). If not provided, defaults to current month and year.
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: idField
+          schema: { type: integer }
+          required: true
+        - in: query
+          name: month_period
+          schema: { type: integer, example: 7 }
+          description: Period month (1-12, required)
+        - in: query
+          name: year_period
+          schema: { type: integer, example: 2025 }
+          description: Period year (>=0, required)
+        - in: query
+          name: cutoff_date
+          schema: { type: string, format: date, example: "2025-07-01" }
+          description: Optional cutoff date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Stock summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockSummary'
+              examples:
+                example:
+                  value:
+                    - project_id: 1
+                      field_id: 2
+                      supply_id: 3
+                      investor_id: 4
+                      units_entered: 100
+                      units_consumed: 60
+                      real_stock_units: 40
+                      year_period: 2025
+                      month_period: 7
+  /projects/{id}/fields/{idField}/stock:
+    post:
+      summary: Create one or more stocks
+      description: |
+        Validation:
+        - month_period: required, >0 and <=12
+        - year_period: required, >=0
+        - supply_id: required, >0, not negative
+        - investor_id: required, >0, not negative
+        - project_id and field_id: passed via path, not in body
+        - created_by/updated_by: injected from user_id header, not in body
+        - real_stock_units is set to units_entered on creation
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: idField
+          schema: { type: integer }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStocksRequest'
+            examples:
+              example:
+                value:
+                  stocks:
+                    - supply_id: 3
+                      investor_id: 4
+                      units_entered: 100
+                      year_period: 2025
+                      month_period: 7
+      responses:
+        '207':
+          description: Batch create result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stocks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CreateStocksResponse'
+                  message:
+                    type: string
+                example:
+                  stocks:
+                    - stock_id: 1
+                      supply_id: 3
+                      is_saved: true
+                      error_detail: ""
+                  message: "stocks created"
+  /projects/{id}/fields/{idField}/stock/close-date:
+    put:
+      summary: Update close_date for stocks by project, field, month and year
+      description: |
+        Validation:
+        - close_date: required, format YYYY-MM-DD, cannot be zero
+        - updated_by: NOT in body, injected from user_id header
+        - month_period and year_period: required in query
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: idField
+          schema: { type: integer }
+          required: true
+        - in: query
+          name: month_period
+          schema: { type: integer, example: 7 }
+          required: true
+        - in: query
+          name: year_period
+          schema: { type: integer, example: 2025 }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCloseDateRequest'
+            examples:
+              example:
+                value:
+                  close_date: "2025-07-31"
+      responses:
+        '200':
+          description: Close date updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCloseDateResponse'
+              examples:
+                example:
+                  value:
+                    message: "close_date updated successfully"
+  /projects/{id}/fields/{idField}/stock/real-stock/{stockId}:
+    put:
+      summary: Update real_stock_units for a stock (audited)
+      description: |
+        Validation:
+        - real_stock_units: required, integer
+        - updated_by: NOT in body, injected from user_id header
+        - Cannot update if stock is closed (close_date != nil)
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: idField
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: stockId
+          schema: { type: integer }
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRealStockRequest'
+            examples:
+              example:
+                value:
+                  real_stock_units: 50
+      responses:
+        '200':
+          description: Stock updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateRealStockResponse'
+              examples:
+                example:
+                  value:
+                    message: "real_stock_units updated successfully"
+  /projects/{id}/fields/{idField}/stock/{stockId}:
+    get:
+      summary: Get stock details by ID
+      parameters:
+        - in: path
+          name: id
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: idField
+          schema: { type: integer }
+          required: true
+        - in: path
+          name: stockId
+          schema: { type: integer }
+          required: true
+      responses:
+        '200':
+          description: Stock details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetStockByIdResponse'
+              examples:
+                example:
+                  value:
+                    id: 1
+                    project_id: 1
+                    field_id: 2
+                    supply_id: 3
+                    investor_id: 4
+                    close_date: "2025-07-31"
+                    units_entered: 100
+                    units_consumed: 60
+                    real_stock_units: 100
+                    year_period: 2025
+                    month_period: 7
+                    class_type: "Seed"
+components:
+  schemas:
+    StockSummary:
+      type: object
+      properties:
+        project_id: { type: integer }
+        field_id: { type: integer }
+        supply_id: { type: integer }
+        investor_id: { type: integer }
+        units_entered: { type: integer }
+        units_consumed: { type: integer }
+        real_stock_units: { type: integer }
+        year_period: { type: integer }
+        month_period: { type: integer }
+    CreateStocksRequest:
+      type: object
+      properties:
+        stocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateStock'
+    CreateStock:
+      type: object
+      properties:
+        supply_id:
+          type: integer
+          description: Supply ID (>0, required, not negative)
+        investor_id:
+          type: integer
+          description: Investor ID (>0, required, not negative)
+        units_entered:
+          type: integer
+          description: Entered units
+        year_period:
+          type: integer
+          description: Period year (>=0, required, not negative)
+        month_period:
+          type: integer
+          description: Period month (1-12, required)
+      required:
+        - supply_id
+        - investor_id
+        - year_period
+        - month_period
+    CreateStocksResponse:
+      type: object
+      properties:
+        stock_id: { type: integer }
+        supply_id: { type: integer }
+        is_saved: { type: boolean }
+        error_detail: { type: string }
+    UpdateCloseDateRequest:
+      type: object
+      properties:
+        close_date:
+          type: string
+          format: date
+          description: Close date (required, format YYYY-MM-DD, cannot be zero)
+      required:
+        - close_date
+    UpdateCloseDateResponse:
+      type: object
+      properties:
+        message: { type: string }
+    UpdateRealStockRequest:
+      type: object
+      properties:
+        real_stock_units:
+          type: integer
+          description: Real units (required)
+      required:
+        - real_stock_units
+    UpdateRealStockResponse:
+      type: object
+      properties:
+        message: { type: string }
+    GetStockByIdResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        project_id: { type: integer }
+        field_id: { type: integer }
+        supply_id: { type: integer }
+        investor_id: { type: integer }
+        close_date: { type: string, format: date }
+        units_entered: { type: integer }
+        units_consumed: { type: integer }
+        real_stock_units: { type: integer }
+        year_period: { type: integer }
+        month_period: { type: integer }
+        class_type: { type: string, description: Supply class type name }

@@ -19,6 +19,8 @@ type Stock struct {
 	UnitsEntered   int64
 	UnitsConsumed  int64
 	RealStockUnits int64
+	YearPeriod     int64
+	MonthPeriod    int64
 	shareddomain.Base
 }
 

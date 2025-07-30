@@ -11,14 +11,14 @@ type GetStockByIdResponse struct {
 	FieldID        int64      `json:"field_id"`
 	SupplyID       int64      `json:"supply_id"`
 	InvestorID     int64      `json:"investor_id"`
+	ClassType      string     `json:"class_type"`
 	CloseDate      *time.Time `json:"close_date"`
 	UnitsEntered   int64      `json:"units_entered"`
 	UnitsConsumed  int64      `json:"units_consumed"`
 	RealStockUnits int64      `json:"real_stock_units"`
-	// Puedes agregar más campos si es necesario
 }
 
-func NewGetStockByIdResponse(stock *domain.Stock) *GetStockByIdResponse {
+func StockByIdResponseFromDomain(stock *domain.Stock) *GetStockByIdResponse {
 	return &GetStockByIdResponse{
 		ID:             stock.ID,
 		ProjectID:      stock.Project.ID,
@@ -29,5 +29,6 @@ func NewGetStockByIdResponse(stock *domain.Stock) *GetStockByIdResponse {
 		UnitsEntered:   stock.UnitsEntered,
 		UnitsConsumed:  stock.UnitsConsumed,
 		RealStockUnits: stock.RealStockUnits,
+		ClassType:      stock.Supply.Type.Name,
 	}
 }
