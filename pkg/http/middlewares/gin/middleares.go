@@ -25,7 +25,7 @@ func NewDefaultMiddlewares() *Middlewares {
 	}
 	validation := []gin.HandlerFunc{
 		RequireUserIDHeader(),
-		//RequireAPIKey(),
+		RequireAPIKey(),
 	}
 	protected := []gin.HandlerFunc{
 		RequireJWT(cfg),
