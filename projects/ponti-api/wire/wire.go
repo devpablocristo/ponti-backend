@@ -73,7 +73,6 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeSet,
 		DollarSet,
 		LaborSet,
-		HandlerSet,
 		StockSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
