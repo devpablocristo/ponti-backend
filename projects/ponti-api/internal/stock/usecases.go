@@ -2,6 +2,7 @@ package stock
 
 import (
 	"context"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"time"
 )
@@ -39,5 +40,8 @@ func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockId int64, stoc
 }
 
 func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Stock, error) {
+	if stockId <= 0 {
+		return nil, types.NewError(types.ErrInvalidInput, "stock id must be greater than 0", nil)
+	}
 	return u.repo.GetStockById(ctx, stockId)
 }

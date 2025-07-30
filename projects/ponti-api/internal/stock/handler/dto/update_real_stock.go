@@ -21,3 +21,9 @@ func (r *UpdateRealStockRequest) ToDomain(updatedBy *int64) *domain.Stock {
 type UpdateRealStockResponse struct {
 	Message string `json:"message"`
 }
+
+func NewUpdateRealStockResponse(message string) *UpdateRealStockResponse {
+	return &UpdateRealStockResponse{
+		Message: message,
+	}
+}

@@ -201,10 +201,10 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		return
 	}
 	userID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
+	if handleError(err, c) {
 		return
 	}
+
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
 	if handleError(err, c) {
 		return
@@ -248,15 +248,14 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
+
 	userID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid user_id in header"})
+	if handleError(err, c) {
 		return
 	}
 
 	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
-	if err != nil {
-		handleError(err, c)
+	if handleError(err, c) {
 		return
 	}
 	stockDomain, err := h.ucs.GetStockById(ctx, stockId)
@@ -271,17 +270,17 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	if handleError(err, c) {
 		return
 	}
-	c.JSON(http.StatusOK, dto.UpdateRealStockResponse{Message: "real_stock_units updated successfully"})
+	c.JSON(http.StatusOK, dto.NewUpdateRealStockResponse("real stock updated successfully"))
 }
 
 func (h *Handler) GetStockById(c *gin.Context) {
 	ctx := c.Request.Context()
 	stockIdStr := c.Param("stockId")
 	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid stock id"})
+	if handleError(err, c) {
 		return
 	}
+
 	stock, err := h.ucs.GetStockById(ctx, stockId)
 	if handleError(err, c) {
 		return
