@@ -2,9 +2,10 @@ package workorder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"gorm.io/gorm"
+	gorm "gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
@@ -23,20 +24,19 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (string, error) {
-	// 1) mapeamos dominio -> modelo
+func (r *Repository) CreateWorkorder(
+	ctx context.Context,
+	o *domain.Workorder,
+) (string, error) {
 	ordModel := models.FromDomain(o)
-
 	err := r.db.Client().WithContext(ctx).
 		Transaction(func(tx *gorm.DB) error {
-			// 2) FullSaveAssociations para que cree también los Items
 			if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
 				Create(ordModel).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to create order", err)
 			}
 			return nil
 		})
-
 	return ordModel.Number, err
 }
 
@@ -46,13 +46,12 @@ func (r *Repository) GetWorkorder(ctx context.Context, number string) (*domain.W
 		Preload("Items").
 		First(&ordModel, "number = ?", number).Error; err != nil {
 
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, types.NewError(types.ErrNotFound, "order not found", err)
 		}
 		return nil, types.NewError(types.ErrInternal, "failed to get order", err)
 	}
 
-	// 3) modelo -> dominio
 	return ordModel.ToDomain(), nil
 }
 
@@ -129,4 +128,36 @@ func getNextNumber(ctx context.Context, db *gorm.DB) (string, error) {
 		return "", types.NewError(types.ErrInternal, "failed to get next work order number from sequence", err)
 	}
 	return fmt.Sprintf("%04d", seq), nil
+}
+
+func (r *Repository) ListWorkorders(
+	ctx context.Context,
+	filt domain.WorkorderFilter,
+	inp types.Input,
+) ([]domain.Workorder, types.PageInfo, error) {
+	db := r.db.Client().WithContext(ctx)
+	if filt.ProjectID != nil {
+		db = db.Where("project_id = ?", *filt.ProjectID)
+	}
+	if filt.FieldID != nil {
+		db = db.Where("field_id = ?", *filt.FieldID)
+	}
+	var total int64
+	if err := db.Model(&models.Workorder{}).Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count workorders", err)
+	}
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+	var modelList []models.Workorder
+	if err := db.Preload("Items").
+		Limit(int(inp.PageSize)).Offset(offset).
+		Order("number desc").
+		Find(&modelList).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list workorders", err)
+	}
+	result := make([]domain.Workorder, len(modelList))
+	for i, m := range modelList {
+		result[i] = *m.ToDomain()
+	}
+	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
+	return result, pageInfo, nil
 }

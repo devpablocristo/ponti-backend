@@ -3,6 +3,7 @@ package workorder
 import (
 	"context"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
 
@@ -12,6 +13,7 @@ type RepositoryPort interface {
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
+	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.Workorder, types.PageInfo, error)
 }
 
 type UseCases struct {
@@ -40,4 +42,13 @@ func (u *UseCases) UpdateWorkorder(ctx context.Context, o *domain.Workorder) err
 
 func (u *UseCases) DeleteWorkorder(ctx context.Context, number string) error {
 	return u.repo.DeleteWorkorder(ctx, number)
+}
+
+// ListWorkorders delega al repositorio
+func (u *UseCases) ListWorkorders(
+	ctx context.Context,
+	filt domain.WorkorderFilter,
+	inp types.Input,
+) ([]domain.Workorder, types.PageInfo, error) {
+	return u.repo.ListWorkorders(ctx, filt, inp)
 }

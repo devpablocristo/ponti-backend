@@ -3,10 +3,11 @@ package workorder
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
@@ -17,6 +18,7 @@ type UseCasesPort interface {
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
+	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.Workorder, types.PageInfo, error)
 }
 
 type GinEnginePort interface {
@@ -56,20 +58,22 @@ func (h *Handler) Routes() {
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.PUT("/:number", h.UpdateWorkorder)
 		grp.DELETE("/:number", h.DeleteWorkorder)
+		grp.GET("", h.ListWorkorders)
+
 	}
 }
 
 func (h *Handler) CreateWorkorder(c *gin.Context) {
-	var req dto.WorkorderRequest
+	var req dto.Workorder
 	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := pkgtypes.NewAPIError(domErr)
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	num, err := h.ucs.CreateWorkorder(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, status := pkgtypes.NewAPIError(err)
+		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
@@ -83,7 +87,7 @@ func (h *Handler) GetWorkorder(c *gin.Context) {
 	number := c.Param("number")
 	ord, err := h.ucs.GetWorkorder(c.Request.Context(), number)
 	if err != nil {
-		apiErr, status := pkgtypes.NewAPIError(err)
+		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
@@ -94,7 +98,7 @@ func (h *Handler) DuplicateWorkorder(c *gin.Context) {
 	orig := c.Param("number")
 	newNum, err := h.ucs.DuplicateWorkorder(c.Request.Context(), orig)
 	if err != nil {
-		apiErr, status := pkgtypes.NewAPIError(err)
+		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
@@ -105,16 +109,16 @@ func (h *Handler) DuplicateWorkorder(c *gin.Context) {
 }
 
 func (h *Handler) UpdateWorkorder(c *gin.Context) {
-	var req dto.WorkorderRequest
+	var req dto.Workorder
 	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := pkgtypes.NewAPIError(domErr)
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.Number = c.Param("number")
 	if err := h.ucs.UpdateWorkorder(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := pkgtypes.NewAPIError(err)
+		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
@@ -124,9 +128,45 @@ func (h *Handler) UpdateWorkorder(c *gin.Context) {
 func (h *Handler) DeleteWorkorder(c *gin.Context) {
 	number := c.Param("number")
 	if err := h.ucs.DeleteWorkorder(c.Request.Context(), number); err != nil {
-		apiErr, status := pkgtypes.NewAPIError(err)
+		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) ListWorkorders(c *gin.Context) {
+	filt := parseFilters(c)
+	inp := types.NewInput(c.Request)
+	list, pageInfo, err := h.ucs.ListWorkorders(c.Request.Context(), filt, inp)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	// Mapear slice de valores
+	var items []dto.WorkorderDetail
+	for _, o := range list {
+		items = append(items, *dto.FromDomain(&o))
+	}
+	c.JSON(http.StatusOK, dto.WorkorderListResponse{
+		PageInfo: pageInfo,
+		Items:    items,
+	})
+}
+
+// ParseFilters extrae project_id, field_id y state
+func parseFilters(c *gin.Context) domain.WorkorderFilter {
+	var f domain.WorkorderFilter
+	if v := c.Query("project_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			f.ProjectID = &id
+		}
+	}
+	if v := c.Query("field_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			f.FieldID = &id
+		}
+	}
+	return f
 }
