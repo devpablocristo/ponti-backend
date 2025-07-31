@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// WorkorderListElement define los campos que se exponen en la capa de dominio para listados.
+// WorkorderListElement para la lista
 type WorkorderListElement struct {
 	Number        string
 	ProjectName   string

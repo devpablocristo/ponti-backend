@@ -1,34 +1,54 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+	"time"
+
 	"github.com/shopspring/decimal"
+
+	classmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
+	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+	labormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
+	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	projectmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
 
+// Workorder GORM model con todas las relaciones
 type Workorder struct {
-	Number        string          `gorm:"primaryKey;column:number;uniqueIndex"`
-	ProjectID     int64           `gorm:"not null"`
-	FieldID       int64           `gorm:"not null"`
-	LotID         int64           `gorm:"not null"`
-	CropID        int64           `gorm:"not null"`
-	LaborID       int64           `gorm:"not null"`
-	Contractor    string          `gorm:"size:100"`
-	Observations  string          `gorm:"size:1000"`
-	Date          string          `gorm:"type:date;not null"`
-	InvestorID    int64           `gorm:"not null"`
-	EffectiveArea decimal.Decimal `gorm:"not null"`
-	Items         []WorkorderItem `gorm:"foreignKey:WorkorderNumber;references:Number"`
+	Number        string             `gorm:"primaryKey;column:number;uniqueIndex"`
+	ProjectID     int64              `gorm:"not null"`
+	Project       projectmod.Project `gorm:"foreignKey:ProjectID"`
+	FieldID       int64              `gorm:"not null"`
+	Field         fieldmod.Field     `gorm:"foreignKey:FieldID"`
+	LotID         int64              `gorm:"not null"`
+	Lot           lotmod.Lot         `gorm:"foreignKey:LotID"`
+	CropID        int64              `gorm:"not null"`
+	Crop          cropmod.Crop       `gorm:"foreignKey:CropID"`
+	LaborID       int64              `gorm:"not null"`
+	Labor         labormod.Labor     `gorm:"foreignKey:LaborID"`
+	ClassTypeID   int64              `gorm:"not null;column:class_type_id"`
+	ClassType     classmod.ClassType `gorm:"foreignKey:ClassTypeID"`
+	Contractor    string             `gorm:"size:100"`
+	Observations  string             `gorm:"size:1000"`
+	Date          time.Time          `gorm:"type:date;not null"`
+	InvestorID    int64              `gorm:"not null"`
+	EffectiveArea decimal.Decimal    `gorm:"not null"`
+	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderNumber;references:Number"`
 }
 
+// WorkorderItem GORM model
 type WorkorderItem struct {
-	ID              int64           `gorm:"primaryKey;autoIncrement"`
-	WorkorderNumber string          `gorm:"column:order_number;index"`
-	SupplyID        int64           `gorm:"not null"`
-	TotalUsed       decimal.Decimal `gorm:"not null"`
-	FinalDose       decimal.Decimal `gorm:"not null"`
+	ID              int64            `gorm:"primaryKey;autoIncrement"`
+	WorkorderNumber string           `gorm:"column:order_number;index"`
+	SupplyID        int64            `gorm:"not null"`
+	Supply          supplymod.Supply `gorm:"foreignKey:SupplyID"`
+	TotalUsed       decimal.Decimal  `gorm:"not null"`
+	FinalDose       decimal.Decimal  `gorm:"not null"`
 }
 
-// FromDomain mapea domain.Workorder a models.Workorder
+// FromDomain convierte domain → GORM
 func FromDomain(o *domain.Workorder) *Workorder {
 	items := make([]WorkorderItem, len(o.Items))
 	for i, it := range o.Items {
@@ -46,6 +66,7 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		LotID:         o.LotID,
 		CropID:        o.CropID,
 		LaborID:       o.LaborID,
+		ClassTypeID:   o.ClassTypeID,
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
 		Date:          o.Date,
@@ -55,7 +76,7 @@ func FromDomain(o *domain.Workorder) *Workorder {
 	}
 }
 
-// ToDomain mapea models.Workorder a domain.Workorder
+// ToDomain convierte GORM → domain
 func (m *Workorder) ToDomain() *domain.Workorder {
 	items := make([]domain.WorkorderItem, len(m.Items))
 	for i, it := range m.Items {
@@ -72,6 +93,7 @@ func (m *Workorder) ToDomain() *domain.Workorder {
 		LotID:         m.LotID,
 		CropID:        m.CropID,
 		LaborID:       m.LaborID,
+		ClassTypeID:   m.ClassTypeID,
 		Contractor:    m.Contractor,
 		Observations:  m.Observations,
 		Date:          m.Date,

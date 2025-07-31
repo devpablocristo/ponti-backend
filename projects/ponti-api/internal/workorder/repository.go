@@ -10,6 +10,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type GormEngine interface {
@@ -143,6 +144,7 @@ func (r *Repository) ListWorkorders(
 		db = db.Where("field_id = ?", *filt.FieldID)
 	}
 
+	// 1) contar
 	var total int64
 	if err := db.Model(&models.WorkorderListElement{}).
 		Count(&total).Error; err != nil {
@@ -150,6 +152,7 @@ func (r *Repository) ListWorkorders(
 			"failed to count workorder list elements", err)
 	}
 
+	// 2) obtener página desde la vista
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 	var rows []models.WorkorderListElement
 	if err := db.
@@ -161,6 +164,7 @@ func (r *Repository) ListWorkorders(
 			"failed to list workorder list elements", err)
 	}
 
+	// 3) mapear al domain
 	list := make([]domain.WorkorderListElement, len(rows))
 	for i, m := range rows {
 		list[i] = domain.WorkorderListElement{
@@ -176,7 +180,7 @@ func (r *Repository) ListWorkorders(
 			SurfaceHa:     m.SurfaceHa,
 			SupplyName:    m.SupplyName,
 			Consumption:   m.Consumption,
-			CategoryName:      m.CategoryName,
+			CategoryName:  m.CategoryName,
 			Dose:          m.Dose,
 			CostPerHa:     m.CostPerHa,
 			UnitPrice:     m.UnitPrice,
@@ -186,4 +190,16 @@ func (r *Repository) ListWorkorders(
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
+}
+
+// calculateDose suma FinalDose y divide por superficie
+func calculateDose(items []models.WorkorderItem, surface decimal.Decimal) decimal.Decimal {
+	totalDose := decimal.Zero
+	for _, it := range items {
+		totalDose = totalDose.Add(it.FinalDose)
+	}
+	if surface.IsZero() {
+		return decimal.Zero
+	}
+	return totalDose.Div(surface)
 }

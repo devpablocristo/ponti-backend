@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// WorkorderListElement representa la vista a nivel de base para listar órdenes de trabajo.
+// WorkorderListElement mapea directamente la vista SQL
 type WorkorderListElement struct {
 	Number        string          `gorm:"column:number;primaryKey"`
 	ProjectName   string          `gorm:"column:project_name"`
@@ -27,7 +27,7 @@ type WorkorderListElement struct {
 	TotalCost     decimal.Decimal `gorm:"column:total_cost"`
 }
 
-// TableName especifica la tabla o vista en la base de datos.
+// TableName apunta a la vista
 func (WorkorderListElement) TableName() string {
 	return "workorder_list_view"
 }

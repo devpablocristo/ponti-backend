@@ -8,7 +8,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// WorkorderListElementDTO para serializar la respuesta JSON de listados.
 type WorkorderListElement struct {
 	Number        string          `json:"number"`
 	ProjectName   string          `json:"project_name"`
@@ -29,13 +28,11 @@ type WorkorderListElement struct {
 	TotalCost     decimal.Decimal `json:"total_cost"`
 }
 
-// WorkorderListResponse agrupa la página y los items.
 type WorkorderListResponse struct {
 	PageInfo types.PageInfo         `json:"page_info"`
 	Items    []WorkorderListElement `json:"items"`
 }
 
-// FromDomainListElement convierte dominio a DTO.
 func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement {
 	return &WorkorderListElement{
 		Number:        d.Number,
@@ -58,7 +55,6 @@ func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement
 	}
 }
 
-// FromDomainList convierte slice de dominio a respuesta.
 func FromDomainList(pageInfo types.PageInfo, list []domain.WorkorderListElement) WorkorderListResponse {
 	items := make([]WorkorderListElement, len(list))
 	for i, d := range list {

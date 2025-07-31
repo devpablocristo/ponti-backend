@@ -1,8 +1,12 @@
 package domain
 
-import "github.com/shopspring/decimal"
+import (
+	"time"
 
-// Workorder representa una orden de trabajo
+	"github.com/shopspring/decimal"
+)
+
+// Workorder dominio, incluye ClassTypeID
 type Workorder struct {
 	Number        string
 	ProjectID     int64
@@ -10,22 +14,23 @@ type Workorder struct {
 	LotID         int64
 	CropID        int64
 	LaborID       int64
+	ClassTypeID   int64
 	Contractor    string
 	Observations  string
-	Date          string
+	Date          time.Time
 	InvestorID    int64
 	EffectiveArea decimal.Decimal
 	Items         []WorkorderItem
 }
 
-// WorkorderItem representa un insumo dentro de la orden
+// WorkorderItem ...
 type WorkorderItem struct {
 	SupplyID  int64
 	TotalUsed decimal.Decimal
 	FinalDose decimal.Decimal
 }
 
-// Filtro para listar workorders
+// Filtro
 type WorkorderFilter struct {
 	ProjectID *int64
 	FieldID   *int64
