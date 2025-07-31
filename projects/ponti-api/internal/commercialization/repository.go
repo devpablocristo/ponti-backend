@@ -2,6 +2,7 @@ package commercialization
 
 import (
 	"context"
+	"time"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"gorm.io/gorm"
@@ -62,4 +63,37 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 	}
 
 	return out, nil
+}
+
+func (r *Repository) Update(ctx context.Context, item *domain.CropCommercialization) error {
+	if item.ID == 0 {
+		return types.NewError(types.ErrInvalidID, "invalid ID", nil)
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.CropCommercialization{}).
+			Where("id = ?", item.ID).
+			Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, "crop commercialization not found", nil)
+		}
+
+		if err := tx.Model(&models.CropCommercialization{}).
+			Where("id = ?", item.ID).
+			Updates(map[string]any{
+				"crop_id":         item.CropID,
+				"board_price":     item.BoardPrice,
+				"freight_cost":    item.FreightCost,
+				"commercial_cost": item.CommercialCost,
+				"net_price":       item.NetPrice,
+				"updated_at":      time.Now(),
+				"updated_by":      item.UpdatedBy,
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update crop commercialization", err)
+		}
+		return nil
+	})
 }

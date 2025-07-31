@@ -7,6 +7,7 @@ import (
 )
 
 type CropCommercialization struct {
+	ID             int64           `json:"id"`
 	CropID         int64           `json:"crop_id" binding:"required,gt=0"`
 	BoardPrice     decimal.Decimal `json:"board_price" binding:"required"`
 	FreightCost    decimal.Decimal `json:"freight_cost" binding:"required"`
@@ -21,6 +22,7 @@ func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int6
 	out := make([]domain.CropCommercialization, len(b.Values))
 	for i, item := range b.Values {
 		out[i] = domain.CropCommercialization{
+			ID:             item.ID,
 			ProjectID:      projecID,
 			CropID:         item.CropID,
 			BoardPrice:     item.BoardPrice,
@@ -28,6 +30,7 @@ func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int6
 			CommercialCost: item.CommercialCost,
 			Base: shareddomain.Base{
 				CreatedBy: &userID,
+				UpdatedBy: &userID,
 			},
 		}
 	}

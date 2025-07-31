@@ -14,7 +14,7 @@ import (
 )
 
 type UseCasePort interface {
-	CreateBulk(context.Context, []domain.CropCommercialization) error
+	CreateOrUpdateBulk(context.Context, []domain.CropCommercialization) error
 	ListByProject(context.Context, int64) ([]domain.CropCommercialization, error)
 }
 
@@ -61,7 +61,7 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL)
 	{
 		public.GET("", h.ListByProject)
-		public.POST("", h.CreateBulk)
+		public.POST("", h.CreateOrUpdateBulk)
 	}
 }
 
@@ -87,7 +87,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 }
 
 // Crear proyecto
-func (h *Handler) CreateBulk(c *gin.Context) {
+func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
 	projectID, ok := parseParamID(c, "id")
 	if !ok {
 		return
@@ -106,7 +106,7 @@ func (h *Handler) CreateBulk(c *gin.Context) {
 	}
 
 	items := body.ToDomainSlice(projectID, userID)
-	if err := h.ucs.CreateBulk(c.Request.Context(), items); err != nil {
+	if err := h.ucs.CreateOrUpdateBulk(c.Request.Context(), items); err != nil {
 		respondError(c, err)
 		return
 	}
