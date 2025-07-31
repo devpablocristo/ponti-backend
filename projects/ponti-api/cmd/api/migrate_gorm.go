@@ -6,13 +6,13 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-
 	gorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	commercializationmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
@@ -44,12 +44,14 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&managermodels.Manager{},
 		&investormodels.Investor{},
 		&cropmodels.Crop{},
+		&commercializationmodels.CropCommercialization{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
 		&customermodels.Customer{},
 		&supplymodels.Supply{},
 		&categorymodels.Category{},
 		&classtypemodels.ClassType{},
+		&supplymodels.SupplyUnit{},
 		&unitmodels.Unit{},
 		&dollarmodels.ProjectDollarValue{},
 		&projectmodels.ProjectInvestor{},

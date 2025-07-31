@@ -14,20 +14,21 @@ import (
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Project struct {
-	ID              int64      `json:"id,omitempty"`
-	ProjectName     string     `json:"name" binding:"required"`
-	Customer        Customer   `json:"customer" binding:"required"`
-	AdminCost       int64      `json:"admin_cost" binding:"required"`
-	Campaign        Campaign   `json:"campaign" binding:"required"`
-	ProjectManagers []Manager  `json:"managers" binding:"required,dive,required"`
-	Investors       []Investor `json:"investors" binding:"required,dive,required"`
-	Fields          []Field    `json:"fields" binding:"required,dive,required"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
-	CreatedBy       *int64     `json:"created_by,omitempty"`
-	UpdatedBy       *int64     `json:"updated_by,omitempty"`
+	ID              int64           `json:"id,omitempty"`
+	ProjectName     string          `json:"name" binding:"required"`
+	Customer        Customer        `json:"customer" binding:"required"`
+	AdminCost       decimal.Decimal `json:"admin_cost" binding:"required"`
+	Campaign        Campaign        `json:"campaign" binding:"required"`
+	ProjectManagers []Manager       `json:"managers" binding:"required,dive,required"`
+	Investors       []Investor      `json:"investors" binding:"required,dive,required"`
+	Fields          []Field         `json:"fields" binding:"required,dive,required"`
+	UpdatedAt       *time.Time      `json:"updated_at,omitempty"`
+	CreatedBy       *int64          `json:"created_by,omitempty"`
+	UpdatedBy       *int64          `json:"updated_by,omitempty"`
 }
 
 type Customer struct {

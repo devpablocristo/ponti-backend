@@ -2,13 +2,16 @@
 
 package dto
 
-import domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+import (
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	"github.com/shopspring/decimal"
+)
 
 type LotKPIsResponse struct {
-	SeededArea     float64 `json:"seeded_area"`
-	HarvestedArea  float64 `json:"harvested_area"`
-	YieldTnPerHa   float64 `json:"yield_tn_per_ha"`
-	CostPerHectare float64 `json:"cost_per_hectare"`
+	SeededArea     decimal.Decimal `json:"seeded_area"`
+	HarvestedArea  decimal.Decimal `json:"harvested_area"`
+	YieldTnPerHa   decimal.Decimal `json:"yield_tn_per_ha"`
+	CostPerHectare decimal.Decimal `json:"cost_per_hectare"`
 }
 
 func FromDomainKPIs(k *domain.LotKPIs) *LotKPIsResponse {
