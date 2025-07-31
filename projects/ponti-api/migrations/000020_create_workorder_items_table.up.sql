@@ -8,3 +8,4 @@ CREATE TABLE workorder_items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
+
