@@ -30,6 +30,7 @@ func FromDomain(cc *domain.CropCommercialization) *CropCommercialization {
 		NetPrice:       cc.NetPrice,
 		Base: sharedmodels.Base{
 			CreatedBy: cc.CreatedBy,
+			UpdatedBy: cc.UpdatedBy,
 		},
 	}
 }
@@ -46,6 +47,8 @@ func (m *CropCommercialization) ToDomain() *domain.CropCommercialization {
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			CreatedBy: m.CreatedBy,
+			UpdatedAt: m.UpdatedAt,
+			UpdatedBy: m.UpdatedBy,
 		},
 	}
 }
