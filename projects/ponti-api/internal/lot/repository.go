@@ -12,10 +12,10 @@ import (
 
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 type GormEnginePort interface {
@@ -147,6 +147,29 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	})
 }
 
+func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons int) error {
+	if id <= 0 {
+		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", id), nil)
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.Lot{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", id), nil)
+		}
+		if err := tx.Model(&models.Lot{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"tons": tons,
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update lot tons", err)
+		}
+		return nil
+	})
+}
+
 // --- DELETE ---
 func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	if id <= 0 {
@@ -223,13 +246,32 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	return res, nil
 }
 
-func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
-	db := r.db.Client().WithContext(ctx).
-		Joins("JOIN fields ON lots.field_id = fields.id").
-		Where("fields.project_id = ?", projectID)
+func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cropID int64, cropType string) (*domain.LotKPIs, error) {
+	type kpiRow struct {
+		SeededArea        decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea     decimal.Decimal `gorm:"column:harvested_area"`
+		TotalHarvest      decimal.Decimal `gorm:"column:total_harvest"`
+		WeightedCostPerHa decimal.Decimal `gorm:"column:weighted_cost_per_ha"`
+	}
 
+	db := r.db.Client().WithContext(ctx).
+		Table("lots AS l").
+		Joins("JOIN fields   AS f ON l.field_id = f.id").
+		Joins("JOIN projects AS p ON f.project_id = p.id").
+		// ld: última fecha de cosecha por lote (si existe)
+		Joins(`
+			LEFT JOIN (
+				SELECT lot_id, MAX(harvest_date) AS harvest_date
+				FROM lot_dates
+				GROUP BY lot_id
+			) AS ld ON ld.lot_id = l.id
+		`)
+
+	if projectID > 0 {
+		db = db.Where("f.project_id = ?", projectID)
+	}
 	if fieldID > 0 {
-		db = db.Where("fields.id = ?", fieldID)
+		db = db.Where("f.id = ?", fieldID)
 	}
 	if cropID > 0 {
 		switch cropType {
@@ -242,27 +284,29 @@ func (r *Repository) ListLotsForKPI(ctx context.Context, projectID, fieldID, cro
 		}
 	}
 
-	var lots []models.Lot
-	if err := db.Find(&lots).Error; err != nil {
+	const sel = `
+		COALESCE(SUM(l.hectares), 0) AS seeded_area,
+		COALESCE(SUM(CASE WHEN ld.harvest_date IS NOT NULL THEN l.hectares ELSE 0 END), 0) AS harvested_area,
+		COALESCE(SUM(COALESCE(l.tons, 0)), 0) AS total_harvest,
+		COALESCE(0, 0) AS weighted_cost_per_ha
+	`
+
+	var row kpiRow
+	if err := db.Select(sel).Scan(&row).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list lots for KPI", err)
 	}
 
-	res := make([]domain.Lot, len(lots))
-	for i := range lots {
-		res[i] = domain.Lot{
-			ID:           lots[i].ID,
-			Name:         lots[i].Name,
-			FieldID:      lots[i].FieldID,
-			Hectares:     lots[i].Hectares,
-			PreviousCrop: cropdom.Crop{ID: lots[i].PreviousCropID},
-			CurrentCrop:  cropdom.Crop{ID: lots[i].CurrentCropID},
-			Season:       lots[i].Season,
-			// Status:        lots[i].Status,
-			// Cost:          lots[i].Cost,
-			// HarvestedTons: lots[i].HarvestedTons,
-		}
+	yield := decimal.Zero
+	if row.HarvestedArea.GreaterThan(decimal.Zero) {
+		yield = row.TotalHarvest.Div(row.HarvestedArea)
 	}
-	return res, nil
+
+	return &domain.LotKPIs{
+		SeededArea:     row.SeededArea,
+		HarvestedArea:  row.HarvestedArea,
+		YieldTnPerHa:   yield,
+		CostPerHectare: row.WeightedCostPerHa,
+	}, nil
 }
 
 func (r *Repository) ListLotsTable(
@@ -333,10 +377,12 @@ func (r *Repository) ListLotsTable(
 			lots.sowing_date as sowing_date,
 			lots.season,
 			lots.updated_at,
-			projects.admin_cost as cost_per_hectare
+			lots.tons,
+			projects.admin_cost
 		`).
 		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
 		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").
+		Order("lots.id DESC").
 		Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {
 		return nil, 0, 0, 0, err

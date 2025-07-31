@@ -15,6 +15,7 @@ type UseCasesPort interface {
 	CreateLot(context.Context, *domain.Lot) (int64, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
+	UpdateLotTons(context.Context, int64, int) error
 	DeleteLot(context.Context, int64) error
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
@@ -70,6 +71,7 @@ func (h *Handler) Routes() {
 		public.GET("", h.ListLots)            // ÚNICO endpoint de lista
 		public.GET("/kpis", h.GetLotKPIs)     // KPIs endpoint
 		public.GET("/table", h.ListLotsTable) // Table endpoint
+		public.PUT("/:id/tons", h.UpdateLotTons)
 		public.GET("/:id", h.GetLot)
 		public.PUT("/:id", h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
@@ -175,6 +177,27 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
 }
 
+func (h *Handler) UpdateLotTons(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
+		return
+	}
+	var req struct {
+		Tons int `json:"tons"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	if err := h.ucs.UpdateLotTons(c, id, req.Tons); err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
+}
+
 func (h *Handler) DeleteLot(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -194,8 +217,8 @@ func (h *Handler) GetLotKPIs(c *gin.Context) {
 	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
 	cropType := c.DefaultQuery("crop_type", "current") // current | previous | both
 
-	if projectID <= 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id is required"})
+	if projectID <= 0 && fieldID <= 0 {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id or field_id is required"})
 		return
 	}
 
@@ -264,9 +287,10 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 			Variety:        row.Variety,
 			SowedArea:      row.SowedArea,
 			Season:         row.Season,
+			Tons:           row.Tons,
 			Dates:          dates,
 			UpdatedAt:      row.UpdatedAt,
-			CostPerHectare: row.CostPerHectare,
+			AdminCost:      row.AdminCost,
 		}
 	}
 	c.JSON(http.StatusOK, dto.LotTableResponse{

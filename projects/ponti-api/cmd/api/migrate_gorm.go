@@ -13,6 +13,7 @@ import (
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	commercializationmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/repository/models"
 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
 	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
@@ -49,9 +50,12 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&investormodels.Investor{},
 		&cropmodels.Crop{},
 		&projectmodels.Manager{},
+		&commercializationmodels.CropCommercialization{},
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
 		&categorymodels.Category{},
+		&classtypemodels.ClassType{},
+		&supplymodels.SupplyUnit{},
 		&unitmodels.Unit{},
 		&classtypemodels.ClassType{},
 		&supplymodels.SupplyUnit{},

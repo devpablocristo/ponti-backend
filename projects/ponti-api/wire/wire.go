@@ -12,6 +12,7 @@ import (
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
 	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
+	commercialization "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
@@ -29,27 +30,28 @@ import (
 )
 
 type Dependencies struct {
-	Config           *config.Config
-	GinEngine        *gin.Server
-	GormRepo         *gorm.Repository
-	Middlewares      *mwr.Middlewares
-	WordsSuggester   *sug.WordsSuggester
-	CustomerHandler  *customer.Handler
-	CampaignHandler  *campaign.Handler
-	InvestorHandler  *investor.Handler
-	CropHandler      *crop.Handler
-	LotHandler       *lot.Handler
-	FieldHandler     *field.Handler
-	ManagerHandler   *manager.Handler
-	ProjectHandler   *project.Handler
-	LeaseTypeHandler *leasetype.Handler
-	SupplyHandler    *supply.Handler
-	CategoryHandler  *category.Handler
-	UnitHandler      *unit.Handler
-	ClassTypeHandler *classtype.Handler
-	DollarHandler    *dollar.Handler
-	WorkorderHandler *workorder.Handler
-	LaborHandler     *labor.Handler
+	Config                   *config.Config
+	GinEngine                *gin.Server
+	GormRepo                 *gorm.Repository
+	Middlewares              *mwr.Middlewares
+	WordsSuggester           *sug.WordsSuggester
+	CustomerHandler          *customer.Handler
+	CampaignHandler          *campaign.Handler
+	InvestorHandler          *investor.Handler
+	CropHandler              *crop.Handler
+	LotHandler               *lot.Handler
+	FieldHandler             *field.Handler
+	ManagerHandler           *manager.Handler
+	ProjectHandler           *project.Handler
+	LeaseTypeHandler         *leasetype.Handler
+	SupplyHandler            *supply.Handler
+	CategoryHandler          *category.Handler
+	UnitHandler              *unit.Handler
+	ClassTypeHandler         *classtype.Handler
+	DollarHandler            *dollar.Handler
+	WorkorderHandler         *workorder.Handler
+	LaborHandler             *labor.Handler
+	CommercializationHandler *commercialization.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -63,6 +65,7 @@ func Initialize() (*Dependencies, error) {
 		CampaignSet,
 		InvestorSet,
 		CropSet,
+		CommercializationSet,
 		LotSet,
 		FieldSet,
 		ManagerSet,

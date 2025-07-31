@@ -3,6 +3,7 @@ package domain
 import (
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Lot struct {
@@ -18,13 +19,14 @@ type Lot struct {
 	Dates         []LotDates
 	Cost          float64 // Costo por hectárea
 	HarvestedTons float64 // Toneladas cosechadas
+	Tons          int     // Toneladas cosechadas
 
 	shareddomain.Base // <-- embebe campos de auditoría
 }
 
 type LotKPIs struct {
-	SeededArea     float64
-	HarvestedArea  float64
-	YieldTnPerHa   float64
-	CostPerHectare float64
+	SeededArea     decimal.Decimal
+	HarvestedArea  decimal.Decimal
+	YieldTnPerHa   decimal.Decimal
+	CostPerHectare decimal.Decimal
 }

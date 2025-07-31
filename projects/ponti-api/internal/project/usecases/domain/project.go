@@ -7,12 +7,13 @@ import (
 	investordom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Project struct {
 	ID        int64
 	Name      string
-	AdminCost int64
+	AdminCost decimal.Decimal
 	Customer  customerdom.Customer
 	Campaign  campdom.Campaign
 	Managers  []managerdom.Manager
