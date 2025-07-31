@@ -134,7 +134,7 @@ func (r *Repository) ListWorkorders(
 	ctx context.Context,
 	filt domain.WorkorderFilter,
 	inp types.Input,
-) ([]domain.Workorder, types.PageInfo, error) {
+) ([]domain.WorkorderListElement, types.PageInfo, error) {
 	db := r.db.Client().WithContext(ctx)
 	if filt.ProjectID != nil {
 		db = db.Where("project_id = ?", *filt.ProjectID)
@@ -142,22 +142,48 @@ func (r *Repository) ListWorkorders(
 	if filt.FieldID != nil {
 		db = db.Where("field_id = ?", *filt.FieldID)
 	}
+
 	var total int64
-	if err := db.Model(&models.Workorder{}).Count(&total).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count workorders", err)
+	if err := db.Model(&models.WorkorderListElement{}).
+		Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to count workorder list elements", err)
 	}
+
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
-	var modelList []models.Workorder
-	if err := db.Preload("Items").
-		Limit(int(inp.PageSize)).Offset(offset).
+	var rows []models.WorkorderListElement
+	if err := db.
+		Limit(int(inp.PageSize)).
+		Offset(offset).
 		Order("number desc").
-		Find(&modelList).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list workorders", err)
+		Find(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to list workorder list elements", err)
 	}
-	result := make([]domain.Workorder, len(modelList))
-	for i, m := range modelList {
-		result[i] = *m.ToDomain()
+
+	list := make([]domain.WorkorderListElement, len(rows))
+	for i, m := range rows {
+		list[i] = domain.WorkorderListElement{
+			Number:        m.Number,
+			ProjectName:   m.ProjectName,
+			FieldName:     m.FieldName,
+			LotName:       m.LotName,
+			Date:          m.Date,
+			CropName:      m.CropName,
+			LaborName:     m.LaborName,
+			ClassTypeName: m.ClassTypeName,
+			Contractor:    m.Contractor,
+			SurfaceHa:     m.SurfaceHa,
+			InputName:     m.InputName,
+			Consumption:   m.Consumption,
+			Category:      m.Category,
+			Dose:          m.Dose,
+			CostPerHa:     m.CostPerHa,
+			UnitPrice:     m.UnitPrice,
+			TotalCost:     m.TotalCost,
+		}
 	}
+
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
-	return result, pageInfo, nil
+	return list, pageInfo, nil
 }

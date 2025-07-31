@@ -1,10 +1,16 @@
 package dto
 
-import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+import (
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+	"github.com/shopspring/decimal"
+)
 
-// Workorder para POST y PUT
-// Incluye fecha, inversor y área efectiva
-// Date en formato YYYY-MM-DD
+type WorkorderItem struct {
+	SupplyID  int64           `json:"supply_id" binding:"required"`
+	TotalUsed decimal.Decimal `json:"total_used" binding:"required"`
+	FinalDose decimal.Decimal `json:"final_dose" binding:"required"`
+}
+
 type Workorder struct {
 	Number        string          `json:"number" binding:"required"`
 	ProjectID     int64           `json:"project_id" binding:"required"`
@@ -16,17 +22,10 @@ type Workorder struct {
 	Observations  string          `json:"observations"`
 	Date          string          `json:"date" binding:"required"`
 	InvestorID    int64           `json:"investor_id" binding:"required"`
-	EffectiveArea float64         `json:"effective_area" binding:"required"`
+	EffectiveArea decimal.Decimal `json:"effective_area" binding:"required"`
 	Items         []WorkorderItem `json:"items" binding:"required,dive"`
 }
 
-type WorkorderItem struct {
-	SupplyID  int64   `json:"supply_id" binding:"required"`
-	TotalUsed float64 `json:"total_used" binding:"required"`
-	FinalDose float64 `json:"final_dose" binding:"required"`
-}
-
-// ToDomain convierte el DTO a domain.Workorder
 func (r *Workorder) ToDomain() *domain.Workorder {
 	o := &domain.Workorder{
 		Number:        r.Number,
@@ -51,8 +50,6 @@ func (r *Workorder) ToDomain() *domain.Workorder {
 	return o
 }
 
-// WorkorderDetail para GET /workorders/:number
-// Incluye fecha, inversor y área efectiva
 type WorkorderDetail struct {
 	Number        string          `json:"number"`
 	ProjectID     int64           `json:"project_id"`
@@ -64,11 +61,10 @@ type WorkorderDetail struct {
 	Observations  string          `json:"observations"`
 	Date          string          `json:"date"`
 	InvestorID    int64           `json:"investor_id"`
-	EffectiveArea float64         `json:"effective_area"`
+	EffectiveArea decimal.Decimal `json:"effective_area"`
 	Items         []WorkorderItem `json:"items"`
 }
 
-// FromDomain convierte domain.Workorder a DTO WorkorderDetail
 func FromDomain(o *domain.Workorder) *WorkorderDetail {
 	d := &WorkorderDetail{
 		Number:        o.Number,
@@ -93,7 +89,6 @@ func FromDomain(o *domain.Workorder) *WorkorderDetail {
 	return d
 }
 
-// WorkorderResponse para POST (creación/duplicado)
 type WorkorderResponse struct {
 	Message string `json:"message"`
 	Number  string `json:"number"`

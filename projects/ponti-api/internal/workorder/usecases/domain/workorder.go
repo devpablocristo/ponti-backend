@@ -1,31 +1,32 @@
 package domain
 
+import "github.com/shopspring/decimal"
+
 // Workorder representa una orden de trabajo
 type Workorder struct {
-	Number        string          // e.g. "0000-0001"
-	ProjectID     int64           // ID de proyecto
-	FieldID       int64           // ID de campo
-	LotID         int64           // ID de lote
-	CropID        int64           // ID de cultivo
-	LaborID       int64           // ID de labor
-	Contractor    string          // Nombre del contratista
-	Observations  string          // Observaciones adicionales
-	Date          string          // Fecha de la orden (YYYY-MM-DD)
-	InvestorID    int64           // ID del inversor
-	EffectiveArea float64         // Superficie efectiva total
-	Items         []WorkorderItem // Insumos y cantidades
+	Number        string
+	ProjectID     int64
+	FieldID       int64
+	LotID         int64
+	CropID        int64
+	LaborID       int64
+	Contractor    string
+	Observations  string
+	Date          string
+	InvestorID    int64
+	EffectiveArea decimal.Decimal
+	Items         []WorkorderItem
 }
 
 // WorkorderItem representa un insumo dentro de la orden
 type WorkorderItem struct {
-	SupplyID  int64   // ID de insumo
-	TotalUsed float64 // litros o kg totales usados
-	FinalDose float64 // dosis final (total/superficie)
+	SupplyID  int64
+	TotalUsed decimal.Decimal
+	FinalDose decimal.Decimal
 }
 
-// Hay cuatro estados posibles: e.g. "pending", "in_progress", "completed", "cancelled".
-// Filtro para listar workorders.// WorkorderFilter para listar workorders
+// Filtro para listar workorders
 type WorkorderFilter struct {
-	ProjectID *int64 // filtrar por proyecto
-	FieldID   *int64 // filtrar por campo
+	ProjectID *int64
+	FieldID   *int64
 }

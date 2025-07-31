@@ -18,7 +18,7 @@ type UseCasesPort interface {
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
-	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.Workorder, types.PageInfo, error)
+	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 }
 
 type GinEnginePort interface {
@@ -58,7 +58,7 @@ func (h *Handler) Routes() {
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.PUT("/:number", h.UpdateWorkorder)
 		grp.DELETE("/:number", h.DeleteWorkorder)
-		grp.GET("", h.ListWorkorders)
+		// grp.GET("", h.ListWorkorders)
 
 	}
 }
@@ -137,22 +137,20 @@ func (h *Handler) DeleteWorkorder(c *gin.Context) {
 
 func (h *Handler) ListWorkorders(c *gin.Context) {
 	filt := parseFilters(c)
-	inp := types.NewInput(c.Request)
-	list, pageInfo, err := h.ucs.ListWorkorders(c.Request.Context(), filt, inp)
+	input := types.NewInput(c.Request)
+
+	// Devuelve ([]domain.WorkorderListElement, types.PageInfo, error)
+	list, pageInfo, err := h.ucs.ListWorkorders(c.Request.Context(), filt, input)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	// Mapear slice de valores
-	var items []dto.WorkorderDetail
-	for _, o := range list {
-		items = append(items, *dto.FromDomain(&o))
-	}
-	c.JSON(http.StatusOK, dto.WorkorderListResponse{
-		PageInfo: pageInfo,
-		Items:    items,
-	})
+
+	// Usamos el helper del DTO para mapear y construir la respuesta
+	resp := dto.FromDomainList(pageInfo, list)
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // ParseFilters extrae project_id, field_id y state

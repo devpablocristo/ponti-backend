@@ -1,6 +1,9 @@
 package models
 
-import "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+import (
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
+	"github.com/shopspring/decimal"
+)
 
 type Workorder struct {
 	Number        string          `gorm:"primaryKey;column:number;uniqueIndex"`
@@ -13,17 +16,16 @@ type Workorder struct {
 	Observations  string          `gorm:"size:1000"`
 	Date          string          `gorm:"type:date;not null"`
 	InvestorID    int64           `gorm:"not null"`
-	EffectiveArea float64         `gorm:"not null"`
+	EffectiveArea decimal.Decimal `gorm:"not null"`
 	Items         []WorkorderItem `gorm:"foreignKey:WorkorderNumber;references:Number"`
 }
 
-// WorkorderItem detalla los insumos de la orden
 type WorkorderItem struct {
-	ID              int64   `gorm:"primaryKey;autoIncrement"`
-	WorkorderNumber string  `gorm:"column:order_number;index"`
-	SupplyID        int64   `gorm:"not null"`
-	TotalUsed       float64 `gorm:"not null"`
-	FinalDose       float64 `gorm:"not null"`
+	ID              int64           `gorm:"primaryKey;autoIncrement"`
+	WorkorderNumber string          `gorm:"column:order_number;index"`
+	SupplyID        int64           `gorm:"not null"`
+	TotalUsed       decimal.Decimal `gorm:"not null"`
+	FinalDose       decimal.Decimal `gorm:"not null"`
 }
 
 // FromDomain mapea domain.Workorder a models.Workorder

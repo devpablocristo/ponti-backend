@@ -1,0 +1,40 @@
+package domain
+
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
+type WorkorderListElement struct {
+	Number        string
+	ProjectName   string
+	FieldName     string
+	LotName       string
+	Date          time.Time
+	CropName      string
+	LaborName     string
+	ClassTypeName string
+	Contractor    string
+	SurfaceHa     decimal.Decimal
+	InputName     string
+	Consumption   decimal.Decimal
+	Category      string
+	Dose          decimal.Decimal
+	CostPerHa     decimal.Decimal
+	UnitPrice     decimal.Decimal
+	TotalCost     decimal.Decimal
+}
+
+
+
+// - Dose: División del consumo por hectárea
+// - CostPerHa: El precio unitario por la dosis
+// - UnitPrice: Esto viene del precio del insumo cargado en la base de datos
+// - TotalCost: Multiplica el costo/hectárea por la superficie de hectáreas
+
+
+
+// - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.
+
+// - Configurar Columnas: Esto debería mostrar una lista de los titulos de columnas disponibles con un checkbox para ir chequeando las que queremos ver activas. Por default, todas deben estar activadas.

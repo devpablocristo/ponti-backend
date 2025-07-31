@@ -13,7 +13,7 @@ type RepositoryPort interface {
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
-	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.Workorder, types.PageInfo, error)
+	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 }
 
 type UseCases struct {
@@ -49,6 +49,6 @@ func (u *UseCases) ListWorkorders(
 	ctx context.Context,
 	filt domain.WorkorderFilter,
 	inp types.Input,
-) ([]domain.Workorder, types.PageInfo, error) {
+) ([]domain.WorkorderListElement, types.PageInfo, error) {
 	return u.repo.ListWorkorders(ctx, filt, inp)
 }
