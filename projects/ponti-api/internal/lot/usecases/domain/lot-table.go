@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type LotTable struct {
 	ID             int64
@@ -18,7 +22,7 @@ type LotTable struct {
 	Tons           int
 	Dates          []LotDates
 	UpdatedAt      *time.Time
-	CostPerHectare float64
+	AdminCost      decimal.Decimal
 }
 
 type LotDates struct {

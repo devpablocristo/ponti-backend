@@ -214,7 +214,7 @@ func seedProjects(repo *gorm.Repository) error {
 			Name:       projectName,
 			CustomerID: customers[i%len(customers)].ID,
 			CampaignID: campaignRelacional.ID,
-			AdminCost:  int64(rand.Intn(10000) + 1000),
+			AdminCost:  decimal.NewFromInt(int64(rand.Intn(10000) + 1000)),
 			Managers:   []projectmodels.Manager{projectManagers[i%len(projectManagers)]},
 			Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 		}
@@ -283,7 +283,7 @@ func seedTestProjectAndLots(repo *gorm.Repository) error {
 		Name:       "Proyecto Test KPIs",
 		CustomerID: customer.ID,
 		CampaignID: campaign.ID,
-		AdminCost:  1000,
+		AdminCost:  decimal.NewFromInt(1000),
 		Base:       sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
 	}
 	if err := db.Create(&project).Error; err != nil {

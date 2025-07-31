@@ -15,7 +15,7 @@ type RepositoryPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
-	ListLotsForKPI(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
+	ListLotsForKPI(context.Context, int64, int64, int64, string) (*domain.LotKPIs, error)
 	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
 	UpdateLotTons(context.Context, int64, int) error
 }
@@ -69,48 +69,7 @@ func (u *UseCases) GetLotKPIs(
 	projectID, fieldID, cropID int64,
 	cropType string,
 ) (*domain.LotKPIs, error) {
-	lots, err := u.repo.ListLotsForKPI(ctx, projectID, fieldID, cropID, cropType)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		seededArea    float64
-		harvestedArea float64
-		totalHarvest  float64
-		totalCost     float64
-		lotCount      float64
-	)
-
-	for _, lot := range lots {
-		seededArea += lot.Hectares
-		totalCost += lot.Cost
-		lotCount++
-		if lot.Status == "cosechado" || lot.Status == "harvested" {
-			harvestedArea += lot.Hectares
-			totalHarvest += lot.HarvestedTons
-		}
-	}
-
-	var (
-		yieldTnPerHa   float64
-		costPerHectare float64
-	)
-
-	if harvestedArea > 0 {
-		yieldTnPerHa = totalHarvest / harvestedArea
-	}
-	if lotCount > 0 {
-		costPerHectare = totalCost / lotCount
-	}
-
-	kpis := &domain.LotKPIs{
-		SeededArea:     seededArea,
-		HarvestedArea:  harvestedArea,
-		YieldTnPerHa:   yieldTnPerHa,
-		CostPerHectare: costPerHectare,
-	}
-	return kpis, nil
+	return u.repo.ListLotsForKPI(ctx, projectID, fieldID, cropID, cropType)
 }
 
 func (u *UseCases) ListLotsTable(ctx context.Context,

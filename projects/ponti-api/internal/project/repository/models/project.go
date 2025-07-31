@@ -15,16 +15,17 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 // --------- MODELOS ---------
 
 type Project struct {
-	ID         int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name       string `gorm:"size:100;not null;column:name"`
-	CustomerID int64  `gorm:"not null;index;column:customer_id"`
-	CampaignID int64  `gorm:"not null;index;column:campaign_id"`
-	AdminCost  int64  `gorm:"not null;column:admin_cost"`
+	ID         int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	Name       string          `gorm:"size:100;not null;column:name"`
+	CustomerID int64           `gorm:"not null;index;column:customer_id"`
+	CampaignID int64           `gorm:"not null;index;column:campaign_id"`
+	AdminCost  decimal.Decimal `gorm:"not null;column:admin_cost"`
 	sharedmodels.Base
 
 	// Relaciones (SOLO para preload/query, no setear manual en insert)
