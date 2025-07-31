@@ -10,7 +10,6 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
-	"github.com/shopspring/decimal"
 )
 
 type GormEngine interface {
@@ -190,16 +189,4 @@ func (r *Repository) ListWorkorders(
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
-}
-
-// calculateDose suma FinalDose y divide por superficie
-func calculateDose(items []models.WorkorderItem, surface decimal.Decimal) decimal.Decimal {
-	totalDose := decimal.Zero
-	for _, it := range items {
-		totalDose = totalDose.Add(it.FinalDose)
-	}
-	if surface.IsZero() {
-		return decimal.Zero
-	}
-	return totalDose.Div(surface)
 }

@@ -27,10 +27,6 @@ type WorkorderListElement struct {
 	TotalCost     decimal.Decimal
 }
 
-// - Dose: División del consumo por hectárea
-// - CostPerHa: El precio unitario por la dosis
-// - UnitPrice: Esto viene del precio del insumo cargado en la base de datos
-// - TotalCost: Multiplica el costo/hectárea por la superficie de hectáreas
 
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.
 
