@@ -6,6 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// WorkorderListElement representa la vista a nivel de base para listar órdenes de trabajo.
 type WorkorderListElement struct {
 	Number        string          `gorm:"column:number;primaryKey"`
 	ProjectName   string          `gorm:"column:project_name"`
@@ -17,17 +18,16 @@ type WorkorderListElement struct {
 	ClassTypeName string          `gorm:"column:class_type_name"`
 	Contractor    string          `gorm:"column:contractor"`
 	SurfaceHa     decimal.Decimal `gorm:"column:surface_ha"`
-	InputName     string          `gorm:"column:input_name"`
+	SupplyName    string          `gorm:"column:supply_name"`
 	Consumption   decimal.Decimal `gorm:"column:consumption"`
-	Category      string          `gorm:"column:category"`
+	CategoryName  string          `gorm:"column:category_name"`
 	Dose          decimal.Decimal `gorm:"column:dose"`
 	CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
 	UnitPrice     decimal.Decimal `gorm:"column:unit_price"`
 	TotalCost     decimal.Decimal `gorm:"column:total_cost"`
 }
 
-// TableName overrides the default table name for GORM.
+// TableName especifica la tabla o vista en la base de datos.
 func (WorkorderListElement) TableName() string {
-	// Replace with your actual table or view name
 	return "workorder_list_view"
 }
