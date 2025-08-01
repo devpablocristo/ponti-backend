@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Workorder dominio, incluye ClassTypeID
+// Workorder
 type Workorder struct {
 	Number        string
 	ProjectID     int64
@@ -14,7 +14,6 @@ type Workorder struct {
 	LotID         int64
 	CropID        int64
 	LaborID       int64
-	ClassTypeID   int64
 	Contractor    string
 	Observations  string
 	Date          time.Time

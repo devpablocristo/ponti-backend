@@ -23,7 +23,6 @@ type Workorder struct {
 	LotID         int64           `json:"lot_id" binding:"required"`
 	CropID        int64           `json:"crop_id" binding:"required"`
 	LaborID       int64           `json:"labor_id" binding:"required"`
-	ClassTypeID   int64           `json:"class_type_id" binding:"required"`
 	Contractor    string          `json:"contractor"`
 	Observations  string          `json:"observations"`
 	Date          utils.ISODate   `json:"date" binding:"required"`
@@ -40,7 +39,6 @@ func (r *Workorder) ToDomain() *domain.Workorder {
 		LotID:         r.LotID,
 		CropID:        r.CropID,
 		LaborID:       r.LaborID,
-		ClassTypeID:   r.ClassTypeID,
 		Contractor:    r.Contractor,
 		Observations:  r.Observations,
 		Date:          time.Time(r.Date),
@@ -79,7 +77,6 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		LotID:         o.LotID,
 		CropID:        o.CropID,
 		LaborID:       o.LaborID,
-		ClassTypeID:   o.ClassTypeID,
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
 		Date:          utils.ISODate(o.Date),

@@ -77,6 +77,11 @@ mix-dev-build:
 	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up --build -d
 	@$(MAKE) mix-dev-logs
 
+mix-dev-build:
+	@echo "Building services in mix.dev mode..."
+	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up --build -d
+	@$(MAKE) mix-dev-logs
+
 mix-dev-up:
 	@echo "Starting services in mix.dev mode..."
 	docker compose -f $(DOCKER_COMPOSE_MIX_DEV) up -d

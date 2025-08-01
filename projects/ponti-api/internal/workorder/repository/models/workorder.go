@@ -5,7 +5,6 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	classmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	labormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
@@ -28,8 +27,6 @@ type Workorder struct {
 	Crop          cropmod.Crop       `gorm:"foreignKey:CropID"`
 	LaborID       int64              `gorm:"not null"`
 	Labor         labormod.Labor     `gorm:"foreignKey:LaborID"`
-	ClassTypeID   int64              `gorm:"not null;column:class_type_id"`
-	ClassType     classmod.ClassType `gorm:"foreignKey:ClassTypeID"`
 	Contractor    string             `gorm:"size:100"`
 	Observations  string             `gorm:"size:1000"`
 	Date          time.Time          `gorm:"type:date;not null"`
@@ -66,7 +63,6 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		LotID:         o.LotID,
 		CropID:        o.CropID,
 		LaborID:       o.LaborID,
-		ClassTypeID:   o.ClassTypeID,
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
 		Date:          o.Date,
@@ -93,7 +89,6 @@ func (m *Workorder) ToDomain() *domain.Workorder {
 		LotID:         m.LotID,
 		CropID:        m.CropID,
 		LaborID:       m.LaborID,
-		ClassTypeID:   m.ClassTypeID,
 		Contractor:    m.Contractor,
 		Observations:  m.Observations,
 		Date:          m.Date,

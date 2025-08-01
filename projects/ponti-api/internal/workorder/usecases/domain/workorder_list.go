@@ -27,7 +27,6 @@ type WorkorderListElement struct {
 	TotalCost     decimal.Decimal
 }
 
-
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.
 
 // - Configurar Columnas: Esto debería mostrar una lista de los titulos de columnas disponibles con un checkbox para ir chequeando las que queremos ver activas. Por default, todas deben estar activadas.
