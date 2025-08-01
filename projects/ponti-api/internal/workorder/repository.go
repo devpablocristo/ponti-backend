@@ -26,7 +26,7 @@ func NewRepository(db GormEngine) *Repository {
 }
 
 func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (string, error) {
-	// 1) convertir a modelo GORM
+	// 1) convertir a modelo GORM (cabecera + items sin WorkorderID)
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
@@ -35,16 +35,32 @@ func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (
 		model.UpdatedBy = &userID
 	}
 
-	// 3) crear dentro de transacción
+	// 3) crear todo en una transacción
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to create workorder", err)
+		// 3.1) insertar la cabecera para obtener model.ID
+		if err := tx.Create(&model).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to create workorder header", err)
 		}
+
+		// 3.2) asignar el ID recién generado a cada ítem
+		for i := range model.Items {
+			model.Items[i].WorkorderID = model.ID
+		}
+
+		// 3.3) insertar los ítems en bloque
+		if len(model.Items) > 0 {
+			if err := tx.Create(&model.Items).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to create workorder items", err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
 		return "", err
 	}
+
+	// 4) devolver el número generado para la API
 	return model.Number, nil
 }
 

@@ -711,17 +711,17 @@ func seedWorkorders(repo *gormrepo.Repository) error {
 	// 4) Crea items asociados
 	for i, s := range supplies {
 		item := workordermodels.WorkorderItem{
-			WorkorderNumber: ord.Number,
-			SupplyID:        s.ID,
-			TotalUsed:       float64((i + 1) * 10),
-			EffectiveArea:   5.0,
-			FinalDose:       float64((i + 1) * 2),
+			Number:        ord.Number,
+			SupplyID:      s.ID,
+			TotalUsed:     float64((i + 1) * 10),
+			EffectiveArea: 5.0,
+			FinalDose:     float64((i + 1) * 2),
 		}
 		if err := db.FirstOrCreate(
 			&item,
 			workordermodels.WorkorderItem{
-				WorkorderNumber: item.WorkorderNumber,
-				SupplyID:        item.SupplyID,
+				Number:   item.Number,
+				SupplyID: item.SupplyID,
 			},
 		).Error; err != nil {
 			return fmt.Errorf("failed to seed work order item for supply %d: %w", item.SupplyID, err)

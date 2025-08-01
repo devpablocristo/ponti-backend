@@ -35,33 +35,23 @@ type Workorder struct {
 	Date          time.Time          `gorm:"type:date;not null"`
 	InvestorID    int64              `gorm:"not null"`
 	EffectiveArea decimal.Decimal    `gorm:"not null"`
-	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderNumber;references:Number;constraint:OnDelete:CASCADE"`
+	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderID;references:ID;constraint:OnDelete:CASCADE"`
 
 	sharedmodels.Base
 }
 
 // WorkorderItem GORM model
 type WorkorderItem struct {
-	ID              int64            `gorm:"primaryKey;autoIncrement"`
-	WorkorderNumber string           `gorm:"column:order_number;index"`
-	SupplyID        int64            `gorm:"not null"`
-	Supply          supplymod.Supply `gorm:"foreignKey:SupplyID"`
-	TotalUsed       decimal.Decimal  `gorm:"not null"`
-	FinalDose       decimal.Decimal  `gorm:"not null"`
+	ID          int64            `gorm:"primaryKey;autoIncrement"`
+	WorkorderID int64            `gorm:"column:workorder_id;index"`
+	SupplyID    int64            `gorm:"not null"`
+	Supply      supplymod.Supply `gorm:"foreignKey:SupplyID"`
+	TotalUsed   decimal.Decimal  `gorm:"not null"`
+	FinalDose   decimal.Decimal  `gorm:"not null"`
 }
 
-// FromDomain convierte domain → GORM
 func FromDomain(o *domain.Workorder) *Workorder {
-	items := make([]WorkorderItem, len(o.Items))
-	for i, it := range o.Items {
-		items[i] = WorkorderItem{
-			WorkorderNumber: o.Number,
-			SupplyID:        it.SupplyID,
-			TotalUsed:       it.TotalUsed,
-			FinalDose:       it.FinalDose,
-		}
-	}
-	return &Workorder{
+	w := &Workorder{
 		Number:        o.Number,
 		ProjectID:     o.ProjectID,
 		FieldID:       o.FieldID,
@@ -73,8 +63,17 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		Date:          o.Date,
 		InvestorID:    o.InvestorID,
 		EffectiveArea: o.EffectiveArea,
-		Items:         items,
 	}
+	items := make([]WorkorderItem, len(o.Items))
+	for i, it := range o.Items {
+		items[i] = WorkorderItem{
+			SupplyID:  it.SupplyID,
+			TotalUsed: it.TotalUsed,
+			FinalDose: it.FinalDose,
+		}
+	}
+	w.Items = items
+	return w
 }
 
 // ToDomain convierte GORM → domain
