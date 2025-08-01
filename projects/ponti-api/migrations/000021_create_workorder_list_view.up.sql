@@ -7,15 +7,15 @@ SELECT
   w.date,
   c.name              AS crop_name,
   lb.name             AS labor_name,
-  t.name              AS class_type_name,  -- ahora viene de supplies→types
+  t.name              AS type_name,
   w.contractor,
   w.effective_area    AS surface_ha,
   s.name              AS supply_name,
   wi.total_used       AS consumption,
   cat.name            AS category_name,
   wi.final_dose       AS dose,
-  (wi.final_dose * s.price)                      AS cost_per_ha,
-  s.price                                        AS unit_price,
+  (wi.final_dose * s.price)                     AS cost_per_ha,
+  s.price                                       AS unit_price,
   ((wi.final_dose * s.price) * w.effective_area) AS total_cost
 FROM workorders w
 JOIN projects p       ON p.id   = w.project_id
