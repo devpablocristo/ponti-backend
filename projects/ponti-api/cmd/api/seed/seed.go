@@ -1,41 +1,22 @@
-package main
-
-// import (
-// 	"context"
-// 	"fmt"
-// 	"log"
-// 	"math/rand"
-// 	"time"
-
-// 	"github.com/shopspring/decimal"
-// 	gorm "gorm.io/gorm"
-
-// 	gormrepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-
-// 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
-// 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
-// 	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
-// 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
-// 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
-// 	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
-// 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
-// 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
-// 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
-// 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
-// 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
-// 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
-// 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-// 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
-// 	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
-// 	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
-// )
-
-// func floatPtr(f float64) *float64 { return &f }
+package seed
 
 // // El usuario "system" que crea los datos de semilla
 // var defaultUser int64 = 1
 
-// // Ejecuta todos los seeders en orden
+// // User corresponde a la tabla users, con campos de auditoría Base
+// type User struct {
+// 	ID            int64    `gorm:"primaryKey;column:id"`
+// 	Email         string   `gorm:"column:email;not null"`
+// 	Username      string   `gorm:"column:username;unique;not null"`
+// 	Password      string   `gorm:"column:password;not null"`
+// 	TokenHash     string   `gorm:"column:token_hash;not null"`
+// 	RefreshTokens []string `gorm:"column:refresh_tokens;type:text[];default:{}"`
+// 	IDRol         int      `gorm:"column:id_rol;not null"`
+// 	IsVerified    bool     `gorm:"column:is_verified;default:false"`
+// 	Active        bool     `gorm:"column:active;default:true"`
+// 	sharedmodels.Base
+// }
+
 // func seedDatabase(ctx context.Context, repo *gormrepo.Repository) error {
 // 	if err := seedCustomers(repo); err != nil {
 // 		return err
@@ -89,7 +70,31 @@ package main
 // 	return nil
 // }
 
+// // seedDefaultUser crea o recupera users.id=1
+// func seedDefaultUser(repo *gormrepo.Repository) error {
+// 	db := repo.Client()
+
+// 	u := User{
+// 		ID:       defaultUser,
+// 		Username: "seed-admin",
+// 		Email:    "admin@example.com",
+// 		Password: "changeme",
+// 		Base:     sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
+// 	}
+
+// 	// Usamos FirstOrCreate para no duplicar
+// 	if err := db.
+// 		FirstOrCreate(&u, User{ID: defaultUser}).
+// 		Error; err != nil {
+// 		return fmt.Errorf("failed to seed default user: %w", err)
+// 	}
+// 	return nil
+// }
+
+// // seedCustomers inserta 5 clientes usando el usuario system en CreatedBy/UpdatedBy
 // func seedCustomers(repo *gormrepo.Repository) error {
+// 	db := repo.Client()
+
 // 	clientes := []customermodels.Customer{
 // 		{Name: "Cliente A", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 // 		{Name: "Cliente B", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
@@ -97,8 +102,11 @@ package main
 // 		{Name: "Cliente D", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 // 		{Name: "Cliente E", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
 // 	}
+
 // 	for _, c := range clientes {
-// 		if err := repo.Client().FirstOrCreate(&c, customermodels.Customer{Name: c.Name}).Error; err != nil {
+// 		if err := db.
+// 			FirstOrCreate(&c, customermodels.Customer{Name: c.Name}).
+// 			Error; err != nil {
 // 			return fmt.Errorf("failed to seed customer %s: %w", c.Name, err)
 // 		}
 // 	}
@@ -663,81 +671,85 @@ package main
 // 	return nil
 // }
 
-// func seedWorkorders(repo *gormrepo.Repository) error {
+// // seedWorkorder crea de forma autónoma una workorder "0001" con hasta 2 items.
+// // Requiere que existan al menos un project, field, lot, crop y supplies.
+// // Usa defaultUser para los campos de auditoría y va en una sola transacción.
+// func seedWorkorder(repo *gormrepo.Repository) error {
+// 	var defaultUserID int64 = 1
 // 	db := repo.Client()
 
-// 	// 1) Obtén entidades existentes
-// 	var project projectmodels.Project
-// 	if err := db.First(&project).Error; err != nil {
-// 		return fmt.Errorf("no projects found: %w", err)
-// 	}
-// 	var field fieldmodels.Field
-// 	if err := db.Where("project_id = ?", project.ID).First(&field).Error; err != nil {
-// 		return fmt.Errorf("no fields for project %d: %w", project.ID, err)
-// 	}
-// 	var lot lotmodels.Lot
-// 	if err := db.Where("field_id = ?", field.ID).First(&lot).Error; err != nil {
-// 		return fmt.Errorf("no lots for field %d: %w", field.ID, err)
-// 	}
-// 	var crop cropmodels.Crop
-// 	if err := db.First(&crop).Error; err != nil {
-// 		return fmt.Errorf("no crops found: %w", err)
-// 	}
-
-// 	// 2) Obtén hasta 2 supplies y comprueba errores por separado
-// 	var supplies []supplymodels.Supply
-// 	if err := db.Limit(2).Find(&supplies).Error; err != nil {
-// 		return fmt.Errorf("failed to query supplies: %w", err)
-// 	}
-// 	if len(supplies) < 1 {
-// 		return fmt.Errorf("not enough supplies: found %d", len(supplies))
-// 	}
-
-// 	// 3) Crea o recupera la orden de trabajo
-// 	ord := workordermodels.Workorder{
-// 		Number:       "0001",
-// 		ProjectID:    project.ID,
-// 		FieldID:      field.ID,
-// 		LotID:        lot.ID,
-// 		CropID:       crop.ID,
-// 		LaborID:      1, // ajusta si tienes tabla de labor
-// 		Contractor:   "Demo Supplier",
-// 		Observations: "Automatic test seed",
-// 	}
-// 	if err := db.FirstOrCreate(&ord, workordermodels.Workorder{Number: ord.Number}).Error; err != nil {
-// 		return fmt.Errorf("failed to seed work order %s: %w", ord.Number, err)
-// 	}
-
-// 	// 4) Crea items asociados
-// 	for i, s := range supplies {
-// 		item := workordermodels.WorkorderItem{
-// 			Number:        ord.Number,
-// 			SupplyID:      s.ID,
-// 			TotalUsed:     float64((i + 1) * 10),
-// 			EffectiveArea: 5.0,
-// 			FinalDose:     float64((i + 1) * 2),
+// 	return db.Transaction(func(tx *gorm.DB) error {
+// 		// 1) Obtengo las entidades donde basar la seed
+// 		var project projectmodels.Project
+// 		if err := tx.First(&project).Error; err != nil {
+// 			return fmt.Errorf("no projects found: %w", err)
 // 		}
-// 		if err := db.FirstOrCreate(
-// 			&item,
-// 			workordermodels.WorkorderItem{
-// 				Number:   item.Number,
-// 				SupplyID: item.SupplyID,
+// 		var field fieldmodels.Field
+// 		if err := tx.Where("project_id = ?", project.ID).First(&field).Error; err != nil {
+// 			return fmt.Errorf("no fields for project %d: %w", project.ID, err)
+// 		}
+// 		var lot lotmodels.Lot
+// 		if err := tx.Where("field_id = ?", field.ID).First(&lot).Error; err != nil {
+// 			return fmt.Errorf("no lots for field %d: %w", field.ID, err)
+// 		}
+// 		var crop cropmodels.Crop
+// 		if err := tx.First(&crop).Error; err != nil {
+// 			return fmt.Errorf("no crops found: %w", err)
+// 		}
+
+// 		// 2) Traigo hasta 2 supplies
+// 		var supplies []supplymodels.Supply
+// 		if err := tx.Limit(2).Find(&supplies).Error; err != nil {
+// 			return fmt.Errorf("failed to query supplies: %w", err)
+// 		}
+// 		if len(supplies) == 0 {
+// 			return fmt.Errorf("not enough supplies: found %d", len(supplies))
+// 		}
+
+// 		// 3) Creo o recupero la workorder con número fijo "0001"
+// 		wo := workordermodels.Workorder{
+// 			Number:        "0001",
+// 			ProjectID:     project.ID,
+// 			FieldID:       field.ID,
+// 			LotID:         lot.ID,
+// 			CropID:        crop.ID,
+// 			LaborID:       1, // ajustar según datos existentes
+// 			Contractor:    "Demo Supplier",
+// 			Observations:  "Seeded automatically",
+// 			Date:          time.Now(),
+// 			InvestorID:    1,                         // ajustar según datos existentes
+// 			EffectiveArea: decimal.NewFromFloat(5.0), // ejemplo fijo
+// 			Base: sharedmodels.Base{
+// 				CreatedBy: &defaultUserID,
+// 				UpdatedBy: &defaultUserID,
 // 			},
-// 		).Error; err != nil {
-// 			return fmt.Errorf("failed to seed work order item for supply %d: %w", item.SupplyID, err)
 // 		}
-// 	}
+// 		if err := tx.
+// 			FirstOrCreate(&wo, workordermodels.Workorder{Number: wo.Number}).
+// 			Error; err != nil {
+// 			return fmt.Errorf("failed to seed workorder %s: %w", wo.Number, err)
+// 		}
 
-// 	log.Printf("Workorder %s seeded with %d items\n", ord.Number, len(supplies))
-// 	return nil
-// }
+// 		// 4) Creo o recupero los items asociados
+// 		for i, s := range supplies {
+// 			item := workordermodels.WorkorderItem{
+// 				WorkorderID: wo.ID,
+// 				SupplyID:    s.ID,
+// 				TotalUsed:   decimal.NewFromFloat(float64((i + 1) * 10)),
+// 				FinalDose:   decimal.NewFromFloat(float64((i + 1) * 2)),
+// 			}
+// 			cond := workordermodels.WorkorderItem{
+// 				WorkorderID: wo.ID,
+// 				SupplyID:    s.ID,
+// 			}
+// 			if err := tx.
+// 				FirstOrCreate(&item, cond).
+// 				Error; err != nil {
+// 				return fmt.Errorf("failed to seed workorder item for supply %d: %w", s.ID, err)
+// 			}
+// 		}
 
-// // seedWorkorder corre migración y seeds de ejemplo
-// func seedWorkorder(repo *gormrepo.Repository) error {
-// 	log.Println("Seeding Workorders...")
-// 	if err := seedWorkorders(repo); err != nil {
-// 		return err
-// 	}
-// 	log.Println("Workorder seeds completed")
-// 	return nil
+// 		log.Printf("✅ Workorder %s seeded with %d items\n", wo.Number, len(supplies))
+// 		return nil
+// 	})
 // }

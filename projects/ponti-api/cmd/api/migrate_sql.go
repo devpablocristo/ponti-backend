@@ -31,13 +31,6 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 		return fmt.Errorf("creating postgres driver: %w", err)
 	}
 
-	// TODO: de referencia para ver como estaba hecha con config anterior
-	// m, err := migrate.NewWithDatabaseInstance(
-	// 	"file://migrations", //<--- migConfig.Dir, directorio de migraciones
-	// 	"postgres",          //<--- dbConfig.Name, nombre de la db
-	// 	driver,
-	// )
-
 	m, err := migrate.NewWithDatabaseInstance(
 		migConfig.Dir,
 		dbConfig.Name,

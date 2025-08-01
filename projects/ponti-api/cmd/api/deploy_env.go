@@ -5,6 +5,7 @@ import (
 	"log"
 
 	pkgenv "github.com/alphacodinggroup/ponti-backend/pkg/config/env"
+	seed "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/api/seed"
 	wire "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/wire"
 )
 
@@ -26,16 +27,16 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 			if err := runGormMigrations(ctx, deps.GormRepo); err != nil {
 				log.Fatalf("Failed to run Gorm migrations: %v", err)
 			}
-			// if err := seedDatabase(ctx, deps.GormRepo); err != nil {
-			// 	log.Fatalf("Failed to run database seeders: %v", err)
-			// }
+			if err := seed.Base(ctx, deps.GormRepo); err != nil {
+				log.Fatalf("Failed to run database seeders: %v", err)
+			}
 		case pkgenv.Stg:
 			if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 				log.Fatalf("Failed to run SQL migrations: %v", err)
 			}
-			// if err := seedDatabase(ctx, deps.GormRepo); err != nil {
-			// 	log.Fatalf("Failed to run database seeders: %v", err)
-			// }
+			if err := seed.Base(ctx, deps.GormRepo); err != nil {
+				log.Fatalf("Failed to run database seeders: %v", err)
+			}
 
 		default:
 			log.Fatalf("Unsupported environment: %s", env)
