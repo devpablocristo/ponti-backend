@@ -20,22 +20,22 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 				log.Fatalf("Failed to run SQL migrations: %v", err)
 			}
 		}
-	case pkgenv.Mix, pkgenv.Docker:
+	case pkgenv.Mix:
 		switch env {
 		case pkgenv.Dev:
 			if err := runGormMigrations(ctx, deps.GormRepo); err != nil {
 				log.Fatalf("Failed to run Gorm migrations: %v", err)
 			}
-			if err := seedDatabase(ctx, deps.GormRepo); err != nil {
-				log.Fatalf("Failed to run database seeders: %v", err)
-			}
+			// if err := seedDatabase(ctx, deps.GormRepo); err != nil {
+			// 	log.Fatalf("Failed to run database seeders: %v", err)
+			// }
 		case pkgenv.Stg:
 			if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 				log.Fatalf("Failed to run SQL migrations: %v", err)
 			}
-			if err := seedDatabase(ctx, deps.GormRepo); err != nil {
-				log.Fatalf("Failed to run database seeders: %v", err)
-			}
+			// if err := seedDatabase(ctx, deps.GormRepo); err != nil {
+			// 	log.Fatalf("Failed to run database seeders: %v", err)
+			// }
 
 		default:
 			log.Fatalf("Unsupported environment: %s", env)

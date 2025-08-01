@@ -39,18 +39,18 @@ type MiddlewaresEnginePort interface {
 // Handler encapsulates all dependencies for the Unit HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
-	gsv    GinEnginePort
-	acf    ConfigAPIPort
-	mws    MiddlewaresEnginePort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
 // NewHandler creates a new Unit handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
-		gsv:    s,
-		acf:    c,
-		mws:    m,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
@@ -58,6 +58,10 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/units"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
 
 	group := r.Group(baseURL)
 	{

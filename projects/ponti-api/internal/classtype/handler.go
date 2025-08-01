@@ -54,6 +54,11 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/types"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
 	group := r.Group(baseURL)
 	{
 		group.GET("", h.ListClassTypes)

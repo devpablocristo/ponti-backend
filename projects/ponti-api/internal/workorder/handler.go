@@ -51,6 +51,11 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/workorders"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
 	grp := r.Group(base)
 	{
 		grp.POST("", h.CreateWorkorder)
