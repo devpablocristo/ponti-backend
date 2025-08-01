@@ -8,6 +8,7 @@ import (
 
 // WorkorderListElement mapea directamente la vista SQL
 type WorkorderListElement struct {
+	ID           int64           `gorm:"column:id;primaryKey"`
 	Number       string          `gorm:"column:number;primaryKey"`
 	ProjectName  string          `gorm:"column:project_name"`
 	FieldName    string          `gorm:"column:field_name"`

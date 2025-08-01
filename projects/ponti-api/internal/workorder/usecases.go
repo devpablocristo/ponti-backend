@@ -9,7 +9,7 @@ import (
 
 type RepositoryPort interface {
 	CreateWorkorder(context.Context, *domain.Workorder) (string, error)
-	GetWorkorder(context.Context, string) (*domain.Workorder, error)
+	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
@@ -28,8 +28,8 @@ func (u *UseCases) CreateWorkorder(ctx context.Context, o *domain.Workorder) (st
 	return u.repo.CreateWorkorder(ctx, o)
 }
 
-func (u *UseCases) GetWorkorder(ctx context.Context, number string) (*domain.Workorder, error) {
-	return u.repo.GetWorkorder(ctx, number)
+func (u *UseCases) GetWorkorderByNumber(ctx context.Context, number string) (*domain.Workorder, error) {
+	return u.repo.GetWorkorderByNumber(ctx, number)
 }
 
 func (u *UseCases) DuplicateWorkorder(ctx context.Context, number string) (string, error) {

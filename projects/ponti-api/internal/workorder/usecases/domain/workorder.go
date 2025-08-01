@@ -4,10 +4,13 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 // Workorder
 type Workorder struct {
+	ID            int64
 	Number        string
 	ProjectID     int64
 	FieldID       int64
@@ -20,6 +23,8 @@ type Workorder struct {
 	InvestorID    int64
 	EffectiveArea decimal.Decimal
 	Items         []WorkorderItem
+
+	Base shareddomain.Base
 }
 
 // WorkorderItem ...

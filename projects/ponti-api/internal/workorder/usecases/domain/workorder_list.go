@@ -8,6 +8,7 @@ import (
 
 // WorkorderListElement para la lista
 type WorkorderListElement struct {
+	ID           int64
 	Number       string
 	ProjectName  string
 	FieldName    string

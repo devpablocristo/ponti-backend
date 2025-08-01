@@ -10,13 +10,16 @@ import (
 	labormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	projectmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
 
 // Workorder GORM model con todas las relaciones
 type Workorder struct {
-	Number        string             `gorm:"primaryKey;column:number;uniqueIndex"`
+	ID            int64              `gorm:"primaryKey;column:id"`
+	Number        string             `gorm:"column:number;uniqueIndex"`
 	ProjectID     int64              `gorm:"not null"`
 	Project       projectmod.Project `gorm:"foreignKey:ProjectID"`
 	FieldID       int64              `gorm:"not null"`
@@ -32,7 +35,9 @@ type Workorder struct {
 	Date          time.Time          `gorm:"type:date;not null"`
 	InvestorID    int64              `gorm:"not null"`
 	EffectiveArea decimal.Decimal    `gorm:"not null"`
-	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderNumber;references:Number"`
+	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderNumber;references:Number;constraint:OnDelete:CASCADE"`
+
+	sharedmodels.Base
 }
 
 // WorkorderItem GORM model
@@ -83,6 +88,7 @@ func (m *Workorder) ToDomain() *domain.Workorder {
 		}
 	}
 	return &domain.Workorder{
+		ID:            m.ID,
 		Number:        m.Number,
 		ProjectID:     m.ProjectID,
 		FieldID:       m.FieldID,
@@ -95,5 +101,11 @@ func (m *Workorder) ToDomain() *domain.Workorder {
 		InvestorID:    m.InvestorID,
 		EffectiveArea: m.EffectiveArea,
 		Items:         items,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
+		},
 	}
 }

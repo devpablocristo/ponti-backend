@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	gorm "gorm.io/gorm"
+	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
@@ -24,91 +25,101 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateWorkorder(
-	ctx context.Context,
-	o *domain.Workorder,
-) (string, error) {
-	ordModel := models.FromDomain(o)
-	err := r.db.Client().WithContext(ctx).
-		Transaction(func(tx *gorm.DB) error {
-			if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
-				Create(ordModel).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to create order", err)
-			}
-			return nil
-		})
-	return ordModel.Number, err
-}
+func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (string, error) {
+	// 1) convertir a modelo GORM
+	model := models.FromDomain(o)
 
-func (r *Repository) GetWorkorder(ctx context.Context, number string) (*domain.Workorder, error) {
-	var ordModel models.Workorder
-	if err := r.db.Client().WithContext(ctx).
-		Preload("Items").
-		First(&ordModel, "number = ?", number).Error; err != nil {
-
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "order not found", err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get order", err)
+	// 2) poblar auditoría
+	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+		model.CreatedBy = &userID
+		model.UpdatedBy = &userID
 	}
 
-	return ordModel.ToDomain(), nil
+	// 3) crear dentro de transacción
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(model).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to create workorder", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return model.Number, nil
+}
+
+func (r *Repository) GetWorkorderByNumber(ctx context.Context, number string) (*domain.Workorder, error) {
+	var m models.Workorder
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Items").
+		Where("number = ?", number).
+		First(&m).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, "workorder not found", err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
+	}
+	return m.ToDomain(), nil
 }
 
 func (r *Repository) UpdateWorkorder(ctx context.Context, o *domain.Workorder) error {
-	ordModel := models.FromDomain(o)
+	// 1) buscar el ID existente por número
+	var existing models.Workorder
+	if err := r.db.Client().WithContext(ctx).
+		Select("id").
+		Where("number = ?", o.Number).
+		First(&existing).Error; err != nil {
 
-	return r.db.Client().WithContext(ctx).
-		Transaction(func(tx *gorm.DB) error {
-			// verificamos existencia
-			var count int64
-			if err := tx.Model(&models.Workorder{}).
-				Where("number = ?", ordModel.Number).
-				Count(&count).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to check order existence", err)
-			}
-			if count == 0 {
-				return types.NewError(types.ErrNotFound, "order not found", nil)
-			}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return types.NewError(types.ErrNotFound, "workorder not found", err)
+		}
+		return types.NewError(types.ErrInternal, "failed to find workorder ID", err)
+	}
 
-			// actualizamos campos y asociaciones de una vez
-			if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
-				Updates(ordModel).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to update order", err)
-			}
-			return nil
-		})
+	// 2) mapear dominio → GORM e inyectar el ID
+	model := models.FromDomain(o)
+	model.ID = existing.ID
+
+	// 3) poblar UpdatedBy
+	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+		model.UpdatedBy = &userID
+	}
+
+	// 4) guardar con asociaciones dentro de transacción
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
+			Save(model).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update workorder", err)
+		}
+		return nil
+	})
 }
 
 func (r *Repository) DeleteWorkorder(ctx context.Context, number string) error {
-	return r.db.Client().WithContext(ctx).
-		Transaction(func(tx *gorm.DB) error {
-			// verificar si existe
-			var count int64
-			if err := tx.Model(&models.Workorder{}).
-				Where("number = ?", number).
-				Count(&count).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to check order existence", err)
-			}
-			if count == 0 {
-				return types.NewError(types.ErrNotFound, "order not found", nil)
-			}
+	// buscar el ID por número
+	var m models.Workorder
+	if err := r.db.Client().WithContext(ctx).
+		Select("id").
+		Where("number = ?", number).
+		First(&m).Error; err != nil {
 
-			// eliminamos items y luego la orden
-			if err := tx.Where("order_number = ?", number).
-				Delete(&models.WorkorderItem{}).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to delete order items", err)
-			}
-			if err := tx.Delete(&models.Workorder{}, "number = ?", number).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to delete order", err)
-			}
-			return nil
-		})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return types.NewError(types.ErrNotFound, "workorder not found", err)
+		}
+		return types.NewError(types.ErrInternal, "failed to find workorder ID", err)
+	}
+
+	// borrar por ID (cascade eliminará items si está configurado)
+	if err := r.db.Client().WithContext(ctx).
+		Delete(&models.Workorder{}, m.ID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to delete workorder", err)
+	}
+	return nil
 }
 
 func (r *Repository) DuplicateWorkorder(ctx context.Context, number string) (string, error) {
-	// reuso Get + Create
-	orig, err := r.GetWorkorder(ctx, number)
+	orig, err := r.GetWorkorderByNumber(ctx, number)
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +136,7 @@ func getNextNumber(ctx context.Context, db *gorm.DB) (string, error) {
 	if err := db.WithContext(ctx).
 		Raw("SELECT nextval('workorder_number_seq')").
 		Scan(&seq).Error; err != nil {
-		return "", types.NewError(types.ErrInternal, "failed to get next work order number from sequence", err)
+		return "", types.NewError(types.ErrInternal, "failed to get next workorder number", err)
 	}
 	return fmt.Sprintf("%04d", seq), nil
 }
@@ -143,15 +154,13 @@ func (r *Repository) ListWorkorders(
 		db = db.Where("field_id = ?", *filt.FieldID)
 	}
 
-	// 1) contar
 	var total int64
 	if err := db.Model(&models.WorkorderListElement{}).
 		Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to count workorder list elements", err)
+			"failed to count workorders", err)
 	}
 
-	// 2) obtener página desde la vista
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 	var rows []models.WorkorderListElement
 	if err := db.
@@ -160,13 +169,13 @@ func (r *Repository) ListWorkorders(
 		Order("number desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to list workorder list elements", err)
+			"failed to list workorders", err)
 	}
 
-	// 3) mapear al domain
 	list := make([]domain.WorkorderListElement, len(rows))
 	for i, m := range rows {
 		list[i] = domain.WorkorderListElement{
+			ID:           m.ID,
 			Number:       m.Number,
 			ProjectName:  m.ProjectName,
 			FieldName:    m.FieldName,

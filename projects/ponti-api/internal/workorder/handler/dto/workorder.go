@@ -17,6 +17,7 @@ type WorkorderItem struct {
 }
 
 type Workorder struct {
+	ID            int64           `json:"id"`
 	Number        string          `json:"number" binding:"required"`
 	ProjectID     int64           `json:"project_id" binding:"required"`
 	FieldID       int64           `json:"field_id" binding:"required"`
@@ -33,6 +34,7 @@ type Workorder struct {
 
 func (r *Workorder) ToDomain() *domain.Workorder {
 	return &domain.Workorder{
+		ID:            r.ID,
 		Number:        r.Number,
 		ProjectID:     r.ProjectID,
 		FieldID:       r.FieldID,
@@ -69,8 +71,8 @@ func FromDomain(o *domain.Workorder) *Workorder {
 			FinalDose: it.FinalDose,
 		}
 	}
-
 	return &Workorder{
+		ID:            o.ID,
 		Number:        o.Number,
 		ProjectID:     o.ProjectID,
 		FieldID:       o.FieldID,

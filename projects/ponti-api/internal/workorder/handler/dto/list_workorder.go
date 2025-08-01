@@ -9,6 +9,7 @@ import (
 )
 
 type WorkorderListElement struct {
+	ID           int64           `json:"id"`
 	Number       string          `json:"number"`
 	ProjectName  string          `json:"project_name"`
 	FieldName    string          `json:"field_name"`
@@ -35,6 +36,7 @@ type WorkorderListResponse struct {
 
 func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement {
 	return &WorkorderListElement{
+		ID:           d.ID,
 		Number:       d.Number,
 		ProjectName:  d.ProjectName,
 		FieldName:    d.FieldName,

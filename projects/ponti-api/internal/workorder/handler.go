@@ -14,7 +14,7 @@ import (
 
 type UseCasesPort interface {
 	CreateWorkorder(context.Context, *domain.Workorder) (string, error)
-	GetWorkorder(context.Context, string) (*domain.Workorder, error)
+	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
@@ -54,7 +54,7 @@ func (h *Handler) Routes() {
 	grp := r.Group(base)
 	{
 		grp.POST("", h.CreateWorkorder)
-		grp.GET("/:number", h.GetWorkorder)
+		grp.GET("/number/:number", h.GetWorkorderByNumber)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.PUT("/:number", h.UpdateWorkorder)
 		grp.DELETE("/:number", h.DeleteWorkorder)
@@ -83,15 +83,15 @@ func (h *Handler) CreateWorkorder(c *gin.Context) {
 	})
 }
 
-func (h *Handler) GetWorkorder(c *gin.Context) {
+func (h *Handler) GetWorkorderByNumber(c *gin.Context) {
 	number := c.Param("number")
-	ord, err := h.ucs.GetWorkorder(c.Request.Context(), number)
+	wo, err := h.ucs.GetWorkorderByNumber(c.Request.Context(), number)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(ord))
+	c.JSON(http.StatusOK, dto.FromDomain(wo))
 }
 
 func (h *Handler) DuplicateWorkorder(c *gin.Context) {
