@@ -13,8 +13,9 @@ import (
 )
 
 type UseCasesPort interface {
-	CreateWorkorder(context.Context, *domain.Workorder) (string, error)
+	CreateWorkorder(context.Context, *domain.Workorder) (int64, error)
 	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
+	GetWorkorderByID(context.Context, int64) (*domain.Workorder, error)
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
@@ -59,9 +60,9 @@ func (h *Handler) Routes() {
 	grp := r.Group(base)
 	{
 		grp.POST("", h.CreateWorkorder)
-		grp.GET("/number/:number", h.GetWorkorderByNumber)
+		grp.GET("/:id", h.GetWorkorderByID)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
-		grp.PUT("/:number", h.UpdateWorkorder)
+		grp.PUT("/:id", h.UpdateWorkorder)
 		grp.DELETE("/:number", h.DeleteWorkorder)
 		grp.GET("", h.ListWorkorders)
 
@@ -76,7 +77,8 @@ func (h *Handler) CreateWorkorder(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	num, err := h.ucs.CreateWorkorder(c.Request.Context(), req.ToDomain())
+
+	id, err := h.ucs.CreateWorkorder(c, req.ToDomain())
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -84,13 +86,19 @@ func (h *Handler) CreateWorkorder(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, dto.WorkorderResponse{
 		Message: "Workorder created",
-		Number:  num,
+		Number:  id,
 	})
 }
 
-func (h *Handler) GetWorkorderByNumber(c *gin.Context) {
-	number := c.Param("number")
-	wo, err := h.ucs.GetWorkorderByNumber(c.Request.Context(), number)
+func (h *Handler) GetWorkorderByID(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+
+	wo, err := h.ucs.GetWorkorderByID(c, id)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -100,16 +108,16 @@ func (h *Handler) GetWorkorderByNumber(c *gin.Context) {
 }
 
 func (h *Handler) DuplicateWorkorder(c *gin.Context) {
-	orig := c.Param("number")
-	newNum, err := h.ucs.DuplicateWorkorder(c.Request.Context(), orig)
-	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
+	// orig := c.Param("number")
+	// newNum, err := h.ucs.DuplicateWorkorder(c.Request.Context(), orig)
+	// if err != nil {
+	// 	apiErr, status := types.NewAPIError(err)
+	// 	c.JSON(status, apiErr.ToResponse())
+	// 	return
+	// }
 	c.JSON(http.StatusCreated, dto.WorkorderResponse{
 		Message: "Workorder duplicated",
-		Number:  newNum,
+		Number:  0,
 	})
 }
 
@@ -121,8 +129,14 @@ func (h *Handler) UpdateWorkorder(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	req.Number = c.Param("number")
-	if err := h.ucs.UpdateWorkorder(c.Request.Context(), req.ToDomain()); err != nil {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	req.ID = id
+	if err := h.ucs.UpdateWorkorder(c, req.ToDomain()); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return

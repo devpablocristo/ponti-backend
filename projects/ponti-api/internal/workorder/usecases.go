@@ -8,9 +8,10 @@ import (
 )
 
 type RepositoryPort interface {
-	CreateWorkorder(context.Context, *domain.Workorder) (string, error)
+	CreateWorkorder(context.Context, *domain.Workorder) (int64, error)
 	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
-	DuplicateWorkorder(context.Context, string) (string, error)
+	GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error)
+	//DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorder(context.Context, *domain.Workorder) error
 	DeleteWorkorder(context.Context, string) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
@@ -24,7 +25,7 @@ func NewUseCases(r RepositoryPort) *UseCases {
 	return &UseCases{repo: r}
 }
 
-func (u *UseCases) CreateWorkorder(ctx context.Context, o *domain.Workorder) (string, error) {
+func (u *UseCases) CreateWorkorder(ctx context.Context, o *domain.Workorder) (int64, error) {
 	return u.repo.CreateWorkorder(ctx, o)
 }
 
@@ -32,8 +33,12 @@ func (u *UseCases) GetWorkorderByNumber(ctx context.Context, number string) (*do
 	return u.repo.GetWorkorderByNumber(ctx, number)
 }
 
+func (u *UseCases) GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error) {
+	return u.repo.GetWorkorderByID(ctx, id)
+}
+
 func (u *UseCases) DuplicateWorkorder(ctx context.Context, number string) (string, error) {
-	return u.repo.DuplicateWorkorder(ctx, number)
+	return "", nil
 }
 
 func (u *UseCases) UpdateWorkorder(ctx context.Context, o *domain.Workorder) error {

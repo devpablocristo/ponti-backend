@@ -1,9 +1,6 @@
-CREATE SEQUENCE IF NOT EXISTS workorder_number_seq
-  START WITH 1 INCREMENT BY 1 CACHE 1;
-
 CREATE TABLE workorders (
   id            BIGSERIAL PRIMARY KEY,
-  number        VARCHAR(20) NOT NULL UNIQUE DEFAULT nextval('workorder_number_seq'),
+  number        VARCHAR(100),
   project_id    BIGINT      NOT NULL REFERENCES projects(id) ON UPDATE CASCADE ON DELETE RESTRICT,
   field_id      BIGINT      NOT NULL REFERENCES fields(id)   ON UPDATE CASCADE ON DELETE RESTRICT,
   lot_id        BIGINT      NOT NULL REFERENCES lots(id)     ON UPDATE CASCADE ON DELETE RESTRICT,

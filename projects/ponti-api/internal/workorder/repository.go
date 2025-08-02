@@ -3,7 +3,6 @@ package workorder
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"gorm.io/gorm"
 
@@ -25,7 +24,7 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (string, error) {
+func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (int64, error) {
 	// 1) convertir a modelo GORM (cabecera + items sin WorkorderID)
 	model := models.FromDomain(o)
 
@@ -42,26 +41,13 @@ func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (
 			return types.NewError(types.ErrInternal, "failed to create workorder header", err)
 		}
 
-		// 3.2) asignar el ID recién generado a cada ítem
-		for i := range model.Items {
-			model.Items[i].WorkorderID = model.ID
-		}
-
-		// 3.3) insertar los ítems en bloque
-		if len(model.Items) > 0 {
-			if err := tx.Create(&model.Items).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to create workorder items", err)
-			}
-		}
-
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
-	// 4) devolver el número generado para la API
-	return model.Number, nil
+	return model.ID, nil
 }
 
 func (r *Repository) GetWorkorderByNumber(ctx context.Context, number string) (*domain.Workorder, error) {
@@ -69,6 +55,21 @@ func (r *Repository) GetWorkorderByNumber(ctx context.Context, number string) (*
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Items").
 		Where("number = ?", number).
+		First(&m).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, "workorder not found", err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
+	}
+	return m.ToDomain(), nil
+}
+
+func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error) {
+	var m models.Workorder
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Items").
+		Where("id = ?", id).
 		First(&m).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -134,28 +135,14 @@ func (r *Repository) DeleteWorkorder(ctx context.Context, number string) error {
 	return nil
 }
 
-func (r *Repository) DuplicateWorkorder(ctx context.Context, number string) (string, error) {
-	orig, err := r.GetWorkorderByNumber(ctx, number)
-	if err != nil {
-		return "", err
-	}
-	newNum, err := getNextNumber(ctx, r.db.Client())
-	if err != nil {
-		return "", err
-	}
-	orig.Number = newNum
-	return r.CreateWorkorder(ctx, orig)
-}
+// func (r *Repository) DuplicateWorkorder(ctx context.Context, number string) (string, error) {
+// 	orig, err := r.GetWorkorderByNumber(ctx, number)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-func getNextNumber(ctx context.Context, db *gorm.DB) (string, error) {
-	var seq int64
-	if err := db.WithContext(ctx).
-		Raw("SELECT nextval('workorder_number_seq')").
-		Scan(&seq).Error; err != nil {
-		return "", types.NewError(types.ErrInternal, "failed to get next workorder number", err)
-	}
-	return fmt.Sprintf("%04d", seq), nil
-}
+// 	return r.CreateWorkorder(ctx, orig)
+// }
 
 func (r *Repository) ListWorkorders(
 	ctx context.Context,

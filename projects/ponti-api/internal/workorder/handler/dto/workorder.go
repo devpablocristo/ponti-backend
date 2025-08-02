@@ -90,5 +90,5 @@ func FromDomain(o *domain.Workorder) *Workorder {
 
 type WorkorderResponse struct {
 	Message string `json:"message"`
-	Number  string `json:"number"`
+	Number  int64  `json:"id"`
 }

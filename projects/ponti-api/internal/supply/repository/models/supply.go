@@ -6,6 +6,7 @@ import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 // Tablas auxiliares normalizadas
@@ -17,10 +18,10 @@ type SupplyUnit struct {
 
 // Modelo principal de Supply
 type Supply struct {
-	ID        int64   `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID int64   `gorm:"not null;index"`
-	Name      string  `gorm:"type:varchar(100);not null"`
-	Price     float64 `gorm:"not null"`
+	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID int64           `gorm:"not null;index"`
+	Name      string          `gorm:"type:varchar(100);not null"`
+	Price     decimal.Decimal `gorm:"not null"`
 
 	UnitID uint
 	//Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`

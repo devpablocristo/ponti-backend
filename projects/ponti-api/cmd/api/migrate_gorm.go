@@ -29,7 +29,6 @@ import (
 )
 
 // runGormMigrations runs GORM AutoMigrate on all models and ensures
-// the workorder_number_seq exists for the Workorder table.
 func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 	log.Println("Starting GORM migrations...")
 
@@ -54,11 +53,9 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&fieldmodels.Field{},
 		&lotmodels.Lot{},
 		&categorymodels.Category{},
-		&classtypemodels.ClassType{},
 		&supplymodels.SupplyUnit{},
 		&unitmodels.Unit{},
 		&classtypemodels.ClassType{},
-		&supplymodels.SupplyUnit{},
 		&supplymodels.Supply{},
 		&dollarmodels.ProjectDollarValue{},
 		&workordermodels.Workorder{},
@@ -72,22 +69,6 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		fmt.Printf("Migrating model: %T\n", m)
 		if err := repo.AutoMigrate(m); err != nil {
 			return fmt.Errorf("failed to migrate %T: %w", m, err)
-		}
-
-		// Después de migrar Workorder, creamos la secuencia si falta
-		if _, ok := m.(*workordermodels.Workorder); ok {
-			sql := `
-                CREATE SEQUENCE IF NOT EXISTS workorder_number_seq
-                  START WITH 1
-                  INCREMENT BY 1
-                  NO MINVALUE
-                  NO MAXVALUE
-                  CACHE 1;
-            `
-			if execErr := repo.Client().Exec(sql).Error; execErr != nil {
-				return fmt.Errorf("failed to ensure sequence workorder_number_seq: %w", execErr)
-			}
-			log.Println("Ensured sequence workorder_number_seq exists")
 		}
 	}
 	log.Printf("GORM migrations completed successfully in %s.", time.Since(start))
