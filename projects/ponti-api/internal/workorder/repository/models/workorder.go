@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
@@ -35,6 +36,7 @@ type Workorder struct {
 	Date          time.Time          `gorm:"type:date;not null"`
 	InvestorID    int64              `gorm:"not null"`
 	EffectiveArea decimal.Decimal    `gorm:"not null"`
+	DeletedAt     gorm.DeletedAt     `gorm:"index"`
 	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderID;references:ID;constraint:OnDelete:CASCADE"`
 
 	sharedmodels.Base

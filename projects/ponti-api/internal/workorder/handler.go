@@ -17,8 +17,8 @@ type UseCasesPort interface {
 	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
 	GetWorkorderByID(context.Context, int64) (*domain.Workorder, error)
 	DuplicateWorkorder(context.Context, string) (string, error)
-	UpdateWorkorder(context.Context, *domain.Workorder) error
-	DeleteWorkorder(context.Context, string) error
+	UpdateWorkorderByID(context.Context, *domain.Workorder) error
+	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 }
 
@@ -62,8 +62,8 @@ func (h *Handler) Routes() {
 		grp.POST("", h.CreateWorkorder)
 		grp.GET("/:id", h.GetWorkorderByID)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
-		grp.PUT("/:id", h.UpdateWorkorder)
-		grp.DELETE("/:number", h.DeleteWorkorder)
+		grp.PUT("/:id", h.UpdateWorkorderByID)
+		grp.DELETE("/:number", h.DeleteWorkorderByID)
 		grp.GET("", h.ListWorkorders)
 
 	}
@@ -121,7 +121,7 @@ func (h *Handler) DuplicateWorkorder(c *gin.Context) {
 	})
 }
 
-func (h *Handler) UpdateWorkorder(c *gin.Context) {
+func (h *Handler) UpdateWorkorderByID(c *gin.Context) {
 	var req dto.Workorder
 	if err := c.ShouldBindJSON(&req); err != nil {
 		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
@@ -136,7 +136,7 @@ func (h *Handler) UpdateWorkorder(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	if err := h.ucs.UpdateWorkorder(c, req.ToDomain()); err != nil {
+	if err := h.ucs.UpdateWorkorderByID(c, req.ToDomain()); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
@@ -144,13 +144,20 @@ func (h *Handler) UpdateWorkorder(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) DeleteWorkorder(c *gin.Context) {
-	number := c.Param("number")
-	if err := h.ucs.DeleteWorkorder(c.Request.Context(), number); err != nil {
+func (h *Handler) DeleteWorkorderByID(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workorder ID"})
+		return
+	}
+
+	if err := h.ucs.DeleteWorkorderByID(c.Request.Context(), id); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
+
 	c.Status(http.StatusNoContent)
 }
 

@@ -80,7 +80,7 @@ func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Wo
 	return m.ToDomain(), nil
 }
 
-func (r *Repository) UpdateWorkorder(ctx context.Context, o *domain.Workorder) error {
+func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
 	// 1) buscar el ID existente por número
 	var existing models.Workorder
 	if err := r.db.Client().WithContext(ctx).
@@ -113,25 +113,32 @@ func (r *Repository) UpdateWorkorder(ctx context.Context, o *domain.Workorder) e
 	})
 }
 
-func (r *Repository) DeleteWorkorder(ctx context.Context, number string) error {
-	// buscar el ID por número
+func (r *Repository) DeleteWorkorderByID(ctx context.Context, id int64) error {
 	var m models.Workorder
-	if err := r.db.Client().WithContext(ctx).
-		Select("id").
-		Where("number = ?", number).
-		First(&m).Error; err != nil {
+
+	// 1) Buscamos la workorder por su ID
+	if err := r.db.Client().
+		WithContext(ctx).
+		First(&m, id).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return types.NewError(types.ErrNotFound, "workorder not found", err)
 		}
-		return types.NewError(types.ErrInternal, "failed to find workorder ID", err)
+		return types.NewError(types.ErrInternal, "failed to find workorder", err)
 	}
 
-	// borrar por ID (cascade eliminará items si está configurado)
-	if err := r.db.Client().WithContext(ctx).
-		Delete(&models.Workorder{}, m.ID).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to delete workorder", err)
+	// 2) Soft-delete dentro de una transacción
+	if err := r.db.Client().
+		WithContext(ctx).
+		Transaction(func(tx *gorm.DB) error {
+			if err := tx.Delete(&m).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to soft delete workorder", err)
+			}
+			return nil
+		}); err != nil {
+		return err
 	}
+
 	return nil
 }
 

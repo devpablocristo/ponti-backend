@@ -1,23 +1,37 @@
-package seed
+// package seed
 
-// // El usuario "system" que crea los datos de semilla
-// var defaultUser int64 = 1
+// import (
+// 	"context"
+// 	"fmt"
+// 	"log"
+// 	"math/rand"
+// 	"time"
 
-// // User corresponde a la tabla users, con campos de auditoría Base
-// type User struct {
-// 	ID            int64    `gorm:"primaryKey;column:id"`
-// 	Email         string   `gorm:"column:email;not null"`
-// 	Username      string   `gorm:"column:username;unique;not null"`
-// 	Password      string   `gorm:"column:password;not null"`
-// 	TokenHash     string   `gorm:"column:token_hash;not null"`
-// 	RefreshTokens []string `gorm:"column:refresh_tokens;type:text[];default:{}"`
-// 	IDRol         int      `gorm:"column:id_rol;not null"`
-// 	IsVerified    bool     `gorm:"column:is_verified;default:false"`
-// 	Active        bool     `gorm:"column:active;default:true"`
-// 	sharedmodels.Base
-// }
+// 	"github.com/shopspring/decimal"
+// 	"gorm.io/gorm"
 
-// func seedDatabase(ctx context.Context, repo *gormrepo.Repository) error {
+// 	gormrepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+
+// 	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
+// 	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
+// 	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+// 	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
+// 	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+// 	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
+// 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+// 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+// 	labormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
+// 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
+// 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+// 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+// 	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+// 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+// 	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+// 	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
+// 	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
+// )
+
+// func Base(ctx context.Context, repo *gormrepo.Repository) error {
 // 	if err := seedCustomers(repo); err != nil {
 // 		return err
 // 	}
@@ -60,36 +74,41 @@ package seed
 // 	if err := seedSupply(repo); err != nil {
 // 		return err
 // 	}
+// 	if err := seedLabors(repo); err != nil {
+// 		return err
+// 	}
 // 	if err := seedWorkorder(repo); err != nil {
 // 		return err
 // 	}
 // 	if err := seedProjectDollarValues(repo); err != nil {
 // 		return err
 // 	}
+
 // 	fmt.Println("Database seeded successfully")
 // 	return nil
 // }
 
-// // seedDefaultUser crea o recupera users.id=1
-// func seedDefaultUser(repo *gormrepo.Repository) error {
-// 	db := repo.Client()
+// // El usuario "system" que crea los datos de semilla
+// var defaultUser int64 = 1
 
-// 	u := User{
-// 		ID:       defaultUser,
-// 		Username: "seed-admin",
-// 		Email:    "admin@example.com",
-// 		Password: "changeme",
-// 		Base:     sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser},
-// 	}
-
-// 	// Usamos FirstOrCreate para no duplicar
-// 	if err := db.
-// 		FirstOrCreate(&u, User{ID: defaultUser}).
-// 		Error; err != nil {
-// 		return fmt.Errorf("failed to seed default user: %w", err)
-// 	}
-// 	return nil
+// // floatPtr returns a pointer to the given float64 value.
+// func floatPtr(f float64) *float64 {
+// 	return &f
 // }
+
+// // User corresponde a la tabla users, con campos de auditoría Base
+// // type User struct {
+// // 	ID            int64    `gorm:"primaryKey;column:id"`
+// // 	Email         string   `gorm:"column:email;not null"`
+// // 	Username      string   `gorm:"column:username;unique;not null"`
+// // 	Password      string   `gorm:"column:password;not null"`
+// // 	TokenHash     string   `gorm:"column:token_hash;not null"`
+// // 	RefreshTokens []string `gorm:"column:refresh_tokens;type:text[];default:{}"`
+// // 	IDRol         int      `gorm:"column:id_rol;not null"`
+// // 	IsVerified    bool     `gorm:"column:is_verified;default:false"`
+// // 	Active        bool     `gorm:"column:active;default:true"`
+// // 	sharedmodels.Base
+// // }
 
 // // seedCustomers inserta 5 clientes usando el usuario system en CreatedBy/UpdatedBy
 // func seedCustomers(repo *gormrepo.Repository) error {
@@ -573,7 +592,7 @@ package seed
 // 		supplies = append(supplies, supplymodels.Supply{
 // 			Name:       fmt.Sprintf("OnlyProject_%d", i+1),
 // 			UnitID:     unitID("kg"),
-// 			Price:      100 + float64(i)*10,
+// 			Price:      decimal.NewFromFloat(100 + float64(i)*10),
 // 			CategoryID: categoryID("Fertilizer"),
 // 			TypeID:     typeID("Chemical"),
 // 			ProjectID:  p.ID,
@@ -586,7 +605,7 @@ package seed
 // 		supplymodels.Supply{
 // 			Name:       "Urea Fertilizer",
 // 			UnitID:     unitID("kg"),
-// 			Price:      400.50,
+// 			Price:      decimal.NewFromFloat(400.50),
 // 			CategoryID: categoryID("Fertilizer"),
 // 			TypeID:     typeID("Chemical"),
 // 			ProjectID:  projects[0].ID,
@@ -595,7 +614,7 @@ package seed
 // 		supplymodels.Supply{
 // 			Name:       "Corn Seed",
 // 			UnitID:     unitID("bag"),
-// 			Price:      3200,
+// 			Price:      decimal.NewFromInt(3200),
 // 			CategoryID: categoryID("Seed"),
 // 			TypeID:     typeID("Grain"),
 // 			ProjectID:  projects[0].ID,
@@ -604,7 +623,7 @@ package seed
 // 		supplymodels.Supply{
 // 			Name:       "Glyphosate Herbicide",
 // 			UnitID:     unitID("lt"),
-// 			Price:      180,
+// 			Price:      decimal.NewFromInt(180),
 // 			CategoryID: categoryID("Herbicide"),
 // 			TypeID:     typeID("Chemical"),
 // 			ProjectID:  projects[len(projects)-1].ID,
@@ -627,7 +646,7 @@ package seed
 // 				sup := supplymodels.Supply{
 // 					Name:       desc[0],
 // 					UnitID:     unitID(desc[1]),
-// 					Price:      120 + float64(idx*37+j*19),
+// 					Price:      decimal.NewFromFloat(120 + float64(idx*37+j*19)),
 // 					CategoryID: categoryID(desc[2]),
 // 					TypeID:     typeID(desc[3]),
 // 					ProjectID:  rp.ID,
@@ -671,85 +690,463 @@ package seed
 // 	return nil
 // }
 
-// // seedWorkorder crea de forma autónoma una workorder "0001" con hasta 2 items.
-// // Requiere que existan al menos un project, field, lot, crop y supplies.
-// // Usa defaultUser para los campos de auditoría y va en una sola transacción.
 // func seedWorkorder(repo *gormrepo.Repository) error {
-// 	var defaultUserID int64 = 1
+// 	examples := []workordermodels.Workorder{
+// 		{
+// 			Number:        "0001",
+// 			ProjectID:     1,
+// 			FieldID:       1,
+// 			LotID:         1,
+// 			CropID:        1,
+// 			LaborID:       1,
+// 			Contractor:    "ACME Corp",
+// 			Observations:  "Seed directa",
+// 			Date:          time.Now(),
+// 			InvestorID:    1,
+// 			EffectiveArea: decimal.NewFromFloat(12.5),
+// 			Items: []workordermodels.WorkorderItem{
+// 				{SupplyID: 1, TotalUsed: decimal.NewFromFloat(100), FinalDose: decimal.NewFromFloat(8)},
+// 				{SupplyID: 2, TotalUsed: decimal.NewFromFloat(50), FinalDose: decimal.NewFromFloat(4)},
+// 			},
+// 		},
+// 		{
+// 			Number:        "0002",
+// 			ProjectID:     1,
+// 			FieldID:       2,
+// 			LotID:         2,
+// 			CropID:        2,
+// 			LaborID:       2,
+// 			Contractor:    "Beta Agro",
+// 			Observations:  "Orden seed 2",
+// 			Date:          time.Now(),
+// 			InvestorID:    2,
+// 			EffectiveArea: decimal.NewFromFloat(15.5),
+// 			Items: []workordermodels.WorkorderItem{
+// 				{SupplyID: 2, TotalUsed: decimal.NewFromFloat(50), FinalDose: decimal.NewFromFloat(4)},
+// 				{SupplyID: 3, TotalUsed: decimal.NewFromFloat(75), FinalDose: decimal.NewFromFloat(6)},
+// 			},
+// 		},
+// 		{
+// 			Number:        "0003",
+// 			ProjectID:     2,
+// 			FieldID:       3,
+// 			LotID:         3,
+// 			CropID:        3,
+// 			LaborID:       3,
+// 			Contractor:    "Gamma Fields",
+// 			Observations:  "Orden seed 3",
+// 			Date:          time.Now(),
+// 			InvestorID:    3,
+// 			EffectiveArea: decimal.NewFromFloat(20.0),
+// 			Items: []workordermodels.WorkorderItem{
+// 				{SupplyID: 1, TotalUsed: decimal.NewFromFloat(120), FinalDose: decimal.NewFromFloat(9)},
+// 			},
+// 		},
+// 		{
+// 			Number:        "0004",
+// 			ProjectID:     2,
+// 			FieldID:       4,
+// 			LotID:         4,
+// 			CropID:        4,
+// 			LaborID:       4,
+// 			Contractor:    "Delta Farms",
+// 			Observations:  "Orden seed 4",
+// 			Date:          time.Now(),
+// 			InvestorID:    4,
+// 			EffectiveArea: decimal.NewFromFloat(12.0),
+// 			Items: []workordermodels.WorkorderItem{
+// 				{SupplyID: 3, TotalUsed: decimal.NewFromFloat(80), FinalDose: decimal.NewFromFloat(5)},
+// 			},
+// 		},
+// 		{
+// 			Number:        "0005",
+// 			ProjectID:     3,
+// 			FieldID:       5,
+// 			LotID:         5,
+// 			CropID:        5,
+// 			LaborID:       5,
+// 			Contractor:    "Epsilon Ltd",
+// 			Observations:  "Orden seed 5",
+// 			Date:          time.Now(),
+// 			InvestorID:    5,
+// 			EffectiveArea: decimal.NewFromFloat(18.0),
+// 			Items: []workordermodels.WorkorderItem{
+// 				{SupplyID: 2, TotalUsed: decimal.NewFromFloat(60), FinalDose: decimal.NewFromFloat(3)},
+// 				{SupplyID: 4, TotalUsed: decimal.NewFromFloat(90), FinalDose: decimal.NewFromFloat(7)},
+// 			},
+// 		},
+// 	}
+
+// 	for _, w := range examples {
+// 		err := repo.Client().Create(&w).Error
+// 		if err != nil {
+// 			log.Printf("error al insertar workorder %s: %v", w.Number, err)
+// 		} else {
+// 			log.Printf("insertado workorder %s", w.Number)
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+// func seedLabors(repo *gormrepo.Repository) error {
 // 	db := repo.Client()
 
-// 	return db.Transaction(func(tx *gorm.DB) error {
-// 		// 1) Obtengo las entidades donde basar la seed
-// 		var project projectmodels.Project
-// 		if err := tx.First(&project).Error; err != nil {
-// 			return fmt.Errorf("no projects found: %w", err)
-// 		}
-// 		var field fieldmodels.Field
-// 		if err := tx.Where("project_id = ?", project.ID).First(&field).Error; err != nil {
-// 			return fmt.Errorf("no fields for project %d: %w", project.ID, err)
-// 		}
-// 		var lot lotmodels.Lot
-// 		if err := tx.Where("field_id = ?", field.ID).First(&lot).Error; err != nil {
-// 			return fmt.Errorf("no lots for field %d: %w", field.ID, err)
-// 		}
-// 		var crop cropmodels.Crop
-// 		if err := tx.First(&crop).Error; err != nil {
-// 			return fmt.Errorf("no crops found: %w", err)
-// 		}
+// 	labs := []labormodels.Labor{
+// 		{Name: "Siembra", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+// 		{Name: "Cosecha", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+// 		{Name: "Fertilización", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+// 		{Name: "Herbicida", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+// 		{Name: "Laboreo", Base: sharedmodels.Base{CreatedBy: &defaultUser, UpdatedBy: &defaultUser}},
+// 	}
 
-// 		// 2) Traigo hasta 2 supplies
-// 		var supplies []supplymodels.Supply
-// 		if err := tx.Limit(2).Find(&supplies).Error; err != nil {
-// 			return fmt.Errorf("failed to query supplies: %w", err)
-// 		}
-// 		if len(supplies) == 0 {
-// 			return fmt.Errorf("not enough supplies: found %d", len(supplies))
-// 		}
+//		for _, l := range labs {
+//			if err := db.FirstOrCreate(&l, labormodels.Labor{Name: l.Name}).Error; err != nil {
+//				return fmt.Errorf("failed to seed labor %s: %w", l.Name, err)
+//			}
+//		}
+//		log.Println("Finished seeding labors")
+//		return nil
+//	}
 
-// 		// 3) Creo o recupero la workorder con número fijo "0001"
-// 		wo := workordermodels.Workorder{
-// 			Number:        "0001",
-// 			ProjectID:     project.ID,
-// 			FieldID:       field.ID,
-// 			LotID:         lot.ID,
-// 			CropID:        crop.ID,
-// 			LaborID:       1, // ajustar según datos existentes
-// 			Contractor:    "Demo Supplier",
-// 			Observations:  "Seeded automatically",
-// 			Date:          time.Now(),
-// 			InvestorID:    1,                         // ajustar según datos existentes
-// 			EffectiveArea: decimal.NewFromFloat(5.0), // ejemplo fijo
-// 			Base: sharedmodels.Base{
-// 				CreatedBy: &defaultUserID,
-// 				UpdatedBy: &defaultUserID,
-// 			},
-// 		}
-// 		if err := tx.
-// 			FirstOrCreate(&wo, workordermodels.Workorder{Number: wo.Number}).
-// 			Error; err != nil {
-// 			return fmt.Errorf("failed to seed workorder %s: %w", wo.Number, err)
-// 		}
+package seed
 
-// 		// 4) Creo o recupero los items asociados
-// 		for i, s := range supplies {
-// 			item := workordermodels.WorkorderItem{
-// 				WorkorderID: wo.ID,
-// 				SupplyID:    s.ID,
-// 				TotalUsed:   decimal.NewFromFloat(float64((i + 1) * 10)),
-// 				FinalDose:   decimal.NewFromFloat(float64((i + 1) * 2)),
-// 			}
-// 			cond := workordermodels.WorkorderItem{
-// 				WorkorderID: wo.ID,
-// 				SupplyID:    s.ID,
-// 			}
-// 			if err := tx.
-// 				FirstOrCreate(&item, cond).
-// 				Error; err != nil {
-// 				return fmt.Errorf("failed to seed workorder item for supply %d: %w", s.ID, err)
-// 			}
-// 		}
+import (
+	"context"
+	"fmt"
+	"time"
 
-// 		log.Printf("✅ Workorder %s seeded with %d items\n", wo.Number, len(supplies))
-// 		return nil
-// 	})
-// }
+	"gorm.io/gorm"
+
+	gormrepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	"github.com/shopspring/decimal"
+
+	campaignmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
+	categorymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
+	classtypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/repository/models"
+	cropmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
+	customermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
+	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
+	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	labormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
+	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
+	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
+	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
+	projectmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	supplymodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+	unitmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit/repository/models"
+	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
+)
+
+// Base runs all seeds in dependency order.
+func Base(ctx context.Context, repo *gormrepo.Repository) error {
+	defaultUser := int64(1)
+	seedFuncs := []func(*gorm.DB, int64) error{
+		seedCustomers,
+		seedCampaigns,
+		seedManagers,
+		seedInvestors,
+		seedCrops,
+		seedLeaseTypes,
+		seedCategories,
+		seedUnits,
+		seedClassTypes,
+		seedLabors,
+		seedProjects,
+		seedFields,
+		seedLots,
+		seedSupplyUnits,
+		seedSupplyCategories,
+		seedSupplyTypes,
+		seedSupplies,
+		seedWorkorders,
+	}
+	for _, f := range seedFuncs {
+		if err := f(repo.Client(), defaultUser); err != nil {
+			return fmt.Errorf("seeding error: %w", err)
+		}
+	}
+	fmt.Println("Seeds inserted successfully")
+	return nil
+}
+
+func floatPtr(f float64) *float64 { return &f }
+func newBase(uid int64) sharedmodels.Base {
+	now := time.Now()
+	return sharedmodels.Base{CreatedAt: now, UpdatedAt: now, CreatedBy: &uid, UpdatedBy: &uid}
+}
+
+// Each seed below creates 10 examples per entity.
+
+func seedCustomers(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Cliente %d", i)
+		c := customermodels.Customer{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&c, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedCampaigns(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Campaña %d", i)
+		c := campaignmodels.Campaign{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&c, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedManagers(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Manager %d", i)
+		m := managermodels.Manager{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&m, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedInvestors(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Investor %d", i)
+		inv := investormodels.Investor{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&inv, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedCrops(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Crop %d", i)
+		cr := cropmodels.Crop{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&cr, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedLeaseTypes(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("LeaseType %d", i)
+		lt := leasetypemodels.LeaseType{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&lt, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedCategories(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Category %d", i)
+		cm := categorymodels.Category{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&cm, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedUnits(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("unit%d", i)
+		um := unitmodels.Unit{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&um, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedClassTypes(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("ClassType %d", i)
+		ct := classtypemodels.ClassType{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&ct, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedLabors(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		name := fmt.Sprintf("Labor %d", i)
+		lb := labormodels.Labor{Name: name, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&lb, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedProjects(db *gorm.DB, userID int64) error {
+	var customers []customermodels.Customer
+	var campaigns []campaignmodels.Campaign
+	db.Find(&customers)
+	db.Find(&campaigns)
+	for i := 1; i <= 10; i++ {
+		cust := customers[(i-1)%len(customers)]
+		camp := campaigns[(i-1)%len(campaigns)]
+		name := fmt.Sprintf("Proyecto %d", i)
+		p := projectmodels.Project{Name: name, CustomerID: cust.ID, CampaignID: camp.ID, Base: newBase(userID)}
+		if err := db.FirstOrCreate(&p, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedFields(db *gorm.DB, userID int64) error {
+	var projects []projectmodels.Project
+	var leaseTypes []leasetypemodels.LeaseType
+	db.Find(&projects)
+	db.Find(&leaseTypes)
+	for i := 1; i <= 10; i++ {
+		proj := projects[(i-1)%len(projects)]
+		lt := leaseTypes[(i-1)%len(leaseTypes)]
+		name := fmt.Sprintf("Field %d", i)
+		f := fieldmodels.Field{Name: name, ProjectID: proj.ID, LeaseTypeID: lt.ID, LeaseTypePercent: floatPtr(10.0), LeaseTypeValue: floatPtr(500.0), Base: newBase(userID)}
+		if err := db.FirstOrCreate(&f, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedLots(db *gorm.DB, userID int64) error {
+	var fields []fieldmodels.Field
+	var crops []cropmodels.Crop
+	db.Find(&fields)
+	db.Find(&crops)
+	for i := 1; i <= 10; i++ {
+		fld := fields[(i-1)%len(fields)]
+		prv := crops[(i-1)%len(crops)]
+		nxt := crops[i%len(crops)]
+		name := fmt.Sprintf("Lot %d", i)
+		l := lotmodels.Lot{Name: name, FieldID: fld.ID, Hectares: float64(i * 5), PreviousCropID: prv.ID, CurrentCropID: nxt.ID, Season: "2025", Base: newBase(userID)}
+		if err := db.FirstOrCreate(&l, "name = ?", name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Supply seeding to satisfy FK on workorder_items
+func seedSupplyUnits(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		u := supplymodels.SupplyUnit{Name: fmt.Sprintf("SU%d", i)}
+		if err := db.FirstOrCreate(&u, "name = ?", u.Name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedSupplyCategories(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		c := categorymodels.Category{Name: fmt.Sprintf("SC%d", i), Base: newBase(userID)}
+		if err := db.FirstOrCreate(&c, "name = ?", c.Name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedSupplyTypes(db *gorm.DB, userID int64) error {
+	for i := 1; i <= 10; i++ {
+		t := classtypemodels.ClassType{Name: fmt.Sprintf("ST%d", i), Base: newBase(userID)}
+		if err := db.FirstOrCreate(&t, "name = ?", t.Name).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedSupplies(db *gorm.DB, userID int64) error {
+	var projects []projectmodels.Project
+	db.Find(&projects)
+	var units []supplymodels.SupplyUnit
+	var cats []categorymodels.Category
+	var typesArr []classtypemodels.ClassType
+	db.Find(&units)
+	db.Find(&cats)
+	db.Find(&typesArr)
+	for i := 1; i <= 10; i++ {
+		p := projects[(i-1)%len(projects)]
+		u := units[(i-1)%len(units)]
+		c := cats[(i-1)%len(cats)]
+		t := typesArr[(i-1)%len(typesArr)]
+		s := supplymodels.Supply{
+			Name:       fmt.Sprintf("Supply %d", i),
+			UnitID:     u.ID,
+			Price:      decimal.NewFromFloat(float64(10 * i)),
+			CategoryID: c.ID,
+			TypeID:     t.ID,
+			ProjectID:  p.ID,
+			Base:       newBase(userID),
+		}
+		if err := db.FirstOrCreate(&s, "name = ? AND project_id = ?", s.Name, p.ID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedWorkorders(db *gorm.DB, userID int64) error {
+	var projects []projectmodels.Project
+	var fields []fieldmodels.Field
+	var lots []lotmodels.Lot
+	var crops []cropmodels.Crop
+	var labors []labormodels.Labor
+	var investors []investormodels.Investor
+	var supplies []supplymodels.Supply
+
+	db.Find(&projects)
+	db.Find(&fields)
+	db.Find(&lots)
+	db.Find(&crops)
+	db.Find(&labors)
+	db.Find(&investors)
+	db.Find(&supplies)
+	for i := 1; i <= 10; i++ {
+		proj := projects[(i-1)%len(projects)]
+		fld := fields[(i-1)%len(fields)]
+		lot := lots[(i-1)%len(lots)]
+		cr := crops[(i-1)%len(crops)]
+		lb := labors[(i-1)%len(labors)]
+		inv := investors[(i-1)%len(investors)]
+		s1 := supplies[(2*(i-1))%len(supplies)]
+		s2 := supplies[(2*(i-1)+1)%len(supplies)]
+		number := fmt.Sprintf("%04d", i)
+		wo := workordermodels.Workorder{
+			Number:        number,
+			ProjectID:     proj.ID,
+			FieldID:       fld.ID,
+			LotID:         lot.ID,
+			CropID:        cr.ID,
+			LaborID:       lb.ID,
+			InvestorID:    inv.ID,
+			Date:          time.Now(),
+			EffectiveArea: decimal.NewFromFloat(5.5 * float64(i)),
+			Items: []workordermodels.WorkorderItem{
+				{SupplyID: s1.ID, TotalUsed: decimal.NewFromFloat(10 * float64(i)), FinalDose: decimal.NewFromFloat(1.5 * float64(i))},
+				{SupplyID: s2.ID, TotalUsed: decimal.NewFromFloat(8 * float64(i)), FinalDose: decimal.NewFromFloat(1.0 * float64(i))},
+			},
+			Base: newBase(userID),
+		}
+		if err := db.FirstOrCreate(&wo, "number = ?", number).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}

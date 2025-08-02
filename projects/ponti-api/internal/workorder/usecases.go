@@ -12,8 +12,8 @@ type RepositoryPort interface {
 	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
 	GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error)
 	//DuplicateWorkorder(context.Context, string) (string, error)
-	UpdateWorkorder(context.Context, *domain.Workorder) error
-	DeleteWorkorder(context.Context, string) error
+	UpdateWorkorderByID(context.Context, *domain.Workorder) error
+	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 }
 
@@ -41,12 +41,12 @@ func (u *UseCases) DuplicateWorkorder(ctx context.Context, number string) (strin
 	return "", nil
 }
 
-func (u *UseCases) UpdateWorkorder(ctx context.Context, o *domain.Workorder) error {
-	return u.repo.UpdateWorkorder(ctx, o)
+func (u *UseCases) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
+	return u.repo.UpdateWorkorderByID(ctx, o)
 }
 
-func (u *UseCases) DeleteWorkorder(ctx context.Context, number string) error {
-	return u.repo.DeleteWorkorder(ctx, number)
+func (u *UseCases) DeleteWorkorderByID(ctx context.Context, id int64) error {
+	return u.repo.DeleteWorkorderByID(ctx, id)
 }
 
 // ListWorkorders delega al repositorio
