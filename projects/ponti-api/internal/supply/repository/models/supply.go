@@ -12,7 +12,7 @@ import (
 // Tablas auxiliares normalizadas
 
 type SupplyUnit struct {
-	ID   uint   `gorm:"primaryKey;autoIncrement;column:id"`
+	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(20);unique;not null"`
 }
 
@@ -23,13 +23,13 @@ type Supply struct {
 	Name      string          `gorm:"type:varchar(100);not null"`
 	Price     decimal.Decimal `gorm:"not null"`
 
-	UnitID uint
+	UnitID int64
 	//Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
-	CategoryID uint
+	CategoryID int64
 	Category   catmod.Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
-	TypeID uint
+	TypeID int64
 	Type   classtype.ClassType `gorm:"foreignKey:TypeID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
 	sharedmodels.Base // Campos de auditoría (CreatedAt, UpdatedAt, etc)
@@ -60,9 +60,9 @@ func FromDomain(d *domain.Supply) *Supply {
 		ProjectID:  d.ProjectID,
 		Name:       d.Name,
 		Price:      d.Price,
-		UnitID:     uint(d.UnitID),
-		CategoryID: uint(d.CategoryID),
-		TypeID:     uint(d.TypeID),
+		UnitID:     int64(d.UnitID),
+		CategoryID: int64(d.CategoryID),
+		TypeID:     int64(d.TypeID),
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,

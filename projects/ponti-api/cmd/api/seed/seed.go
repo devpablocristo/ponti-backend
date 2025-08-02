@@ -561,7 +561,7 @@
 // 	}
 
 // 	// 3) Helpers para obtener IDs
-// 	unitID := func(name string) uint {
+// 	unitID := func(name string) int64 {
 // 		for _, u := range units {
 // 			if u.Name == name {
 // 				return u.ID
@@ -569,21 +569,21 @@
 // 		}
 // 		return units[0].ID
 // 	}
-// 	categoryID := func(name string) uint {
+// 	categoryID := func(name string) int64 {
 // 		for _, c := range categories {
 // 			if c.Name == name {
-// 				return uint(c.ID)
+// 				return int64(c.ID)
 // 			}
 // 		}
-// 		return uint(categories[0].ID)
+// 		return int64(categories[0].ID)
 // 	}
-// 	typeID := func(name string) uint {
+// 	typeID := func(name string) int64 {
 // 		for _, t := range typesArr {
 // 			if t.Name == name {
-// 				return uint(t.ID)
+// 				return int64(t.ID)
 // 			}
 // 		}
-// 		return uint(typesArr[0].ID)
+// 		return int64(typesArr[0].ID)
 // 	}
 
 // 	// 4) Construir lista de supplies
