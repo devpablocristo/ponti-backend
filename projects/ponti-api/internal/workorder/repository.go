@@ -81,32 +81,29 @@ func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Wo
 }
 
 func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
-	// 1) buscar el ID existente por número
-	var existing models.Workorder
-	if err := r.db.Client().WithContext(ctx).
-		Select("id").
-		Where("number = ?", o.Number).
-		First(&existing).Error; err != nil {
-
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return types.NewError(types.ErrNotFound, "workorder not found", err)
-		}
-		return types.NewError(types.ErrInternal, "failed to find workorder ID", err)
-	}
-
-	// 2) mapear dominio → GORM e inyectar el ID
+	// 1) Convertimos dominio → GORM y fijamos el ID que viene en o.ID
 	model := models.FromDomain(o)
-	model.ID = existing.ID
+	model.ID = o.ID
 
-	// 3) poblar UpdatedBy
+	// 2) Poblar UpdatedBy si hay usuario en contexto
 	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
 		model.UpdatedBy = &userID
 	}
 
-	// 4) guardar con asociaciones dentro de transacción
+	// 3) Ejecutar update en transacción, con FullSaveAssociations para reemplazar items
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
-			Save(model).Error; err != nil {
+		// Opcional: comprobaremos que la cabecera existe
+		if err := tx.First(&models.Workorder{}, model.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "workorder not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to find workorder before update", err)
+		}
+
+		// Save con FullSaveAssociations reemplaza la cabecera y todas las asociaciones (items)
+		if err := tx.
+			Session(&gorm.Session{FullSaveAssociations: true}).
+			Save(&model).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update workorder", err)
 		}
 		return nil

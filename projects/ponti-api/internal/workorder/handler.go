@@ -59,13 +59,16 @@ func (h *Handler) Routes() {
 
 	grp := r.Group(base)
 	{
-		grp.POST("", h.CreateWorkorder)
-		grp.GET("/:id", h.GetWorkorderByID)
+		grp.GET("/number/:number", h.GetWorkorderByNumber)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
+
+		grp.POST("", h.CreateWorkorder)
+
+		grp.GET("/:id", h.GetWorkorderByID)
 		grp.PUT("/:id", h.UpdateWorkorderByID)
 		grp.DELETE("/:id", h.DeleteWorkorderByID)
-		grp.GET("", h.ListWorkorders)
 
+		grp.GET("", h.ListWorkorders)
 	}
 }
 
@@ -105,6 +108,23 @@ func (h *Handler) GetWorkorderByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomain(wo))
+}
+
+func (h *Handler) GetWorkorderByNumber(c *gin.Context) {
+	// id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	// if err != nil {
+	// 	apiErr, status := types.NewAPIError(err)
+	// 	c.JSON(status, apiErr.ToResponse())
+	// 	return
+	// }
+
+	// wo, err := h.ucs.GetWorkorderByID(c, id)
+	// if err != nil {
+	// 	apiErr, status := types.NewAPIError(err)
+	// 	c.JSON(status, apiErr.ToResponse())
+	// 	return
+	// }
+	c.JSON(http.StatusOK, nil)
 }
 
 func (h *Handler) DuplicateWorkorder(c *gin.Context) {

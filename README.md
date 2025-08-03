@@ -276,3 +276,6 @@ Customer (1)──────(∞) Project (∞)──────(1) Campaign
 
 X-API-KEY abc123secreta
 X-USER-ID 123
+
+
+Workorders Update: update actualiza los valores pero LOS ITEMES PASADOS SON AÑADIDOS, PARA ACTUALIZARLOS, HAY Q HACER UNA IMPLEMENTACION NUEVA.
