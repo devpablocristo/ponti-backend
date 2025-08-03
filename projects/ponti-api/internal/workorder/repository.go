@@ -50,21 +50,6 @@ func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (
 	return model.ID, nil
 }
 
-func (r *Repository) GetWorkorderByNumber(ctx context.Context, number string) (*domain.Workorder, error) {
-	var m models.Workorder
-	if err := r.db.Client().WithContext(ctx).
-		Preload("Items").
-		Where("number = ?", number).
-		First(&m).Error; err != nil {
-
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "workorder not found", err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
-	}
-	return m.ToDomain(), nil
-}
-
 func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error) {
 	var m models.Workorder
 	if err := r.db.Client().WithContext(ctx).
@@ -81,7 +66,7 @@ func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Wo
 }
 
 func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
-	// 1) Convertimos dominio → GORM y fijamos el ID que viene en o.ID
+	// 1) Convertimos dominio → GORM y fijamos el ID
 	model := models.FromDomain(o)
 	model.ID = o.ID
 
@@ -90,22 +75,40 @@ func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorde
 		model.UpdatedBy = &userID
 	}
 
-	// 3) Ejecutar update en transacción, con FullSaveAssociations para reemplazar items
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Opcional: comprobaremos que la cabecera existe
-		if err := tx.First(&models.Workorder{}, model.ID).Error; err != nil {
+		// 3.1) Recuperar original para validar existencia y conservar auditoría
+		var orig models.Workorder
+		if err := tx.Preload("Items").First(&orig, model.ID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return types.NewError(types.ErrNotFound, "workorder not found", err)
 			}
 			return types.NewError(types.ErrInternal, "failed to find workorder before update", err)
 		}
 
-		// Save con FullSaveAssociations reemplaza la cabecera y todas las asociaciones (items)
+		// 3.2) Eliminar todos los items antiguos
 		if err := tx.
-			Session(&gorm.Session{FullSaveAssociations: true}).
-			Save(&model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update workorder", err)
+			Where("workorder_id = ?", model.ID).
+			Delete(&models.WorkorderItem{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete old items", err)
 		}
+
+		// 3.3) Actualizar sólo la cabecera, omitiendo campos de auditoría y la asociación Items
+		if err := tx.Model(&orig).
+			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items").
+			Updates(model).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to update workorder header", err)
+		}
+
+		// 3.4) Insertar los items nuevos, asignando WorkorderID
+		for i := range model.Items {
+			model.Items[i].WorkorderID = model.ID
+		}
+		if len(model.Items) > 0 {
+			if err := tx.Create(&model.Items).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to insert new items", err)
+			}
+		}
+
 		return nil
 	})
 }

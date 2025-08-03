@@ -34,9 +34,9 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 			if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 				log.Fatalf("Failed to run SQL migrations: %v", err)
 			}
-			if err := seed.Base(ctx, deps.GormRepo); err != nil {
-				log.Fatalf("Failed to run database seeders: %v", err)
-			}
+			// if err := seed.Base(ctx, deps.GormRepo); err != nil {
+			// 	log.Fatalf("Failed to run database seeders: %v", err)
+			// }
 
 		default:
 			log.Fatalf("Unsupported environment: %s", env)

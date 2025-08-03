@@ -14,7 +14,6 @@ import (
 
 type UseCasesPort interface {
 	CreateWorkorder(context.Context, *domain.Workorder) (int64, error)
-	GetWorkorderByNumber(context.Context, string) (*domain.Workorder, error)
 	GetWorkorderByID(context.Context, int64) (*domain.Workorder, error)
 	DuplicateWorkorder(context.Context, string) (string, error)
 	UpdateWorkorderByID(context.Context, *domain.Workorder) error
@@ -59,15 +58,12 @@ func (h *Handler) Routes() {
 
 	grp := r.Group(base)
 	{
-		grp.GET("/number/:number", h.GetWorkorderByNumber)
-		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 
 		grp.POST("", h.CreateWorkorder)
-
 		grp.GET("/:id", h.GetWorkorderByID)
 		grp.PUT("/:id", h.UpdateWorkorderByID)
 		grp.DELETE("/:id", h.DeleteWorkorderByID)
-
+		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.GET("", h.ListWorkorders)
 	}
 }

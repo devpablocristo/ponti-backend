@@ -1,0 +1,9 @@
+DELETE FROM workorder_items WHERE id = 1;
+DELETE FROM workorders WHERE id = 1;
+DELETE FROM supplies WHERE id = 1;
+DELETE FROM labors WHERE id = 1;
+DELETE FROM lots WHERE id = 1;
+DELETE FROM fields WHERE id = 1;
+DELETE FROM projects WHERE id = 1;
+DELETE FROM customers WHERE id = 1;
+DELETE FROM users WHERE id = 1;

@@ -1,5 +1,6 @@
 CREATE OR REPLACE VIEW workorder_list_view AS
 SELECT
+  w.id,
   w.number,
   p.name              AS project_name,
   f.name              AS field_name,
