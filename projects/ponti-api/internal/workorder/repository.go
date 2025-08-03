@@ -156,24 +156,33 @@ func (r *Repository) ListWorkorders(
 	filt domain.WorkorderFilter,
 	inp types.Input,
 ) ([]domain.WorkorderListElement, types.PageInfo, error) {
-	db := r.db.Client().WithContext(ctx)
+	// 1) Base del query: vinculada a la vista
+	base := r.db.Client().
+		WithContext(ctx).
+		Model(&models.WorkorderListElement{})
+
+	// 2) Aplicar filtros
 	if filt.ProjectID != nil {
-		db = db.Where("project_id = ?", *filt.ProjectID)
+		base = base.Where("project_id = ?", *filt.ProjectID)
 	}
 	if filt.FieldID != nil {
-		db = db.Where("field_id = ?", *filt.FieldID)
+		base = base.Where("field_id = ?", *filt.FieldID)
 	}
 
+	// 3) Contar total
 	var total int64
-	if err := db.Model(&models.WorkorderListElement{}).
+	if err := base.
 		Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to count workorders", err)
 	}
 
+	// 4) Paginación
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
+	// 5) Recuperar filas paginadas (reutiliza 'base' con filtros)
 	var rows []models.WorkorderListElement
-	if err := db.
+	if err := base.
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Order("number desc").
@@ -182,6 +191,7 @@ func (r *Repository) ListWorkorders(
 			"failed to list workorders", err)
 	}
 
+	// 6) Mapear a dominio
 	list := make([]domain.WorkorderListElement, len(rows))
 	for i, m := range rows {
 		list[i] = domain.WorkorderListElement{
@@ -206,6 +216,7 @@ func (r *Repository) ListWorkorders(
 		}
 	}
 
+	// 7) Construir PageInfo y devolver
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
 }

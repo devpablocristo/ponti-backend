@@ -106,23 +106,6 @@ func (h *Handler) GetWorkorderByID(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDomain(wo))
 }
 
-func (h *Handler) GetWorkorderByNumber(c *gin.Context) {
-	// id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	// if err != nil {
-	// 	apiErr, status := types.NewAPIError(err)
-	// 	c.JSON(status, apiErr.ToResponse())
-	// 	return
-	// }
-
-	// wo, err := h.ucs.GetWorkorderByID(c, id)
-	// if err != nil {
-	// 	apiErr, status := types.NewAPIError(err)
-	// 	c.JSON(status, apiErr.ToResponse())
-	// 	return
-	// }
-	c.JSON(http.StatusOK, nil)
-}
-
 func (h *Handler) DuplicateWorkorder(c *gin.Context) {
 	// orig := c.Param("number")
 	// newNum, err := h.ucs.DuplicateWorkorder(c.Request.Context(), orig)

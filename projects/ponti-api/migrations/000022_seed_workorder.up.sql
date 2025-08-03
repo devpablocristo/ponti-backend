@@ -1,5 +1,3 @@
--- 000023_seed_workorder.up.sql
-
 -- 0) Dummy user for audit FKs (self-referential)
 INSERT INTO users (
   id, email, username, password, token_hash, refresh_tokens,
@@ -24,14 +22,14 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO investors (
   id, name, created_by, updated_by, created_at, updated_at
 ) VALUES
-  (1, 'DemoInvestor',     1, 1, now(), now()),
-  (10,'DemoInvestor-10',  1, 1, now(), now())
+  (1, 'DemoInvestor',    1, 1, now(), now()),
+  (10,'DemoInvestor-10', 1, 1, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 -- 4) Crops
 INSERT INTO crops (id, name, created_by, updated_by) VALUES
-  (1, 'DemoCrop',    1, 1),
-  (4, 'DemoCrop-4',  1, 1)
+  (1, 'DemoCrop',   1, 1),
+  (4, 'DemoCrop-4', 1, 1)
 ON CONFLICT (id) DO NOTHING;
 
 -- 5) Lease types
@@ -39,11 +37,12 @@ INSERT INTO lease_types (id, name, created_by, updated_by) VALUES
   (1, 'DemoLease', 1, 1)
 ON CONFLICT (id) DO NOTHING;
 
--- 6) Projects
+-- 6) Projects (add both id=1 and id=2)
 INSERT INTO projects (
   id, name, customer_id, campaign_id, admin_cost, created_by, updated_by
 ) VALUES
-  (1, 'DemoProject', 1, 1, 1000.00, 1, 1)
+  (1, 'DemoProject-1', 1, 1, 1000.00, 1, 1),
+  (2, 'DemoProject-2', 1, 1, 1000.00, 1, 1)
 ON CONFLICT (id) DO NOTHING;
 
 -- 7) Fields
@@ -93,36 +92,48 @@ INSERT INTO supplies (
   (1, 1, 'DemoSupply', 20.00, NULL, 1, 1, 1, 1)
 ON CONFLICT (id) DO NOTHING;
 
--- 13) Workorder headers (IDs 1..10)
+-- 13) Workorder headers (IDs 1..12), variando project_id y field_id
 INSERT INTO workorders (
-  id,  number,    project_id, field_id, lot_id,
-  crop_id, labor_id,   contractor,       observations,
-  date,        investor_id, effective_area, created_by, updated_by, created_at, updated_at
+  id, number,   project_id, field_id, lot_id,
+  crop_id, labor_id, contractor, observations,
+  date, investor_id, effective_area,
+  created_by, updated_by, created_at, updated_at
 ) VALUES
-  (1,  'WO-001',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #1',  '2025-08-01',  1, 100.00, 1, 1, now(), now()),
-  (2,  'WO-002',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #2',  '2025-08-02',  1, 100.00, 1, 1, now(), now()),
-  (3,  'WO-003',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #3',  '2025-08-03',  1, 100.00, 1, 1, now(), now()),
-  (4,  'WO-004',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #4',  '2025-08-04',  1, 100.00, 1, 1, now(), now()),
-  (5,  'WO-005',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #5',  '2025-08-05',  1, 100.00, 1, 1, now(), now()),
-  (6,  'WO-006',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #6',  '2025-08-06',  1, 100.00, 1, 1, now(), now()),
-  (7,  'WO-007',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #7',  '2025-08-07',  1, 100.00, 1, 1, now(), now()),
-  (8,  'WO-008',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #8',  '2025-08-08',  1, 100.00, 1, 1, now(), now()),
-  (9,  'WO-009',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #9',  '2025-08-09',  1, 100.00, 1, 1, now(), now()),
-  (10, 'WO-010',  1, 1, 1, 1, 1, 'DemoContractor', 'Workorder #10', '2025-08-10',  1, 100.00, 1, 1, now(), now())
+  -- 3 con project=1 & field=1
+  ( 1, 'WO-001', 1, 1, 1, 1, 1, 'C1-F1', 'Obs1', '2025-08-01', 1, 10.0, 1, 1, now(), now()),
+  ( 2, 'WO-002', 1, 1, 1, 1, 1, 'C1-F1', 'Obs2', '2025-08-02', 1, 10.0, 1, 1, now(), now()),
+  ( 3, 'WO-003', 1, 1, 1, 1, 1, 'C1-F1', 'Obs3', '2025-08-03', 1, 10.0, 1, 1, now(), now()),
+
+  -- 3 con project=1 & field!=1  ⇒ project=1 total=6
+  ( 4, 'WO-004', 1, 2, 1, 1, 1, 'C1-F2', 'Obs4', '2025-08-04', 1, 10.0, 1, 1, now(), now()),
+  ( 5, 'WO-005', 1, 2, 1, 1, 1, 'C1-F2', 'Obs5', '2025-08-05', 1, 10.0, 1, 1, now(), now()),
+  ( 6, 'WO-006', 1, 2, 1, 1, 1, 'C1-F2', 'Obs6', '2025-08-06', 1, 10.0, 1, 1, now(), now()),
+
+  -- 3 con project!=1 & field=1  ⇒ field=1 total=6
+  ( 7, 'WO-007', 2, 1, 1, 1, 1, 'C2-F1', 'Obs7', '2025-08-07', 1, 10.0, 1, 1, now(), now()),
+  ( 8, 'WO-008', 2, 1, 1, 1, 1, 'C2-F1', 'Obs8', '2025-08-08', 1, 10.0, 1, 1, now(), now()),
+  ( 9, 'WO-009', 2, 1, 1, 1, 1, 'C2-F1', 'Obs9', '2025-08-09', 1, 10.0, 1, 1, now(), now()),
+
+  -- 3 con project!=1 & field!=1  ⇒ resto sin restricciones
+  (10, 'WO-010', 2, 2, 1, 1, 1, 'C2-F2', 'Obs10','2025-08-10', 1, 10.0, 1, 1, now(), now()),
+  (11, 'WO-011', 2, 2, 1, 1, 1, 'C2-F2', 'Obs11','2025-08-11', 1, 10.0, 1, 1, now(), now()),
+  (12, 'WO-012', 2, 2, 1, 1, 1, 'C2-F2', 'Obs12','2025-08-12', 1, 10.0, 1, 1, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
--- 14) Workorder items (one per workorder)
+-- 14) Workorder items (uno por workorder, IDs 1..12)
 INSERT INTO workorder_items (
   id, workorder_id, supply_id, total_used, final_dose, created_at, updated_at
 ) VALUES
-  (1,  1,  1,  10.0, 0.2, now(), now()),
-  (2,  2,  1,  20.0, 0.4, now(), now()),
-  (3,  3,  1,  30.0, 0.6, now(), now()),
-  (4,  4,  1,  40.0, 0.8, now(), now()),
-  (5,  5,  1,  50.0, 1.0, now(), now()),
-  (6,  6,  1,  60.0, 1.2, now(), now()),
-  (7,  7,  1,  70.0, 1.4, now(), now()),
-  (8,  8,  1,  80.0, 1.6, now(), now()),
-  (9,  9,  1,  90.0, 1.8, now(), now()),
-  (10, 10, 1, 100.0, 2.0, now(), now())
+  ( 1,  1, 1,  10.0, 0.2, now(), now()),
+  ( 2,  2, 1,  20.0, 0.4, now(), now()),
+  ( 3,  3, 1,  30.0, 0.6, now(), now()),
+  ( 4,  4, 1,  40.0, 0.8, now(), now()),
+  ( 5,  5, 1,  50.0, 1.0, now(), now()),
+  ( 6,  6, 1,  60.0, 1.2, now(), now()),
+  ( 7,  7, 1,  70.0, 1.4, now(), now()),
+  ( 8,  8, 1,  80.0, 1.6, now(), now()),
+  ( 9,  9, 1,  90.0, 1.8, now(), now()),
+  (10, 10, 1, 100.0, 2.0, now(), now()),
+  (11, 11, 1, 110.0, 2.2, now(), now()),
+  (12, 12, 1, 120.0, 2.4, now(), now())
 ON CONFLICT (id) DO NOTHING;
