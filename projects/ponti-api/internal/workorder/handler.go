@@ -63,7 +63,7 @@ func (h *Handler) Routes() {
 		grp.GET("/:id", h.GetWorkorderByID)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.PUT("/:id", h.UpdateWorkorderByID)
-		grp.DELETE("/:number", h.DeleteWorkorderByID)
+		grp.DELETE("/:id", h.DeleteWorkorderByID)
 		grp.GET("", h.ListWorkorders)
 
 	}
