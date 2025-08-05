@@ -25,6 +25,7 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
+	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 	"github.com/google/wire"
 )
 
@@ -38,7 +39,6 @@ type Dependencies struct {
 	CampaignHandler          *campaign.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
-	CommercializationHandler *commercialization.Handler
 	LotHandler               *lot.Handler
 	FieldHandler             *field.Handler
 	ManagerHandler           *manager.Handler
@@ -49,7 +49,9 @@ type Dependencies struct {
 	UnitHandler              *unit.Handler
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
+	WorkorderHandler         *workorder.Handler
 	LaborHandler             *labor.Handler
+	CommercializationHandler *commercialization.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -74,6 +76,7 @@ func Initialize() (*Dependencies, error) {
 		UnitSet,
 		ClassTypeSet,
 		DollarSet,
+		WorkorderSet,
 		LaborSet,
 		wire.Struct(new(Dependencies), "*"),
 	)

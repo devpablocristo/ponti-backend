@@ -38,19 +38,19 @@ type MiddlewaresEnginePort interface {
 
 // Handler encapsulates all dependencies for the Unit HTTP handler.
 type Handler struct {
-	unitUC UseCasesPort
-	gsv    GinEnginePort
-	acf    ConfigAPIPort
-	mws    MiddlewaresEnginePort
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
 // NewHandler creates a new Unit handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
-		unitUC: u,
-		gsv:    s,
-		acf:    c,
-		mws:    m,
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
@@ -58,6 +58,10 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/units"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
 
 	group := r.Group(baseURL)
 	{
@@ -69,7 +73,7 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListUnits(c *gin.Context) {
-	units, err := h.unitUC.ListUnits(c.Request.Context())
+	units, err := h.ucs.ListUnits(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -87,7 +91,7 @@ func (h *Handler) CreateUnit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	newID, err := h.unitUC.CreateUnit(c.Request.Context(), req.ToDomain())
+	newID, err := h.ucs.CreateUnit(c.Request.Context(), req.ToDomain())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -108,7 +112,7 @@ func (h *Handler) UpdateUnit(c *gin.Context) {
 	}
 	dom := req.ToDomain()
 	dom.ID = id
-	if err := h.unitUC.UpdateUnit(c.Request.Context(), dom); err != nil {
+	if err := h.ucs.UpdateUnit(c.Request.Context(), dom); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -121,7 +125,7 @@ func (h *Handler) DeleteUnit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid unit id"})
 		return
 	}
-	if err := h.unitUC.DeleteUnit(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteUnit(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}

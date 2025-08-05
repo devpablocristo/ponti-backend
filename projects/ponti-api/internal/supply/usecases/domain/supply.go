@@ -2,6 +2,7 @@ package domain
 
 import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Supply struct {
@@ -9,7 +10,7 @@ type Supply struct {
 	ProjectID  int64
 	Name       string
 	UnitID     int64
-	Price      float64
+	Price      decimal.Decimal
 	CategoryID int64
 	TypeID     int64
 
