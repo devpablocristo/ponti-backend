@@ -21,6 +21,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/invoice"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
@@ -198,6 +199,15 @@ func Initialize() (*Dependencies, error) {
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
 	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
+	invoiceGinEnginePort := ProvideInvoiceGinEnginePort(server)
+	invoiceGormEnginePort := ProvideInvoiceGormEnginePort(repository)
+	invoiceRepository := ProvideInvoiceRepository(invoiceGormEnginePort)
+	invoiceRepositoryPort := ProvideInvoiceRepositoryPort(invoiceRepository)
+	invoiceUseCases := ProvideInvoiceUseCases(invoiceRepositoryPort)
+	invoiceUseCasePort := ProvideInvoiceUseCasePort(invoiceUseCases)
+	invoiceConfigAPIPort := ProvideInvoiceConfigAPI(config)
+	invoiceMiddlewaresEnginePort := ProvideInvoiceMiddlewaresEnginePort(middlewares)
+	invoiceHandler := ProvideInvoiceHandler(invoiceGinEnginePort, invoiceUseCasePort, invoiceConfigAPIPort, invoiceMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                   config,
 		GinEngine:                server,
@@ -220,6 +230,7 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeHandler:         classtypeHandler,
 		DollarHandler:            dollarHandler,
 		LaborHandler:             laborHandler,
+		InvoiceHandler:           invoiceHandler,
 	}
 	return dependencies, nil
 }
@@ -248,4 +259,5 @@ type Dependencies struct {
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
 	LaborHandler             *labor.Handler
+	InvoiceHandler           *invoice.Handler
 }

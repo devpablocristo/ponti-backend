@@ -18,6 +18,7 @@ import (
 	dollarmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/repository/models"
 	fieldmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
+	invoicemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/invoice/repository/models"
 	leasetypemodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	lotmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	managermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/repository/models"
@@ -55,6 +56,7 @@ func runGormMigrations(ctx context.Context, repo *gorm.Repository) error {
 		&unitmodels.Unit{},
 		&dollarmodels.ProjectDollarValue{},
 		&projectmodels.ProjectInvestor{},
+		&invoicemodels.Invoice{},
 		&projectmodels.Project{}, // último
 	}
 

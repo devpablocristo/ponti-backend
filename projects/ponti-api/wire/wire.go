@@ -18,6 +18,7 @@ import (
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	invoice "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/invoice"
 	labor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
@@ -50,6 +51,7 @@ type Dependencies struct {
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
 	LaborHandler             *labor.Handler
+	InvoiceHandler           *invoice.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -75,6 +77,7 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeSet,
 		DollarSet,
 		LaborSet,
+		InvoiceSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
