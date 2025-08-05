@@ -26,8 +26,8 @@ JOIN fields f         ON f.id   = w.field_id
 JOIN lots l           ON l.id   = w.lot_id
 JOIN crops c          ON c.id   = w.crop_id
 JOIN labors lb        ON lb.id  = w.labor_id
--- ahora unimos por workorder_id en lugar de number
 JOIN workorder_items wi ON wi.workorder_id = w.id
 JOIN supplies s        ON s.id        = wi.supply_id
 JOIN types t           ON t.id        = s.type_id
-JOIN categories cat    ON cat.id      = s.category_id;
+JOIN categories cat    ON cat.id      = s.category_id
+WHERE w.deleted_at IS NULL;
