@@ -12,16 +12,16 @@ import (
 )
 
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
-	m, err := migrate.New(
-		migConfig.Dir,
-		buildMigrateDatabaseURL(dbConfig),
-	)
-	if err != nil {
-		return fmt.Errorf("error creating migrate instance: %w", err)
-	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("error applying migrations: %w", err)
-	}
+	// m, err := migrate.New(
+	// 	migConfig.Dir,
+	// 	buildMigrateDatabaseURL(dbConfig),
+	// )
+	// if err != nil {
+	// 	return fmt.Errorf("error creating migrate instance: %w", err)
+	// }
+	// if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	// 	return fmt.Errorf("error applying migrations: %w", err)
+	// }
 	return nil
 }
 
@@ -30,13 +30,6 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 	if err != nil {
 		return fmt.Errorf("creating postgres driver: %w", err)
 	}
-
-	// TODO: de referencia para ver como estaba hecha con config anterior
-	// m, err := migrate.NewWithDatabaseInstance(
-	// 	"file://migrations", //<--- migConfig.Dir, directorio de migraciones
-	// 	"postgres",          //<--- dbConfig.Name, nombre de la db
-	// 	driver,
-	// )
 
 	m, err := migrate.NewWithDatabaseInstance(
 		migConfig.Dir,

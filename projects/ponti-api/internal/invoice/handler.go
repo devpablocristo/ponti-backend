@@ -53,7 +53,7 @@ func NewHandler(u UseCasePort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEn
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.cfg.APIBaseURL() + "/workorders/:id/invoice"
+	baseURL := h.cfg.APIBaseURL() + "/invoice"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -61,16 +61,16 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.GET("", h.GetInvoiceByWorkOrder)
-		public.POST("", h.CreateInvoice)
-		public.PUT("", h.UpdateInvoice)
-		public.DELETE("", h.DeleteInvoice)
+		public.GET("/:workorderID", h.GetInvoiceByWorkOrder)
+		public.POST("/:workorderID", h.CreateInvoice)
+		public.PUT("/:workorderID", h.UpdateInvoice)
+		public.DELETE("/:workorderID", h.DeleteInvoice)
 
 	}
 }
 
 func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
-	id, ok := parseParamID(c, "id")
+	id, ok := parseParamID(c, "workorderID")
 	if !ok {
 		return
 	}
@@ -87,7 +87,7 @@ func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
 }
 
 func (h *Handler) CreateInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "id")
+	id, ok := parseParamID(c, "workorderID")
 	if !ok {
 		return
 	}
@@ -118,7 +118,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 }
 
 func (h *Handler) UpdateInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "id")
+	id, ok := parseParamID(c, "workorderID")
 	if !ok {
 		return
 	}
@@ -148,7 +148,7 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "id")
+	id, ok := parseParamID(c, "workorderID")
 	if !ok {
 		return
 	}

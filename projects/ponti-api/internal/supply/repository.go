@@ -84,10 +84,10 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		}
 		updates := map[string]any{
 			"name":        s.Name,
-			"unit_id":     uint(s.UnitID),
+			"unit_id":     int64(s.UnitID),
 			"price":       s.Price,
-			"category_id": uint(s.CategoryID),
-			"type_id":     uint(s.TypeID),
+			"category_id": int64(s.CategoryID),
+			"type_id":     int64(s.TypeID),
 			"project_id":  s.ProjectID,
 			"updated_by":  s.UpdatedBy,
 		}
@@ -159,10 +159,10 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 		for i := range supplies {
 			updates := map[string]any{
 				"name":        supplies[i].Name,
-				"unit_id":     uint(supplies[i].UnitID),
+				"unit_id":     int64(supplies[i].UnitID),
 				"price":       supplies[i].Price,
-				"category_id": uint(supplies[i].CategoryID),
-				"type_id":     uint(supplies[i].TypeID),
+				"category_id": int64(supplies[i].CategoryID),
+				"type_id":     int64(supplies[i].TypeID),
 				"project_id":  supplies[i].ProjectID,
 				"updated_by":  supplies[i].UpdatedBy,
 			}

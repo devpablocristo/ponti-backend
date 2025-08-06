@@ -29,6 +29,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
 // Injectors from wire.go:
@@ -90,15 +91,6 @@ func Initialize() (*Dependencies, error) {
 	cropConfigAPIPort := ProvideCropConfigAPI(config)
 	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
 	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
-	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
-	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
-	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
-	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
-	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
-	useCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
-	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(config)
-	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
-	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, useCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
 	lotGinEnginePort := ProvideLotGinEnginePort(server)
 	lotGormEnginePort := ProvideLotGormEnginePort(repository)
 	lotRepository := ProvideLotRepository(lotGormEnginePort)
@@ -186,10 +178,19 @@ func Initialize() (*Dependencies, error) {
 	dollarRepository := ProvideDollarRepository(dollarGormEnginePort)
 	dollarRepositoryPort := ProvideDollarRepositoryPort(dollarRepository)
 	dollarUseCases := ProvideDollarUseCases(dollarRepositoryPort)
-	dollarUseCasePort := ProvideDollarUseCasePort(dollarUseCases)
+	useCasePort := ProvideDollarUseCasePort(dollarUseCases)
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
-	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, dollarUseCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	workorderGinEnginePort := ProvideWorkorderGinEnginePort(server)
+	gormEngine := ProvideWorkorderGormEnginePort(repository)
+	workorderRepository := ProvideWorkorderRepository(gormEngine)
+	workorderRepositoryPort := ProvideWorkorderRepositoryPort(workorderRepository)
+	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort)
+	workorderUseCasesPort := ProvideWorkorderUseCasesPort(workorderUseCases)
+	workorderConfigAPIPort := ProvideWorkorderConfigAPI(config)
+	workorderMiddlewaresEnginePort := ProvideWorkorderMiddlewaresEnginePort(middlewares)
+	workorderHandler := ProvideWorkorderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
 	laborGinEnginePort := ProvideLaborGinEnginePort(server)
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
@@ -208,6 +209,15 @@ func Initialize() (*Dependencies, error) {
 	invoiceConfigAPIPort := ProvideInvoiceConfigAPI(config)
 	invoiceMiddlewaresEnginePort := ProvideInvoiceMiddlewaresEnginePort(middlewares)
 	invoiceHandler := ProvideInvoiceHandler(invoiceGinEnginePort, invoiceUseCasePort, invoiceConfigAPIPort, invoiceMiddlewaresEnginePort)
+	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
+	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
+	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
+	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
+	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
+	commercializationUseCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
+	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(config)
+	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
+	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, commercializationUseCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                   config,
 		GinEngine:                server,
@@ -218,7 +228,6 @@ func Initialize() (*Dependencies, error) {
 		CampaignHandler:          campaignHandler,
 		InvestorHandler:          investorHandler,
 		CropHandler:              cropHandler,
-		CommercializationHandler: commercializationHandler,
 		LotHandler:               lotHandler,
 		FieldHandler:             fieldHandler,
 		ManagerHandler:           managerHandler,
@@ -229,8 +238,10 @@ func Initialize() (*Dependencies, error) {
 		UnitHandler:              unitHandler,
 		ClassTypeHandler:         classtypeHandler,
 		DollarHandler:            dollarHandler,
+		WorkorderHandler:         workorderHandler,
 		LaborHandler:             laborHandler,
 		InvoiceHandler:           invoiceHandler,
+		CommercializationHandler: commercializationHandler,
 	}
 	return dependencies, nil
 }
@@ -247,7 +258,6 @@ type Dependencies struct {
 	CampaignHandler          *campaign.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
-	CommercializationHandler *commercialization.Handler
 	LotHandler               *lot.Handler
 	FieldHandler             *field.Handler
 	ManagerHandler           *manager.Handler
@@ -258,6 +268,8 @@ type Dependencies struct {
 	UnitHandler              *unit.Handler
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
+	WorkorderHandler         *workorder.Handler
 	LaborHandler             *labor.Handler
 	InvoiceHandler           *invoice.Handler
+	CommercializationHandler *commercialization.Handler
 }
