@@ -3,6 +3,7 @@ package stock
 import (
 	"context"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"time"
 )
@@ -13,6 +14,8 @@ type RepositoryPort interface {
 	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
+	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetStockByPeriodAndProjectIdAndFieldId(context.Context, int64, int64, int64, int64) (*domain.Stock, error)
 }
 
 type UseCases struct {
@@ -32,6 +35,22 @@ func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, err
 }
 
 func (u *UseCases) UpdateCloseDateByProjectAndField(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
+	stockFromDb, err := u.repo.GetStockByPeriodAndProjectIdAndFieldId(ctx, projectId, fieldId, monthPeriod, yearPeriod)
+	if err != nil {
+		return err
+	}
+
+	err = u.repo.UpdateCloseDateByProjectAndField(ctx, projectId, fieldId, monthPeriod, yearPeriod, stock)
+	if err != nil {
+		return err
+	}
+
+	newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, stockFromDb)
+	_, err = u.repo.CreateStock(ctx, &newStock)
+
+	if err != nil {
+		return err
+	}
 	return u.repo.UpdateCloseDateByProjectAndField(ctx, projectId, fieldId, monthPeriod, yearPeriod, stock)
 }
 
@@ -44,4 +63,44 @@ func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Sto
 		return nil, types.NewError(types.ErrInvalidInput, "stock id must be greater than 0", nil)
 	}
 	return u.repo.GetStockById(ctx, stockId)
+}
+
+func (u *UseCases) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastStockByProjectIdAndFieldId(ctx, projectId, fieldId)
+}
+
+func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
+	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
+	newStock := domain.Stock{
+		Project:        stock.Project,
+		Field:          stock.Field,
+		YearPeriod:     newYearPeriod,
+		MonthPeriod:    newMonthPeriod,
+		Supply:         stock.Supply,
+		Investor:       stock.Investor,
+		InitialStock:   stock.RealStockUnits,
+		RealStockUnits: stock.RealStockUnits,
+		Base: shareddomain.Base{
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			CreatedBy: &userId,
+			UpdatedBy: &userId,
+		},
+	}
+	return newStock
+}
+
+func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
+	var newMonthPeriod int64
+	var newYearPeriod int64
+
+	if monthPeriod == 12 {
+		newMonthPeriod = 1
+		newYearPeriod = yearPeriod + 1
+	} else {
+		newMonthPeriod = monthPeriod + 1
+		newYearPeriod = yearPeriod
+	}
+	return newMonthPeriod, newYearPeriod
+
 }

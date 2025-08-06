@@ -19,6 +19,7 @@ type UseCasesPort interface {
 	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
+	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64) (*domain.Stock, bool, error)
 }
 type GinEnginePort interface {
 	GetRouter() *gin.Engine

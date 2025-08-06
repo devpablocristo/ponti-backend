@@ -1,0 +1,25 @@
+package domain
+
+import (
+	investordomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
+	provaderdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	suplydomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	"time"
+)
+
+type SupplyMovement struct {
+	ID                   int64
+	StockId              int64
+	Quantity             float64
+	MovementType         string
+	MovementDate         time.Time
+	Reference            string
+	ProjectId            int64
+	ProjectDestinationId int64
+	FieldId              int64
+	Supply               *suplydomain.Supply
+	Investor             *investordomain.Investor
+	Provider             *provaderdomain.Provider
+	shareddomain.Base
+}

@@ -8,25 +8,28 @@ import (
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
+	supplymovmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/repository/models"
 	"time"
 )
 
 type Stock struct {
-	ID             int64                `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID      int64                `gorm:"not null;index;column:project_id"`
-	Project        projmod.Project      `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	FieldID        int64                `gorm:"not null;index;column:field_id"`
-	Field          fieldmod.Field       `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	SupplyID       int64                `gorm:"not null;index;column:supply_id"`
-	Supply         supplymod.Supply     `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	InvestorID     int64                `gorm:"not null;index;column:investor_id"`
-	Investor       investormod.Investor `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	CloseDate      time.Time            `gorm:"not null;column:close_date"`
-	YearPeriod     int64                `gorm:"not null;column:year_period"`
-	MonthPeriod    int64                `gorm:"not null;column:month_period"`
-	UnitsEntered   int64                `gorm:"not null;column:units_entered"`
-	UnitsConsumed  int64                `gorm:"not null;column:units_consumed"`
-	RealStockUnits int64                `gorm:"not null;column:real_stock_units"`
+	ID             int64                         `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID      int64                         `gorm:"not null;index;column:project_id"`
+	Project        projmod.Project               `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	FieldID        int64                         `gorm:"not null;index;column:field_id"`
+	Field          fieldmod.Field                `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	SupplyID       int64                         `gorm:"not null;index;column:supply_id"`
+	Supply         supplymod.Supply              `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	InvestorID     int64                         `gorm:"not null;index;column:investor_id"`
+	Investor       investormod.Investor          `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CloseDate      time.Time                     `gorm:"not null;column:close_date"`
+	SupplyMovement []supplymovmod.SupplyMovement `gorm:"foreignKey:StockID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	InitialStock   float64                       `gorm:"not null;column:initial_units"`
+	YearPeriod     int64                         `gorm:"not null;column:year_period"`
+	MonthPeriod    int64                         `gorm:"not null;column:month_period"`
+	UnitsEntered   int64                         `gorm:"not null;column:units_entered"`
+	UnitsConsumed  int64                         `gorm:"not null;column:units_consumed"`
+	RealStockUnits float64                       `gorm:"not null;column:real_stock_units"`
 	sharedmodels.Base
 }
 
@@ -45,8 +48,6 @@ func (m *Stock) ToDomain() *domain.Stock {
 		Field:          m.Field.ToDomain(),
 		Supply:         m.Supply.ToDomain(),
 		CloseDate:      closeDateNil,
-		UnitsEntered:   m.UnitsEntered,
-		UnitsConsumed:  m.UnitsConsumed,
 		RealStockUnits: m.RealStockUnits,
 		YearPeriod:     m.YearPeriod,
 		MonthPeriod:    m.MonthPeriod,
@@ -72,10 +73,10 @@ func FromDomain(d *domain.Stock) *Stock {
 		SupplyID:       d.Supply.ID,
 		InvestorID:     d.Investor.ID,
 		RealStockUnits: d.RealStockUnits,
-		UnitsEntered:   d.UnitsEntered,
-		UnitsConsumed:  d.UnitsConsumed,
 		YearPeriod:     d.YearPeriod,
 		MonthPeriod:    d.MonthPeriod,
+		InitialStock:   d.InitialStock,
+		SupplyMovement: []supplymovmod.SupplyMovement{},
 		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,
 			UpdatedAt: d.UpdatedAt,
