@@ -21,6 +21,7 @@ type UseCasesPort interface {
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
+	ListLaborByWorkorder(context.Context, int64) ([]domain.LaborListItem, error)
 }
 
 type GinEnginePort interface {
@@ -60,19 +61,24 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/labors"
+	baseURL := h.acf.APIBaseURL()
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL)
+	public := r.Group(baseURL + "/projects/:id/labors")
 	{
 		public.POST("", h.CreateLabor)
 		public.GET("", h.ListLabor)
 		public.DELETE("/:idLabor", h.DeleteLabor)
 		public.PUT("/:idLabor", h.UpdateLabor)
 		public.GET("/labor-categories/:typeId", h.ListLaborCategories)
+	}
+
+	workorderGroup := r.Group(baseURL + "/labors")
+	{
+		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
 	}
 }
 
@@ -248,4 +254,25 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 	resp := dto.NewLaborCategoriesListResponse(laborCategories)
 	c.JSON(http.StatusOK, resp)
 
+}
+
+func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
+	id := c.Param("workorderID")
+
+	workorderID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	resp := dto.ToLaborListResponse(items)
+	c.JSON(http.StatusOK, resp)
 }

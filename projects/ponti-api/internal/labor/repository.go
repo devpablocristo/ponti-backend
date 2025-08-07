@@ -3,6 +3,7 @@ package labor
 import (
 	"context"
 	"fmt"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"gorm.io/gorm"
@@ -123,4 +124,54 @@ func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int
 		}
 	}
 	return laborCategories, nil
+}
+
+func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
+	var rawModels []models.LaborRawItem
+
+	err := r.db.Client().
+		WithContext(ctx).
+		Table("workorders AS w").
+		Select(`
+            w.number                AS workorder_number,
+            w.date                  AS date,
+            p.name                  AS project_name,
+            f.name                  AS field_name,
+            c.name                  AS crop_name,
+            lb.name                 AS labor_name,
+            w.contractor            AS contractor,
+            w.effective_area        AS effective_area,
+            lb.price                AS price,
+            lb.contractor_name      AS contractor_name,
+            inv.name                AS investor_name
+        `).
+		Joins("INNER JOIN projects p   ON w.project_id    = p.id").
+		Joins("INNER JOIN fields f     ON w.field_id      = f.id").
+		Joins("INNER JOIN crops c      ON w.crop_id       = c.id").
+		Joins("INNER JOIN labors lb    ON w.labor_id      = lb.id").
+		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
+		Where("w.id = ?", workorderID).
+		Scan(&rawModels).Error
+
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
+	}
+
+	raws := make([]domain.LaborRawItem, len(rawModels))
+	for i, m := range rawModels {
+		raws[i] = domain.LaborRawItem{
+			WorkorderNumber: m.WorkorderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			CropName:        m.CropName,
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          m.CostHa,
+			CategoryName:    m.CategoryName,
+			InvestorName:    m.InvestorName,
+		}
+	}
+	return raws, nil
 }
