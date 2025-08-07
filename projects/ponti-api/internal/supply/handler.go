@@ -127,7 +127,7 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 	mode := c.Query("mode") // "and" o "or"
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
 
 	// Debes tener tu UC adaptado a paginar y devolver total
 	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), projectID, campaignID, page, perPage, mode)

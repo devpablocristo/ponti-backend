@@ -143,7 +143,7 @@ func (r *Repository) ListSuppliesPaginated(
 	}
 
 	offset := (page - 1) * perPage
-	if err := db.Offset(offset).Limit(perPage).Find(&supplies).Error; err != nil {
+	if err := db.Offset(offset).Limit(perPage).Order("name").Find(&supplies).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to list supplies with filters", err)
 	}
 
