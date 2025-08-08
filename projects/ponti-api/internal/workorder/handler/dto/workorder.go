@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"time"
 
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
@@ -14,6 +15,20 @@ type WorkorderItem struct {
 	SupplyID  int64           `json:"supply_id" binding:"required"`
 	TotalUsed decimal.Decimal `json:"total_used" binding:"required"`
 	FinalDose decimal.Decimal `json:"final_dose" binding:"required"`
+}
+
+// MarshalJSON asegura 2 decimales en los campos decimal de salida
+func (w WorkorderItem) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		SupplyID  int64           `json:"supply_id"`
+		TotalUsed decimal.Decimal `json:"total_used"`
+		FinalDose decimal.Decimal `json:"final_dose"`
+	}{
+		SupplyID:  w.SupplyID,
+		TotalUsed: w.TotalUsed,
+		FinalDose: w.FinalDose,
+	}
+	return json.Marshal(aux)
 }
 
 type Workorder struct {
@@ -30,6 +45,40 @@ type Workorder struct {
 	InvestorID    int64           `json:"investor_id" binding:"required"`
 	EffectiveArea decimal.Decimal `json:"effective_area" binding:"required"`
 	Items         []WorkorderItem `json:"items" binding:"required,dive"`
+}
+
+// MarshalJSON asegura 2 decimales en EffectiveArea (y deja que Items manejen su propio redondeo)
+func (r Workorder) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		ID            int64           `json:"id"`
+		Number        string          `json:"number"`
+		ProjectID     int64           `json:"project_id"`
+		FieldID       int64           `json:"field_id"`
+		LotID         int64           `json:"lot_id"`
+		CropID        int64           `json:"crop_id"`
+		LaborID       int64           `json:"labor_id"`
+		Contractor    string          `json:"contractor"`
+		Observations  string          `json:"observations"`
+		Date          utils.ISODate   `json:"date"`
+		InvestorID    int64           `json:"investor_id"`
+		EffectiveArea decimal.Decimal `json:"effective_area"`
+		Items         []WorkorderItem `json:"items"`
+	}{
+		ID:            r.ID,
+		Number:        r.Number,
+		ProjectID:     r.ProjectID,
+		FieldID:       r.FieldID,
+		LotID:         r.LotID,
+		CropID:        r.CropID,
+		LaborID:       r.LaborID,
+		Contractor:    r.Contractor,
+		Observations:  r.Observations,
+		Date:          r.Date,
+		InvestorID:    r.InvestorID,
+		EffectiveArea: r.EffectiveArea.Round(2),
+		Items:         r.Items,
+	}
+	return json.Marshal(aux)
 }
 
 func (r *Workorder) ToDomain() *domain.Workorder {
