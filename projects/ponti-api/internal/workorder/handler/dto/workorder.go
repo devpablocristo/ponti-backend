@@ -1,4 +1,3 @@
-// Package dto define los tipos de transferencia de datos (DTO) para órdenes de trabajo.
 package dto
 
 import (
