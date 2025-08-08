@@ -25,8 +25,8 @@ func (w WorkorderItem) MarshalJSON() ([]byte, error) {
 		FinalDose decimal.Decimal `json:"final_dose"`
 	}{
 		SupplyID:  w.SupplyID,
-		TotalUsed: w.TotalUsed.Round(2),
-		FinalDose: w.FinalDose.Round(2),
+		TotalUsed: w.TotalUsed,
+		FinalDose: w.FinalDose,
 	}
 	return json.Marshal(aux)
 }
