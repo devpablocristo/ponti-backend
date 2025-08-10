@@ -13,13 +13,14 @@ type SupplyMovement struct {
 	StockId              int64
 	Quantity             float64
 	MovementType         string
-	MovementDate         time.Time
-	Reference            string
+	MovementDate         *time.Time
+	ReferenceNumber      string
 	ProjectId            int64
 	ProjectDestinationId int64
 	FieldId              int64
 	Supply               *suplydomain.Supply
 	Investor             *investordomain.Investor
 	Provider             *provaderdomain.Provider
+	IsEntry 			 bool
 	shareddomain.Base
 }

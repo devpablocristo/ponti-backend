@@ -32,7 +32,12 @@ func (s *Stock) GetTotalUSD() float64 {
 func (s *Stock) GetStockUnits() float64 {
 	var stockUnits float64
 	for _, supplyMovement := range s.SupplyMovements {
-		stockUnits += supplyMovement.Quantity
+		if supplyMovement.IsEntry {
+			stockUnits += supplyMovement.Quantity
+		}else {
+			stockUnits += -supplyMovement.Quantity
+
+		}
 	}
 	return stockUnits + s.InitialStock
 }

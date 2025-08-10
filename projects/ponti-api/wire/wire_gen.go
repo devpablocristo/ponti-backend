@@ -27,6 +27,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 )
 
@@ -189,15 +190,25 @@ func Initialize() (*Dependencies, error) {
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
 	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
-	StockGinEnginePort := ProvideStockGinEnginePort(server)
-	StockGormEnginePort := ProvideStockGormEnginePort(repository)
-	StockRepository := ProvideStockRepository(StockGormEnginePort)
-	StockRepositoryPort := ProvideStockRepositoryPort(StockRepository)
-	StockUseCases := ProvideStockUseCases(StockRepositoryPort)
-	StockUseCasesPort := ProvideStockUseCasesPort(StockUseCases)
-	StockConfigAPIPort := ProvideStockConfigAPI(config)
-	StockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
-	StockHandler := ProvideStockHandler(StockGinEnginePort, StockUseCasesPort, StockConfigAPIPort, StockMiddlewaresEnginePort, projectUseCasesPort)
+	stockGinEnginePort := ProvideStockGinEnginePort(server)
+	stockGormEnginePort := ProvideStockGormEnginePort(repository)
+	stockRepository := ProvideStockRepository(stockGormEnginePort)
+	stockRepositoryPort := ProvideStockRepositoryPort(stockRepository)
+	stockUseCases := ProvideStockUseCases(stockRepositoryPort)
+	stockUseCasesPort := ProvideStockUseCasesPort(stockUseCases)
+	stockConfigAPIPort := ProvideStockConfigAPI(config)
+	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
+	stockHandler := ProvideStockHandler(stockGinEnginePort, stockUseCasesPort, stockConfigAPIPort, stockMiddlewaresEnginePort, projectUseCasesPort)
+	supplyMovementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
+	supplyMovementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
+	supplyMovementRepository := ProvideSupplyMovementRepository(supplyMovementGormEnginePort)
+	supplyMovementUseCase := ProvideSupplyMovementUseCases(stockUseCases, supplyMovementRepository)
+	supplyMovementUseCasePort := ProvideSupplyMovementUseCasesPort(supplyMovementUseCase)
+	supplyMovementConfigAPIPort := ProvideSupplyMovementConfigAPI(config)
+	supplyMovementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)
+	supplyMovementHandler := ProvideSupplyMovementHandler(supplyMovementGinEnginePort, supplyMovementUseCasePort, supplyMovementConfigAPIPort, supplyMovementMiddlewaresEnginePort, projectUseCases)
+
+
 	dependencies := &Dependencies{
 		Config:           config,
 		GinEngine:        server,
@@ -219,7 +230,8 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeHandler: classtypeHandler,
 		DollarHandler:    dollarHandler,
 		LaborHandler:     laborHandler,
-		StockHandler:     StockHandler,
+		StockHandler:     stockHandler,
+		SupplyMovementHandler: 	supplyMovementHandler,
 	}
 	return dependencies, nil
 }
@@ -248,4 +260,5 @@ type Dependencies struct {
 	DollarHandler    *dollar.Handler
 	LaborHandler     *labor.Handler
 	StockHandler     *stock.Handler
+	SupplyMovementHandler *supply_movement.Handler
 }

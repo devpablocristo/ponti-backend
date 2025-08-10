@@ -49,6 +49,7 @@ type Dependencies struct {
 	DollarHandler    *dollar.Handler
 	LaborHandler     *labor.Handler
 	StockHandler     *stock.Handler
+	SupplyMovement   *supply_movement.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -74,6 +75,7 @@ func Initialize() (*Dependencies, error) {
 		DollarSet,
 		LaborSet,
 		StockSet,
+		SupplyMovementSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

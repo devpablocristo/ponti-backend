@@ -1,3 +1,79 @@
 package dto
 
-// TODO: Adapt GetStockByIdResponse for supply_movement context
+import (
+	"fmt"
+	"time"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+)
+
+type GetEntrySupplyMovementsResponse struct {
+	Summary summary `json:"summary"`
+	EntrySupplyMovementsResponses []entrySupplyMovementsResponse `json:"entries"`
+}
+
+type summary struct{
+	TotalKg  float64 `json:"total_kg"`
+	TotalLt  float64 `json:"total_lt"`
+	TotalUSD float64 `json:"total_usd"`
+}
+
+type entrySupplyMovementsResponse struct{
+	ID int64 `json:"id"`
+	EntryType string `json:"entry_type"`
+	ReferenceNumber string `json:"reference_number"`
+	EntryDate time.Time `json:"entry_date"`
+	InvestorName string `json:"investor_name"`
+	SupplyName string `json:"supply_name"`
+	Quantity string `json:"quantity"`
+	Category string `json:"category"`
+	Type string `json:"type"`
+	ProviderName string `json:"provider_name"`
+	PriceUSD float64 `json:"price_usd"`
+	TotalUSD float64 `json:"total_usd"`
+
+}
+
+func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement)  entrySupplyMovementsResponse{
+	return entrySupplyMovementsResponse{
+		ID: dsm.ID,
+		EntryType: dsm.MovementType,
+		ReferenceNumber: dsm.ReferenceNumber,
+		EntryDate: *dsm.MovementDate,
+		InvestorName: dsm.Investor.Name,
+		SupplyName: dsm.Supply.Name,
+		Quantity: fmt.Sprintf("%.2f %s", dsm.Quantity, dsm.Supply.UnitName),
+		Category: dsm.Supply.CategoryName,
+		Type: dsm.Supply.Type.Name,
+		PriceUSD: dsm.Supply.Price,
+		TotalUSD: dsm.Supply.Price * dsm.Quantity,
+	}
+}
+
+func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) GetEntrySupplyMovementsResponse {
+	var totalKg float64
+	var totalLt float64
+	var totalUSD float64
+	var entrySupplyMovementsResponses []entrySupplyMovementsResponse
+
+	for i, supplyMovement := range entriesDomain {
+		entrySupplyMovementsResponses = append(
+			entrySupplyMovementsResponses,
+			entrySupplyMovementsResponseFromDomain(supplyMovement),
+	 	)
+		totalUSD =+ entrySupplyMovementsResponses[i].TotalUSD
+	}
+
+	summary := summary{
+		TotalKg: totalKg,
+		TotalLt: totalLt,
+		TotalUSD: totalUSD,
+	}
+
+	return GetEntrySupplyMovementsResponse{
+		Summary: summary,
+		EntrySupplyMovementsResponses: entrySupplyMovementsResponses,
+	}
+}
+
+

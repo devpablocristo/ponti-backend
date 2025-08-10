@@ -24,7 +24,7 @@ type Supply struct {
 	Price     float64 `gorm:"not null"`
 
 	UnitID uint
-	//Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
 	CategoryID uint
 	Category   catmod.Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
@@ -44,10 +44,12 @@ func (m *Supply) ToDomain() *domain.Supply {
 		UnitID:     int64(m.UnitID),
 		Price:      m.Price,
 		CategoryID: int64(m.CategoryID),
+		CategoryName: m.Category.Name,
 		Type: classdomain.ClassType{
 			ID:   int64(m.TypeID),
 			Name: m.Type.Name,
 		},
+		UnitName: m.Unit.Name,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -72,3 +74,4 @@ func FromDomain(d *domain.Supply) *Supply {
 		},
 	}
 }
+

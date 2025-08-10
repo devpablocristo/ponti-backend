@@ -10,8 +10,10 @@ type Supply struct {
 	ProjectID  int64
 	Name       string
 	UnitID     int64
+	UnitName   string
 	Price      float64
 	CategoryID int64
+	CategoryName string
 	Type       classdomain.ClassType
 
 	shareddomain.Base // Audit fields

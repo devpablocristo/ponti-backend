@@ -15,8 +15,8 @@ type SupplyMovement struct {
 	StockId              int64     `gorm:"not null;column:stock_id"`
 	Quantity             float64   `gorm:"not null;column:quantity"`
 	MovementType         string    `gorm:"type:movement_type;not null;column:movement_type"`
-	MovementDate         time.Time `gorm:"not null;column:movement_date"`
-	Reference            string    `gorm:"not null;column:reference"`
+	MovementDate         *time.Time `gorm:"not null;column:movement_date"`
+	ReferenceNumber      string    `gorm:"not null;column:reference_number"`
 	ProjectId            int64     `gorm:"not null;column:project_id"`
 	FieldId              int64     `gorm:"not null;column:field_id"`
 	ProjectDestinationId int64     `gorm:"not null;column:project_destination_id"`
@@ -37,7 +37,7 @@ func (s *SupplyMovement) ToDomain() *domain.SupplyMovement {
 		Quantity:             s.Quantity,
 		MovementType:         s.MovementType,
 		MovementDate:         s.MovementDate,
-		Reference:            s.Reference,
+		ReferenceNumber:      s.ReferenceNumber,
 		ProjectId:            s.ProjectId,
 		FieldId:              s.FieldId,
 		ProjectDestinationId: s.ProjectDestinationId,
@@ -61,7 +61,7 @@ func FromDomain(s *domain.SupplyMovement) *SupplyMovement {
 		Quantity:             s.Quantity,
 		MovementType:         s.MovementType,
 		MovementDate:         s.MovementDate,
-		Reference:            s.Reference,
+		ReferenceNumber:            s.ReferenceNumber,
 		ProjectId:            s.ProjectId,
 		FieldId:              s.FieldId,
 		ProjectDestinationId: s.ProjectDestinationId,

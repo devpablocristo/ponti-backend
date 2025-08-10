@@ -14,7 +14,7 @@ type RepositoryPort interface {
 	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectIdAndFieldId(context.Context, int64, int64, int64, int64) (*domain.Stock, error)
 }
 
@@ -65,8 +65,8 @@ func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Sto
 	return u.repo.GetStockById(ctx, stockId)
 }
 
-func (u *UseCases) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64) (*domain.Stock, bool, error) {
-	return u.repo.GetLastStockByProjectIdAndFieldId(ctx, projectId, fieldId)
+func (u *UseCases) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, supplyId int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastStockByProjectIdAndFieldId(ctx, projectId, fieldId,supplyId )
 }
 
 func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {

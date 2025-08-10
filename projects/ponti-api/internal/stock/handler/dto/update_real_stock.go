@@ -6,7 +6,7 @@ import (
 )
 
 type UpdateRealStockRequest struct {
-	RealStockUnits int64 `json:"real_stock_units"`
+	RealStockUnits float64 `json:"real_stock_units"`
 }
 
 func (r *UpdateRealStockRequest) ToDomain(updatedBy *int64) *domain.Stock {

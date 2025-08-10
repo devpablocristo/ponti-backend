@@ -1,58 +1,74 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"time"
+
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 )
 
 type GetStocksResponse struct {
-	Stocks      []GetStock `json:"items"`
+	Stocks      []GetStockSummary `json:"items"`
 	NetTotalUSD float64    `json:"net_total_usd"`
+	TotalLiters float32 `json:"total_liters"`
+	TotalKilograms float32 `json:"total_kilograms"`
 }
 
-type GetStock struct {
+type GetStockSummary struct {
 	ID              int64      `json:"id"`
 	SupplyName      string     `json:"supply_name"`
 	InvestorName    string     `json:"investor_name"`
-	UnitsEntered    int64      `json:"units_entered"`
-	UnitsConsumed   int64      `json:"units_consumed"`
-	StockUnits      int64      `json:"stock_units"`
-	RealStockUnits  int64      `json:"real_stock_units"`
-	StockDifference int64      `json:"stock_difference"`
+	StockUnits      float64      `json:"stock_units"`
+	RealStockUnits  float64      `json:"real_stock_units"`
+	StockDifference float64      `json:"stock_difference"`
 	TotalUSD        float64    `json:"total_usd"`
 	ClassType       string     `json:"class_type"`
 	CloseDate       *time.Time `json:"close_date"`
+
+	supplyUnitId int64
+
 }
 
 // FromDomain maps domain.Stock to GetStock DTO
-func FromDomain(s *domain.Stock) *GetStock {
-	return &GetStock{
+func FromDomain(s *domain.Stock) *GetStockSummary {
+	return &GetStockSummary{
 		ID:              s.ID,
 		InvestorName:    s.Investor.Name,
 		SupplyName:      s.Supply.Name,
-		UnitsEntered:    s.UnitsEntered,
-		UnitsConsumed:   s.UnitsConsumed,
 		StockUnits:      s.GetStockUnits(),
 		RealStockUnits:  s.RealStockUnits,
 		TotalUSD:        s.GetTotalUSD(),
 		StockDifference: s.GetStockDifference(),
 		CloseDate:       s.CloseDate,
 		ClassType:       s.Supply.Type.Name,
+		supplyUnitId: s.Supply.UnitID,
+
 	}
 }
 
 func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 	var netTotalUSD float64
-	listedStocks := make([]GetStock, len(stocks))
+	var totalKilograms float32
+	var totalLiters float32
+	listedStocks := make([]GetStockSummary, len(stocks))
 
 	for i, stock := range stocks {
 		listedStocks[i] = *FromDomain(stock)
 		netTotalUSD += stock.GetTotalUSD()
+		if listedStocks[i].supplyUnitId == 1 {
+			totalKilograms =+ float32(stock.GetStockUnits())
+		}
+		if listedStocks[i].supplyUnitId == 2 {
+			totalLiters =+ float32(stock.GetStockUnits())
+		}
 	}
+
+
 
 	return GetStocksResponse{
 		Stocks:      listedStocks,
 		NetTotalUSD: netTotalUSD,
+		TotalLiters: totalLiters,
+		TotalKilograms: totalKilograms,
 	}
 
 }

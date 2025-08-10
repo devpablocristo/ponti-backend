@@ -19,7 +19,7 @@ type UseCasesPort interface {
 	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
 }
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
@@ -67,14 +67,12 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 	public := r.Group(baseURL)
-	public.GET("/summary", h.getStocks)
-	public.POST("", h.CreateStock)
+	public.GET("/summary", h.getStocksSummary)
 	public.PUT("/close-date", h.UpdateStocksCloseDate)
 	public.PUT("/real-stock/:stockId", h.UpdateRealStock)
-	public.GET("/:stockId", h.GetStockById)
 }
 
-func (h *Handler) getStocks(c *gin.Context) {
+func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
 	fieldIdStr := c.Param("idField")
@@ -106,11 +104,10 @@ func (h *Handler) getStocks(c *gin.Context) {
 	cutoffDateStr := c.Query("cutoff_date")
 	var cutoffDate time.Time
 	if cutoffDateStr != "" {
-		cutoffDate, err := time.Parse("2006-01-02", cutoffDateStr)
+		cutoffDate, err = time.Parse("2006-01-02", cutoffDateStr)
 		if handleError(err, c) {
 			return
 		}
-		cutoffDate.UTC()
 	}
 
 	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, fieldId, monthPeriod, yearPeriod, cutoffDate)
@@ -122,63 +119,6 @@ func (h *Handler) getStocks(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (h *Handler) CreateStock(c *gin.Context) {
-	var req dto.CreateStocksRequest
-	ctx := c.Request.Context()
-	projectIdStr := c.Param("id")
-	fieldIdStr := c.Param("idField")
-
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-	_, err = h.ucps.GetProject(ctx, projectId)
-	if handleError(err, c) {
-		return
-	}
-
-	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	userID, err := sharedmodels.ConvertStringToID(c)
-	if handleError(err, c) {
-		return
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	var responses []dto.CreateStocksResponse
-	for _, stockReq := range req.Stocks {
-		var resp dto.CreateStocksResponse
-		err := stockReq.Validate()
-		if err != nil {
-			resp = dto.CreateStocksResponse{
-				StockID:     0,
-				SupplyID:    stockReq.SupplyID,
-				IsSaved:     false,
-				ErrorDetail: err.Error(),
-			}
-		} else {
-			stockId, err := h.ucs.CreateStock(ctx, stockReq.ToDomain(projectId, fieldId, &userID))
-			resp = dto.CreateStocksResponse{
-				StockID:  stockId,
-				SupplyID: stockReq.SupplyID,
-				IsSaved:  err == nil,
-			}
-			if err != nil {
-				resp.ErrorDetail = err.Error()
-			}
-		}
-
-		responses = append(responses, resp)
-	}
-	c.JSON(http.StatusMultiStatus, gin.H{"stocks": responses, "message": "stocks created"})
-}
 
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
@@ -272,22 +212,6 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.NewUpdateRealStockResponse("real stock updated successfully"))
-}
-
-func (h *Handler) GetStockById(c *gin.Context) {
-	ctx := c.Request.Context()
-	stockIdStr := c.Param("stockId")
-	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	stock, err := h.ucs.GetStockById(ctx, stockId)
-	if handleError(err, c) {
-		return
-	}
-	resp := dto.StockByIdResponseFromDomain(stock)
-	c.JSON(http.StatusOK, resp)
 }
 
 func handleError(err error, c *gin.Context) bool {

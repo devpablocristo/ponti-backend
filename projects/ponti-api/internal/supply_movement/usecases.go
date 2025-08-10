@@ -1,10 +1,8 @@
 package supply_movement
 
-// Usecases for supply_movement operations
 
 import (
 	"context"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	projdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	stockUseCases "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
@@ -14,9 +12,11 @@ import (
 )
 
 type RepositoryPort interface {
-	GetSupplyMovements(context.Context, int64, int64, time.Time, time.Time) ([]*domain.SupplyMovement, error)
+	GetEntriesSupplyMovementsByProjectID(context.Context, int64) ([]*domain.SupplyMovement, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
-	GetSupplyMovementById(context.Context, int64) (*domain.SupplyMovement, error)
+	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
+	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
+
 }
 
 type UseCases struct {
@@ -30,14 +30,10 @@ func NewUseCases(
 	return &UseCases{repo: repo, stockUseCases: stockUseCases}
 }
 
-func (u *UseCases) GetSupplyMovements(ctx context.Context, projectId int64, supplyId int64, fromDate, toDate time.Time) ([]*domain.SupplyMovement, error) {
-	return u.repo.GetSupplyMovements(ctx, projectId, supplyId, fromDate, toDate)
-}
-
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	stock, isFirst, error := u.stockUseCases.GetLastStockByProjectIdAndFieldId(ctx, movement.ProjectId, movement.FieldId)
-	if error != nil {
-		return 0, error
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectIdAndFieldId(ctx, movement.ProjectId, movement.FieldId, movement.Supply.ID)
+	if err != nil {
+		return 0, err
 	}
 	if isFirst {
 		stock = createStockDomainFromSupplyMovement(movement)
@@ -49,15 +45,29 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	}
 
 	movement.StockId = stock.ID
+
+	stock.RealStockUnits =+ movement.Quantity
+
+	err = u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock)
+	if err != nil {
+		return 0, err
+	}
+
 	return u.repo.CreateSupplyMovement(ctx, movement)
 }
 
-func (u *UseCases) GetSupplyMovementById(ctx context.Context, id int64) (*domain.SupplyMovement, error) {
-	if id <= 0 {
-		return nil, types.NewError(types.ErrInvalidInput, "supply movement id must be greater than 0", nil)
-	}
-	return u.repo.GetSupplyMovementById(ctx, id)
+func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectId int64) ([]*domain.SupplyMovement, error){
+	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectId)
 }
+
+func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
+	return u.repo.UpdateSupplyMovement(ctx, supplyMovement)
+}
+
+func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain.SupplyMovement, error){
+	return u.repo.GetSupplyMovementByID(ctx, id)
+}
+
 
 func createStockDomainFromSupplyMovement(supplyMovement *domain.SupplyMovement) *stockdomain.Stock {
 	return &stockdomain.Stock{

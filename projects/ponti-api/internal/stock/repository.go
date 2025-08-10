@@ -118,3 +118,52 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 	}
 	return stockModel.ToDomain(), nil
 }
+
+func(r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, supplyId int64) (*domain.Stock, bool, error){
+	var stockModel models.Stock
+	err := r.db.Client().WithContext(ctx).
+		Preload("Project").
+		Preload("Field").
+		Preload("Supply").
+		Preload("Supply.Type").
+		Preload("Investor").
+		Where("project_id = ?", projectId).
+		Where("field_id = ?", fieldId).
+		Where("supply_id = ?", supplyId).
+		Where("close_date is null").
+		First(&stockModel).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, true, nil
+		}
+
+		return nil, false, err
+	}
+
+	return stockModel.ToDomain(), false, nil
+
+}
+
+
+func (r *Repository) GetStockByPeriodAndProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64) (*domain.Stock, error){
+	var stockModel models.Stock
+
+	err := r.db.Client().WithContext(ctx).
+		Preload("Project").
+		Preload("Field").
+		Preload("Supply").
+		Preload("Supply.Type").
+		Preload("Investor").
+		Where("project_id = ?", projectId).
+		Where("field_id = ?", fieldId).
+		Where("month_period = ?", monthPeriod).
+		Where("year_period = ?", yearPeriod).
+		First(&stockModel).Error
+	
+	if err != nil {
+		return nil, err
+	}
+
+	return stockModel.ToDomain(), nil
+
+} 

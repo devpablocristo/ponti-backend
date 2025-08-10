@@ -5,7 +5,7 @@ import (
 )
 
 type StockUpdateRealUnits struct {
-	RealStockUnits int64 `gorm:"column:real_stock_units"`
+	RealStockUnits float64 `gorm:"column:real_stock_units"`
 	UpdatedBy      int64 `gorm:"column:updated_by"`
 }
 

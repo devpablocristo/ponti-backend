@@ -4,21 +4,22 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	createsupplymovement "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto/create_supply_movement"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
 	"github.com/gin-gonic/gin"
 )
 
-// Handler for supply_movement operations
 
 type UseCasesPort interface {
-	GetSupplyMovements(context.Context, int64, int64, time.Time, time.Time) ([]*domain.SupplyMovement, error)
+	GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectId int64) ([]*domain.SupplyMovement, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
-	GetSupplyMovementById(context.Context, int64) (*domain.SupplyMovement, error)
+	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
+	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 }
 
 type GinEnginePort interface {
@@ -37,13 +38,27 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
+func (h *Handler) Routes() {
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/projects/:id/fields/:idField/supply-movements"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
+	public := r.Group(baseURL)
+	{
+		public.POST("", h.CreateSupplyMovement)
+		public.GET("", h.GetSupplyMovementsByProjectID)
+	}
+}
+
 type Handler struct {
 	ucs  UseCasesPort
 	gsv  GinEnginePort
 	acf  ConfigAPIPort
 	mws  MiddlewaresEnginePort
 	ucpp project.UseCasesPort
-	ucps stock.UseCasesPort
 }
 
 func NewHandler(
@@ -62,71 +77,135 @@ func NewHandler(
 	}
 }
 
-// --- HANDLER ENDPOINTS ---
 
-// GetSupplyMovements handles GET /supply-movements
-func (h *Handler) GetSupplyMovements(c *gin.Context) {
-	projectIdStr := c.Query("project_id")
-	supplyIdStr := c.Query("supply_id")
-	fromDateStr := c.Query("from_date")
-	toDateStr := c.Query("to_date")
-
-	projectId, _ := strconv.ParseInt(projectIdStr, 10, 64)
-	supplyId, _ := strconv.ParseInt(supplyIdStr, 10, 64)
-
-	var fromDate, toDate time.Time
-	var err error
-	if fromDateStr != "" {
-		fromDate, err = time.Parse(time.RFC3339, fromDateStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from_date"})
-			return
-		}
-	}
-	if toDateStr != "" {
-		toDate, err = time.Parse(time.RFC3339, toDateStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to_date"})
-			return
-		}
-	}
-
-	movements, err := h.ucs.GetSupplyMovements(c.Request.Context(), projectId, supplyId, fromDate, toDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, dto.FromDomainList(movements))
-}
-
-// CreateSupplyMovement handles POST /supply-movements
 func (h *Handler) CreateSupplyMovement(c *gin.Context) {
-	var req dto.CreateSupplyMovementRequest
+	ctx := c.Request.Context()
+	var req createsupplymovement.CreateSupplyMovementRequestBulk
+
+	userID, err := sharedmodels.ConvertStringToID(c)
+	if handleError(err, c) {
+		return
+	}
+
+	projectIdStr := c.Param("id")
+	fieldIdStr := c.Param("idField")
+
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	movement := req.ToDomain()
-	id, err := h.ucs.CreateSupplyMovement(c.Request.Context(), movement)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+
+	var supplyMovementsResponse []createsupplymovement.CreateSupplyMovementResponse
+
+	for _, supplyMovement:= range req.SupplyMovements {
+		var supplyMovementResponse createsupplymovement.CreateSupplyMovementResponse
+
+		err = supplyMovement.Validate()
+		if err != nil {
+			supplyMovementResponse = createsupplymovement.NewErrorCreateSupplyMovementResponse(err.Error())
+		} else {
+			supplyMovementId, err := h.ucs.CreateSupplyMovement(ctx, supplyMovement.ToDomain(projectId, fieldId, &userID))
+			if err != nil {
+				supplyMovementResponse = createsupplymovement.NewErrorCreateSupplyMovementResponse(err.Error())
+			}else{
+				supplyMovementResponse = createsupplymovement.NewSuccessfulCreateSupplyMovementResponse(supplyMovementId)
+			}
+		}
+
+		supplyMovementsResponse = append(supplyMovementsResponse, supplyMovementResponse)
 	}
-	c.JSON(http.StatusOK, gin.H{"id": id})
+
+	c.JSON(http.StatusMultiStatus, createsupplymovement.CreateSupplyMovementBulkResponse{
+		SupplyMovements:  supplyMovementsResponse,
+	})
+
 }
 
-// GetSupplyMovementById handles GET /supply-movements/:id
-func (h *Handler) GetSupplyMovementById(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
+    ctx := c.Request.Context()
+
+    projectIdStr := c.Param("id")
+    projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+    if handleError(err, c) {
+        return
+    }
+
+    supplyMovements, err := h.ucs.GetEntriesSupplyMovementsByProjectID(ctx, projectId)
+    if handleError(err, c) {
+        return
+    }
+
+	c.JSON(http.StatusOK, dto.NewGetEntrySupplyMovementsResponse(supplyMovements))
+
+}
+
+func (h *Handler) UpdateSupplyMovementById(c *gin.Context){
+	ctx := c.Request.Context()
+	var req dto.UpdateSupplyMovementEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	movement, err := h.ucs.GetSupplyMovementById(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+
+    projectIdStr := c.Param("id")
+    projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+    if handleError(err, c) {
+        return
+    }
+
+	fieldIdStr := c.Param("idField")
+	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
+	if handleError(err, c) {
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(movement))
+
+	supplyMovementStr := c.Param("idSupplyMovement")
+	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	userID, err := sharedmodels.ConvertStringToID(c)
+	if handleError(err, c) {
+		return
+	}
+
+	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementId)
+	if handleError(err, c) {
+		return
+	}
+
+	if err = req.Validate(); handleError(err, c){
+		return
+	}
+	err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectId, fieldId, &userID, supplyMovement))
+
+	if handleError(err, c) {
+		return
+	}
+
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "supply movement updated successfully"})
+
+}
+
+
+
+
+func handleError(err error, c *gin.Context) bool {
+	if err == nil {
+		return false
+	}
+	apiErr, _ := types.NewAPIError(err)
+	c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	return true
 }
