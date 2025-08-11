@@ -2,10 +2,11 @@ package models
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type StockUpdateRealUnits struct {
-	RealStockUnits float64 `gorm:"column:real_stock_units"`
+	RealStockUnits decimal.Decimal `gorm:"column:real_stock_units"`
 	UpdatedBy      int64 `gorm:"column:updated_by"`
 }
 

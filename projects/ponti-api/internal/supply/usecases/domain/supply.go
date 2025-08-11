@@ -3,6 +3,7 @@ package domain
 import (
 	classdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Supply struct {
@@ -11,7 +12,7 @@ type Supply struct {
 	Name       string
 	UnitID     int64
 	UnitName   string
-	Price      float64
+	Price      decimal.Decimal
 	CategoryID int64
 	CategoryName string
 	Type       classdomain.ClassType

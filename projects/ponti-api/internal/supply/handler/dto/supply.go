@@ -6,14 +6,15 @@ import (
 
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	decimal "github.com/shopspring/decimal"
 )
 
 // DTO para entrada y salida (puedes separarlo si quieres)
 type Supply struct {
-	ID        int64   `json:"id,omitempty"`
-	ProjectID int64   `json:"project_id"`
-	Name      string  `json:"name"`
-	Price     float64 `json:"price"`
+	ID        int64           `json:"id,omitempty"`
+	ProjectID int64           `json:"project_id"`
+	Name      string          `json:"name"`
+	Price     decimal.Decimal `json:"price"`
 
 	UnitID     int64 `json:"unit_id"`
 	CategoryID int64 `json:"category_id"`

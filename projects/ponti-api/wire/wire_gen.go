@@ -15,6 +15,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
@@ -29,6 +30,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
 // Injectors from wire.go:
@@ -181,6 +183,15 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
+	workorderGinEnginePort := ProvideWorkorderGinEnginePort(server)
+	gormEngine := ProvideWorkorderGormEnginePort(repository)
+	workorderRepository := ProvideWorkorderRepository(gormEngine)
+	workorderRepositoryPort := ProvideWorkorderRepositoryPort(workorderRepository)
+	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort)
+	workorderUseCasesPort := ProvideWorkorderUseCasesPort(workorderUseCases)
+	workorderConfigAPIPort := ProvideWorkorderConfigAPI(config)
+	workorderMiddlewaresEnginePort := ProvideWorkorderMiddlewaresEnginePort(middlewares)
+	workorderHandler := ProvideWorkorderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
 	laborGinEnginePort := ProvideLaborGinEnginePort(server)
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
@@ -190,6 +201,15 @@ func Initialize() (*Dependencies, error) {
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
 	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
+	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
+	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
+	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
+	commercializationRepositoryPort := ProvideCommercializationRepositoryPort(commercializationRepository)
+	commercializationUseCases := ProvideCommercializationUseCases(commercializationRepositoryPort)
+	commercializationUseCasePort := ProvideCommercializationUseCasePort(commercializationUseCases)
+	commercializationConfigAPIPort := ProvideCommercializationConfigAPI(config)
+	commercializationMiddlewaresEnginePort := ProvideCommercializationMiddlewaresEnginePort(middlewares)
+	commercializationHandler := ProvideCommercializationHandler(commercializationGinEnginePort, commercializationUseCasePort, commercializationConfigAPIPort, commercializationMiddlewaresEnginePort)
 	stockGinEnginePort := ProvideStockGinEnginePort(server)
 	stockGormEnginePort := ProvideStockGormEnginePort(repository)
 	stockRepository := ProvideStockRepository(stockGormEnginePort)
@@ -208,30 +228,31 @@ func Initialize() (*Dependencies, error) {
 	supplyMovementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)
 	supplyMovementHandler := ProvideSupplyMovementHandler(supplyMovementGinEnginePort, supplyMovementUseCasePort, supplyMovementConfigAPIPort, supplyMovementMiddlewaresEnginePort, projectUseCases)
 
-
 	dependencies := &Dependencies{
-		Config:           config,
-		GinEngine:        server,
-		GormRepo:         repository,
-		Middlewares:      middlewares,
-		WordsSuggester:   pkgsuggesterWordsSuggester,
-		CustomerHandler:  handler,
-		CampaignHandler:  campaignHandler,
-		InvestorHandler:  investorHandler,
-		CropHandler:      cropHandler,
-		LotHandler:       lotHandler,
-		FieldHandler:     fieldHandler,
-		ManagerHandler:   managerHandler,
-		ProjectHandler:   projectHandler,
-		LeaseTypeHandler: leasetypeHandler,
-		SupplyHandler:    supplyHandler,
-		CategoryHandler:  categoryHandler,
-		UnitHandler:      unitHandler,
-		ClassTypeHandler: classtypeHandler,
-		DollarHandler:    dollarHandler,
-		LaborHandler:     laborHandler,
-		StockHandler:     stockHandler,
-		SupplyMovementHandler: 	supplyMovementHandler,
+		Config:                   config,
+		GinEngine:                server,
+		GormRepo:                 repository,
+		Middlewares:              middlewares,
+		WordsSuggester:           pkgsuggesterWordsSuggester,
+		CustomerHandler:          handler,
+		CampaignHandler:          campaignHandler,
+		InvestorHandler:          investorHandler,
+		CropHandler:              cropHandler,
+		LotHandler:               lotHandler,
+		FieldHandler:             fieldHandler,
+		ManagerHandler:           managerHandler,
+		ProjectHandler:           projectHandler,
+		LeaseTypeHandler:         leasetypeHandler,
+		SupplyHandler:            supplyHandler,
+		CategoryHandler:          categoryHandler,
+		UnitHandler:              unitHandler,
+		ClassTypeHandler:         classtypeHandler,
+		DollarHandler:            dollarHandler,
+		WorkorderHandler:         workorderHandler,
+		LaborHandler:             laborHandler,
+		CommercializationHandler: commercializationHandler,
+		StockHandler: stockHandler,
+		SupplyMovementHandler: supplyMovementHandler,
 	}
 	return dependencies, nil
 }
@@ -239,26 +260,29 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config           *config.Config
-	GinEngine        *pkggin.Server
-	GormRepo         *pkggorm.Repository
-	Middlewares      *pkgmwr.Middlewares
-	WordsSuggester   *pkgsuggester.WordsSuggester
-	CustomerHandler  *customer.Handler
-	CampaignHandler  *campaign.Handler
-	InvestorHandler  *investor.Handler
-	CropHandler      *crop.Handler
-	LotHandler       *lot.Handler
-	FieldHandler     *field.Handler
-	ManagerHandler   *manager.Handler
-	ProjectHandler   *project.Handler
-	LeaseTypeHandler *leasetype.Handler
-	SupplyHandler    *supply.Handler
-	CategoryHandler  *category.Handler
-	UnitHandler      *unit.Handler
-	ClassTypeHandler *classtype.Handler
-	DollarHandler    *dollar.Handler
-	LaborHandler     *labor.Handler
+	Config                   *config.Config
+	GinEngine                *pkggin.Server
+	GormRepo                 *pkggorm.Repository
+	Middlewares              *pkgmwr.Middlewares
+	WordsSuggester           *pkgsuggester.WordsSuggester
+	CustomerHandler          *customer.Handler
+	CampaignHandler          *campaign.Handler
+	InvestorHandler          *investor.Handler
+	CropHandler              *crop.Handler
+	LotHandler               *lot.Handler
+	FieldHandler             *field.Handler
+	ManagerHandler           *manager.Handler
+	ProjectHandler           *project.Handler
+	LeaseTypeHandler         *leasetype.Handler
+	SupplyHandler            *supply.Handler
+	CategoryHandler          *category.Handler
+	UnitHandler              *unit.Handler
+	ClassTypeHandler         *classtype.Handler
+	DollarHandler            *dollar.Handler
+	WorkorderHandler         *workorder.Handler
+	LaborHandler             *labor.Handler
+	CommercializationHandler *commercialization.Handler
 	StockHandler     *stock.Handler
 	SupplyMovementHandler *supply_movement.Handler
+
 }

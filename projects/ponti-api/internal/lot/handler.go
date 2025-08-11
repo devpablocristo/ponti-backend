@@ -217,8 +217,8 @@ func (h *Handler) GetLotKPIs(c *gin.Context) {
 	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
 	cropType := c.DefaultQuery("crop_type", "current") // current | previous | both
 
-	if projectID <= 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id is required"})
+	if projectID <= 0 && fieldID <= 0 {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id or field_id is required"})
 		return
 	}
 
@@ -290,7 +290,7 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 			Tons:           row.Tons,
 			Dates:          dates,
 			UpdatedAt:      row.UpdatedAt,
-			CostPerHectare: row.CostPerHectare,
+			AdminCost:      row.AdminCost,
 		}
 	}
 	c.JSON(http.StatusOK, dto.LotTableResponse{

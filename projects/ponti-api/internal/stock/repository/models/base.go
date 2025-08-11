@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	projmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
@@ -9,7 +11,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	supplymovmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/repository/models"
-	"time"
+	"github.com/shopspring/decimal"
 )
 
 type Stock struct {
@@ -24,12 +26,12 @@ type Stock struct {
 	Investor       investormod.Investor          `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	CloseDate      time.Time                     `gorm:"not null;column:close_date"`
 	SupplyMovement []supplymovmod.SupplyMovement `gorm:"foreignKey:StockID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	InitialStock   float64                       `gorm:"not null;column:initial_units"`
+	InitialStock   decimal.Decimal                       `gorm:"not null;column:initial_units"`
 	YearPeriod     int64                         `gorm:"not null;column:year_period"`
 	MonthPeriod    int64                         `gorm:"not null;column:month_period"`
 	UnitsEntered   int64                         `gorm:"not null;column:units_entered"`
 	UnitsConsumed  int64                         `gorm:"not null;column:units_consumed"`
-	RealStockUnits float64                       `gorm:"not null;column:real_stock_units"`
+	RealStockUnits decimal.Decimal                       `gorm:"not null;column:real_stock_units"`
 	sharedmodels.Base
 }
 

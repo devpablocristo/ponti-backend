@@ -84,10 +84,10 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		}
 		updates := map[string]any{
 			"name":        s.Name,
-			"unit_id":     uint(s.UnitID),
+			"unit_id":     int64(s.UnitID),
 			"price":       s.Price,
-			"category_id": uint(s.CategoryID),
-			"type_id":     uint(s.Type.ID),
+			"category_id": int64(s.CategoryID),
+			"type_id":     s.Type.ID,
 			"project_id":  s.ProjectID,
 			"updated_by":  s.UpdatedBy,
 		}
@@ -143,7 +143,7 @@ func (r *Repository) ListSuppliesPaginated(
 	}
 
 	offset := (page - 1) * perPage
-	if err := db.Offset(offset).Limit(perPage).Find(&supplies).Error; err != nil {
+	if err := db.Offset(offset).Limit(perPage).Order("name").Find(&supplies).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to list supplies with filters", err)
 	}
 
@@ -159,10 +159,10 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 		for i := range supplies {
 			updates := map[string]any{
 				"name":        supplies[i].Name,
-				"unit_id":     uint(supplies[i].UnitID),
+				"unit_id":     int64(supplies[i].UnitID),
 				"price":       supplies[i].Price,
-				"category_id": uint(supplies[i].CategoryID),
-				"type_id":     uint(supplies[i].Type.ID),
+				"category_id": int64(supplies[i].CategoryID),
+				"type_id":     supplies[i].Type.ID,
 				"project_id":  supplies[i].ProjectID,
 				"updated_by":  supplies[i].UpdatedBy,
 			}

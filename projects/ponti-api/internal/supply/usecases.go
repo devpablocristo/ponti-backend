@@ -95,8 +95,8 @@ func (u *UseCases) ListSuppliesPaginated(
 	if page < 1 {
 		page = 1
 	}
-	if perPage <= 0 || perPage > 100 {
-		perPage = 20
+	if perPage <= 0 || perPage > 1000 {
+		perPage = 1000
 	}
 	return u.repo.ListSuppliesPaginated(ctx, projectID, campaignID, mode, page, perPage)
 }

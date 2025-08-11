@@ -1,19 +1,21 @@
 package models
 
 import (
+	"time"
+
 	investormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	provmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/repository/models"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
-	"time"
+	"github.com/shopspring/decimal"
 )
 
 type SupplyMovement struct {
 	ID                   int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	StockId              int64     `gorm:"not null;column:stock_id"`
-	Quantity             float64   `gorm:"not null;column:quantity"`
+	Quantity             decimal.Decimal   `gorm:"not null;column:quantity"`
 	MovementType         string    `gorm:"type:movement_type;not null;column:movement_type"`
 	MovementDate         *time.Time `gorm:"not null;column:movement_date"`
 	ReferenceNumber      string    `gorm:"not null;column:reference_number"`

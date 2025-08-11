@@ -1,43 +1,11 @@
 services:
-  ponti-api:
-    build:
-      context: ../../
-      dockerfile: ./projects/ponti-api/Dockerfile.docker.dev
-    image: "ponti-api:${APP_VERSION}"
-    env_file:
-      - .env
-      - .env.docker.dev
-    ports:
-      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
-      - "${DEBUGGER_PORT}:${DEBUGGER_PORT}"
-    volumes:
-      - type: bind
-        source: ../../
-        target: /app
-      - /var/run/docker.sock:/var/run/docker.sock
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      - GO111MODULE=on
-      - BUILDING_FILES=/app/cmd/api/main.go
-      - APP_NAME=${APP_NAME}
-    depends_on:
-      ponti-db:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: on-failure
-    command: tail -f /dev/null
-
   ponti-db:
     image: postgres:16.3
     ports:
       - "${DB_PORT}:${DB_PORT}"
     env_file:
       - .env
-      - .env.docker.dev
+      - .env.mix.stg
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -49,7 +17,7 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ponti_api_db -p ${DB_PORT}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -62,7 +30,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.docker.dev
+      - .env.mix.stg
     volumes:
       - ./migrations:/migrations
     environment:
@@ -74,7 +42,7 @@ services:
       - DB_SSL_MODE=${DB_SSL_MODE}
     command: [
       "-path", "/migrations",
-      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}",
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:${DB_PORT}/ponti_api_db?sslmode=${DB_SSL_MODE}",
       "up"
     ]
     networks:
@@ -86,7 +54,7 @@ services:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
     env_file:
       - .env
-      - .env.docker.dev
+      - .env.mix.stg
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}

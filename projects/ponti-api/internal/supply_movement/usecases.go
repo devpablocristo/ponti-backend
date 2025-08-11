@@ -46,7 +46,7 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 
 	movement.StockId = stock.ID
 
-	stock.RealStockUnits =+ movement.Quantity
+	stock.RealStockUnits = movement.Quantity
 
 	err = u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock)
 	if err != nil {

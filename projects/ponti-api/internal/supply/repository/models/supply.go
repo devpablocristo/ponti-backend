@@ -6,30 +6,31 @@ import (
 	classdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 // Tablas auxiliares normalizadas
 
 type SupplyUnit struct {
-	ID   uint   `gorm:"primaryKey;autoIncrement;column:id"`
+	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Name string `gorm:"type:varchar(20);unique;not null"`
 }
 
 // Modelo principal de Supply
 type Supply struct {
-	ID        int64   `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID int64   `gorm:"not null;index"`
-	Name      string  `gorm:"type:varchar(100);not null"`
-	Price     float64 `gorm:"not null"`
+	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID int64           `gorm:"not null;index"`
+	Name      string          `gorm:"type:varchar(100);not null"`
+	Price     decimal.Decimal `gorm:"not null"`
 
-	UnitID uint
+	UnitID int64
 	Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
-	CategoryID uint
+	CategoryID int64
 	Category   catmod.Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
-	TypeID uint
+	TypeID int64
 	Type   classtype.ClassType `gorm:"foreignKey:TypeID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
 	sharedmodels.Base // Campos de auditoría (CreatedAt, UpdatedAt, etc)
@@ -65,9 +66,9 @@ func FromDomain(d *domain.Supply) *Supply {
 		ProjectID:  d.ProjectID,
 		Name:       d.Name,
 		Price:      d.Price,
-		UnitID:     uint(d.UnitID),
-		CategoryID: uint(d.CategoryID),
-		TypeID:     uint(d.Type.ID),
+		UnitID:     int64(d.UnitID),
+		CategoryID: int64(d.CategoryID),
+		TypeID:     int64(d.Type.ID),
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,

@@ -6,12 +6,13 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 
 
 type UpdateSupplyMovementEntryRequest struct {
-	Quantity             *float64   `json:"quantity"`
+	Quantity             *decimal.Decimal   `json:"quantity"`
 	MovementType         *string    `json:"movement_type"`
 	MovementDate         *time.Time `json:"movement_date"`
 	ReferenceNumber            *string    `json:"reference_number"`

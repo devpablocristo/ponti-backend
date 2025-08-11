@@ -3,10 +3,11 @@ package dto
 import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type UpdateRealStockRequest struct {
-	RealStockUnits float64 `json:"real_stock_units"`
+	RealStockUnits decimal.Decimal `json:"real_stock_units"`
 }
 
 func (r *UpdateRealStockRequest) ToDomain(updatedBy *int64) *domain.Stock {

@@ -5,6 +5,7 @@ import (
 
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 type LotTable struct {
@@ -21,8 +22,8 @@ type LotTable struct {
 	SowedArea      float64
 	Season         string
 	Tons           int
-	UpdatedAt      *time.Time `gorm:"updated_at,omitempty"`
-	CostPerHectare float64
+	UpdatedAt      *time.Time      `gorm:"updated_at,omitempty"`
+	AdminCost      decimal.Decimal `gorm:"admin_cost,omitempty"`
 }
 
 type LotDates struct {
@@ -59,6 +60,6 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 		Season:         m.Season,
 		Tons:           m.Tons,
 		UpdatedAt:      m.UpdatedAt,
-		CostPerHectare: m.CostPerHectare,
+		AdminCost:      m.AdminCost,
 	}
 }

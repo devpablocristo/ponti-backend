@@ -9,6 +9,7 @@ import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	supplydomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 
 	"time"
 )
@@ -18,7 +19,7 @@ type CreateSupplyMovementRequestBulk struct{
 }
 
 type CreateSupplyMovementEntryRequest struct {
-	Quantity             float64   `json:"quantity"`
+	Quantity             decimal.Decimal   `json:"quantity"`
 	MovementType         string    `json:"movement_type"`
 	MovementDate         *time.Time `json:"movement_date"`
 	Reference            string    `json:"reference_number"`

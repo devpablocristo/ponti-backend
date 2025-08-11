@@ -1,17 +1,19 @@
 package domain
 
 import (
+	"time"
+
 	investordomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	provaderdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	suplydomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
-	"time"
+	"github.com/shopspring/decimal"
 )
 
 type SupplyMovement struct {
 	ID                   int64
 	StockId              int64
-	Quantity             float64
+	Quantity             decimal.Decimal
 	MovementType         string
 	MovementDate         *time.Time
 	ReferenceNumber      string

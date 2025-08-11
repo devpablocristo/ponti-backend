@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type GetEntrySupplyMovementsResponse struct {
@@ -15,7 +16,7 @@ type GetEntrySupplyMovementsResponse struct {
 type summary struct{
 	TotalKg  float64 `json:"total_kg"`
 	TotalLt  float64 `json:"total_lt"`
-	TotalUSD float64 `json:"total_usd"`
+	TotalUSD decimal.Decimal `json:"total_usd"`
 }
 
 type entrySupplyMovementsResponse struct{
@@ -29,8 +30,8 @@ type entrySupplyMovementsResponse struct{
 	Category string `json:"category"`
 	Type string `json:"type"`
 	ProviderName string `json:"provider_name"`
-	PriceUSD float64 `json:"price_usd"`
-	TotalUSD float64 `json:"total_usd"`
+	PriceUSD decimal.Decimal `json:"price_usd"`
+	TotalUSD decimal.Decimal `json:"total_usd"`
 
 }
 
@@ -46,14 +47,14 @@ func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement)  entrySu
 		Category: dsm.Supply.CategoryName,
 		Type: dsm.Supply.Type.Name,
 		PriceUSD: dsm.Supply.Price,
-		TotalUSD: dsm.Supply.Price * dsm.Quantity,
+		TotalUSD: dsm.Supply.Price.Mul(dsm.Quantity),
 	}
 }
 
 func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) GetEntrySupplyMovementsResponse {
 	var totalKg float64
 	var totalLt float64
-	var totalUSD float64
+	var totalUSD decimal.Decimal
 	var entrySupplyMovementsResponses []entrySupplyMovementsResponse
 
 	for i, supplyMovement := range entriesDomain {
@@ -61,7 +62,7 @@ func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) 
 			entrySupplyMovementsResponses,
 			entrySupplyMovementsResponseFromDomain(supplyMovement),
 	 	)
-		totalUSD =+ entrySupplyMovementsResponses[i].TotalUSD
+		totalUSD = totalUSD.Add(entrySupplyMovementsResponses[i].TotalUSD)
 	}
 
 	summary := summary{
