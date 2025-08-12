@@ -14,7 +14,8 @@ type RepositoryPort interface {
 	deleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
-	ListByWorkorder(context.Context, int64) ([]domain.LaborRawItem, error)
+	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
+	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborRawItem, types.PageInfo, error)
 }
 
 type UseCases struct {
@@ -45,32 +46,43 @@ func (u *UseCases) ListLaborCategoriesByTypeId(ctx context.Context, typeId int64
 	return u.repo.ListLaborCategoriesByTypeId(ctx, typeId)
 }
 
-func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborListItem, error) {
-	raws, err := u.repo.ListByWorkorder(ctx, workorderID)
-	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "internal error", err)
-	}
+func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
+	return u.repo.ListByWorkorder(ctx, workorderID, usdMonth)
+}
 
-	var out []domain.LaborListItem
-	for _, r := range raws {
-		totalNet := r.CostHa.Mul(r.SurfaceHa)                // costoHa * superficie = netprice
-		totalIVA := totalNet.Mul(decimal.NewFromFloat(0.21)) // netprice * 21%  = totalIva
+func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborListItem, types.PageInfo, error) {
+	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID, usdMonth)
 
-		out = append(out, domain.LaborListItem{
+	items := make([]domain.LaborListItem, len(rawItems))
+	for i, r := range rawItems {
+		netTotal := r.CostHa.Mul(r.SurfaceHa)
+		totalIVA := netTotal.Mul(decimal.NewFromFloat(0.21))
+		usdCostHa := r.CostHa.Div(r.USDAvgValue)
+		usdTotalNet := netTotal.Div(r.USDAvgValue)
+
+		items[i] = domain.LaborListItem{
 			WorkorderNumber: r.WorkorderNumber,
 			Date:            r.Date,
 			ProjectName:     r.ProjectName,
 			FieldName:       r.FieldName,
 			CropName:        r.CropName,
-			CategoryName:    r.CategoryName,
+			LaborName:       r.LaborName,
 			Contractor:      r.Contractor,
 			SurfaceHa:       r.SurfaceHa,
 			CostHa:          r.CostHa,
+			CategoryName:    r.CategoryName,
 			InvestorName:    r.InvestorName,
-			NetTotal:        totalNet,
-			TotalIVA:        totalIVA,
-		})
+			USDAvgValue:     r.USDAvgValue,
+			NetTotal:        netTotal.Round(2),
+			TotalIVA:        totalIVA.Round(2),
+			USDCostHa:       usdCostHa.Round(2),
+			USDNetTotal:     usdTotalNet.Round(2),
+			InvoiceNumber:   r.InvoiceNumber,
+			InvoiceCompany:  r.InvoiceCompany,
+			InvoiceDate:     r.InvoiceDate,
+			InvoiceStatus:   r.InvoiceStatus,
+		}
 	}
 
-	return out, err
+	return items, pageInfo, err
 }

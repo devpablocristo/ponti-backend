@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type LaborListItem struct {
+type LaborRawItem struct {
 	WorkorderNumber string          `json:"workorder_number"`
 	Date            time.Time       `json:"date"`
 	ProjectName     string          `json:"project_name"`
@@ -15,22 +15,25 @@ type LaborListItem struct {
 	CropName        string          `json:"crop_name"`
 	LaborName       string          `json:"labor_name"`
 	Contractor      string          `json:"contractor"`
-	SurfaceHa       decimal.Decimal `json:"surface_ha"`
-	CostHa          decimal.Decimal `json:"cost_ha"`
-	CategoryName    string          `json:"category_name"`
+	SurfaceHa       decimal.Decimal `json:"effective_area"`
+	CostHa          decimal.Decimal `json:"price"`
+	CategoryName    string          `json:"contractor_name"`
 	InvestorName    string          `json:"investor_name"`
-	NetTotal        decimal.Decimal `json:"net_total"`
-	TotalIVA        decimal.Decimal `json:"total_iva"`
+	USDAvgValue     decimal.Decimal `json:"usd_avg_value"`
+	InvoiceNumber   string          `json:"invoice_number"`
+	InvoiceCompany  string          `json:"invoice_company"`
+	InvoiceDate     time.Time       `json:"invoice_date"`
+	InvoiceStatus   string          `json:"invoice_status"`
 }
 
 type LaborByWorkorderListResponse struct {
-	Data []LaborListItem `json:"data"`
+	Data []LaborRawItem `json:"data"`
 }
 
-func ToLaborListResponse(items []domain.LaborListItem) LaborByWorkorderListResponse {
-	dtos := make([]LaborListItem, len(items))
+func ToLaborListResponse(items []domain.LaborRawItem) LaborByWorkorderListResponse {
+	dtos := make([]LaborRawItem, len(items))
 	for i, d := range items {
-		dtos[i] = LaborListItem{
+		dtos[i] = LaborRawItem{
 			WorkorderNumber: d.WorkorderNumber,
 			Date:            d.Date,
 			ProjectName:     d.ProjectName,
@@ -42,8 +45,11 @@ func ToLaborListResponse(items []domain.LaborListItem) LaborByWorkorderListRespo
 			CostHa:          d.CostHa,
 			CategoryName:    d.CategoryName,
 			InvestorName:    d.InvestorName,
-			NetTotal:        d.NetTotal,
-			TotalIVA:        d.TotalIVA,
+			USDAvgValue:     d.USDAvgValue,
+			InvoiceNumber:   d.InvoiceNumber,
+			InvoiceCompany:  d.InvoiceCompany,
+			InvoiceDate:     d.InvoiceDate,
+			InvoiceStatus:   d.InvoiceStatus,
 		}
 	}
 	return LaborByWorkorderListResponse{Data: dtos}

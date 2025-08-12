@@ -18,11 +18,18 @@ type LaborListItem struct {
 	CostHa          decimal.Decimal // costo por ha
 	CategoryName    string          // rubro
 	InvestorName    string          // nombre del inversor
+	USDAvgValue     decimal.Decimal // valor dolar promedio
 	NetTotal        decimal.Decimal // total neto
 	TotalIVA        decimal.Decimal // total IVA
+	USDCostHa       decimal.Decimal // costo de dolar por ha
+	USDNetTotal     decimal.Decimal // total neto dolar
+
+	InvoiceNumber  string    // numero de factura
+	InvoiceCompany string    // empresa de la factura
+	InvoiceDate    time.Time // fecha de factura
+	InvoiceStatus  string    // estado de factura
 }
 
-// este tipo representa a los datos crudos extraidos antes para ser calculados luego
 type LaborRawItem struct {
 	WorkorderNumber string
 	Date            time.Time
@@ -35,4 +42,9 @@ type LaborRawItem struct {
 	CostHa          decimal.Decimal
 	CategoryName    string
 	InvestorName    string
+	USDAvgValue     decimal.Decimal
+	InvoiceNumber   string
+	InvoiceCompany  string
+	InvoiceDate     time.Time
+	InvoiceStatus   string
 }

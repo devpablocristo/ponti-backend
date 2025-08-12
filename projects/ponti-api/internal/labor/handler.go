@@ -2,8 +2,10 @@ package labor
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
@@ -21,7 +23,8 @@ type UseCasesPort interface {
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
-	ListLaborByWorkorder(context.Context, int64) ([]domain.LaborListItem, error)
+	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
+	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
 }
 
 type GinEnginePort interface {
@@ -79,6 +82,7 @@ func (h *Handler) Routes() {
 	workorderGroup := r.Group(baseURL + "/labors")
 	{
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
+		workorderGroup.GET("/group/:projectID/:fieldID", h.ListGroupLaborByProject)
 	}
 }
 
@@ -257,16 +261,19 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
-	id := c.Param("workorderID")
-
-	workorderID, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	workorderID, ok := parseParamID(c, "workorderID")
+	if !ok {
 		return
 	}
 
-	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID)
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
+		return
+	}
+
+	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID, usdMonth)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -275,4 +282,56 @@ func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
 
 	resp := dto.ToLaborListResponse(items)
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
+	projectID, ok := parseParamID(c, "projectID")
+	if !ok {
+		return
+	}
+	fieldID, ok := parseParamID(c, "fieldID")
+	if !ok {
+		return
+	}
+
+	input := types.NewInput(c.Request)
+
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
+		return
+	}
+
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	resp := dto.FromDomainList(pageInfo, list)
+
+	c.JSON(http.StatusOK, resp)
+
+}
+
+// ----- HELPER -----
+
+func parseParamID(c *gin.Context, param string) (int64, bool) {
+	raw := strings.TrimSpace(c.Param(param))
+	if raw == "" {
+		apiErr := types.NewError(types.ErrInvalidID, param+" is required", nil)
+		c.Error(apiErr).SetMeta(map[string]any{"param": param})
+		return 0, false
+	}
+
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		apiErr := types.NewError(types.ErrInvalidID, param+" must be a positive integer", err)
+		c.Error(apiErr).SetMeta(map[string]any{"param": param, "value": raw})
+		return 0, false
+	}
+
+	return id, true
 }
