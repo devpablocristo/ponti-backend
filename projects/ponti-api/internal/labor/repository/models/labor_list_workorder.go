@@ -18,4 +18,9 @@ type LaborRawItem struct {
 	CostHa          decimal.Decimal `gorm:"column:price"`
 	CategoryName    string          `gorm:"column:contractor_name"`
 	InvestorName    string          `gorm:"column:investor_name"`
+	USDAvgValue     decimal.Decimal `gorm:"column:usd_avg_value"`
+	InvoiceNumber   string          `gorm:"column:invoice_number"`
+	InvoiceCompany  string          `gorm:"column:invoice_company"`
+	InvoiceDate     time.Time       `gorm:"column:invoice_date"`
+	InvoiceStatus   string          `gorm:"column:invoice_status"`
 }
