@@ -43,6 +43,7 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 		Preload("Supply.Unit").
 		Preload("Investor").
 		Preload("Provider").
+		Joins("JOIN stocks ON supply_movements.stock_id = stocks.id").
 		Joins("JOIN projects ON projects.id = stocks.project_id").
 		Where("projects.id = ?", projectId).
 		Where("is_entry = TRUE").

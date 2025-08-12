@@ -85,7 +85,7 @@ func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, fieldId
 func validateMovementType(movementType *string) error {
 	if movementType != nil {
 		movementTypeS := *movementType
-		if movementTypeS != domain.INTERNAL_MOVEMENT || movementTypeS != domain.OFFICIAL_INVOICE || movementTypeS != domain.STOCK {
+		if movementTypeS != domain.INTERNAL_MOVEMENT && movementTypeS != domain.OFFICIAL_INVOICE && movementTypeS != domain.STOCK {
 			return types.NewValidationError(
 			"movement_type", 
 				fmt.Sprintf( 

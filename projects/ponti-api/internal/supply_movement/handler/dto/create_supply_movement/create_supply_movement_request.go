@@ -86,7 +86,7 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, fieldId int
 }
 
 func validateMovementType(movementType string) error {
-	if movementType != domain.INTERNAL_MOVEMENT || movementType != domain.OFFICIAL_INVOICE || movementType != domain.STOCK {
+	if movementType != domain.INTERNAL_MOVEMENT && movementType != domain.OFFICIAL_INVOICE && movementType != domain.STOCK {
 		return types.NewValidationError(
 			"movement_type", 
 			fmt.Sprintf( 

@@ -16,7 +16,7 @@ type SupplyMovement struct {
 	ID                   int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	StockId              int64     `gorm:"not null;column:stock_id"`
 	Quantity             decimal.Decimal   `gorm:"not null;column:quantity"`
-	MovementType         string    `gorm:"type:movement_type;not null;column:movement_type"`
+	MovementType         string    `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial');not null;column:movement_type"`
 	MovementDate         *time.Time `gorm:"not null;column:movement_date"`
 	ReferenceNumber      string    `gorm:"not null;column:reference_number"`
 	ProjectId            int64     `gorm:"not null;column:project_id"`
@@ -25,6 +25,7 @@ type SupplyMovement struct {
 	SupplyID             int64     `gorm:"not null;column:supply_id"`
 	InvestorID           int64     `gorm:"not null;column:investor_id"`
 	ProviderID           int64     `gorm:"not null;column:provider_id"`
+	IsEntry			 bool      `gorm:"not null;column:is_entry"`
 
 	Supply   supplymod.Supply     `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	Investor investormod.Investor `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
@@ -46,6 +47,7 @@ func (s *SupplyMovement) ToDomain() *domain.SupplyMovement {
 		Supply:               s.Supply.ToDomain(),
 		Investor:             s.Investor.ToDomain(),
 		Provider:             s.Provider.ToDomain(),
+		IsEntry: 			  s.IsEntry,
 		Base: shareddomain.Base{
 			CreatedAt: s.CreatedAt,
 			UpdatedAt: s.UpdatedAt,
@@ -70,6 +72,7 @@ func FromDomain(s *domain.SupplyMovement) *SupplyMovement {
 		SupplyID:             s.Supply.ID,
 		InvestorID:           s.Investor.ID,
 		ProviderID:           s.Provider.ID,
+		IsEntry: 			  s.IsEntry,
 		Base: sharedmodels.Base{
 			CreatedAt: s.CreatedAt,
 			UpdatedAt: s.UpdatedAt,

@@ -1,1 +1,1 @@
-DROP TYPE entry_type_enum;
+DROP TYPE movement_type;

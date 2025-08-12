@@ -43,7 +43,7 @@ func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement)  entrySu
 		EntryDate: *dsm.MovementDate,
 		InvestorName: dsm.Investor.Name,
 		SupplyName: dsm.Supply.Name,
-		Quantity: fmt.Sprintf("%.2f %s", dsm.Quantity, dsm.Supply.UnitName),
+		Quantity: fmt.Sprintf("%s %s", dsm.Quantity.String(), dsm.Supply.UnitName),
 		Category: dsm.Supply.CategoryName,
 		Type: dsm.Supply.Type.Name,
 		PriceUSD: dsm.Supply.Price,

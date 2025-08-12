@@ -1,4 +1,4 @@
-CREATE TYPE entry_type_enum AS ENUM (
+CREATE TYPE movement_type AS ENUM (
     'Stock',
     'Movimiento interno',
     'Remito oficial'

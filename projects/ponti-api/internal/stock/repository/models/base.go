@@ -11,6 +11,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	supplymod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	supplymovmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/repository/models"
+	supplymovementdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -24,8 +25,8 @@ type Stock struct {
 	Supply         supplymod.Supply              `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	InvestorID     int64                         `gorm:"not null;index;column:investor_id"`
 	Investor       investormod.Investor          `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	CloseDate      time.Time                     `gorm:"not null;column:close_date"`
-	SupplyMovement []supplymovmod.SupplyMovement `gorm:"foreignKey:StockID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CloseDate      *time.Time                     `gorm:"null;column:close_date"`
+	SupplyMovements []supplymovmod.SupplyMovement `gorm:"foreignKey:StockId;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	InitialStock   decimal.Decimal                       `gorm:"not null;column:initial_units"`
 	YearPeriod     int64                         `gorm:"not null;column:year_period"`
 	MonthPeriod    int64                         `gorm:"not null;column:month_period"`
@@ -37,23 +38,24 @@ type Stock struct {
 
 // ToDomain convierte el modelo Stock a la entidad de dominio
 func (m *Stock) ToDomain() *domain.Stock {
-	var timeZero time.Time
-	var closeDateNil *time.Time
-	if m.CloseDate == timeZero {
-		closeDateNil = nil
-	} else {
-		closeDateNil = &m.CloseDate
+
+	var supplyMovementsDomains []supplymovementdomain.SupplyMovement
+
+	for i, supplyMovement := range m.SupplyMovements{
+		supplyMovementsDomains[i]= *supplyMovement.ToDomain()
 	}
+
 	return &domain.Stock{
 		ID:             m.ID,
 		Project:        m.Project.ToDomain(),
 		Field:          m.Field.ToDomain(),
 		Supply:         m.Supply.ToDomain(),
-		CloseDate:      closeDateNil,
+		CloseDate:       m.CloseDate,
 		RealStockUnits: m.RealStockUnits,
 		YearPeriod:     m.YearPeriod,
 		MonthPeriod:    m.MonthPeriod,
 		Investor:       m.Investor.ToDomain(),
+		SupplyMovements: supplyMovementsDomains,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -78,7 +80,8 @@ func FromDomain(d *domain.Stock) *Stock {
 		YearPeriod:     d.YearPeriod,
 		MonthPeriod:    d.MonthPeriod,
 		InitialStock:   d.InitialStock,
-		SupplyMovement: []supplymovmod.SupplyMovement{},
+		CloseDate: d.CloseDate,
+		SupplyMovements: []supplymovmod.SupplyMovement{},
 		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,
 			UpdatedAt: d.UpdatedAt,
