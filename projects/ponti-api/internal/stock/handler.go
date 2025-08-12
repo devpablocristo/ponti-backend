@@ -61,7 +61,7 @@ func NewHandler(
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/fields/:idField/stock"
+	baseURL := h.acf.APIBaseURL() + "/projects/:id/fields/:idField/stocks"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)

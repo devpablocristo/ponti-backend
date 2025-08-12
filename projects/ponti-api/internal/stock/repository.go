@@ -3,8 +3,7 @@ package stock
 import (
 	"context"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
-	modelupdates "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
+	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"gorm.io/gorm"
 	"time"
@@ -32,7 +31,9 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int
 		Preload("Project").
 		Preload("Field").
 		Preload("Supply").
+		Preload("Supply.Type").
 		Preload("Investor").
+		Preload("SupplyMovements").
 		Joins("JOIN projects ON projects.id = stocks.project_id").
 		Joins("JOIN fields ON fields.id = stocks.field_id").
 		Where("projects.id = ?", projectId).
@@ -68,7 +69,7 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 }
 
 func (r *Repository) UpdateCloseDateByProjectAndField(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
-	stockUpdate := modelupdates.StockUpdateCloseDateFromDomain(stock)
+	stockUpdate := models.StockUpdateCloseDateFromDomain(stock)
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
 		Where("project_id = ?", projectId).
@@ -87,7 +88,7 @@ func (r *Repository) UpdateCloseDateByProjectAndField(ctx context.Context, proje
 }
 
 func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockId int64, stock *domain.Stock) error {
-	stockUpdate := modelupdates.StockUpdateRealUnitsFromDomain(stock)
+	stockUpdate := models.StockUpdateRealUnitsFromDomain(stock)
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
 		Where("id = ?", stockId).

@@ -39,7 +39,7 @@ type Stock struct {
 // ToDomain convierte el modelo Stock a la entidad de dominio
 func (m *Stock) ToDomain() *domain.Stock {
 
-	var supplyMovementsDomains []supplymovementdomain.SupplyMovement
+ 	supplyMovementsDomains := make([]supplymovementdomain.SupplyMovement, len(m.SupplyMovements))
 
 	for i, supplyMovement := range m.SupplyMovements{
 		supplyMovementsDomains[i]= *supplyMovement.ToDomain()
