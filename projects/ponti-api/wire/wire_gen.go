@@ -21,6 +21,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/invoice"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
@@ -199,6 +200,15 @@ func Initialize() (*Dependencies, error) {
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
 	laborHandler := ProvideLaborHandler(laborGinEnginePort, laborUseCasesPort, laborConfigAPIPort, laborMiddlewaresEnginePort, projectUseCasesPort)
+	invoiceGinEnginePort := ProvideInvoiceGinEnginePort(server)
+	invoiceGormEnginePort := ProvideInvoiceGormEnginePort(repository)
+	invoiceRepository := ProvideInvoiceRepository(invoiceGormEnginePort)
+	invoiceRepositoryPort := ProvideInvoiceRepositoryPort(invoiceRepository)
+	invoiceUseCases := ProvideInvoiceUseCases(invoiceRepositoryPort)
+	invoiceUseCasePort := ProvideInvoiceUseCasePort(invoiceUseCases)
+	invoiceConfigAPIPort := ProvideInvoiceConfigAPI(config)
+	invoiceMiddlewaresEnginePort := ProvideInvoiceMiddlewaresEnginePort(middlewares)
+	invoiceHandler := ProvideInvoiceHandler(invoiceGinEnginePort, invoiceUseCasePort, invoiceConfigAPIPort, invoiceMiddlewaresEnginePort)
 	commercializationGinEnginePort := ProvideCommercializationGinEnginePort(server)
 	commercializationGormEnginePort := ProvideCommercializationGormEnginePort(repository)
 	commercializationRepository := ProvideCommercializationRepository(commercializationGormEnginePort)
@@ -230,6 +240,7 @@ func Initialize() (*Dependencies, error) {
 		DollarHandler:            dollarHandler,
 		WorkorderHandler:         workorderHandler,
 		LaborHandler:             laborHandler,
+		InvoiceHandler:           invoiceHandler,
 		CommercializationHandler: commercializationHandler,
 	}
 	return dependencies, nil
@@ -259,5 +270,6 @@ type Dependencies struct {
 	DollarHandler            *dollar.Handler
 	WorkorderHandler         *workorder.Handler
 	LaborHandler             *labor.Handler
+	InvoiceHandler           *invoice.Handler
 	CommercializationHandler *commercialization.Handler
 }

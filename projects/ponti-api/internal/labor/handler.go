@@ -2,8 +2,10 @@ package labor
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
@@ -21,6 +23,8 @@ type UseCasesPort interface {
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
+	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
+	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
 }
 
 type GinEnginePort interface {
@@ -60,19 +64,25 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/labors"
+	baseURL := h.acf.APIBaseURL()
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL)
+	public := r.Group(baseURL + "/projects/:id/labors")
 	{
 		public.POST("", h.CreateLabor)
 		public.GET("", h.ListLabor)
 		public.DELETE("/:idLabor", h.DeleteLabor)
 		public.PUT("/:idLabor", h.UpdateLabor)
 		public.GET("/labor-categories/:typeId", h.ListLaborCategories)
+	}
+
+	workorderGroup := r.Group(baseURL + "/labors")
+	{
+		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
+		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
 	}
 }
 
@@ -248,4 +258,94 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 	resp := dto.NewLaborCategoriesListResponse(laborCategories)
 	c.JSON(http.StatusOK, resp)
 
+}
+
+func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
+	workorderID, ok := parseParamID(c, "workorderID")
+	if !ok {
+		return
+	}
+
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
+		return
+	}
+
+	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID, usdMonth)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	resp := dto.ToLaborListResponse(items)
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
+	projectID, ok := parseParamID(c, "projectID")
+	if !ok {
+		return
+	}
+
+	fieldIDParam := c.Query("fieldID")
+	if fieldIDParam == "" && projectID == 0 {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID or projectID is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID or projectID requires a value"})
+		return
+	}
+
+	var fieldID int64
+	if fieldIDParam != "" {
+		var err error
+		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
+		if err != nil {
+			apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID is not a valid integer"))
+			c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID is not a valid integer"})
+			return
+		}
+	}
+
+	input := types.NewInput(c.Request)
+
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
+		return
+	}
+
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+
+	resp := dto.FromDomainList(pageInfo, list)
+
+	c.JSON(http.StatusOK, resp)
+
+}
+
+// ----- HELPER -----
+
+func parseParamID(c *gin.Context, param string) (int64, bool) {
+	raw := strings.TrimSpace(c.Param(param))
+	if raw == "" {
+		apiErr := types.NewError(types.ErrInvalidID, param+" is required", nil)
+		c.Error(apiErr).SetMeta(map[string]any{"param": param})
+		return 0, false
+	}
+
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		apiErr := types.NewError(types.ErrInvalidID, param+" must be a positive integer", err)
+		c.Error(apiErr).SetMeta(map[string]any{"param": param, "value": raw})
+		return 0, false
+	}
+
+	return id, true
 }
