@@ -9,6 +9,7 @@ import (
 )
 
 type LaborListItem struct {
+	WorkorderID     int64           `json:"workorder_id"`
 	WorkorderNumber string          `json:"workorder_number"`
 	Date            time.Time       `json:"date"`
 	ProjectName     string          `json:"project_name"`
@@ -25,6 +26,7 @@ type LaborListItem struct {
 	TotalIVA        decimal.Decimal `json:"total_iva"`
 	USDCostHa       decimal.Decimal `json:"usd_cost_ha"`
 	USDNetTotal     decimal.Decimal `json:"usd_net_total"`
+	InvoiceID       int64           `json:"invoice_id"`
 	InvoiceNumber   string          `json:"invoice_number"`
 	InvoiceCompany  string          `json:"invoice_company"`
 	InvoiceDate     time.Time       `json:"invoice_date"`
@@ -38,6 +40,7 @@ type ListLaborGroupResponse struct {
 
 func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 	return &LaborListItem{
+		WorkorderID:     d.WorkorderID,
 		WorkorderNumber: d.WorkorderNumber,
 		Date:            d.Date,
 		ProjectName:     d.ProjectName,
@@ -54,6 +57,7 @@ func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 		TotalIVA:        d.TotalIVA,
 		USDCostHa:       d.USDCostHa,
 		USDNetTotal:     d.USDNetTotal,
+		InvoiceID:       d.InvoiceID,
 		InvoiceNumber:   d.InvoiceNumber,
 		InvoiceCompany:  d.InvoiceCompany,
 		InvoiceDate:     d.InvoiceDate,

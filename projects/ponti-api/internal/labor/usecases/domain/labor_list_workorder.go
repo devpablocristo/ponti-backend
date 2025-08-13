@@ -7,6 +7,7 @@ import (
 )
 
 type LaborListItem struct {
+	WorkorderID     int64           // id de la orden
 	WorkorderNumber string          //numero de orden
 	Date            time.Time       // fecha de la orden
 	ProjectName     string          // nombre del proyecto
@@ -24,6 +25,7 @@ type LaborListItem struct {
 	USDCostHa       decimal.Decimal // costo de dolar por ha
 	USDNetTotal     decimal.Decimal // total neto dolar
 
+	InvoiceID      int64     // id de la factura
 	InvoiceNumber  string    // numero de factura
 	InvoiceCompany string    // empresa de la factura
 	InvoiceDate    time.Time // fecha de factura
@@ -31,6 +33,7 @@ type LaborListItem struct {
 }
 
 type LaborRawItem struct {
+	WorkorderID     int64
 	WorkorderNumber string
 	Date            time.Time
 	ProjectName     string
@@ -43,6 +46,7 @@ type LaborRawItem struct {
 	CategoryName    string
 	InvestorName    string
 	USDAvgValue     decimal.Decimal
+	InvoiceID       int64
 	InvoiceNumber   string
 	InvoiceCompany  string
 	InvoiceDate     time.Time

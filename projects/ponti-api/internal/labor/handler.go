@@ -82,7 +82,7 @@ func (h *Handler) Routes() {
 	workorderGroup := r.Group(baseURL + "/labors")
 	{
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
-		workorderGroup.GET("/group/:projectID/:fieldID", h.ListGroupLaborByProject)
+		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
 	}
 }
 
@@ -289,9 +289,23 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	if !ok {
 		return
 	}
-	fieldID, ok := parseParamID(c, "fieldID")
-	if !ok {
+
+	fieldIDParam := c.Query("fieldID")
+	if fieldIDParam == "" && projectID == 0 {
+		apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID or projectID is required"))
+		c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID or projectID requires a value"})
 		return
+	}
+
+	var fieldID int64
+	if fieldIDParam != "" {
+		var err error
+		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
+		if err != nil {
+			apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID is not a valid integer"))
+			c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID is not a valid integer"})
+			return
+		}
 	}
 
 	input := types.NewInput(c.Request)

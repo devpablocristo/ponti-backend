@@ -55,12 +55,17 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 
 	items := make([]domain.LaborListItem, len(rawItems))
 	for i, r := range rawItems {
+		var usdCostHa, usdTotalNet decimal.Decimal
 		netTotal := r.CostHa.Mul(r.SurfaceHa)
 		totalIVA := netTotal.Mul(decimal.NewFromFloat(0.21))
-		usdCostHa := r.CostHa.Div(r.USDAvgValue)
-		usdTotalNet := netTotal.Div(r.USDAvgValue)
+
+		if !r.USDAvgValue.IsZero() {
+			usdCostHa = r.CostHa.Div(r.USDAvgValue)
+			usdTotalNet = netTotal.Div(r.USDAvgValue)
+		}
 
 		items[i] = domain.LaborListItem{
+			WorkorderID:     r.WorkorderID,
 			WorkorderNumber: r.WorkorderNumber,
 			Date:            r.Date,
 			ProjectName:     r.ProjectName,
@@ -77,6 +82,7 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 			TotalIVA:        totalIVA.Round(2),
 			USDCostHa:       usdCostHa.Round(2),
 			USDNetTotal:     usdTotalNet.Round(2),
+			InvoiceID:       r.InvoiceID,
 			InvoiceNumber:   r.InvoiceNumber,
 			InvoiceCompany:  r.InvoiceCompany,
 			InvoiceDate:     r.InvoiceDate,

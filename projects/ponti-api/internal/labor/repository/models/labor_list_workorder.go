@@ -7,6 +7,7 @@ import (
 )
 
 type LaborRawItem struct {
+	WorkorderID     int64           `gorm:"column:workorder_id"`
 	WorkorderNumber string          `gorm:"column:workorder_number"`
 	Date            time.Time       `gorm:"column:date"`
 	ProjectName     string          `gorm:"column:project_name"`
@@ -16,9 +17,10 @@ type LaborRawItem struct {
 	Contractor      string          `gorm:"column:contractor"`
 	SurfaceHa       decimal.Decimal `gorm:"column:effective_area"`
 	CostHa          decimal.Decimal `gorm:"column:price"`
-	CategoryName    string          `gorm:"column:contractor_name"`
+	CategoryName    string          `gorm:"column:category_name"`
 	InvestorName    string          `gorm:"column:investor_name"`
 	USDAvgValue     decimal.Decimal `gorm:"column:usd_avg_value"`
+	InvoiceID       int64           `gorm:"column:invoice_id"`
 	InvoiceNumber   string          `gorm:"column:invoice_number"`
 	InvoiceCompany  string          `gorm:"column:invoice_company"`
 	InvoiceDate     time.Time       `gorm:"column:invoice_date"`
