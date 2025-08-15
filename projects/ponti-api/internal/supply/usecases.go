@@ -27,7 +27,7 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 }
 
 func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
-	if s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+	if s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 		return 0, types.NewError(types.ErrInvalidInput, "missing required fields", nil)
 	}
 	return u.repo.CreateSupply(ctx, s)
@@ -50,7 +50,7 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 		if s.ProjectID != projectID {
 			return types.NewError(types.ErrInvalidInput, "all supplies must have the same project_id", nil)
 		}
-		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply: %s", s.Name), nil)
 		}
 	}
@@ -76,7 +76,7 @@ func (u *UseCases) GetSupply(ctx context.Context, id int64) (*domain.Supply, err
 }
 
 func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
-	if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+	if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 		return types.NewError(types.ErrInvalidInput, "missing required fields", nil)
 	}
 	return u.repo.UpdateSupply(ctx, s)
@@ -107,7 +107,7 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	}
 	seen := map[int64]bool{}
 	for _, s := range supplies {
-		if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.TypeID == 0 {
+		if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply id: %d", s.ID), nil)
 		}
 		if seen[s.ID] {

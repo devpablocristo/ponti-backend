@@ -87,7 +87,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"unit_id":     int64(s.UnitID),
 			"price":       s.Price,
 			"category_id": int64(s.CategoryID),
-			"type_id":     int64(s.TypeID),
+			"type_id":     s.Type.ID,
 			"project_id":  s.ProjectID,
 			"updated_by":  s.UpdatedBy,
 		}
@@ -162,7 +162,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 				"unit_id":     int64(supplies[i].UnitID),
 				"price":       supplies[i].Price,
 				"category_id": int64(supplies[i].CategoryID),
-				"type_id":     int64(supplies[i].TypeID),
+				"type_id":     supplies[i].Type.ID,
 				"project_id":  supplies[i].ProjectID,
 				"updated_by":  supplies[i].UpdatedBy,
 			}

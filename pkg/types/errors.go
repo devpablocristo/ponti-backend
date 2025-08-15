@@ -108,6 +108,15 @@ func NewMissingFieldError(field string) *Error {
 	)
 }
 
+func NewValidationError(field string, message string) *Error {
+	return NewErrorWithContext(
+		ErrValidation,
+		message,
+		nil,
+		map[string]any{"field": field},
+	)
+}
+
 // Domain error helpers
 func IsNotFound(err error) bool {
 	var e *Error
