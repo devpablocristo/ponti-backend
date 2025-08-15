@@ -2,11 +2,12 @@ package stock
 
 import (
 	"context"
+	"time"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"gorm.io/gorm"
-	"time"
 )
 
 type GormEnginePort interface {
@@ -37,9 +38,12 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int
 		Joins("JOIN projects ON projects.id = stocks.project_id").
 		Joins("JOIN fields ON fields.id = stocks.field_id").
 		Where("projects.id = ?", projectId).
-		Where("fields.id = ?", fieldId).
 		Where("stocks.month_period = ?", monthPeriod).
 		Where("stocks.year_period = ?", yearPeriod)
+
+	if fieldId != 0 {
+		query.Where("fields.id = ?", fieldId)
+	}
 
 	if closeDate != t {
 		query.Where("stocks.close_date < ?", closeDate)
@@ -120,7 +124,7 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 	return stockModel.ToDomain(), nil
 }
 
-func(r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, supplyId int64) (*domain.Stock, bool, error){
+func (r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, supplyId int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	err := r.db.Client().WithContext(ctx).
 		Preload("Project").
@@ -145,8 +149,7 @@ func(r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, proje
 
 }
 
-
-func (r *Repository) GetStockByPeriodAndProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64) (*domain.Stock, error){
+func (r *Repository) GetStockByPeriodAndProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
 	err := r.db.Client().WithContext(ctx).
@@ -160,11 +163,11 @@ func (r *Repository) GetStockByPeriodAndProjectIdAndFieldId(ctx context.Context,
 		Where("month_period = ?", monthPeriod).
 		Where("year_period = ?", yearPeriod).
 		First(&stockModel).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
 
 	return stockModel.ToDomain(), nil
 
-} 
+}
