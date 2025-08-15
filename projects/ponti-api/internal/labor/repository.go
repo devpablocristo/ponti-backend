@@ -3,6 +3,7 @@ package labor
 import (
 	"context"
 	"fmt"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"gorm.io/gorm"
@@ -123,4 +124,154 @@ func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int
 		}
 	}
 	return laborCategories, nil
+}
+
+func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
+	var rawModels []models.LaborRawItem
+
+	err := r.db.Client().
+		WithContext(ctx).
+		Table("workorders AS w").
+		Select(`
+            w.number                AS workorder_number,
+            w.date                  AS date,
+            p.name                  AS project_name,
+            f.name                  AS field_name,
+            c.name                  AS crop_name,
+            lb.name                 AS labor_name,
+            w.contractor            AS contractor,
+            w.effective_area        AS effective_area,
+            lb.price                AS price,
+            lb.contractor_name      AS contractor_name,
+            inv.name                AS investor_name,
+			pdv.average_value       AS usd_avg_value,
+			i.number                AS invoice_number,
+			i.company               AS invoice_company,
+			i.date                  AS invoice_date,
+			i.status                AS invoice_status
+        `).
+		Joins("INNER JOIN projects p   ON w.project_id    = p.id").
+		Joins("INNER JOIN fields f     ON w.field_id      = f.id").
+		Joins("INNER JOIN crops c      ON w.crop_id       = c.id").
+		Joins("INNER JOIN labors lb    ON w.labor_id      = lb.id").
+		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
+		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
+		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
+		Where("w.id = ?", workorderID).
+		Scan(&rawModels).Error
+
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
+	}
+
+	raws := make([]domain.LaborRawItem, len(rawModels))
+	for i, m := range rawModels {
+		raws[i] = domain.LaborRawItem{
+			WorkorderNumber: m.WorkorderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			CropName:        m.CropName,
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          m.CostHa,
+			CategoryName:    m.CategoryName,
+			InvestorName:    m.InvestorName,
+			USDAvgValue:     m.USDAvgValue,
+			InvoiceNumber:   m.InvoiceNumber,
+			InvoiceCompany:  m.InvoiceCompany,
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   m.InvoiceStatus,
+		}
+	}
+	return raws, nil
+}
+
+func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
+
+	base := r.db.Client().
+		WithContext(ctx).
+		Table("workorders AS w").
+		Joins("INNER JOIN projects p    ON w.project_id   = p.id").
+		Joins("INNER JOIN fields f      ON w.field_id     = f.id").
+		Joins("INNER JOIN crops c       ON w.crop_id      = c.id").
+		Joins("INNER JOIN labors lb     ON w.labor_id     = lb.id").
+		Joins("INNER JOIN categories lc ON lb.category_id = lc.id").
+		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
+		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
+		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+
+	if fieldID != 0 {
+		base = base.Where("w.field_id = ?", fieldID)
+	} else if projectID != 0 {
+		base = base.Where("w.project_id = ?", projectID)
+	} else {
+		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
+			"fieldID or projectID is required", nil)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to count labors for workorder", err)
+	}
+
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
+	var rows []models.LaborRawItem
+	if err := base.Select(`
+			w.id AS workorder_id,
+            w.number                AS workorder_number,
+            w.date                  AS date,
+            p.name                  AS project_name,
+            f.name                  AS field_name,
+            c.name                  AS crop_name,
+            lb.name                 AS labor_name,
+            lc.name                 AS category_name,
+            w.contractor            AS contractor,
+            w.effective_area        AS effective_area,
+            lb.price                AS price,
+            lb.contractor_name      AS contractor_name,
+            inv.name                AS investor_name,
+			pdv.average_value       AS usd_avg_value,
+			i.id                    AS invoice_id,
+			i.number                AS invoice_number,
+			i.company               AS invoice_company,
+			i.date                  AS invoice_date,
+			i.status                AS invoice_status
+        `).Order("w.number DESC").
+		Limit(int(inp.PageSize)).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to list grouped labors", err)
+	}
+
+	list := make([]domain.LaborRawItem, len(rows))
+	for i, m := range rows {
+		list[i] = domain.LaborRawItem{
+			WorkorderID:     m.WorkorderID,
+			WorkorderNumber: m.WorkorderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			CropName:        m.CropName,
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          m.CostHa,
+			CategoryName:    m.CategoryName,
+			InvestorName:    m.InvestorName,
+			USDAvgValue:     m.USDAvgValue,
+			InvoiceID:       m.InvoiceID,
+			InvoiceNumber:   m.InvoiceNumber,
+			InvoiceCompany:  m.InvoiceCompany,
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   m.InvoiceStatus,
+		}
+	}
+
+	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
+	return list, pageInfo, nil
 }

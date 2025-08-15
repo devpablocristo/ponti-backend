@@ -6,20 +6,21 @@ import (
 	"strconv"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto"
 	createsupplymovement "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto/create_supply_movement"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
 	"github.com/gin-gonic/gin"
 )
-
 
 type UseCasesPort interface {
 	GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectId int64) ([]*domain.SupplyMovement, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
+	GetProviders(context.Context) ([]providerdomain.Provider, error)
 }
 
 type GinEnginePort interface {
@@ -40,16 +41,25 @@ type MiddlewaresEnginePort interface {
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/fields/:idField/supply-movements"
+	baseURL := h.acf.APIBaseURL()
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL)
+	publicProviders := r.Group(baseURL + "/providers")
+	{
+		publicProviders.GET("", h.GetProviders)
+	}
+
+	public := r.Group(baseURL + "/projects/:id/fields/:idField/supply-movements")
 	{
 		public.POST("", h.CreateSupplyMovement)
-		public.GET("", h.GetSupplyMovementsByProjectID)
+	}
+
+	publicGroup := r.Group(baseURL + "/projects/:id/supply-movements")
+	{
+		publicGroup.GET("", h.GetSupplyMovementsByProjectID)
 	}
 }
 
@@ -76,7 +86,6 @@ func NewHandler(
 		ucpp: ucpp,
 	}
 }
-
 
 func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -107,7 +116,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 	var supplyMovementsResponse []createsupplymovement.CreateSupplyMovementResponse
 
-	for _, supplyMovement:= range req.SupplyMovements {
+	for _, supplyMovement := range req.SupplyMovements {
 		var supplyMovementResponse createsupplymovement.CreateSupplyMovementResponse
 
 		err = supplyMovement.Validate()
@@ -117,7 +126,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			supplyMovementId, err := h.ucs.CreateSupplyMovement(ctx, supplyMovement.ToDomain(projectId, fieldId, &userID))
 			if err != nil {
 				supplyMovementResponse = createsupplymovement.NewErrorCreateSupplyMovementResponse(err.Error())
-			}else{
+			} else {
 				supplyMovementResponse = createsupplymovement.NewSuccessfulCreateSupplyMovementResponse(supplyMovementId)
 			}
 		}
@@ -126,30 +135,30 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusMultiStatus, createsupplymovement.CreateSupplyMovementBulkResponse{
-		SupplyMovements:  supplyMovementsResponse,
+		SupplyMovements: supplyMovementsResponse,
 	})
 
 }
 
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
-    ctx := c.Request.Context()
+	ctx := c.Request.Context()
 
-    projectIdStr := c.Param("id")
-    projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-    if handleError(err, c) {
-        return
-    }
+	projectIdStr := c.Param("id")
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
 
-    supplyMovements, err := h.ucs.GetEntriesSupplyMovementsByProjectID(ctx, projectId)
-    if handleError(err, c) {
-        return
-    }
+	supplyMovements, err := h.ucs.GetEntriesSupplyMovementsByProjectID(ctx, projectId)
+	if handleError(err, c) {
+		return
+	}
 
 	c.JSON(http.StatusOK, dto.NewGetEntrySupplyMovementsResponse(supplyMovements))
 
 }
 
-func (h *Handler) UpdateSupplyMovementById(c *gin.Context){
+func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req dto.UpdateSupplyMovementEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -157,11 +166,11 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context){
 		return
 	}
 
-    projectIdStr := c.Param("id")
-    projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-    if handleError(err, c) {
-        return
-    }
+	projectIdStr := c.Param("id")
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
 
 	fieldIdStr := c.Param("idField")
 	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
@@ -185,7 +194,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context){
 		return
 	}
 
-	if err = req.Validate(); handleError(err, c){
+	if err = req.Validate(); handleError(err, c) {
 		return
 	}
 	err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectId, fieldId, &userID, supplyMovement))
@@ -198,8 +207,16 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context){
 
 }
 
+func (h *Handler) GetProviders(c *gin.Context) {
+	ctx := c.Request.Context()
 
+	providers, err := h.ucs.GetProviders(ctx)
+	if handleError(err, c) {
+		return
+	}
 
+	c.JSON(http.StatusOK, dto.NewGetProvidersResponse(providers))
+}
 
 func handleError(err error, c *gin.Context) bool {
 	if err == nil {

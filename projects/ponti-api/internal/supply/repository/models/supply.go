@@ -38,13 +38,19 @@ type Supply struct {
 
 // De persistencia (models.Supply) → dominio (domain.Supply)
 func (m *Supply) ToDomain() *domain.Supply {
+	if m.UnitID == 1 {
+		m.Unit.Name = "Lt"
+	} else {
+		m.Unit.Name = "Kg"
+	}
+
 	return &domain.Supply{
-		ID:         m.ID,
-		ProjectID:  m.ProjectID,
-		Name:       m.Name,
-		UnitID:     int64(m.UnitID),
-		Price:      m.Price,
-		CategoryID: int64(m.CategoryID),
+		ID:           m.ID,
+		ProjectID:    m.ProjectID,
+		Name:         m.Name,
+		UnitID:       int64(m.UnitID),
+		Price:        m.Price,
+		CategoryID:   int64(m.CategoryID),
 		CategoryName: m.Category.Name,
 		Type: classdomain.ClassType{
 			ID:   int64(m.TypeID),
@@ -75,4 +81,3 @@ func FromDomain(d *domain.Supply) *Supply {
 		},
 	}
 }
-
