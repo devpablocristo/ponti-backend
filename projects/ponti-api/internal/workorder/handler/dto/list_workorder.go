@@ -11,66 +11,69 @@ import (
 )
 
 type WorkorderListElement struct {
-	ID           int64           `json:"id"`
-	Number       string          `json:"number"`
-	ProjectName  string          `json:"project_name"`
-	FieldName    string          `json:"field_name"`
-	LotName      string          `json:"lot_name"`
-	Date         time.Time       `json:"date"`
-	CropName     string          `json:"crop_name"`
-	LaborName    string          `json:"labor_name"`
-	TypeName     string          `json:"type_name"`
-	Contractor   string          `json:"contractor"`
-	SurfaceHa    decimal.Decimal `json:"surface_ha"`
-	SupplyName   string          `json:"supply_name"`
-	Consumption  decimal.Decimal `json:"consumption"`
-	CategoryName string          `json:"category_name"`
-	Dose         decimal.Decimal `json:"dose"`
-	CostPerHa    decimal.Decimal `json:"cost_per_ha"`
-	UnitPrice    decimal.Decimal `json:"unit_price"`
-	TotalCost    decimal.Decimal `json:"total_cost"`
+	ID                int64           `json:"id"`
+	Number            string          `json:"number"`
+	ProjectName       string          `json:"project_name"`
+	FieldName         string          `json:"field_name"`
+	LotName           string          `json:"lot_name"`
+	Date              time.Time       `json:"date"`
+	CropName          string          `json:"crop_name"`
+	LaborName         string          `json:"labor_name"`
+	LaborCategoryName string          `json:"labor_category_name"`
+	TypeName          string          `json:"type_name"`
+	Contractor        string          `json:"contractor"`
+	SurfaceHa         decimal.Decimal `json:"surface_ha"`
+	SupplyName        string          `json:"supply_name"`
+	Consumption       decimal.Decimal `json:"consumption"`
+	CategoryName      string          `json:"category_name"`
+	Dose              decimal.Decimal `json:"dose"`
+	CostPerHa         decimal.Decimal `json:"cost_per_ha"`
+	UnitPrice         decimal.Decimal `json:"unit_price"`
+	TotalCost         decimal.Decimal `json:"total_cost"`
 }
 
 // MarshalJSON asegura 2 decimales en todos los campos decimal de salida
 func (w WorkorderListElement) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		ID           int64           `json:"id"`
-		Number       string          `json:"number"`
-		ProjectName  string          `json:"project_name"`
-		FieldName    string          `json:"field_name"`
-		LotName      string          `json:"lot_name"`
-		Date         time.Time       `json:"date"`
-		CropName     string          `json:"crop_name"`
-		LaborName    string          `json:"labor_name"`
-		TypeName     string          `json:"type_name"`
-		Contractor   string          `json:"contractor"`
-		SurfaceHa    decimal.Decimal `json:"surface_ha"`
-		SupplyName   string          `json:"supply_name"`
-		Consumption  decimal.Decimal `json:"consumption"`
-		CategoryName string          `json:"category_name"`
-		Dose         decimal.Decimal `json:"dose"`
-		CostPerHa    decimal.Decimal `json:"cost_per_ha"`
-		UnitPrice    decimal.Decimal `json:"unit_price"`
-		TotalCost    decimal.Decimal `json:"total_cost"`
+		ID                int64           `json:"id"`
+		Number            string          `json:"number"`
+		ProjectName       string          `json:"project_name"`
+		FieldName         string          `json:"field_name"`
+		LotName           string          `json:"lot_name"`
+		Date              time.Time       `json:"date"`
+		CropName          string          `json:"crop_name"`
+		LaborName         string          `json:"labor_name"`
+		LaborCategoryName string          `json:"labor_category_name"`
+		TypeName          string          `json:"type_name"`
+		Contractor        string          `json:"contractor"`
+		SurfaceHa         decimal.Decimal `json:"surface_ha"`
+		SupplyName        string          `json:"supply_name"`
+		Consumption       decimal.Decimal `json:"consumption"`
+		CategoryName      string          `json:"category_name"`
+		Dose              decimal.Decimal `json:"dose"`
+		CostPerHa         decimal.Decimal `json:"cost_per_ha"`
+		UnitPrice         decimal.Decimal `json:"unit_price"`
+		TotalCost         decimal.Decimal `json:"total_cost"`
 	}{
-		ID:           w.ID,
-		Number:       w.Number,
-		ProjectName:  w.ProjectName,
-		FieldName:    w.FieldName,
-		LotName:      w.LotName,
-		Date:         w.Date,
-		CropName:     w.CropName,
-		LaborName:    w.LaborName,
-		TypeName:     w.TypeName,
-		Contractor:   w.Contractor,
-		SurfaceHa:    w.SurfaceHa.Round(2),
-		SupplyName:   w.SupplyName,
-		Consumption:  w.Consumption,
-		CategoryName: w.CategoryName,
-		Dose:         w.Dose,
-		CostPerHa:    w.CostPerHa.Round(2),
-		UnitPrice:    w.UnitPrice.Round(2),
-		TotalCost:    w.TotalCost.Round(2),
+		ID:                w.ID,
+		Number:            w.Number,
+		ProjectName:       w.ProjectName,
+		FieldName:         w.FieldName,
+		LotName:           w.LotName,
+		Date:              w.Date,
+		CropName:          w.CropName,
+		LaborName:         w.LaborName,
+		LaborCategoryName: w.LaborCategoryName,
+		TypeName:          w.TypeName,
+		Contractor:        w.Contractor,
+		SurfaceHa:         w.SurfaceHa.Round(2),
+		SupplyName:        w.SupplyName,
+		Consumption:       w.Consumption,
+		CategoryName:      w.CategoryName,
+		Dose:              w.Dose,
+		CostPerHa:         w.CostPerHa.Round(2),
+		UnitPrice:         w.UnitPrice.Round(2),
+		TotalCost:         w.TotalCost.Round(2),
 	}
 	return json.Marshal(aux)
 }
@@ -82,24 +85,25 @@ type WorkorderListResponse struct {
 
 func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement {
 	return &WorkorderListElement{
-		ID:           d.ID,
-		Number:       d.Number,
-		ProjectName:  d.ProjectName,
-		FieldName:    d.FieldName,
-		LotName:      d.LotName,
-		Date:         d.Date,
-		CropName:     d.CropName,
-		LaborName:    d.LaborName,
-		TypeName:     d.TypeName,
-		Contractor:   d.Contractor,
-		SurfaceHa:    d.SurfaceHa,
-		SupplyName:   d.SupplyName,
-		Consumption:  d.Consumption,
-		CategoryName: d.CategoryName,
-		Dose:         d.Dose,
-		CostPerHa:    d.CostPerHa,
-		UnitPrice:    d.UnitPrice,
-		TotalCost:    d.TotalCost,
+		ID:                d.ID,
+		Number:            d.Number,
+		ProjectName:       d.ProjectName,
+		FieldName:         d.FieldName,
+		LotName:           d.LotName,
+		Date:              d.Date,
+		CropName:          d.CropName,
+		LaborName:         d.LaborName,
+		LaborCategoryName: d.LaborCategoryName,
+		TypeName:          d.TypeName,
+		Contractor:        d.Contractor,
+		SurfaceHa:         d.SurfaceHa,
+		SupplyName:        d.SupplyName,
+		Consumption:       d.Consumption,
+		CategoryName:      d.CategoryName,
+		Dose:              d.Dose,
+		CostPerHa:         d.CostPerHa,
+		UnitPrice:         d.UnitPrice,
+		TotalCost:         d.TotalCost,
 	}
 }
 
