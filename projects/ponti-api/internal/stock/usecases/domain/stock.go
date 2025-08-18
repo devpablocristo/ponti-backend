@@ -61,3 +61,7 @@ func (s *Stock) GetOutStock() decimal.Decimal{
 
 	return stockUnits
 }
+
+func (s *Stock) GetSupplyUnitName() string {
+	return s.Supply.UnitName
+}

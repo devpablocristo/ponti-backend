@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"strings"
 	"time"
 
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
@@ -56,10 +57,9 @@ func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 	for i, stock := range stocks {
 		listedStocks[i] = *FromDomain(stock)
 		netTotalUSD = netTotalUSD.Add(stock.GetTotalUSD())
-		if listedStocks[i].SupplyUnitId == 1 {
+		if isKG(stock.GetSupplyUnitName()) {
 			totalKilograms = totalKilograms.Add(stock.GetStockUnits())
-		}
-		if listedStocks[i].SupplyUnitId == 2 {
+		}else if isLt(stock.GetSupplyUnitName()) {
 			totalLiters = totalLiters.Add(stock.GetStockUnits())
 		}
 	}
@@ -71,4 +71,12 @@ func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 		TotalKilograms: totalKilograms,
 	}
 
+}
+
+func isKG(unitName string) bool{
+	return strings.Contains(strings.ToLower(unitName), "kg")
+}
+
+func isLt(unitName string) bool {
+	return strings.Contains(strings.ToLower(unitName), "lt")
 }
