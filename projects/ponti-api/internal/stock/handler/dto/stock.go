@@ -25,6 +25,8 @@ type GetStockSummary struct {
 	ClassType       string          `json:"class_type"`
 	CloseDate       *time.Time      `json:"close_date"`
 	SupplyUnitId    int64           `json:"supply_unit_id"`
+	EntryStock decimal.Decimal `json:"entry_stock"`
+	OutStock decimal.Decimal `json:"out_stock"`
 }
 
 // FromDomain maps domain.Stock to GetStock DTO
@@ -40,6 +42,8 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		CloseDate:       s.CloseDate,
 		ClassType:       s.Supply.Type.Name,
 		SupplyUnitId:    s.Supply.UnitID,
+		EntryStock: s.GetEntryStock(),
+		OutStock: s.GetOutStock(),
 	}
 }
 
