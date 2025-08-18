@@ -2,6 +2,7 @@ package dto
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
@@ -14,8 +15,8 @@ type GetEntrySupplyMovementsResponse struct {
 }
 
 type summary struct {
-	TotalKg  float64         `json:"total_kg"`
-	TotalLt  float64         `json:"total_lt"`
+	TotalKg  decimal.Decimal         `json:"total_kg"`
+	TotalLt  decimal.Decimal         `json:"total_lt"`
 	TotalUSD decimal.Decimal `json:"total_usd"`
 }
 
@@ -52,8 +53,8 @@ func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement) entrySup
 }
 
 func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) GetEntrySupplyMovementsResponse {
-	var totalKg float64
-	var totalLt float64
+	var totalKg decimal.Decimal
+	var totalLt decimal.Decimal
 	var totalUSD decimal.Decimal
 	var entrySupplyMovementsResponses []entrySupplyMovementsResponse
 
@@ -62,6 +63,11 @@ func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) 
 			entrySupplyMovementsResponses,
 			entrySupplyMovementsResponseFromDomain(supplyMovement),
 		)
+		if isKG(supplyMovement.Supply.UnitName){
+			totalKg = totalKg.Add(supplyMovement.Quantity)
+		}else if isLt(supplyMovement.Supply.UnitName){
+			totalLt = totalLt.Add(supplyMovement.Quantity)
+		}
 		totalUSD = totalUSD.Add(entrySupplyMovementsResponses[i].TotalUSD)
 	}
 
@@ -75,4 +81,12 @@ func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) 
 		Summary:                       summary,
 		EntrySupplyMovementsResponses: entrySupplyMovementsResponses,
 	}
+}
+
+func isKG(unitName string) bool{
+	return strings.Contains(strings.ToLower(unitName), "kg")
+}
+
+func isLt(unitName string) bool {
+	return strings.Contains(strings.ToLower(unitName), "lt")
 }

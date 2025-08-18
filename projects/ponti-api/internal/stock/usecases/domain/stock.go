@@ -47,3 +47,7 @@ func (s *Stock) GetStockUnits() decimal.Decimal {
 func (s *Stock) GetStockDifference() decimal.Decimal {
 	return s.RealStockUnits.Sub(s.GetStockUnits())
 }
+
+func (s *Stock) GetSupplyUnitName() string {
+	return s.Supply.UnitName
+}
