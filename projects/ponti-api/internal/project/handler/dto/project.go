@@ -13,7 +13,6 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -88,9 +87,6 @@ func (r *Project) ToDomain() *domain.Project {
 			Name: r.Campaign.Name,
 		},
 		AdminCost: r.AdminCost,
-		Base: shareddomain.Base{
-			UpdatedAt: *r.UpdatedAt,
-		},
 	}
 
 	for _, mgr := range r.ProjectManagers {

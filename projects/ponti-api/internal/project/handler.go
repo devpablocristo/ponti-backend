@@ -11,6 +11,7 @@ import (
 	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type UseCasesPort interface {
@@ -211,6 +212,9 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 	}
 	dom := req.ToDomain()
 	dom.ID = id
+	dom.Base = shareddomain.Base{
+		UpdatedAt: *req.UpdatedAt,
+	}
 	if err := h.ucs.UpdateProject(c, dom); err != nil {
 		switch {
 		case types.IsNotFound(err):
