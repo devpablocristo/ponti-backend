@@ -50,7 +50,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int
 	}
 
 	var stockModels []models.Stock
-	if err := query.Find(&stockModels).Error; err != nil {
+	if err := query.Order("stocks.id DESC").Find(&stockModels).Error; err != nil {
 		return nil, err
 	}
 

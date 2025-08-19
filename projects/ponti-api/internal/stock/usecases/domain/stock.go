@@ -32,20 +32,34 @@ func (s *Stock) GetTotalUSD() decimal.Decimal {
 }
 
 func (s *Stock) GetStockUnits() decimal.Decimal {
-	var stockUnits decimal.Decimal
-	for _, supplyMovement := range s.SupplyMovements {
-		if supplyMovement.IsEntry {
-			stockUnits = stockUnits.Add(supplyMovement.Quantity)
-		}else {
-			stockUnits = stockUnits.Sub(supplyMovement.Quantity)
-
-		}
-	}
-	return stockUnits.Add(s.InitialStock)
+	
+	return s.GetEntryStock().Sub(s.GetOutStock())
 }
 
 func (s *Stock) GetStockDifference() decimal.Decimal {
 	return s.RealStockUnits.Sub(s.GetStockUnits())
+}
+
+func (s *Stock) GetEntryStock() decimal.Decimal{
+	var stockUnits decimal.Decimal
+	for _, supplyMovement := range s.SupplyMovements{
+		if supplyMovement.IsEntry {
+			stockUnits = stockUnits.Add(supplyMovement.Quantity)
+		}
+	}
+
+	return stockUnits
+}
+
+func (s *Stock) GetOutStock() decimal.Decimal{
+	var stockUnits decimal.Decimal
+	for _, supplyMovement := range s.SupplyMovements{
+		if !supplyMovement.IsEntry {
+			stockUnits = stockUnits.Add(supplyMovement.Quantity)
+		}
+	}
+
+	return stockUnits
 }
 
 func (s *Stock) GetSupplyUnitName() string {
