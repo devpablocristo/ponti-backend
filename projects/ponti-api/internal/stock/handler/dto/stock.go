@@ -26,8 +26,9 @@ type GetStockSummary struct {
 	ClassType       string          `json:"class_type"`
 	CloseDate       *time.Time      `json:"close_date"`
 	SupplyUnitId    int64           `json:"supply_unit_id"`
-	EntryStock decimal.Decimal `json:"entry_stock"`
-	OutStock decimal.Decimal `json:"out_stock"`
+	SupplyUnitPrice decimal.Decimal `json:"supply_unit_price"`
+	EntryStock      decimal.Decimal `json:"entry_stock"`
+	OutStock        decimal.Decimal `json:"out_stock"`
 }
 
 // FromDomain maps domain.Stock to GetStock DTO
@@ -43,8 +44,9 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		CloseDate:       s.CloseDate,
 		ClassType:       s.Supply.Type.Name,
 		SupplyUnitId:    s.Supply.UnitID,
-		EntryStock: s.GetEntryStock(),
-		OutStock: s.GetOutStock(),
+		SupplyUnitPrice: s.Supply.Price,
+		EntryStock:      s.GetEntryStock(),
+		OutStock:        s.GetOutStock(),
 	}
 }
 
@@ -59,7 +61,7 @@ func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 		netTotalUSD = netTotalUSD.Add(stock.GetTotalUSD())
 		if isKG(stock.GetSupplyUnitName()) {
 			totalKilograms = totalKilograms.Add(stock.GetStockUnits())
-		}else if isLt(stock.GetSupplyUnitName()) {
+		} else if isLt(stock.GetSupplyUnitName()) {
 			totalLiters = totalLiters.Add(stock.GetStockUnits())
 		}
 	}
@@ -73,7 +75,7 @@ func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 
 }
 
-func isKG(unitName string) bool{
+func isKG(unitName string) bool {
 	return strings.Contains(strings.ToLower(unitName), "kg")
 }
 

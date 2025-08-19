@@ -2,15 +2,16 @@ package stock
 
 import (
 	"context"
+	"net/http"
+	"strconv"
+	"time"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 type UseCasesPort interface {
@@ -119,7 +120,6 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -184,6 +184,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 func (h *Handler) UpdateRealStock(c *gin.Context) {
 	ctx := c.Request.Context()
 	stockIdStr := c.Param("stockId")
+
 	var req dto.UpdateRealStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
