@@ -22,6 +22,7 @@ type LotTable struct {
 	SowedArea      float64
 	Season         string
 	Tons           int
+	NetPrice       decimal.Decimal `gorm:"net_price,omitempty"`
 	UpdatedAt      *time.Time      `gorm:"updated_at,omitempty"`
 	AdminCost      decimal.Decimal `gorm:"admin_cost,omitempty"`
 }
@@ -59,6 +60,7 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 		Dates:          domainDates,
 		Season:         m.Season,
 		Tons:           m.Tons,
+		NetPrice:       m.NetPrice,
 		UpdatedAt:      m.UpdatedAt,
 		AdminCost:      m.AdminCost,
 	}

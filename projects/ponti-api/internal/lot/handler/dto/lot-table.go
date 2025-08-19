@@ -20,6 +20,7 @@ type LotTable struct {
 	SowedArea      float64         `json:"sowed_area"`
 	Season         string          `json:"season"`
 	Tons           int             `json:"tons"`
+	NetPrice       decimal.Decimal `json:"net_price"`
 	Dates          []LotDates      `json:"dates"` // ISO 8601 o el formato que uses
 	AdminCost      decimal.Decimal `json:"admin_cost"`
 	UpdatedAt      *time.Time      `json:"updated_at,omitempty"`

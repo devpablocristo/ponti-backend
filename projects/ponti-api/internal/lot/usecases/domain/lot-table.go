@@ -20,6 +20,7 @@ type LotTable struct {
 	SowedArea      float64
 	Season         string
 	Tons           int
+	NetPrice       decimal.Decimal
 	Dates          []LotDates
 	UpdatedAt      *time.Time
 	AdminCost      decimal.Decimal

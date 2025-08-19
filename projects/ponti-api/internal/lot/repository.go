@@ -378,10 +378,12 @@ func (r *Repository) ListLotsTable(
 			lots.season,
 			lots.updated_at,
 			lots.tons,
-			projects.admin_cost
+			projects.admin_cost,
+			comm.net_price
 		`).
 		Joins("JOIN crops as previous_crop ON lots.previous_crop_id = previous_crop.id").
 		Joins("JOIN crops as current_crop ON lots.current_crop_id = current_crop.id").
+		Joins("LEFT JOIN crop_commercializations as comm ON current_crop.id = comm.crop_id").
 		Order("lots.id DESC").
 		Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {

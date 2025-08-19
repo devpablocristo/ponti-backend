@@ -288,6 +288,7 @@ func (h *Handler) ListLotsTable(c *gin.Context) {
 			SowedArea:      row.SowedArea,
 			Season:         row.Season,
 			Tons:           row.Tons,
+			NetPrice:       row.NetPrice,
 			Dates:          dates,
 			UpdatedAt:      row.UpdatedAt,
 			AdminCost:      row.AdminCost,
