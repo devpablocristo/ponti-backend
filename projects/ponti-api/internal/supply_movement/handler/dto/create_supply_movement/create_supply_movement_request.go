@@ -131,7 +131,7 @@ func validateInvestorId(investorId int64) error {
 }
 
 func validateProjectDestinationId(projectDestinationId int64, movementType string) error {
-	if movementType == domain.INTERNAL_MOVEMENT && projectDestinationId < 0 {
+	if movementType == domain.INTERNAL_MOVEMENT && projectDestinationId <= 0 {
 		return types.NewInvalidIDError("invalid project_destination_id", nil)
 	}
 	return nil

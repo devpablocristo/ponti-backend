@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	projdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
 	stockUseCases "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
@@ -33,9 +34,6 @@ func NewUseCases(
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	if movement.MovementType == domain.INTERNAL_MOVEMENT {
-		u.handleMovementInternalMovementOut(ctx, movement)
-	}
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectId(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err
@@ -49,6 +47,12 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 		stock.ID = stockId
 	}
 
+	if movement.MovementType == domain.INTERNAL_MOVEMENT {
+		err := u.handleMovementInternalMovementOut(ctx, movement, *stock)
+		if err != nil {
+			return 0, err
+		}
+	}
 	movement.StockId = stock.ID
 
 	stockDiference := createStockDiference(movement.IsEntry, movement.Quantity)
@@ -110,7 +114,12 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 	}
 }
 
-func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement) (error){
+func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) (error){
+
+	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
+		return types.NewValidationError("quantity", "quantity must be less than real stock units")
+	}
+
 	movementIn := *movement
 
 	movementIn.ProjectId = movement.ProjectDestinationId
