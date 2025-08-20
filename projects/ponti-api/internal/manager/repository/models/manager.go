@@ -10,7 +10,6 @@ import (
 type Manager struct {
 	ID       int64                `gorm:"primaryKey;autoIncrement"`
 	Name     string               `gorm:"type:varchar(255);not null;unique"`
-	Type     string               `gorm:"type:varchar(50);not null;default:GENERIC"` // Default ayuda para migración inicial
 	Projects []projectmod.Project `gorm:"many2many:project_managers;"`
 	sharedmodels.Base
 }
@@ -20,7 +19,6 @@ func (m Manager) ToDomain() *domain.Manager {
 	return &domain.Manager{
 		ID:   m.ID,
 		Name: m.Name,
-		Type: m.Type,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -34,7 +32,6 @@ func (m Manager) ToDomain() *domain.Manager {
 func FromDomain(d *domain.Manager) *Manager {
 	m := &Manager{
 		Name: d.Name,
-		Type: d.Type,
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
