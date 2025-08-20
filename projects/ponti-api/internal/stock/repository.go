@@ -24,26 +24,21 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 // GetStocks retorna stocks filtrando por nombre de proyecto, nombre de field y opcionalmente por fecha de corte
-func (r *Repository) GetStocks(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, closeDate time.Time) ([]*domain.Stock, error) {
+func (r *Repository) GetStocks(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64, closeDate time.Time) ([]*domain.Stock, error) {
 	db := r.db.Client().WithContext(ctx)
 	var t time.Time
 
 	query := db.Model(&models.Stock{}).
 		Preload("Project").
-		Preload("Field").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Investor").
 		Preload("SupplyMovements").
 		Joins("JOIN projects ON projects.id = stocks.project_id").
-		Joins("JOIN fields ON fields.id = stocks.field_id").
 		Where("projects.id = ?", projectId).
 		Where("stocks.month_period = ?", monthPeriod).
 		Where("stocks.year_period = ?", yearPeriod)
 
-	if fieldId != 0 {
-		query.Where("fields.id = ?", fieldId)
-	}
 
 	if closeDate != t {
 		query.Where("stocks.close_date < ?", closeDate)
@@ -72,12 +67,11 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 	return model.ID, nil
 }
 
-func (r *Repository) UpdateCloseDateByProjectAndField(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
+func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
 	stockUpdate := models.StockUpdateCloseDateFromDomain(stock)
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
 		Where("project_id = ?", projectId).
-		Where("field_id = ?", fieldId).
 		Where("year_period = ?", yearPeriod).
 		Where("month_period = ?", monthPeriod).
 		Updates(stockUpdate)
@@ -110,7 +104,6 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 	var stockModel models.Stock
 	err := r.db.Client().WithContext(ctx).
 		Preload("Project").
-		Preload("Field").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Investor").
@@ -124,16 +117,14 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 	return stockModel.ToDomain(), nil
 }
 
-func (r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, supplyId int64) (*domain.Stock, bool, error) {
+func (r *Repository) GetLastStockByProjectId(ctx context.Context, projectId int64, supplyId int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	err := r.db.Client().WithContext(ctx).
 		Preload("Project").
-		Preload("Field").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Investor").
 		Where("project_id = ?", projectId).
-		Where("field_id = ?", fieldId).
 		Where("supply_id = ?", supplyId).
 		Where("close_date is null").
 		First(&stockModel).Error
@@ -149,17 +140,15 @@ func (r *Repository) GetLastStockByProjectIdAndFieldId(ctx context.Context, proj
 
 }
 
-func (r *Repository) GetStockByPeriodAndProjectIdAndFieldId(ctx context.Context, projectId int64, fieldId int64, monthPeriod int64, yearPeriod int64) (*domain.Stock, error) {
+func (r *Repository) GetStockByPeriodAndProjectId(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
 	err := r.db.Client().WithContext(ctx).
 		Preload("Project").
-		Preload("Field").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Investor").
 		Where("project_id = ?", projectId).
-		Where("field_id = ?", fieldId).
 		Where("month_period = ?", monthPeriod).
 		Where("year_period = ?", yearPeriod).
 		First(&stockModel).Error

@@ -62,10 +62,9 @@ func(csmr *CreateSupplyMovementEntryRequest) Validate() error{
 	return err
 }
 
-func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, fieldId int64, userId *int64) *domain.SupplyMovement {
+func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64) *domain.SupplyMovement {
 	return &domain.SupplyMovement{
 		ProjectId: projectId,
-		FieldId: fieldId,
 		Quantity:             r.Quantity,
 		MovementType:         r.MovementType,
 		MovementDate:         r.MovementDate,

@@ -19,7 +19,6 @@ type SupplyMovement struct {
 	ReferenceNumber      string
 	ProjectId            int64
 	ProjectDestinationId int64
-	FieldId              int64
 	Supply               *suplydomain.Supply
 	Investor             *investordomain.Investor
 	Provider             *provaderdomain.Provider

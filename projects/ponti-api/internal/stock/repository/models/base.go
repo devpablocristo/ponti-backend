@@ -3,7 +3,6 @@ package models
 import (
 	"time"
 
-	fieldmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/repository/models"
 	investormod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	projmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/repository/models"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
@@ -19,8 +18,6 @@ type Stock struct {
 	ID             int64                         `gorm:"primaryKey;autoIncrement;column:id"`
 	ProjectID      int64                         `gorm:"not null;index;column:project_id"`
 	Project        projmod.Project               `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	FieldID        int64                         `gorm:"not null;index;column:field_id"`
-	Field          fieldmod.Field                `gorm:"foreignKey:FieldID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	SupplyID       int64                         `gorm:"not null;index;column:supply_id"`
 	Supply         supplymod.Supply              `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	InvestorID     int64                         `gorm:"not null;index;column:investor_id"`
@@ -48,7 +45,6 @@ func (m *Stock) ToDomain() *domain.Stock {
 	return &domain.Stock{
 		ID:             m.ID,
 		Project:        m.Project.ToDomain(),
-		Field:          m.Field.ToDomain(),
 		Supply:         m.Supply.ToDomain(),
 		CloseDate:       m.CloseDate,
 		RealStockUnits: m.RealStockUnits,
@@ -70,10 +66,6 @@ func FromDomain(d *domain.Stock) *Stock {
 	return &Stock{
 		ID:        d.ID,
 		ProjectID: d.Project.ID,
-		FieldID:   d.Field.ID,
-		Field: fieldmod.Field{
-			ID: d.Field.ID,
-		},
 		SupplyID:       d.Supply.ID,
 		InvestorID:     d.Investor.ID,
 		RealStockUnits: d.RealStockUnits,
