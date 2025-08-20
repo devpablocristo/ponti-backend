@@ -49,7 +49,7 @@ func(usmr *UpdateSupplyMovementEntryRequest) Validate() error{
 	return err
 }
 
-func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, fieldId int64, userId *int64, sm *domain.SupplyMovement) *domain.SupplyMovement {
+func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64, sm *domain.SupplyMovement) *domain.SupplyMovement {
 	if usmer.Quantity != nil {
 		sm.Quantity = *usmer.Quantity
 	}

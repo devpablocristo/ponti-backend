@@ -62,10 +62,9 @@ func(csmr *CreateSupplyMovementEntryRequest) Validate() error{
 	return err
 }
 
-func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, fieldId int64, userId *int64) *domain.SupplyMovement {
+func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64) *domain.SupplyMovement {
 	return &domain.SupplyMovement{
 		ProjectId: projectId,
-		FieldId: fieldId,
 		Quantity:             r.Quantity,
 		MovementType:         r.MovementType,
 		MovementDate:         r.MovementDate,
@@ -132,7 +131,7 @@ func validateInvestorId(investorId int64) error {
 }
 
 func validateProjectDestinationId(projectDestinationId int64, movementType string) error {
-	if movementType == domain.INTERNAL_MOVEMENT && projectDestinationId < 0 {
+	if movementType == domain.INTERNAL_MOVEMENT && projectDestinationId <= 0 {
 		return types.NewInvalidIDError("invalid project_destination_id", nil)
 	}
 	return nil

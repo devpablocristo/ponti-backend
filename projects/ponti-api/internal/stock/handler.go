@@ -15,12 +15,12 @@ import (
 )
 
 type UseCasesPort interface {
-	GetStocksSummary(context.Context, int64, int64, int64, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksSummary(context.Context, int64, int64, int64, time.Time) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
-	UpdateCloseDateByProjectAndField(context.Context, int64, int64, int64, int64, *domain.Stock) error
+	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectIdAndFieldId(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
+	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
 }
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
@@ -62,7 +62,7 @@ func NewHandler(
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/fields/:idField/stocks"
+	baseURL := h.acf.APIBaseURL() + "/projects/:id/stocks"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -76,7 +76,6 @@ func (h *Handler) Routes() {
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
-	fieldIdStr := c.Param("idField")
 
 	monthPeriod, err := getMonthPeriodOrDefault(c)
 	if handleError(err, c) {
@@ -97,11 +96,6 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 		return
 	}
 
-	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
 	cutoffDateStr := c.Query("cutoff_date")
 	var cutoffDate time.Time
 	if cutoffDateStr != "" {
@@ -111,7 +105,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 		}
 	}
 
-	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, fieldId, monthPeriod, yearPeriod, cutoffDate)
+	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, monthPeriod, yearPeriod, cutoffDate)
 	if handleError(err, c) {
 		return
 	}
@@ -124,7 +118,6 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
-	fieldIdStr := c.Param("idField")
 
 	monthPeriod, err := getMonthPeriod(c)
 	if handleError(err, c) {
@@ -156,19 +149,13 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		return
 	}
 
-	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
 	if err := req.Validate(); handleError(err, c) {
 		return
 	}
 
-	err = h.ucs.UpdateCloseDateByProjectAndField(
+	err = h.ucs.UpdateCloseDateByProject(
 		ctx,
 		projectId,
-		fieldId,
 		monthPeriod,
 		yearPeriod,
 		req.ToDomain(&userID),

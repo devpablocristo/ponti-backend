@@ -3,7 +3,6 @@ package domain
 import (
 	"time"
 
-	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
 	projdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
@@ -15,7 +14,6 @@ import (
 type Stock struct {
 	ID              int64
 	Project         *projdom.Project
-	Field           *fielddom.Field
 	Supply          *supplydomain.Supply
 	Investor        *domain.Investor
 	CloseDate       *time.Time

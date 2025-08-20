@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	projdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
 	stockUseCases "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	stockdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type RepositoryPort interface {
@@ -33,7 +34,7 @@ func NewUseCases(
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectIdAndFieldId(ctx, movement.ProjectId, movement.FieldId, movement.Supply.ID)
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectId(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -46,9 +47,17 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 		stock.ID = stockId
 	}
 
+	if movement.MovementType == domain.INTERNAL_MOVEMENT {
+		err := u.handleMovementInternalMovementOut(ctx, movement, *stock)
+		if err != nil {
+			return 0, err
+		}
+	}
 	movement.StockId = stock.ID
 
-	stock.RealStockUnits = movement.Quantity.Add(stock.RealStockUnits)
+	stockDiference := createStockDiference(movement.IsEntry, movement.Quantity)
+	 
+	stock.RealStockUnits = stock.RealStockUnits.Add(stockDiference)
 
 	err = u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock)
 	if err != nil {
@@ -87,9 +96,6 @@ func createStockDomainFromSupplyMovement(supplyMovement *domain.SupplyMovement) 
 		Project: &projdom.Project{
 			ID: supplyMovement.ProjectId,
 		},
-		Field: &fielddom.Field{
-			ID: supplyMovement.FieldId,
-		},
 		Supply:       supplyMovement.Supply,
 		Investor:     supplyMovement.Investor,
 		CloseDate:    nil,
@@ -98,4 +104,32 @@ func createStockDomainFromSupplyMovement(supplyMovement *domain.SupplyMovement) 
 		MonthPeriod:  int64(time.Now().Month()),
 		Base:         supplyMovement.Base,
 	}
+}
+
+func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decimal{
+	if isEntry {
+		return quantity
+	}else {
+		return quantity.Neg()
+	}
+}
+
+func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) (error){
+
+	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
+		return types.NewValidationError("quantity", "quantity must be less than real stock units")
+	}
+
+	movementIn := *movement
+
+	movementIn.ProjectId = movement.ProjectDestinationId
+	movementIn.MovementType = domain.INTERNAL_MOVEMENT_IN
+	movementIn.IsEntry = true
+	movementIn.ProjectDestinationId = 0
+
+	movement.IsEntry = false
+
+	_, err := u.CreateSupplyMovement(ctx, &movementIn)
+
+	return err
 }

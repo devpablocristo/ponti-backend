@@ -52,7 +52,7 @@ func (h *Handler) Routes() {
 		publicProviders.GET("", h.GetProviders)
 	}
 
-	public := r.Group(baseURL + "/projects/:id/fields/:idField/supply-movements")
+	public := r.Group(baseURL + "/projects/:id/supply-movements")
 	{
 		public.POST("", h.CreateSupplyMovement)
 	}
@@ -97,14 +97,8 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	}
 
 	projectIdStr := c.Param("id")
-	fieldIdStr := c.Param("idField")
 
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
@@ -123,7 +117,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		if err != nil {
 			supplyMovementResponse = createsupplymovement.NewErrorCreateSupplyMovementResponse(err.Error())
 		} else {
-			supplyMovementId, err := h.ucs.CreateSupplyMovement(ctx, supplyMovement.ToDomain(projectId, fieldId, &userID))
+			supplyMovementId, err := h.ucs.CreateSupplyMovement(ctx, supplyMovement.ToDomain(projectId, &userID))
 			if err != nil {
 				supplyMovementResponse = createsupplymovement.NewErrorCreateSupplyMovementResponse(err.Error())
 			} else {
@@ -172,11 +166,6 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	fieldIdStr := c.Param("idField")
-	fieldId, err := strconv.ParseInt(fieldIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
 
 	supplyMovementStr := c.Param("idSupplyMovement")
 	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
@@ -197,7 +186,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	if err = req.Validate(); handleError(err, c) {
 		return
 	}
-	err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectId, fieldId, &userID, supplyMovement))
+	err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectId, &userID, supplyMovement))
 
 	if handleError(err, c) {
 		return

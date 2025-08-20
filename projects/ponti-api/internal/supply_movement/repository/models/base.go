@@ -16,11 +16,10 @@ type SupplyMovement struct {
 	ID                   int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	StockId              int64     `gorm:"not null;column:stock_id"`
 	Quantity             decimal.Decimal   `gorm:"not null;column:quantity"`
-	MovementType         string    `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial');not null;column:movement_type"`
+	MovementType         string    `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial', 'Movimiento interno entrada');not null;column:movement_type"`
 	MovementDate         *time.Time `gorm:"not null;column:movement_date"`
 	ReferenceNumber      string    `gorm:"not null;column:reference_number"`
 	ProjectId            int64     `gorm:"not null;column:project_id"`
-	FieldId              int64     `gorm:"not null;column:field_id"`
 	ProjectDestinationId int64     `gorm:"not null;column:project_destination_id"`
 	SupplyID             int64     `gorm:"not null;column:supply_id"`
 	InvestorID           int64     `gorm:"not null;column:investor_id"`
@@ -42,7 +41,6 @@ func (s *SupplyMovement) ToDomain() *domain.SupplyMovement {
 		MovementDate:         s.MovementDate,
 		ReferenceNumber:      s.ReferenceNumber,
 		ProjectId:            s.ProjectId,
-		FieldId:              s.FieldId,
 		ProjectDestinationId: s.ProjectDestinationId,
 		Supply:               s.Supply.ToDomain(),
 		Investor:             s.Investor.ToDomain(),
@@ -67,7 +65,6 @@ func FromDomain(s *domain.SupplyMovement) *SupplyMovement {
 		MovementDate:         s.MovementDate,
 		ReferenceNumber:            s.ReferenceNumber,
 		ProjectId:            s.ProjectId,
-		FieldId:              s.FieldId,
 		ProjectDestinationId: s.ProjectDestinationId,
 		SupplyID:             s.Supply.ID,
 		InvestorID:           s.Investor.ID,
