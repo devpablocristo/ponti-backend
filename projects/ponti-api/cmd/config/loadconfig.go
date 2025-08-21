@@ -11,49 +11,52 @@ import (
 	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
 )
 
+// Config agrupa todas las configuraciones de la aplicación.
 type Config struct {
-	App            App            // Variables generales
-	API            API            // configuración de la API
-	HTTPServer     HTTPServer     // configuración del servidor HTTP
-	Debugger       Debugger       // configuración del debugger
-	DB             DB             // configuración de la base de datos
-	WordsSuggester WordsSuggester // configuración del sugeridor
-	Migrations     Migrations     // configuración de las migraciones
-	Deploy         Deploy         // configuración de despliegue
+	App            App            // General variables
+	API            API            // API configuration
+	HTTPServer     HTTPServer     // HTTP server configuration
+	Debugger       Debugger       // debugger configuration
+	DB             DB             // database configuration
+	WordsSuggester WordsSuggester // suggester configuration
+	Migrations     Migrations     // migrations configuration
+	Deploy         Deploy         // deployment configuration
 }
 
+// LoadConfig carga la configuración desde variables de entorno y archivos .env.
 func LoadConfig() (*Config, error) {
 
 	if os.Getenv("GO_ENVIRONMENT") == "" {
 		// 1) SIEMPRE cargar primero el base para poblar las variables
-		if err := envvars.OverloadConfig("./projects/ponti-api/.env"); err != nil {
-			return nil, fmt.Errorf("could not load base .env: %w", err)
+		if err := envvars.OverloadConfig("projects/ponti-api/.env"); err != nil {
+			return nil, fmt.Errorf("no se pudo cargar el archivo .env base: %w", err)
 		}
 
 		// 2) Ahora que el entorno ya tiene DEPLOY_ENV (si estaba en .env), lo leemos
 		platform := strings.ToLower(os.Getenv("DEPLOY_PLATFORM"))
 		env := strings.ToLower(os.Getenv("DEPLOY_ENV"))
-		root := strings.ToLower(os.Getenv("DEPLOY_PROJECT_ROOT"))
+		// No forzar a minúsculas el path del proyecto (puede romper el path en Linux)
+		root := os.Getenv("DEPLOY_PROJECT_ROOT")
 		if env != "" {
 			envFile := fmt.Sprintf(root+"/.env.%s.%s", platform, env)
 			if _, err := os.Stat(envFile); err == nil {
-				// El archivo existe, se carga y sobrescribe variables
+				// El archivo existe, cargar y sobrescribir variables
 				if err := envvars.OverloadConfig(envFile); err != nil {
-					return nil, fmt.Errorf("error overloading config from %v env file: %w", envFile, err)
+					return nil, fmt.Errorf("error al sobrescribir configuración desde el archivo .env %v: %w", envFile, err)
 				}
 			} else if os.IsNotExist(err) {
-				// El archivo no existe, solo loguea advertencia (no error)
+				// El archivo no existe, solo advertir (sin error)
 				fmt.Printf("Advertencia: el archivo %s no existe, se omite override\n", envFile)
 			} else {
-				// Otro error al intentar acceder el archivo
-				return nil, fmt.Errorf("error checking existence of %v: %w", envFile, err)
+				// Otro error al intentar acceder al archivo
+				return nil, fmt.Errorf("error al verificar la existencia de %v: %w", envFile, err)
 			}
 		}
 	}
 
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {
-		return nil, fmt.Errorf("failed to process config: %w", err)
+		return nil, fmt.Errorf("no se pudo procesar la configuración: %w", err)
 	}
 
 	// 4) Valores derivados
@@ -62,7 +65,7 @@ func LoadConfig() (*Config, error) {
 	// 5) Validación final
 	validate := validator.New()
 	if err := validate.Struct(&cfg); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
+		return nil, fmt.Errorf("configuración inválida: %w", err)
 	}
 
 	return &cfg, nil

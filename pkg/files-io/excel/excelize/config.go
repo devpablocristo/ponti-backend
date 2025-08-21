@@ -1,7 +1,4 @@
-// ================================
 // Package: pkgexcel (estilo pkggorm) — 3 archivos: config.go, bootstrap.go, service.go
-// ================================
-
 // File: config.go
 package pkgexcel
 
@@ -57,9 +54,9 @@ func (c *Config) Validate() error {
 	if c.dateFormat == "" {
 		c.dateFormat = "2006-01-02"
 	}
-	// por defecto true (igual a cómo pkggorm completa valores por defecto)
-	if !c.writeHeader {
-		c.writeHeader = true
-	}
+	// El default ya se resolvió en Bootstrap con tri‑state.
 	return nil
 }
+
+// Interface assertion guards to ensure Config satisfies ConfigPort at compile-time.
+var _ ConfigPort = (*Config)(nil)

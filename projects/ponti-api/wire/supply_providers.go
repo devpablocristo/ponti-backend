@@ -22,9 +22,7 @@ func ProvideSupplyRepositoryPort(r *supply.Repository) supply.RepositoryPort {
 }
 
 // ProvideSupplyUseCases agrupa repositorios en supply.UseCases.
-func ProvideSupplyUseCases(
-	repo supply.RepositoryPort,
-) *supply.UseCases {
+func ProvideSupplyUseCases(repo supply.RepositoryPort) *supply.UseCases {
 	return supply.NewUseCases(repo)
 }
 

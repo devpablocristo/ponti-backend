@@ -80,7 +80,6 @@ func (s *Server) RunServer(ctx context.Context) error {
 	errChan := make(chan error, 1)
 
 	go func() {
-		log.Printf("Starting Server on port %s...\n", s.config.GetRouterPort())
 		errChan <- httpServer.ListenAndServe()
 	}()
 

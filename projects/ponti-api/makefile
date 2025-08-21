@@ -1,25 +1,23 @@
 SHELL := /bin/bash
 
-# Variables base (ahora más parametrizables)
+# Variables base
 ROOT_DIR           := $(shell pwd)
 VERSION            := 1.0
 BUILD_DIR          := $(ROOT_DIR)/bin
-DOCKER_COMPOSE_DEV := $(ROOT_DIR)/docker-compose.mix.dev.yml
-DOCKER_COMPOSE_STG := $(ROOT_DIR)/docker-compose.mix.stg.yml   # renombrado para consistencia
-# Recomiendo usar variables de entorno en vez de hardcodear “localhost”
+DOCKER_COMPOSE_YML := $(ROOT_DIR)/docker-compose.yml
+
+# Recomiendo usar variables de entorno para la base de datos
 DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}
 MIGRATIONS_DIR     := ./migrations
-# MIGRATIONS_NAME estaba usando $(name) que no viene definido
-MIGRATIONS_NAME    := $(NAME)  # deberías pasar NAME=name_al_migrar o cambiar aquí
+MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
-.PHONY: all build run test clean lint \
-        mix-dev-build mix-dev-up mix-dev-down mix-dev-logs \
-        mix-stg-build mix-stg-up mix-stg-down mix-stg-logs \
+.PHONY: all bin-build run test bin-clean lint \
+        build up down logs reset rebuild \
         run-api seed \
-        migrate-up migrate-down migrate-force migrate-version migrate-create
+        migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create
 
 # --------------------------------------------------
-# Migrations
+# Migraciones
 # --------------------------------------------------
 migrate-up:
 	@echo "Running migrations..."
@@ -29,7 +27,7 @@ migrate-down:
 	@echo "Running migrations down..."
 	@$(MIGRATE) down
 
-# Usamos la var NAME en lugar de name
+# Crea una nueva migración usando la variable NAME
 migrate-create:
 	@echo "Creating migration $(MIGRATIONS_NAME)..."
 	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
@@ -42,12 +40,47 @@ migrate-version:
 	@echo "Current migration version:"
 	@$(MIGRATE) version
 
+# Forzar migración en docker-compose pasando el número como argumento
+migrate-force-dc:
+	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		echo "Error: You must pass the version number. Example: make migrate-force-dc 31"; \
+		exit 1; \
+	fi
+	@echo "Forcing migration to version $(filter-out $@,$(MAKECMDGOALS))..."
+	@docker compose run --rm migrate \
+		-path /migrations \
+		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
+		force $(filter-out $@,$(MAKECMDGOALS))
+
+%:
+	@:
+
+# Baja todo, borra volúmenes, recompila, levanta, limpia esquema y corre migraciones desde cero
+migrate-reset-dc:
+	@echo "Resetting everything: down -v, build, up -d, drop schema and run migrations from scratch..."
+	@docker compose down -v --remove-orphans
+	@docker compose build
+	@docker compose up -d
+	@echo "Waiting for DB (ponti-db) to be ready..."
+	@until docker compose exec -T ponti-db pg_isready -U admin -d ponti_api_db >/dev/null 2>&1; do sleep 1; done
+	@echo "Dropping schema with migrate drop -f..."
+	@docker compose run --rm migrate \
+		-path /migrations \
+		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
+		drop -f
+	@echo "Running migrations from scratch..."
+	@docker compose run --rm migrate \
+		-path /migrations \
+		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
+		up
+	@echo "Reset completed."
+
 # --------------------------------------------------
-# Build & Run
+# Compilación y ejecución
 # --------------------------------------------------
 all: build run
 
-build:
+bin-build:
 	@echo "Building the project..."
 	@mkdir -p $(BUILD_DIR)
 	APP_NAME=ponti-api go build -gcflags "all=-N -l" \
@@ -63,7 +96,7 @@ test:
 	@echo "Running tests..."
 	@go test ./...
 
-clean:
+bin-clean:
 	@echo "Cleaning up build artifacts..."
 	@rm -rf $(BUILD_DIR)
 
@@ -79,44 +112,31 @@ seed:
 	@echo "Seeding database..."
 	@go run ./cmd/seed/main.go
 
-# --------------------------------------------------
-# Docker Compose: Mix Dev
-# --------------------------------------------------
-mix-dev-build:
-	@echo "Building services in mix.dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) up --build -d
-	@$(MAKE) mix-dev-logs
-
-mix-dev-up:
-	@echo "Starting services in mix.dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) up -d
-	@$(MAKE) mix-dev-logs
-
-mix-dev-down:
-	@echo "Stopping services in mix.dev mode..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) down --remove-orphans
-
-mix-dev-logs:
-	@echo "Tailing logs for mix.dev services..."
-	docker compose -f $(DOCKER_COMPOSE_DEV) logs -f
+seed-dashboard:
+	@echo "Seeding dashboard test data..."
+	@go run ./cmd/api/main.go seed
 
 # --------------------------------------------------
-# Docker Compose: Staging (Mix Stg)
+# Docker Compose
 # --------------------------------------------------
-mix-stg-build:
-	@echo "Building services in mix-stg mode..."
-	docker compose -f $(DOCKER_COMPOSE_STG) up --build -d
-	@$(MAKE) mix-stg-logs
+build:
+	@echo "Building services (compose up --build)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) up --build
 
-mix-stg-up:
-	@echo "Starting services in mix-stg mode..."
-	docker compose -f $(DOCKER_COMPOSE_STG) up -d
-	@$(MAKE) mix-stg-logs
+up:
+	@echo "Starting services (compose up)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) up
 
-mix-stg-down:
-	@echo "Stopping services in mix-stg mode..."
-	docker compose -f $(DOCKER_COMPOSE_STG) down --remove-orphans
+down:
+	@echo "Stopping services (compose down)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) down --remove-orphans
 
-mix-stg-logs:
-	@echo "Tailing logs for mix-stg services..."
-	docker compose -f $(DOCKER_COMPOSE_STG) logs -f
+reset: down up
+	@echo "Reset done (down & up)."
+
+rebuild: down build
+	@echo "Rebuild done (down & build)."
+
+logs:
+	@echo "Tailing logs (compose logs -f)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) logs -f

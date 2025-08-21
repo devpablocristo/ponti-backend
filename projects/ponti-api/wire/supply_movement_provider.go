@@ -54,13 +54,13 @@ func ProvideSupplyMovementMiddlewaresEnginePort(m *mwr.Middlewares) supply_movem
 }
 
 var SupplyMovementSet = wire.NewSet(
-	ProvideStockRepository,
-	ProvideStockRepositoryPort,
-	ProvideStockUseCases,
-	ProvideStockUseCasesPort,
-	ProvideStockHandler,
-	ProvideStockConfigAPI,
-	ProvideStockGormEnginePort,
-	ProvideStockGinEnginePort,
-	ProvideStockMiddlewaresEnginePort,
+	ProvideSupplyMovementRepository,
+	ProvideSupplyMovementRepositoryPort,
+	ProvideSupplyMovementUseCases,
+	ProvideSupplyMovementUseCasesPort,
+	ProvideSupplyMovementHandler,
+	ProvideSupplyMovementConfigAPI,
+	ProvideSupplyMovementGormEnginePort,
+	ProvideSupplyMovementGinEnginePort,
+	ProvideSupplyMovementMiddlewaresEnginePort,
 )

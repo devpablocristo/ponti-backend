@@ -1,8 +1,14 @@
+// Package lot contiene los casos de uso para la entidad Lot.
 package lot
 
 import (
+	// standard library
 	"context"
 
+	// third-party
+	"github.com/shopspring/decimal"
+
+	// project
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -15,9 +21,9 @@ type RepositoryPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
-	ListLotsForKPI(context.Context, int64, int64, int64, string) (*domain.LotKPIs, error)
-	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
-	UpdateLotTons(context.Context, int64, int) error
+	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	ListLots(context.Context, int64, int64, int64, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
+	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 }
 
 type UseCases struct {
@@ -44,7 +50,7 @@ func (u *UseCases) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	return u.repo.UpdateLot(ctx, l)
 }
 
-func (u *UseCases) UpdateLotTons(ctx context.Context, id int64, tons int) error {
+func (u *UseCases) UpdateLotTons(ctx context.Context, id int64, tons decimal.Decimal) error {
 	return u.repo.UpdateLotTons(ctx, id, tons)
 }
 
@@ -64,17 +70,17 @@ func (u *UseCases) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID,
 	return u.repo.ListLotsByProjectFieldAndCrop(ctx, projectID, fieldID, cropID, cropType)
 }
 
-func (u *UseCases) GetLotKPIs(
+func (u *UseCases) GetMetrics(
 	ctx context.Context,
 	projectID, fieldID, cropID int64,
-	cropType string,
-) (*domain.LotKPIs, error) {
-	return u.repo.ListLotsForKPI(ctx, projectID, fieldID, cropID, cropType)
+) (*domain.LotMetrics, error) {
+	return u.repo.GetMetrics(ctx, projectID, fieldID, cropID)
 }
 
-func (u *UseCases) ListLotsTable(ctx context.Context,
-	projectID, fieldID, cropID int64, cropType string,
+func (u *UseCases) ListLots(
+	ctx context.Context,
+	projectID, fieldID, cropID int64,
 	page, pageSize int,
-) ([]domain.LotTable, int, float64, float64, error) {
-	return u.repo.ListLotsTable(ctx, projectID, fieldID, cropID, cropType, page, pageSize)
+) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
+	return u.repo.ListLots(ctx, projectID, fieldID, cropID, page, pageSize)
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
@@ -77,7 +76,7 @@ func (h *Handler) Routes() {
 
 func (h *Handler) CreateManager(c *gin.Context) {
 	var req dto.CreateManager
-	if err := utils.ValidateRequest(c, &req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

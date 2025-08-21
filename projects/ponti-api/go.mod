@@ -3,6 +3,7 @@ module github.com/alphacodinggroup/ponti-backend/projects/ponti-api
 go 1.23.4
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alphacodinggroup/ponti-backend/pkg v0.0.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-playground/validator/v10 v10.27.0
@@ -10,7 +11,14 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/shopspring/decimal v1.2.0
+	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.0
+)
+
+// Dependencias para testing
+require (
+	github.com/golang/mock v1.6.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
@@ -87,7 +95,6 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
-	gorm.io/driver/postgres v1.6.0 // indirect
 	gorm.io/driver/sqlite v1.6.0 // indirect
 )
 

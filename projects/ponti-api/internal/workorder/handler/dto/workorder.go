@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
-
 	"github.com/shopspring/decimal"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
@@ -41,7 +39,7 @@ type Workorder struct {
 	LaborID       int64           `json:"labor_id" binding:"required"`
 	Contractor    string          `json:"contractor"`
 	Observations  string          `json:"observations"`
-	Date          utils.ISODate   `json:"date" binding:"required"`
+	Date          time.Time       `json:"date" binding:"required"`
 	InvestorID    int64           `json:"investor_id" binding:"required"`
 	EffectiveArea decimal.Decimal `json:"effective_area" binding:"required"`
 	Items         []WorkorderItem `json:"items" binding:"required,dive"`
@@ -59,7 +57,7 @@ func (r Workorder) MarshalJSON() ([]byte, error) {
 		LaborID       int64           `json:"labor_id"`
 		Contractor    string          `json:"contractor"`
 		Observations  string          `json:"observations"`
-		Date          utils.ISODate   `json:"date"`
+		Date          time.Time       `json:"date"`
 		InvestorID    int64           `json:"investor_id"`
 		EffectiveArea decimal.Decimal `json:"effective_area"`
 		Items         []WorkorderItem `json:"items"`
@@ -92,7 +90,7 @@ func (r *Workorder) ToDomain() *domain.Workorder {
 		LaborID:       r.LaborID,
 		Contractor:    r.Contractor,
 		Observations:  r.Observations,
-		Date:          time.Time(r.Date),
+		Date:          r.Date,
 		InvestorID:    r.InvestorID,
 		EffectiveArea: r.EffectiveArea,
 		Items:         toDomainItems(r.Items),
@@ -130,7 +128,7 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		LaborID:       o.LaborID,
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
-		Date:          utils.ISODate(o.Date),
+		Date:          o.Date,
 		InvestorID:    o.InvestorID,
 		EffectiveArea: o.EffectiveArea,
 		Items:         items,

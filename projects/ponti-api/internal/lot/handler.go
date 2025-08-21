@@ -1,28 +1,36 @@
+// Package lot expone los handlers HTTP para la entidad Lot.
 package lot
 
 import (
+	// standard library
 	"context"
 	"net/http"
 	"strconv"
 
+	// third-party
+	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
+
+	// pkg
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	// project
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
-	"github.com/gin-gonic/gin"
 )
 
 type UseCasesPort interface {
 	CreateLot(context.Context, *domain.Lot) (int64, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
-	UpdateLotTons(context.Context, int64, int) error
+	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 	DeleteLot(context.Context, int64) error
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
-	GetLotKPIs(context.Context, int64, int64, int64, string) (*domain.LotKPIs, error)
-	ListLotsTable(context.Context, int64, int64, int64, string, int, int) ([]domain.LotTable, int, float64, float64, error)
+	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	ListLots(context.Context, int64, int64, int64, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 }
 
 type GinEnginePort interface {
@@ -67,34 +75,29 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateLot)
-		public.GET("", h.ListLots)            // ÚNICO endpoint de lista
-		public.GET("/kpis", h.GetLotKPIs)     // KPIs endpoint
-		public.GET("/table", h.ListLotsTable) // Table endpoint
-		public.PUT("/:id/tons", h.UpdateLotTons)
+		public.POST("", ValidateLotRequest(), h.CreateLot)
+		public.GET("", h.ListLots)
+		public.GET("/metrics", h.GetMetrics)
+		public.PUT("/:id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
 		public.GET("/:id", h.GetLot)
-		public.PUT("/:id", h.UpdateLot)
+		public.PUT("/:id", ValidateLotUpdate(), h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
 	}
 }
 
-// --- Handlers ---
-
 func (h *Handler) CreateLot(c *gin.Context) {
-	var req dto.Lot
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		return
-	}
+	// El lote ya fue validado por el middleware ValidateLotRequest
+	req := c.MustGet("validated_lot").(*dto.Lot)
 
 	lotDomain, err := req.ToDomain()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "invalid domain conversion", err))
 		return
 	}
+
 	newID, err := h.ucs.CreateLot(c.Request.Context(), lotDomain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, dto.CreateLotResponse{Message: "Lot created successfully", ID: newID})
@@ -103,50 +106,45 @@ func (h *Handler) CreateLot(c *gin.Context) {
 func (h *Handler) ListLots(c *gin.Context) {
 	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
 	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	currentCropID, _ := strconv.ParseInt(c.Query("current_crop_id"), 10, 64)
-	previousCropID, _ := strconv.ParseInt(c.Query("previous_crop_id"), 10, 64)
-
-	var (
-		lots []domain.Lot
-		err  error
-	)
-
-	switch {
-	case projectID > 0 && fieldID > 0 && currentCropID > 0:
-		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, currentCropID, "current")
-	case projectID > 0 && fieldID > 0 && previousCropID > 0:
-		lots, err = h.ucs.ListLotsByProjectFieldAndCrop(c.Request.Context(), projectID, fieldID, previousCropID, "previous")
-	case projectID > 0 && fieldID > 0:
-		lots, err = h.ucs.ListLotsByProjectAndField(c.Request.Context(), projectID, fieldID)
-	case projectID > 0:
-		lots, err = h.ucs.ListLotsByProject(c.Request.Context(), projectID)
-	case fieldID > 0:
-		lots, err = h.ucs.ListLotsByField(c.Request.Context(), fieldID)
-	default:
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Missing required parameters"})
+	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	// Requiere al menos uno de project_id o field_id
+	if projectID <= 0 && fieldID <= 0 {
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "project_id or field_id is required", nil))
 		return
 	}
+	// Cap de paginación
+	if pageSize > 100 {
+		pageSize = 100
+	}
 
+	rows, total, sumSowed, sumCost, err := h.ucs.ListLots(c.Request.Context(), projectID, fieldID, cropID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
-	out := make([]dto.Lot, len(lots))
-	for i := range lots {
-		out[i] = *dto.FromDomain(&lots[i])
-	}
-	c.JSON(http.StatusOK, out)
+
+	pageInfo := types.NewPageInfo(page, pageSize, int64(total))
+	resp := dto.FromDomainList(pageInfo, rows, sumSowed, sumCost)
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
 	}
 	lot, err := h.ucs.GetLot(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomain(lot))
@@ -155,149 +153,78 @@ func (h *Handler) GetLot(c *gin.Context) {
 func (h *Handler) UpdateLot(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
-		return
-	}
-	var req dto.Lot
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
 	}
 
+	// El lote ya fue validado por el middleware ValidateLotUpdate
+	req := c.MustGet("validated_lot").(*dto.Lot)
+
 	dom, err := req.ToDomain()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "invalid domain conversion", err))
 		return
 	}
 	dom.ID = id
-	if err := h.ucs.UpdateLot(c, dom); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+	// Si el cliente no envía field_id, usamos el existente para evitar inconsistencias
+	if dom.FieldID == 0 {
+		if cur, getErr := h.ucs.GetLot(c.Request.Context(), id); getErr == nil {
+			dom.FieldID = cur.FieldID
+		} else {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "field_id is required"})
+			return
+		}
+	}
+	if err := h.ucs.UpdateLot(c.Request.Context(), dom); err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
-		return
-	}
-	var req struct {
-		Tons int `json:"tons"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
 	}
 
-	if err := h.ucs.UpdateLotTons(c, id, req.Tons); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+	// Las toneladas ya fueron validadas por el middleware ValidateLotTonsUpdate
+	tons := c.MustGet("validated_tons").(decimal.Decimal)
+
+	if err := h.ucs.UpdateLotTons(c.Request.Context(), id, tons); err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lot id"})
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
 	}
-	if err := h.ucs.DeleteLot(c, id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lot deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) GetLotKPIs(c *gin.Context) {
+func (h *Handler) GetMetrics(c *gin.Context) {
 	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
 	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
 	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
-	cropType := c.DefaultQuery("crop_type", "current") // current | previous | both
 
 	if projectID <= 0 && fieldID <= 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "project_id or field_id is required"})
-		return
+		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "project_id or field_id is required", nil))
 	}
 
-	kpis, err := h.ucs.GetLotKPIs(c, projectID, fieldID, cropID, cropType)
+	m, err := h.ucs.GetMetrics(c.Request.Context(), projectID, fieldID, cropID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomainKPIs(kpis))
-}
-
-func (h *Handler) ListLotsTable(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
-	cropType := c.DefaultQuery("crop_type", "current")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	rows, total, sumSowed, sumCost, err := h.ucs.ListLotsTable(c, projectID, fieldID, cropID, cropType, page, pageSize)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		return
-	}
-	// Map domain → dto
-	dtoRows := make([]dto.LotTable, len(rows))
-	for i, row := range rows {
-		dateMap := make(map[int]dto.LotDates)
-		for _, date := range row.Dates {
-			harvestDate := ""
-			if date.HarvestDate != nil {
-				harvestDate = date.HarvestDate.Format("2006-01-02")
-			}
-			sowingDate := ""
-			if date.SowingDate != nil {
-				sowingDate = date.SowingDate.Format("2006-01-02")
-			}
-			dateMap[date.Sequence] = dto.LotDates{
-				SowingDate:  sowingDate,
-				HarvestDate: harvestDate,
-				Sequence:    date.Sequence,
-			}
-		}
-
-		dates := make([]dto.LotDates, 3)
-		for seq := 1; seq <= 3; seq++ {
-			if d, ok := dateMap[seq]; ok {
-				dates[seq-1] = d
-			} else {
-				dates[seq-1] = dto.LotDates{
-					Sequence: seq,
-				}
-			}
-		}
-
-		dtoRows[i] = dto.LotTable{
-			ID:             row.ID,
-			ProjectID:      row.ProjectID,
-			ProjectName:    row.ProjectName,
-			FieldName:      row.FieldName,
-			LotName:        row.LotName,
-			PreviousCropID: row.PreviousCropID,
-			CurrentCropID:  row.CurrentCropID,
-			PreviousCrop:   row.PreviousCrop,
-			CurrentCrop:    row.CurrentCrop,
-			Variety:        row.Variety,
-			SowedArea:      row.SowedArea,
-			Season:         row.Season,
-			Tons:           row.Tons,
-			NetPrice:       row.NetPrice,
-			Dates:          dates,
-			UpdatedAt:      row.UpdatedAt,
-			AdminCost:      row.AdminCost,
-		}
-	}
-	c.JSON(http.StatusOK, dto.LotTableResponse{
-		Rows:         dtoRows,
-		Total:        total,
-		SumSowedArea: sumSowed,
-		SumCost:      sumCost,
-	})
+	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
 }

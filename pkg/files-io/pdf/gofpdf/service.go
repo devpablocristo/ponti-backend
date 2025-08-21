@@ -3,6 +3,8 @@ package pkgpdf
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"time"
@@ -31,8 +33,38 @@ func newRepository(c ConfigPort) (*Repository, error) {
 func (r *Repository) Connect(config ConfigPort) error {
 	p := gofpdf.New(config.GetOrientation(), "mm", config.GetPageSize(), "")
 	p.SetMargins(config.GetMarginLeft(), config.GetMarginTop(), config.GetMarginRight())
-	p.SetAutoPageBreak(true, 10)
+	p.SetAutoPageBreak(true, config.GetMarginBottom())
+
+	// UTF-8 fonts opcionales
+	if config.GetUseUTF8() && config.GetFontRegularPath() != "" {
+		p.AddUTF8Font(config.GetFontFamily(), "", config.GetFontRegularPath())
+		if b := config.GetFontBoldPath(); b != "" {
+			p.AddUTF8Font(config.GetFontFamily(), "B", b)
+		}
+	}
 	p.SetFont(config.GetFontFamily(), "", config.GetFontSize())
+
+	// Metadatos del documento
+	if t := config.GetTitle(); t != "" {
+		p.SetTitle(t, true)
+	}
+	if a := config.GetAuthor(); a != "" {
+		p.SetAuthor(a, true)
+	}
+	if s := config.GetSubject(); s != "" {
+		p.SetSubject(s, true)
+	}
+	if k := config.GetKeywords(); k != "" {
+		p.SetKeywords(k, true)
+	}
+	if config.GetPageNumbers() {
+		p.AliasNbPages("")
+		p.SetFooterFunc(func() {
+			p.SetY(-12)
+			p.SetFont(config.GetFontFamily(), "", config.GetFontSize()-2)
+			p.CellFormat(0, 10, fmt.Sprintf("Page %d/{nb}", p.PageNo()), "", 0, "C", false, 0, "")
+		})
+	}
 	r.client = p
 	r.address = config.GetFilePath()
 	r.config = config
@@ -49,6 +81,9 @@ func (r *Repository) Address() string { return r.address }
 func (r *Repository) ExportTable(data any) error {
 	if r.client == nil {
 		return fmt.Errorf("client not connected")
+	}
+	if dir := filepath.Dir(r.address); dir != "" && dir != "." {
+		_ = os.MkdirAll(dir, 0o755)
 	}
 	if err := r.render(r.client, data); err != nil {
 		return err
@@ -79,19 +114,23 @@ func (r *Repository) render(p *gofpdf.Fpdf, data any) error {
 	}
 
 	// Anchos de columna.
-	pageW, _ := p.GetPageSize()
+	pageW, pageH := p.GetPageSize()
 	lm, _, rm, _ := p.GetMargins()
+	bm := r.config.GetMarginBottom()
 	usableW := pageW - lm - rm
 	colW := r.columnWidths(p, headers, rows, usableW)
 
 	// Header.
 	rowH := 8.0
-	p.SetFont(r.config.GetFontFamily(), "B", r.config.GetFontSize())
-	for i, h := range headers {
-		p.CellFormat(colW[i], rowH, h, "1", 0, "C", false, 0, "")
+	drawHeader := func() {
+		p.SetFont(r.config.GetFontFamily(), "B", r.config.GetFontSize())
+		for i, h := range headers {
+			p.CellFormat(colW[i], rowH, h, "1", 0, "C", false, 0, "")
+		}
+		p.Ln(-1)
+		p.SetFont(r.config.GetFontFamily(), "", r.config.GetFontSize())
 	}
-	p.Ln(-1)
-	p.SetFont(r.config.GetFontFamily(), "", r.config.GetFontSize())
+	drawHeader()
 
 	// Rows con wrapping simple.
 	for _, row := range rows {
@@ -101,6 +140,14 @@ func (r *Repository) render(p *gofpdf.Fpdf, data any) error {
 			h := float64(len(lines)) * (rowH - 2)
 			if h > maxH {
 				maxH = math.Max(rowH, h)
+			}
+		}
+		// salto de página si no entra la fila
+		_, y := p.GetXY()
+		if y+maxH > (pageH - bm) {
+			p.AddPage()
+			if r.config.GetHeaderEveryPage() {
+				drawHeader()
 			}
 		}
 		x, y := p.GetXY()

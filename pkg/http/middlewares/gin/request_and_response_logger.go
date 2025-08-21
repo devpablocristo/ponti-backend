@@ -17,7 +17,7 @@ type HttpLoggingOptions struct {
 	ExcludedPaths  []string
 }
 
-// RequestAndResponseLogger logs requests and responses, skipping ExcludedPaths.
+// RequestAndResponseLogger registra solicitudes y respuestas, omitiendo ExcludedPaths.
 // INFO: registra y loggea las solicitudes HTTP entrantes y las respuestas salientes
 func RequestAndResponseLogger(options HttpLoggingOptions) gin.HandlerFunc {
 	excluded := make(map[string]struct{}, len(options.ExcludedPaths))

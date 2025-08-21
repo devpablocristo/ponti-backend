@@ -56,7 +56,7 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	movement.StockId = stock.ID
 
 	stockDiference := createStockDiference(movement.IsEntry, movement.Quantity)
-	 
+
 	stock.RealStockUnits = stock.RealStockUnits.Add(stockDiference)
 
 	err = u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock)
@@ -106,18 +106,18 @@ func createStockDomainFromSupplyMovement(supplyMovement *domain.SupplyMovement) 
 	}
 }
 
-func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decimal{
+func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decimal {
 	if isEntry {
 		return quantity
-	}else {
+	} else {
 		return quantity.Neg()
 	}
 }
 
-func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) (error){
+func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
 
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
-		return types.NewValidationError("quantity", "quantity must be less than real stock units")
+		return types.NewError(types.ErrValidation, "quantity must be less than real stock units", nil)
 	}
 
 	movementIn := *movement

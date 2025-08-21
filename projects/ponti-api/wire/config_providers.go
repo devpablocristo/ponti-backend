@@ -5,26 +5,27 @@ import (
 	"github.com/google/wire"
 )
 
-// Provee toda la config
+// ProvideAllConfigs ...
 func ProvideAllConfigs() (*config.Config, error) {
 	return config.LoadConfig()
 }
 
-// Extrae DB de la config
+// ProvideConfigDB ...
 func ProvideConfigDB(cfg *config.Config) *config.DB {
 	return &cfg.DB
 }
 
-// Extrae WordsSuggester de la config
+// ProvideConfigSuggester ...
 func ProvideConfigSuggester(cfg *config.Config) *config.WordsSuggester {
 	return &cfg.WordsSuggester
 }
 
-// ProvideConfigAPI extrae cfg.API y satisface todos los ConfigAPIPort de los dominios.
+// ProvideConfigAPI ...
 func ProvideConfigAPI(cfg *config.Config) *config.API {
 	return &cfg.API
 }
 
+// ConfigSet ...
 var ConfigSet = wire.NewSet(
 	ProvideAllConfigs,
 	ProvideConfigDB,

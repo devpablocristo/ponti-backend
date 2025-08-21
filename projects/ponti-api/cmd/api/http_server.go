@@ -16,14 +16,21 @@ func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 		return errors.New("dependencies cannot be nil")
 	}
 
-	log.Println("Registering HTTP routes...")
-
-	// Set up the Gin router with global middlewares
+	// Set up the Gin router with global middlewares only
+	// Global middlewares: ErrorHandling, RequestAndResponseLogger
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
 
 	// Register all application routes.
-	log.Println("Starting HTTP Server...")
+	// Each handler will apply its own validation middlewares as needed
 	registerHttpRoutes(deps)
+
+	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
+	log.Println("Version: ", deps.Config.App.Version)
+	log.Println("--------------------------------")
+	log.Println("Database: ", deps.Config.DB.Name)
+	log.Println("--------------------------------")
+	log.Println("Environment: ", deps.Config.Deploy.Environment)
+	log.Println("Platform: ", deps.Config.Deploy.Platform)
 
 	// Start the HTTP server (e.g., on port 8080).
 	return deps.GinEngine.RunServer(ctx)
@@ -50,7 +57,5 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.LaborHandler.Routes()
 	deps.StockHandler.Routes()
 	deps.CommercializationHandler.Routes()
-	deps.SupplyMovementHandler.Routes()
-
-	log.Println("HTTP routes registered successfully.")
+	deps.SupplyMovement.Routes()
 }

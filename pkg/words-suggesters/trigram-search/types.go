@@ -1,7 +1,7 @@
 package pkgsuggester
 
 type Suggestion struct {
-	ID   int    `json:"id"`
+	ID   int64  `json:"id"`
 	Text string `json:"text"`
 }
 

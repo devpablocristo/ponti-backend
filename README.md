@@ -278,3 +278,8 @@ X-API-KEY abc123secreta
 X-USER-ID 123
 
 
+problema migraciones 
+
+1. **Forzamos la migración** a la versión 31: migrate force 31
+2. **Ejecutamos la migración** nuevamente: migrate up
+

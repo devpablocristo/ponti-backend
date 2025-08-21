@@ -12,45 +12,52 @@ import (
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 )
 
-// --- GORM & REPO ---
+// ProvideProjectGormEnginePort ...
 func ProvideProjectGormEnginePort(r *gormpkg.Repository) project.GormEnginePort {
 	return r
 }
+
+// ProvideProjectRepository ...
 func ProvideProjectRepository(r project.GormEnginePort) *project.Repository {
 	return project.NewRepository(r)
 }
+
+// ProvideProjectRepositoryPort ...
 func ProvideProjectRepositoryPort(repo *project.Repository) project.RepositoryPort {
 	return repo
 }
 
-// --- CONFIG API ---
+// ProvideProjectConfigAPI ...
 func ProvideProjectConfigAPI(c *cfg.Config) project.ConfigAPIPort {
 	return &c.API
 }
 
-// --- HTTP & MIDDLEWARE ---
+// ProvideProjectGinEnginePort ...
 func ProvideProjectGinEnginePort(s *pgin.Server) project.GinEnginePort {
 	return s
 }
+
+// ProvideProjectMiddlewaresEnginePort ...
 func ProvideProjectMiddlewaresEnginePort(m *mwr.Middlewares) project.MiddlewaresEnginePort {
 	return m
 }
 
-// --- SUGGESTER PORT ---
+// ProvideProjectSuggesterPort ...
 func ProvideProjectSuggesterPort(s *sug.WordsSuggester) project.WordsSuggesterPort {
 	return project.NewWordsSuggester(s)
 }
 
-// --- USE CASES ---
+// ProvideProjectUseCases ...
 func ProvideProjectUseCases(rep project.RepositoryPort, sug project.WordsSuggesterPort) *project.UseCases {
 	return project.NewUseCases(rep, sug)
 }
 
+// ProvideProjectUseCasesPort ...
 func ProvideProjectUseCasesPort(u *project.UseCases) project.UseCasesPort {
 	return u
 }
 
-// --- HANDLER ---
+// ProvideProjectHandler ...
 func ProvideProjectHandler(
 	server project.GinEnginePort,
 	ucs project.UseCasesPort,
@@ -60,7 +67,7 @@ func ProvideProjectHandler(
 	return project.NewHandler(ucs, server, cfg, mws)
 }
 
-// --- WIRE SET ---
+// ProjectSet ...
 var ProjectSet = wire.NewSet(
 	ProvideProjectGormEnginePort,
 	ProvideProjectRepository,

@@ -7,17 +7,17 @@ import (
 )
 
 func main() {
-	// Claims con exactamente los mismos valores
+	// Generar claims
 	claims := jwt.MapClaims{
 		"cuil": "20345678901",
 		"exp":  int64(2547504000),
 		"iat":  int64(1701204497),
 	}
 
-	// Crear el token usando el mismo método
+	// Crear token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Firmar con la misma clave
+	// Firmar token
 	secretKey := "ce5abdb2-9b00-431c-a213-8c815cb97226"
 	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
@@ -25,7 +25,7 @@ func main() {
 		return
 	}
 
-	// Verificar el token inmediatamente
+	// Verificar token
 	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		return []byte(secretKey), nil
 	})

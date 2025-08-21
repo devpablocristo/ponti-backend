@@ -5,18 +5,19 @@ import (
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 // Lot DTO para Field, enriquecido
 type Lot struct {
-	ID               int64   `json:"id,omitempty"`
-	Name             string  `json:"name" binding:"required"`
-	Hectares         float64 `json:"hectares" binding:"required"`
-	PreviousCropID   int64   `json:"previous_crop_id" binding:"required"`
-	PreviousCropName string  `json:"previous_crop_name,omitempty"`
-	CurrentCropID    int64   `json:"current_crop_id" binding:"required"`
-	CurrentCropName  string  `json:"current_crop_name,omitempty"`
-	Season           string  `json:"season" binding:"required"`
+	ID               int64           `json:"id,omitempty"`
+	Name             string          `json:"name" binding:"required"`
+	Hectares         decimal.Decimal `json:"hectares" binding:"required"`
+	PreviousCropID   int64           `json:"previous_crop_id" binding:"required"`
+	PreviousCropName string          `json:"previous_crop_name,omitempty"`
+	CurrentCropID    int64           `json:"current_crop_id" binding:"required"`
+	CurrentCropName  string          `json:"current_crop_name,omitempty"`
+	Season           string          `json:"season" binding:"required"`
 }
 
 // Field DTO

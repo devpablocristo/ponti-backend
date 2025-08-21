@@ -6,22 +6,35 @@ import (
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
+	"github.com/shopspring/decimal"
 )
 
 type Lot struct {
-	ID               int64      `json:"id,omitempty"`
-	Name             string     `json:"name" binding:"required"`
-	FieldID          int64      `json:"field_id"`
-	Hectares         float64    `json:"hectares" binding:"required"`
-	PreviousCropID   int64      `json:"previous_crop_id" binding:"required"`
-	PreviousCropName string     `json:"previous_crop_name,omitempty"`
-	CurrentCropID    int64      `json:"current_crop_id" binding:"required"`
-	CurrentCropName  string     `json:"current_crop_name,omitempty"`
-	Season           string     `json:"season" binding:"required"`
-	Variety          string     `json:"variety"`
-	Dates            []LotDates `json:"dates"`
-	Status           string     `json:"status"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID               int64           `json:"id,omitempty"`
+	Name             string          `json:"name" binding:"required"`
+	FieldID          int64           `json:"field_id"`
+	Hectares         decimal.Decimal `json:"hectares" binding:"required"`
+	PreviousCropID   int64           `json:"previous_crop_id" binding:"required"`
+	PreviousCropName string          `json:"previous_crop_name,omitempty"`
+	CurrentCropID    int64           `json:"current_crop_id" binding:"required"`
+	CurrentCropName  string          `json:"current_crop_name,omitempty"`
+	Season           string          `json:"season" binding:"required"`
+	Variety          string          `json:"variety"`
+	Dates            []LotDates      `json:"dates"`
+	Status           string          `json:"status"`
+	Version          uint            `json:"version"` // requerido para PUT
+
+	// Campos de auditoría
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	CreatedBy *int64    `json:"created_by,omitempty"`
+	UpdatedBy *int64    `json:"updated_by,omitempty"`
+}
+
+type LotDates struct {
+	SowingDate  string `json:"sowing_date"`
+	HarvestDate string `json:"harvest_date"`
+	Sequence    int    `json:"sequence"`
 }
 
 func (d *Lot) ToDomain() (*domain.Lot, error) {
@@ -66,6 +79,7 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 		Variety:      d.Variety,
 		Dates:        dates,
 		Status:       d.Status,
+		Version:      d.Version,
 		Base: shareddomain.Base{
 			UpdatedAt: d.UpdatedAt,
 		},
@@ -83,7 +97,12 @@ func FromDomain(l *domain.Lot) *Lot {
 		CurrentCropID:    l.CurrentCrop.ID,
 		CurrentCropName:  l.CurrentCrop.Name,
 		Season:           l.Season,
+		Variety:          l.Variety,
 		Status:           l.Status,
-		UpdatedAt:        l.UpdatedAt,
+		Version:          l.Version,
+		CreatedAt:        l.Base.CreatedAt,
+		UpdatedAt:        l.Base.UpdatedAt,
+		CreatedBy:        l.Base.CreatedBy,
+		UpdatedBy:        l.Base.UpdatedBy,
 	}
 }
