@@ -28,10 +28,21 @@ type Lot struct {
 
 	PreviousCrop cropmod.Crop `gorm:"foreignKey:PreviousCropID;references:ID"`
 	CurrentCrop  cropmod.Crop `gorm:"foreignKey:CurrentCropID;references:ID"`
+	Dates        []LotDates   `gorm:"foreignKey:LotID;references:ID"`
 }
 
 // ToDomain convierte el modelo Lot en su equivalente de dominio.
 func (m *Lot) ToDomain() *domain.Lot {
+	// Convertir las fechas del modelo a dominio
+	domainDates := make([]domain.LotDates, 0, len(m.Dates))
+	for _, date := range m.Dates {
+		domainDates = append(domainDates, domain.LotDates{
+			SowingDate:  date.SowingDate,
+			HarvestDate: date.HarvestDate,
+			Sequence:    date.Sequence,
+		})
+	}
+
 	return &domain.Lot{
 		ID:           m.ID,
 		Name:         m.Name,
@@ -43,6 +54,7 @@ func (m *Lot) ToDomain() *domain.Lot {
 		Variety:      m.Variety,
 		SowingDate:   m.SowingDate,
 		Tons:         m.Tons,
+		Dates:        domainDates,
 		Version:      uint(m.Version),
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
@@ -77,5 +89,6 @@ func FromDomain(d *domain.Lot) *Lot {
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
 		},
+		// Las fechas se manejan por separado en el repositorio
 	}
 }

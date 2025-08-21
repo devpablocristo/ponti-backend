@@ -158,7 +158,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 	}
 
 	// El lote ya fue validado por el middleware ValidateLotUpdate
-	req := c.MustGet("validated_lot").(*dto.Lot)
+	req := c.MustGet("validated_lot").(*dto.LotUpdate)
 
 	dom, err := req.ToDomain()
 	if err != nil {

@@ -9,35 +9,29 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type Lot struct {
-	ID               int64           `json:"id,omitempty"`
-	Name             string          `json:"name"`
-	FieldID          int64           `json:"field_id"`
-	Hectares         decimal.Decimal `json:"hectares"`
-	PreviousCropID   int64           `json:"previous_crop_id"`
+// LotUpdate es un DTO específico para actualizaciones de lotes
+// No tiene validaciones binding requeridas para permitir actualizaciones parciales
+type LotUpdate struct {
+	Name             string          `json:"name,omitempty"`
+	FieldID          int64           `json:"field_id,omitempty"`
+	Hectares         decimal.Decimal `json:"hectares,omitempty"`
+	PreviousCropID   int64           `json:"previous_crop_id,omitempty"`
 	PreviousCropName string          `json:"previous_crop_name,omitempty"`
-	CurrentCropID    int64           `json:"current_crop_id"`
+	CurrentCropID    int64           `json:"current_crop_id,omitempty"`
 	CurrentCropName  string          `json:"current_crop_name,omitempty"`
-	Season           string          `json:"season"`
-	Variety          string          `json:"variety"`
-	Dates            []LotDates      `json:"dates"`
-	Status           string          `json:"status"`
+	Season           string          `json:"season,omitempty"`
+	Variety          string          `json:"variety,omitempty"`
+	Dates            []LotDates      `json:"dates,omitempty"`
+	Status           string          `json:"status,omitempty"`
 	Version          uint            `json:"version"` // requerido para PUT
 
 	// Campos de auditoría
-	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	CreatedBy *int64    `json:"created_by,omitempty"`
 	UpdatedBy *int64    `json:"updated_by,omitempty"`
 }
 
-type LotDates struct {
-	SowingDate  string `json:"sowing_date"`
-	HarvestDate string `json:"harvest_date"`
-	Sequence    int    `json:"sequence"`
-}
-
-func (d *Lot) ToDomain() (*domain.Lot, error) {
+// ToDomain convierte el DTO de actualización al dominio
+func (d *LotUpdate) ToDomain() (*domain.Lot, error) {
 	dates := make([]domain.LotDates, len(d.Dates))
 
 	for i, date := range d.Dates {
@@ -57,8 +51,6 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 				return nil, err
 			}
 			harvestDatePtr = &harvestDate
-		} else {
-			harvestDatePtr = nil
 		}
 
 		dates[i] = domain.LotDates{
@@ -69,7 +61,6 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 	}
 
 	return &domain.Lot{
-		ID:           d.ID,
 		Name:         d.Name,
 		FieldID:      d.FieldID,
 		Hectares:     d.Hectares,
@@ -84,25 +75,4 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 			UpdatedAt: d.UpdatedAt,
 		},
 	}, nil
-}
-
-func FromDomain(l *domain.Lot) *Lot {
-	return &Lot{
-		ID:               l.ID,
-		Name:             l.Name,
-		FieldID:          l.FieldID,
-		Hectares:         l.Hectares,
-		PreviousCropID:   l.PreviousCrop.ID,
-		PreviousCropName: l.PreviousCrop.Name,
-		CurrentCropID:    l.CurrentCrop.ID,
-		CurrentCropName:  l.CurrentCrop.Name,
-		Season:           l.Season,
-		Variety:          l.Variety,
-		Status:           l.Status,
-		Version:          l.Version,
-		CreatedAt:        l.Base.CreatedAt,
-		UpdatedAt:        l.Base.UpdatedAt,
-		CreatedBy:        l.Base.CreatedBy,
-		UpdatedBy:        l.Base.UpdatedBy,
-	}
 }

@@ -375,7 +375,7 @@ func ValidateLotRequest() gin.HandlerFunc {
 // ValidateLotUpdate es un middleware que valida actualizaciones de lotes
 func ValidateLotUpdate() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req dto.Lot
+		var req dto.LotUpdate
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{
