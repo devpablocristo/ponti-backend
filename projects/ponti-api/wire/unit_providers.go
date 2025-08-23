@@ -10,41 +10,48 @@ import (
 	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit" // Corrected import for unit
 )
 
-// --- GORM & REPO ---
+// ProvideUnitGormEnginePort ...
 func ProvideUnitGormEnginePort(r *gormpkg.Repository) unit.GormEnginePort {
 	return r
 }
+
+// ProvideUnitRepository ...
 func ProvideUnitRepository(r unit.GormEnginePort) *unit.Repository {
 	return unit.NewRepository(r)
 }
+
+// ProvideUnitRepositoryPort ...
 func ProvideUnitRepositoryPort(repo *unit.Repository) unit.RepositoryPort {
 	return repo
 }
 
-// --- CONFIG API ---
+// ProvideUnitConfigAPI ...
 func ProvideUnitConfigAPI(c *cfg.Config) unit.ConfigAPIPort {
 	return &c.API
 }
 
-// --- HTTP & MIDDLEWARE ---
+// ProvideUnitGinEnginePort ...
 func ProvideUnitGinEnginePort(s *pgin.Server) unit.GinEnginePort {
 	return s
 }
+
+// ProvideUnitMiddlewaresEnginePort ...
 func ProvideUnitMiddlewaresEnginePort(m *mwr.Middlewares) unit.MiddlewaresEnginePort {
 	return m
 }
 
-// --- USE CASES ---
+// ProvideUnitUseCases ...
 func ProvideUnitUseCases(rep unit.RepositoryPort) *unit.UseCases {
 	return unit.NewUseCases(rep)
 }
 
 // Corrected line: Changed *unit.UseCasesPort to unit.UseCasesPort
+// ProvideUnitUseCasesPort ...
 func ProvideUnitUseCasesPort(u *unit.UseCases) unit.UseCasesPort {
 	return u
 }
 
-// --- HANDLER ---
+// ProvideUnitHandler ...
 func ProvideUnitHandler(
 	server unit.GinEnginePort,
 	ucs unit.UseCasesPort,
@@ -54,7 +61,7 @@ func ProvideUnitHandler(
 	return unit.NewHandler(ucs, server, cfg, mws)
 }
 
-// --- WIRE SET ---
+// UnitSet ...
 var UnitSet = wire.NewSet(
 	ProvideUnitGormEnginePort,
 	ProvideUnitRepository,

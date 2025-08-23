@@ -14,28 +14,27 @@ import (
 	"time"
 )
 
-type CreateSupplyMovementRequestBulk struct{
+type CreateSupplyMovementRequestBulk struct {
 	SupplyMovements []CreateSupplyMovementEntryRequest `json:"items"`
 }
 
 type CreateSupplyMovementEntryRequest struct {
-	Quantity             decimal.Decimal   `json:"quantity"`
-	MovementType         string    `json:"movement_type"`
-	MovementDate         *time.Time `json:"movement_date"`
-	Reference            string    `json:"reference_number"`
-	ProjectDestinationId int64     `json:"project_destination_id"`
-	SupplyID             int64     `json:"supply_id"`
-	InvestorID           int64     `json:"investor_id"`
-	Provider			ProviderRequest `json:"provider"`
+	Quantity             decimal.Decimal `json:"quantity"`
+	MovementType         string          `json:"movement_type"`
+	MovementDate         *time.Time      `json:"movement_date"`
+	Reference            string          `json:"reference_number"`
+	ProjectDestinationId int64           `json:"project_destination_id"`
+	SupplyID             int64           `json:"supply_id"`
+	InvestorID           int64           `json:"investor_id"`
+	Provider             ProviderRequest `json:"provider"`
 }
 
-
 type ProviderRequest struct {
-	ID int64 `json:"id"`
+	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 
-func(csmr *CreateSupplyMovementEntryRequest) Validate() error{
+func (csmr *CreateSupplyMovementEntryRequest) Validate() error {
 	var err error
 	if err = validateMovementType(csmr.MovementType); err != nil {
 		return err
@@ -64,16 +63,16 @@ func(csmr *CreateSupplyMovementEntryRequest) Validate() error{
 
 func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64) *domain.SupplyMovement {
 	return &domain.SupplyMovement{
-		ProjectId: projectId,
+		ProjectId:            projectId,
 		Quantity:             r.Quantity,
 		MovementType:         r.MovementType,
 		MovementDate:         r.MovementDate,
-		ReferenceNumber:            r.Reference,
+		ReferenceNumber:      r.Reference,
 		ProjectDestinationId: r.ProjectDestinationId,
 		Supply:               &supplydomain.Supply{ID: r.SupplyID},
 		Investor:             &investordomain.Investor{ID: r.InvestorID},
-		Provider:             &providerdomain.Provider{
-			ID: r.Provider.ID,
+		Provider: &providerdomain.Provider{
+			ID:   r.Provider.ID,
 			Name: r.Provider.Name,
 		},
 		IsEntry: true,
@@ -86,16 +85,16 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int
 
 func validateMovementType(movementType string) error {
 	if movementType != domain.INTERNAL_MOVEMENT && movementType != domain.OFFICIAL_INVOICE && movementType != domain.STOCK {
-		return types.NewValidationError(
-			"movement_type", 
-			fmt.Sprintf( 
+		return types.NewError(
+			types.ErrValidation,
+			fmt.Sprintf(
 				"must be a valid type [%s, %s, %s]",
 				domain.INTERNAL_MOVEMENT,
 				domain.OFFICIAL_INVOICE,
 				domain.STOCK,
 			),
+			nil,
 		)
-
 	}
 	return nil
 }
@@ -149,4 +148,3 @@ func validateProvider(provider ProviderRequest, movementType string) error {
 
 	return nil
 }
-

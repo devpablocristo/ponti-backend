@@ -11,6 +11,7 @@ import (
 )
 
 // IsNumeric returns true if the string contains only digits.
+// Deprecated: Use validations.ValidateNumeric instead.
 func IsNumeric(s string) bool {
 	s = strings.TrimSpace(s)
 	for _, r := range s {

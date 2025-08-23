@@ -11,7 +11,7 @@ import (
 	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
-// RequireJWT validates the JWT token in the request.
+// RequireJWT valida el token JWT en la solicitud.
 func RequireJWT(cfg pkgutils.Config) gin.HandlerFunc {
 	var rsaPublicKey *rsa.PublicKey
 	if cfg.PublicKeyPEM != "" {

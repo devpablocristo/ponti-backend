@@ -65,14 +65,14 @@ type Field struct {
 }
 
 type Lot struct {
-	ID               int64   `json:"id,omitempty"`
-	Name             string  `json:"name" binding:"required"`
-	Hectares         float64 `json:"hectares" binding:"required"`
-	PreviousCropID   int64   `json:"previous_crop_id"`
-	CurrentCropID    int64   `json:"current_crop_id"`
-	PreviousCropName string  `json:"previous_crop_name"`
-	CurrentCropName  string  `json:"current_crop_name"`
-	Season           string  `json:"season" binding:"required"`
+	ID               int64           `json:"id,omitempty"`
+	Name             string          `json:"name" binding:"required"`
+	Hectares         decimal.Decimal `json:"hectares" binding:"required"`
+	PreviousCropID   int64           `json:"previous_crop_id"`
+	CurrentCropID    int64           `json:"current_crop_id"`
+	PreviousCropName string          `json:"previous_crop_name"`
+	CurrentCropName  string          `json:"current_crop_name"`
+	Season           string          `json:"season" binding:"required"`
 }
 
 func (r *Project) ToDomain() *domain.Project {

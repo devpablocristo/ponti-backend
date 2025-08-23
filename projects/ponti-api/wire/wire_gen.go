@@ -229,15 +229,14 @@ func Initialize() (*Dependencies, error) {
 	stockConfigAPIPort := ProvideStockConfigAPI(config)
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, stockUseCasesPort, stockConfigAPIPort, stockMiddlewaresEnginePort, projectUseCasesPort)
-	supplyMovementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
-	supplyMovementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
-	supplyMovementRepository := ProvideSupplyMovementRepository(supplyMovementGormEnginePort)
-	supplyMovementUseCase := ProvideSupplyMovementUseCases(stockUseCases, supplyMovementRepository)
-	supplyMovementUseCasePort := ProvideSupplyMovementUseCasesPort(supplyMovementUseCase)
-	supplyMovementConfigAPIPort := ProvideSupplyMovementConfigAPI(config)
-	supplyMovementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)
-	supplyMovementHandler := ProvideSupplyMovementHandler(supplyMovementGinEnginePort, supplyMovementUseCasePort, supplyMovementConfigAPIPort, supplyMovementMiddlewaresEnginePort, projectUseCases)
-
+	supply_movementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
+	supply_movementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
+	supply_movementRepository := ProvideSupplyMovementRepository(supply_movementGormEnginePort)
+	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository)
+	supply_movementUseCasesPort := ProvideSupplyMovementUseCasesPort(supply_movementUseCases)
+	supply_movementConfigAPIPort := ProvideSupplyMovementConfigAPI(config)
+	supply_movementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)
+	supply_movementHandler := ProvideSupplyMovementHandler(supply_movementGinEnginePort, supply_movementUseCasesPort, supply_movementConfigAPIPort, supply_movementMiddlewaresEnginePort, projectUseCasesPort)
 	dependencies := &Dependencies{
 		Config:                   config,
 		GinEngine:                server,
@@ -262,8 +261,8 @@ func Initialize() (*Dependencies, error) {
 		LaborHandler:             laborHandler,
 		InvoiceHandler:           invoiceHandler,
 		CommercializationHandler: commercializationHandler,
-		StockHandler: stockHandler,
-		SupplyMovementHandler: supplyMovementHandler,
+		StockHandler:             stockHandler,
+		SupplyMovement:           supply_movementHandler,
 	}
 	return dependencies, nil
 }
@@ -294,7 +293,6 @@ type Dependencies struct {
 	LaborHandler             *labor.Handler
 	InvoiceHandler           *invoice.Handler
 	CommercializationHandler *commercialization.Handler
-	StockHandler     *stock.Handler
-	SupplyMovementHandler *supply_movement.Handler
-
+	StockHandler             *stock.Handler
+	SupplyMovement           *supply_movement.Handler
 }

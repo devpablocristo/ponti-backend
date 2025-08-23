@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-// APIErrorType define tipos de error en la capa API.
+// APIErrorType define el tipo de error de la API.
 type APIErrorType string
 
 const (
@@ -21,7 +21,7 @@ const (
 	APIErrForbidden    APIErrorType = "FORBIDDEN"
 )
 
-// APIError representa un error estandarizado de la API.
+// APIError representa un error de la API con información adicional.
 type APIError struct {
 	Type    APIErrorType   `json:"type"`
 	Code    int            `json:"code"`
@@ -37,7 +37,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
-// APIErrorResponse es la respuesta JSON canónica en caso de error.
+// APIErrorResponse es la respuesta estándar de error para la API.
 type APIErrorResponse struct {
 	Type    APIErrorType   `json:"type"`
 	Code    int            `json:"code"`
@@ -49,7 +49,7 @@ type APIErrorResponse struct {
 func (e *APIErrorResponse) IsType(t APIErrorType) bool { return e.Type == t }
 func (e *APIErrorResponse) HasCode(code int) bool      { return e.Code == code }
 
-// Map entre errores de dominio y tipos/API correspondientes.
+// errorToAPIError mapea errores de dominio a tipos de error de la API.
 var errorToAPIError = map[ErrorType]APIErrorType{
 	ErrNotFound:        APIErrNotFound,
 	ErrConflict:        APIErrConflict,
@@ -79,7 +79,7 @@ var httpStatus = map[APIErrorType]int{
 	APIErrForbidden:    http.StatusForbidden,
 }
 
-// NewAPIError convierte errores de dominio a APIError con código HTTP adecuado.
+// NewAPIError convierte errores de dominio a APIError con el código HTTP apropiado.
 func NewAPIError(err error) (*APIError, int) {
 	var domainErr *Error
 	if errors.As(err, &domainErr) {
@@ -102,7 +102,7 @@ func NewAPIError(err error) (*APIError, int) {
 	return &APIError{
 		Type:    APIErrInternal,
 		Code:    http.StatusInternalServerError,
-		Message: "Internal server error",
+		Message: "Error interno del servidor",
 		Details: err.Error(),
 	}, http.StatusInternalServerError
 }

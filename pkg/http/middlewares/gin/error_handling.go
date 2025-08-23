@@ -9,7 +9,7 @@ import (
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-// ErrorHandling handles Gin context errors and responds with formatted JSON.
+// ErrorHandling maneja errores del contexto Gin y responde con JSON formateado.
 func ErrorHandling() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()

@@ -1,3 +1,4 @@
+// Package models contiene los modelos de persistencia para lot.
 package models
 
 import (
@@ -9,22 +10,31 @@ import (
 )
 
 type LotTable struct {
-	ID             int64
-	ProjectID      int64 `gorm:"project_id"`
-	ProjectName    string
-	FieldName      string
-	LotName        string
-	PreviousCrop   string
-	PreviousCropID int64
-	CurrentCrop    string
-	CurrentCropID  int64
-	Variety        string
-	SowedArea      float64
-	Season         string
-	Tons           int
-	NetPrice       decimal.Decimal `gorm:"net_price,omitempty"`
-	UpdatedAt      *time.Time      `gorm:"updated_at,omitempty"`
-	AdminCost      decimal.Decimal `gorm:"admin_cost,omitempty"`
+	ID             int64           `gorm:"column:id"`
+	ProjectID      int64           `gorm:"column:project_id"`
+	FieldID        int64           `gorm:"column:field_id"`
+	ProjectName    string          `gorm:"column:project_name"`
+	FieldName      string          `gorm:"column:field_name"`
+	LotName        string          `gorm:"column:lot_name"`
+	PreviousCrop   string          `gorm:"column:previous_crop"`
+	PreviousCropID int64           `gorm:"column:previous_crop_id"`
+	CurrentCrop    string          `gorm:"column:current_crop"`
+	CurrentCropID  int64           `gorm:"column:current_crop_id"`
+	Variety        string          `gorm:"column:variety"`
+	SowedArea      decimal.Decimal `gorm:"column:sowed_area"`
+	Season         string          `gorm:"column:season"`
+	Tons           decimal.Decimal `gorm:"column:tons"`
+	UpdatedAt      *time.Time      `gorm:"column:updated_at"`
+
+	AdminCost            decimal.Decimal `gorm:"column:admin_cost_per_ha"`
+	HarvestedArea        decimal.Decimal `gorm:"column:harvested_area"`
+	HarvestDate          *time.Time      `gorm:"column:harvest_date"`
+	CostUsdPerHa         decimal.Decimal `gorm:"column:cost_usd_per_ha"`
+	YieldTnPerHa         decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+	IncomeNetPerHa       decimal.Decimal `gorm:"column:income_net_per_ha"`
+	RentPerHa            decimal.Decimal `gorm:"column:rent_per_ha"`
+	ActiveTotalPerHa     decimal.Decimal `gorm:"column:active_total_per_ha"`
+	OperatingResultPerHa decimal.Decimal `gorm:"column:operating_result_per_ha"`
 }
 
 type LotDates struct {
@@ -36,7 +46,7 @@ type LotDates struct {
 }
 
 func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
-	var domainDates []domain.LotDates
+	domainDates := make([]domain.LotDates, 0, len(dates))
 	for _, date := range dates {
 		domainDates = append(domainDates, domain.LotDates{
 			SowingDate:  date.SowingDate,
@@ -49,6 +59,7 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 		ID:             m.ID,
 		ProjectID:      m.ProjectID,
 		ProjectName:    m.ProjectName,
+		FieldID:        m.FieldID,
 		FieldName:      m.FieldName,
 		LotName:        m.LotName,
 		PreviousCrop:   m.PreviousCrop,
@@ -57,11 +68,19 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 		CurrentCropID:  m.CurrentCropID,
 		Variety:        m.Variety,
 		SowedArea:      m.SowedArea,
-		Dates:          domainDates,
 		Season:         m.Season,
 		Tons:           m.Tons,
-		NetPrice:       m.NetPrice,
+		Dates:          domainDates,
 		UpdatedAt:      m.UpdatedAt,
-		AdminCost:      m.AdminCost,
+
+		AdminCost:            m.AdminCost,
+		HarvestedArea:        m.HarvestedArea,
+		HarvestDate:          m.HarvestDate,
+		CostUsdPerHa:         m.CostUsdPerHa,
+		YieldTnPerHa:         m.YieldTnPerHa,
+		IncomeNetPerHa:       m.IncomeNetPerHa,
+		RentPerHa:            m.RentPerHa,
+		ActiveTotalPerHa:     m.ActiveTotalPerHa,
+		OperatingResultPerHa: m.OperatingResultPerHa,
 	}
 }

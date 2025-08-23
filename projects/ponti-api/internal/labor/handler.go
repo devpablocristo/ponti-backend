@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
@@ -113,7 +112,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		return
 	}
 
-	if err = utils.ValidateRequest(c, &req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

@@ -30,3 +30,13 @@ func ConvertStringToID(ctx context.Context) (int64, error) {
 	}
 	return 0, fmt.Errorf("user ID is not a string")
 }
+
+// IncrementVersion incrementa la versión del modelo
+// func (b *Base) IncrementVersion() {
+// 	b.Version++
+// }
+
+// // GetVersion retorna la versión actual
+// func (b *Base) GetVersion() int64 {
+// 	return b.Version
+// }

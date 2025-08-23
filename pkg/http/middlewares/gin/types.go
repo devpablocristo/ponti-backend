@@ -1,6 +1,6 @@
 package pkgmwr
 
-// Centralizes all HTTP header, context, and env key constants.
+// Centraliza todas las constantes de headers HTTP, contexto y claves de entorno.
 const (
 	HeaderAPIKey       = "X-API-KEY"
 	HeaderUserID       = "X-USER-ID"

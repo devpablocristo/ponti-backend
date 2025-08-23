@@ -10,40 +10,47 @@ import (
 	leasetype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype"
 )
 
-// --- GORM & REPO ---
+// ProvideLeaseTypeGormEnginePort ...
 func ProvideLeaseTypeGormEnginePort(r *gormpkg.Repository) leasetype.GormEnginePort {
 	return r
 }
+
+// ProvideLeaseTypeRepository ...
 func ProvideLeaseTypeRepository(r leasetype.GormEnginePort) *leasetype.Repository {
 	return leasetype.NewRepository(r)
 }
+
+// ProvideLeaseTypeRepositoryPort ...
 func ProvideLeaseTypeRepositoryPort(repo *leasetype.Repository) leasetype.RepositoryPort {
 	return repo
 }
 
-// --- CONFIG API ---
+// ProvideLeaseTypeConfigAPI ...
 func ProvideLeaseTypeConfigAPI(c *cfg.Config) leasetype.ConfigAPIPort {
 	return &c.API
 }
 
-// --- HTTP & MIDDLEWARE ---
+// ProvideLeaseTypeGinEnginePort ...
 func ProvideLeaseTypeGinEnginePort(s *pgin.Server) leasetype.GinEnginePort {
 	return s
 }
+
+// ProvideLeaseTypeMiddlewaresEnginePort ...
 func ProvideLeaseTypeMiddlewaresEnginePort(m *mwr.Middlewares) leasetype.MiddlewaresEnginePort {
 	return m
 }
 
-// --- USE CASES ---
+// ProvideLeaseTypeUseCases ...
 func ProvideLeaseTypeUseCases(rep leasetype.RepositoryPort) *leasetype.UseCases {
 	return leasetype.NewUseCases(rep)
 }
 
+// ProvideLeaseTypeUseCasesPort ...
 func ProvideLeaseTypeUseCasesPort(u *leasetype.UseCases) leasetype.UseCasesPort {
 	return u
 }
 
-// --- HANDLER ---
+// ProvideLeaseTypeHandler ...
 func ProvideLeaseTypeHandler(
 	server leasetype.GinEnginePort,
 	ucs leasetype.UseCasesPort,
@@ -53,7 +60,7 @@ func ProvideLeaseTypeHandler(
 	return leasetype.NewHandler(ucs, server, cfg, mws)
 }
 
-// --- WIRE SET ---
+// LeaseTypeSet ...
 var LeaseTypeSet = wire.NewSet(
 	ProvideLeaseTypeGormEnginePort,
 	ProvideLeaseTypeRepository,

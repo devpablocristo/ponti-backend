@@ -22,9 +22,7 @@ func ProvideCustomerRepositoryPort(r *customer.Repository) customer.RepositoryPo
 }
 
 // ProvideCustomerUseCases agrupa repositorios en customer.UseCases.
-func ProvideCustomerUseCases(
-	repo customer.RepositoryPort,
-) *customer.UseCases {
+func ProvideCustomerUseCases(repo customer.RepositoryPort) *customer.UseCases {
 	return customer.NewUseCases(repo)
 }
 

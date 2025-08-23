@@ -1,13 +1,14 @@
 package pkgmwr
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// RequireUserIDHeader ensures a valid user ID header is present.
+// RequireUserIDHeader asegura que un header de ID de usuario válido esté presente.
 func RequireUserIDHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := strings.TrimSpace(c.GetHeader(HeaderUserID))
@@ -19,6 +20,9 @@ func RequireUserIDHeader() gin.HandlerFunc {
 			return
 		}
 		c.Set(ContextUserID, userID)
+		// Propagar también al request.Context() para capas que usan ctx estándar
+		ctx := context.WithValue(c.Request.Context(), ContextUserID, userID)
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }

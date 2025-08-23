@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/usecases/domain"
@@ -78,7 +77,7 @@ func (h *Handler) Routes() {
 // CreateCustomer maneja la creación de un nuevo customer.
 func (h *Handler) CreateCustomer(c *gin.Context) {
 	var req dto.CreateCustomer
-	if err := utils.ValidateRequest(c, &req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

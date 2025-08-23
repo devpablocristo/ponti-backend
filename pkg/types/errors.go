@@ -1,3 +1,5 @@
+// Package pkgtypes provides common types and utilities used across the ponti-backend project,
+// including domain error types, API error handling, and common data structures.
 package pkgtypes
 
 import (
@@ -56,7 +58,7 @@ func (e *Error) ToJSON() map[string]any {
 	return response
 }
 
-// Error constructors
+// NewError creates a new domain error with the specified type, message, and details.
 func NewError(errType ErrorType, message string, details error) *Error {
 	return &Error{
 		Type:    errType,
@@ -108,16 +110,7 @@ func NewMissingFieldError(field string) *Error {
 	)
 }
 
-func NewValidationError(field string, message string) *Error {
-	return NewErrorWithContext(
-		ErrValidation,
-		message,
-		nil,
-		map[string]any{"field": field},
-	)
-}
-
-// Domain error helpers
+// IsNotFound checks if the error is a "not found" domain error.
 func IsNotFound(err error) bool {
 	var e *Error
 	return errors.As(err, &e) && e.Type == ErrNotFound
@@ -148,7 +141,7 @@ func IsTokenNotFoundError(err error) bool {
 	return errors.As(err, &e) && e.Type == ErrTokenNotFound
 }
 
-// Utilities
+// GetErrorType extracts the error type from a domain error, returning the type and whether it was found.
 func GetErrorType(err error) (ErrorType, bool) {
 	var e *Error
 	if errors.As(err, &e) {

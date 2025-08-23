@@ -10,7 +10,7 @@ import (
 	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category" // Corrected import for category
 )
 
-// --- GORM & REPO ---
+// ProvideCategoryGormEnginePort ...
 func ProvideCategoryGormEnginePort(r *gormpkg.Repository) category.GormEnginePort {
 	return r
 }
@@ -21,12 +21,12 @@ func ProvideCategoryRepositoryPort(repo *category.Repository) category.Repositor
 	return repo
 }
 
-// --- CONFIG API ---
+// ProvideCategoryConfigAPI ...
 func ProvideCategoryConfigAPI(c *cfg.Config) category.ConfigAPIPort {
 	return &c.API
 }
 
-// --- HTTP & MIDDLEWARE ---
+// ProvideCategoryGinEnginePort ...
 func ProvideCategoryGinEnginePort(s *pgin.Server) category.GinEnginePort {
 	return s
 }
@@ -34,7 +34,7 @@ func ProvideCategoryMiddlewaresEnginePort(m *mwr.Middlewares) category.Middlewar
 	return m
 }
 
-// --- USE CASES ---
+// ProvideCategoryUseCases ...
 func ProvideCategoryUseCases(rep category.RepositoryPort) *category.UseCases {
 	return category.NewUseCases(rep)
 }
@@ -43,7 +43,7 @@ func ProvideCategoryUseCasesPort(u *category.UseCases) category.UseCasesPort {
 	return u
 }
 
-// --- HANDLER ---
+// ProvideCategoryHandler ...
 func ProvideCategoryHandler(
 	server category.GinEnginePort,
 	ucs category.UseCasesPort,
@@ -53,7 +53,7 @@ func ProvideCategoryHandler(
 	return category.NewHandler(ucs, server, cfg, mws)
 }
 
-// --- WIRE SET ---
+// CategorySet ...
 var CategorySet = wire.NewSet(
 	ProvideCategoryGormEnginePort,
 	ProvideCategoryRepository,

@@ -13,6 +13,12 @@ require (
 	gorm.io/gorm v1.30.0
 )
 
+// Dependencias para testing
+require (
+	github.com/golang/mock v1.6.0
+	github.com/stretchr/testify v1.10.0
+)
+
 require (
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect

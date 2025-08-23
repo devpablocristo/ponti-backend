@@ -5,7 +5,7 @@ services:
       - "${DB_PORT}:${DB_PORT}"
     env_file:
       - .env
-      - .env.mix.stg
+      - .env.${DEPLOY_PLATFORM}.${DEPLOY_ENV}
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.mix.stg
+      - .env.${DEPLOY_PLATFORM}.${DEPLOY_ENV}
     volumes:
       - ./migrations:/migrations
     environment:
@@ -54,10 +54,12 @@ services:
       - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
     env_file:
       - .env
-      - .env.mix.stg
+      - .env.${DEPLOY_PLATFORM}.${DEPLOY_ENV}
     environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'                # sin pantalla de login
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'   # sin master password
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     logging:
       driver: "json-file"
     depends_on:

@@ -1,4 +1,4 @@
--- Alter all tables to change audit columns to BIGINT and add foreign key constraints
+-- Alterar todas las tablas para cambiar las columnas de auditoría a BIGINT y agregar restricciones de clave foránea
 
 ALTER TABLE campaigns
   ALTER COLUMN created_by TYPE BIGINT USING created_by::BIGINT,

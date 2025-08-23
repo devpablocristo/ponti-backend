@@ -8,7 +8,7 @@ import (
 	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-// RequireCredentials validates the login payload for user authentication.
+// RequireCredentials valida el payload de login para la autenticación del usuario.
 func RequireCredentials() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var credentials pkgtypes.LoginCredentials

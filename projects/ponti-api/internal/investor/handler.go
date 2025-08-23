@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	utils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/usecases/domain"
@@ -78,7 +77,7 @@ func (h *Handler) Routes() {
 // CreateInvestor handles the creation of a new investor.
 func (h *Handler) CreateInvestor(c *gin.Context) {
 	var req dto.Investor
-	if err := utils.ValidateRequest(c, &req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return

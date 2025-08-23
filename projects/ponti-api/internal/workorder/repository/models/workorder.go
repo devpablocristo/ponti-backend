@@ -66,26 +66,32 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		InvestorID:    o.InvestorID,
 		EffectiveArea: o.EffectiveArea,
 	}
-	items := make([]WorkorderItem, len(o.Items))
-	for i, it := range o.Items {
-		items[i] = WorkorderItem{
-			SupplyID:  it.SupplyID,
-			TotalUsed: it.TotalUsed,
-			FinalDose: it.FinalDose,
+
+	if len(o.Items) > 0 {
+		items := make([]WorkorderItem, len(o.Items))
+		for i, it := range o.Items {
+			items[i] = WorkorderItem{
+				SupplyID:  it.SupplyID,
+				TotalUsed: it.TotalUsed,
+				FinalDose: it.FinalDose,
+			}
 		}
+		w.Items = items
 	}
-	w.Items = items
 	return w
 }
 
 // ToDomain convierte GORM → domain
 func (m *Workorder) ToDomain() *domain.Workorder {
-	items := make([]domain.WorkorderItem, len(m.Items))
-	for i, it := range m.Items {
-		items[i] = domain.WorkorderItem{
-			SupplyID:  it.SupplyID,
-			TotalUsed: it.TotalUsed,
-			FinalDose: it.FinalDose,
+	var items []domain.WorkorderItem
+	if len(m.Items) > 0 {
+		items = make([]domain.WorkorderItem, len(m.Items))
+		for i, it := range m.Items {
+			items[i] = domain.WorkorderItem{
+				SupplyID:  it.SupplyID,
+				TotalUsed: it.TotalUsed,
+				FinalDose: it.FinalDose,
+			}
 		}
 	}
 	return &domain.Workorder{

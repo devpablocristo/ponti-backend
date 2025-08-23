@@ -17,7 +17,7 @@ type LotTable struct {
 	PreviousCrop   string          `json:"previous_crop"`
 	CurrentCrop    string          `json:"current_crop"`
 	Variety        string          `json:"variety"`
-	SowedArea      float64         `json:"sowed_area"`
+	SowedArea      decimal.Decimal `json:"sowed_area"`
 	Season         string          `json:"season"`
 	Tons           int             `json:"tons"`
 	NetPrice       decimal.Decimal `json:"net_price"`
@@ -26,15 +26,9 @@ type LotTable struct {
 	UpdatedAt      *time.Time      `json:"updated_at,omitempty"`
 }
 
-type LotDates struct {
-	SowingDate  string `json:"sowing_date"`
-	HarvestDate string `json:"harvest_date"`
-	Sequence    int    `json:"sequence"`
-}
-
 type LotTableResponse struct {
-	Rows         []LotTable `json:"rows"`
-	Total        int        `json:"total"` // total de registros sin paginar
-	SumSowedArea float64    `json:"sum_sowed_area"`
-	SumCost      float64    `json:"sum_cost"`
+	Rows         []LotTable      `json:"rows"`
+	Total        int             `json:"total"` // total de registros sin paginar
+	SumSowedArea decimal.Decimal `json:"sum_sowed_area"`
+	SumCost      decimal.Decimal `json:"sum_cost"`
 }

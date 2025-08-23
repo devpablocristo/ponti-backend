@@ -22,9 +22,7 @@ func ProvideWorkorderRepositoryPort(r *workorder.Repository) workorder.Repositor
 }
 
 // ProvideWorkorderUseCases agrupa repositorios en workorder.UseCases.
-func ProvideWorkorderUseCases(
-	repo workorder.RepositoryPort,
-) *workorder.UseCases {
+func ProvideWorkorderUseCases(repo workorder.RepositoryPort) *workorder.UseCases {
 	return workorder.NewUseCases(repo)
 }
 

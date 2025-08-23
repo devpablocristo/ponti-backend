@@ -10,7 +10,7 @@ import (
 	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype" // Corrected import for classtype
 )
 
-// --- GORM & REPO ---
+// ProvideClassTypeGormEnginePort ...
 func ProvideClassTypeGormEnginePort(r *gormpkg.Repository) classtype.GormEnginePort {
 	return r
 }
@@ -21,12 +21,12 @@ func ProvideClassTypeRepositoryPort(repo *classtype.Repository) classtype.Reposi
 	return repo
 }
 
-// --- CONFIG API ---
+// ProvideClassTypeConfigAPI ...
 func ProvideClassTypeConfigAPI(c *cfg.Config) classtype.ConfigAPIPort {
 	return &c.API
 }
 
-// --- HTTP & MIDDLEWARE ---
+// ProvideClassTypeGinEnginePort ...
 func ProvideClassTypeGinEnginePort(s *pgin.Server) classtype.GinEnginePort {
 	return s
 }
@@ -34,16 +34,17 @@ func ProvideClassTypeMiddlewaresEnginePort(m *mwr.Middlewares) classtype.Middlew
 	return m
 }
 
-// --- USE CASES ---
+// ProvideClassTypeUseCases ...
 func ProvideClassTypeUseCases(rep classtype.RepositoryPort) *classtype.UseCases {
 	return classtype.NewUseCases(rep)
 }
 
+// ProvideClassTypeUseCasesPort ...
 func ProvideClassTypeUseCasesPort(u *classtype.UseCases) classtype.UseCasesPort {
 	return u
 }
 
-// --- HANDLER ---
+// ProvideClassTypeHandler ...
 func ProvideClassTypeHandler(
 	server classtype.GinEnginePort,
 	ucs classtype.UseCasesPort,
@@ -53,7 +54,7 @@ func ProvideClassTypeHandler(
 	return classtype.NewHandler(ucs, server, cfg, mws)
 }
 
-// --- WIRE SET ---
+// ClassTypeSet ...
 var ClassTypeSet = wire.NewSet(
 	ProvideClassTypeGormEnginePort,
 	ProvideClassTypeRepository,

@@ -1,3 +1,4 @@
+// Package domain define estructuras de dominio para lot.
 package domain
 
 import (
@@ -9,6 +10,7 @@ import (
 type LotTable struct {
 	ID             int64
 	ProjectID      int64
+	FieldID        int64
 	ProjectName    string
 	FieldName      string
 	LotName        string
@@ -17,13 +19,21 @@ type LotTable struct {
 	CurrentCrop    string
 	CurrentCropID  int64
 	Variety        string
-	SowedArea      float64
+	SowedArea      decimal.Decimal
 	Season         string
-	Tons           int
-	NetPrice       decimal.Decimal
+	Tons           decimal.Decimal
 	Dates          []LotDates
 	UpdatedAt      *time.Time
-	AdminCost      decimal.Decimal
+
+	AdminCost            decimal.Decimal
+	HarvestedArea        decimal.Decimal
+	HarvestDate          *time.Time
+	CostUsdPerHa         decimal.Decimal
+	YieldTnPerHa         decimal.Decimal
+	IncomeNetPerHa       decimal.Decimal
+	RentPerHa            decimal.Decimal
+	ActiveTotalPerHa     decimal.Decimal
+	OperatingResultPerHa decimal.Decimal
 }
 
 type LotDates struct {

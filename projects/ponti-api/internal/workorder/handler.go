@@ -2,6 +2,7 @@ package workorder
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -71,6 +72,7 @@ func (h *Handler) Routes() {
 func (h *Handler) CreateWorkorder(c *gin.Context) {
 	var req dto.Workorder
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Println("error", err)
 		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
 		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
