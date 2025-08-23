@@ -17,7 +17,6 @@ type Base struct {
 	CreatedBy *int64         `gorm:"column:created_by"`
 	UpdatedBy *int64         `gorm:"column:updated_by"`
 	DeletedBy *int64         `gorm:"column:deleted_by"`
-	Version   int64          `gorm:"column:version;default:1;not null"`
 }
 
 func ConvertStringToID(ctx context.Context) (int64, error) {
@@ -33,11 +32,11 @@ func ConvertStringToID(ctx context.Context) (int64, error) {
 }
 
 // IncrementVersion incrementa la versión del modelo
-func (b *Base) IncrementVersion() {
-	b.Version++
-}
+// func (b *Base) IncrementVersion() {
+// 	b.Version++
+// }
 
-// GetVersion retorna la versión actual
-func (b *Base) GetVersion() int64 {
-	return b.Version
-}
+// // GetVersion retorna la versión actual
+// func (b *Base) GetVersion() int64 {
+// 	return b.Version
+// }

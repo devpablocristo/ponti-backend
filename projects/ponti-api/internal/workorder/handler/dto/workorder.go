@@ -42,7 +42,7 @@ type Workorder struct {
 	Date          time.Time       `json:"date" binding:"required"`
 	InvestorID    int64           `json:"investor_id" binding:"required"`
 	EffectiveArea decimal.Decimal `json:"effective_area" binding:"required"`
-	Items         []WorkorderItem `json:"items" binding:"required,dive"`
+	Items         []WorkorderItem `json:"items"`
 }
 
 // MarshalJSON asegura 2 decimales en EffectiveArea (y deja que Items manejen su propio redondeo)

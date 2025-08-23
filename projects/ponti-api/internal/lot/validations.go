@@ -139,12 +139,6 @@ func ValidateTons(tons decimal.Decimal, fieldName string) error {
 		return validations.Err(fieldName, "must be greater than or equal to 0")
 	}
 
-	// Opcional: Agregar validación de límite máximo
-	maxTons := decimal.NewFromFloat(10000.0) // 10,000 tons as example limit
-	if tons.GreaterThan(maxTons) {
-		return validations.Err(fieldName, "exceeds maximum allowed tons")
-	}
-
 	return nil
 }
 
