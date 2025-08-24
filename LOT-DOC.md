@@ -977,3 +977,414 @@ const handleApiError = (error, setErrors) => {
 - Usar React.memo para componentes de lista
 
 Esta documentación proporciona toda la información necesaria para implementar la integración completa con la API de lotes en el frontend, incluyendo ejemplos prácticos, manejo de errores y mejores prácticas.
+
+
+
+
+####################################
+
+
+
+Tienes razón, me quedé en un bucle. Déjame crear un TODO para organizar mi análisis y luego darte la respuesta completa sobre cómo construir la tabla de lotes desde el inicio.
+Ran tool
+Perfecto, ahora te explico **cómo se construye la tabla de lotes desde el inicio** basándome en todo el análisis que hice:
+
+## 🏗️ **Flujo Completo de Construcción de la Tabla de Lotes**
+
+### **1. Jerarquía de Dependencias (De arriba hacia abajo)**
+
+```
+📊 PROJECTS (Proyectos)
+├── 🏢 CUSTOMERS (Clientes)
+├── 📅 CAMPAIGNS (Campañas)
+└── 🏞️ FIELDS (Campos)
+    ├── 📋 LEASE_TYPES (Tipos de Arriendo)
+    └── 🌱 LOTS (Lotes) ← **TU OBJETIVO**
+        ├── 🌾 CROPS (Cultivos - anterior y actual)
+        └── 📅 LOT_DATES (Fechas de siembra/cosecha)
+```
+
+### **2. Datos Mínimos Requeridos para Crear un Lote**
+
+Según las validaciones que encontré, **ESTOS CAMPOS SON OBLIGATORIOS**:
+
+```json
+{
+  "name": "string",              // 2-255 caracteres, sin espacios consecutivos
+  "field_id": "number",          // > 0, debe existir en la tabla fields
+  "hectares": "decimal",         // > 0, máximo 10,000
+  "previous_crop_id": "number",  // > 0, debe existir en la tabla crops
+  "current_crop_id": "number",   // > 0, debe existir en la tabla crops
+  "season": "string"             // Formato: "YYYY" o "YYYY-YYYY"
+}
+```
+
+**CAMPOS OPCIONALES**:
+```json
+{
+  "variety": "string",           // Opcional
+  "dates": [                     // Opcional, máximo 3 fechas
+    {
+      "sowing_date": "YYYY-MM-DD",
+      "harvest_date": "YYYY-MM-DD", 
+      "sequence": 1
+    }
+  ]
+}
+```
+
+### **3. Orden de Creación de Datos (Paso a Paso)**
+
+#### **Paso 1: Crear Datos Base (Si no existen)**
+```sql
+-- 1. Crear cultivos (ya existen por defecto)
+SELECT * FROM crops; -- Soja, Maíz, Trigo, etc.
+
+-- 2. Crear tipos de arriendo (ya existen por defecto)
+SELECT * FROM lease_types; -- % INGRESO NETO, % UTILIDAD, etc.
+
+-- 3. Crear campañas (ya existen por defecto)
+SELECT * FROM campaigns; -- 2024-2025, 2025-2026, etc.
+```
+
+#### **Paso 2: Crear Customer (Cliente)**
+```sql
+INSERT INTO customers (name, created_by, updated_by) 
+VALUES ('Mi Cliente Test', 2, 2);
+```
+
+#### **Paso 3: Crear Project (Proyecto)**
+```sql
+INSERT INTO projects (name, customer_id, campaign_id, admin_cost, created_by, updated_by)
+VALUES ('Mi Proyecto Test', 1, 1, 200, 2, 2);
+```
+
+#### **Paso 4: Crear Field (Campo)**
+```sql
+INSERT INTO fields (name, project_id, lease_type_id, lease_type_percent, lease_type_value, created_by, updated_by)
+VALUES ('Mi Campo Test', 1, 1, 25.0, 100.0, 2, 2);
+```
+
+#### **Paso 5: Crear Lot (Lote) - ¡TU OBJETIVO!**
+```json
+POST /api/v1/lots
+{
+  "name": "Lote Test 1",
+  "field_id": 1,
+  "hectares": "10.5",
+  "previous_crop_id": 1,  // Soja
+  "current_crop_id": 2,   // Maíz
+  "season": "2025",
+  "variety": "Variedad Test",
+  "dates": [
+    {
+      "sowing_date": "2025-01-15",
+      "harvest_date": "2025-06-15",
+      "sequence": 1
+    }
+  ]
+}
+```
+
+### **4. Cómo se Llena la Vista `lot_table_view`**
+
+La vista compleja que viste se llena automáticamente cuando:
+
+1. **Creas workorders** (órdenes de trabajo) con labores de siembra/cosecha
+2. **Asignas supplies** (insumos) a las workorders
+3. **Estableces commercializations** (comercializaciones) para los cultivos
+4. **Actualizas las toneladas** del lote
+
+### **5. Ejemplo Completo de Prueba Manual**
+
+```bash
+# 1. Verificar datos base
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
+  http://localhost:8080/api/v1/crops
+
+# 2. Crear lote mínimo
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Lote Prueba Integral",
+    "field_id": 1,
+    "hectares": "25.0",
+    "previous_crop_id": 1,
+    "current_crop_id": 2,
+    "season": "2025"
+  }' \
+  http://localhost:8080/api/v1/lots
+
+# 3. Verificar que aparece en la lista
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
+  "http://localhost:8080/api/v1/lots?project_id=1&field_id=1"
+```
+
+### **6. Configuración de la Aplicación**
+
+Para ejecutar la app necesitas:
+
+```bash
+# Variables de entorno mínimas
+export DEPLOY_PLATFORM=local
+export DEPLOY_ENV=dev
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=admin
+export DB_PASSWORD=admin
+export DB_NAME=ponti_api_db
+export HTTP_SERVER_PORT=8080
+```
+Ran tool
+## **Resumen: ¿Puedes construir tu tabla de lotes?**
+
+**¡SÍ!** Puedes construir la tabla de lotes siguiendo este orden:
+
+1. **Datos base** → Ya existen (crops, campaigns, lease_types)
+2. **Customer** → Crear cliente
+3. **Project** → Crear proyecto 
+4. **Field** → Crear campo
+5. **Lot** → ¡Crear tu lote!
+
+La tabla se poblará inicialmente con datos básicos, y se enriquecerá con métricas cuando agregues workorders, supplies y commercializations.
+
+············································
+
+
+¡Perfecto! Entiendo que vas a empezar con tablas vacías. Te voy a dar la **secuencia completa manual** para crear todo desde cero.
+
+Ran tool
+## 🚀 **SECUENCIA COMPLETA MANUAL - Desde Tablas Vacías**
+
+### **�� DATOS QUE DEBEN EXISTIR ANTES (Sin Endpoints)**
+
+Estos datos **NO tienen endpoints**, debes insertarlos directamente en la base:
+
+```sql
+-- 1. CROPS (Cultivos) - SIN ENDPOINT
+INSERT INTO crops (id, name, created_by, updated_by) VALUES
+(1, 'Soja', 1, 1),
+(2, 'Maíz', 1, 1),
+(3, 'Trigo', 1, 1),
+(4, 'Girasol', 1, 1),
+(5, 'Sorgo', 1, 1);
+
+-- 2. LEASE_TYPES (Tipos de Arriendo) - SIN ENDPOINT  
+INSERT INTO lease_types (id, name, created_by, updated_by) VALUES
+(1, '% INGRESO NETO', 1, 1),
+(2, '% UTILIDAD', 1, 1),
+(3, 'ARRIENDO FIJO', 1, 1),
+(4, 'ARRIENDO FIJO + % INGRESO NETO', 1, 1);
+
+-- 3. LABOR_TYPES (Tipos de Labor) - SIN ENDPOINT
+INSERT INTO labor_types (id, name, created_by, updated_by) VALUES
+(1, 'Semilla', 1, 1),
+(2, 'Agroquímicos', 1, 1),
+(3, 'Fertilizantes', 1, 1),
+(4, 'Labores', 1, 1);
+
+-- 4. LABOR_CATEGORIES (Categorías de Labor) - SIN ENDPOINT
+INSERT INTO labor_categories (id, name, type_id, created_by, updated_by) VALUES
+(1, 'Semilla', 1, 1, 1),           -- Para calcular área sembrada
+(2, 'Cosecha', 4, 1, 1),           -- Para calcular área cosechada
+(3, 'Pulverización', 4, 1, 1),
+(4, 'Siembra', 4, 1, 1);
+```
+
+### **�� SECUENCIA COMPLETA CON ENDPOINTS**
+
+#### **PASO 1: Crear Customer (Cliente)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Cliente Test Principal"
+  }' \
+  http://localhost:8080/api/v1/customers
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 2: Crear Campaign (Campaña)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "2025-2026"
+  }' \
+  http://localhost:8080/api/v1/campaigns
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 3: Crear Manager (Gerente)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Gerente Test"
+  }' \
+  http://localhost:8080/api/v1/managers
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 4: Crear Investor (Inversor)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Inversor Test"
+  }' \
+  http://localhost:8080/api/v1/investors
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 5: Crear Project (Proyecto)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Proyecto Test Principal",
+    "customer_id": 1,
+    "campaign_id": 1,
+    "admin_cost": "200.00"
+  }' \
+  http://localhost:8080/api/v1/projects
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 6: Asignar Manager al Project**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "manager_id": 1
+  }' \
+  http://localhost:8080/api/v1/projects/1/managers
+```
+
+#### **PASO 7: Asignar Investor al Project**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "investor_id": 1,
+    "percentage": 100
+  }' \
+  http://localhost:8080/api/v1/projects/1/investors
+```
+
+#### **PASO 8: Crear Field (Campo)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Campo Test Principal",
+    "project_id": 1,
+    "lease_type_id": 1,
+    "lease_type_percent": 25.0,
+    "lease_type_value": 100.0
+  }' \
+  http://localhost:8080/api/v1/fields
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 9: Crear Supply (Insumo)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Semilla Soja Test",
+    "type_id": 1,
+    "category_id": 1,
+    "price": "150.00"
+  }' \
+  http://localhost:8080/api/v1/supplies
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 10: Crear Labor (Labor)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Siembra Directa",
+    "type_id": 4,
+    "category_id": 4,
+    "price": "50.00"
+  }' \
+  http://localhost:8080/api/v1/labors
+```
+**Respuesta esperada**: `{"id": 1}`
+
+#### **PASO 11: Crear Crop Commercialization (Comercialización)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "crop_id": 1,
+    "net_price": "400.00"
+  }' \
+  http://localhost:8080/api/v1/crop-commercializations
+```
+
+#### **PASO 12: ¡CREAR TU LOTE!**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Lote Test Principal",
+    "field_id": 1,
+    "hectares": "25.0",
+    "previous_crop_id": 1,
+    "current_crop_id": 2,
+    "season": "2025",
+    "variety": "Variedad Test",
+    "dates": [
+      {
+        "sowing_date": "2025-01-15",
+        "harvest_date": "2025-06-15",
+        "sequence": 1
+      }
+    ]
+  }' \
+  http://localhost:8080/api/v1/lots
+```
+**Respuesta esperada**: `{"message": "Lot created successfully", "id": 1}`
+
+#### **PASO 13: Crear Workorder (Orden de Trabajo)**
+```bash
+curl -X POST -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lot_id": 1,
+    "labor_id": 1,
+    "date": "2025-01-15",
+    "effective_area": "25.0",
+    "planned_area": "25.0"
+  }' \
+  http://localhost:8080/api/v1/workorders
+```
+
+#### **PASO 14: Verificar tu Lote en la Lista**
+```bash
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" \
+  "http://localhost:8080/api/v1/lots?project_id=1&field_id=1"
+```
+
+### **📊 ¿QUÉ PASA DESPUÉS?**
+
+Una vez que tengas todo esto:
+
+1. **La vista `lot_table_view` se poblará automáticamente**
+2. **Los cálculos de costos se harán basados en workorders y supplies**
+3. **Las métricas se calcularán automáticamente**
+4. **Podrás ver tu lote con todos los campos llenos**
+
+### **⚠️ IMPORTANTE**
+
+- **User ID**: Usa `1` para todos los requests (o crea un usuario primero)
+- **API Key**: `abc123secreta` (según la documentación)
+- **Orden**: Sigue la secuencia exacta, no puedes saltar pasos
+- **Base de datos**: Asegúrate de que las migraciones estén ejecutadas

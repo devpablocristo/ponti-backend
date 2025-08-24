@@ -327,3 +327,23 @@ CREATE INDEX IF NOT EXISTS idx_lot_table_labors_sowing
 CREATE INDEX IF NOT EXISTS idx_lot_table_labors_harvest 
   ON labors(id, category_id) 
   WHERE deleted_at IS NULL AND category_id = 2;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

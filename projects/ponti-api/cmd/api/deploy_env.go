@@ -38,8 +38,8 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 	case pkgenv.GCP:
 		switch env {
 		case pkgenv.Dev, pkgenv.Stg, pkgenv.Prod:
-			deps.Config.DB.Name = "postgres"
-			deps.Config.Migrations.Dir = "file://./migrations"
+			// deps.Config.DB.Name = "postgres"
+			// deps.Config.Migrations.Dir = "file://./migrations"
 
 			if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
 				log.Fatalf("Failed to run SQL migrations: %v", err)
