@@ -23,7 +23,6 @@ type Lot struct {
 	Cost          decimal.Decimal // Costo por hectárea
 	HarvestedTons decimal.Decimal // Toneladas cosechadas
 	Tons          decimal.Decimal // Toneladas cosechadas
-	Version       uint            // <-- versión para optimistic locking
 
 	shareddomain.Base // <-- embebe campos de auditoría
 }

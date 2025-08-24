@@ -299,17 +299,6 @@ func validateLotDate(date dto.LotDates, errors *ValidationErrors, index int) {
 	}
 }
 
-// validateTons valida el campo Toneladas
-func validateTons(tons decimal.Decimal, errors *ValidationErrors, fieldName string) {
-	if err := ValidateTons(tons, fieldName); err != nil {
-		errors.Errors = append(errors.Errors, ValidationError{
-			Field:   fieldName,
-			Message: err.Error(),
-			Value:   tons.String(),
-		})
-	}
-}
-
 // ValidateLotRequest es un middleware que valida requests de lotes
 func ValidateLotRequest() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -346,7 +335,6 @@ func ValidateLotRequest() gin.HandlerFunc {
 		base := &shareddomain.Base{
 			CreatedAt: now,
 			UpdatedAt: now,
-			Version:   1, // Para creación, versión inicial
 		}
 
 		// Validar el Base
@@ -432,18 +420,6 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		now := time.Now()
 		req.UpdatedAt = now
 
-		// Validar los campos del Base después de establecer los timestamps
-		base := &shareddomain.Base{
-			CreatedAt: now, // Para actualizaciones, usamos el timestamp actual
-			UpdatedAt: now,
-			Version:   int64(req.Version),
-		}
-
-		// Solo validar el Base si se proporciona una versión
-		if req.Version > 0 {
-			validateLotBase(base, validationErrors)
-		}
-
 		// Si hay errores de validación del Base, abortar
 		if len(validationErrors.Errors) > 0 {
 			c.JSON(http.StatusBadRequest, validationErrors)
@@ -525,16 +501,5 @@ func validateLotBase(base *shareddomain.Base, errors *ValidationErrors) {
 			Message: "updated_at cannot be before created_at",
 			Value:   updatedAtStr,
 		})
-	}
-
-	// Validar que la versión sea razonable solo si se proporciona
-	if base.Version > 0 {
-		if base.Version > 999999 {
-			errors.Errors = append(errors.Errors, ValidationError{
-				Field:   "version",
-				Message: "version cannot be greater than 999999",
-				Value:   fmt.Sprintf("%d", base.Version),
-			})
-		}
 	}
 }

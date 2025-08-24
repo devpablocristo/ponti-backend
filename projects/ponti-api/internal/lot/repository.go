@@ -130,8 +130,8 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// Optimistic locking por versión: WHERE id = ? AND version = ?
 		nowTS := time.Now().UTC().Truncate(time.Microsecond)
 		res := tx.Model(&models.Lot{}).
-			Where("id = ? AND version = ? AND deleted_at IS NULL", l.ID, l.Version).
-			Updates(map[string]interface{}{
+			Where("id = ? AND deleted_at IS NULL", l.ID).
+			Updates(map[string]any{
 				"name":             l.Name,
 				"hectares":         l.Hectares,
 				"previous_crop_id": l.PreviousCrop.ID,

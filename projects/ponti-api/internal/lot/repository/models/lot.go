@@ -22,7 +22,6 @@ type Lot struct {
 	Variety        string          `gorm:"type:text;column:variety"`
 	SowingDate     *time.Time      `gorm:"type:date;column:sowing_date"`
 	Tons           decimal.Decimal `gorm:"type:numeric;column:tons"`
-	Version        int64           `gorm:"column:version;not null;default:1"`
 
 	sharedmodels.Base // <-- embebe campos GORM de auditoría
 
@@ -55,7 +54,6 @@ func (m *Lot) ToDomain() *domain.Lot {
 		SowingDate:   m.SowingDate,
 		Tons:         m.Tons,
 		Dates:        domainDates,
-		Version:      uint(m.Version),
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
@@ -78,17 +76,9 @@ func FromDomain(d *domain.Lot) *Lot {
 		Variety:        d.Variety,
 		SowingDate:     d.SowingDate,
 		Tons:           d.Tons,
-		// En create, si d.Version == 0, dejamos que DB use DEFAULT 1 asignándolo explícitamente:
-		Version: func() int64 {
-			if d.Version > 0 {
-				return int64(d.Version)
-			}
-			return 1
-		}(),
 		Base: sharedmodels.Base{
 			CreatedBy: d.CreatedBy,
 			UpdatedBy: d.UpdatedBy,
 		},
-		// Las fechas se manejan por separado en el repositorio
 	}
 }

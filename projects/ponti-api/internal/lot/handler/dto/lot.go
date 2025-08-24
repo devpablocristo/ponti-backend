@@ -22,7 +22,6 @@ type Lot struct {
 	Variety          string          `json:"variety"`
 	Dates            []LotDates      `json:"dates"`
 	Status           string          `json:"status"`
-	Version          uint            `json:"version"` // requerido para PUT
 
 	// Campos de auditoría
 	CreatedAt time.Time `json:"created_at,omitempty"`
@@ -79,7 +78,6 @@ func (d *Lot) ToDomain() (*domain.Lot, error) {
 		Variety:      d.Variety,
 		Dates:        dates,
 		Status:       d.Status,
-		Version:      d.Version,
 		Base: shareddomain.Base{
 			UpdatedAt: d.UpdatedAt,
 		},
@@ -99,7 +97,6 @@ func FromDomain(l *domain.Lot) *Lot {
 		Season:           l.Season,
 		Variety:          l.Variety,
 		Status:           l.Status,
-		Version:          l.Version,
 		CreatedAt:        l.Base.CreatedAt,
 		UpdatedAt:        l.Base.UpdatedAt,
 		CreatedBy:        l.Base.CreatedBy,

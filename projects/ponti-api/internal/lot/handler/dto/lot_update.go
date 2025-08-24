@@ -23,7 +23,6 @@ type LotUpdate struct {
 	Variety          string          `json:"variety,omitempty"`
 	Dates            []LotDates      `json:"dates,omitempty"`
 	Status           string          `json:"status,omitempty"`
-	Version          uint            `json:"version"` // requerido para PUT
 
 	// Campos de auditoría
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
@@ -70,7 +69,6 @@ func (d *LotUpdate) ToDomain() (*domain.Lot, error) {
 		Variety:      d.Variety,
 		Dates:        dates,
 		Status:       d.Status,
-		Version:      d.Version,
 		Base: shareddomain.Base{
 			UpdatedAt: d.UpdatedAt,
 		},
