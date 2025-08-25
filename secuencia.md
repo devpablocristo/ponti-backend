@@ -287,7 +287,17 @@ curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
 
 9. Fechas (opcional)
 
-### **1. 🎯 ACTUALIZAR LOTE 1 (Parcela A1) CON FECHAS:**
+
+
+
+
+
+
+¡Perfecto! Aquí tienes los curls correctos para crear las fechas de todos los lotes:
+
+## 🎯 **CURLS CORRECTOS PARA FECHAS:**
+
+### **✅ LOTE 1 - Parcela A1 (3 secuencias):**
 
 ```bash
 curl -H "X-API-KEY: abc123secreta" \
@@ -315,7 +325,7 @@ curl -H "X-API-KEY: abc123secreta" \
   }'
 ```
 
-### **2. 🎯 ACTUALIZAR LOTE 2 (Parcela A2) CON FECHAS:**
+### **✅ LOTE 2 - Parcela A2 (3 secuencias):**
 
 ```bash
 curl -H "X-API-KEY: abc123secreta" \
@@ -343,7 +353,7 @@ curl -H "X-API-KEY: abc123secreta" \
   }'
 ```
 
-### **3. 🎯 ACTUALIZAR LOTE 3 (Parcela B1) CON FECHAS:**
+### **✅ LOTE 3 - Parcela B1 (3 secuencias):**
 
 ```bash
 curl -H "X-API-KEY: abc123secreta" \
@@ -371,19 +381,22 @@ curl -H "X-API-KEY: abc123secreta" \
   }'
 ```
 
-## 📅 **ESTRUCTURA DE FECHAS:**
 
-### **SECUENCIA 1 (CICLO ACTUAL 2025):**
-- **Siembra:** Enero-Febrero 2025
-- **Cosecha:** Junio-Julio 2025
+**¡Ejecuta estos curls en orden y tendrás fechas completas para todos los lotes!** 📅✨
 
-### **SECUENCIA 2 (CICLO 2025-2026):**
-- **Siembra:** Septiembre-Octubre 2025
-- **Cosecha:** Febrero-Marzo 2026
 
-### **SECUENCIA 3 (CICLO 2026):**
-- **Siembra:** Marzo-Abril 2026
-- **Cosecha:** Agosto-Septiembre 2026
+
+
+
+
+
+
+
+
+
+
+
+
 
 ################################################
 ################################################
