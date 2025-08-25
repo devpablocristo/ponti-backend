@@ -391,10 +391,6 @@ func ValidateLotUpdate() gin.HandlerFunc {
 			validateCropID(req.CurrentCropID, validationErrors, "current_crop_id")
 		}
 
-		if req.Season != "" {
-			validateSeason(req.Season, validationErrors)
-		}
-
 		// Para actualizaciones, las fechas son opcionales
 		if len(req.Dates) > 0 {
 			validateLotDates(req.Dates, validationErrors)

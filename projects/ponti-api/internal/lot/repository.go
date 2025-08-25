@@ -140,7 +140,6 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 				"variety":          l.Variety,
 				"updated_by":       &userID,
 				"updated_at":       nowTS,
-				"version":          gorm.Expr("version + 1"),
 			})
 		if res.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
