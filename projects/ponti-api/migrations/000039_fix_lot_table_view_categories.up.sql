@@ -155,6 +155,7 @@ SELECT
   cc.name AS current_crop,
   l.current_crop_id,
   l.variety,
+  l.hectares,
   COALESCE(s.sowed_area, 0) AS sowed_area,
   l.season,
   COALESCE(l.tons, 0) AS tons,
