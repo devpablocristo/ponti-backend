@@ -1,7 +1,17 @@
 -- =======================
--- VISTA OPTIMIZADA DE LOTES PARA GCP
+-- CORRECCIÓN COMPLETA DE VISTA LOT_TABLE_VIEW
 -- =======================
-CREATE OR REPLACE VIEW lot_table_view AS
+-- Esta migración corrige la vista lot_table_view creada en la migración 000037
+-- Incluye:
+-- 1. Cambio de categorías incorrectas por las reales (9 y 13)
+-- 2. Lógica exacta de cálculos de la 00037
+-- 3. Optimización de índices
+
+-- Primero eliminar la vista existente
+DROP VIEW IF EXISTS lot_table_view;
+
+-- Luego crear la vista completa con todas las correcciones
+CREATE VIEW lot_table_view AS
 WITH
 -- =======================
 -- CÁLCULO DE ÁREA SEMBRADA (optimizado)
@@ -14,7 +24,7 @@ sowing AS (
   JOIN labors lb ON lb.id = w.labor_id
   WHERE w.deleted_at IS NULL
     AND lb.deleted_at IS NULL
-    AND lb.category_id = 1  -- ID de "Categoría 1" (usar la que existe)
+    AND lb.category_id = 9  -- ID correcto de "Siembra"
     AND w.effective_area IS NOT NULL
     AND w.effective_area > 0
   GROUP BY w.lot_id
@@ -32,7 +42,7 @@ harvest AS (
   JOIN labors lb ON lb.id = w.labor_id
   WHERE w.deleted_at IS NULL
     AND lb.deleted_at IS NULL
-    AND lb.category_id = 2  -- ID de "Categoría 2" (usar la que existe)
+    AND lb.category_id = 13  -- ID correcto de "Cosecha"
     AND w.effective_area IS NOT NULL
     AND w.effective_area > 0
   GROUP BY w.lot_id
@@ -58,7 +68,7 @@ direct_costs AS (
 ),
 
 -- =======================
--- CÁLCULO DE INGRESO NETO (optimizado)
+-- CÁLCULO DE INGRESO NETO (optimizado) - PRECIO REAL DE COMERCIALIZACIÓN
 -- =======================
 income_net AS (
   SELECT 
@@ -75,7 +85,7 @@ income_net AS (
 ),
 
 -- =======================
--- CÁLCULO DE ARRIENDO (optimizado)
+-- CÁLCULO DE ARRIENDO (optimizado) - LÓGICA COMPLEJA DE TIPOS DE ARRIENDO
 -- =======================
 rent_calculation AS (
   SELECT 
@@ -118,14 +128,14 @@ admin_cost AS (
 lot_dates AS (
   SELECT 
     w.lot_id,
-    MIN(CASE WHEN lb.category_id = 1 THEN w.date END) AS lot_sowing_date,
-    MAX(CASE WHEN lb.category_id = 2 THEN w.date END) AS lot_harvest_date,
+    MIN(CASE WHEN lb.category_id = 9 THEN w.date END) AS lot_sowing_date,
+    MAX(CASE WHEN lb.category_id = 13 THEN w.date END) AS lot_harvest_date,
     COUNT(DISTINCT w.id) AS sequence
   FROM workorders w
   JOIN labors lb ON lb.id = w.labor_id
   WHERE w.deleted_at IS NULL
     AND lb.deleted_at IS NULL
-    AND lb.category_id IN (1, 2) -- Categoría 1 y 2 (las que existen)
+    AND lb.category_id IN (9, 13) -- IDs correctos de Siembra y Cosecha
     AND w.date IS NOT NULL
   GROUP BY w.lot_id
 )
@@ -145,6 +155,7 @@ SELECT
   cc.name AS current_crop,
   l.current_crop_id,
   l.variety,
+  l.hectares,
   COALESCE(s.sowed_area, 0) AS sowed_area,
   l.season,
   COALESCE(l.tons, 0) AS tons,
@@ -319,31 +330,11 @@ CREATE INDEX IF NOT EXISTS idx_lot_table_lots_composite
   ON lots(field_id, current_crop_id, previous_crop_id, tons, hectares) 
   WHERE deleted_at IS NULL AND hectares > 0;
 
--- Índices para categorías específicas
+-- Índices para categorías específicas (corregidos a 9 y 13)
 CREATE INDEX IF NOT EXISTS idx_lot_table_labors_sowing 
   ON labors(id, category_id) 
-  WHERE deleted_at IS NULL AND category_id = 1;
+  WHERE deleted_at IS NULL AND category_id = 9;
 
 CREATE INDEX IF NOT EXISTS idx_lot_table_labors_harvest 
   ON labors(id, category_id) 
-  WHERE deleted_at IS NULL AND category_id = 2;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  WHERE deleted_at IS NULL AND category_id = 13;

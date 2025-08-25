@@ -127,8 +127,41 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", l.ID), nil)
 		}
 
-		// Optimistic locking por versión: WHERE id = ? AND version = ?
+		// Optimistic locking por fecha: WHERE id = ? AND updated_at = ? (última fecha conocida)
 		nowTS := time.Now().UTC().Truncate(time.Microsecond)
+
+		// Obtener la fecha de actualización actual para optimistic locking
+		var currentLot models.Lot
+		if err := tx.Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to get current lot for optimistic locking", err)
+		}
+
+		// Construir mapa de actualización solo con campos no vacíos
+		updateFields := map[string]any{
+			"updated_by": &userID,
+			"updated_at": nowTS,
+		}
+
+		// Solo agregar campos que no estén vacíos
+		if l.Name != "" {
+			updateFields["name"] = l.Name
+		}
+		if l.Hectares.GreaterThan(decimal.Zero) {
+			updateFields["hectares"] = l.Hectares
+		}
+		if l.PreviousCrop.ID > 0 {
+			updateFields["previous_crop_id"] = l.PreviousCrop.ID
+		}
+		if l.CurrentCrop.ID > 0 {
+			updateFields["current_crop_id"] = l.CurrentCrop.ID
+		}
+		if l.Season != "" {
+			updateFields["season"] = l.Season
+		}
+		if l.Variety != "" {
+			updateFields["variety"] = l.Variety
+		}
+
 		res := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Updates(map[string]any{
@@ -145,8 +178,8 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
 		}
 		if res.RowsAffected == 0 {
-			// Fila existe pero versión no matchea -> conflicto
-			return types.NewError(types.ErrConflict, "version conflict", nil)
+			// Fila existe pero fecha de actualización no matchea -> conflicto por concurrencia
+			return types.NewError(types.ErrConflict, "concurrent update conflict - lot was modified by another user", nil)
 		}
 
 		// Upsert de fechas por secuencia
