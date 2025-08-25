@@ -163,8 +163,17 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		}
 
 		res := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL AND updated_at = ?", l.ID, currentLot.UpdatedAt).
-			Updates(updateFields)
+			Where("id = ? AND deleted_at IS NULL", l.ID).
+			Updates(map[string]any{
+				"name":             l.Name,
+				"hectares":         l.Hectares,
+				"previous_crop_id": l.PreviousCrop.ID,
+				"current_crop_id":  l.CurrentCrop.ID,
+				"season":           l.Season,
+				"variety":          l.Variety,
+				"updated_by":       &userID,
+				"updated_at":       nowTS,
+			})
 		if res.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
 		}
