@@ -5,6 +5,23 @@ Secuencia:
 
 1. Usuario (manual)
 
+INSERT INTO users (id, email, username, password, token_hash, refresh_tokens, id_rol, is_verified, active, created_by, updated_by, created_at, updated_at)
+VALUES (
+    123, 
+    'demo@ponti.com', 
+    'demo_user', 
+    'demo_password', 
+    'demo_token_hash', 
+    '{}', 
+    1, 
+    TRUE, 
+    TRUE, 
+    1, 
+    1, 
+    NOW(), 
+    NOW()
+);
+
 ################################################
 ################################################
 
@@ -157,7 +174,10 @@ curl --location 'http://localhost:8080/api/v1/projects/1/labors' \
 ################################################
 ################################################
 
-5. Crear Orden Siembra (workorder)
+5. Crear Ordenes
+
+## **Lote 1 - Workorder de Siembra:**
+ Siembra (workorder)
 
 ```bash
 curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
@@ -169,17 +189,15 @@ curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
     "field_id": 1,
     "lot_id": 1,
     "crop_id": 2,
-    "labor_id": 3,
+    "labor_id": 1,
     "investor_id": 1,
     "date": "2025-01-15T00:00:00Z",
     "effective_area": 2.5
 }'
 ```
 
-################################################
-################################################
+## **Lote 1 - Workorder de cosecha:**
 
-6. Crear Orden Cosecha (workorder)
 ```bash
 curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
   -X POST "http://localhost:8080/api/v1/workorders" \
@@ -190,17 +208,40 @@ curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
     "field_id": 1,
     "lot_id": 1,
     "crop_id": 2,
-    "labor_id": 4,
+    "labor_id": 2,
     "investor_id": 1,
     "date": "2025-06-15T00:00:00Z",
     "effective_area": 2.5
   }'
 ```
 
+## **Lote 2 - Workorder de Siembra:**
+
+```bash
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" -X POST "http://localhost:8080/api/v1/workorders" -H "Content-Type: application/json" -d '{"number": "WO-SOWING-A2-001", "project_id": 1, "field_id": 1, "lot_id": 2, "crop_id": 2, "labor_id": 1, "investor_id": 1, "date": "2025-02-15T00:00:00Z", "effective_area": 3.0}'
+```
+## **Lote 2 - Workorder de Cosecha:**
+
+```bash
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" -X POST "http://localhost:8080/api/v1/workorders" -H "Content-Type: application/json" -d '{"number": "WO-HARVEST-A2-001", "project_id": 1, "field_id": 1, "lot_id": 2, "crop_id": 2, "labor_id": 2, "investor_id": 1, "date": "2025-07-15T00:00:00Z", "effective_area": 3.0}'
+```
+Ahora voy a crear workorders para el **Lote 3** (Parcela B1):
+
+## **Lote 3 - Workorder de Siembra:**
+
+```bash
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" -X POST "http://localhost:8080/api/v1/workorders" -H "Content-Type: application/json" -d '{"number": "WO-SOWING-B1-001", "project_id": 1, "field_id": 2, "lot_id": 3, "crop_id": 2, "labor_id": 1, "investor_id": 1, "date": "2025-03-15T00:00:00Z", "effective_area": 4.0}'
+```
+## **Lote 3 - Workorder de Cosecha:**
+
+```bash
+curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 1" -X POST "http://localhost:8080/api/v1/workorders" -H "Content-Type: application/json" -d '{"number": "WO-HARVEST-B1-001", "project_id": 1, "field_id": 2, "lot_id": 3, "crop_id": 2, "labor_id": 2, "investor_id": 1, "date": "2025-08-15T00:00:00Z", "effective_area": 4.0}'
+```
+
 ################################################
 ################################################
 
-7. Toneladas (update lote)
+6. Toneladas (update lote)
 
 
 Valores demo realistas
@@ -250,7 +291,7 @@ curl --location --request PUT 'http://localhost:8080/api/v1/lots/3/tons' \
 ################################################
 
 
-8. Precio de venta (comercialización)
+7. Precio de venta (comercialización)
 
 ```bash
 curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
@@ -285,117 +326,40 @@ curl -H "X-API-KEY: abc123secreta" -H "X-USER-ID: 123" \
 ################################################
 
 
-9. Fechas (opcional)
+8. Fechas (opcional)
+  
 
+## 🚨 **PROBLEMA IDENTIFICADO:**
 
+El error "parsing time" con "extra text" no viene del código Go del repositorio, sino de algún middleware de binding que está interfiriendo con el formato de fecha antes de que llegue a la validación de Go.
 
+## �� **ANÁLISIS DEL CÓDIGO:**
 
+Revisando el código del repositorio `lot`, veo que:
 
+1. **El modelo `LotDates` está bien definido** con los tags de GORM correctos
+2. **La función `UpdateLot` maneja correctamente las fechas** usando `clause.OnConflict` para upsert
+3. **Los DTOs parsean correctamente las fechas** usando `time.Parse("2006-01-02", date.SowingDate)`
+4. **El middleware `ValidateLotUpdate` está comentado** (líneas 375-395 en `validations.go`)
 
+## 🚀 **SOLUCIÓN:**
 
-¡Perfecto! Aquí tienes los curls correctos para crear las fechas de todos los lotes:
+El problema está en algún middleware de binding que está interfiriendo con el formato de fecha. Para solucionarlo:
 
-## 🎯 **CURLS CORRECTOS PARA FECHAS:**
-
-### **✅ LOTE 1 - Parcela A1 (3 secuencias):**
-
-```bash
-curl -H "X-API-KEY: abc123secreta" \
-  -H "X-USER-ID: 123" \
-  -X PUT "http://localhost:8080/api/v1/lots/1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dates": [
-      {
-        "sowing_date": "2025-01-15T00:00:00Z",
-        "harvest_date": "2025-06-15T00:00:00Z",
-        "sequence": 1
-      },
-      {
-        "sowing_date": "2025-09-15T00:00:00Z",
-        "harvest_date": "2026-02-15T00:00:00Z",
-        "sequence": 2
-      },
-      {
-        "sowing_date": "2026-03-01T00:00:00Z",
-        "harvest_date": "2026-08-01T00:00:00Z",
-        "sequence": 3
-      }
-    ]
-  }'
+### **Opción 1: Usar SQL directo (como se documentó)**
+```sql
+INSERT INTO lot_dates (lot_id, sowing_date, harvest_date, sequence, created_by, updated_by) VALUES 
+(1, '2025-01-15 00:00:00', '2025-06-15 00:00:00', 1, 123, 123);
 ```
 
-### **✅ LOTE 2 - Parcela A2 (3 secuencias):**
+### **Opción 2: Revisar middlewares de binding**
+El problema podría estar en:
+- Middlewares de Gin que procesan el JSON antes de llegar a la validación
+- Algún middleware de logging o parsing que modifica las fechas
+- Configuración de timezone o formato de fecha en algún middleware
 
-```bash
-curl -H "X-API-KEY: abc123secreta" \
-  -H "X-USER-ID: 123" \
-  -X PUT "http://localhost:8080/api/v1/lots/2" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dates": [
-      {
-        "sowing_date": "2025-02-01T00:00:00Z",
-        "harvest_date": "2025-07-01T00:00:00Z",
-        "sequence": 1
-      },
-      {
-        "sowing_date": "2025-10-01T00:00:00Z",
-        "harvest_date": "2026-03-01T00:00:00Z",
-        "sequence": 2
-      },
-      {
-        "sowing_date": "2026-04-01T00:00:00Z",
-        "harvest_date": "2026-09-01T00:00:00Z",
-        "sequence": 3
-      }
-    ]
-  }'
-```
-
-### **✅ LOTE 3 - Parcela B1 (3 secuencias):**
-
-```bash
-curl -H "X-API-KEY: abc123secreta" \
-  -H "X-USER-ID: 123" \
-  -X PUT "http://localhost:8080/api/v1/lots/3" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dates": [
-      {
-        "sowing_date": "2025-01-20T00:00:00Z",
-        "harvest_date": "2025-06-20T00:00:00Z",
-        "sequence": 1
-      },
-      {
-        "sowing_date": "2025-09-20T00:00:00Z",
-        "harvest_date": "2026-02-20T00:00:00Z",
-        "sequence": 2
-      },
-      {
-        "sowing_date": "2026-03-15T00:00:00Z",
-        "harvest_date": "2026-08-15T00:00:00Z",
-        "sequence": 3
-      }
-    ]
-  }'
-```
-
-
-**¡Ejecuta estos curls en orden y tendrás fechas completas para todos los lotes!** 📅✨
-
-
-
-
-
-
-
-
-
-
-
-
-
+### **Opción 3: Habilitar validaciones comentadas**
+En `validations.go` (líneas 375-395), las validaciones están comentadas. Habilitarlas podría ayudar a identificar el problema.
 
 
 ################################################

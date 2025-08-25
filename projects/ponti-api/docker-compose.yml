@@ -56,10 +56,12 @@ services:
       - .env
       - .env.${DEPLOY_PLATFORM}.${DEPLOY_ENV}
     environment:
-      PGADMIN_CONFIG_SERVER_MODE: 'False'                # sin pantalla de login
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'   # sin master password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      GUNICORN_ACCESS_LOGFILE: "/dev/null"
+      PGADMIN_CONFIG_CONSOLE_LOG_LEVEL: 30
     logging:
       driver: "json-file"
     depends_on:
@@ -69,6 +71,8 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+
+
 
 networks:
   app-network:
