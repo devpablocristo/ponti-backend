@@ -20,6 +20,7 @@ type LotTable struct {
 	CurrentCropID  int64
 	Variety        string
 	SowedArea      decimal.Decimal
+	Hectares       decimal.Decimal
 	Season         string
 	Tons           decimal.Decimal
 	Dates          []LotDates

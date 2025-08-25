@@ -381,7 +381,7 @@ func (r *Repository) ListLots(
 	if err := base.Session(&gorm.Session{}).
 		Select(`
 	             project_id, field_id, project_name, field_name,
-	             id, lot_name, variety, sowed_area, season, updated_at, tons,
+	             id, lot_name, variety, sowed_area, hectares, season, updated_at, tons,
 	             previous_crop_id, previous_crop,
 	             current_crop_id, current_crop,
 	             admin_cost_per_ha,
