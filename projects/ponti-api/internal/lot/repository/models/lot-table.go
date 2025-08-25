@@ -22,6 +22,7 @@ type LotTable struct {
 	CurrentCropID  int64           `gorm:"column:current_crop_id"`
 	Variety        string          `gorm:"column:variety"`
 	SowedArea      decimal.Decimal `gorm:"column:sowed_area"`
+	Hectares       decimal.Decimal `gorm:"column:hectares"`
 	Season         string          `gorm:"column:season"`
 	Tons           decimal.Decimal `gorm:"column:tons"`
 	UpdatedAt      *time.Time      `gorm:"column:updated_at"`
@@ -68,6 +69,7 @@ func (m *LotTable) ToDomain(dates []LotDates) domain.LotTable {
 		CurrentCropID:  m.CurrentCropID,
 		Variety:        m.Variety,
 		SowedArea:      m.SowedArea,
+		Hectares:       m.Hectares,
 		Season:         m.Season,
 		Tons:           m.Tons,
 		Dates:          domainDates,

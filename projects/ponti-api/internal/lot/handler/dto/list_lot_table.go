@@ -29,6 +29,7 @@ type LotListElement struct {
 	CurrentCrop          string          `json:"current_crop"`
 	Variety              string          `json:"variety"`
 	SowedArea            decimal.Decimal `json:"sowed_area"`
+	Hectares             decimal.Decimal `json:"hectares"`
 	Season               string          `json:"season"`
 	Tons                 decimal.Decimal `json:"tons"`
 	Dates                []LotDate       `json:"dates"`
@@ -59,6 +60,7 @@ func (e LotListElement) MarshalJSON() ([]byte, error) {
 		CurrentCrop          string     `json:"current_crop"`
 		Variety              string     `json:"variety"`
 		SowedArea            string     `json:"sowed_area"`
+		Hectares             string     `json:"hectares"`
 		Season               string     `json:"season"`
 		Tons                 string     `json:"tons"`
 		Dates                []LotDate  `json:"dates"`
@@ -85,6 +87,7 @@ func (e LotListElement) MarshalJSON() ([]byte, error) {
 		CurrentCrop:          e.CurrentCrop,
 		Variety:              e.Variety,
 		SowedArea:            e.SowedArea.Round(2).String(),
+		Hectares:             e.Hectares.Round(2).String(),
 		Season:               e.Season,
 		Tons:                 e.Tons.Round(2).String(),
 		Dates:                e.Dates,
@@ -167,6 +170,7 @@ func FromDomainListElement(d domain.LotTable) LotListElement {
 		CurrentCrop:          d.CurrentCrop,
 		Variety:              d.Variety,
 		SowedArea:            d.SowedArea,
+		Hectares:             d.Hectares,
 		Season:               d.Season,
 		Tons:                 d.Tons,
 		Dates:                dates,
