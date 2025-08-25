@@ -80,7 +80,7 @@ func (h *Handler) Routes() {
 		public.GET("/metrics", h.GetMetrics)
 		public.PUT("/:id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
 		public.GET("/:id", h.GetLot)
-		public.PUT("/:id", ValidateLotUpdate(), h.UpdateLot)
+		public.PUT("/:id", h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
 	}
 }
