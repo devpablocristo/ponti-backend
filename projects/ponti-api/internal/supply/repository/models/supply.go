@@ -10,13 +10,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Tablas auxiliares normalizadas
-
-type SupplyUnit struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(20);unique;not null"`
-}
-
 // Modelo principal de Supply
 type Supply struct {
 	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
@@ -25,7 +18,6 @@ type Supply struct {
 	Price     decimal.Decimal `gorm:"not null"`
 
 	UnitID int64
-	Unit   SupplyUnit `gorm:"foreignKey:UnitID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
 	CategoryID int64
 	Category   catmod.Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
@@ -38,12 +30,6 @@ type Supply struct {
 
 // De persistencia (models.Supply) → dominio (domain.Supply)
 func (m *Supply) ToDomain() *domain.Supply {
-	if m.UnitID == 1 {
-		m.Unit.Name = "Lt"
-	} else {
-		m.Unit.Name = "Kg"
-	}
-
 	return &domain.Supply{
 		ID:           m.ID,
 		ProjectID:    m.ProjectID,
@@ -56,7 +42,7 @@ func (m *Supply) ToDomain() *domain.Supply {
 			ID:   int64(m.TypeID),
 			Name: m.Type.Name,
 		},
-		UnitName: m.Unit.Name,
+		UnitName: "", // No se muestra la unidad
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
