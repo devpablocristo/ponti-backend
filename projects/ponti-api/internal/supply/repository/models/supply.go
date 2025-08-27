@@ -30,6 +30,13 @@ type Supply struct {
 
 // De persistencia (models.Supply) → dominio (domain.Supply)
 func (m *Supply) ToDomain() *domain.Supply {
+	unitName := ""
+	if m.UnitID == 1 {
+		unitName = "Lt"
+	} else {
+		unitName = "Kg"
+	}
+
 	return &domain.Supply{
 		ID:           m.ID,
 		ProjectID:    m.ProjectID,
@@ -42,7 +49,7 @@ func (m *Supply) ToDomain() *domain.Supply {
 			ID:   int64(m.TypeID),
 			Name: m.Type.Name,
 		},
-		UnitName: "", // No se muestra la unidad
+		UnitName: unitName,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
