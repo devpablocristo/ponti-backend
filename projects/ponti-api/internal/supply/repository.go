@@ -60,7 +60,6 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
 	if err := r.db.Client().WithContext(ctx).
-		//Preload("Unit").
 		Preload("Category").
 		Preload("Type").
 		First(&m, id).Error; err != nil {
@@ -128,7 +127,6 @@ func (r *Repository) ListSuppliesPaginated(
 	var total int64
 
 	db := r.db.Client().WithContext(ctx).Model(&models.Supply{}).
-		//Preload("Unit").
 		Preload("Category").
 		Preload("Type")
 

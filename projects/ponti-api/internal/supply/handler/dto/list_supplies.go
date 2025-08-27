@@ -3,12 +3,16 @@ package dto
 import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
-// Estructura simple de supply para listados rápidos
+// Estructura de supply para listados con información completa
 type ListedSupply struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID           int64           `json:"id"`
+	Name         string          `json:"name"`
+	Price        decimal.Decimal `json:"price"`         // Precio
+	CategoryName string          `json:"category_name"` // Rubro
+	TypeName     string          `json:"type_name"`     // Tipo/Clase
 }
 
 // Respuesta principal de listado de supplies
@@ -26,8 +30,11 @@ func NewListSuppliesResponse(
 	out := make([]ListedSupply, len(items))
 	for i, s := range items {
 		out[i] = ListedSupply{
-			ID:   s.ID,
-			Name: s.Name,
+			ID:           s.ID,
+			Name:         s.Name,
+			Price:        s.Price,        // Precio
+			CategoryName: s.CategoryName, // Rubro
+			TypeName:     s.Type.Name,    // Tipo/Clase
 		}
 	}
 
