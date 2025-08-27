@@ -22,6 +22,7 @@ type ListedLabor struct {
 	Price          decimal.Decimal
 	ProjectId      int64
 	CategoryId     int64
+	CategoryName   string
 
 	shareddomain.Base
 }

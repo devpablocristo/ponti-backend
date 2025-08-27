@@ -76,6 +76,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 	}
 
 	if err := db0.
+		Preload("Category").
 		Select("id, name, contractor_name, price, category_id").
 		Where("project_id = ?", projectId).
 		Limit(perPage).
@@ -93,6 +94,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 			Price:          labor.Price,
 			ContractorName: labor.ContractorName,
 			CategoryId:     labor.LaborCategoryID,
+			CategoryName:   labor.Category.Name,
 		}
 	}
 
