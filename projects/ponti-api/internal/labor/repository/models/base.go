@@ -1,6 +1,7 @@
 package models
 
 import (
+	catmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/shopspring/decimal"
@@ -13,6 +14,7 @@ type Labor struct {
 	Price           decimal.Decimal `gorm:"not null;column:price"`
 	ProjectId       int64           `gorm:"not null;column:project_id"`
 	LaborCategoryID int64           `gorm:"not null;column:category_id"`
+	Category        catmod.Category `gorm:"foreignKey:LaborCategoryID;references:ID" json:"category"`
 
 	sharedmodels.Base
 }
