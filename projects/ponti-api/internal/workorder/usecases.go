@@ -14,6 +14,7 @@ type RepositoryPort interface {
 	UpdateWorkorderByID(context.Context, *domain.Workorder) error
 	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
+	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
 }
 
 type UseCases struct {
@@ -51,4 +52,9 @@ func (u *UseCases) ListWorkorders(
 	inp types.Input,
 ) ([]domain.WorkorderListElement, types.PageInfo, error) {
 	return u.repo.ListWorkorders(ctx, filt, inp)
+}
+
+// GetMetrics delega al repositorio
+func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkorderFilter) (*domain.WorkorderMetrics, error) {
+	return u.repo.GetMetrics(ctx, f)
 }
