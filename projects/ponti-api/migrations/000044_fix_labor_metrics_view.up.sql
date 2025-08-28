@@ -1,23 +1,6 @@
--- =======================
--- MIGRACIÓN 000045: CORRECCIÓN DE LABOR_METRICS_VIEW
--- =======================
--- 
--- CORRIGE las siguientes violaciones de reglas de negocio:
--- 1. ❌ COALESCE(lb.price, 0) → ✅ lb.price IS NOT NULL (exigir precio desde BD)
--- 2. ❌ Falta total_liters y total_kilos → ✅ Agregados con mapeo directo de unit_id
--- 3. ❌ Fórmula incorrecta de insumos → ✅ qty_used = COALESCE(total_used, final_dose * effective_area)
--- 4. ❌ Duplicaciones en costos → ✅ CTE para evitar multiplicaciones incorrectas
--- 
--- REGLAS IMPLEMENTADAS:
--- - Superficie ejecutada = suma de workorders.effective_area
--- - Consumo en litros = suma de cantidades con unit_id = 1 (Litros)
--- - Consumo en kilos = suma de cantidades con unit_id = 2 (Kilos)
--- - Costo directo = labor (desde BD) + insumos (fórmula específica)
--- - Costo por ha = net_total_cost / surface_ha (ponderado)
--- - Soft deletes filtrados en todas las tablas
--- - Unidades mapeadas directamente por unit_id (versión simplificada)
+DROP VIEW IF EXISTS labor_metrics_view CASCADE;
 
-CREATE OR REPLACE VIEW labor_metrics_view AS
+CREATE VIEW labor_metrics_view AS
 WITH
 -- =======================
 -- BASE DE ÓRDENES DE TRABAJO (exigiendo lb.price IS NOT NULL)
