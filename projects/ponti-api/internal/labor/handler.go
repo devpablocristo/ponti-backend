@@ -24,6 +24,7 @@ type UseCasesPort interface {
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
+	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
 type GinEnginePort interface {
@@ -82,6 +83,7 @@ func (h *Handler) Routes() {
 	{
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
 		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
+		workorderGroup.GET("/metrics", h.GetMetrics)
 	}
 }
 
@@ -327,6 +329,33 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 
+}
+
+func (h *Handler) GetMetrics(c *gin.Context) {
+	var filt domain.LaborFilter
+	if v := c.Query("project_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+			return
+		}
+		filt.ProjectID = &id
+	}
+	if v := c.Query("field_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+			return
+		}
+		filt.FieldID = &id
+	}
+	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
+	if err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
 }
 
 // ----- HELPER -----
