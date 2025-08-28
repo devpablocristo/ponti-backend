@@ -16,6 +16,7 @@ type RepositoryPort interface {
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborRawItem, types.PageInfo, error)
+	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
 type UseCases struct {
@@ -91,4 +92,8 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 	}
 
 	return items, pageInfo, err
+}
+
+func (u *UseCases) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
+	return u.repo.GetMetrics(ctx, f)
 }
