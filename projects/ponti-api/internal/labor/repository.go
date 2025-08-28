@@ -215,7 +215,10 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	}
 
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	// Usar COUNT(DISTINCT w.id) para contar correctamente y evitar duplicados
+	// causados por múltiples facturas por workorder
+	countQuery := base.Session(&gorm.Session{})
+	if err := countQuery.Select("COUNT(DISTINCT w.id)").Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to count labors for workorder", err)
 	}
@@ -223,6 +226,8 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.LaborRawItem
+	// Usar GROUP BY para evitar duplicados causados por múltiples facturas por workorder
+	// Las funciones MAX() se usan para campos de factura que pueden tener múltiples valores
 	if err := base.Select(`
 			w.id AS workorder_id,
             w.number                AS workorder_number,
@@ -238,12 +243,13 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
             lb.contractor_name      AS contractor_name,
             inv.name                AS investor_name,
 			pdv.average_value       AS usd_avg_value,
-			i.id                    AS invoice_id,
-			i.number                AS invoice_number,
-			i.company               AS invoice_company,
-			i.date                  AS invoice_date,
-			i.status                AS invoice_status
-        `).Order("w.number DESC").
+			MAX(i.id)               AS invoice_id,
+			MAX(i.number)           AS invoice_number,
+			MAX(i.company)          AS invoice_company,
+			MAX(i.date)             AS invoice_date,
+			MAX(i.status)           AS invoice_status
+        `).Group("w.id, w.number, w.date, p.name, f.name, c.name, lb.name, lc.name, w.contractor, w.effective_area, lb.price, lb.contractor_name, inv.name, pdv.average_value").
+		Order("w.number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
