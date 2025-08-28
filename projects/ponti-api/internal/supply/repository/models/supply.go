@@ -30,11 +30,14 @@ type Supply struct {
 
 // De persistencia (models.Supply) → dominio (domain.Supply)
 func (m *Supply) ToDomain() *domain.Supply {
-	unitName := ""
-	if m.UnitID == 1 {
+	var unitName string
+	switch m.UnitID {
+	case 1:
 		unitName = "Lt"
-	} else {
+	case 2:
 		unitName = "Kg"
+	default:
+		unitName = "Unknown"
 	}
 
 	return &domain.Supply{
