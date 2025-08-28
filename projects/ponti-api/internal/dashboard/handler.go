@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -59,37 +60,45 @@ func (h *Handler) Routes() {
 
 func (h *Handler) GetDashboard(c *gin.Context) {
 	var f domain.DashboardFilter
-	if v := c.Query("campaign_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id"})
+
+	// Parse customer_ids array parameter
+	if v := c.Query("customer_ids"); v != "" {
+		ids, err := parseInt64Array(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_ids format"})
 			return
 		}
-		f.CampaignID = &id
+		f.CustomerIDs = ids
 	}
-	if v := c.Query("project_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+
+	// Parse project_ids array parameter
+	if v := c.Query("project_ids"); v != "" {
+		ids, err := parseInt64Array(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_ids format"})
 			return
 		}
-		f.ProjectID = &id
+		f.ProjectIDs = ids
 	}
-	if v := c.Query("customer_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id"})
+
+	// Parse campaign_ids array parameter
+	if v := c.Query("campaign_ids"); v != "" {
+		ids, err := parseInt64Array(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_ids format"})
 			return
 		}
-		f.CustomerID = &id
+		f.CampaignIDs = ids
 	}
-	if v := c.Query("field_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+
+	// Parse field_ids array parameter
+	if v := c.Query("field_ids"); v != "" {
+		ids, err := parseInt64Array(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_ids format"})
 			return
 		}
-		f.FieldID = &id
+		f.FieldIDs = ids
 	}
 
 	// Pagination removed - only one object returned
@@ -102,5 +111,30 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(*row))
+	c.JSON(http.StatusOK, dto.FromDomain(row))
+}
+
+// parseInt64Array parses a comma-separated string of integers into a slice of int64
+func parseInt64Array(s string) ([]int64, error) {
+	if s == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(s, ",")
+	ids := make([]int64, 0, len(parts))
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		id, err := strconv.ParseInt(part, 10, 64)
+		if err != nil || id <= 0 {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }

@@ -146,7 +146,7 @@ type DashboardRow struct {
 }
 
 // FromDomain converts domain.DashboardRow to dto.DashboardRow
-func FromDomain(d domain.DashboardRow) DashboardRow {
+func FromDomain(d *domain.DashboardRow) DashboardRow {
 	// Parse crops breakdown if available
 	var crops []CropDetail
 	if d.CropsBreakdown != nil {
@@ -227,15 +227,15 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 				Budget      *decimal.Decimal `json:"budget,omitempty"`
 			}{
 				ProgressPct: toPtr(d.CostsProgressPct),
-				Executed:    d.ExecutedCosts,
-				Budget:      toPtr(d.BudgetCosts),
+				Executed:    d.DirectCostsExecutedUSD,
+				Budget:      &d.BudgetCostUSD,
 			},
 
-			// APORTES DE INVERSORES - Agrupado
+			// APORTES DE INVERSORES - Agrupado (vacío por ahora)
 			InvestorContributions: struct {
 				Details *string `json:"details,omitempty"`
 			}{
-				Details: d.ContributionDetails,
+				Details: nil, // Vacío por ahora según requisitos
 			},
 
 			// RESULTADO OPERATIVO - Agrupado
@@ -245,8 +245,8 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 				TotalCosts  decimal.Decimal  `json:"total_costs"`
 			}{
 				ProgressPct: toPtr(d.OperatingResultPct),
-				IncomeNet:   d.IncomeNet,
-				TotalCosts:  d.TotalCosts,
+				IncomeNet:   d.IncomeUSD,
+				TotalCosts:  d.DirectCostsExecutedUSD.Add(d.StructureUSD).Add(d.RentUSD),
 			},
 		},
 
@@ -266,9 +266,9 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 				RotationPct    decimal.Decimal `json:"rotation_pct"`
 				CostPerHectare decimal.Decimal `json:"cost_per_hectare"`
 			}{
-				Hectares:       d.CropsTotalHectares,
-				RotationPct:    d.CropsTotalRotationPct,
-				CostPerHectare: d.CropsTotalCostPerHectare,
+				Hectares:       d.TotalHectares,
+				RotationPct:    decimal.NewFromInt(100), // Siempre 100% según requisitos
+				CostPerHectare: d.TotalCostPerHectare,
 			},
 		},
 
@@ -277,8 +277,8 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 			YieldPerHectare     *decimal.Decimal `json:"yield_per_hectare,omitempty"`
 			TotalCostPerHectare *decimal.Decimal `json:"total_cost_per_hectare,omitempty"`
 		}{
-			YieldPerHectare:     toPtr(d.YieldPerHectare),
-			TotalCostPerHectare: toPtr(d.TotalCostPerHectare),
+			YieldPerHectare:     nil, // No disponible en el dominio simplificado
+			TotalCostPerHectare: &d.TotalCostPerHectare,
 		},
 
 		// ===== Grupo 4: INDICADORES OPERATIVOS =====
@@ -289,11 +289,11 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 			LastOrderNumber    *string    `json:"last_order_number,omitempty"`
 			LastStockCountDate *time.Time `json:"last_stock_count_date,omitempty"`
 		}{
-			FirstOrderDate:     d.FirstOrderDate,
-			FirstOrderNumber:   d.FirstOrderNumber,
-			LastOrderDate:      d.LastOrderDate,
-			LastOrderNumber:    d.LastOrderNumber,
-			LastStockCountDate: d.LastStockCountDate,
+			FirstOrderDate:     nil, // No disponible en el dominio simplificado
+			FirstOrderNumber:   nil, // No disponible en el dominio simplificado
+			LastOrderDate:      nil, // No disponible en el dominio simplificado
+			LastOrderNumber:    nil, // No disponible en el dominio simplificado
+			LastStockCountDate: nil, // No disponible en el dominio simplificado
 		},
 
 		// ===== Grupo 5: BALANCE DE GESTIÓN =====
@@ -305,12 +305,12 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 			InvestedCostUSD    *decimal.Decimal `json:"invested_cost_usd,omitempty"`
 			StockUSD           *decimal.Decimal `json:"stock_usd,omitempty"`
 		}{
-			IncomeUSD:          d.MgmtIncomeUSD,
-			TotalCostsUSD:      d.MgmtTotalCostsUSD,
-			OperatingResultUSD: d.MgmtOperatingResultUSD,
-			OperatingResultPct: toPtr(d.MgmtOperatingResultPct),
-			InvestedCostUSD:    toPtr(d.InvestedCostUSD),
-			StockUSD:           toPtr(d.StockUSD),
+			IncomeUSD:          d.IncomeUSD,
+			TotalCostsUSD:      d.LaborsInvestedUSD.Add(d.SuppliesInvestedUSD).Add(d.StructureUSD),
+			OperatingResultUSD: d.IncomeUSD.Sub(d.LaborsInvestedUSD).Sub(d.SuppliesInvestedUSD).Sub(d.StructureUSD),
+			OperatingResultPct: toPtr(d.OperatingResultPct),
+			InvestedCostUSD:    &d.DirectCostsInvestedUSD,
+			StockUSD:           &d.StockUSD,
 		},
 
 		// ===== Grupo 6: BALANCE DE GESTIÓN DETALLADO =====
@@ -372,21 +372,21 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.DirectCostsExecutedUSD,
-							Has: d.DirectCostsHectares,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.DirectCostsInvestedUSD,
-							Has: d.DirectCostsHectares,
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.DirectCostsStockUSD,
-							Has: &d.DirectCostsHectares,
+							USD: &d.StockUSD,
+							Has: &d.TotalHectares,
 						},
 					},
 					{
@@ -396,21 +396,21 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.SeedExecutedUSD,
-							Has: d.SeedHectares,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.SeedInvestedUSD,
-							Has: d.SeedHectares,
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.SeedStockUSD,
-							Has: &d.SeedHectares,
+							USD: &d.StockUSD,
+							Has: &d.TotalHectares,
 						},
 					},
 					{
@@ -420,21 +420,21 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.SuppliesExecutedUSD,
-							Has: d.SuppliesHectares,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.SuppliesInvestedUSD,
-							Has: d.SuppliesHectares,
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.SuppliesStockUSD,
-							Has: &d.SuppliesHectares,
+							USD: &d.StockUSD,
+							Has: &d.TotalHectares,
 						},
 					},
 					{
@@ -444,21 +444,21 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.LaborsExecutedUSD,
-							Has: d.LaborsHectares,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
 							USD: d.LaborsInvestedUSD,
-							Has: d.LaborsHectares,
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.LaborsStockUSD,
-							Has: &d.LaborsHectares,
+							USD: toPtr(decimal.NullDecimal{Decimal: decimal.Zero, Valid: true}), // Siempre 0 según requisitos
+							Has: &d.TotalHectares,
 						},
 					},
 					{
@@ -467,22 +467,22 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
-							USD: d.RentExecutedUSD,
-							Has: d.RentHectares,
+							USD: d.RentUSD,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
-							USD: d.RentInvestedUSD,
-							Has: d.RentHectares,
+							USD: decimal.Zero, // Siempre 0 según requisitos
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.RentStockUSD,
-							Has: &d.RentHectares,
+							USD: toPtr(decimal.NullDecimal{Decimal: decimal.Zero, Valid: true}), // Siempre 0 según requisitos
+							Has: &d.TotalHectares,
 						},
 					},
 					{
@@ -491,22 +491,22 @@ func FromDomain(d domain.DashboardRow) DashboardRow {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
-							USD: d.StructureExecutedUSD,
-							Has: d.StructureHectares,
+							USD: d.StructureUSD,
+							Has: d.TotalHectares,
 						},
 						Invested: struct {
 							USD decimal.Decimal `json:"usd"`
 							Has decimal.Decimal `json:"has"`
 						}{
-							USD: d.StructureInvestedUSD,
-							Has: d.StructureHectares,
+							USD: decimal.Zero, // Siempre 0 según requisitos
+							Has: d.TotalHectares,
 						},
 						Stock: struct {
 							USD *decimal.Decimal `json:"usd"`
 							Has *decimal.Decimal `json:"has"`
 						}{
-							USD: &d.StructureStockUSD,
-							Has: &d.StructureHectares,
+							USD: toPtr(decimal.NullDecimal{Decimal: decimal.Zero, Valid: true}), // Siempre 0 según requisitos
+							Has: &d.TotalHectares,
 						},
 					},
 				},
