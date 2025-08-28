@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	labexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
@@ -24,6 +25,7 @@ type UseCasesPort interface {
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
+	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64, string) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -82,6 +84,7 @@ func (h *Handler) Routes() {
 	{
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
 		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
+		workorderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
 	}
 }
 
@@ -327,6 +330,49 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 
+}
+
+func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
+	projectID, ok := parseParamID(c, "projectID")
+	if !ok {
+		return
+	}
+
+	fieldIDParam := c.Query("fieldID")
+	if fieldIDParam == "" && projectID == 0 {
+		types.NewErrorResponseHelper().BadRequest(c, "fieldID or projectID requires a value", nil)
+		return
+	}
+
+	var fieldID int64
+	if fieldIDParam != "" {
+		var err error
+		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().BadRequest(c, "fieldID is not a valid integer", nil)
+			return
+		}
+	}
+
+	input := types.NewInput(c.Request)
+
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		types.NewErrorResponseHelper().BadRequest(c, "usd_month requires a month", nil)
+		return
+	}
+
+	data, err := h.ucs.ExportGroupLaborXLSX(c.Request.Context(), input, projectID, fieldID, usdMonth)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
+	}
+
+	filename := labexcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 // ----- HELPER -----

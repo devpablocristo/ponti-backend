@@ -1,11 +1,16 @@
 package wire
 
 import (
+	"os"
+	"path/filepath"
+
 	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor"
+	labexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	"github.com/google/wire"
 )
@@ -19,9 +24,32 @@ func ProvideLaborRepositoryPort(r *labor.Repository) labor.RepositoryPort {
 	return r
 }
 
-// ProvideLotUseCases agrupa repositorio y servicio de crop en lot.UseCases.
-func ProvideLaborUseCases(rep labor.RepositoryPort) *labor.UseCases {
-	return labor.NewUseCases(rep)
+// Crea el engine de Excel ya configurado
+func ProvidePkgExcelService() (*pkgexcel.Service, error) {
+	fp := filepath.Join(os.TempDir(), labexcel.DefaultFilename)
+	write := true
+	return pkgexcel.Bootstrap(
+		fp,
+		labexcel.SheetName,
+		labexcel.DateFormat,
+		&write,
+		labexcel.ColumnWidths,
+	)
+}
+
+// bindea el engine como la interfaz XLSXEnginePort
+func ProvideXLSXEnginePort(s *pkgexcel.Service) labor.XLSXEnginePort {
+	return s
+}
+
+// Crea el adaptador de exportación que usa el engine
+func ProvideExporterPort(eng labor.XLSXEnginePort) labor.ExporterAdapterPort {
+	return labor.NewExcelExporter(eng)
+}
+
+// ProvideLaborUseCases agrupa repositorio y servicio
+func ProvideLaborUseCases(rep labor.RepositoryPort, exp labor.ExporterAdapterPort) *labor.UseCases {
+	return labor.NewUseCases(rep, exp)
 }
 
 func ProvideLaborUseCasesPort(uc *labor.UseCases) labor.UseCasesPort {
@@ -63,4 +91,7 @@ var LaborSet = wire.NewSet(
 	ProvideLaborGormEnginePort,
 	ProvideLaborGinEnginePort,
 	ProvideLaborMiddlewaresEnginePort,
+	ProvidePkgExcelService,
+	ProvideXLSXEnginePort,
+	ProvideExporterPort,
 )

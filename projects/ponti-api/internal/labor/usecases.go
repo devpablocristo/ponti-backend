@@ -18,12 +18,17 @@ type RepositoryPort interface {
 	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborRawItem, types.PageInfo, error)
 }
 
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []domain.LaborListItem) ([]byte, error)
+	Close() error
+}
 type UseCases struct {
-	repo RepositoryPort
+	repo  RepositoryPort
+	excel ExporterAdapterPort
 }
 
-func NewUseCases(repo RepositoryPort) *UseCases {
-	return &UseCases{repo: repo}
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, excel: excel}
 }
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
@@ -91,4 +96,20 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 	}
 
 	return items, pageInfo, err
+}
+
+func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64, usdMonth string) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, _, err := u.ListGroupLaborByWorkorder(ctx, in, pid, fid, usdMonth)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list group labor", err)
+	}
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }
