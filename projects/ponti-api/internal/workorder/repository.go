@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -220,4 +221,45 @@ func (r *Repository) ListWorkorders(
 	// 7) Construir PageInfo y devolver
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
+}
+
+func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter) (*domain.WorkorderMetrics, error) {
+	// Construimos el WHERE dinámico según los filtros presentes
+	q := `
+		SELECT
+		  COALESCE(SUM(surface_ha), 0) AS surface_ha,
+		  COALESCE(SUM(liters), 0) AS liters,
+		  COALESCE(SUM(kilograms), 0) AS kilograms,
+		  COALESCE(SUM(direct_cost), 0) AS direct_cost
+		FROM workorder_metrics_view
+		WHERE 1=1
+	`
+	var args []any
+
+	if filt.ProjectID != nil {
+		q += " AND project_id = ?"
+		args = append(args, *filt.ProjectID)
+	}
+	if filt.FieldID != nil {
+		q += " AND field_id = ?"
+		args = append(args, *filt.FieldID)
+	}
+
+	var row struct {
+		SurfaceHa  decimal.Decimal `gorm:"column:surface_ha"`
+		Liters     decimal.Decimal `gorm:"column:liters"`
+		Kilograms  decimal.Decimal `gorm:"column:kilograms"`
+		DirectCost decimal.Decimal `gorm:"column:direct_cost"`
+	}
+
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get metrics", err)
+	}
+
+	return &domain.WorkorderMetrics{
+		SurfaceHa:  row.SurfaceHa,
+		Liters:     row.Liters,
+		Kilograms:  row.Kilograms,
+		DirectCost: row.DirectCost,
+	}, nil
 }

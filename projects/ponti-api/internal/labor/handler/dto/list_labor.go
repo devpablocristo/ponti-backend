@@ -13,6 +13,7 @@ type ListedLabor struct {
 	CategoryId     int64           `json:"category_id"`
 	Price          decimal.Decimal `json:"price"`
 	ContractorName string          `json:"contractor_name"`
+	CategoryName   string          `json:"category_name"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
@@ -42,6 +43,7 @@ func NewListLaborsResponse(
 			CategoryId:     l.CategoryId,
 			Price:          l.Price,
 			ContractorName: l.ContractorName,
+			CategoryName:   l.CategoryName,
 			UpdatedAt:      l.UpdatedAt,
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/shopspring/decimal"
 )
 
 type GormEnginePort interface {
@@ -76,6 +77,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 	}
 
 	if err := db0.
+		Preload("Category").
 		Select("id, name, contractor_name, price, category_id").
 		Where("project_id = ?", projectId).
 		Limit(perPage).
@@ -93,6 +95,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 			Price:          labor.Price,
 			ContractorName: labor.ContractorName,
 			CategoryId:     labor.LaborCategoryID,
+			CategoryName:   labor.Category.Name,
 		}
 	}
 
@@ -274,4 +277,41 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
+}
+
+func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
+	q := `
+        SELECT 
+          COALESCE(SUM(surface_ha), 0) AS surface_ha,
+          COALESCE(SUM(net_total_cost), 0) AS net_total_cost,
+          COALESCE(
+            SUM(net_total_cost) / NULLIF(SUM(surface_ha), 0),
+            0
+          ) AS avg_cost_per_ha
+        FROM labor_metrics_view
+        WHERE 1=1
+    `
+	var args []any
+	if f.ProjectID != nil {
+		q += " AND project_id = ?"
+		args = append(args, *f.ProjectID)
+	}
+	if f.FieldID != nil {
+		q += " AND field_id = ?"
+		args = append(args, *f.FieldID)
+	}
+
+	var row struct {
+		SurfaceHa    decimal.Decimal `gorm:"column:surface_ha"`
+		NetTotalCost decimal.Decimal `gorm:"column:net_total_cost"`
+		AvgCostPerHa decimal.Decimal `gorm:"column:avg_cost_per_ha"`
+	}
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+	}
+	return &domain.LaborMetrics{
+		SurfaceHa:    row.SurfaceHa,
+		NetTotalCost: row.NetTotalCost,
+		AvgCostPerHa: row.AvgCostPerHa,
+	}, nil
 }

@@ -20,6 +20,7 @@ type UseCasesPort interface {
 	UpdateWorkorderByID(context.Context, *domain.Workorder) error
 	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
+	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
 }
 
 type GinEnginePort interface {
@@ -66,6 +67,7 @@ func (h *Handler) Routes() {
 		grp.DELETE("/:id", h.DeleteWorkorderByID)
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.GET("", h.ListWorkorders)
+		grp.GET("/metrics", h.GetMetrics)
 	}
 }
 
@@ -194,4 +196,31 @@ func parseFilters(c *gin.Context) domain.WorkorderFilter {
 		}
 	}
 	return f
+}
+
+func (h *Handler) GetMetrics(c *gin.Context) {
+	var filt domain.WorkorderFilter
+	if v := c.Query("project_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+			return
+		}
+		filt.ProjectID = &id
+	}
+	if v := c.Query("field_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+			return
+		}
+		filt.FieldID = &id
+	}
+	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
 }
