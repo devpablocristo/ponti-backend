@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -45,7 +44,7 @@ func main() {
 
 func showHelp() {
 	fmt.Println(`
-🌱 SEED DASHBOARD - Herramienta para poblar la base de datos con datos mínimos para el dashboard
+🌱 SEED DASHBOARD - Herramienta para poblar la base de datos con datos del dashboard
 
 USO:
   go run cmd/seed-dashboard/main.go [OPCIONES]
@@ -62,28 +61,30 @@ EJEMPLOS:
   go run cmd/seed-dashboard/main.go -reset
 
 DESCRIPCIÓN:
-  Carga automáticamente todos los scripts SQL del directorio sql/ en orden alfabético:
+  Carga automáticamente todos los scripts SQL del directorio sql/ en orden específico:
   
-  - 01_dashboard_minimal.sql: Datos básicos (Soja)
-  - 02_add_maiz_crop.sql: Agregar Maíz
-  - 03_add_trigo_crop.sql: Agregar Trigo
-  - ... (cualquier script adicional que agregues)
+  - 00_create_basic_tables.sql: Crear tablas básicas necesarias
+  - 00_base_data.sql: Datos base (types, categories, labor_types, providers, users)
+  - 01_basic_entities.sql: Entidades básicas (customers, campaigns, projects, fields, crops, lots)
+  - 99_complete_dashboard_data.sql: Datos completos del dashboard (supplies, labors, workorders, investors, stock, invoices)
 
 RESULTADO:
-  El dashboard mostrará todos los cultivos configurados en los scripts SQL
-  - Soja: 10.5 hectáreas
-  - Maíz: 8.5 hectáreas  
-  - Trigo: 12.0 hectáreas
-  - Total: 31.0 hectáreas
+  El dashboard mostrará datos reales y ricos:
+  - 20 workorders con fechas reales
+  - 20 supplies con precios reales
+  - 20 labors con contratistas reales
+  - 5 inversores con porcentajes
+  - Stock valorado en inventario
+  - Facturas por montos reales
+  - Métricas completas de siembra, cosecha, costos e ingresos
 
 NOTA:
-  Los scripts se ejecutan en orden alfabético, por eso usamos prefijos numéricos
-  (01_, 02_, 03_, etc.) para controlar el orden de ejecución.
+  Los scripts se ejecutan en orden específico para respetar las dependencias de foreign keys
 `)
 }
 
 func connectDB() (*sql.DB, error) {
-	// Configuración de la base de datos
+	// Configuración de la base de datos - por defecto usa Docker Compose
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_USER", "admin"),
@@ -93,11 +94,23 @@ func connectDB() (*sql.DB, error) {
 		getEnv("DB_SSL_MODE", "disable"),
 	)
 
+	fmt.Printf("🔌 Conectando a: %s:%s/%s (usuario: %s)\n",
+		getEnv("DB_HOST", "localhost"),
+		getEnv("DB_PORT", "5432"),
+		getEnv("DB_NAME", "ponti_api_db"),
+		getEnv("DB_USER", "admin"))
+
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("error abriendo conexión: %w", err)
 	}
 
+	// Verificar conexión
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("error conectando a la BD: %w", err)
+	}
+
+	fmt.Println("✅ Conexión exitosa a la base de datos")
 	return db, nil
 }
 
@@ -113,12 +126,26 @@ func resetDatabase(db *sql.DB) {
 
 	// Limpiar en orden correcto (por foreign keys)
 	tables := []string{
+		"invoices",
+		"stocks",
+		"workorders",
+		"project_investors",
+		"labors",
+		"supplies",
 		"lots",
 		"fields",
 		"projects",
 		"customers",
 		"campaigns",
 		"crops",
+		"investors",
+		"users",
+		"providers",
+		"labor_categories",
+		"labor_types",
+		"categories",
+		"types",
+		"lease_types",
 	}
 
 	for _, table := range tables {
@@ -148,39 +175,42 @@ func runAllSQLScripts(db *sql.DB) {
 		log.Fatalf("❌ Directorio SQL no encontrado: %s", sqlDir)
 	}
 
-	// Leer todos los archivos .sql del directorio
-	files, err := filepath.Glob(filepath.Join(sqlDir, "*.sql"))
-	if err != nil {
-		log.Fatalf("❌ Error leyendo directorio SQL: %v", err)
+	// Scripts en orden específico para respetar dependencias
+	scriptOrder := []string{
+		"00_create_basic_tables.sql",
+		"00_base_data.sql",
+		"01_basic_entities.sql",
+		"99_complete_dashboard_data.sql",
 	}
 
-	if len(files) == 0 {
-		log.Fatalf("❌ No se encontraron archivos SQL en %s", sqlDir)
-	}
-
-	// Ordenar archivos alfabéticamente (para mantener el orden 01_, 02_, 03_, etc.)
-	sort.Strings(files)
-
-	fmt.Printf("📁 Encontrados %d scripts SQL en %s:\n", len(files), sqlDir)
-	for i, file := range files {
-		fmt.Printf("   %d. %s\n", i+1, filepath.Base(file))
+	fmt.Printf("📁 Ejecutando %d scripts SQL en %s:\n", len(scriptOrder), sqlDir)
+	for i, script := range scriptOrder {
+		fmt.Printf("   %d. %s\n", i+1, script)
 	}
 	fmt.Println()
 
-	// Ejecutar cada script en orden
-	for i, file := range files {
-		fmt.Printf("🔄 Ejecutando script %d/%d: %s\n", i+1, len(files), filepath.Base(file))
+	// Ejecutar cada script en orden específico
+	for i, scriptName := range scriptOrder {
+		scriptPath := filepath.Join(sqlDir, scriptName)
 
-		if err := executeSQLFile(db, file); err != nil {
-			log.Fatalf("❌ Error ejecutando script %s: %v", filepath.Base(file), err)
+		// Verificar que el archivo existe
+		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+			log.Fatalf("❌ Script no encontrado: %s", scriptPath)
 		}
 
-		fmt.Printf("✅ Script %s ejecutado exitosamente\n", filepath.Base(file))
+		fmt.Printf("🔄 Ejecutando script %d/%d: %s\n", i+1, len(scriptOrder), scriptName)
+
+		if err := executeSQLFile(db, scriptPath); err != nil {
+			log.Fatalf("❌ Error ejecutando script %s: %v", scriptName, err)
+		}
+
+		fmt.Printf("✅ Script %s ejecutado exitosamente\n", scriptName)
 		fmt.Println()
 	}
 
 	fmt.Println("🎉 Todos los scripts SQL ejecutados exitosamente")
 	fmt.Println("🎯 Ahora puedes probar el endpoint: GET /api/v1/dashboard")
+	fmt.Println("📈 El dashboard mostrará datos reales y ricos en lugar de solo 0s")
 }
 
 func executeSQLFile(db *sql.DB, filePath string) error {
