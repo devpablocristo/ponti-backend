@@ -248,7 +248,8 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			MAX(i.company)          AS invoice_company,
 			MAX(i.date)             AS invoice_date,
 			MAX(i.status)           AS invoice_status
-        `).Group("w.id, w.number, w.date, p.name, f.name, c.name, lb.name, lc.name, w.contractor, w.effective_area, lb.price, lb.contractor_name, inv.name, pdv.average_value").
+        `).Where("w.deleted_at IS NULL").
+		Group("w.id, w.number, w.date, p.name, f.name, c.name, lb.name, lc.name, w.contractor, w.effective_area, lb.price, lb.contractor_name, inv.name, pdv.average_value").
 		Order("w.number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
