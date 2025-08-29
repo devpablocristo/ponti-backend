@@ -290,9 +290,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	q := `
         SELECT 
           COALESCE(SUM(surface_ha), 0) AS surface_ha,
-          COALESCE(SUM(net_total_cost), 0) AS net_total_cost,
+          COALESCE(SUM(total_labor_cost), 0) AS net_total_cost,
           COALESCE(
-            SUM(net_total_cost) / NULLIF(SUM(surface_ha), 0),
+            SUM(total_labor_cost) / NULLIF(SUM(surface_ha), 0),
             0
           ) AS avg_cost_per_ha
         FROM labor_cards_cube_view
