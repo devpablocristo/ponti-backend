@@ -115,11 +115,8 @@ func (h *Handler) ListLots(c *gin.Context) {
 	if pageSize <= 0 {
 		pageSize = 10
 	}
-	// Requiere al menos uno de project_id o field_id
-	if projectID <= 0 && fieldID <= 0 {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "project_id or field_id is required", nil))
-		return
-	}
+	// Los filtros por ID son opcionales para permitir búsquedas globales
+	// Si no se proporcionan filtros, se retornan todos los lotes
 	// Cap de paginación
 	if pageSize > 100 {
 		pageSize = 100
@@ -217,9 +214,8 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
 	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
 
-	if projectID <= 0 && fieldID <= 0 {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "project_id or field_id is required", nil))
-	}
+	// Los filtros por ID son opcionales para permitir búsquedas globales
+	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	m, err := h.ucs.GetMetrics(c.Request.Context(), projectID, fieldID, cropID)
 	if err != nil {

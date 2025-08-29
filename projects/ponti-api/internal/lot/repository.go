@@ -326,13 +326,13 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 
 	base := r.db.Client().WithContext(ctx).Table("lot_metrics_view")
 
+	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
 		base = base.Where("field_id = ?", fieldID)
 	} else if projectID > 0 {
 		base = base.Where("project_id = ?", projectID)
-	} else {
-		return nil, types.NewError(types.ErrInvalidID, "field_id or project_id is required", nil)
 	}
+	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	if cropID > 0 {
 		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
@@ -380,9 +380,8 @@ func (r *Repository) ListLots(
 		base = base.Where("field_id = ?", fieldID)
 	} else if projectID > 0 {
 		base = base.Where("project_id = ?", projectID)
-	} else {
-		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInvalidID, "field_id or project_id is required", nil)
 	}
+	// Si no se proporcionan filtros, se retornan todos los lotes
 
 	if cropID > 0 {
 		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
