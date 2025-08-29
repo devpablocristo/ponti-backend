@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -61,49 +60,45 @@ func (h *Handler) Routes() {
 func (h *Handler) GetDashboard(c *gin.Context) {
 	var f domain.DashboardFilter
 
-	// Parse customer_ids array parameter
-	if v := c.Query("customer_ids"); v != "" {
-		ids, err := parseInt64Array(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_ids format"})
+	// Parse customer_id parameter (solo 1 ID)
+	if v := c.Query("customer_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id format"})
 			return
 		}
-		f.CustomerIDs = ids
+		f.CustomerIDs = []int64{id}
 	}
 
-	// Parse project_ids array parameter
-	if v := c.Query("project_ids"); v != "" {
-		ids, err := parseInt64Array(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_ids format"})
+	// Parse project_id parameter (solo 1 ID)
+	if v := c.Query("project_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id format"})
 			return
 		}
-		f.ProjectIDs = ids
+		f.ProjectIDs = []int64{id}
 	}
 
-	// Parse campaign_ids array parameter
-	if v := c.Query("campaign_ids"); v != "" {
-		ids, err := parseInt64Array(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_ids format"})
+	// Parse campaign_id parameter (solo 1 ID)
+	if v := c.Query("campaign_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id format"})
 			return
 		}
-		f.CampaignIDs = ids
+		f.CampaignIDs = []int64{id}
 	}
 
-	// Parse field_ids array parameter
-	if v := c.Query("field_ids"); v != "" {
-		ids, err := parseInt64Array(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_ids format"})
+	// Parse field_id parameter (solo 1 ID)
+	if v := c.Query("field_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id format"})
 			return
 		}
-		f.FieldIDs = ids
+		f.FieldIDs = []int64{id}
 	}
-
-	// Sin límites - mostrar todos los datos
-	f.Limit = 0
-	f.Offset = 0
 
 	// Obtener el dashboard desde la vista SQL
 	dashboard, err := h.ucs.GetDashboard(c.Request.Context(), f)
@@ -117,29 +112,4 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	response := dto.FromDashboardPayload(dashboard)
 
 	c.JSON(http.StatusOK, response)
-}
-
-// parseInt64Array parses a comma-separated string of integers into a slice of int64
-func parseInt64Array(s string) ([]int64, error) {
-	if s == "" {
-		return nil, nil
-	}
-
-	parts := strings.Split(s, ",")
-	ids := make([]int64, 0, len(parts))
-
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-
-		id, err := strconv.ParseInt(part, 10, 64)
-		if err != nil || id <= 0 {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-
-	return ids, nil
 }
