@@ -12,7 +12,7 @@ MIGRATIONS_DIR     := ./migrations
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
-        build up down logs reset rebuild \
+        build up down logs reset rebuild clean \
         run-api seed \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create
 
@@ -119,10 +119,6 @@ seed-dashboard:
 # --------------------------------------------------
 # Docker Compose
 # --------------------------------------------------
-build:
-	@echo "Building services (compose up --build)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) up --build
-
 up:
 	@echo "Starting services (compose up)..."
 	docker compose -f $(DOCKER_COMPOSE_YML) up
@@ -134,8 +130,18 @@ down:
 reset: down up
 	@echo "Reset done (down & up)."
 
-rebuild: down build
-	@echo "Rebuild done (down & build)."
+build:
+	@echo "Building services (compose up --build)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) up --build
+
+clean:
+	@echo "Cleaning: stopping services, removing containers, volumes, networks and build artifacts..."
+	@docker system prune -f --volumes
+	@rm -rf $(BUILD_DIR)
+	@echo "Clean completed."
+
+rebuild: clean build
+	@echo "Rebuild completed (clean + build)."
 
 logs:
 	@echo "Tailing logs (compose logs -f)..."
