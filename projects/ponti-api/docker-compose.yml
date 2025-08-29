@@ -42,7 +42,8 @@ services:
       - DB_SSL_MODE=${DB_SSL_MODE}
     command: [
       "-path", "/migrations",
-      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:${DB_PORT}/ponti_api_db?sslmode=${DB_SSL_MODE}"
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:${DB_PORT}/ponti_api_db?sslmode=${DB_SSL_MODE}",
+      "up"
     ]
     networks:
       - app-network
@@ -70,8 +71,6 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-
-
 
 networks:
   app-network:

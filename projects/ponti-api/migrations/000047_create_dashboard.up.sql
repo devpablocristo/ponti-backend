@@ -1,311 +1,301 @@
 -- =========================================================
--- Migración 000046: Crear dashboard completo y optimizado
+-- ÚNICA VISTA: dashboard_view (sin FULL JOIN, Cloud SQL friendly)
+--  - Global / Customer / Project / Campaign / Field (GROUPING SETS)
+--  - Incluye: siembra, cosecha, costos (budget / ejecutado),
+--             ingresos, contribuciones, resultado operativo (USD y %)
+--  - Expone labors/supplies y breakdown normalizado por inversor
+--  - row_kind: 'metric' (métricas) | 'investor' (filas por inversor)
 -- =========================================================
-
--- Eliminar vistas existentes si existen
-DROP VIEW IF EXISTS dashboard_card_sowing_view;
-DROP VIEW IF EXISTS dashboard_card_harvest_view;
-DROP VIEW IF EXISTS dashboard_card_costs_progress_view;
-DROP VIEW IF EXISTS dashboard_card_contributions_view;
-DROP VIEW IF EXISTS dashboard_card_operating_result_view;
-
--- Vista para métricas de siembra
-CREATE VIEW dashboard_card_sowing_view AS
-SELECT 
-    COALESCE(p.customer_id, 0) as customer_id,
-    COALESCE(p.id, 0) as project_id,
-    COALESCE(p.campaign_id, 0) as campaign_id,
-    COALESCE(f.id, 0) as field_id,
-    -- Calcular área sembrada basándose en sowing_date (si tiene fecha, está sembrado)
-    COALESCE(SUM(CASE WHEN l.sowing_date IS NOT NULL THEN l.hectares ELSE 0 END), 0)::numeric(14,2) as sowed_area,
-    -- Total de hectáreas del proyecto
-    COALESCE(SUM(l.hectares), 0)::numeric(14,2) as total_hectares
-FROM projects p
-JOIN fields f ON f.project_id = p.id
-JOIN lots l ON l.field_id = f.id
-WHERE p.deleted_at IS NULL 
-  AND f.deleted_at IS NULL 
-  AND l.deleted_at IS NULL
-GROUP BY p.customer_id, p.id, p.campaign_id, f.id;
-
--- Vista para métricas de cosecha
-CREATE VIEW dashboard_card_harvest_view AS
-SELECT 
-    COALESCE(p.customer_id, 0) as customer_id,
-    COALESCE(p.id, 0) as project_id,
-    COALESCE(p.campaign_id, 0) as campaign_id,
-    COALESCE(f.id, 0) as field_id,
-    -- Calcular área cosechada basándose en tons (si tiene toneladas, está cosechado)
-    COALESCE(SUM(CASE WHEN l.tons IS NOT NULL AND l.tons > 0 THEN l.hectares ELSE 0 END), 0)::numeric(14,2) as harvested_area,
-    -- Total de hectáreas del proyecto
-    COALESCE(SUM(l.hectares), 0)::numeric(14,2) as total_hectares
-FROM projects p
-JOIN fields f ON f.project_id = p.id
-JOIN lots l ON l.field_id = f.id
-WHERE p.deleted_at IS NULL 
-  AND f.deleted_at IS NULL 
-  AND l.deleted_at IS NULL
-GROUP BY p.customer_id, p.id, p.campaign_id, f.id;
-
--- Vista para progreso de costos
-CREATE VIEW dashboard_card_costs_progress_view AS
-SELECT 
-    COALESCE(p.customer_id, 0) as customer_id,
-    COALESCE(p.id, 0) as project_id,
-    COALESCE(p.campaign_id, 0) as campaign_id,
-    COALESCE(f.id, 0) as field_id,
-    -- Costo presupuestado del proyecto
-    COALESCE(p.admin_cost, 0)::numeric(14,2) as budget_cost_usd,
-    -- Costos ejecutados (labors + supplies)
-    COALESCE(
-        (SELECT COALESCE(SUM(l.price), 0) FROM labors l WHERE l.project_id = p.id AND l.deleted_at IS NULL) +
-        (SELECT COALESCE(SUM(s.price), 0) FROM supplies s WHERE s.project_id = p.id AND s.deleted_at IS NULL),
-        0
-    )::numeric(14,2) as executed_costs_usd
-FROM projects p
-JOIN fields f ON f.project_id = p.id
-WHERE p.deleted_at IS NULL 
-  AND f.deleted_at IS NULL
-GROUP BY p.customer_id, p.id, p.campaign_id, f.id, p.admin_cost;
-
--- Vista para contribuciones de inversores
-CREATE VIEW dashboard_card_contributions_view AS
-SELECT 
-    COALESCE(p.customer_id, 0) as customer_id,
-    COALESCE(p.id, 0) as project_id,
-    COALESCE(p.campaign_id, 0) as campaign_id,
-    COALESCE(f.id, 0) as field_id,
-    -- Progreso de contribuciones (simplificado)
-    100.0::numeric(14,2) as contributions_progress_pct,
-    -- Breakdown de inversores
-    jsonb_build_object(
-        'investor_id', COALESCE(pi.investor_id, 0),
-        'investor_name', COALESCE(i.name, ''),
-        'percentage', COALESCE(pi.percentage, 0),
-        'contribution_pct', COALESCE(pi.percentage, 0)
-    ) as investors_breakdown
-FROM projects p
-JOIN fields f ON f.project_id = p.id
-JOIN project_investors pi ON pi.project_id = p.id
-JOIN investors i ON i.id = pi.investor_id
-WHERE p.deleted_at IS NULL 
-  AND f.deleted_at IS NULL
-  AND pi.deleted_at IS NULL
-  AND i.deleted_at IS NULL;
-
--- Vista para resultado operativo
-CREATE VIEW dashboard_card_operating_result_view AS
-SELECT 
-    COALESCE(p.customer_id, 0) as customer_id,
-    COALESCE(p.id, 0) as project_id,
-    COALESCE(p.campaign_id, 0) as campaign_id,
-    COALESCE(f.id, 0) as field_id,
-    -- Ingresos estimados (tons * 200 USD)
-    COALESCE(SUM(l.tons * 200), 0)::numeric(14,2) as income_usd,
-    -- Costos directos ejecutados
-    COALESCE(SUM(COALESCE(lab.price, 0)), 0)::numeric(14,2) as direct_costs_executed_usd,
-    -- % resultado sobre invertido directo
-    CASE WHEN SUM(COALESCE(lab.price, 0)) > 0 THEN
-      ROUND(((SUM(l.tons * 200) - SUM(COALESCE(lab.price, 0))) / SUM(COALESCE(lab.price, 0)) * 100)::numeric, 2)
-    ELSE 0 END as operating_result_pct,
-    -- Resultado operativo en USD
-    COALESCE(SUM(l.tons * 200) - SUM(COALESCE(lab.price, 0)), 0)::numeric(14,2) as operating_result_usd
-FROM projects p
-JOIN fields f ON f.project_id = p.id
-JOIN lots l ON l.field_id = f.id
-LEFT JOIN labors lab ON lab.project_id = p.id
-WHERE p.deleted_at IS NULL 
-  AND f.deleted_at IS NULL 
-  AND l.deleted_at IS NULL
-  AND (lab.deleted_at IS NULL OR lab.deleted_at IS NULL)
-GROUP BY p.customer_id, p.id, p.campaign_id, f.id;
-
--- Crear la función get_dashboard_payload optimizada que NUNCA devuelve NULL
-CREATE OR REPLACE FUNCTION get_dashboard_payload(
-  p_customer_id  BIGINT DEFAULT NULL,
-  p_project_id   BIGINT DEFAULT NULL,
-  p_campaign_id  BIGINT DEFAULT NULL,
-  p_field_id     BIGINT DEFAULT NULL
-) RETURNS JSONB
-LANGUAGE sql
-STABLE
-AS $$
+CREATE OR REPLACE VIEW dashboard_view AS
 WITH
--- =========================================================
--- 0) Filtros opcionales (si vienen NULL, no filtran nada)
--- =========================================================
-flt AS (
+-- -----------------------------------------------------------------
+-- Costos directos por proyecto (labors + supplies)
+-- -----------------------------------------------------------------
+v_direct_costs_by_project AS (
   SELECT
-    p_customer_id  AS customer_id,
-    p_project_id   AS project_id,
-    p_campaign_id  AS campaign_id,
-    p_field_id     AS field_id
+    p.id AS project_id,
+    COALESCE((SELECT SUM(lb.price) FROM labors lb WHERE lb.project_id = p.id AND lb.deleted_at IS NULL), 0)::numeric(14,2) AS labors_usd,
+    COALESCE((SELECT SUM(sp.price) FROM supplies sp WHERE sp.project_id = p.id AND sp.deleted_at IS NULL), 0)::numeric(14,2) AS supplies_usd,
+    (
+      COALESCE((SELECT SUM(lb.price) FROM labors lb WHERE lb.project_id = p.id AND lb.deleted_at IS NULL), 0)
+      +
+      COALESCE((SELECT SUM(sp.price) FROM supplies sp WHERE sp.project_id = p.id AND sp.deleted_at IS NULL), 0)
+    )::numeric(14,2) AS direct_costs_usd
+  FROM projects p
+  WHERE p.deleted_at IS NULL
 ),
 
--- =========================================================
--- 1) MÉTRICAS (5 cards) - usando solo las vistas que existen
--- =========================================================
+-- -----------------------------------------------------------------
+-- Ingresos por field (tons * 200)
+-- -----------------------------------------------------------------
+v_income_by_field AS (
+  SELECT
+    f.project_id,
+    f.id AS field_id,
+    COALESCE(SUM(l.tons * 200), 0)::numeric(14,2) AS income_usd
+  FROM fields f
+  LEFT JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
+  WHERE f.deleted_at IS NULL
+  GROUP BY f.project_id, f.id
+),
+
+-- -----------------------------------------------------------------
+-- Dimensión de niveles (todas las combinaciones)
+-- -----------------------------------------------------------------
+levels AS (
+  SELECT
+    CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
+    CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
+    CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
+    CASE WHEN GROUPING(f.id)=1          THEN NULL ELSE f.id          END AS field_id
+  FROM projects p
+  LEFT JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
+  GROUP BY GROUPING SETS (
+    (p.customer_id, p.id, p.campaign_id, f.id),
+    (p.customer_id, p.id, p.campaign_id),
+    (p.customer_id, p.id),
+    (p.customer_id),
+    ()
+  )
+),
+
+-- -----------------------------------------------------------------
+-- Siembra agregada
+-- -----------------------------------------------------------------
 sowing AS (
   SELECT
-    COALESCE(SUM(v.sowed_area),0)::numeric(14,2)     AS hectares,
-    COALESCE(SUM(v.total_hectares),0)::numeric(14,2) AS total_hectares
-  FROM dashboard_card_sowing_view v, flt f
-  WHERE (f.customer_id IS NULL OR v.customer_id = f.customer_id)
-    AND (f.project_id  IS NULL OR v.project_id  = f.project_id)
-    AND (f.campaign_id IS NULL OR v.campaign_id = f.campaign_id)
-    AND (f.field_id    IS NULL OR v.field_id    = f.field_id)
+    CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
+    CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
+    CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
+    CASE WHEN GROUPING(f.id)=1          THEN NULL ELSE f.id          END AS field_id,
+    COALESCE(SUM(CASE WHEN l.sowing_date IS NOT NULL THEN l.hectares ELSE 0 END),0)::numeric(14,2) AS sowed_area,
+    COALESCE(SUM(l.hectares),0)::numeric(14,2) AS total_hectares
+  FROM projects p
+  LEFT JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+  LEFT JOIN lots   l ON l.field_id   = f.id AND l.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
+  GROUP BY GROUPING SETS (
+    (p.customer_id, p.id, p.campaign_id, f.id),
+    (p.customer_id, p.id, p.campaign_id),
+    (p.customer_id, p.id),
+    (p.customer_id),
+    ()
+  )
 ),
-sowing_kpi AS (
-  SELECT
-    CASE WHEN s.total_hectares > 0
-         THEN ROUND((s.hectares / s.total_hectares * 100)::numeric, 2)
-         ELSE 0 END AS progress_pct,
-    s.hectares, s.total_hectares
-  FROM sowing s
-),
+
+-- -----------------------------------------------------------------
+-- Cosecha agregada
+-- -----------------------------------------------------------------
 harvest AS (
   SELECT
-    COALESCE(SUM(v.harvested_area),0)::numeric(14,2) AS hectares,
-    COALESCE(SUM(v.total_hectares),0)::numeric(14,2) AS total_hectares
-  FROM dashboard_card_harvest_view v, flt f
-  WHERE (f.customer_id IS NULL OR v.customer_id = f.customer_id)
-    AND (f.project_id  IS NULL OR v.project_id  = f.project_id)
-    AND (f.campaign_id IS NULL OR v.campaign_id = f.campaign_id)
-    AND (f.field_id    IS NULL OR v.field_id    = f.field_id)
+    CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
+    CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
+    CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
+    CASE WHEN GROUPING(f.id)=1          THEN NULL ELSE f.id          END AS field_id,
+    COALESCE(SUM(CASE WHEN l.tons IS NOT NULL AND l.tons > 0 THEN l.hectares ELSE 0 END),0)::numeric(14,2) AS harvested_area,
+    COALESCE(SUM(l.hectares),0)::numeric(14,2) AS total_hectares
+  FROM projects p
+  LEFT JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+  LEFT JOIN lots   l ON l.field_id   = f.id AND l.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
+  GROUP BY GROUPING SETS (
+    (p.customer_id, p.id, p.campaign_id, f.id),
+    (p.customer_id, p.id, p.campaign_id),
+    (p.customer_id, p.id),
+    (p.customer_id),
+    ()
+  )
 ),
-harvest_kpi AS (
+
+-- -----------------------------------------------------------------
+-- Costos agregados (budget + ejecutado desglosado)
+-- -----------------------------------------------------------------
+costs_agg AS (
   SELECT
-    CASE WHEN h.total_hectares > 0
-         THEN ROUND((h.hectares / h.total_hectares * 100)::numeric, 2)
-         ELSE 0 END AS progress_pct,
-    h.hectares, h.total_hectares
-  FROM harvest h
+    CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
+    CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
+    CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
+    COALESCE(SUM(COALESCE(p.admin_cost,0)),0)::numeric(14,2)                AS budget_cost_usd,
+    COALESCE(SUM(COALESCE(dc.labors_usd,0)),0)::numeric(14,2)               AS executed_labors_usd,
+    COALESCE(SUM(COALESCE(dc.supplies_usd,0)),0)::numeric(14,2)             AS executed_supplies_usd,
+    COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0)::numeric(14,2)         AS executed_costs_usd
+  FROM projects p
+  LEFT JOIN v_direct_costs_by_project dc ON dc.project_id = p.id
+  WHERE p.deleted_at IS NULL
+  GROUP BY GROUPING SETS (
+    (p.customer_id, p.id, p.campaign_id),
+    (p.customer_id, p.id),
+    (p.customer_id),
+    ()
+  )
 ),
-costs AS (
+
+-- -----------------------------------------------------------------
+-- Contribuciones: filas por inversor (nivel proyecto; field_id NULL)
+-- -----------------------------------------------------------------
+contrib_rows AS (
   SELECT
-    COALESCE(SUM(v.budget_cost_usd),0)::numeric(14,2)    AS budget_usd,
-    COALESCE(SUM(v.executed_costs_usd),0)::numeric(14,2) AS executed_usd
-  FROM dashboard_card_costs_progress_view v, flt f
-  WHERE (f.customer_id IS NULL OR v.customer_id = f.customer_id)
-    AND (f.project_id  IS NULL OR v.project_id  = f.project_id)
-    AND (f.campaign_id IS NULL OR v.campaign_id = f.campaign_id)
-    AND (f.field_id    IS NULL OR v.field_id    = f.field_id)
+    p.customer_id,
+    p.id           AS project_id,
+    p.campaign_id,
+    NULL::bigint   AS field_id,
+    pi.investor_id,
+    COALESCE(i.name,'')                     AS investor_name,
+    COALESCE(pi.percentage,0)::numeric(6,2) AS investor_percentage,
+    COALESCE(pi.percentage,0)::numeric(6,2) AS investor_contribution_pct
+  FROM projects p
+  JOIN project_investors pi ON pi.project_id = p.id AND pi.deleted_at IS NULL
+  LEFT JOIN investors i      ON i.id = pi.investor_id AND i.deleted_at IS NULL
+  WHERE p.deleted_at IS NULL
 ),
-costs_kpi AS (
+
+-- Métrica de contribuciones por nivel (100 si hay inversores; 0 si no)
+contrib_metric AS (
   SELECT
-    CASE WHEN c.budget_usd > 0
-         THEN ROUND((c.executed_usd / c.budget_usd * 100)::numeric, 2)
-         ELSE 0 END AS progress_pct,
-    c.executed_usd, c.budget_usd
-  FROM costs c
+    CASE WHEN GROUPING(customer_id)=1 THEN NULL ELSE customer_id END AS customer_id,
+    CASE WHEN GROUPING(project_id)=1  THEN NULL ELSE project_id  END AS project_id,
+    CASE WHEN GROUPING(campaign_id)=1 THEN NULL ELSE campaign_id END AS campaign_id,
+    CASE WHEN GROUPING(field_id)=1    THEN NULL ELSE field_id    END AS field_id,
+    CASE WHEN COUNT(*) > 0 THEN 100.0::numeric(14,2) ELSE 0::numeric(14,2) END AS contrib_progress_pct
+  FROM contrib_rows
+  GROUP BY GROUPING SETS (
+    (customer_id, project_id, campaign_id, field_id),
+    (customer_id, project_id, campaign_id),
+    (customer_id, project_id),
+    (customer_id),
+    ()
+  )
 ),
-contribs AS (
+
+-- -----------------------------------------------------------------
+-- Resultado operativo (ingresos vs SOLO labors)
+-- -----------------------------------------------------------------
+operating_result AS (
+  WITH income_by_project AS (
+    SELECT f.project_id, COALESCE(SUM(vf.income_usd),0)::numeric(14,2) AS income_usd
+    FROM v_income_by_field vf
+    JOIN fields f ON f.id = vf.field_id AND f.deleted_at IS NULL
+    GROUP BY f.project_id
+  ),
+  labors_by_project AS (
+    SELECT lb.project_id, COALESCE(SUM(lb.price),0)::numeric(14,2) AS labors_usd
+    FROM labors lb
+    WHERE lb.deleted_at IS NULL
+    GROUP BY lb.project_id
+  )
   SELECT
-    COALESCE(AVG(v.contributions_progress_pct),0)::numeric(14,2) AS progress_pct,
-    COALESCE(jsonb_agg(v.investors_breakdown) FILTER (WHERE v.investors_breakdown IS NOT NULL), '[]'::jsonb) AS breakdowns
-  FROM dashboard_card_contributions_view v, flt f
-  WHERE (f.customer_id IS NULL OR v.customer_id = f.customer_id)
-    AND (f.project_id  IS NULL OR v.project_id  = f.project_id)
-    AND (f.campaign_id IS NULL OR v.campaign_id = f.campaign_id)
-    AND (f.field_id    IS NULL OR v.field_id    = f.field_id)
-),
-oper_card AS (
-  SELECT
-    COALESCE(SUM(v.income_usd),0)::numeric(14,2)              AS income_usd,
-    COALESCE(SUM(v.direct_costs_executed_usd),0)::numeric(14,2) AS direct_costs_executed_usd,
-    -- % resultado sobre invertido directo
-    CASE WHEN SUM(v.direct_costs_executed_usd) IS NOT NULL AND SUM(v.direct_costs_executed_usd) > 0 THEN
-      COALESCE(AVG(v.operating_result_pct),0)::numeric(14,2)
-    ELSE 0 END AS operating_result_pct,
-    COALESCE(SUM(v.operating_result_usd),0)::numeric(14,2)    AS operating_result_usd
-  FROM dashboard_card_operating_result_view v, flt f
-  WHERE (f.customer_id IS NULL OR v.customer_id = f.customer_id)
-    AND (f.project_id  IS NULL OR v.project_id  = f.project_id)
-    AND (f.campaign_id IS NULL OR v.campaign_id = f.campaign_id)
-    AND (f.field_id    IS NULL OR v.field_id    = f.field_id)
+    CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
+    CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
+    CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
+    COALESCE(SUM(COALESCE(ip.income_usd,0)),0)::numeric(14,2)  AS income_usd,
+    COALESCE(SUM(COALESCE(lb.labors_usd,0)),0)::numeric(14,2)  AS direct_labors_usd
+  FROM projects p
+  LEFT JOIN income_by_project ip ON ip.project_id = p.id
+  LEFT JOIN labors_by_project lb ON lb.project_id = p.id
+  WHERE p.deleted_at IS NULL
+  GROUP BY GROUPING SETS (
+    (p.customer_id, p.id, p.campaign_id),
+    (p.customer_id, p.id),
+    (p.customer_id),
+    ()
+  )
 )
 
--- =========================================================
--- 2) COMPOSICIÓN DEL JSON SIMPLIFICADO - SIEMPRE DEVUELVE UN JSON VÁLIDO
--- =========================================================
-SELECT COALESCE(
-  jsonb_build_object(
-    'metrics', jsonb_build_object(
-      'sowing', jsonb_build_object(
-        'progress_pct', COALESCE(sk.progress_pct, 0),
-        'hectares',     COALESCE(sk.hectares, 0),
-        'total_hectares', COALESCE(sk.total_hectares, 0)
-      ),
-      'harvest', jsonb_build_object(
-        'progress_pct', COALESCE(hk.progress_pct, 0),
-        'hectares',     COALESCE(hk.hectares, 0),
-        'total_hectares', COALESCE(hk.total_hectares, 0)
-      ),
-      'costs', jsonb_build_object(
-        'progress_pct', COALESCE(ck.progress_pct, 0),
-        'executed_usd', COALESCE(ck.executed_usd, 0),
-        'budget_usd',   COALESCE(ck.budget_usd, 0)
-      ),
-      'investor_contributions', jsonb_build_object(
-        'progress_pct', COALESCE(c.progress_pct, 0),
-        'breakdown',    COALESCE(c.breakdowns, '[]'::jsonb)
-      ),
-      'operating_result', jsonb_build_object(
-        'progress_pct',     COALESCE(oc.operating_result_pct, 0),
-        'income_usd',       COALESCE(oc.income_usd, 0),
-        'total_costs_usd',  COALESCE(oc.direct_costs_executed_usd, 0)
-      )
-    ),
+-- -----------------------------------------------------------------
+-- SALIDA ÚNICA (base = levels) con UNION ALL: METRIC + INVESTOR
+-- -----------------------------------------------------------------
+-- 1) Filas METRIC
+SELECT
+  lvl.customer_id,
+  lvl.project_id,
+  lvl.campaign_id,
+  lvl.field_id,
 
-    'management_balance', jsonb_build_object(
-      'summary', jsonb_build_object(
-        'income_usd',                 COALESCE(oc.income_usd, 0),
-        'direct_costs_executed_usd',  COALESCE(oc.direct_costs_executed_usd, 0),
-        'direct_costs_invested_usd',  0,
-        'stock_usd',                  0,
-        'rent_usd',                   0,
-        'structure_usd',              0,
-        'operating_result_usd',       COALESCE(oc.operating_result_usd, 0),
-        'operating_result_pct',       COALESCE(oc.operating_result_pct, 0)
-      ),
-      'breakdown', jsonb_build_array(
-        jsonb_build_object('label','Seed',      'executed_usd', 0, 'invested_usd', 0, 'stock_usd', NULL),
-        jsonb_build_object('label','Supplies',  'executed_usd', 0, 'invested_usd', 0, 'stock_usd', NULL),
-        jsonb_build_object('label','Labors',    'executed_usd', COALESCE(oc.direct_costs_executed_usd, 0), 'invested_usd', 0, 'stock_usd', 0),
-        jsonb_build_object('label','Rent',      'executed_usd', 0, 'invested_usd', 0, 'stock_usd', 0),
-        jsonb_build_object('label','Structure', 'executed_usd', 0, 'invested_usd', 0, 'stock_usd', 0)
-      ),
-      'totals_row', jsonb_build_object(
-        'executed_usd', COALESCE(oc.direct_costs_executed_usd, 0),
-        'invested_usd', 0,
-        'stock_usd',    0
-      )
-    ),
+  COALESCE(s.sowed_area,0)::numeric(14,2)     AS sowing_hectares,
+  COALESCE(s.total_hectares,0)::numeric(14,2) AS sowing_total_hectares,
 
-    'crop_incidence', jsonb_build_object(
-      'crops', '[]'::jsonb,
-      'total', jsonb_build_object(
-        'hectares', 0,
-        'rotation_pct', 0,
-        'cost_usd_per_hectare', 0
-      )
-    ),
+  COALESCE(h.harvested_area,0)::numeric(14,2) AS harvest_hectares,
+  COALESCE(h.total_hectares,0)::numeric(14,2) AS harvest_total_hectares,
 
-    'operational_indicators', jsonb_build_object(
-      'cards', jsonb_build_array(
-        jsonb_build_object('key','first_workorder', 'title','Primera orden de trabajo',
-                           'date', NULL, 'workorder_id', NULL, 'workorder_code', NULL),
-        jsonb_build_object('key','last_workorder',  'title','Última orden de trabajo',
-                           'date', NULL, 'workorder_id', NULL, 'workorder_code', NULL),
-        jsonb_build_object('key','last_stock_audit','title','Último arqueo de stock',
-                           'date', NULL, 'audit_id', NULL, 'audit_code', NULL),
-        jsonb_build_object('key','campaign_close',  'title','Cierre de campaña',
-                           'date', NULL, 'status', 'pending')
-      )
-    )
-  ),
-  -- JSON por defecto si todo falla
-  '{"metrics":{"sowing":{"progress_pct":0,"hectares":0,"total_hectares":0},"harvest":{"progress_pct":0,"hectares":0,"total_hectares":0},"costs":{"progress_pct":0,"executed_usd":0,"budget_usd":0},"investor_contributions":{"progress_pct":0,"breakdown":[]},"operating_result":{"progress_pct":0,"income_usd":0,"total_costs_usd":0}},"management_balance":{"summary":{"income_usd":0,"direct_costs_executed_usd":0,"direct_costs_invested_usd":0,"stock_usd":0,"rent_usd":0,"structure_usd":0,"operating_result_usd":0,"operating_result_pct":0},"breakdown":[{"label":"Seed","executed_usd":0,"invested_usd":0,"stock_usd":null},{"label":"Supplies","executed_usd":0,"invested_usd":0,"stock_usd":null},{"label":"Labors","executed_usd":0,"invested_usd":0,"stock_usd":0},{"label":"Rent","executed_usd":0,"invested_usd":0,"stock_usd":0},{"label":"Structure","executed_usd":0,"invested_usd":0,"stock_usd":0}],"totals_row":{"executed_usd":0,"invested_usd":0,"stock_usd":0}},"crop_incidence":{"crops":[],"total":{"hectares":0,"rotation_pct":0,"cost_usd_per_hectare":0}},"operational_indicators":{"cards":[{"key":"first_workorder","title":"Primera orden de trabajo","date":null,"workorder_id":null,"workorder_code":null},{"key":"last_workorder","title":"Última orden de trabajo","date":null,"workorder_id":null,"workorder_code":null},{"key":"last_stock_audit","title":"Último arqueo de stock","date":null,"audit_id":null,"audit_code":null},{"key":"campaign_close","title":"Cierre de campaña","date":null,"status":"pending"}]}}'::jsonb
-) as payload
-FROM sowing_kpi sk, harvest_kpi hk, costs_kpi ck, contribs c, oper_card oc;
-$$;
+  COALESCE(ca.budget_cost_usd,0)::numeric(14,2)        AS budget_cost_usd,
+  COALESCE(ca.executed_costs_usd,0)::numeric(14,2)     AS executed_costs_usd,
+  COALESCE(ca.executed_labors_usd,0)::numeric(14,2)    AS executed_labors_usd,
+  COALESCE(ca.executed_supplies_usd,0)::numeric(14,2)  AS executed_supplies_usd,
+
+  COALESCE(o.income_usd,0)::numeric(14,2)             AS income_usd,
+  COALESCE(o.direct_labors_usd,0)::numeric(14,2)      AS direct_labors_usd,
+  (COALESCE(o.income_usd,0) - COALESCE(o.direct_labors_usd,0))::numeric(14,2) AS operating_result_usd,
+  CASE WHEN COALESCE(o.direct_labors_usd,0) > 0
+       THEN ROUND(((COALESCE(o.income_usd,0) - COALESCE(o.direct_labors_usd,0))
+                  / NULLIF(o.direct_labors_usd,0) * 100)::numeric, 2)
+       ELSE 0 END AS operating_result_pct,
+
+  COALESCE(cm.contrib_progress_pct,0)::numeric(14,2) AS contributions_progress_pct,
+
+  -- columnas de inversor vacías
+  NULL::bigint        AS investor_id,
+  NULL::text          AS investor_name,
+  NULL::numeric(6,2)  AS investor_percentage,
+  NULL::numeric(6,2)  AS investor_contribution_pct,
+
+  'metric'::text AS row_kind
+FROM levels lvl
+LEFT JOIN sowing s
+  ON s.customer_id IS NOT DISTINCT FROM lvl.customer_id
+ AND s.project_id  IS NOT DISTINCT FROM lvl.project_id
+ AND s.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
+ AND s.field_id    IS NOT DISTINCT FROM lvl.field_id
+LEFT JOIN harvest h
+  ON h.customer_id IS NOT DISTINCT FROM lvl.customer_id
+ AND h.project_id  IS NOT DISTINCT FROM lvl.project_id
+ AND h.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
+ AND h.field_id    IS NOT DISTINCT FROM lvl.field_id
+LEFT JOIN costs_agg ca
+  ON ca.customer_id IS NOT DISTINCT FROM lvl.customer_id
+ AND ca.project_id  IS NOT DISTINCT FROM lvl.project_id
+ AND ca.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
+LEFT JOIN operating_result o
+  ON o.customer_id IS NOT DISTINCT FROM lvl.customer_id
+ AND o.project_id  IS NOT DISTINCT FROM lvl.project_id
+ AND o.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
+LEFT JOIN contrib_metric cm
+  ON cm.customer_id IS NOT DISTINCT FROM lvl.customer_id
+ AND cm.project_id  IS NOT DISTINCT FROM lvl.project_id
+ AND cm.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
+ AND cm.field_id    IS NOT DISTINCT FROM lvl.field_id
+
+UNION ALL
+
+-- 2) Filas INVESTOR (métricas NULL para no duplicar agregados)
+SELECT
+  cr.customer_id,
+  cr.project_id,
+  cr.campaign_id,
+  cr.field_id,
+
+  NULL::numeric(14,2) AS sowing_hectares,
+  NULL::numeric(14,2) AS sowing_total_hectares,
+
+  NULL::numeric(14,2) AS harvest_hectares,
+  NULL::numeric(14,2) AS harvest_total_hectares,
+
+  NULL::numeric(14,2) AS budget_cost_usd,
+  NULL::numeric(14,2) AS executed_costs_usd,
+  NULL::numeric(14,2) AS executed_labors_usd,
+  NULL::numeric(14,2) AS executed_supplies_usd,
+
+  NULL::numeric(14,2) AS income_usd,
+  NULL::numeric(14,2) AS direct_labors_usd,
+  NULL::numeric(14,2) AS operating_result_usd,
+  NULL::numeric(14,2) AS operating_result_pct,
+
+  100.0::numeric(14,2) AS contributions_progress_pct,
+
+  cr.investor_id,
+  cr.investor_name,
+  cr.investor_percentage,
+  cr.investor_contribution_pct,
+
+  'investor'::text AS row_kind
+FROM contrib_rows cr;
