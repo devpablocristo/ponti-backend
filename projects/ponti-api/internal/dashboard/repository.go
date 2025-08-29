@@ -2,12 +2,13 @@ package dashboard
 
 import (
 	"context"
+	"encoding/json"
 
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	m "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type GormEngine interface {
@@ -22,103 +23,114 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.DashboardRow, error) {
-	q := r.db.Client().WithContext(ctx).
-		Table("dashboard_full_view").
-		Select([]string{
-			// Basic metrics
-			"total_hectares", "sowed_area", "harvested_area",
-			"sowing_progress_pct", "harvest_progress_pct",
+func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.DashboardResponse, error) {
+	// Llamar directamente a la función SQL get_dashboard_payload
+	var resultJSON []byte
+	var err error
 
-			// Labor costs
-			"labors_executed_usd", "supplies_executed_usd", "seed_executed_usd", "direct_costs_executed_usd",
+	// Construir la consulta SQL con los parámetros
+	query := `SELECT get_dashboard_payload($1, $2, $3, $4)`
 
-			// Project costs
-			"labors_invested_usd", "supplies_invested_usd", "direct_costs_invested_usd",
+	// Obtener los primeros valores de cada array de filtros (o NULL si están vacíos)
+	var customerID, projectID, campaignID, fieldID *int64
 
-			// Stock and budget
-			"stock_usd", "budget_cost_usd", "costs_progress_pct",
-
-			// Income and structure
-			"income_usd", "rent_usd", "structure_usd",
-
-			// Operating result
-			"operating_result_usd", "operating_result_pct",
-
-			// Cost per hectare
-			"total_cost_per_hectare",
-
-			// Crops breakdown
-			"crops_breakdown",
-
-			// Additional fields for DTO mapping
-			"seed_invested_usd",
-		})
-
-	// Aplicar filtros de arrays
 	if len(filt.CustomerIDs) > 0 {
-		q = q.Where("customer_id = ANY(?)", filt.CustomerIDs)
+		customerID = &filt.CustomerIDs[0]
 	}
 	if len(filt.ProjectIDs) > 0 {
-		q = q.Where("project_id = ANY(?)", filt.ProjectIDs)
+		projectID = &filt.ProjectIDs[0]
 	}
 	if len(filt.CampaignIDs) > 0 {
-		q = q.Where("campaign_id = ANY(?)", filt.CampaignIDs)
+		campaignID = &filt.CampaignIDs[0]
 	}
 	if len(filt.FieldIDs) > 0 {
-		q = q.Where("field_id = ANY(?)", filt.FieldIDs)
+		fieldID = &filt.FieldIDs[0]
 	}
 
-	q = q.Order("campaign_id, project_id, customer_id")
-	q = q.Limit(1) // SOLO UN REGISTRO
-
-	var row m.DashboardRow
-	if err := q.Scan(&row).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get dashboard", err)
+	// Ejecutar la función SQL
+	err = r.db.Client().WithContext(ctx).Raw(query, customerID, projectID, campaignID, fieldID).Scan(&resultJSON).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to execute get_dashboard_payload function", err)
 	}
 
-	result := &domain.DashboardRow{
-		// Basic metrics
-		TotalHectares:      row.TotalHectares,
-		SowedArea:          row.SowedArea,
-		HarvestedArea:      row.HarvestedArea,
-		SowingProgressPct:  row.SowingProgressPct,
-		HarvestProgressPct: row.HarvestProgressPct,
-
-		// Labor costs
-		LaborsExecutedUSD:      row.LaborsExecutedUSD,
-		SuppliesExecutedUSD:    row.SuppliesExecutedUSD,
-		SeedExecutedUSD:        row.SeedExecutedUSD,
-		DirectCostsExecutedUSD: row.DirectCostsExecutedUSD,
-
-		// Project costs
-		LaborsInvestedUSD:      row.LaborsInvestedUSD,
-		SuppliesInvestedUSD:    row.SuppliesInvestedUSD,
-		DirectCostsInvestedUSD: row.DirectCostsInvestedUSD,
-
-		// Stock and budget
-		StockUSD:         row.StockUSD,
-		BudgetCostUSD:    row.BudgetCostUSD,
-		CostsProgressPct: row.CostsProgressPct,
-
-		// Income and structure
-		IncomeUSD:    row.IncomeUSD,
-		RentUSD:      row.RentUSD,
-		StructureUSD: row.StructureUSD,
-
-		// Operating result
-		OperatingResultUSD: row.OperatingResultUSD,
-		OperatingResultPct: row.OperatingResultPct,
-
-		// Cost per hectare
-		TotalCostPerHectare: row.TotalCostPerHectare,
-
-		// Crops breakdown
-		CropsBreakdown: row.CropsBreakdown,
-
-		// Additional fields for DTO mapping
-		SeedInvestedUSD: row.SeedInvestedUSD,
+	// Parsear el JSON resultante para validar que sea válido
+	var jsonResponse map[string]interface{}
+	if err := json.Unmarshal(resultJSON, &jsonResponse); err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to parse dashboard payload response", err)
 	}
 
-	return result, nil
+	// Crear una respuesta de dominio simple que contenga el JSON
+	response := &domain.DashboardResponse{
+		Cards:                 []domain.DashboardCards{},
+		Balance:               []domain.DashboardBalance{},
+		CropIncidence:         []domain.DashboardCropIncidence{},
+		OperationalIndicators: []domain.DashboardOperationalIndicators{},
+	}
+
+	// Extraer datos básicos del JSON para el dominio (opcional, para compatibilidad)
+	if metrics, ok := jsonResponse["metrics"].(map[string]interface{}); ok {
+		if _, ok := metrics["sowing"].(map[string]interface{}); ok {
+			// Crear una card básica con datos de siembra
+			card := domain.DashboardCards{
+				ProjectID:                0,
+				CustomerID:               0,
+				CampaignID:               0,
+				FieldID:                  0,
+				TotalHectares:            decimal.Zero, // TODO: Extraer del JSON
+				SowedArea:                decimal.Zero, // TODO: Extraer del JSON
+				HarvestedArea:            decimal.Zero, // TODO: Extraer del JSON
+				SowingProgressPct:        decimal.Zero, // TODO: Extraer del JSON
+				BudgetCostUSD:            decimal.Zero, // TODO: Extraer del JSON
+				CostsProgressPct:         decimal.Zero, // TODO: Extraer del JSON
+				HarvestProgressPct:       decimal.Zero, // TODO: Extraer del JSON
+				ContributionsProgressPct: decimal.Zero, // TODO: Extraer del JSON
+				IncomeUSD:                decimal.Zero, // TODO: Extraer del JSON
+				OperatingResultUSD:       decimal.Zero, // TODO: Extraer del JSON
+				OperatingResultPct:       decimal.Zero, // TODO: Extraer del JSON
+				LaborsExecutedUSD:        decimal.Zero, // TODO: Extraer del JSON
+				SuppliesExecutedUSD:      decimal.Zero, // TODO: Extraer del JSON
+				SeedExecutedUSD:          decimal.Zero, // TODO: Extraer del JSON
+				LaborsInvestedUSD:        decimal.Zero, // TODO: Extraer del JSON
+				SuppliesInvestedUSD:      decimal.Zero, // TODO: Extraer del JSON
+				SeedInvestedUSD:          decimal.Zero, // TODO: Extraer del JSON
+				StockUSD:                 decimal.Zero, // TODO: Extraer del JSON
+				StructureUSD:             decimal.Zero, // TODO: Extraer del JSON
+				RentUSD:                  decimal.Zero, // TODO: Extraer del JSON
+			}
+			response.Cards = append(response.Cards, card)
+		}
+	}
+
+	return response, nil
+}
+
+// GetDashboardPayload retorna directamente el JSON de la función SQL
+func (r *Repository) GetDashboardPayload(ctx context.Context, filt domain.DashboardFilter) ([]byte, error) {
+	// Construir la consulta SQL con los parámetros
+	query := `SELECT get_dashboard_payload($1, $2, $3, $4)`
+
+	// Obtener los primeros valores de cada array de filtros (o NULL si están vacíos)
+	var customerID, projectID, campaignID, fieldID *int64
+
+	if len(filt.CustomerIDs) > 0 {
+		customerID = &filt.CustomerIDs[0]
+	}
+	if len(filt.ProjectIDs) > 0 {
+		projectID = &filt.ProjectIDs[0]
+	}
+	if len(filt.CampaignIDs) > 0 {
+		campaignID = &filt.CampaignIDs[0]
+	}
+	if len(filt.FieldIDs) > 0 {
+		fieldID = &filt.FieldIDs[0]
+	}
+
+	// Ejecutar la función SQL y retornar el JSON directamente
+	var resultJSON []byte
+	err := r.db.Client().WithContext(ctx).Raw(query, customerID, projectID, campaignID, fieldID).Scan(&resultJSON).Error
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to execute get_dashboard_payload function", err)
+	}
+
+	return resultJSON, nil
 }
