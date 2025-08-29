@@ -63,7 +63,6 @@ EJEMPLOS:
 DESCRIPCIÓN:
   Carga automáticamente todos los scripts SQL del directorio sql/ en orden específico:
   
-  - 00_create_basic_tables.sql: Crear tablas básicas necesarias
   - 00_base_data.sql: Datos base (types, categories, labor_types, providers, users)
   - 01_basic_entities.sql: Entidades básicas (customers, campaigns, projects, fields, crops, lots)
   - 99_complete_dashboard_data.sql: Datos completos del dashboard (supplies, labors, workorders, investors, stock, invoices)
@@ -177,7 +176,6 @@ func runAllSQLScripts(db *sql.DB) {
 
 	// Scripts en orden específico para respetar dependencias
 	scriptOrder := []string{
-		"00_create_basic_tables.sql",
 		"00_base_data.sql",
 		"01_basic_entities.sql",
 		"99_complete_dashboard_data.sql",
