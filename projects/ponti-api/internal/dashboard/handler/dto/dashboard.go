@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -141,6 +142,88 @@ func FromDashboardPayloadResponse(payload interface{}) DashboardResponse {
 	// Convertir el payload a JSON y luego parsearlo
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
+		// Si hay error, retornar estructura vacía con valores por defecto
+		return createEmptyDashboardResponse()
+	}
+
+	var response DashboardResponse
+	if err := json.Unmarshal(jsonData, &response); err != nil {
+		// Si hay error, retornar estructura vacía con valores por defecto
+		return createEmptyDashboardResponse()
+	}
+
+	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	response = RoundAllDecimals(response)
+
+	return response
+}
+
+// createEmptyDashboardResponse crea una respuesta vacía con valores por defecto
+func createEmptyDashboardResponse() DashboardResponse {
+	return DashboardResponse{
+		Metrics: Metrics{
+			Sowing: SowingMetric{
+				ProgressPct:   decimal.Zero,
+				Hectares:      decimal.Zero,
+				TotalHectares: decimal.Zero,
+			},
+			Harvest: HarvestMetric{
+				ProgressPct:   decimal.Zero,
+				Hectares:      decimal.Zero,
+				TotalHectares: decimal.Zero,
+			},
+			Costs: CostsMetric{
+				ProgressPct: decimal.Zero,
+				ExecutedUSD: decimal.Zero,
+				BudgetUSD:   decimal.Zero,
+			},
+			InvestorContributions: InvestorContributions{
+				ProgressPct: decimal.Zero,
+				Breakdown:   nil,
+			},
+			OperatingResult: OperatingResultMetric{
+				ProgressPct:   decimal.Zero,
+				IncomeUSD:     decimal.Zero,
+				TotalCostsUSD: decimal.Zero,
+			},
+		},
+		ManagementBalance: ManagementBalance{
+			Summary: BalanceSummary{
+				IncomeUSD:              decimal.Zero,
+				DirectCostsExecutedUSD: decimal.Zero,
+				DirectCostsInvestedUSD: decimal.Zero,
+				StockUSD:               decimal.Zero,
+				RentUSD:                decimal.Zero,
+				StructureUSD:           decimal.Zero,
+				OperatingResultUSD:     decimal.Zero,
+				OperatingResultPct:     decimal.Zero,
+			},
+			Breakdown: []BalanceBreakdown{},
+			TotalsRow: BalanceTotals{
+				ExecutedUSD: decimal.Zero,
+				InvestedUSD: decimal.Zero,
+				StockUSD:    decimal.Zero,
+			},
+		},
+		CropIncidence: CropIncidence{
+			Crops: []CropData{},
+			Total: CropTotal{
+				Hectares:          decimal.Zero,
+				RotationPct:       decimal.Zero,
+				CostUSDPerHectare: decimal.Zero,
+			},
+		},
+		OperationalIndicators: OperationalIndicators{
+			Cards: []OperationalCard{},
+		},
+	}
+}
+
+// FromDashboardPayload convierte el dominio DashboardPayload a DTO
+func FromDashboardPayload(domain *domain.DashboardPayload) DashboardResponse {
+	// Convertir el dominio a JSON y luego parsearlo
+	jsonData, err := json.Marshal(domain)
+	if err != nil {
 		// Si hay error, retornar estructura vacía
 		return DashboardResponse{}
 	}
@@ -201,7 +284,7 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.ManagementBalance.Summary.OperatingResultUSD = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultUSD)
 	response.ManagementBalance.Summary.OperatingResultPct = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultPct)
 
-	// Redondear breakdown
+	// Redondear breakdown - solo si StockUSD no es NULL
 	for i := range response.ManagementBalance.Breakdown {
 		response.ManagementBalance.Breakdown[i].ExecutedUSD = roundTo3Decimals(response.ManagementBalance.Breakdown[i].ExecutedUSD)
 		response.ManagementBalance.Breakdown[i].InvestedUSD = roundTo3Decimals(response.ManagementBalance.Breakdown[i].InvestedUSD)

@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,8 +14,7 @@ import (
 )
 
 type UseCasesPort interface {
-	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardResponse, error)
-	GetDashboardPayload(context.Context, domain.DashboardFilter) ([]byte, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardPayload, error)
 }
 
 type GinEnginePort interface {
@@ -107,23 +105,16 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	f.Limit = 0
 	f.Offset = 0
 
-	// Obtener directamente el JSON de la función SQL
-	jsonData, err := h.ucs.GetDashboardPayload(c.Request.Context(), f)
+	// Obtener el dashboard desde la vista SQL
+	dashboard, err := h.ucs.GetDashboard(c.Request.Context(), f)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
-	// Parsear el JSON y aplicar redondeo a 3 decimales
-	var response dto.DashboardResponse
-	if err := json.Unmarshal(jsonData, &response); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "failed to parse dashboard response"})
-		return
-	}
-
-	// Aplicar redondeo a 3 decimales
-	response = dto.RoundAllDecimals(response)
+	// Convertir directamente desde el dominio a DTO (ya incluye redondeo a 3 decimales)
+	response := dto.FromDashboardPayload(dashboard)
 
 	c.JSON(http.StatusOK, response)
 }
