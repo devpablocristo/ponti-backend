@@ -295,7 +295,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
             SUM(net_total_cost) / NULLIF(SUM(surface_ha), 0),
             0
           ) AS avg_cost_per_ha
-        FROM labor_metrics_view
+        FROM labor_cards_cube_view
         WHERE 1=1
     `
 	var args []any
