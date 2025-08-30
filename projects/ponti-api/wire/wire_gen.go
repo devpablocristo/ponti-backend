@@ -207,7 +207,13 @@ func Initialize() (*Dependencies, error) {
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
 	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
-	laborUseCases := ProvideLaborUseCases(laborRepositoryPort)
+	service, err := ProvidePkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	xlsxEnginePort := ProvideXLSXEnginePort(service)
+	exporterAdapterPort := ProvideExporterPort(xlsxEnginePort)
+	laborUseCases := ProvideLaborUseCases(laborRepositoryPort, exporterAdapterPort)
 	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
