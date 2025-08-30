@@ -18,6 +18,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -75,6 +76,15 @@ func Initialize() (*Dependencies, error) {
 	campaignConfigAPIPort := ProvideCampaignConfigAPI(config)
 	campaignMiddlewaresEnginePort := ProvideCampaignMiddlewaresEnginePort(middlewares)
 	campaignHandler := ProvideCampaignHandler(campaignGinEnginePort, campaignUseCasesPort, campaignConfigAPIPort, campaignMiddlewaresEnginePort)
+	dashboardGinEnginePort := ProvideDashboardGinEnginePort(server)
+	gormEngine := ProvideDashboardGormEnginePort(repository)
+	dashboardRepository := ProvideDashboardRepository(gormEngine)
+	dashboardRepositoryPort := ProvideDashboardRepositoryPort(dashboardRepository)
+	dashboardUseCases := ProvideDashboardUseCases(dashboardRepositoryPort)
+	dashboardUseCasesPort := ProvideDashboardUseCasesPort(dashboardUseCases)
+	dashboardConfigAPIPort := ProvideDashboardConfigAPI(config)
+	dashboardMiddlewaresEnginePort := ProvideDashboardMiddlewaresEnginePort(middlewares)
+	dashboardHandler := ProvideDashboardHandler(dashboardGinEnginePort, dashboardUseCasesPort, dashboardConfigAPIPort, dashboardMiddlewaresEnginePort)
 	investorGinEnginePort := ProvideInvestorGinEnginePort(server)
 	investorGormEnginePort := ProvideInvestorGormEnginePort(repository)
 	investorRepository := ProvideInvestorRepository(investorGormEnginePort)
@@ -185,8 +195,8 @@ func Initialize() (*Dependencies, error) {
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	workorderGinEnginePort := ProvideWorkorderGinEnginePort(server)
-	gormEngine := ProvideWorkorderGormEnginePort(repository)
-	workorderRepository := ProvideWorkorderRepository(gormEngine)
+	workorderGormEngine := ProvideWorkorderGormEnginePort(repository)
+	workorderRepository := ProvideWorkorderRepository(workorderGormEngine)
 	workorderRepositoryPort := ProvideWorkorderRepositoryPort(workorderRepository)
 	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort)
 	workorderUseCasesPort := ProvideWorkorderUseCasesPort(workorderUseCases)
@@ -245,6 +255,7 @@ func Initialize() (*Dependencies, error) {
 		WordsSuggester:           pkgsuggesterWordsSuggester,
 		CustomerHandler:          handler,
 		CampaignHandler:          campaignHandler,
+		DashboardHandler:         dashboardHandler,
 		InvestorHandler:          investorHandler,
 		CropHandler:              cropHandler,
 		LotHandler:               lotHandler,
@@ -277,6 +288,7 @@ type Dependencies struct {
 	WordsSuggester           *pkgsuggester.WordsSuggester
 	CustomerHandler          *customer.Handler
 	CampaignHandler          *campaign.Handler
+	DashboardHandler         *dashboard.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
 	LotHandler               *lot.Handler
