@@ -108,18 +108,18 @@ func (h *Handler) ListLots(c *gin.Context) {
 	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
 	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "1000"))
 	if page <= 0 {
 		page = 1
 	}
 	if pageSize <= 0 {
-		pageSize = 10
+		pageSize = 1000
 	}
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	// Si no se proporcionan filtros, se retornan todos los lotes
 	// Cap de paginación
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > 1000 {
+		pageSize = 1000
 	}
 
 	rows, total, sumSowed, sumCost, err := h.ucs.ListLots(c.Request.Context(), projectID, fieldID, cropID, page, pageSize)
