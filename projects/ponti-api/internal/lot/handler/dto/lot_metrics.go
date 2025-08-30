@@ -14,7 +14,7 @@ type LotMetrics struct {
 	CostPerHectare decimal.Decimal `json:"cost_per_hectare"`
 }
 
-// Redondeo homogéneo (2 decimales) como en workorders.
+// Redondeo homogéneo (3 decimales) como en workorders.
 func (m LotMetrics) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		SeededArea     string `json:"seeded_area"`
@@ -22,10 +22,10 @@ func (m LotMetrics) MarshalJSON() ([]byte, error) {
 		YieldTnPerHa   string `json:"yield_tn_per_ha"`
 		CostPerHectare string `json:"cost_per_hectare"`
 	}{
-		SeededArea:     m.SeededArea.Round(2).String(),
-		HarvestedArea:  m.HarvestedArea.Round(2).String(),
-		YieldTnPerHa:   m.YieldTnPerHa.Round(2).String(),
-		CostPerHectare: m.CostPerHectare.Round(2).String(),
+		SeededArea:     m.SeededArea.Round(3).String(),
+		HarvestedArea:  m.HarvestedArea.Round(3).String(),
+		YieldTnPerHa:   m.YieldTnPerHa.Round(3).String(),
+		CostPerHectare: m.CostPerHectare.Round(3).String(),
 	}
 	return json.Marshal(aux)
 }
