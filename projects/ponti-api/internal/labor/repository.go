@@ -215,7 +215,10 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	}
 
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	// Usar COUNT(DISTINCT w.id) para contar correctamente y evitar duplicados
+	// causados por múltiples facturas por workorder
+	countQuery := base.Session(&gorm.Session{})
+	if err := countQuery.Select("COUNT(DISTINCT w.id)").Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to count labors for workorder", err)
 	}
@@ -223,6 +226,8 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.LaborRawItem
+	// Usar GROUP BY para evitar duplicados causados por múltiples facturas por workorder
+	// Las funciones MAX() se usan para campos de factura que pueden tener múltiples valores
 	if err := base.Select(`
 			w.id AS workorder_id,
             w.number                AS workorder_number,
@@ -238,12 +243,14 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
             lb.contractor_name      AS contractor_name,
             inv.name                AS investor_name,
 			pdv.average_value       AS usd_avg_value,
-			i.id                    AS invoice_id,
-			i.number                AS invoice_number,
-			i.company               AS invoice_company,
-			i.date                  AS invoice_date,
-			i.status                AS invoice_status
-        `).Order("w.number DESC").
+			MAX(i.id)               AS invoice_id,
+			MAX(i.number)           AS invoice_number,
+			MAX(i.company)          AS invoice_company,
+			MAX(i.date)             AS invoice_date,
+			MAX(i.status)           AS invoice_status
+        `).Where("w.deleted_at IS NULL").
+		Group("w.id, w.number, w.date, p.name, f.name, c.name, lb.name, lc.name, w.contractor, w.effective_area, lb.price, lb.contractor_name, inv.name, pdv.average_value").
+		Order("w.number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
@@ -282,23 +289,26 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
 	q := `
         SELECT 
-          COALESCE(SUM(surface_ha), 0) AS surface_ha,
-          COALESCE(SUM(net_total_cost), 0) AS net_total_cost,
-          COALESCE(
-            SUM(net_total_cost) / NULLIF(SUM(surface_ha), 0),
-            0
-          ) AS avg_cost_per_ha
-        FROM labor_metrics_view
+          surface_ha,
+          total_labor_cost AS net_total_cost,
+          labor_cost_per_ha AS avg_cost_per_ha
+        FROM labor_cards_cube_view
         WHERE 1=1
     `
 	var args []any
-	if f.ProjectID != nil {
-		q += " AND project_id = ?"
+
+	// Filtros: se decide el nivel de agrupación
+	if f.ProjectID != nil && f.FieldID != nil {
+		q += " AND project_id = ? AND field_id = ? AND level = 'project+field'"
+		args = append(args, *f.ProjectID, *f.FieldID)
+	} else if f.ProjectID != nil {
+		q += " AND project_id = ? AND level = 'project'"
 		args = append(args, *f.ProjectID)
-	}
-	if f.FieldID != nil {
-		q += " AND field_id = ?"
+	} else if f.FieldID != nil {
+		q += " AND field_id = ? AND level = 'field'"
 		args = append(args, *f.FieldID)
+	} else {
+		q += " AND level = 'global'"
 	}
 
 	var row struct {
@@ -306,9 +316,11 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 		NetTotalCost decimal.Decimal `gorm:"column:net_total_cost"`
 		AvgCostPerHa decimal.Decimal `gorm:"column:avg_cost_per_ha"`
 	}
+
 	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 	}
+
 	return &domain.LaborMetrics{
 		SurfaceHa:    row.SurfaceHa,
 		NetTotalCost: row.NetTotalCost,

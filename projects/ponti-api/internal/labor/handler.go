@@ -83,6 +83,7 @@ func (h *Handler) Routes() {
 
 	workorderGroup := r.Group(baseURL + "/labors")
 	{
+		workorderGroup.DELETE("/:idLabor", h.DeleteLaborByID)
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
 		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
 		workorderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
@@ -223,6 +224,20 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 
+	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
+		return
+	}
+	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
+}
+
+func (h *Handler) DeleteLaborByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})

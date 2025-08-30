@@ -10,6 +10,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
+	dashboard "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard"
 	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
 	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	commercialization "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
@@ -40,6 +41,7 @@ type Dependencies struct {
 	WordsSuggester           *sug.WordsSuggester
 	CustomerHandler          *customer.Handler
 	CampaignHandler          *campaign.Handler
+	DashboardHandler         *dashboard.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
 	LotHandler               *lot.Handler
@@ -69,6 +71,7 @@ func Initialize() (*Dependencies, error) {
 		SuggesterSet,
 		CustomerSet,
 		CampaignSet,
+		DashboardSet,
 		InvestorSet,
 		CropSet,
 		CommercializationSet,

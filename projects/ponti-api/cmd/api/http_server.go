@@ -41,6 +41,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
+	deps.DashboardHandler.Routes()
 	deps.InvestorHandler.Routes()
 	deps.InvoiceHandler.Routes()
 	deps.FieldHandler.Routes()
