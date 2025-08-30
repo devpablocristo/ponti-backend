@@ -2,10 +2,12 @@ package labor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -36,7 +38,22 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	return model.ID, nil
 }
 
-func (r *Repository) deleteLabor(ctx context.Context, id int64) error {
+func (r *Repository) GetWorkordersByLaborID(ctx context.Context, laborID int64) (int64, error) {
+	var count int64
+	if err := r.db.Client().WithContext(ctx).
+		Model(&workordermodels.Workorder{}).
+		Joins("JOIN labors ON labors.id = workorders.labor_id").
+		Where("labors.id = ?", laborID).
+		Count(&count).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, types.NewError(types.ErrInternal, "failed to get workorder", err)
+	}
+	return count, nil
+}
+
+func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Labor{}, "id = ?", id)
 	if result.Error != nil {

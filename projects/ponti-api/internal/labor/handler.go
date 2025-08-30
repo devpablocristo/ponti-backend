@@ -241,8 +241,8 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})

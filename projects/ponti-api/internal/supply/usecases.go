@@ -84,7 +84,6 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
-	//TODO validar si fue usado en una orden de trabajo
 	count, err := u.repo.GetWorkordersBySupplyID(ctx, id)
 	if err != nil {
 		return err
