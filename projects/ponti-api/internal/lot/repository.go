@@ -318,21 +318,21 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
 	type rowAgg struct {
-		SeededArea        decimal.Decimal `gorm:"column:seeded_area"`
-		HarvestedArea     decimal.Decimal `gorm:"column:harvested_area"`
-		TotalHarvest      decimal.Decimal `gorm:"column:total_harvest"`
-		WeightedCostPerHa decimal.Decimal `gorm:"column:weighted_cost_per_ha"`
+		SeededArea    decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea decimal.Decimal `gorm:"column:harvested_area"`
+		YieldTnPerHa  decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
 	}
 
 	base := r.db.Client().WithContext(ctx).Table("lot_metrics_view")
 
+	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
 		base = base.Where("field_id = ?", fieldID)
 	} else if projectID > 0 {
 		base = base.Where("project_id = ?", projectID)
-	} else {
-		return nil, types.NewError(types.ErrInvalidID, "field_id or project_id is required", nil)
 	}
+	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	if cropID > 0 {
 		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
@@ -340,13 +340,13 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 
 	// La vista ya viene agregada por (project_id, field_id, previous_crop_id, current_crop_id).
 	// Si los filtros devuelven varias filas, re-agregamos:
-	// - áreas y cosecha: SUM directo
-	// - costo por ha: promedio ponderado por seeded_area de cada fila agregada
+	// - áreas: SUM directo
+	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
 	const sel = `
         COALESCE(SUM(seeded_area), 0) AS seeded_area,
         COALESCE(SUM(harvested_area), 0) AS harvested_area,
-        COALESCE(SUM(total_harvest), 0) AS total_harvest,
-        COALESCE(SUM(weighted_cost_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS weighted_cost_per_ha
+        COALESCE(SUM(yield_tn_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS yield_tn_per_ha,
+        COALESCE(SUM(cost_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS cost_per_ha
     `
 
 	var row rowAgg
@@ -354,16 +354,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		return nil, types.NewError(types.ErrInternal, "failed to list lot metrics", err)
 	}
 
-	yield := decimal.Zero
-	if row.HarvestedArea.GreaterThan(decimal.Zero) {
-		yield = row.TotalHarvest.Div(row.HarvestedArea)
-	}
-
 	return &domain.LotMetrics{
 		SeededArea:     row.SeededArea,
 		HarvestedArea:  row.HarvestedArea,
-		YieldTnPerHa:   yield,
-		CostPerHectare: row.WeightedCostPerHa,
+		YieldTnPerHa:   row.YieldTnPerHa,
+		CostPerHectare: row.CostPerHa,
 	}, nil
 }
 
@@ -380,9 +375,8 @@ func (r *Repository) ListLots(
 		base = base.Where("field_id = ?", fieldID)
 	} else if projectID > 0 {
 		base = base.Where("project_id = ?", projectID)
-	} else {
-		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInvalidID, "field_id or project_id is required", nil)
 	}
+	// Si no se proporcionan filtros, se retornan todos los lotes
 
 	if cropID > 0 {
 		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
