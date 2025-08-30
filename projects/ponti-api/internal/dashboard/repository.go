@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
 )
@@ -22,31 +23,7 @@ func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-// DashboardRow representa una fila de la vista dashboard_view
-type DashboardRow struct {
-	CustomerID               *int64           `gorm:"column:customer_id"`
-	ProjectID                *int64           `gorm:"column:project_id"`
-	CampaignID               *int64           `gorm:"column:campaign_id"`
-	FieldID                  *int64           `gorm:"column:field_id"`
-	SowingHectares           decimal.Decimal  `gorm:"column:sowing_hectares"`
-	SowingTotalHectares      decimal.Decimal  `gorm:"column:sowing_total_hectares"`
-	HarvestHectares          decimal.Decimal  `gorm:"column:harvest_hectares"`
-	HarvestTotalHectares     decimal.Decimal  `gorm:"column:harvest_total_hectares"`
-	BudgetCostUSD            decimal.Decimal  `gorm:"column:budget_cost_usd"`
-	ExecutedCostsUSD         decimal.Decimal  `gorm:"column:executed_costs_usd"`
-	ExecutedLaborsUSD        decimal.Decimal  `gorm:"column:executed_labors_usd"`
-	ExecutedSuppliesUSD      decimal.Decimal  `gorm:"column:executed_supplies_usd"`
-	IncomeUSD                decimal.Decimal  `gorm:"column:income_usd"`
-	DirectLaborsUSD          decimal.Decimal  `gorm:"column:direct_labors_usd"`
-	OperatingResultUSD       decimal.Decimal  `gorm:"column:operating_result_usd"`
-	OperatingResultPct       decimal.Decimal  `gorm:"column:operating_result_pct"`
-	ContributionsProgressPct decimal.Decimal  `gorm:"column:contributions_progress_pct"`
-	InvestorID               *int64           `gorm:"column:investor_id"`
-	InvestorName             *string          `gorm:"column:investor_name"`
-	InvestorPercentage       *decimal.Decimal `gorm:"column:investor_percentage"`
-	InvestorContributionPct  *decimal.Decimal `gorm:"column:investor_contribution_pct"`
-	RowKind                  string           `gorm:"column:row_kind"`
-}
+// DashboardRow is now imported from models package
 
 // GetDashboard obtiene el dashboard usando la vista dashboard_view
 func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.Dashboard, error) {
@@ -74,8 +51,8 @@ func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilt
 }
 
 // getMetricRows obtiene las filas de métricas de la vista
-func (r *Repository) getMetricRows(ctx context.Context, filt domain.DashboardFilter) ([]DashboardRow, error) {
-	var rows []DashboardRow
+func (r *Repository) getMetricRows(ctx context.Context, filt domain.DashboardFilter) ([]models.DashboardRow, error) {
+	var rows []models.DashboardRow
 
 	query := r.db.Client().WithContext(ctx).Table("dashboard_view")
 
@@ -104,8 +81,8 @@ func (r *Repository) getMetricRows(ctx context.Context, filt domain.DashboardFil
 }
 
 // getInvestorRows obtiene las filas de inversores para el breakdown
-func (r *Repository) getInvestorRows(ctx context.Context, filt domain.DashboardFilter) ([]DashboardRow, error) {
-	var rows []DashboardRow
+func (r *Repository) getInvestorRows(ctx context.Context, filt domain.DashboardFilter) ([]models.DashboardRow, error) {
+	var rows []models.DashboardRow
 
 	query := r.db.Client().WithContext(ctx).Table("dashboard_view")
 
@@ -128,36 +105,6 @@ func (r *Repository) getInvestorRows(ctx context.Context, filt domain.DashboardF
 
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to query dashboard_view investors", err)
-	}
-
-	return rows, nil
-}
-
-// getCropData obtiene datos de cultivos desde la vista
-func (r *Repository) getCropData(ctx context.Context, filt domain.DashboardFilter) ([]DashboardRow, error) {
-	var rows []DashboardRow
-
-	query := r.db.Client().WithContext(ctx).Table("dashboard_view")
-
-	// Aplicar filtros
-	if len(filt.CustomerIDs) > 0 {
-		query = query.Where("customer_id = ?", filt.CustomerIDs[0])
-	}
-	if len(filt.ProjectIDs) > 0 {
-		query = query.Where("project_id = ?", filt.ProjectIDs[0])
-	}
-	if len(filt.CampaignIDs) > 0 {
-		query = query.Where("campaign_id = ?", filt.CampaignIDs[0])
-	}
-	if len(filt.FieldIDs) > 0 {
-		query = query.Where("field_id = ?", filt.FieldIDs[0])
-	}
-
-	// Solo obtener filas de métricas para cultivos
-	query = query.Where("row_kind = 'metric'")
-
-	if err := query.Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to query dashboard_view crops", err)
 	}
 
 	return rows, nil
@@ -225,7 +172,7 @@ func (r *Repository) createEmptyDashboard() *domain.Dashboard {
 }
 
 // buildDashboard construye el dashboard desde las filas de la vista
-func (r *Repository) buildDashboard(metricRows []DashboardRow, investorRows []DashboardRow, cropRows []DashboardRow) *domain.Dashboard {
+func (r *Repository) buildDashboard(metricRows []models.DashboardRow, investorRows []models.DashboardRow, cropRows []models.DashboardRow) *domain.Dashboard {
 	dashboard := r.createEmptyDashboard()
 
 	// Construir métricas principales desde las filas de métricas
@@ -291,7 +238,7 @@ func (r *Repository) buildDashboard(metricRows []DashboardRow, investorRows []Da
 }
 
 // buildInvestorBreakdown construye el breakdown de inversores
-func (r *Repository) buildInvestorBreakdown(investorRows []DashboardRow) []domain.DashboardInvestorBreakdown {
+func (r *Repository) buildInvestorBreakdown(investorRows []models.DashboardRow) []domain.DashboardInvestorBreakdown {
 	var breakdown []domain.DashboardInvestorBreakdown
 
 	for _, row := range investorRows {
@@ -308,7 +255,7 @@ func (r *Repository) buildInvestorBreakdown(investorRows []DashboardRow) []domai
 }
 
 // buildBalanceBreakdown construye el breakdown del balance de gestión
-func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []domain.DashboardBalanceBreakdown {
+func (r *Repository) buildBalanceBreakdown(metricRows []models.DashboardRow) []domain.DashboardBalanceBreakdown {
 	var breakdown []domain.DashboardBalanceBreakdown
 
 	// Seed
@@ -375,7 +322,7 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []domain.D
 }
 
 // buildCropIncidence construye la incidencia de cultivos
-func (r *Repository) buildCropIncidence(cropRows []DashboardRow) *domain.DashboardCropIncidence {
+func (r *Repository) buildCropIncidence(cropRows []models.DashboardRow) *domain.DashboardCropIncidence {
 	result := &domain.DashboardCropIncidence{}
 
 	// Por ahora, crear datos de ejemplo según el JSON requerido

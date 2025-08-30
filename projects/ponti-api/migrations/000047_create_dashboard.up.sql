@@ -1,32 +1,52 @@
--- =========================================================
--- ÚNICA VISTA: dashboard_view (sin FULL JOIN, Cloud SQL friendly)
---  - Global / Customer / Project / Campaign / Field (GROUPING SETS)
---  - Incluye: siembra, cosecha, costos (budget / ejecutado),
---             ingresos, contribuciones, resultado operativo (USD y %)
---  - Expone labors/supplies y breakdown normalizado por inversor
---  - row_kind: 'metric' (métricas) | 'investor' (filas por inversor)
--- =========================================================
+DROP VIEW IF EXISTS dashboard_view;
+
 CREATE OR REPLACE VIEW dashboard_view AS
 WITH
+executed_labors_by_project AS (
+  SELECT lb.project_id, SUM(lb.price) AS labors_usd
+  FROM labors lb
+  WHERE lb.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM workorders w
+      WHERE w.labor_id = lb.id
+        AND w.effective_area > 0
+        AND w.deleted_at IS NULL
+    )
+  GROUP BY lb.project_id
+),
+used_supplies_by_project AS (
+  SELECT sp.project_id, SUM(sp.price) AS supplies_usd
+  FROM supplies sp
+  WHERE sp.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM workorder_items wi
+      WHERE wi.supply_id = sp.id
+        AND wi.final_dose > 0
+        AND wi.deleted_at IS NULL
+    )
+  GROUP BY sp.project_id
+),
+
 -- -----------------------------------------------------------------
--- Costos directos por proyecto (labors + supplies)
+-- Costos directos por proyecto (SOLO ejecutado / utilizado)
+--   B = direct_costs_usd = labors_usd + supplies_usd
 -- -----------------------------------------------------------------
 v_direct_costs_by_project AS (
   SELECT
     p.id AS project_id,
-    COALESCE((SELECT SUM(lb.price) FROM labors lb WHERE lb.project_id = p.id AND lb.deleted_at IS NULL), 0)::numeric(14,2) AS labors_usd,
-    COALESCE((SELECT SUM(sp.price) FROM supplies sp WHERE sp.project_id = p.id AND sp.deleted_at IS NULL), 0)::numeric(14,2) AS supplies_usd,
-    (
-      COALESCE((SELECT SUM(lb.price) FROM labors lb WHERE lb.project_id = p.id AND lb.deleted_at IS NULL), 0)
-      +
-      COALESCE((SELECT SUM(sp.price) FROM supplies sp WHERE sp.project_id = p.id AND sp.deleted_at IS NULL), 0)
-    )::numeric(14,2) AS direct_costs_usd
+    COALESCE(el.labors_usd,   0)::numeric(14,2) AS labors_usd,
+    COALESCE(us.supplies_usd, 0)::numeric(14,2) AS supplies_usd,
+    (COALESCE(el.labors_usd,0) + COALESCE(us.supplies_usd,0))::numeric(14,2) AS direct_costs_usd
   FROM projects p
+  LEFT JOIN executed_labors_by_project el ON el.project_id = p.id
+  LEFT JOIN used_supplies_by_project  us ON us.project_id = p.id
   WHERE p.deleted_at IS NULL
 ),
 
 -- -----------------------------------------------------------------
--- Ingresos por field (tons * 200)
+-- Ingresos por field (tons * 200)  → A = income_usd
 -- -----------------------------------------------------------------
 v_income_by_field AS (
   SELECT
@@ -61,7 +81,7 @@ levels AS (
 ),
 
 -- -----------------------------------------------------------------
--- Siembra agregada
+-- Siembra agregada  → card "Avance de siembra"
 -- -----------------------------------------------------------------
 sowing AS (
   SELECT
@@ -85,7 +105,7 @@ sowing AS (
 ),
 
 -- -----------------------------------------------------------------
--- Cosecha agregada
+-- Cosecha agregada  → card "Avance de cosecha"
 -- -----------------------------------------------------------------
 harvest AS (
   SELECT
@@ -109,17 +129,19 @@ harvest AS (
 ),
 
 -- -----------------------------------------------------------------
--- Costos agregados (budget + ejecutado desglosado)
+-- Costos agregados (admin + directos ejecutados)
+--   C = budget_cost_usd (= admin_cost en projects)
+--   B = executed_costs_usd (= direct_costs_usd de v_direct_costs_by_project)
 -- -----------------------------------------------------------------
 costs_agg AS (
   SELECT
     CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
     CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
     CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
-    COALESCE(SUM(COALESCE(p.admin_cost,0)),0)::numeric(14,2)                AS budget_cost_usd,
-    COALESCE(SUM(COALESCE(dc.labors_usd,0)),0)::numeric(14,2)               AS executed_labors_usd,
-    COALESCE(SUM(COALESCE(dc.supplies_usd,0)),0)::numeric(14,2)             AS executed_supplies_usd,
-    COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0)::numeric(14,2)         AS executed_costs_usd
+    COALESCE(SUM(COALESCE(p.admin_cost,0)),0)::numeric(14,2)        AS budget_cost_usd,        -- C
+    COALESCE(SUM(COALESCE(dc.labors_usd,0)),0)::numeric(14,2)       AS executed_labors_usd,
+    COALESCE(SUM(COALESCE(dc.supplies_usd,0)),0)::numeric(14,2)     AS executed_supplies_usd,
+    COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0)::numeric(14,2) AS executed_costs_usd      -- B
   FROM projects p
   LEFT JOIN v_direct_costs_by_project dc ON dc.project_id = p.id
   WHERE p.deleted_at IS NULL
@@ -132,44 +154,8 @@ costs_agg AS (
 ),
 
 -- -----------------------------------------------------------------
--- Contribuciones: filas por inversor (nivel proyecto; field_id NULL)
--- -----------------------------------------------------------------
-contrib_rows AS (
-  SELECT
-    p.customer_id,
-    p.id           AS project_id,
-    p.campaign_id,
-    NULL::bigint   AS field_id,
-    pi.investor_id,
-    COALESCE(i.name,'')                     AS investor_name,
-    COALESCE(pi.percentage,0)::numeric(6,2) AS investor_percentage,
-    COALESCE(pi.percentage,0)::numeric(6,2) AS investor_contribution_pct
-  FROM projects p
-  JOIN project_investors pi ON pi.project_id = p.id AND pi.deleted_at IS NULL
-  LEFT JOIN investors i      ON i.id = pi.investor_id AND i.deleted_at IS NULL
-  WHERE p.deleted_at IS NULL
-),
-
--- Métrica de contribuciones por nivel (100 si hay inversores; 0 si no)
-contrib_metric AS (
-  SELECT
-    CASE WHEN GROUPING(customer_id)=1 THEN NULL ELSE customer_id END AS customer_id,
-    CASE WHEN GROUPING(project_id)=1  THEN NULL ELSE project_id  END AS project_id,
-    CASE WHEN GROUPING(campaign_id)=1 THEN NULL ELSE campaign_id END AS campaign_id,
-    CASE WHEN GROUPING(field_id)=1    THEN NULL ELSE field_id    END AS field_id,
-    CASE WHEN COUNT(*) > 0 THEN 100.0::numeric(14,2) ELSE 0::numeric(14,2) END AS contrib_progress_pct
-  FROM contrib_rows
-  GROUP BY GROUPING SETS (
-    (customer_id, project_id, campaign_id, field_id),
-    (customer_id, project_id, campaign_id),
-    (customer_id, project_id),
-    (customer_id),
-    ()
-  )
-),
-
--- -----------------------------------------------------------------
--- Resultado operativo (ingresos vs SOLO labors)
+-- Resultado operativo (RENTABILIDAD) → % rojo = (A-B)/B*100
+--   A = income_usd ; B = total_invested_usd (= direct labors + supplies)
 -- -----------------------------------------------------------------
 operating_result AS (
   WITH income_by_project AS (
@@ -177,22 +163,20 @@ operating_result AS (
     FROM v_income_by_field vf
     JOIN fields f ON f.id = vf.field_id AND f.deleted_at IS NULL
     GROUP BY f.project_id
-  ),
-  labors_by_project AS (
-    SELECT lb.project_id, COALESCE(SUM(lb.price),0)::numeric(14,2) AS labors_usd
-    FROM labors lb
-    WHERE lb.deleted_at IS NULL
-    GROUP BY lb.project_id
   )
   SELECT
     CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
     CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
     CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
-    COALESCE(SUM(COALESCE(ip.income_usd,0)),0)::numeric(14,2)  AS income_usd,
-    COALESCE(SUM(COALESCE(lb.labors_usd,0)),0)::numeric(14,2)  AS direct_labors_usd
+    COALESCE(SUM(COALESCE(ip.income_usd,0)),0)::numeric(14,2)  AS income_usd,          -- A
+    COALESCE(SUM(COALESCE(el.labors_usd,0)),0)::numeric(14,2)  AS direct_labors_usd,
+    COALESCE(SUM(COALESCE(us.supplies_usd,0)),0)::numeric(14,2) AS direct_supplies_usd,
+    (COALESCE(SUM(COALESCE(el.labors_usd,0)),0)
+     + COALESCE(SUM(COALESCE(us.supplies_usd,0)),0))::numeric(14,2) AS total_invested_usd -- B
   FROM projects p
-  LEFT JOIN income_by_project ip ON ip.project_id = p.id
-  LEFT JOIN labors_by_project lb ON lb.project_id = p.id
+  LEFT JOIN income_by_project         ip ON ip.project_id = p.id
+  LEFT JOIN executed_labors_by_project el ON el.project_id = p.id
+  LEFT JOIN used_supplies_by_project   us ON us.project_id = p.id
   WHERE p.deleted_at IS NULL
   GROUP BY GROUPING SETS (
     (p.customer_id, p.id, p.campaign_id),
@@ -203,43 +187,46 @@ operating_result AS (
 )
 
 -- -----------------------------------------------------------------
--- SALIDA ÚNICA (base = levels) con UNION ALL: METRIC + INVESTOR
+-- SALIDA ÚNICA (base = levels)
 -- -----------------------------------------------------------------
--- 1) Filas METRIC
 SELECT
   lvl.customer_id,
   lvl.project_id,
   lvl.campaign_id,
   lvl.field_id,
 
+  -- Siembra
   COALESCE(s.sowed_area,0)::numeric(14,2)     AS sowing_hectares,
   COALESCE(s.total_hectares,0)::numeric(14,2) AS sowing_total_hectares,
 
+  -- Cosecha
   COALESCE(h.harvested_area,0)::numeric(14,2) AS harvest_hectares,
   COALESCE(h.total_hectares,0)::numeric(14,2) AS harvest_total_hectares,
 
-  COALESCE(ca.budget_cost_usd,0)::numeric(14,2)        AS budget_cost_usd,
-  COALESCE(ca.executed_costs_usd,0)::numeric(14,2)     AS executed_costs_usd,
+  -- Costos (B y C)
+  COALESCE(ca.executed_costs_usd,0)::numeric(14,2)     AS executed_costs_usd,     -- B
   COALESCE(ca.executed_labors_usd,0)::numeric(14,2)    AS executed_labors_usd,
   COALESCE(ca.executed_supplies_usd,0)::numeric(14,2)  AS executed_supplies_usd,
+  COALESCE(ca.budget_cost_usd,0)::numeric(14,2)        AS budget_cost_usd,        -- C (admin)
 
-  COALESCE(o.income_usd,0)::numeric(14,2)             AS income_usd,
-  COALESCE(o.direct_labors_usd,0)::numeric(14,2)      AS direct_labors_usd,
-  (COALESCE(o.income_usd,0) - COALESCE(o.direct_labors_usd,0))::numeric(14,2) AS operating_result_usd,
-  CASE WHEN COALESCE(o.direct_labors_usd,0) > 0
-       THEN ROUND(((COALESCE(o.income_usd,0) - COALESCE(o.direct_labors_usd,0))
-                  / NULLIF(o.direct_labors_usd,0) * 100)::numeric, 2)
-       ELSE 0 END AS operating_result_pct,
+  -- Ingresos (A) y Resultado operativo
+  COALESCE(o.income_usd,0)::numeric(14,2)             AS income_usd,              -- A
+  (COALESCE(o.income_usd,0) - COALESCE(o.total_invested_usd,0))::numeric(14,2) AS operating_result_usd,
+  CASE WHEN COALESCE(o.total_invested_usd,0) > 0
+       THEN ROUND(((COALESCE(o.income_usd,0) - COALESCE(o.total_invested_usd,0))
+                  / NULLIF(o.total_invested_usd,0) * 100)::numeric, 2)
+       ELSE 0 END AS operating_result_pct,                                      -- % rojo = (A-B)/B*100
 
-  COALESCE(cm.contrib_progress_pct,0)::numeric(14,2) AS contributions_progress_pct,
+  -- NÚMERO GRIS 2 listo para UI: (B + C)
+  (COALESCE(ca.executed_costs_usd,0) + COALESCE(ca.budget_cost_usd,0))::numeric(14,2)
+     AS operating_result_total_costs_usd,                                       -- gris 2 = B + C
 
-  -- columnas de inversor vacías
-  NULL::bigint        AS investor_id,
-  NULL::text          AS investor_name,
-  NULL::numeric(6,2)  AS investor_percentage,
-  NULL::numeric(6,2)  AS investor_contribution_pct,
+  -- Aportes (placeholder hasta que se implemente la tabla de aportes)
+  0::numeric(14,2) AS contributions_progress_pct,
 
+  -- Identificador de fila
   'metric'::text AS row_kind
+
 FROM levels lvl
 LEFT JOIN sowing s
   ON s.customer_id IS NOT DISTINCT FROM lvl.customer_id
@@ -258,44 +245,4 @@ LEFT JOIN costs_agg ca
 LEFT JOIN operating_result o
   ON o.customer_id IS NOT DISTINCT FROM lvl.customer_id
  AND o.project_id  IS NOT DISTINCT FROM lvl.project_id
- AND o.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
-LEFT JOIN contrib_metric cm
-  ON cm.customer_id IS NOT DISTINCT FROM lvl.customer_id
- AND cm.project_id  IS NOT DISTINCT FROM lvl.project_id
- AND cm.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
- AND cm.field_id    IS NOT DISTINCT FROM lvl.field_id
-
-UNION ALL
-
--- 2) Filas INVESTOR (métricas NULL para no duplicar agregados)
-SELECT
-  cr.customer_id,
-  cr.project_id,
-  cr.campaign_id,
-  cr.field_id,
-
-  NULL::numeric(14,2) AS sowing_hectares,
-  NULL::numeric(14,2) AS sowing_total_hectares,
-
-  NULL::numeric(14,2) AS harvest_hectares,
-  NULL::numeric(14,2) AS harvest_total_hectares,
-
-  NULL::numeric(14,2) AS budget_cost_usd,
-  NULL::numeric(14,2) AS executed_costs_usd,
-  NULL::numeric(14,2) AS executed_labors_usd,
-  NULL::numeric(14,2) AS executed_supplies_usd,
-
-  NULL::numeric(14,2) AS income_usd,
-  NULL::numeric(14,2) AS direct_labors_usd,
-  NULL::numeric(14,2) AS operating_result_usd,
-  NULL::numeric(14,2) AS operating_result_pct,
-
-  100.0::numeric(14,2) AS contributions_progress_pct,
-
-  cr.investor_id,
-  cr.investor_name,
-  cr.investor_percentage,
-  cr.investor_contribution_pct,
-
-  'investor'::text AS row_kind
-FROM contrib_rows cr;
+ AND o.campaign_id IS NOT DISTINCT FROM lvl.campaign_id;

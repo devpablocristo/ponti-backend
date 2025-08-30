@@ -102,48 +102,35 @@ type DashboardOperationalIndicators struct {
 	CampaignCloseDate  *time.Time `gorm:"column:campaign_close_date"`
 }
 
-// ===== MODELO LEGACY (mantener para compatibilidad) =====
+// ===== MODELO PARA LA VISTA dashboard_view =====
 type DashboardRow struct {
-	// Basic metrics
-	TotalHectares      decimal.Decimal     `gorm:"column:total_hectares"`
-	SowedArea          decimal.Decimal     `gorm:"column:sowed_area"`
-	HarvestedArea      decimal.Decimal     `gorm:"column:harvested_area"`
-	SowingProgressPct  decimal.NullDecimal `gorm:"column:sowing_progress_pct"`
-	HarvestProgressPct decimal.NullDecimal `gorm:"column:harvest_progress_pct"`
+	CustomerID               *int64           `gorm:"column:customer_id"`
+	ProjectID                *int64           `gorm:"column:project_id"`
+	CampaignID               *int64           `gorm:"column:campaign_id"`
+	FieldID                  *int64           `gorm:"column:field_id"`
+	SowingHectares           decimal.Decimal  `gorm:"column:sowing_hectares"`
+	SowingTotalHectares      decimal.Decimal  `gorm:"column:sowing_total_hectares"`
+	HarvestHectares          decimal.Decimal  `gorm:"column:harvest_hectares"`
+	HarvestTotalHectares     decimal.Decimal  `gorm:"column:harvest_total_hectares"`
+	BudgetCostUSD            decimal.Decimal  `gorm:"column:budget_cost_usd"`
+	ExecutedCostsUSD         decimal.Decimal  `gorm:"column:executed_costs_usd"`
+	ExecutedLaborsUSD        decimal.Decimal  `gorm:"column:executed_labors_usd"`
+	ExecutedSuppliesUSD      decimal.Decimal  `gorm:"column:executed_supplies_usd"`
+	IncomeUSD                decimal.Decimal  `gorm:"column:income_usd"`
+	DirectLaborsUSD          decimal.Decimal  `gorm:"column:direct_labors_usd"`
+	OperatingResultUSD       decimal.Decimal  `gorm:"column:operating_result_usd"`
+	OperatingResultPct       decimal.Decimal  `gorm:"column:operating_result_pct"`
+	ContributionsProgressPct decimal.Decimal  `gorm:"column:contributions_progress_pct"`
+	InvestorID               *int64           `gorm:"column:investor_id"`
+	InvestorName             *string          `gorm:"column:investor_name"`
+	InvestorPercentage       *decimal.Decimal `gorm:"column:investor_percentage"`
+	InvestorContributionPct  *decimal.Decimal `gorm:"column:investor_contribution_pct"`
+	RowKind                  string           `gorm:"column:row_kind"`
+}
 
-	// Labor costs
-	LaborsExecutedUSD      decimal.Decimal `gorm:"column:labors_executed_usd"`
-	SuppliesExecutedUSD    decimal.Decimal `gorm:"column:supplies_executed_usd"`
-	SeedExecutedUSD        decimal.Decimal `gorm:"column:seed_executed_usd"`
-	DirectCostsExecutedUSD decimal.Decimal `gorm:"column:direct_costs_executed_usd"`
-
-	// Project costs
-	LaborsInvestedUSD      decimal.Decimal `gorm:"column:labors_invested_usd"`
-	SuppliesInvestedUSD    decimal.Decimal `gorm:"column:supplies_invested_usd"`
-	DirectCostsInvestedUSD decimal.Decimal `gorm:"column:direct_costs_invested_usd"`
-
-	// Stock and budget
-	StockUSD         decimal.Decimal     `gorm:"column:stock_usd"`
-	BudgetCostUSD    decimal.Decimal     `gorm:"column:budget_cost_usd"`
-	CostsProgressPct decimal.NullDecimal `gorm:"column:costs_progress_pct"`
-
-	// Income and structure
-	IncomeUSD    decimal.Decimal `gorm:"column:income_usd"`
-	RentUSD      decimal.Decimal `gorm:"column:rent_usd"`
-	StructureUSD decimal.Decimal `gorm:"column:structure_usd"`
-
-	// Operating result
-	OperatingResultUSD decimal.Decimal     `gorm:"column:operating_result_usd"`
-	OperatingResultPct decimal.NullDecimal `gorm:"column:operating_result_pct"`
-
-	// Cost per hectare
-	TotalCostPerHectare decimal.Decimal `gorm:"column:total_cost_per_hectare"`
-
-	// Crops breakdown
-	CropsBreakdown *string `gorm:"column:crops_breakdown"`
-
-	// Additional fields needed for DTO mapping
-	SeedInvestedUSD decimal.Decimal `gorm:"column:seed_invested_usd"`
+// TableName specifies the table name for GORM
+func (DashboardRow) TableName() string {
+	return "dashboard_view"
 }
 
 // ===== MODELO PARA LA FUNCIÓN SQL get_dashboard_payload =====
