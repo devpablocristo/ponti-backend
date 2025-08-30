@@ -12,6 +12,7 @@ type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
 	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
+	GetWorkordersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
 	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
@@ -83,6 +84,15 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
+	//TODO validar si fue usado en una orden de trabajo
+	count, err := u.repo.GetWorkordersBySupplyID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return types.NewError(types.ErrConflict, "supply is being used in a workorder", nil)
+	}
+
 	return u.repo.DeleteSupply(ctx, id)
 }
 

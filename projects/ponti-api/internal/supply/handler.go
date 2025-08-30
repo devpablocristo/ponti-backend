@@ -181,7 +181,8 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteSupply(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supply deleted successfully"})

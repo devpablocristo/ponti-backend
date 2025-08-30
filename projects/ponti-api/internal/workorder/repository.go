@@ -66,6 +66,20 @@ func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Wo
 	return m.ToDomain(), nil
 }
 
+func (r *Repository) GetWorkorderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.Workorder, error) {
+	var m models.Workorder
+	if err := r.db.Client().WithContext(ctx).
+		Where("number = ?", number).
+		Where("project_id = ?", projectID).
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
+	}
+	return m.ToDomain(), nil
+}
+
 func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
 	// 1) Convertimos dominio → GORM y fijamos el ID
 	model := models.FromDomain(o)
@@ -142,15 +156,6 @@ func (r *Repository) DeleteWorkorderByID(ctx context.Context, id int64) error {
 
 	return nil
 }
-
-// func (r *Repository) DuplicateWorkorder(ctx context.Context, number string) (string, error) {
-// 	orig, err := r.GetWorkorderByNumber(ctx, number)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return r.CreateWorkorder(ctx, orig)
-// }
 
 func (r *Repository) ListWorkorders(
 	ctx context.Context,

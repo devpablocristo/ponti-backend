@@ -10,7 +10,7 @@ import (
 type RepositoryPort interface {
 	CreateWorkorder(context.Context, *domain.Workorder) (int64, error)
 	GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error)
-	//DuplicateWorkorder(context.Context, string) (string, error)
+	GetWorkorderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.Workorder, error)
 	UpdateWorkorderByID(context.Context, *domain.Workorder) error
 	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
@@ -26,6 +26,14 @@ func NewUseCases(r RepositoryPort) *UseCases {
 }
 
 func (u *UseCases) CreateWorkorder(ctx context.Context, o *domain.Workorder) (int64, error) {
+	workorder, err := u.repo.GetWorkorderByNumberAndProjectID(ctx, o.Number, o.ProjectID)
+	if err != nil {
+		return 0, err
+	}
+	if workorder != nil {
+		return 0, types.NewError(types.ErrConflict, "workorder already exists", nil)
+	}
+
 	return u.repo.CreateWorkorder(ctx, o)
 }
 

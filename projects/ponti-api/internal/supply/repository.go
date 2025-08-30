@@ -9,6 +9,7 @@ import (
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
+	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"gorm.io/gorm"
 )
 
@@ -100,6 +101,21 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 // --- DELETE ---
+func (r *Repository) GetWorkordersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
+	var count int64
+	if err := r.db.Client().WithContext(ctx).
+		Model(&workordermodels.Workorder{}).
+		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
+		Where("workorder_items.supply_id = ?", supplyID).
+		Count(&count).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, types.NewError(types.ErrInternal, "failed to get workorder", err)
+	}
+	return count, nil
+}
+
 func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
