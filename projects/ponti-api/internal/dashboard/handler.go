@@ -13,7 +13,7 @@ import (
 )
 
 type UseCasesPort interface {
-	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardPayload, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.Dashboard, error)
 }
 
 type GinEnginePort interface {
@@ -58,7 +58,8 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) GetDashboard(c *gin.Context) {
-	var f domain.DashboardFilter
+	// Crear DTO de filtro desde los query parameters
+	filterDTO := dto.DashboardFilterRequest{}
 
 	// Parse customer_id parameter (solo 1 ID)
 	if v := c.Query("customer_id"); v != "" {
@@ -67,7 +68,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id format"})
 			return
 		}
-		f.CustomerIDs = []int64{id}
+		filterDTO.CustomerIDs = []int64{id}
 	}
 
 	// Parse project_id parameter (solo 1 ID)
@@ -77,7 +78,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id format"})
 			return
 		}
-		f.ProjectIDs = []int64{id}
+		filterDTO.ProjectIDs = []int64{id}
 	}
 
 	// Parse campaign_id parameter (solo 1 ID)
@@ -87,7 +88,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id format"})
 			return
 		}
-		f.CampaignIDs = []int64{id}
+		filterDTO.CampaignIDs = []int64{id}
 	}
 
 	// Parse field_id parameter (solo 1 ID)
@@ -97,8 +98,11 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id format"})
 			return
 		}
-		f.FieldIDs = []int64{id}
+		filterDTO.FieldIDs = []int64{id}
 	}
+
+	// Usar el mapper para convertir DTO a entidad de dominio
+	f := dto.ToDashboardFilter(filterDTO)
 
 	// Obtener el dashboard desde la vista SQL
 	dashboard, err := h.ucs.GetDashboard(c.Request.Context(), f)
@@ -109,7 +113,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	}
 
 	// Convertir directamente desde el dominio a DTO (ya incluye redondeo a 3 decimales)
-	response := dto.FromDashboardPayload(dashboard)
+	response := dto.FromDashboard(dashboard)
 
 	c.JSON(http.StatusOK, response)
 }

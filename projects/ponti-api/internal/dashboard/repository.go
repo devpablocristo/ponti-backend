@@ -48,9 +48,9 @@ type DashboardRow struct {
 	RowKind                  string           `gorm:"column:row_kind"`
 }
 
-// Devuelve el struct tipado con decimal.Decimal
-func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.DashboardPayload, error) {
-	// Obtener filas de métricas
+// GetDashboard obtiene el dashboard usando la vista dashboard_view
+func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.Dashboard, error) {
+	// Obtener filas de métricas de la vista dashboard_view
 	metricRows, err := r.getMetricRows(ctx, filt)
 	if err != nil {
 		return nil, err
@@ -62,21 +62,15 @@ func (r *Repository) GetDashboard(ctx context.Context, filt domain.DashboardFilt
 		return nil, err
 	}
 
-	// Obtener datos de cultivos
-	cropData, err := r.getCropData(ctx, filt)
-	if err != nil {
-		return nil, err
-	}
-
 	// Si no hay resultados, retornar estructura vacía
 	if len(metricRows) == 0 {
-		return r.createEmptyDashboardPayload(), nil
+		return r.createEmptyDashboard(), nil
 	}
 
-	// Construir el payload del dashboard
-	payload := r.buildDashboardPayload(metricRows, investorRows, cropData)
+	// Construir el dashboard usando la lógica existente
+	dashboard := r.buildDashboard(metricRows, investorRows, nil)
 
-	return payload, nil
+	return dashboard, nil
 }
 
 // getMetricRows obtiene las filas de métricas de la vista
@@ -169,112 +163,37 @@ func (r *Repository) getCropData(ctx context.Context, filt domain.DashboardFilte
 	return rows, nil
 }
 
-// createEmptyDashboardPayload crea un payload vacío pero válido
-func (r *Repository) createEmptyDashboardPayload() *domain.DashboardPayload {
-	return &domain.DashboardPayload{
-		Metrics: struct {
-			Sowing struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				Hectares      decimal.Decimal `json:"hectares"`
-				TotalHectares decimal.Decimal `json:"total_hectares"`
-			} `json:"sowing"`
-			Harvest struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				Hectares      decimal.Decimal `json:"hectares"`
-				TotalHectares decimal.Decimal `json:"total_hectares"`
-			} `json:"harvest"`
-			Costs struct {
-				ProgressPct decimal.Decimal `json:"progress_pct"`
-				ExecutedUSD decimal.Decimal `json:"executed_usd"`
-				BudgetUSD   decimal.Decimal `json:"budget_usd"`
-			} `json:"costs"`
-			InvestorContributions struct {
-				ProgressPct decimal.Decimal `json:"progress_pct"`
-				Breakdown   interface{}     `json:"breakdown"`
-			} `json:"investor_contributions"`
-			OperatingResult struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				IncomeUSD     decimal.Decimal `json:"income_usd"`
-				TotalCostsUSD decimal.Decimal `json:"total_costs_usd"`
-			} `json:"operating_result"`
-		}{
-			Sowing: struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				Hectares      decimal.Decimal `json:"hectares"`
-				TotalHectares decimal.Decimal `json:"total_hectares"`
-			}{
+// createEmptyDashboard crea un dashboard vacío pero válido
+func (r *Repository) createEmptyDashboard() *domain.Dashboard {
+	return &domain.Dashboard{
+		Metrics: &domain.DashboardMetrics{
+			Sowing: &domain.DashboardSowing{
 				ProgressPct:   decimal.Zero,
 				Hectares:      decimal.Zero,
 				TotalHectares: decimal.Zero,
 			},
-			Harvest: struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				Hectares      decimal.Decimal `json:"hectares"`
-				TotalHectares decimal.Decimal `json:"total_hectares"`
-			}{
+			Harvest: &domain.DashboardHarvest{
 				ProgressPct:   decimal.Zero,
 				Hectares:      decimal.Zero,
 				TotalHectares: decimal.Zero,
 			},
-			Costs: struct {
-				ProgressPct decimal.Decimal `json:"progress_pct"`
-				ExecutedUSD decimal.Decimal `json:"executed_usd"`
-				BudgetUSD   decimal.Decimal `json:"budget_usd"`
-			}{
+			Costs: &domain.DashboardCosts{
 				ProgressPct: decimal.Zero,
 				ExecutedUSD: decimal.Zero,
 				BudgetUSD:   decimal.Zero,
 			},
-			InvestorContributions: struct {
-				ProgressPct decimal.Decimal `json:"progress_pct"`
-				Breakdown   interface{}     `json:"breakdown"`
-			}{
+			InvestorContributions: &domain.DashboardInvestorContributions{
 				ProgressPct: decimal.Zero,
-				Breakdown:   []interface{}{},
+				Breakdown:   []domain.DashboardInvestorBreakdown{},
 			},
-			OperatingResult: struct {
-				ProgressPct   decimal.Decimal `json:"progress_pct"`
-				IncomeUSD     decimal.Decimal `json:"income_usd"`
-				TotalCostsUSD decimal.Decimal `json:"total_costs_usd"`
-			}{
+			OperatingResult: &domain.DashboardOperatingResult{
 				ProgressPct:   decimal.Zero,
 				IncomeUSD:     decimal.Zero,
 				TotalCostsUSD: decimal.Zero,
 			},
 		},
-		ManagementBalance: struct {
-			Summary struct {
-				IncomeUSD              decimal.Decimal `json:"income_usd"`
-				DirectCostsExecutedUSD decimal.Decimal `json:"direct_costs_executed_usd"`
-				DirectCostsInvestedUSD decimal.Decimal `json:"direct_costs_invested_usd"`
-				StockUSD               decimal.Decimal `json:"stock_usd"`
-				RentUSD                decimal.Decimal `json:"rent_usd"`
-				StructureUSD           decimal.Decimal `json:"structure_usd"`
-				OperatingResultUSD     decimal.Decimal `json:"operating_result_usd"`
-				OperatingResultPct     decimal.Decimal `json:"operating_result_pct"`
-			} `json:"summary"`
-			Breakdown []struct {
-				Label       string           `json:"label"`
-				ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-				InvestedUSD decimal.Decimal  `json:"invested_usd"`
-				StockUSD    *decimal.Decimal `json:"stock_usd"`
-			} `json:"breakdown"`
-			TotalsRow struct {
-				ExecutedUSD decimal.Decimal `json:"executed_usd"`
-				InvestedUSD decimal.Decimal `json:"invested_usd"`
-				StockUSD    decimal.Decimal `json:"stock_usd"`
-			} `json:"totals_row"`
-		}{
-			Summary: struct {
-				IncomeUSD              decimal.Decimal `json:"income_usd"`
-				DirectCostsExecutedUSD decimal.Decimal `json:"direct_costs_executed_usd"`
-				DirectCostsInvestedUSD decimal.Decimal `json:"direct_costs_invested_usd"`
-				StockUSD               decimal.Decimal `json:"stock_usd"`
-				RentUSD                decimal.Decimal `json:"rent_usd"`
-				StructureUSD           decimal.Decimal `json:"structure_usd"`
-				OperatingResultUSD     decimal.Decimal `json:"operating_result_usd"`
-				OperatingResultPct     decimal.Decimal `json:"operating_result_pct"`
-			}{
+		ManagementBalance: &domain.DashboardManagementBalance{
+			Summary: &domain.DashboardBalanceSummary{
 				IncomeUSD:              decimal.Zero,
 				DirectCostsExecutedUSD: decimal.Zero,
 				DirectCostsInvestedUSD: decimal.Zero,
@@ -284,155 +203,103 @@ func (r *Repository) createEmptyDashboardPayload() *domain.DashboardPayload {
 				OperatingResultUSD:     decimal.Zero,
 				OperatingResultPct:     decimal.Zero,
 			},
-			Breakdown: []struct {
-				Label       string           `json:"label"`
-				ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-				InvestedUSD decimal.Decimal  `json:"invested_usd"`
-				StockUSD    *decimal.Decimal `json:"stock_usd"`
-			}{},
-			TotalsRow: struct {
-				ExecutedUSD decimal.Decimal `json:"executed_usd"`
-				InvestedUSD decimal.Decimal `json:"invested_usd"`
-				StockUSD    decimal.Decimal `json:"stock_usd"`
-			}{
+			Breakdown: []domain.DashboardBalanceBreakdown{},
+			TotalsRow: &domain.DashboardBalanceTotals{
 				ExecutedUSD: decimal.Zero,
 				InvestedUSD: decimal.Zero,
 				StockUSD:    decimal.Zero,
 			},
 		},
-		CropIncidence: struct {
-			Crops []struct {
-				Name         string          `json:"name"`
-				Hectares     decimal.Decimal `json:"hectares"`
-				RotationPct  decimal.Decimal `json:"rotation_pct"`
-				CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
-				IncidencePct decimal.Decimal `json:"incidence_pct"`
-			} `json:"crops"`
-			Total struct {
-				Hectares          decimal.Decimal `json:"hectares"`
-				RotationPct       decimal.Decimal `json:"rotation_pct"`
-				CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
-			} `json:"total"`
-		}{
-			Crops: []struct {
-				Name         string          `json:"name"`
-				Hectares     decimal.Decimal `json:"hectares"`
-				RotationPct  decimal.Decimal `json:"rotation_pct"`
-				CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
-				IncidencePct decimal.Decimal `json:"incidence_pct"`
-			}{},
-			Total: struct {
-				Hectares          decimal.Decimal `json:"hectares"`
-				RotationPct       decimal.Decimal `json:"rotation_pct"`
-				CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
-			}{
+		CropIncidence: &domain.DashboardCropIncidence{
+			Crops: []domain.DashboardCrop{},
+			Total: &domain.DashboardCropTotal{
 				Hectares:          decimal.Zero,
 				RotationPct:       decimal.Zero,
 				CostUSDPerHectare: decimal.Zero,
 			},
 		},
-		OperationalIndicators: struct {
-			Cards []struct {
-				Key           string      `json:"key"`
-				Title         string      `json:"title"`
-				Date          *string     `json:"date"`
-				WorkorderID   interface{} `json:"workorder_id"`
-				WorkorderCode interface{} `json:"workorder_code"`
-				AuditID       interface{} `json:"audit_id"`
-				AuditCode     interface{} `json:"audit_code"`
-				Status        interface{} `json:"status"`
-			} `json:"cards"`
-		}{
-			Cards: []struct {
-				Key           string      `json:"key"`
-				Title         string      `json:"title"`
-				Date          *string     `json:"date"`
-				WorkorderID   interface{} `json:"workorder_id"`
-				WorkorderCode interface{} `json:"workorder_code"`
-				AuditID       interface{} `json:"audit_id"`
-				AuditCode     interface{} `json:"audit_code"`
-				Status        interface{} `json:"status"`
-			}{},
+		OperationalIndicators: &domain.DashboardOperationalIndicators{
+			Cards: []domain.DashboardOperationalCard{},
 		},
 	}
 }
 
-// buildDashboardPayload construye el payload del dashboard desde las filas de la vista
-func (r *Repository) buildDashboardPayload(metricRows []DashboardRow, investorRows []DashboardRow, cropRows []DashboardRow) *domain.DashboardPayload {
-	payload := r.createEmptyDashboardPayload()
+// buildDashboard construye el dashboard desde las filas de la vista
+func (r *Repository) buildDashboard(metricRows []DashboardRow, investorRows []DashboardRow, cropRows []DashboardRow) *domain.Dashboard {
+	dashboard := r.createEmptyDashboard()
 
 	// Construir métricas principales desde las filas de métricas
 	for _, row := range metricRows {
 		// Métricas de siembra
-		payload.Metrics.Sowing.Hectares = payload.Metrics.Sowing.Hectares.Add(row.SowingHectares)
-		payload.Metrics.Sowing.TotalHectares = payload.Metrics.Sowing.TotalHectares.Add(row.SowingTotalHectares)
+		dashboard.Metrics.Sowing.Hectares = dashboard.Metrics.Sowing.Hectares.Add(row.SowingHectares)
+		dashboard.Metrics.Sowing.TotalHectares = dashboard.Metrics.Sowing.TotalHectares.Add(row.SowingTotalHectares)
 
 		// Métricas de cosecha
-		payload.Metrics.Harvest.Hectares = payload.Metrics.Harvest.Hectares.Add(row.HarvestHectares)
-		payload.Metrics.Harvest.TotalHectares = payload.Metrics.Harvest.TotalHectares.Add(row.HarvestTotalHectares)
+		dashboard.Metrics.Harvest.Hectares = dashboard.Metrics.Harvest.Hectares.Add(row.HarvestHectares)
+		dashboard.Metrics.Harvest.TotalHectares = dashboard.Metrics.Harvest.TotalHectares.Add(row.HarvestTotalHectares)
 
 		// Métricas de costos
-		payload.Metrics.Costs.ExecutedUSD = payload.Metrics.Costs.ExecutedUSD.Add(row.ExecutedCostsUSD)
-		payload.Metrics.Costs.BudgetUSD = payload.Metrics.Costs.BudgetUSD.Add(row.BudgetCostUSD)
+		dashboard.Metrics.Costs.ExecutedUSD = dashboard.Metrics.Costs.ExecutedUSD.Add(row.ExecutedCostsUSD)
+		dashboard.Metrics.Costs.BudgetUSD = dashboard.Metrics.Costs.BudgetUSD.Add(row.BudgetCostUSD)
 
 		// Métricas de contribuciones
-		payload.Metrics.InvestorContributions.ProgressPct = row.ContributionsProgressPct
+		dashboard.Metrics.InvestorContributions.ProgressPct = row.ContributionsProgressPct
 
 		// Métricas de resultado operativo
-		payload.Metrics.OperatingResult.IncomeUSD = payload.Metrics.OperatingResult.IncomeUSD.Add(row.IncomeUSD)
-		payload.Metrics.OperatingResult.TotalCostsUSD = payload.Metrics.OperatingResult.TotalCostsUSD.Add(row.DirectLaborsUSD)
+		dashboard.Metrics.OperatingResult.IncomeUSD = dashboard.Metrics.OperatingResult.IncomeUSD.Add(row.IncomeUSD)
+		dashboard.Metrics.OperatingResult.TotalCostsUSD = dashboard.Metrics.OperatingResult.TotalCostsUSD.Add(row.DirectLaborsUSD)
 
 		// Balance de gestión
-		payload.ManagementBalance.Summary.IncomeUSD = payload.ManagementBalance.Summary.IncomeUSD.Add(row.IncomeUSD)
-		payload.ManagementBalance.Summary.DirectCostsExecutedUSD = payload.ManagementBalance.Summary.DirectCostsExecutedUSD.Add(row.ExecutedCostsUSD)
-		payload.ManagementBalance.Summary.OperatingResultUSD = payload.ManagementBalance.Summary.OperatingResultUSD.Add(row.OperatingResultUSD)
-		payload.ManagementBalance.Summary.OperatingResultPct = row.OperatingResultPct
+		dashboard.ManagementBalance.Summary.IncomeUSD = dashboard.ManagementBalance.Summary.IncomeUSD.Add(row.IncomeUSD)
+		dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD = dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD.Add(row.ExecutedCostsUSD)
+		dashboard.ManagementBalance.Summary.OperatingResultUSD = dashboard.ManagementBalance.Summary.OperatingResultUSD.Add(row.OperatingResultUSD)
+		dashboard.ManagementBalance.Summary.OperatingResultPct = row.OperatingResultPct
 	}
 
 	// Construir breakdown de inversores
-	payload.Metrics.InvestorContributions.Breakdown = r.buildInvestorBreakdown(investorRows)
+	dashboard.Metrics.InvestorContributions.Breakdown = r.buildInvestorBreakdown(investorRows)
 
 	// Construir breakdown del balance de gestión
-	payload.ManagementBalance.Breakdown = r.buildBalanceBreakdown(metricRows)
+	dashboard.ManagementBalance.Breakdown = r.buildBalanceBreakdown(metricRows)
 
 	// Construir incidencia de cultivos
-	payload.CropIncidence = r.buildCropIncidence(cropRows)
+	dashboard.CropIncidence = r.buildCropIncidence(cropRows)
 
 	// Construir indicadores operativos
-	payload.OperationalIndicators = r.buildOperationalIndicators()
+	dashboard.OperationalIndicators = r.buildOperationalIndicators()
 
 	// Calcular porcentajes de progreso
-	if payload.Metrics.Sowing.TotalHectares.GreaterThan(decimal.Zero) {
-		payload.Metrics.Sowing.ProgressPct = payload.Metrics.Sowing.Hectares.Div(payload.Metrics.Sowing.TotalHectares).Mul(decimal.NewFromInt(100))
+	if dashboard.Metrics.Sowing.TotalHectares.GreaterThan(decimal.Zero) {
+		dashboard.Metrics.Sowing.ProgressPct = dashboard.Metrics.Sowing.Hectares.Div(dashboard.Metrics.Sowing.TotalHectares).Mul(decimal.NewFromInt(100))
 	}
-	if payload.Metrics.Harvest.TotalHectares.GreaterThan(decimal.Zero) {
-		payload.Metrics.Harvest.ProgressPct = payload.Metrics.Harvest.Hectares.Div(payload.Metrics.Harvest.TotalHectares).Mul(decimal.NewFromInt(100))
+	if dashboard.Metrics.Harvest.TotalHectares.GreaterThan(decimal.Zero) {
+		dashboard.Metrics.Harvest.ProgressPct = dashboard.Metrics.Harvest.Hectares.Div(dashboard.Metrics.Harvest.TotalHectares).Mul(decimal.NewFromInt(100))
 	}
-	if payload.Metrics.Costs.BudgetUSD.GreaterThan(decimal.Zero) {
-		payload.Metrics.Costs.ProgressPct = payload.Metrics.Costs.ExecutedUSD.Div(payload.Metrics.Costs.BudgetUSD).Mul(decimal.NewFromInt(100))
+	if dashboard.Metrics.Costs.BudgetUSD.GreaterThan(decimal.Zero) {
+		dashboard.Metrics.Costs.ProgressPct = dashboard.Metrics.Costs.ExecutedUSD.Div(dashboard.Metrics.Costs.BudgetUSD).Mul(decimal.NewFromInt(100))
 	}
-	if payload.Metrics.OperatingResult.TotalCostsUSD.GreaterThan(decimal.Zero) {
-		payload.Metrics.OperatingResult.ProgressPct = payload.Metrics.OperatingResult.IncomeUSD.Div(payload.Metrics.OperatingResult.TotalCostsUSD).Mul(decimal.NewFromInt(100))
+	if dashboard.Metrics.OperatingResult.TotalCostsUSD.GreaterThan(decimal.Zero) {
+		dashboard.Metrics.OperatingResult.ProgressPct = dashboard.Metrics.OperatingResult.IncomeUSD.Div(dashboard.Metrics.OperatingResult.TotalCostsUSD).Mul(decimal.NewFromInt(100))
 	}
 
 	// Calcular totales del balance
-	payload.ManagementBalance.TotalsRow.ExecutedUSD = payload.ManagementBalance.Summary.DirectCostsExecutedUSD
-	payload.ManagementBalance.TotalsRow.InvestedUSD = payload.ManagementBalance.Summary.DirectCostsInvestedUSD
-	payload.ManagementBalance.TotalsRow.StockUSD = payload.ManagementBalance.Summary.StockUSD
+	dashboard.ManagementBalance.TotalsRow.ExecutedUSD = dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD
+	dashboard.ManagementBalance.TotalsRow.InvestedUSD = dashboard.ManagementBalance.Summary.DirectCostsInvestedUSD
+	dashboard.ManagementBalance.TotalsRow.StockUSD = dashboard.ManagementBalance.Summary.StockUSD
 
-	return payload
+	return dashboard
 }
 
 // buildInvestorBreakdown construye el breakdown de inversores
-func (r *Repository) buildInvestorBreakdown(investorRows []DashboardRow) interface{} {
-	var breakdown []map[string]interface{}
+func (r *Repository) buildInvestorBreakdown(investorRows []DashboardRow) []domain.DashboardInvestorBreakdown {
+	var breakdown []domain.DashboardInvestorBreakdown
 
 	for _, row := range investorRows {
 		if row.InvestorID != nil && row.InvestorName != nil && row.InvestorPercentage != nil {
-			breakdown = append(breakdown, map[string]interface{}{
-				"investor_id":   *row.InvestorID,
-				"investor_name": *row.InvestorName,
-				"percent_pct":   row.InvestorPercentage.String(),
+			breakdown = append(breakdown, domain.DashboardInvestorBreakdown{
+				InvestorID:   *row.InvestorID,
+				InvestorName: *row.InvestorName,
+				PercentPct:   row.InvestorPercentage.String(),
 			})
 		}
 	}
@@ -441,29 +308,14 @@ func (r *Repository) buildInvestorBreakdown(investorRows []DashboardRow) interfa
 }
 
 // buildBalanceBreakdown construye el breakdown del balance de gestión
-func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
-	Label       string           `json:"label"`
-	ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-	InvestedUSD decimal.Decimal  `json:"invested_usd"`
-	StockUSD    *decimal.Decimal `json:"stock_usd"`
-} {
-	var breakdown []struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}
+func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []domain.DashboardBalanceBreakdown {
+	var breakdown []domain.DashboardBalanceBreakdown
 
 	// Seed
 	seedExecuted := decimal.Zero
 	seedInvested := decimal.Zero
 	// Aquí podrías agregar lógica para obtener datos de seed si están disponibles
-	breakdown = append(breakdown, struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}{
+	breakdown = append(breakdown, domain.DashboardBalanceBreakdown{
 		Label:       "Seed",
 		ExecutedUSD: seedExecuted,
 		InvestedUSD: seedInvested,
@@ -476,12 +328,7 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
 	for _, row := range metricRows {
 		suppliesExecuted = suppliesExecuted.Add(row.ExecutedSuppliesUSD)
 	}
-	breakdown = append(breakdown, struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}{
+	breakdown = append(breakdown, domain.DashboardBalanceBreakdown{
 		Label:       "Supplies",
 		ExecutedUSD: suppliesExecuted,
 		InvestedUSD: suppliesInvested,
@@ -495,12 +342,7 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
 		laborsExecuted = laborsExecuted.Add(row.ExecutedLaborsUSD)
 	}
 	laborsStock := decimal.Zero
-	breakdown = append(breakdown, struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}{
+	breakdown = append(breakdown, domain.DashboardBalanceBreakdown{
 		Label:       "Labors",
 		ExecutedUSD: laborsExecuted,
 		InvestedUSD: laborsInvested,
@@ -511,12 +353,7 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
 	rentExecuted := decimal.Zero
 	rentInvested := decimal.Zero
 	rentStock := decimal.Zero
-	breakdown = append(breakdown, struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}{
+	breakdown = append(breakdown, domain.DashboardBalanceBreakdown{
 		Label:       "Rent",
 		ExecutedUSD: rentExecuted,
 		InvestedUSD: rentInvested,
@@ -527,12 +364,7 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
 	structureExecuted := decimal.Zero
 	structureInvested := decimal.Zero
 	structureStock := decimal.Zero
-	breakdown = append(breakdown, struct {
-		Label       string           `json:"label"`
-		ExecutedUSD decimal.Decimal  `json:"executed_usd"`
-		InvestedUSD decimal.Decimal  `json:"invested_usd"`
-		StockUSD    *decimal.Decimal `json:"stock_usd"`
-	}{
+	breakdown = append(breakdown, domain.DashboardBalanceBreakdown{
 		Label:       "Structure",
 		ExecutedUSD: structureExecuted,
 		InvestedUSD: structureInvested,
@@ -543,44 +375,12 @@ func (r *Repository) buildBalanceBreakdown(metricRows []DashboardRow) []struct {
 }
 
 // buildCropIncidence construye la incidencia de cultivos
-func (r *Repository) buildCropIncidence(cropRows []DashboardRow) struct {
-	Crops []struct {
-		Name         string          `json:"name"`
-		Hectares     decimal.Decimal `json:"hectares"`
-		RotationPct  decimal.Decimal `json:"rotation_pct"`
-		CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
-		IncidencePct decimal.Decimal `json:"incidence_pct"`
-	} `json:"crops"`
-	Total struct {
-		Hectares          decimal.Decimal `json:"hectares"`
-		RotationPct       decimal.Decimal `json:"rotation_pct"`
-		CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
-	} `json:"total"`
-} {
-	var result struct {
-		Crops []struct {
-			Name         string          `json:"name"`
-			Hectares     decimal.Decimal `json:"hectares"`
-			RotationPct  decimal.Decimal `json:"rotation_pct"`
-			CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
-			IncidencePct decimal.Decimal `json:"incidence_pct"`
-		} `json:"crops"`
-		Total struct {
-			Hectares          decimal.Decimal `json:"hectares"`
-			RotationPct       decimal.Decimal `json:"rotation_pct"`
-			CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
-		} `json:"total"`
-	}
+func (r *Repository) buildCropIncidence(cropRows []DashboardRow) *domain.DashboardCropIncidence {
+	result := &domain.DashboardCropIncidence{}
 
 	// Por ahora, crear datos de ejemplo según el JSON requerido
 	// En una implementación real, estos datos vendrían de la base de datos
-	result.Crops = []struct {
-		Name         string          `json:"name"`
-		Hectares     decimal.Decimal `json:"hectares"`
-		RotationPct  decimal.Decimal `json:"rotation_pct"`
-		CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
-		IncidencePct decimal.Decimal `json:"incidence_pct"`
-	}{
+	result.Crops = []domain.DashboardCrop{
 		{
 			Name:         "Trigo",
 			Hectares:     decimal.NewFromInt(40),
@@ -610,8 +410,11 @@ func (r *Repository) buildCropIncidence(cropRows []DashboardRow) struct {
 		totalHectares = totalHectares.Add(crop.Hectares)
 	}
 
-	result.Total.Hectares = totalHectares
-	result.Total.RotationPct = decimal.NewFromInt(100)
+	result.Total = &domain.DashboardCropTotal{
+		Hectares:          totalHectares,
+		RotationPct:       decimal.NewFromInt(100),
+		CostUSDPerHectare: decimal.Zero,
+	}
 
 	// Calcular costo promedio por hectárea
 	if totalHectares.GreaterThan(decimal.Zero) {
@@ -626,42 +429,11 @@ func (r *Repository) buildCropIncidence(cropRows []DashboardRow) struct {
 }
 
 // buildOperationalIndicators construye los indicadores operativos
-func (r *Repository) buildOperationalIndicators() struct {
-	Cards []struct {
-		Key           string      `json:"key"`
-		Title         string      `json:"title"`
-		Date          *string     `json:"date"`
-		WorkorderID   interface{} `json:"workorder_id"`
-		WorkorderCode interface{} `json:"workorder_code"`
-		AuditID       interface{} `json:"audit_id"`
-		AuditCode     interface{} `json:"audit_code"`
-		Status        interface{} `json:"status"`
-	} `json:"cards"`
-} {
-	var result struct {
-		Cards []struct {
-			Key           string      `json:"key"`
-			Title         string      `json:"title"`
-			Date          *string     `json:"date"`
-			WorkorderID   interface{} `json:"workorder_id"`
-			WorkorderCode interface{} `json:"workorder_code"`
-			AuditID       interface{} `json:"audit_id"`
-			AuditCode     interface{} `json:"audit_code"`
-			Status        interface{} `json:"status"`
-		} `json:"cards"`
-	}
+func (r *Repository) buildOperationalIndicators() *domain.DashboardOperationalIndicators {
+	result := &domain.DashboardOperationalIndicators{}
 
 	// Crear las 4 tarjetas según el JSON requerido
-	result.Cards = []struct {
-		Key           string      `json:"key"`
-		Title         string      `json:"title"`
-		Date          *string     `json:"date"`
-		WorkorderID   interface{} `json:"workorder_id"`
-		WorkorderCode interface{} `json:"workorder_code"`
-		AuditID       interface{} `json:"audit_id"`
-		AuditCode     interface{} `json:"audit_code"`
-		Status        interface{} `json:"status"`
-	}{
+	result.Cards = []domain.DashboardOperationalCard{
 		{
 			Key:           "first_workorder",
 			Title:         "Primera orden de trabajo",

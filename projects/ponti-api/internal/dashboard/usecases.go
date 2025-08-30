@@ -7,7 +7,7 @@ import (
 )
 
 type RepositoryPort interface {
-	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardPayload, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.Dashboard, error)
 }
 
 type UseCases struct {
@@ -18,6 +18,6 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
 
-func (uc *UseCases) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.DashboardPayload, error) {
+func (uc *UseCases) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.Dashboard, error) {
 	return uc.repo.GetDashboard(ctx, filt)
 }

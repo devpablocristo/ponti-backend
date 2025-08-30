@@ -15,7 +15,7 @@
             "executed_usd": "2325",
             "budget_usd": "0"
         },
-       "investor_contributions": { <----- FALTA IMPLEMENTAR AQUI EN LA RESPUESTA
+       "investor_contributions": {
             "breakdown": [
                 { "investor_id": 101, "investor_name": "Juan Pérez",  "percent_pct": "50" },
                 { "investor_id": 102, "investor_name": "María Gómez", "percent_pct": "30" },

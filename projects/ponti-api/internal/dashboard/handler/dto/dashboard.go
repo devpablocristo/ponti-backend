@@ -8,6 +8,142 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// ===== REQUEST DTOs =====
+
+// DashboardFilterRequest representa el filtro de request para el dashboard
+type DashboardFilterRequest struct {
+	CustomerIDs []int64 `json:"customer_ids" binding:"omitempty"`
+	ProjectIDs  []int64 `json:"project_ids" binding:"omitempty"`
+	CampaignIDs []int64 `json:"campaign_ids" binding:"omitempty"`
+	FieldIDs    []int64 `json:"field_ids" binding:"omitempty"`
+}
+
+// DashboardRequest representa un request de dashboard (para casos de creación/actualización)
+type DashboardRequest struct {
+	Metrics               MetricsRequest               `json:"metrics"`
+	ManagementBalance     ManagementBalanceRequest     `json:"management_balance"`
+	CropIncidence         CropIncidenceRequest         `json:"crop_incidence"`
+	OperationalIndicators OperationalIndicatorsRequest `json:"operational_indicators"`
+}
+
+// MetricsRequest representa las métricas en el request
+type MetricsRequest struct {
+	Sowing                SowingMetricRequest          `json:"sowing"`
+	Harvest               HarvestMetricRequest         `json:"harvest"`
+	Costs                 CostsMetricRequest           `json:"costs"`
+	InvestorContributions InvestorContributionsRequest `json:"investor_contributions"`
+	OperatingResult       OperatingResultMetricRequest `json:"operating_result"`
+}
+
+// SowingMetricRequest representa la métrica de siembra en el request
+type SowingMetricRequest struct {
+	ProgressPct   decimal.Decimal `json:"progress_pct"`
+	Hectares      decimal.Decimal `json:"hectares"`
+	TotalHectares decimal.Decimal `json:"total_hectares"`
+}
+
+// HarvestMetricRequest representa la métrica de cosecha en el request
+type HarvestMetricRequest struct {
+	ProgressPct   decimal.Decimal `json:"progress_pct"`
+	Hectares      decimal.Decimal `json:"hectares"`
+	TotalHectares decimal.Decimal `json:"total_hectares"`
+}
+
+// CostsMetricRequest representa la métrica de costos en el request
+type CostsMetricRequest struct {
+	ProgressPct decimal.Decimal `json:"progress_pct"`
+	ExecutedUSD decimal.Decimal `json:"executed_usd"`
+	BudgetUSD   decimal.Decimal `json:"budget_usd"`
+}
+
+// InvestorContributionsRequest representa la métrica de contribuciones en el request
+type InvestorContributionsRequest struct {
+	ProgressPct decimal.Decimal `json:"progress_pct"`
+	Breakdown   interface{}     `json:"breakdown"`
+}
+
+// OperatingResultMetricRequest representa la métrica de resultado operativo en el request
+type OperatingResultMetricRequest struct {
+	ProgressPct   decimal.Decimal `json:"progress_pct"`
+	IncomeUSD     decimal.Decimal `json:"income_usd"`
+	TotalCostsUSD decimal.Decimal `json:"total_costs_usd"`
+}
+
+// ManagementBalanceRequest representa el balance de gestión en el request
+type ManagementBalanceRequest struct {
+	Summary   BalanceSummaryRequest     `json:"summary"`
+	Breakdown []BalanceBreakdownRequest `json:"breakdown"`
+	TotalsRow BalanceTotalsRequest      `json:"totals_row"`
+}
+
+// BalanceSummaryRequest representa el resumen del balance en el request
+type BalanceSummaryRequest struct {
+	IncomeUSD              decimal.Decimal `json:"income_usd"`
+	DirectCostsExecutedUSD decimal.Decimal `json:"direct_costs_executed_usd"`
+	DirectCostsInvestedUSD decimal.Decimal `json:"direct_costs_invested_usd"`
+	StockUSD               decimal.Decimal `json:"stock_usd"`
+	RentUSD                decimal.Decimal `json:"rent_usd"`
+	StructureUSD           decimal.Decimal `json:"structure_usd"`
+	OperatingResultUSD     decimal.Decimal `json:"operating_result_usd"`
+	OperatingResultPct     decimal.Decimal `json:"operating_result_pct"`
+}
+
+// BalanceBreakdownRequest representa el desglose por categoría en el request
+type BalanceBreakdownRequest struct {
+	Label       string           `json:"label"`
+	ExecutedUSD decimal.Decimal  `json:"executed_usd"`
+	InvestedUSD decimal.Decimal  `json:"invested_usd"`
+	StockUSD    *decimal.Decimal `json:"stock_usd"`
+}
+
+// BalanceTotalsRequest representa la fila de totales en el request
+type BalanceTotalsRequest struct {
+	ExecutedUSD decimal.Decimal `json:"executed_usd"`
+	InvestedUSD decimal.Decimal `json:"invested_usd"`
+	StockUSD    decimal.Decimal `json:"stock_usd"`
+}
+
+// CropIncidenceRequest representa la incidencia de cultivos en el request
+type CropIncidenceRequest struct {
+	Crops []CropRequest    `json:"crops"`
+	Total CropTotalRequest `json:"total"`
+}
+
+// CropRequest representa un cultivo en el request
+type CropRequest struct {
+	Name         string          `json:"name"`
+	Hectares     decimal.Decimal `json:"hectares"`
+	RotationPct  decimal.Decimal `json:"rotation_pct"`
+	CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
+	IncidencePct decimal.Decimal `json:"incidence_pct"`
+}
+
+// CropTotalRequest representa los totales de cultivos en el request
+type CropTotalRequest struct {
+	Hectares          decimal.Decimal `json:"hectares"`
+	RotationPct       decimal.Decimal `json:"rotation_pct"`
+	CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
+}
+
+// OperationalIndicatorsRequest representa los indicadores operativos en el request
+type OperationalIndicatorsRequest struct {
+	Cards []OperationalCardRequest `json:"cards"`
+}
+
+// OperationalCardRequest representa una tarjeta de indicador operativo en el request
+type OperationalCardRequest struct {
+	Key           string      `json:"key"`
+	Title         string      `json:"title"`
+	Date          *string     `json:"date"`
+	WorkorderID   interface{} `json:"workorder_id"`
+	WorkorderCode interface{} `json:"workorder_code"`
+	AuditID       interface{} `json:"audit_id"`
+	AuditCode     interface{} `json:"audit_code"`
+	Status        interface{} `json:"status"`
+}
+
+// ===== RESPONSE DTOs =====
+
 // roundTo3Decimals redondea un decimal a 3 decimales de precisión
 func roundTo3Decimals(d decimal.Decimal) decimal.Decimal {
 	return d.Round(3)
@@ -219,8 +355,8 @@ func createEmptyDashboardResponse() DashboardResponse {
 	}
 }
 
-// FromDashboardPayload convierte el dominio DashboardPayload a DTO
-func FromDashboardPayload(domain *domain.DashboardPayload) DashboardResponse {
+// FromDashboard convierte el dominio Dashboard a DTO
+func FromDashboard(domain *domain.Dashboard) DashboardResponse {
 	// Convertir el dominio a JSON y luego parsearlo
 	jsonData, err := json.Marshal(domain)
 	if err != nil {
@@ -311,4 +447,78 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.CropIncidence.Total.CostUSDPerHectare = roundTo3Decimals(response.CropIncidence.Total.CostUSDPerHectare)
 
 	return response
+}
+
+// ===== MAPPER FUNCTIONS =====
+
+// ToDashboardFilter convierte un DTO de filtro a entidad de dominio
+func ToDashboardFilter(dto DashboardFilterRequest) domain.DashboardFilter {
+	return domain.DashboardFilter{
+		CustomerIDs: dto.CustomerIDs,
+		ProjectIDs:  dto.ProjectIDs,
+		CampaignIDs: dto.CampaignIDs,
+		FieldIDs:    dto.FieldIDs,
+	}
+}
+
+// ToDashboard convierte un DTO de dashboard a entidad de dominio
+// (útil para casos donde se recibe un dashboard desde el exterior)
+func ToDashboard(dto DashboardRequest) *domain.Dashboard {
+	return &domain.Dashboard{
+		Metrics: &domain.DashboardMetrics{
+			Sowing: &domain.DashboardSowing{
+				ProgressPct:   dto.Metrics.Sowing.ProgressPct,
+				Hectares:      dto.Metrics.Sowing.Hectares,
+				TotalHectares: dto.Metrics.Sowing.TotalHectares,
+			},
+			Harvest: &domain.DashboardHarvest{
+				ProgressPct:   dto.Metrics.Harvest.ProgressPct,
+				Hectares:      dto.Metrics.Harvest.Hectares,
+				TotalHectares: dto.Metrics.Harvest.TotalHectares,
+			},
+			Costs: &domain.DashboardCosts{
+				ProgressPct: dto.Metrics.Costs.ProgressPct,
+				ExecutedUSD: dto.Metrics.Costs.ExecutedUSD,
+				BudgetUSD:   dto.Metrics.Costs.BudgetUSD,
+			},
+			InvestorContributions: &domain.DashboardInvestorContributions{
+				ProgressPct: dto.Metrics.InvestorContributions.ProgressPct,
+				Breakdown:   []domain.DashboardInvestorBreakdown{},
+			},
+			OperatingResult: &domain.DashboardOperatingResult{
+				ProgressPct:   dto.Metrics.OperatingResult.ProgressPct,
+				IncomeUSD:     dto.Metrics.OperatingResult.IncomeUSD,
+				TotalCostsUSD: dto.Metrics.OperatingResult.TotalCostsUSD,
+			},
+		},
+		ManagementBalance: &domain.DashboardManagementBalance{
+			Summary: &domain.DashboardBalanceSummary{
+				IncomeUSD:              dto.ManagementBalance.Summary.IncomeUSD,
+				DirectCostsExecutedUSD: dto.ManagementBalance.Summary.DirectCostsExecutedUSD,
+				DirectCostsInvestedUSD: dto.ManagementBalance.Summary.DirectCostsInvestedUSD,
+				StockUSD:               dto.ManagementBalance.Summary.StockUSD,
+				RentUSD:                dto.ManagementBalance.Summary.RentUSD,
+				StructureUSD:           dto.ManagementBalance.Summary.StructureUSD,
+				OperatingResultUSD:     dto.ManagementBalance.Summary.OperatingResultUSD,
+				OperatingResultPct:     dto.ManagementBalance.Summary.OperatingResultPct,
+			},
+			Breakdown: []domain.DashboardBalanceBreakdown{},
+			TotalsRow: &domain.DashboardBalanceTotals{
+				ExecutedUSD: dto.ManagementBalance.TotalsRow.ExecutedUSD,
+				InvestedUSD: dto.ManagementBalance.TotalsRow.InvestedUSD,
+				StockUSD:    dto.ManagementBalance.TotalsRow.StockUSD,
+			},
+		},
+		CropIncidence: &domain.DashboardCropIncidence{
+			Crops: []domain.DashboardCrop{},
+			Total: &domain.DashboardCropTotal{
+				Hectares:          dto.CropIncidence.Total.Hectares,
+				RotationPct:       dto.CropIncidence.Total.RotationPct,
+				CostUSDPerHectare: dto.CropIncidence.Total.CostUSDPerHectare,
+			},
+		},
+		OperationalIndicators: &domain.DashboardOperationalIndicators{
+			Cards: []domain.DashboardOperationalCard{},
+		},
+	}
 }
