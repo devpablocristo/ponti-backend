@@ -46,13 +46,16 @@ v_direct_costs_by_project AS (
 ),
 
 -- -----------------------------------------------------------------
--- Ingresos por field (tons * 200)  → A = income_usd
+-- Ingresos por field (tons * precio por tonelada)  → A = income_usd
+--   El precio por tonelada debe ser configurado en la aplicación
 -- -----------------------------------------------------------------
 v_income_by_field AS (
   SELECT
     f.project_id,
     f.id AS field_id,
-    COALESCE(SUM(l.tons * 200), 0)::numeric(14,2) AS income_usd
+    COALESCE(SUM(l.tons), 0)::numeric(14,2) AS total_tons,
+    -- NUEVO: Ingresos calculados (debe ser configurado en la app)
+    0::numeric(14,2) AS income_usd
   FROM fields f
   LEFT JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
   WHERE f.deleted_at IS NULL
@@ -144,11 +147,11 @@ costs_agg AS (
     COALESCE(SUM(COALESCE(dc.labors_usd,0)),0)::numeric(14,2)       AS executed_labors_usd,
     COALESCE(SUM(COALESCE(dc.supplies_usd,0)),0)::numeric(14,2)     AS executed_supplies_usd,
     COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0)::numeric(14,2) AS executed_costs_usd,     -- B
-    -- NUEVO: Costos presupuestados totales (hardcodeado temporalmente)
-    COALESCE(SUM(10000),0)::numeric(14,2)                            AS budget_total_usd,       -- Presupuesto total por proyecto
+    -- NUEVO: Costos presupuestados totales (hardcodeado)
+    COALESCE(SUM(20000),0)::numeric(14,2)                            AS budget_total_usd,       -- Presupuesto total por proyecto
     -- NUEVO: Porcentaje de avance de costos
-    CASE WHEN COALESCE(SUM(10000),0) > 0
-         THEN ROUND(((COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0) / NULLIF(SUM(10000),0)) * 100)::numeric, 2)
+    CASE WHEN COALESCE(SUM(20000),0) > 0
+         THEN ROUND(((COALESCE(SUM(COALESCE(dc.direct_costs_usd,0)),0) / NULLIF(SUM(20000),0)) * 100)::numeric, 2)
          ELSE 0 END AS costs_progress_pct
   FROM projects p
   LEFT JOIN v_direct_costs_by_project dc ON dc.project_id = p.id
@@ -199,26 +202,28 @@ operating_result AS (
 --   Calcula el porcentaje de participación acordada por inversores
 --   Basado en project_investors.percentage
 --   Retorna información individual de cada inversor
+--   SIEMPRE 100% por proyecto (1 proyecto a la vez)
+--   Los inversores son por PROYECTO, no por campo
 -- -----------------------------------------------------------------
 contributions AS (
   SELECT
     CASE WHEN GROUPING(p.customer_id)=1 THEN NULL ELSE p.customer_id END AS customer_id,
     CASE WHEN GROUPING(p.id)=1          THEN NULL ELSE p.id          END AS project_id,
     CASE WHEN GROUPING(p.campaign_id)=1 THEN NULL ELSE p.campaign_id END AS campaign_id,
-    CASE WHEN GROUPING(pi.investor_id)=1 THEN NULL ELSE pi.investor_id END AS investor_id,
-    CASE WHEN GROUPING(i.name)=1 THEN NULL ELSE i.name END AS investor_name,
-    CASE WHEN GROUPING(pi.percentage)=1 THEN NULL ELSE pi.percentage END AS investor_percentage_pct,
-    COALESCE(SUM(COALESCE(pi.percentage,0)),0)::numeric(6,2) AS contributions_progress_pct
+    pi.investor_id,
+    i.name AS investor_name,
+    pi.percentage AS investor_percentage_pct,
+    -- SIEMPRE 100% por proyecto
+    100.00::numeric(6,2) AS contributions_progress_pct
   FROM projects p
   LEFT JOIN project_investors pi ON pi.project_id = p.id AND pi.deleted_at IS NULL
   LEFT JOIN investors i ON i.id = pi.investor_id AND i.deleted_at IS NULL
   WHERE p.deleted_at IS NULL
   GROUP BY GROUPING SETS (
     (p.customer_id, p.id, p.campaign_id, pi.investor_id, i.name, pi.percentage),
-    (p.customer_id, p.id, p.campaign_id),
-    (p.customer_id, p.id),
-    (p.customer_id),
-    ()
+    (p.customer_id, p.id, pi.investor_id, i.name, pi.percentage),
+    (p.customer_id, pi.investor_id, i.name, pi.percentage),
+    (pi.investor_id, i.name, pi.percentage)
   )
 )
 
