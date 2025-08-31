@@ -32,6 +32,18 @@ migrate-create:
 	@echo "Creating migration $(MIGRATIONS_NAME)..."
 	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
 
+# Recargar la última migración (bajar y subir en un acto, sin borrar volúmenes)
+migrate-reload:
+	@echo "Reloading last migration (down + up without losing data)..."
+	@docker compose run --rm migrate \
+		-path /migrations \
+		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
+		down 1
+	@docker compose run --rm migrate \
+		-path /migrations \
+		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
+		up 1
+	@echo "Migration reloaded successfully!"
 migrate-force:
 	@echo "Forcing migration to -1..."
 	@$(MIGRATE) force -1
