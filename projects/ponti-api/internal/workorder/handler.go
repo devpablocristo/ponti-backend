@@ -182,7 +182,7 @@ func (h *Handler) ListWorkorders(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// ParseFilters extrae project_id, field_id y state
+// ParseFilters extrae project_id, field_id, customer_id y campaign_id
 func parseFilters(c *gin.Context) domain.WorkorderFilter {
 	var f domain.WorkorderFilter
 	if v := c.Query("project_id"); v != "" {
@@ -193,6 +193,16 @@ func parseFilters(c *gin.Context) domain.WorkorderFilter {
 	if v := c.Query("field_id"); v != "" {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
 			f.FieldID = &id
+		}
+	}
+	if v := c.Query("customer_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			f.CustomerID = &id
+		}
+	}
+	if v := c.Query("campaign_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			f.CampaignID = &id
 		}
 	}
 	return f
@@ -215,6 +225,22 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 			return
 		}
 		filt.FieldID = &id
+	}
+	if v := c.Query("customer_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id"})
+			return
+		}
+		filt.CustomerID = &id
+	}
+	if v := c.Query("campaign_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id"})
+			return
+		}
+		filt.CampaignID = &id
 	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {

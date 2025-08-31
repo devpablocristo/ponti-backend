@@ -36,6 +36,8 @@ type WorkorderItem struct {
 
 // Filtro
 type WorkorderFilter struct {
-	ProjectID *int64
-	FieldID   *int64
+	ProjectID  *int64
+	FieldID    *int64
+	CustomerID *int64
+	CampaignID *int64
 }
