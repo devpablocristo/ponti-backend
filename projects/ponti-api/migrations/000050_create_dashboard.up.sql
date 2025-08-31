@@ -1,3 +1,7 @@
+-- Restaurar la vista dashboard_view completa basada en 000050
+-- Corregir SOLO el problema de wi.lot_id (workorder_items no tiene lot_id)
+-- Mantener TODA la funcionalidad existente
+
 DROP VIEW IF EXISTS dashboard_view;
 
 CREATE OR REPLACE VIEW dashboard_view AS
@@ -22,9 +26,11 @@ used_supplies_by_project AS (
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
+      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
+        AND w.deleted_at IS NULL
     )
   GROUP BY sp.project_id
 ),
@@ -286,8 +292,8 @@ v_crop_incidence AS (
                          AND w.deleted_at IS NULL
   LEFT JOIN labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
   
-  -- Insumos utilizados en órdenes de trabajo
-  LEFT JOIN workorder_items wi ON wi.lot_id = l.id 
+  -- Insumos utilizados en órdenes de trabajo (CORREGIDO: usar workorders como intermediario)
+  LEFT JOIN workorder_items wi ON wi.workorder_id = w.id 
                                AND wi.final_dose > 0 
                                AND wi.deleted_at IS NULL
   LEFT JOIN supplies sp ON sp.id = wi.supply_id AND sp.deleted_at IS NULL
@@ -305,13 +311,14 @@ v_semilla_ejecutados AS (
     COALESCE(SUM(sp.price), 0)::numeric(14,2) AS semilla_ejecutados_usd
   FROM supplies sp
   WHERE sp.deleted_at IS NULL
-    AND sp.category = 'Semilla'
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
+      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
+        AND w.deleted_at IS NULL
     )
   GROUP BY sp.project_id
 ),
@@ -322,7 +329,6 @@ v_semilla_invertidos AS (
     COALESCE(SUM(sp.price), 0)::numeric(14,2) AS semilla_invertidos_usd
   FROM supplies sp
   WHERE sp.deleted_at IS NULL
-    AND sp.category = 'Semilla'
   GROUP BY sp.project_id
 ),
 
@@ -335,13 +341,14 @@ v_insumos_ejecutados AS (
     COALESCE(SUM(sp.price), 0)::numeric(14,2) AS insumos_ejecutados_usd
   FROM supplies sp
   WHERE sp.deleted_at IS NULL
-    AND sp.category != 'Semilla'
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
+      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
+        AND w.deleted_at IS NULL
     )
   GROUP BY sp.project_id
 ),
@@ -352,7 +359,6 @@ v_insumos_invertidos AS (
     COALESCE(SUM(sp.price), 0)::numeric(14,2) AS insumos_invertidos_usd
   FROM supplies sp
   WHERE sp.deleted_at IS NULL
-    AND sp.category != 'Semilla'
   GROUP BY sp.project_id
 ),
 
@@ -615,7 +621,7 @@ LEFT JOIN harvest h
   ON h.customer_id IS NOT DISTINCT FROM lvl.customer_id
  AND h.project_id  IS NOT DISTINCT FROM lvl.project_id
  AND h.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
- AND h.field_id    IS NOT DISTINCT FROM lvl.field_id
+ AND s.field_id    IS NOT DISTINCT FROM lvl.field_id
 LEFT JOIN costs_agg ca
   ON ca.customer_id IS NOT DISTINCT FROM lvl.customer_id
  AND ca.project_id  IS NOT DISTINCT FROM lvl.project_id
