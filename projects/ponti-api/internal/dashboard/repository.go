@@ -32,17 +32,20 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 			-- Métricas de siembra
 			COALESCE(SUM(sowing_hectares), 0) as sowing_hectares,
 			COALESCE(SUM(sowing_total_hectares), 0) as sowing_total_hectares,
-			COALESCE(SUM(sowing_progress_percent), 0) as sowing_progress_percent,
+			-- Tomar el porcentaje directamente sin sumar
+			COALESCE(MAX(sowing_progress_percent), 0) as sowing_progress_percent,
 			
 			-- Métricas de cosecha
 			COALESCE(SUM(harvest_hectares), 0) as harvest_hectares,
 			COALESCE(SUM(harvest_total_hectares), 0) as harvest_total_hectares,
-			COALESCE(SUM(harvest_progress_percent), 0) as harvest_progress_percent,
+			-- Tomar el porcentaje directamente sin sumar
+			COALESCE(MAX(harvest_progress_percent), 0) as harvest_progress_percent,
 			
 			-- Métricas de costos
 			COALESCE(SUM(executed_costs_usd), 0) as costs_executed_usd,
 			COALESCE(SUM(budget_total_usd), 0) as costs_budget_usd,
-			COALESCE(SUM(costs_progress_pct), 0) as costs_progress_pct,
+			-- Tomar el porcentaje directamente sin sumar
+			COALESCE(MAX(costs_progress_pct), 0) as costs_progress_pct,
 			COALESCE(SUM(executed_labors_usd), 0) as executed_labors_usd,
 			COALESCE(SUM(executed_supplies_usd), 0) as executed_supplies_usd,
 			COALESCE(SUM(budget_cost_usd), 0) as budget_cost_usd,
@@ -51,7 +54,8 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 			COALESCE(SUM(income_usd), 0) as operating_income_usd,
 			COALESCE(SUM(operating_result_total_costs_usd), 0) as operating_total_costs_usd,
 			COALESCE(SUM(operating_result_usd), 0) as operating_result_usd,
-			COALESCE(SUM(operating_result_pct), 0) as operating_result_pct,
+			-- Tomar el porcentaje directamente sin sumar
+			COALESCE(MAX(operating_result_pct), 0) as operating_result_pct,
 			
 			-- Balance de gestión - Semilla
 			COALESCE(SUM(semilla_ejecutados_usd), 0) as semilla_ejecutados_usd,
@@ -80,6 +84,7 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 			COALESCE(SUM(costos_directos_stock_usd), 0) as costos_directos_stock_usd
 		FROM dashboard_view 
 		WHERE row_kind = 'metric'
+		AND field_id IS NULL
 	`
 
 	// Aplicar filtros si están presentes
@@ -133,7 +138,7 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 
 func (r *Repository) getCropIncidence(ctx context.Context, filter domain.DashboardFilter) ([]models.CropIncidenceModel, error) {
 	query := `
-		SELECT 
+		SELECT DISTINCT
 			crop_name,
 			crop_hectares,
 			incidence_pct,
@@ -141,6 +146,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 		FROM dashboard_view 
 		WHERE row_kind = 'metric'
 		AND crop_name IS NOT NULL
+		AND crop_name != ''
 	`
 
 	args := []interface{}{}
@@ -175,13 +181,15 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 
 func (r *Repository) getInvestorContributions(ctx context.Context, filter domain.DashboardFilter) ([]models.InvestorContributionModel, error) {
 	query := `
-		SELECT 
+		SELECT DISTINCT
 			investor_id,
 			investor_name,
 			investor_percentage_pct
 		FROM dashboard_view 
 		WHERE row_kind = 'metric'
 		AND investor_id IS NOT NULL
+		AND investor_id > 0
+		AND field_id IS NULL
 	`
 
 	args := []interface{}{}
@@ -196,10 +204,6 @@ func (r *Repository) getInvestorContributions(ctx context.Context, filter domain
 	if len(filter.CampaignIDs) > 0 {
 		query += " AND campaign_id = ANY($3)"
 		args = append(args, filter.CampaignIDs)
-	}
-	if len(filter.FieldIDs) > 0 {
-		query += " AND field_id = ANY($4)"
-		args = append(args, filter.FieldIDs)
 	}
 
 	query += " ORDER BY investor_id"
