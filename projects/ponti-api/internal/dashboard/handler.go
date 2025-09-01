@@ -19,6 +19,7 @@ type UseCasesPort interface {
 	GetDashboard(context.Context, int64) (*domain.Dashboard, error)
 	UpdateDashboard(context.Context, *domain.Dashboard) error
 	DeleteDashboard(context.Context, int64) error
+	GetDashboardData(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type GinEnginePort interface {
@@ -58,7 +59,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 // Routes registers all dashboard routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/dashboards"
+	baseURL := h.acf.APIBaseURL() + "/dashboard"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -105,22 +106,54 @@ func (h *Handler) ListDashboards(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetDashboard retrieves a dashboard by its ID.
+// GetDashboard retrieves dashboard data based on query parameters.
 func (h *Handler) GetDashboard(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid dashboard id"})
-		return
+	// Parse query parameters for filters
+	var filter domain.DashboardFilter
+
+	if customerIDs := c.QueryArray("customer_ids"); len(customerIDs) > 0 {
+		for _, idStr := range customerIDs {
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+				filter.CustomerIDs = append(filter.CustomerIDs, id)
+			}
+		}
 	}
 
-	dashboard, err := h.ucs.GetDashboard(c.Request.Context(), id)
+	if projectIDs := c.QueryArray("project_ids"); len(projectIDs) > 0 {
+		for _, idStr := range projectIDs {
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+				filter.ProjectIDs = append(filter.ProjectIDs, id)
+			}
+		}
+	}
+
+	if campaignIDs := c.QueryArray("campaign_ids"); len(campaignIDs) > 0 {
+		for _, idStr := range campaignIDs {
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+				filter.CampaignIDs = append(filter.CampaignIDs, id)
+			}
+		}
+	}
+
+	if fieldIDs := c.QueryArray("field_ids"); len(fieldIDs) > 0 {
+		for _, idStr := range fieldIDs {
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+				filter.FieldIDs = append(filter.FieldIDs, id)
+			}
+		}
+	}
+
+	// Get dashboard data
+	dashboardData, err := h.ucs.GetDashboardData(c.Request.Context(), filter)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, dashboard)
+	// Convert to DTO response
+	response := dto.FromDashboardData(dashboardData)
+	c.JSON(http.StatusOK, response)
 }
 
 // UpdateDashboard updates an existing dashboard.
@@ -156,5 +189,5 @@ func (h *Handler) DeleteDashboard(c *gin.Context) {
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Dashboard deleted successfully"})
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Dashboard updated successfully"})
 }

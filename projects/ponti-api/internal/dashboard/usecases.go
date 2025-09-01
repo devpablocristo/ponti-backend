@@ -12,6 +12,7 @@ type RepositoryPort interface {
 	GetDashboard(context.Context, int64) (*domain.Dashboard, error)
 	UpdateDashboard(context.Context, *domain.Dashboard) error
 	DeleteDashboard(context.Context, int64) error
+	GetDashboardData(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type UseCases struct {
@@ -41,4 +42,8 @@ func (u *UseCases) UpdateDashboard(ctx context.Context, d *domain.Dashboard) err
 
 func (u *UseCases) DeleteDashboard(ctx context.Context, id int64) error {
 	return u.repo.DeleteDashboard(ctx, id)
+}
+
+func (u *UseCases) GetDashboardData(ctx context.Context, filter domain.DashboardFilter) (*domain.DashboardData, error) {
+	return u.repo.GetDashboardData(ctx, filter)
 }

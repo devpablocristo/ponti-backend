@@ -461,64 +461,236 @@ func ToDashboardFilter(dto DashboardFilterRequest) domain.DashboardFilter {
 	}
 }
 
+// FromDashboardData convierte el dominio DashboardData a DTO
+func FromDashboardData(domain *domain.DashboardData) DashboardResponse {
+	if domain == nil {
+		return createEmptyDashboardResponse()
+	}
+
+	response := DashboardResponse{
+		Metrics:               convertMetrics(domain.Metrics),
+		ManagementBalance:     convertManagementBalance(domain.ManagementBalance),
+		CropIncidence:         convertCropIncidence(domain.CropIncidence),
+		OperationalIndicators: convertOperationalIndicators(domain.OperationalIndicators),
+	}
+
+	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	response = RoundAllDecimals(response)
+
+	return response
+}
+
+// convertMetrics convierte las métricas del dominio al DTO
+func convertMetrics(metrics *domain.DashboardMetrics) Metrics {
+	if metrics == nil {
+		return Metrics{}
+	}
+
+	return Metrics{
+		Sowing:                convertSowing(metrics.Sowing),
+		Harvest:               convertHarvest(metrics.Harvest),
+		Costs:                 convertCosts(metrics.Costs),
+		InvestorContributions: convertInvestorContributions(metrics.InvestorContributions),
+		OperatingResult:       convertOperatingResult(metrics.OperatingResult),
+	}
+}
+
+// convertSowing convierte la métrica de siembra
+func convertSowing(sowing *domain.DashboardSowing) SowingMetric {
+	if sowing == nil {
+		return SowingMetric{}
+	}
+
+	return SowingMetric{
+		ProgressPct:   sowing.ProgressPct,
+		Hectares:      sowing.Hectares,
+		TotalHectares: sowing.TotalHectares,
+	}
+}
+
+// convertHarvest convierte la métrica de cosecha
+func convertHarvest(harvest *domain.DashboardHarvest) HarvestMetric {
+	if harvest == nil {
+		return HarvestMetric{}
+	}
+
+	return HarvestMetric{
+		ProgressPct:   harvest.ProgressPct,
+		Hectares:      harvest.Hectares,
+		TotalHectares: harvest.TotalHectares,
+	}
+}
+
+// convertCosts convierte la métrica de costos
+func convertCosts(costs *domain.DashboardCosts) CostsMetric {
+	if costs == nil {
+		return CostsMetric{}
+	}
+
+	return CostsMetric{
+		ProgressPct: costs.ProgressPct,
+		ExecutedUSD: costs.ExecutedUSD,
+		BudgetUSD:   costs.BudgetUSD,
+	}
+}
+
+// convertInvestorContributions convierte las contribuciones de inversores
+func convertInvestorContributions(contributions *domain.DashboardInvestorContributions) InvestorContributions {
+	if contributions == nil {
+		return InvestorContributions{}
+	}
+
+	breakdown := make([]map[string]interface{}, 0, len(contributions.Breakdown))
+	for _, inv := range contributions.Breakdown {
+		breakdown = append(breakdown, map[string]interface{}{
+			"investor_id":   inv.InvestorID,
+			"investor_name": inv.InvestorName,
+			"percent_pct":   inv.PercentPct.String(),
+		})
+	}
+
+	return InvestorContributions{
+		ProgressPct: contributions.ProgressPct,
+		Breakdown:   breakdown,
+	}
+}
+
+// convertOperatingResult convierte la métrica de resultado operativo
+func convertOperatingResult(result *domain.DashboardOperatingResult) OperatingResultMetric {
+	if result == nil {
+		return OperatingResultMetric{}
+	}
+
+	return OperatingResultMetric{
+		ProgressPct:   result.ProgressPct,
+		IncomeUSD:     result.IncomeUSD,
+		TotalCostsUSD: result.TotalCostsUSD,
+	}
+}
+
+// convertManagementBalance convierte el balance de gestión
+func convertManagementBalance(balance *domain.DashboardManagementBalance) ManagementBalance {
+	if balance == nil {
+		return ManagementBalance{}
+	}
+
+	return ManagementBalance{
+		Summary:   convertBalanceSummary(balance.Summary),
+		Breakdown: convertBalanceBreakdown(balance.Breakdown),
+		TotalsRow: convertBalanceTotals(balance.TotalsRow),
+	}
+}
+
+// convertBalanceSummary convierte el resumen del balance
+func convertBalanceSummary(summary *domain.DashboardBalanceSummary) BalanceSummary {
+	if summary == nil {
+		return BalanceSummary{}
+	}
+
+	return BalanceSummary{
+		IncomeUSD:              summary.IncomeUSD,
+		DirectCostsExecutedUSD: summary.DirectCostsExecutedUSD,
+		DirectCostsInvestedUSD: summary.DirectCostsInvestedUSD,
+		StockUSD:               summary.StockUSD,
+		RentUSD:                summary.RentUSD,
+		StructureUSD:           summary.StructureUSD,
+		OperatingResultUSD:     summary.OperatingResultUSD,
+		OperatingResultPct:     summary.OperatingResultPct,
+	}
+}
+
+// convertBalanceBreakdown convierte el desglose del balance
+func convertBalanceBreakdown(breakdown []domain.DashboardBalanceBreakdown) []BalanceBreakdown {
+	result := make([]BalanceBreakdown, 0, len(breakdown))
+	for _, item := range breakdown {
+		result = append(result, BalanceBreakdown{
+			Label:       item.Label,
+			ExecutedUSD: item.ExecutedUSD,
+			InvestedUSD: item.InvestedUSD,
+			StockUSD:    item.StockUSD,
+		})
+	}
+	return result
+}
+
+// convertBalanceTotals convierte los totales del balance
+func convertBalanceTotals(totals *domain.DashboardBalanceTotals) BalanceTotals {
+	if totals == nil {
+		return BalanceTotals{}
+	}
+
+	return BalanceTotals{
+		ExecutedUSD: totals.ExecutedUSD,
+		InvestedUSD: totals.InvestedUSD,
+		StockUSD:    totals.StockUSD,
+	}
+}
+
+// convertCropIncidence convierte la incidencia de cultivos
+func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidence {
+	if incidence == nil {
+		return CropIncidence{}
+	}
+
+	crops := make([]CropData, 0, len(incidence.Crops))
+	for _, crop := range incidence.Crops {
+		crops = append(crops, CropData{
+			Name:         crop.Name,
+			Hectares:     crop.Hectares,
+			RotationPct:  crop.RotationPct,
+			CostUSDPerHa: crop.CostUSDPerHa,
+			IncidencePct: crop.IncidencePct,
+		})
+	}
+
+	return CropIncidence{
+		Crops: crops,
+		Total: convertCropTotal(incidence.Total),
+	}
+}
+
+// convertCropTotal convierte los totales de cultivos
+func convertCropTotal(total *domain.DashboardCropTotal) CropTotal {
+	if total == nil {
+		return CropTotal{}
+	}
+
+	return CropTotal{
+		Hectares:          total.Hectares,
+		RotationPct:       total.RotationPct,
+		CostUSDPerHectare: total.CostUSDPerHectare,
+	}
+}
+
+// convertOperationalIndicators convierte los indicadores operativos
+func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicators) OperationalIndicators {
+	if indicators == nil {
+		return OperationalIndicators{}
+	}
+
+	cards := make([]OperationalCard, 0, len(indicators.Cards))
+	for _, card := range indicators.Cards {
+		cards = append(cards, OperationalCard{
+			Key:           card.Key,
+			Title:         card.Title,
+			Date:          card.Date,
+			WorkorderID:   card.WorkorderID,
+			WorkorderCode: card.WorkorderCode,
+			AuditID:       card.AuditID,
+			AuditCode:     card.AuditCode,
+			Status:        card.Status,
+		})
+	}
+
+	return OperationalIndicators{
+		Cards: cards,
+	}
+}
+
 // ToDashboard convierte un DTO de dashboard a entidad de dominio
 // (útil para casos donde se recibe un dashboard desde el exterior)
 func ToDashboard(dto DashboardRequest) *domain.Dashboard {
 	return &domain.Dashboard{
-		Metrics: &domain.DashboardMetrics{
-			Sowing: &domain.DashboardSowing{
-				ProgressPct:   dto.Metrics.Sowing.ProgressPct,
-				Hectares:      dto.Metrics.Sowing.Hectares,
-				TotalHectares: dto.Metrics.Sowing.TotalHectares,
-			},
-			Harvest: &domain.DashboardHarvest{
-				ProgressPct:   dto.Metrics.Harvest.ProgressPct,
-				Hectares:      dto.Metrics.Harvest.Hectares,
-				TotalHectares: dto.Metrics.Harvest.TotalHectares,
-			},
-			Costs: &domain.DashboardCosts{
-				ProgressPct: dto.Metrics.Costs.ProgressPct,
-				ExecutedUSD: dto.Metrics.Costs.ExecutedUSD,
-				BudgetUSD:   dto.Metrics.Costs.BudgetUSD,
-			},
-			InvestorContributions: &domain.DashboardInvestorContributions{
-				ProgressPct: dto.Metrics.InvestorContributions.ProgressPct,
-				Breakdown:   []domain.DashboardInvestorBreakdown{},
-			},
-			OperatingResult: &domain.DashboardOperatingResult{
-				ProgressPct:   dto.Metrics.OperatingResult.ProgressPct,
-				IncomeUSD:     dto.Metrics.OperatingResult.IncomeUSD,
-				TotalCostsUSD: dto.Metrics.OperatingResult.TotalCostsUSD,
-			},
-		},
-		ManagementBalance: &domain.DashboardManagementBalance{
-			Summary: &domain.DashboardBalanceSummary{
-				IncomeUSD:              dto.ManagementBalance.Summary.IncomeUSD,
-				DirectCostsExecutedUSD: dto.ManagementBalance.Summary.DirectCostsExecutedUSD,
-				DirectCostsInvestedUSD: dto.ManagementBalance.Summary.DirectCostsInvestedUSD,
-				StockUSD:               dto.ManagementBalance.Summary.StockUSD,
-				RentUSD:                dto.ManagementBalance.Summary.RentUSD,
-				StructureUSD:           dto.ManagementBalance.Summary.StructureUSD,
-				OperatingResultUSD:     dto.ManagementBalance.Summary.OperatingResultUSD,
-				OperatingResultPct:     dto.ManagementBalance.Summary.OperatingResultPct,
-			},
-			Breakdown: []domain.DashboardBalanceBreakdown{},
-			TotalsRow: &domain.DashboardBalanceTotals{
-				ExecutedUSD: dto.ManagementBalance.TotalsRow.ExecutedUSD,
-				InvestedUSD: dto.ManagementBalance.TotalsRow.InvestedUSD,
-				StockUSD:    dto.ManagementBalance.TotalsRow.StockUSD,
-			},
-		},
-		CropIncidence: &domain.DashboardCropIncidence{
-			Crops: []domain.DashboardCrop{},
-			Total: &domain.DashboardCropTotal{
-				Hectares:          dto.CropIncidence.Total.Hectares,
-				RotationPct:       dto.CropIncidence.Total.RotationPct,
-				CostUSDPerHectare: dto.CropIncidence.Total.CostUSDPerHectare,
-			},
-		},
-		OperationalIndicators: &domain.DashboardOperationalIndicators{
-			Cards: []domain.DashboardOperationalCard{},
-		},
+		// Campos básicos
 	}
 }
