@@ -7,12 +7,7 @@ import (
 )
 
 type RepositoryPort interface {
-	CreateDashboard(context.Context, *domain.Dashboard) (int64, error)
-	ListDashboards(context.Context) ([]domain.Dashboard, error)
-	GetDashboard(context.Context, int64) (*domain.Dashboard, error)
-	UpdateDashboard(context.Context, *domain.Dashboard) error
-	DeleteDashboard(context.Context, int64) error
-	GetDashboardData(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type UseCases struct {
@@ -24,26 +19,6 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
 
-func (u *UseCases) CreateDashboard(ctx context.Context, d *domain.Dashboard) (int64, error) {
-	return u.repo.CreateDashboard(ctx, d)
-}
-
-func (u *UseCases) ListDashboards(ctx context.Context) ([]domain.Dashboard, error) {
-	return u.repo.ListDashboards(ctx)
-}
-
-func (u *UseCases) GetDashboard(ctx context.Context, id int64) (*domain.Dashboard, error) {
-	return u.repo.GetDashboard(ctx, id)
-}
-
-func (u *UseCases) UpdateDashboard(ctx context.Context, d *domain.Dashboard) error {
-	return u.repo.UpdateDashboard(ctx, d)
-}
-
-func (u *UseCases) DeleteDashboard(ctx context.Context, id int64) error {
-	return u.repo.DeleteDashboard(ctx, id)
-}
-
-func (u *UseCases) GetDashboardData(ctx context.Context, filter domain.DashboardFilter) (*domain.DashboardData, error) {
-	return u.repo.GetDashboardData(ctx, filter)
+func (u *UseCases) GetDashboard(ctx context.Context, filter domain.DashboardFilter) (*domain.DashboardData, error) {
+	return u.repo.GetDashboard(ctx, filter)
 }

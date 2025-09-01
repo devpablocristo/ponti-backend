@@ -14,12 +14,7 @@ import (
 )
 
 type UseCasesPort interface {
-	CreateDashboard(context.Context, *domain.Dashboard) (int64, error)
-	ListDashboards(context.Context) ([]domain.Dashboard, error)
-	GetDashboard(context.Context, int64) (*domain.Dashboard, error)
-	UpdateDashboard(context.Context, *domain.Dashboard) error
-	DeleteDashboard(context.Context, int64) error
-	GetDashboardData(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type GinEnginePort interface {
@@ -71,41 +66,6 @@ func (h *Handler) Routes() {
 	}
 }
 
-func (h *Handler) CreateDashboard(c *gin.Context) {
-	var req dto.CreateDashboard
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateDashboard(ctx, req.ToDomain())
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, dto.CreateDashboardResponse{
-		Message: "Dashboard created successfully",
-		ID:      newID,
-	})
-}
-
-// ListDashboards retrieves all dashboards.
-func (h *Handler) ListDashboards(c *gin.Context) {
-	dashboards, err := h.ucs.ListDashboards(c.Request.Context())
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-
-	resp := dto.NewListDashboardsResponse(dashboards)
-	c.JSON(http.StatusOK, resp)
-}
-
 // GetDashboard retrieves dashboard data based on query parameters.
 func (h *Handler) GetDashboard(c *gin.Context) {
 	// Parse query parameters for filters
@@ -144,7 +104,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	}
 
 	// Get dashboard data
-	dashboardData, err := h.ucs.GetDashboardData(c.Request.Context(), filter)
+	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -154,40 +114,4 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	// Convert to DTO response
 	response := dto.FromDashboardData(dashboardData)
 	c.JSON(http.StatusOK, response)
-}
-
-// UpdateDashboard updates an existing dashboard.
-func (h *Handler) UpdateDashboard(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid dashboard id"})
-		return
-	}
-	var req dto.Dashboard
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
-		return
-	}
-	req.ID = id
-	if err := h.ucs.UpdateDashboard(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Dashboard updated successfully"})
-}
-
-// DeleteDashboard deletes a dashboard by its ID.
-func (h *Handler) DeleteDashboard(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid dashboard id"})
-		return
-	}
-	if err := h.ucs.DeleteDashboard(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Dashboard updated successfully"})
 }
