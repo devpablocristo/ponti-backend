@@ -66,11 +66,7 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateDashboard)
-		public.GET("", h.ListDashboards)
-		public.GET("/:id", h.GetDashboard)
-		public.PUT("/:id", h.UpdateDashboard)
-		public.DELETE("/:id", h.DeleteDashboard)
+		public.GET("", h.GetDashboard)
 	}
 }
 
