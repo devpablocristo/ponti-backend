@@ -24,16 +24,22 @@ type ExcelDto struct {
 	USDCostHa       decimal.Decimal `excel:"COSTO U$ /HA"`
 	USDNetTotal     decimal.Decimal `excel:"TOTAL U$ NETO"`
 
-	InvoiceNumber  string    `excel:"N° FACTURA"`
-	InvoiceCompany string    `excel:"EMPRESA"`
-	InvoiceDate    time.Time `excel:"FECHA DE FACTURACIÓN"`
-	InvoiceStatus  string    `excel:"ESTADO DE FACTURA"`
+	InvoiceNumber  string     `excel:"N° FACTURA"`
+	InvoiceCompany string     `excel:"EMPRESA"`
+	InvoiceDate    *time.Time `excel:"FECHA DE FACTURACIÓN"`
+	InvoiceStatus  string     `excel:"ESTADO DE FACTURA"`
 }
 
 func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 	out := make([]ExcelDto, 0, len(items))
 
 	for _, it := range items {
+
+		var invDate *time.Time
+		if !it.InvoiceDate.IsZero() {
+			d := it.InvoiceDate
+			invDate = &d
+		}
 
 		out = append(out, ExcelDto{
 			WorkorderNumber: it.WorkorderNumber,
@@ -53,7 +59,7 @@ func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 			USDNetTotal:     it.USDNetTotal,
 			InvoiceNumber:   it.InvoiceNumber,
 			InvoiceCompany:  it.InvoiceCompany,
-			InvoiceDate:     it.InvoiceDate,
+			InvoiceDate:     invDate,
 			InvoiceStatus:   it.InvoiceStatus,
 		})
 	}
