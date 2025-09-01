@@ -159,7 +159,7 @@ SELECT
   sowing_total_hectares,     -- Total de hectáreas del proyecto
   sowing_progress_percent    -- Porcentaje de avance de siembra
 FROM dashboard_view 
-WHERE project_id IN (1, 2, 3)
+WHERE project_id IN (1)
 ORDER BY project_id, customer_id, campaign_id, field_id;
 
 -- ========================================
