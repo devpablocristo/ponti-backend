@@ -204,3 +204,65 @@ FROM projects p
 JOIN fields f ON f.project_id=p.id
 LEFT JOIN costs c ON c.project_id=p.id
 LEFT JOIN harvest h ON h.project_id=p.id;
+
+6. Balance de gestion
+DROP VIEW IF EXISTS dashboard_view;
+CREATE VIEW dashboard_view AS
+WITH base_costs AS (
+  SELECT w.project_id,
+         SUM(lb.price*w.effective_area) AS executed_labors_usd,
+         SUM(wi.total_used*s.price) AS executed_supplies_usd
+  FROM workorders w
+  JOIN labors lb ON lb.id=w.labor_id
+  LEFT JOIN workorder_items wi ON wi.workorder_id=w.id
+  LEFT JOIN supplies s ON s.id=wi.supply_id
+  GROUP BY w.project_id
+)
+SELECT
+  p.customer_id,
+  p.id AS project_id,
+  p.campaign_id,
+  f.id AS field_id,
+  COALESCE(bc.executed_labors_usd,0) AS executed_labors_usd,
+  COALESCE(bc.executed_supplies_usd,0) AS executed_supplies_usd,
+  COALESCE(bc.executed_labors_usd,0)+COALESCE(bc.executed_supplies_usd,0) AS executed_costs_usd,
+  p.admin_cost AS budget_cost_usd,
+  (COALESCE(bc.executed_labors_usd,0)+COALESCE(bc.executed_supplies_usd,0)+p.admin_cost) AS operating_result_total_costs_usd,
+  0::numeric AS operating_result_usd, -- placeholder (lo calcula la app)
+  0::numeric AS operating_result_pct  -- placeholder (lo calcula la app)
+FROM projects p
+JOIN fields f ON f.project_id=p.id
+LEFT JOIN base_costs bc ON bc.project_id=p.id;
+
+
+7. DROP VIEW IF EXISTS dashboard_view;
+CREATE VIEW dashboard_view AS
+WITH lot_costs AS (
+  SELECT w.lot_id,
+         SUM(lb.price*w.effective_area) + SUM(wi.total_used*s.price) AS direct_costs_usd
+  FROM workorders w
+  JOIN labors lb ON lb.id=w.labor_id
+  LEFT JOIN workorder_items wi ON wi.workorder_id=w.id
+  LEFT JOIN supplies s ON s.id=wi.supply_id
+  GROUP BY w.lot_id
+)
+SELECT
+  p.customer_id,
+  p.id AS project_id,
+  p.campaign_id,
+  f.id AS field_id,
+  l.current_crop_id AS crop_id,
+  c.name AS crop_name,
+  SUM(l.hectares) AS crop_hectares,
+  SUM(SUM(l.hectares)) OVER (PARTITION BY p.id) AS project_total_hectares,
+  (SUM(l.hectares)::numeric / NULLIF(SUM(SUM(l.hectares)) OVER (PARTITION BY p.id),0) * 100) AS incidence_pct,
+  COALESCE(SUM(lc.direct_costs_usd),0) AS crop_direct_costs_usd,
+  CASE WHEN SUM(l.hectares)>0
+       THEN COALESCE(SUM(lc.direct_costs_usd),0)::numeric / SUM(l.hectares)
+       ELSE 0 END AS cost_per_ha_usd
+FROM projects p
+JOIN fields f ON f.project_id=p.id
+JOIN lots l ON l.field_id=f.id
+JOIN crops c ON c.id=l.current_crop_id
+LEFT JOIN lot_costs lc ON lc.lot_id=l.id
+GROUP BY p.customer_id,p.id,p.campaign_id,f.id,l.current_crop_id,c.name;
