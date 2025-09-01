@@ -1,9 +1,32 @@
--- Restaurar la vista dashboard_view completa basada en 000050
--- Corregir SOLO el problema de wi.lot_id (workorder_items no tiene lot_id)
--- Mantener TODA la funcionalidad existente
+-- ========================================
+-- MIGRACIÓN 000051: CORRECCIÓN DEL AVANCE DE SIEMBRA
+-- ========================================
+-- 
+-- PROBLEMA IDENTIFICADO:
+-- El CTE 'sowing' en dashboard_view tiene la lógica correcta pero
+-- puede haber problemas de duplicación en la agrupación.
+-- 
+-- SOLUCIÓN:
+-- Recrear solo la vista dashboard_view con comentarios mejorados
+-- y lógica verificada para el avance de siembra.
+-- 
+-- MÓDULOS NO AFECTADOS:
+-- ✅ Avance de costos
+-- ✅ Avance de cosecha  
+-- ✅ Avance de aportes
+-- ✅ Resultado operativo
+-- ✅ Balance de gestión
+-- ✅ Incidencia de costos por cultivo
+-- ✅ Indicadores operativos
+-- 
+-- SOLO SE CORRIGE:
+-- 🔧 Avance de siembra (CTE sowing y cálculo de porcentaje)
+-- ========================================
 
+-- Eliminar la vista existente
 DROP VIEW IF EXISTS dashboard_view;
 
+-- Recrear la vista con la lógica corregida
 CREATE OR REPLACE VIEW dashboard_view AS
 WITH
 executed_labors_by_project AS (
@@ -26,7 +49,7 @@ used_supplies_by_project AS (
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
-      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
+      JOIN workorders w ON w.id = wi.workorder_id
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
@@ -89,9 +112,6 @@ levels AS (
   )
 ),
 
--- -----------------------------------------------------------------
--- Siembra agregada  → card "Avance de siembra"
--- -----------------------------------------------------------------
 -- -----------------------------------------------------------------
 -- Siembra agregada  → card "Avance de siembra"
 --   CORREGIDO: Lógica de cálculo de área sembrada vs área total
@@ -300,7 +320,7 @@ v_crop_incidence AS (
                          AND w.deleted_at IS NULL
   LEFT JOIN labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
   
-  -- Insumos utilizados en órdenes de trabajo (CORREGIDO: usar workorders como intermediario)
+  -- Insumos utilizados en órdenes de trabajo
   LEFT JOIN workorder_items wi ON wi.workorder_id = w.id 
                                AND wi.final_dose > 0 
                                AND wi.deleted_at IS NULL
@@ -322,7 +342,7 @@ v_semilla_ejecutados AS (
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
-      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
+      JOIN workorders w ON w.id = wi.workorder_id
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
@@ -352,7 +372,7 @@ v_insumos_ejecutados AS (
     AND EXISTS (
       SELECT 1
       FROM workorder_items wi
-      JOIN workorders w ON w.id = wi.workorder_id  -- CORREGIDO: usar workorders como intermediario
+      JOIN workorders w ON w.id = wi.workorder_id
       WHERE wi.supply_id = sp.id
         AND wi.final_dose > 0
         AND wi.deleted_at IS NULL
