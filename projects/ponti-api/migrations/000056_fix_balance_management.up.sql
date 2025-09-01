@@ -7,7 +7,8 @@
 -- Autor: Sistema
 
 -- Crear vista para el balance de gestión
-CREATE OR REPLACE VIEW dashboard_view AS
+DROP VIEW IF EXISTS dashboard_view;
+CREATE VIEW dashboard_view AS
 WITH base_costs AS (
   SELECT w.project_id,
          SUM(lb.price*w.effective_area) AS executed_labors_usd,
@@ -27,7 +28,9 @@ SELECT
   COALESCE(bc.executed_supplies_usd,0) AS executed_supplies_usd,
   COALESCE(bc.executed_labors_usd,0)+COALESCE(bc.executed_supplies_usd,0) AS executed_costs_usd,
   p.admin_cost AS budget_cost_usd,
-  (COALESCE(bc.executed_labors_usd,0)+COALESCE(bc.executed_supplies_usd,0)+p.admin_cost) AS operating_result_total_costs_usd
+  (COALESCE(bc.executed_labors_usd,0)+COALESCE(bc.executed_supplies_usd,0)+p.admin_cost) AS operating_result_total_costs_usd,
+  0::numeric AS operating_result_usd, -- placeholder (lo calcula la app)
+  0::numeric AS operating_result_pct  -- placeholder (lo calcula la app)
 FROM projects p
 JOIN fields f ON f.project_id=p.id
 LEFT JOIN base_costs bc ON bc.project_id=p.id;
