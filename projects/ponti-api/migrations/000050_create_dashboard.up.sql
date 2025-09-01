@@ -529,10 +529,18 @@ SELECT
   -- Siembra
   COALESCE(s.sowed_area,0)::numeric(14,2)     AS sowing_hectares,
   COALESCE(s.total_hectares,0)::numeric(14,2) AS sowing_total_hectares,
+  -- NUEVO: Porcentaje de avance de siembra
+  CASE WHEN COALESCE(s.total_hectares,0) > 0 
+       THEN ROUND((COALESCE(s.sowed_area,0) / NULLIF(s.total_hectares,0) * 100)::numeric, 2)
+       ELSE 0 END AS sowing_progress_percent,
 
   -- Cosecha
   COALESCE(h.harvested_area,0)::numeric(14,2) AS harvest_hectares,
   COALESCE(h.total_hectares,0)::numeric(14,2) AS harvest_total_hectares,
+  -- NUEVO: Porcentaje de avance de cosecha
+  CASE WHEN COALESCE(h.total_hectares,0) > 0 
+       THEN ROUND((COALESCE(h.harvested_area,0) / NULLIF(h.total_hectares,0) * 100)::numeric, 2)
+       ELSE 0 END AS harvest_progress_percent,
 
   -- Costos (B y C)
   COALESCE(ca.executed_costs_usd,0)::numeric(14,2)     AS executed_costs_usd,     -- B
@@ -621,7 +629,7 @@ LEFT JOIN harvest h
   ON h.customer_id IS NOT DISTINCT FROM lvl.customer_id
  AND h.project_id  IS NOT DISTINCT FROM lvl.project_id
  AND h.campaign_id IS NOT DISTINCT FROM lvl.campaign_id
- AND s.field_id    IS NOT DISTINCT FROM lvl.field_id
+ AND h.field_id    IS NOT DISTINCT FROM lvl.field_id
 LEFT JOIN costs_agg ca
   ON ca.customer_id IS NOT DISTINCT FROM lvl.customer_id
  AND ca.project_id  IS NOT DISTINCT FROM lvl.project_id
