@@ -29,59 +29,55 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 	// Construir la consulta SQL base usando todos los campos de la vista
 	query := `
 		SELECT 
-			-- Métricas de siembra
-			COALESCE(SUM(sowing_hectares), 0) as sowing_hectares,
-			COALESCE(SUM(sowing_total_hectares), 0) as sowing_total_hectares,
-			-- Tomar el porcentaje directamente sin sumar
-			COALESCE(MAX(sowing_progress_percent), 0) as sowing_progress_percent,
+			-- Métricas de siembra - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(sowing_hectares, 0) as sowing_hectares,
+			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
+			COALESCE(sowing_progress_percent, 0) as sowing_progress_percent,
 			
-			-- Métricas de cosecha
-			COALESCE(SUM(harvest_hectares), 0) as harvest_hectares,
-			COALESCE(SUM(harvest_total_hectares), 0) as harvest_total_hectares,
-			-- Tomar el porcentaje directamente sin sumar
-			COALESCE(MAX(harvest_progress_percent), 0) as harvest_progress_percent,
+			-- Métricas de cosecha - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(harvest_hectares, 0) as harvest_hectares,
+			COALESCE(harvest_total_hectares, 0) as harvest_total_hectares,
+			COALESCE(harvest_progress_percent, 0) as harvest_progress_percent,
 			
-			-- Métricas de costos
-			COALESCE(SUM(executed_costs_usd), 0) as costs_executed_usd,
-			COALESCE(SUM(budget_total_usd), 0) as costs_budget_usd,
-			-- Tomar el porcentaje directamente sin sumar
-			COALESCE(MAX(costs_progress_pct), 0) as costs_progress_pct,
-			COALESCE(SUM(executed_labors_usd), 0) as executed_labors_usd,
-			COALESCE(SUM(executed_supplies_usd), 0) as executed_supplies_usd,
-			COALESCE(SUM(budget_cost_usd), 0) as budget_cost_usd,
+			-- Métricas de costos - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(executed_costs_usd, 0) as costs_executed_usd,
+			COALESCE(budget_total_usd, 0) as costs_budget_usd,
+			COALESCE(costs_progress_pct, 0) as costs_progress_pct,
+			COALESCE(executed_labors_usd, 0) as executed_labors_usd,
+			COALESCE(executed_supplies_usd, 0) as executed_supplies_usd,
+			COALESCE(budget_cost_usd, 0) as budget_cost_usd,
 			
-			-- Resultado operativo
-			COALESCE(SUM(income_usd), 0) as operating_income_usd,
-			COALESCE(SUM(operating_result_total_costs_usd), 0) as operating_total_costs_usd,
-			COALESCE(SUM(operating_result_usd), 0) as operating_result_usd,
-			-- Tomar el porcentaje directamente sin sumar
-			COALESCE(MAX(operating_result_pct), 0) as operating_result_pct,
+			-- Resultado operativo - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(income_usd, 0) as operating_income_usd,
+			COALESCE(operating_result_total_costs_usd, 0) as operating_total_costs_usd,
+			COALESCE(operating_result_usd, 0) as operating_result_usd,
+			COALESCE(operating_result_pct, 0) as operating_result_pct,
 			
-			-- Balance de gestión - Semilla
-			COALESCE(SUM(semilla_ejecutados_usd), 0) as semilla_ejecutados_usd,
-			COALESCE(SUM(semilla_invertidos_usd), 0) as semilla_invertidos_usd,
-			COALESCE(SUM(semilla_stock_usd), 0) as semilla_stock_usd,
+			-- Balance de gestión - Semilla - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(semilla_ejecutados_usd, 0) as semilla_ejecutados_usd,
+			COALESCE(semilla_invertidos_usd, 0) as semilla_invertidos_usd,
+			COALESCE(semilla_stock_usd, 0) as semilla_stock_usd,
 			
-			-- Balance de gestión - Insumos
-			COALESCE(SUM(insumos_ejecutados_usd), 0) as insumos_ejecutados_usd,
-			COALESCE(SUM(insumos_invertidos_usd), 0) as insumos_invertidos_usd,
-			COALESCE(SUM(insumos_stock_usd), 0) as insumos_stock_usd,
+			-- Balance de gestión - Insumos - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(insumos_ejecutados_usd, 0) as insumos_ejecutados_usd,
+			COALESCE(insumos_invertidos_usd, 0) as insumos_invertidos_usd,
+			COALESCE(insumos_stock_usd, 0) as insumos_stock_usd,
 			
-			-- Balance de gestión - Labores
-			COALESCE(SUM(labores_ejecutados_usd), 0) as labores_ejecutados_usd,
-			COALESCE(SUM(labores_invertidos_usd), 0) as labores_invertidos_usd,
-			COALESCE(SUM(labores_stock_usd), 0) as labores_stock_usd,
+			-- Balance de gestión - Labores - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(labores_ejecutados_usd, 0) as labores_ejecutados_usd,
+			COALESCE(labores_invertidos_usd, 0) as labores_invertidos_usd,
+			COALESCE(labores_stock_usd, 0) as labores_stock_usd,
 			
-			-- Balance de gestión - Arriendo
-			COALESCE(SUM(arriendo_invertidos_usd), 0) as arriendo_invertidos_usd,
+			-- Balance de gestión - Arriendo - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(arriendo_invertidos_usd, 0) as arriendo_invertidos_usd,
 			
-			-- Balance de gestión - Estructura
-			COALESCE(SUM(estructura_invertidos_usd), 0) as estructura_invertidos_usd,
+			-- Balance de gestión - Estructura - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(estructura_invertidos_usd, 0) as estructura_invertidos_usd,
 			
-			-- Totales del Balance de Gestión
-			COALESCE(SUM(costos_directos_ejecutados_usd), 0) as costos_directos_ejecutados_usd,
-			COALESCE(SUM(costos_directos_invertidos_usd), 0) as costos_directos_invertidos_usd,
-			COALESCE(SUM(costos_directos_stock_usd), 0) as costos_directos_stock_usd
+			-- Totales del Balance de Gestión - CORREGIDO: No sumar, tomar valores directos
+			COALESCE(costos_directos_ejecutados_usd, 0) as costos_directos_ejecutados_usd,
+			COALESCE(costos_directos_invertidos_usd, 0) as costos_directos_invertidos_usd,
+			COALESCE(costos_directos_stock_usd, 0) as costos_directos_stock_usd
 		FROM dashboard_view 
 		WHERE row_kind = 'metric'
 		AND field_id IS NULL
@@ -105,6 +101,9 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		query += " AND field_id = ANY($4)"
 		args = append(args, filter.FieldIDs)
 	}
+
+	// CORREGIDO: Agregar LIMIT 1 para tomar solo una fila (un proyecto)
+	query += " LIMIT 1"
 
 	// Ejecutar la consulta
 	var result models.DashboardDataModel

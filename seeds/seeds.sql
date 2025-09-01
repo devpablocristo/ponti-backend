@@ -184,7 +184,7 @@ SELECT
   budget_total_usd,          -- Presupuesto total del proyecto
   costs_progress_pct         -- Porcentaje de avance de costos
 FROM dashboard_view 
-WHERE project_id IN (1, 2, 3)
+WHERE project_id IN (1)
 ORDER BY project_id, customer_id, campaign_id, field_id;
 
 -- ========================================
