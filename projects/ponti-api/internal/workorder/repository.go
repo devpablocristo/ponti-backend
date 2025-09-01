@@ -249,6 +249,14 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter
 		q += " AND field_id = ?"
 		args = append(args, *filt.FieldID)
 	}
+	if filt.CustomerID != nil {
+		q += " AND customer_id = ?"
+		args = append(args, *filt.CustomerID)
+	}
+	if filt.CampaignID != nil {
+		q += " AND campaign_id = ?"
+		args = append(args, *filt.CampaignID)
+	}
 
 	var row struct {
 		SurfaceHa  decimal.Decimal `gorm:"column:surface_ha"`

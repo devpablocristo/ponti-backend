@@ -11,7 +11,8 @@ import (
 type RepositoryPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
-	deleteLabor(context.Context, int64) error
+	DeleteLabor(context.Context, int64) error
+	GetWorkordersByLaborID(ctx context.Context, laborID int64) (int64, error)
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
@@ -41,7 +42,14 @@ func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectId i
 }
 
 func (u *UseCases) DeleteLabor(ctx context.Context, laborId int64) error {
-	return u.repo.deleteLabor(ctx, laborId)
+	count, err := u.repo.GetWorkordersByLaborID(ctx, laborId)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return types.NewError(types.ErrConflict, "labor is being used in a workorder", nil)
+	}
+	return u.repo.DeleteLabor(ctx, laborId)
 }
 
 func (u *UseCases) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
