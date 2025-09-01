@@ -1,4 +1,4 @@
--- Rollback: Restaurar la vista dashboard_view original
+-- Rollback: Restaurar la vista dashboard_view de la migración 000050
 DROP VIEW IF EXISTS dashboard_view;
 
 -- Restaurar la vista completa de la migración 000050
