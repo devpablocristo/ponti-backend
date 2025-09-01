@@ -22,7 +22,11 @@ INSERT INTO customers (id, name) VALUES
   (1, 'Cliente Demo');
 
 INSERT INTO investors (id, name) VALUES 
-  (1, 'Inversor Demo');
+  (1, 'Inversor 1'),
+  (2, 'Inversor 2'),
+  (3, 'Inversor 3'),
+  (4, 'Inversor 4'),
+  (5, 'Inversor 5');
 
 -- ========================================
 -- TRES PROYECTOS CON DIFERENTES ESCENARIOS
@@ -36,8 +40,16 @@ INSERT INTO projects (id, customer_id, campaign_id, name, admin_cost) VALUES
 -- RELACIÓN PROYECTO-INVERSOR (CORREGIDO)
 -- ========================================
 INSERT INTO project_investors (project_id, investor_id, percentage) VALUES
-  (1, 1, 100.00),
-  (2, 1, 100.00),
+  -- Proyecto 1: 3 inversores (40% + 35% + 25% = 100%)
+  (1, 1, 40.00),
+  (1, 2, 35.00),
+  (1, 3, 25.00),
+  
+  -- Proyecto 2: 2 inversores (60% + 40% = 100%)
+  (2, 4, 60.00),
+  (2, 5, 40.00),
+  
+  -- Proyecto 3: 1 inversor (100%)
   (3, 1, 100.00);
 
 -- ========================================
