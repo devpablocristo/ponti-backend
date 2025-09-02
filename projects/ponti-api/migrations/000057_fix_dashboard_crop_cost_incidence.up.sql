@@ -7,8 +7,8 @@
 -- Autor: Sistema
 
 -- Crear vista para la incidencia de costos por cultivo
-DROP VIEW IF EXISTS dashboard_view;
-CREATE VIEW dashboard_view AS
+DROP VIEW IF EXISTS dashboard_crop_cost_incidence_view;
+CREATE VIEW dashboard_crop_cost_incidence_view AS
 WITH lot_costs AS (
   SELECT w.lot_id,
          SUM(lb.price*w.effective_area) + SUM(wi.total_used*s.price) AS direct_costs_usd
@@ -22,7 +22,6 @@ SELECT
   p.customer_id,
   p.id AS project_id,
   p.campaign_id,
-  f.id AS field_id,
   l.current_crop_id AS crop_id,
   c.name AS crop_name,
   SUM(l.hectares) AS crop_hectares,
@@ -37,4 +36,4 @@ JOIN fields f ON f.project_id=p.id
 JOIN lots l ON l.field_id=f.id
 JOIN crops c ON c.id=l.current_crop_id
 LEFT JOIN lot_costs lc ON lc.lot_id=l.id
-GROUP BY p.customer_id,p.id,p.campaign_id,f.id,l.current_crop_id,c.name;
+GROUP BY p.customer_id,p.id,p.campaign_id,l.current_crop_id,c.name;

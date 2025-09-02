@@ -2,9 +2,9 @@
 -- Enfoque: Vista que calcula correctamente el porcentaje de avance de aportes
 -- Partir de la migración 000050 (no tocar la 000051, 000052 ni 000053)
 
-DROP VIEW IF EXISTS dashboard_view;
+DROP VIEW IF EXISTS dashboard_contributions_progress_view;
 
-CREATE OR REPLACE VIEW dashboard_view AS
+CREATE OR REPLACE VIEW dashboard_contributions_progress_view AS
 SELECT
     p.customer_id,
     p.id AS project_id,
@@ -14,12 +14,12 @@ SELECT
     -- Campos de siembra (placeholder)
     0::numeric(14,2) AS sowing_hectares,
     0::numeric(14,2) AS sowing_total_hectares,
-    0::numeric(6,2) AS sowing_progress_percent,
+    0::numeric(6,2) AS sowing_progress_pct,
     
     -- Campos de cosecha (placeholder)
     0::numeric(14,2) AS harvest_hectares,
     0::numeric(14,2) AS harvest_total_hectares,
-    0::numeric(6,2) AS harvest_progress_percent,
+    0::numeric(6,2) AS harvest_progress_pct,
     
     -- Campos de costos (placeholder)
     0::numeric(14,2) AS executed_costs_usd,
@@ -51,24 +51,11 @@ SELECT
     0::numeric(14,2) AS cost_per_ha_usd,
     
     -- Campos de balance de gestión (placeholder)
-    0::numeric(14,2) AS semilla_ejecutados_usd,
-    0::numeric(14,2) AS semilla_invertidos_usd,
-    0::numeric(14,2) AS semilla_stock_usd,
-    0::numeric(14,2) AS insumos_ejecutados_usd,
-    0::numeric(14,2) AS insumos_invertidos_usd,
-    0::numeric(14,2) AS insumos_stock_usd,
-    0::numeric(14,2) AS labores_ejecutados_usd,
-    0::numeric(14,2) AS labores_invertidos_usd,
-    0::numeric(14,2) AS labores_stock_usd,
-    0::numeric(14,2) AS arriendo_ejecutados_usd,
-    0::numeric(14,2) AS arriendo_invertidos_usd,
-    0::numeric(14,2) AS arriendo_stock_usd,
-    0::numeric(14,2) AS estructura_ejecutados_usd,
-    0::numeric(14,2) AS estructura_invertidos_usd,
-    0::numeric(14,2) AS estructura_stock_usd,
-    0::numeric(14,2) AS costos_directos_ejecutados_usd,
-    0::numeric(14,2) AS costos_directos_invertidos_usd,
-    0::numeric(14,2) AS costos_directos_stock_usd,
+    0::numeric(14,2) AS balance_executed_costs_usd,
+    0::numeric(14,2) AS balance_budget_cost_usd,
+    0::numeric(14,2) AS balance_operating_result_total_costs_usd,
+    0::numeric(14,2) AS balance_operating_result_usd,
+    0::numeric(6,2) AS balance_operating_result_pct,
     
     -- Campos de fechas (placeholder)
     NULL::timestamp AS primera_orden_fecha,

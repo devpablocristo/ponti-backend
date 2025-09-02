@@ -7,8 +7,8 @@
 -- Autor: Sistema
 
 -- Crear vista para indicadores operativos y fechas clave
-DROP VIEW IF EXISTS dashboard_view;
-CREATE VIEW dashboard_view AS
+DROP VIEW IF EXISTS dashboard_operational_indicators_view;
+CREATE VIEW dashboard_operational_indicators_view AS
 WITH workorder_costs AS (
   SELECT w.project_id,
          SUM(lb.price*w.effective_area) AS labors_cost_usd,
@@ -30,10 +30,9 @@ SELECT
   p.customer_id,
   p.id AS project_id,
   p.campaign_id,
-  f.id AS field_id,
   -- Avance de siembra
   SUM(CASE WHEN l.sowing_date IS NOT NULL THEN l.hectares ELSE 0 END) AS sowing_hectares,
-  SUM(l.hectares) AS total_hectares,
+  SUM(l.hectares) AS sowing_total_hectares,
   -- Avance de cosecha
   SUM(CASE WHEN l.tons > 0 THEN l.hectares ELSE 0 END) AS harvest_hectares,
   SUM(l.hectares) AS harvest_total_hectares,
@@ -43,19 +42,19 @@ SELECT
   NULL::date AS arqueo_stock_fecha, -- placeholder
   NULL::date AS cierre_campana_fecha, -- placeholder
   -- Indicadores operativos detallados (calculados)
-  COALESCE(wc.supplies_cost_usd * 0.5, 0) AS semilla_ejecutados_usd,    -- Semillas ejecutadas (50% de supplies)
-  COALESCE(wc.supplies_cost_usd * 0.6, 0) AS semilla_invertidos_usd,    -- Semillas invertidas (60% de supplies)
-  COALESCE(ss.semilla_stock_usd, 0) AS semilla_stock_usd,               -- Semillas en stock
-  COALESCE(wc.supplies_cost_usd * 0.5, 0) AS insumos_ejecutados_usd,    -- Insumos ejecutados (50% de supplies)
-  COALESCE(wc.supplies_cost_usd * 0.4, 0) AS insumos_invertidos_usd,    -- Insumos invertidos (40% de supplies)
-  COALESCE(ss.insumos_stock_usd, 0) AS insumos_stock_usd,               -- Insumos en stock
-  COALESCE(wc.labors_cost_usd, 0) AS labores_ejecutados_usd,            -- Labores ejecutadas
-  COALESCE(wc.labors_cost_usd * 1.2, 0) AS labores_invertidos_usd,      -- Labores invertidas (120% de ejecutadas)
-  COALESCE(wc.labors_cost_usd * 0.3, 0) AS labores_stock_usd            -- Labores en stock (30% de ejecutadas)
+  COALESCE(wc.supplies_cost_usd * 0.5, 0) AS seeds_executed_usd,    -- Semillas ejecutadas (50% de supplies)
+  COALESCE(wc.supplies_cost_usd * 0.6, 0) AS seeds_invested_usd,    -- Semillas invertidas (60% de supplies)
+  COALESCE(ss.semilla_stock_usd, 0) AS seeds_stock_usd,               -- Semillas en stock
+  COALESCE(wc.supplies_cost_usd * 0.5, 0) AS supplies_executed_usd,    -- Insumos ejecutados (50% de supplies)
+  COALESCE(wc.supplies_cost_usd * 0.4, 0) AS supplies_invested_usd,    -- Insumos invertidos (40% de supplies)
+  COALESCE(ss.insumos_stock_usd, 0) AS supplies_stock_usd,               -- Insumos en stock
+  COALESCE(wc.labors_cost_usd, 0) AS labors_executed_usd,            -- Labores ejecutadas
+  COALESCE(wc.labors_cost_usd * 1.2, 0) AS labors_invested_usd,      -- Labores invertidas (120% de ejecutadas)
+  COALESCE(wc.labors_cost_usd * 0.3, 0) AS labors_stock_usd            -- Labores en stock (30% de ejecutadas)
 FROM projects p
-JOIN fields f ON f.project_id=p.id
+LEFT JOIN fields f ON f.project_id=p.id
 LEFT JOIN lots l ON l.field_id=f.id
 LEFT JOIN workorders w ON w.field_id=f.id
 LEFT JOIN workorder_costs wc ON wc.project_id=p.id
 LEFT JOIN supply_stocks ss ON ss.project_id=p.id
-GROUP BY p.customer_id,p.id,p.campaign_id,f.id,wc.labors_cost_usd,wc.supplies_cost_usd,ss.semilla_stock_usd,ss.insumos_stock_usd;
+GROUP BY p.customer_id,p.id,p.campaign_id,wc.labors_cost_usd,wc.supplies_cost_usd,ss.semilla_stock_usd,ss.insumos_stock_usd;

@@ -2,9 +2,9 @@
 -- Enfoque: Vista que calcula correctamente el resultado operativo
 -- Partir de la migración 000050 (no tocar la 000051, 000052, 000053 ni 000054)
 
-DROP VIEW IF EXISTS dashboard_view;
+DROP VIEW IF EXISTS dashboard_operating_result_view;
 
-CREATE OR REPLACE VIEW dashboard_view AS
+CREATE OR REPLACE VIEW dashboard_operating_result_view AS
 WITH costs AS (
   SELECT w.project_id,
          SUM(lb.price*w.effective_area) + SUM(wi.total_used*s.price) AS executed_costs_usd
@@ -24,14 +24,12 @@ SELECT
   p.customer_id,
   p.id AS project_id,
   p.campaign_id,
-  f.id AS field_id,
   COALESCE(h.total_tons,0) AS total_tons,
   0::numeric AS income_usd, -- placeholder (lo calcula la app: tons*precio)
-  COALESCE(c.executed_costs_usd,0) AS total_invested_usd,
+  COALESCE(c.executed_costs_usd,0) AS operating_result_total_costs_usd,
   0::numeric AS operating_result_usd, -- placeholder
   0::numeric AS operating_result_pct, -- placeholder
-  COALESCE(c.executed_costs_usd,0) AS operating_result_total_costs_usd -- Costos totales ejecutados
+  COALESCE(c.executed_costs_usd,0) AS executed_costs_usd -- Costos totales ejecutados
 FROM projects p
-JOIN fields f ON f.project_id=p.id
 LEFT JOIN costs c ON c.project_id=p.id
 LEFT JOIN harvest h ON h.project_id=p.id;

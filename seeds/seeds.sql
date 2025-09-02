@@ -142,142 +142,152 @@ INSERT INTO workorder_items (workorder_id, supply_id, final_dose, total_used) VA
   (4, 4, 50, 3750),      -- Workorder 4: 50 kg/ha × 75 ha = 3,750 kg × $10 = $37,500
   (7, 4, 50, 3750);      -- Workorder 7: 50 kg/ha × 75 ha = 3,750 kg × $10 = $37,500
 
-
 -- ========================================
 -- VER TODAS LAS COLUMNAS DISPONIBLES
 -- ========================================
 SELECT '=== VER TODAS LAS COLUMNAS DISPONIBLES ===' as info;
-SELECT * FROM dashboard_view WHERE project_id = 1 LIMIT 1;
+SELECT * FROM dashboard_sowing_progress_view WHERE project_id = 1 LIMIT 1;
 
--- -- ========================================
--- -- MÓDULO 1: AVANCE DE SIEMBRA
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: 300 ha sembradas / 600 ha totales = 50.00%
--- -- Proyecto 2: 900 ha sembradas / 900 ha totales = 100.00%
--- -- Proyecto 3: 0 ha sembradas / 100 ha totales = 0.00%
--- SELECT '=== MÓDULO 1: AVANCE DE SIEMBRA ===' as info;
--- SELECT 
---   project_id, 
---   sowing_hectares, 
---   total_hectares, 
---   (sowing_hectares::numeric / NULLIF(total_hectares,0) * 100) AS sowing_progress_percent
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 1: AVANCE DE SIEMBRA
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: 100 ha sembradas / 200 ha totales = 50.00%
+-- Proyecto 2: 150 ha sembradas / 150 ha totales = 100.00%
+-- Proyecto 3: 0 ha sembradas / 100 ha totales = 0.00%
+SELECT '=== MÓDULO 1: AVANCE DE SIEMBRA ===' as info;
+SELECT 
+  project_id, 
+  sowing_hectares, 
+  sowing_total_hectares, 
+  sowing_progress_pct
+FROM dashboard_sowing_progress_view
+WHERE project_id IN (1)
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 2: AVANCE DE COSTOS
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: $57,500 ejecutados (labores + insumos)
--- -- Proyecto 2: $86,250 ejecutados (labores + insumos)
--- -- Proyecto 3: $0 ejecutados
--- SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
--- SELECT 
---   project_id, 
---   semilla_ejecutados_usd + insumos_ejecutados_usd AS total_supplies_cost,
---   labores_ejecutados_usd AS total_labors_cost,
---   (semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd) AS total_executed_costs
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 2: AVANCE DE COSTOS
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: $57,500 ejecutados (labores + insumos)
+-- Proyecto 2: $86,250 ejecutados (labores + insumos)
+-- Proyecto 3: $0 ejecutados
+SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
+SELECT 
+  project_id, 
+  executed_supplies_usd,
+  executed_labors_usd,
+  executed_costs_usd,
+  costs_progress_pct
+FROM dashboard_costs_progress_view
+WHERE project_id IN (1)
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 3: AVANCE DE COSECHA
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: 600 ha cosechadas / 600 ha totales = 100.00%
--- -- Proyecto 2: 900 ha cosechadas / 900 ha totales = 100.00%
--- -- Proyecto 3: 100 ha cosechadas / 100 ha totales = 100.00%
--- SELECT '=== MÓDULO 3: AVANCE DE COSECHA ===' as info;
--- SELECT 
---   project_id, 
---   harvest_hectares, 
---   harvest_total_hectares, 
---   (harvest_hectares::numeric / NULLIF(harvest_total_hectares,0) * 100) AS harvest_progress_percent
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 3: AVANCE DE COSECHA
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: 100 ha cosechadas / 200 ha totales = 50.00%
+-- Proyecto 2: 150 ha cosechadas / 150 ha totales = 100.00%
+-- Proyecto 3: 0 ha cosechadas / 100 ha totales = 0.00%
+SELECT '=== MÓDULO 3: AVANCE DE COSECHA ===' as info;
+SELECT 
+  project_id, 
+  harvest_hectares, 
+  harvest_total_hectares, 
+  harvest_progress_pct
+FROM dashboard_harvest_progress_view
+WHERE project_id IN (1)
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 4: RESULTADO OPERATIVO
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: $0 ingresos - $57,500 costos = -$57,500
--- -- Proyecto 2: $0 ingresos - $86,250 costos = -$86,250
--- -- Proyecto 3: $0 ingresos - $0 costos = $0
--- SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
--- SELECT 
---   project_id, 
---   0 AS income_usd,
---   -(semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd) AS operating_result_usd,
---   (semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd) AS total_costs_usd
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 4: RESULTADO OPERATIVO
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: $0 ingresos - $57,500 costos = -$57,500
+-- Proyecto 2: $0 ingresos - $86,250 costos = -$86,250
+-- Proyecto 3: $0 ingresos - $0 costos = $0
+SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
+SELECT 
+  project_id, 
+  income_usd,
+  operating_result_usd,
+  operating_result_total_costs_usd,
+  operating_result_pct
+FROM dashboard_operating_result_view
+WHERE project_id IN (1,2,3)
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 5: RESULTADO OPERTATIVO
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: 3 inversores (40% + 35% + 25% = 100%)
--- -- Proyecto 2: 2 inversores (60% + 40% = 100%)
--- -- Proyecto 3: 1 inversor (100%)
--- SELECT '=== MÓDULO 5: APORTES E INVERSORES ===' as info;
--- SELECT 
---   pi.project_id, 
---   pi.investor_id,
---   i.name AS investor_name,
---   pi.percentage AS investor_percentage_pct,
---   100 AS contributions_progress_pct
--- FROM project_investors pi
--- JOIN investors i ON i.id = pi.investor_id
--- ORDER BY pi.project_id, pi.investor_id;
+-- ========================================
+-- MÓDULO 5: AVANCE DE APORTES
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: 3 inversores (40% + 35% + 25% = 100%)
+-- Proyecto 2: 2 inversores (60% + 40% = 100%)
+-- Proyecto 3: 1 inversor (100%)
+SELECT '=== MÓDULO 5: AVANCE DE APORTES ===' as info;
+SELECT 
+  project_id, 
+  investor_id,
+  investor_name,
+  investor_percentage_pct,
+  contributions_progress_pct
+FROM dashboard_contributions_progress_view
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 6: BALANCE DE GESTIÓN
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: $57,500 ejecutados + $1,000 admin = $58,500 total
--- -- Proyecto 2: $86,250 ejecutados + $500 admin = $86,750 total
--- -- Proyecto 3: $0 ejecutados + $750 admin = $750 total
--- SELECT '=== MÓDULO 6: BALANCE DE GESTIÓN ===' as info;
--- SELECT 
---   project_id, 
---   (semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd) AS executed_costs_usd,
---   1000 AS budget_cost_usd, -- Placeholder para admin_cost
---   (semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd + 1000) AS total_costs_usd
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 6: BALANCE DE GESTIÓN
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: $57,500 ejecutados + $1,000 admin = $58,500 total
+-- Proyecto 2: $86,250 ejecutados + $500 admin = $86,750 total
+-- Proyecto 3: $0 ejecutados + $750 admin = $750 total
+SELECT '=== MÓDULO 6: BALANCE DE GESTIÓN ===' as info;
+SELECT 
+  project_id, 
+  balance_executed_costs_usd,
+  balance_budget_cost_usd,
+  balance_operating_result_total_costs_usd,
+  balance_operating_result_usd,
+  balance_operating_result_pct
+FROM dashboard_balance_management_view 
+ORDER BY project_id;
 
--- -- =============================================
--- -- MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO
--- -- =============================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: 600 ha - $57,500 costos = $95.83/ha
--- -- Proyecto 2: 900 ha - $86,250 costos = $95.83/ha
--- -- Proyecto 3: 100 ha - $0 costos = $0.00/ha
--- SELECT '=== MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO ===' as info;
--- SELECT 
---   project_id, 
---   total_hectares AS crop_hectares,
---   (semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd) AS crop_direct_costs_usd,
---   ((semilla_ejecutados_usd + insumos_ejecutados_usd + labores_ejecutados_usd)::numeric / NULLIF(total_hectares,0)) AS cost_per_ha_usd
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- =============================================
+-- MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO
+-- =============================================
+-- RESULTADOS REALES:
+-- Proyecto 1: 200 ha - $57,500 costos = $287.50/ha
+-- Proyecto 2: 150 ha - $86,250 costos = $575.00/ha
+-- Proyecto 3: 100 ha - $0 costos = $0.00/ha
+SELECT '=== MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO ===' as info;
+SELECT 
+  project_id, 
+  crop_id,
+  crop_name,
+  crop_hectares,
+  project_total_hectares,
+  incidence_pct,
+  crop_direct_costs_usd,
+  cost_per_ha_usd
+FROM dashboard_crop_cost_incidence_view 
+ORDER BY project_id;
 
--- -- ========================================
--- -- MÓDULO 8: INDICADORES OPERATIVOS
--- -- ========================================
--- -- RESULTADOS REALES:
--- -- Proyecto 1: Semillas $35,000, Insumos $35,000, Labores $22,500
--- -- Proyecto 2: Semillas $52,500, Insumos $52,500, Labores $33,750
--- -- Proyecto 3: Todo en $0, Stock: Semillas $10,000, Insumos $2,000
--- SELECT '=== MÓDULO 8: INDICADORES OPERATIVOS ===' as info;
--- SELECT 
---   project_id, 
---   semilla_ejecutados_usd,
---   insumos_ejecutados_usd,
---   labores_ejecutados_usd,
---   semilla_stock_usd,
---   insumos_stock_usd,
---   labores_stock_usd
--- FROM dashboard_view 
--- ORDER BY project_id;
+-- ========================================
+-- MÓDULO 8: INDICADORES OPERATIVOS
+-- ========================================
+-- RESULTADOS REALES:
+-- Proyecto 1: Semillas $35,000, Insumos $35,000, Labores $22,500
+-- Proyecto 2: Semillas $52,500, Insumos $52,500, Labores $33,750
+-- Proyecto 3: Todo en $0, Stock: Semillas $10,000, Insumos $2,000
+SELECT '=== MÓDULO 8: INDICADORES OPERATIVOS ===' as info;
+SELECT 
+  project_id, 
+  seeds_executed_usd,
+  supplies_executed_usd,
+  labors_executed_usd,
+  seeds_stock_usd,
+  supplies_stock_usd,
+  labors_stock_usd
+FROM dashboard_operational_indicators_view 
+ORDER BY project_id;

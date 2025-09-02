@@ -2,9 +2,9 @@
 -- Enfoque: Vista que calcula correctamente el porcentaje de avance de costos
 -- Partir de la migración 000050 (no tocar la 000051)
 
-DROP VIEW IF EXISTS dashboard_view;
+DROP VIEW IF EXISTS dashboard_costs_progress_view;
 
-CREATE OR REPLACE VIEW dashboard_view AS
+CREATE OR REPLACE VIEW dashboard_costs_progress_view AS
 WITH costs AS (
   SELECT
     w.project_id,
@@ -21,7 +21,6 @@ SELECT
     p.customer_id,
     p.id AS project_id,
     p.campaign_id,
-    f.id AS field_id,
     COALESCE(c.executed_labors_usd,0) AS executed_labors_usd,
     COALESCE(c.executed_supplies_usd,0) AS executed_supplies_usd,
     COALESCE(c.executed_labors_usd,0)+COALESCE(c.executed_supplies_usd,0) AS executed_costs_usd,
@@ -33,5 +32,4 @@ SELECT
       ELSE 0 END,100
     ) AS costs_progress_pct
 FROM projects p
-JOIN fields f ON f.project_id=p.id
 LEFT JOIN costs c ON c.project_id=p.id;
