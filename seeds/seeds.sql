@@ -162,7 +162,7 @@ SELECT
   sowing_total_hectares, 
   sowing_progress_pct
 FROM dashboard_sowing_progress_view
-WHERE project_id IN (1,2,3)
+WHERE project_id IN (1)
 ORDER BY project_id;
 
 -- ========================================
@@ -176,11 +176,10 @@ SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
 SELECT 
   project_id, 
   executed_supplies_usd,
-  executed_labors_usd,
   executed_costs_usd,
   costs_progress_pct
 FROM dashboard_costs_progress_view
-WHERE project_id IN (1,2,3)
+WHERE project_id IN (1)
 ORDER BY project_id;
 
 -- ========================================

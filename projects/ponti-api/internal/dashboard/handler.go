@@ -71,35 +71,27 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	// Parse query parameters for filters
 	var filter domain.DashboardFilter
 
-	if customerIDs := c.QueryArray("customer_ids"); len(customerIDs) > 0 {
-		for _, idStr := range customerIDs {
-			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
-				filter.CustomerIDs = append(filter.CustomerIDs, id)
-			}
+	if customerIDStr := c.Query("customer_id"); customerIDStr != "" {
+		if id, err := strconv.ParseInt(customerIDStr, 10, 64); err == nil {
+			filter.CustomerID = &id
 		}
 	}
 
-	if projectIDs := c.QueryArray("project_ids"); len(projectIDs) > 0 {
-		for _, idStr := range projectIDs {
-			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
-				filter.ProjectIDs = append(filter.ProjectIDs, id)
-			}
+	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
+		if id, err := strconv.ParseInt(projectIDStr, 10, 64); err == nil {
+			filter.ProjectID = &id
 		}
 	}
 
-	if campaignIDs := c.QueryArray("campaign_ids"); len(campaignIDs) > 0 {
-		for _, idStr := range campaignIDs {
-			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
-				filter.CampaignIDs = append(filter.CampaignIDs, id)
-			}
+	if campaignIDStr := c.Query("campaign_id"); campaignIDStr != "" {
+		if id, err := strconv.ParseInt(campaignIDStr, 10, 64); err == nil {
+			filter.CampaignID = &id
 		}
 	}
 
-	if fieldIDs := c.QueryArray("field_ids"); len(fieldIDs) > 0 {
-		for _, idStr := range fieldIDs {
-			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
-				filter.FieldIDs = append(filter.FieldIDs, id)
-			}
+	if fieldIDStr := c.Query("field_id"); fieldIDStr != "" {
+		if id, err := strconv.ParseInt(fieldIDStr, 10, 64); err == nil {
+			filter.FieldID = &id
 		}
 	}
 

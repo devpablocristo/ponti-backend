@@ -2,63 +2,18 @@ package models
 
 import (
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/shopspring/decimal"
 )
 
-// DashboardModelMapper mapea entre modelos y dominio
-type DashboardModelMapper struct {
-	config *DashboardConfig
-}
+// DashboardModelMapper maneja la conversión entre modelos de base de datos y dominio
+type DashboardModelMapper struct{}
 
 // NewDashboardModelMapper crea una nueva instancia del mapper
 func NewDashboardModelMapper() *DashboardModelMapper {
-	return &DashboardModelMapper{
-		config: GetDefaultDashboardConfig(),
-	}
+	return &DashboardModelMapper{}
 }
 
-// NewDashboardModelMapperWithConfig crea un mapper con configuración personalizada
-func NewDashboardModelMapperWithConfig(config *DashboardConfig) *DashboardModelMapper {
-	return &DashboardModelMapper{
-		config: config,
-	}
-}
-
-// ToDomain convierte DashboardModel a dominio
-func (m *DashboardModelMapper) ToDomain(model *DashboardModel) *domain.Dashboard {
-	if model == nil {
-		return nil
-	}
-
-	return &domain.Dashboard{
-		ID: model.ID,
-		Base: shareddomain.Base{
-			CreatedAt: model.CreatedAt,
-			UpdatedAt: model.UpdatedAt,
-			CreatedBy: model.CreatedBy,
-			UpdatedBy: model.UpdatedBy,
-		},
-	}
-}
-
-// FromDomain convierte dominio a DashboardModel
-func (m *DashboardModelMapper) FromDomain(domain *domain.Dashboard) *DashboardModel {
-	if domain == nil {
-		return nil
-	}
-
-	return &DashboardModel{
-		ID: domain.ID,
-		Base: sharedmodels.Base{
-			CreatedBy: domain.CreatedBy,
-			UpdatedBy: domain.UpdatedBy,
-		},
-	}
-}
-
-// DashboardDataToDomain convierte DashboardDataModel a dominio
+// DashboardDataToDomain convierte DashboardDataModel a domain.DashboardData
 func (m *DashboardModelMapper) DashboardDataToDomain(
 	data *DashboardDataModel,
 	crops []CropIncidenceModel,
@@ -66,92 +21,8 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 	operational *OperationalIndicatorModel,
 ) *domain.DashboardData {
 	if data == nil {
-		return nil
+		return &domain.DashboardData{}
 	}
-
-	// Convertir cultivos
-	domainCrops := make([]domain.DashboardCrop, 0, len(crops))
-	var totalHectares, totalCosts decimal.Decimal
-
-	for _, crop := range crops {
-		domainCrops = append(domainCrops, domain.DashboardCrop{
-			Name:         crop.Name,
-			Hectares:     crop.Hectares,
-			RotationPct:  crop.IncidencePct,
-			CostUSDPerHa: crop.CostPerHa,
-			IncidencePct: crop.IncidencePct,
-		})
-
-		totalHectares = totalHectares.Add(crop.Hectares)
-		totalCosts = totalCosts.Add(crop.Hectares.Mul(crop.CostPerHa))
-	}
-
-	// Calcular totales de cultivos
-	var totalRotationPct, totalCostPerHectare decimal.Decimal
-	if totalHectares.GreaterThan(decimal.Zero) {
-		totalRotationPct = decimal.NewFromFloat(100)
-		totalCostPerHectare = totalCosts.Div(totalHectares)
-	}
-
-	// Convertir inversores
-	domainInvestors := make([]domain.DashboardInvestorBreakdown, 0, len(investors))
-	for _, investor := range investors {
-		domainInvestors = append(domainInvestors, domain.DashboardInvestorBreakdown{
-			InvestorID:   investor.InvestorID,
-			InvestorName: investor.InvestorName,
-			PercentPct:   investor.Percentage,
-		})
-	}
-
-	// Convertir indicadores operativos usando configuración
-	var operationalCards []domain.DashboardOperationalCard
-	if operational != nil {
-		operationalCards = []domain.DashboardOperationalCard{
-			{
-				Key:           m.config.CardKeys.FirstWorkorder,
-				Title:         m.config.CardTitles.FirstWorkorder,
-				Date:          operational.PrimeraOrdenFecha,
-				WorkorderID:   operational.PrimeraOrdenID,
-				WorkorderCode: nil,
-				AuditID:       nil,
-				AuditCode:     nil,
-				Status:        nil,
-			},
-			{
-				Key:           m.config.CardKeys.LastWorkorder,
-				Title:         m.config.CardTitles.LastWorkorder,
-				Date:          operational.UltimaOrdenFecha,
-				WorkorderID:   operational.UltimaOrdenID,
-				WorkorderCode: nil,
-				AuditID:       nil,
-				AuditCode:     nil,
-				Status:        nil,
-			},
-			{
-				Key:           m.config.CardKeys.LastStockAudit,
-				Title:         m.config.CardTitles.LastStockAudit,
-				Date:          operational.ArqueoStockFecha,
-				WorkorderID:   nil,
-				WorkorderCode: nil,
-				AuditID:       nil,
-				AuditCode:     nil,
-				Status:        nil,
-			},
-			{
-				Key:           m.config.CardKeys.CampaignClose,
-				Title:         m.config.CardTitles.CampaignClose,
-				Date:          operational.CierreCampanaFecha,
-				WorkorderID:   nil,
-				WorkorderCode: nil,
-				AuditID:       nil,
-				AuditCode:     nil,
-				Status:        stringPtr(m.config.DefaultStatuses.CampaignClose),
-			},
-		}
-	}
-
-	// Calcular progreso de inversores basado en datos reales
-	investorProgressPct := calculateInvestorProgress(investors)
 
 	return &domain.DashboardData{
 		Metrics: &domain.DashboardMetrics{
@@ -171,8 +42,8 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 				BudgetUSD:   data.CostsBudgetUSD,
 			},
 			InvestorContributions: &domain.DashboardInvestorContributions{
-				ProgressPct: investorProgressPct,
-				Breakdown:   domainInvestors,
+				ProgressPct: decimal.NewFromInt(100), // Siempre 100% por proyecto
+				Breakdown:   m.investorContributionsToDomain(investors),
 			},
 			OperatingResult: &domain.DashboardOperatingResult{
 				ProgressPct:   data.OperatingResultPct,
@@ -191,38 +62,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 				OperatingResultUSD:     data.OperatingResultUSD,
 				OperatingResultPct:     data.OperatingResultPct,
 			},
-			Breakdown: []domain.DashboardBalanceBreakdown{
-				{
-					Label:       m.config.BalanceLabels.Seed,
-					ExecutedUSD: data.SemillaEjecutadosUSD,
-					InvestedUSD: data.SemillaInvertidosUSD,
-					StockUSD:    decimalPtr(data.SemillaStockUSD),
-				},
-				{
-					Label:       m.config.BalanceLabels.Supplies,
-					ExecutedUSD: data.InsumosEjecutadosUSD,
-					InvestedUSD: data.InsumosInvertidosUSD,
-					StockUSD:    decimalPtr(data.InsumosStockUSD),
-				},
-				{
-					Label:       m.config.BalanceLabels.Labors,
-					ExecutedUSD: data.LaboresEjecutadosUSD,
-					InvestedUSD: data.LaboresInvertidosUSD,
-					StockUSD:    decimalPtr(data.LaboresStockUSD),
-				},
-				{
-					Label:       m.config.BalanceLabels.Rent,
-					ExecutedUSD: decimal.Zero, // No se calcula según la vista
-					InvestedUSD: data.ArriendoInvertidosUSD,
-					StockUSD:    nil, // No se calcula según la vista
-				},
-				{
-					Label:       m.config.BalanceLabels.Structure,
-					ExecutedUSD: decimal.Zero, // No se calcula según la vista
-					InvestedUSD: data.EstructuraInvertidosUSD,
-					StockUSD:    nil, // No se calcula según la vista
-				},
-			},
+			Breakdown: m.managementBalanceBreakdownFromData(data),
 			TotalsRow: &domain.DashboardBalanceTotals{
 				ExecutedUSD: data.CostosDirectosEjecutados,
 				InvestedUSD: data.CostosDirectosInvertidos,
@@ -230,42 +70,305 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 			},
 		},
 		CropIncidence: &domain.DashboardCropIncidence{
-			Crops: domainCrops,
-			Total: &domain.DashboardCropTotal{
-				Hectares:          totalHectares,
-				RotationPct:       totalRotationPct,
-				CostUSDPerHectare: totalCostPerHectare,
-			},
+			Crops: m.cropIncidenceToDomain(crops),
+			Total: nil, // TODO: Implementar cuando se requiera
 		},
-		OperationalIndicators: &domain.DashboardOperationalIndicators{
-			Cards: operationalCards,
+		OperationalIndicators: m.operationalIndicatorsToDomain(operational),
+	}
+}
+
+// SowingProgressToDomain convierte SowingProgressModel a domain.DashboardSowing
+func (m *DashboardModelMapper) SowingProgressToDomain(model *SowingProgressModel) *domain.DashboardSowing {
+	if model == nil {
+		return &domain.DashboardSowing{}
+	}
+
+	// Manejar punteros a decimal.Decimal
+	var hectares, totalHectares, progressPct decimal.Decimal
+
+	if model.Hectares != nil {
+		hectares = *model.Hectares
+	} else {
+		hectares = decimal.Zero
+	}
+
+	if model.TotalHectares != nil {
+		totalHectares = *model.TotalHectares
+	} else {
+		totalHectares = decimal.Zero
+	}
+
+	if model.ProgressPct != nil {
+		progressPct = *model.ProgressPct
+	} else {
+		progressPct = decimal.Zero
+	}
+
+	return &domain.DashboardSowing{
+		ProgressPct:   progressPct,
+		Hectares:      hectares,
+		TotalHectares: totalHectares,
+	}
+}
+
+// HarvestProgressToDomain convierte HarvestProgressModel a domain.DashboardHarvest
+func (m *DashboardModelMapper) HarvestProgressToDomain(model *HarvestProgressModel) *domain.DashboardHarvest {
+	if model == nil {
+		return &domain.DashboardHarvest{}
+	}
+
+	// Manejar punteros a decimal.Decimal
+	var hectares, totalHectares, progressPct decimal.Decimal
+
+	if model.Hectares != nil {
+		hectares = *model.Hectares
+	} else {
+		hectares = decimal.Zero
+	}
+
+	if model.TotalHectares != nil {
+		totalHectares = *model.TotalHectares
+	} else {
+		totalHectares = decimal.Zero
+	}
+
+	if model.ProgressPct != nil {
+		progressPct = *model.ProgressPct
+	} else {
+		progressPct = decimal.Zero
+	}
+
+	return &domain.DashboardHarvest{
+		ProgressPct:   progressPct,
+		Hectares:      hectares,
+		TotalHectares: totalHectares,
+	}
+}
+
+// CostsProgressToDomain convierte CostsProgressModel a domain.DashboardCosts
+func (m *DashboardModelMapper) CostsProgressToDomain(model *CostsProgressModel) *domain.DashboardCosts {
+	if model == nil {
+		return &domain.DashboardCosts{}
+	}
+
+	// Manejar punteros a decimal.Decimal
+	var progressPct, executedUSD, budgetUSD decimal.Decimal
+
+	if model.ProgressPct != nil {
+		progressPct = *model.ProgressPct
+	} else {
+		progressPct = decimal.Zero
+	}
+
+	if model.ExecutedCostsUSD != nil {
+		executedUSD = *model.ExecutedCostsUSD
+	} else {
+		executedUSD = decimal.Zero
+	}
+
+	if model.BudgetTotalUSD != nil {
+		budgetUSD = *model.BudgetTotalUSD
+	} else {
+		budgetUSD = decimal.Zero
+	}
+
+	return &domain.DashboardCosts{
+		ProgressPct: progressPct,
+		ExecutedUSD: executedUSD,
+		BudgetUSD:   budgetUSD,
+	}
+}
+
+// ContributionsProgressToDomain convierte ContributionsProgressModel a domain.DashboardInvestorContributions
+func (m *DashboardModelMapper) ContributionsProgressToDomain(models []ContributionsProgressModel) *domain.DashboardInvestorContributions {
+	if len(models) == 0 {
+		return &domain.DashboardInvestorContributions{
+			ProgressPct: decimal.NewFromInt(100),
+			Breakdown:   []domain.DashboardInvestorBreakdown{},
+		}
+	}
+
+	breakdown := make([]domain.DashboardInvestorBreakdown, len(models))
+	for i, model := range models {
+		breakdown[i] = domain.DashboardInvestorBreakdown{
+			InvestorID:   model.InvestorID,
+			InvestorName: model.InvestorName,
+			PercentPct:   model.InvestorPercentage,
+		}
+	}
+
+	return &domain.DashboardInvestorContributions{
+		ProgressPct: decimal.NewFromInt(100), // Siempre 100% por proyecto
+		Breakdown:   breakdown,
+	}
+}
+
+// OperatingResultToDomain convierte OperatingResultModel a domain.DashboardOperatingResult
+func (m *DashboardModelMapper) OperatingResultToDomain(model *OperatingResultModel) *domain.DashboardOperatingResult {
+	if model == nil {
+		return &domain.DashboardOperatingResult{}
+	}
+
+	return &domain.DashboardOperatingResult{
+		ProgressPct:   model.ResultPct,
+		IncomeUSD:     model.IncomeUSD,
+		TotalCostsUSD: model.TotalCostsUSD,
+	}
+}
+
+// ManagementBalanceToDomain convierte ManagementBalanceModel a domain.DashboardManagementBalance
+func (m *DashboardModelMapper) ManagementBalanceToDomain(model *ManagementBalanceModel) *domain.DashboardManagementBalance {
+	if model == nil {
+		return &domain.DashboardManagementBalance{}
+	}
+
+	return &domain.DashboardManagementBalance{
+		Summary:   m.managementBalanceSummaryToDomain(model.Summary),
+		Breakdown: m.managementBalanceBreakdownToDomain(model.Breakdown),
+		TotalsRow: m.managementBalanceTotalsToDomain(model.TotalsRow),
+	}
+}
+
+// cropIncidenceToDomain convierte CropIncidenceModel a domain.DashboardCropBreakdown
+func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel) []domain.DashboardCropBreakdown {
+	if len(models) == 0 {
+		return []domain.DashboardCropBreakdown{}
+	}
+
+	breakdown := make([]domain.DashboardCropBreakdown, len(models))
+	for i, model := range models {
+		breakdown[i] = domain.DashboardCropBreakdown{
+			Name:         model.Name,
+			Hectares:     model.Hectares,
+			RotationPct:  decimal.Zero, // TODO: Implementar cuando se requiera
+			CostUSDPerHa: model.CostPerHa,
+			IncidencePct: model.IncidencePct,
+		}
+	}
+
+	return breakdown
+}
+
+// investorContributionsToDomain convierte InvestorContributionModel a domain.DashboardInvestorBreakdown
+func (m *DashboardModelMapper) investorContributionsToDomain(models []InvestorContributionModel) []domain.DashboardInvestorBreakdown {
+	if len(models) == 0 {
+		return []domain.DashboardInvestorBreakdown{}
+	}
+
+	breakdown := make([]domain.DashboardInvestorBreakdown, len(models))
+	for i, model := range models {
+		breakdown[i] = domain.DashboardInvestorBreakdown{
+			InvestorID:   model.InvestorID,
+			InvestorName: model.InvestorName,
+			PercentPct:   model.Percentage,
+		}
+	}
+
+	return breakdown
+}
+
+// operationalIndicatorsToDomain convierte OperationalIndicatorModel a domain.DashboardOperationalIndicators
+func (m *DashboardModelMapper) operationalIndicatorsToDomain(model *OperationalIndicatorModel) *domain.DashboardOperationalIndicators {
+	if model == nil {
+		return &domain.DashboardOperationalIndicators{
+			Cards: []domain.DashboardOperationalCard{},
+		}
+	}
+
+	// TODO: Implementar conversión cuando se requiera
+	return &domain.DashboardOperationalIndicators{
+		Cards: []domain.DashboardOperationalCard{},
+	}
+}
+
+// managementBalanceSummaryToDomain convierte ManagementBalanceSummary a domain.DashboardBalanceSummary
+func (m *DashboardModelMapper) managementBalanceSummaryToDomain(model *ManagementBalanceSummary) *domain.DashboardBalanceSummary {
+	if model == nil {
+		return &domain.DashboardBalanceSummary{}
+	}
+
+	return &domain.DashboardBalanceSummary{
+		IncomeUSD:              model.IncomeUSD,
+		DirectCostsExecutedUSD: model.DirectCostsExecutedUSD,
+		DirectCostsInvestedUSD: model.DirectCostsInvestedUSD,
+		StockUSD:               model.StockUSD,
+		RentUSD:                model.RentUSD,
+		StructureUSD:           model.StructureUSD,
+		OperatingResultUSD:     model.OperatingResultUSD,
+		OperatingResultPct:     model.OperatingResultPct,
+	}
+}
+
+// managementBalanceBreakdownToDomain convierte ManagementBalanceBreakdown a domain.DashboardBalanceBreakdown
+func (m *DashboardModelMapper) managementBalanceBreakdownToDomain(models []ManagementBalanceBreakdown) []domain.DashboardBalanceBreakdown {
+	if len(models) == 0 {
+		return []domain.DashboardBalanceBreakdown{}
+	}
+
+	breakdown := make([]domain.DashboardBalanceBreakdown, len(models))
+	for i, model := range models {
+		breakdown[i] = domain.DashboardBalanceBreakdown{
+			Label:       model.Category,
+			ExecutedUSD: model.ExecutedUSD,
+			InvestedUSD: model.InvestedUSD,
+			StockUSD:    &model.StockUSD,
+		}
+	}
+
+	return breakdown
+}
+
+// managementBalanceTotalsToDomain convierte ManagementBalanceTotals a domain.DashboardBalanceTotals
+func (m *DashboardModelMapper) managementBalanceTotalsToDomain(model *ManagementBalanceTotals) *domain.DashboardBalanceTotals {
+	if model == nil {
+		return &domain.DashboardBalanceTotals{}
+	}
+
+	return &domain.DashboardBalanceTotals{
+		ExecutedUSD: model.TotalExecutedUSD,
+		InvestedUSD: model.TotalInvestedUSD,
+		StockUSD:    model.TotalStockUSD,
+	}
+}
+
+// managementBalanceBreakdownFromData convierte DashboardDataModel a domain.DashboardBalanceBreakdown
+func (m *DashboardModelMapper) managementBalanceBreakdownFromData(data *DashboardDataModel) []domain.DashboardBalanceBreakdown {
+	if data == nil {
+		return []domain.DashboardBalanceBreakdown{}
+	}
+
+	zeroStock := decimal.Zero
+
+	return []domain.DashboardBalanceBreakdown{
+		{
+			Label:       "Semilla",
+			ExecutedUSD: data.SemillaEjecutadosUSD,
+			InvestedUSD: data.SemillaInvertidosUSD,
+			StockUSD:    &data.SemillaStockUSD,
+		},
+		{
+			Label:       "Insumos",
+			ExecutedUSD: data.InsumosEjecutadosUSD,
+			InvestedUSD: data.InsumosInvertidosUSD,
+			StockUSD:    &data.InsumosStockUSD,
+		},
+		{
+			Label:       "Labores",
+			ExecutedUSD: data.LaboresEjecutadosUSD,
+			InvestedUSD: data.LaboresInvertidosUSD,
+			StockUSD:    &data.LaboresStockUSD,
+		},
+		{
+			Label:       "Arriendo",
+			ExecutedUSD: decimal.Zero,
+			InvestedUSD: data.ArriendoInvertidosUSD,
+			StockUSD:    &zeroStock,
+		},
+		{
+			Label:       "Estructura",
+			ExecutedUSD: decimal.Zero,
+			InvestedUSD: data.EstructuraInvertidosUSD,
+			StockUSD:    &zeroStock,
 		},
 	}
-}
-
-// calculateInvestorProgress calcula el progreso real de inversores basado en datos
-func calculateInvestorProgress(investors []InvestorContributionModel) decimal.Decimal {
-	if len(investors) == 0 {
-		return decimal.Zero
-	}
-
-	var totalPercentage decimal.Decimal
-	for _, investor := range investors {
-		totalPercentage = totalPercentage.Add(investor.Percentage)
-	}
-
-	// Si la suma es 100%, retornar 100, sino retornar el valor real
-	if totalPercentage.Equal(decimal.NewFromFloat(100)) {
-		return decimal.NewFromFloat(100)
-	}
-	return totalPercentage
-}
-
-// Funciones auxiliares
-func decimalPtr(d decimal.Decimal) *decimal.Decimal {
-	return &d
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

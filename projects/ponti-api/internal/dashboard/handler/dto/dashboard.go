@@ -12,10 +12,10 @@ import (
 
 // DashboardFilterRequest representa el filtro de request para el dashboard
 type DashboardFilterRequest struct {
-	CustomerIDs []int64 `json:"customer_ids" binding:"omitempty"`
-	ProjectIDs  []int64 `json:"project_ids" binding:"omitempty"`
-	CampaignIDs []int64 `json:"campaign_ids" binding:"omitempty"`
-	FieldIDs    []int64 `json:"field_ids" binding:"omitempty"`
+	CustomerID *int64 `json:"customer_id" binding:"omitempty"`
+	ProjectID  *int64 `json:"project_id" binding:"omitempty"`
+	CampaignID *int64 `json:"campaign_id" binding:"omitempty"`
+	FieldID    *int64 `json:"field_id" binding:"omitempty"`
 }
 
 // DashboardRequest representa un request de dashboard (para casos de creación/actualización)
@@ -454,10 +454,10 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 // ToDashboardFilter convierte un DTO de filtro a entidad de dominio
 func ToDashboardFilter(dto DashboardFilterRequest) domain.DashboardFilter {
 	return domain.DashboardFilter{
-		CustomerIDs: dto.CustomerIDs,
-		ProjectIDs:  dto.ProjectIDs,
-		CampaignIDs: dto.CampaignIDs,
-		FieldIDs:    dto.FieldIDs,
+		CustomerID: dto.CustomerID,
+		ProjectID:  dto.ProjectID,
+		CampaignID: dto.CampaignID,
+		FieldID:    dto.FieldID,
 	}
 }
 

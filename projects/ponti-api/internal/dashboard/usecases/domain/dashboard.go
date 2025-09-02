@@ -9,10 +9,10 @@ import (
 
 // DashboardFilter representa los filtros para obtener datos del dashboard
 type DashboardFilter struct {
-	CustomerIDs []int64
-	ProjectIDs  []int64
-	CampaignIDs []int64
-	FieldIDs    []int64
+	CustomerID *int64
+	ProjectID  *int64
+	CampaignID *int64
+	FieldID    *int64
 }
 
 // Dashboard representa la entidad principal del dashboard
@@ -99,7 +99,7 @@ type DashboardBalanceSummary struct {
 	OperatingResultPct     decimal.Decimal
 }
 
-// DashboardBalanceBreakdown representa el desglose por categoría
+// DashboardBalanceBreakdown representa el desglose del balance por categoría
 type DashboardBalanceBreakdown struct {
 	Label       string
 	ExecutedUSD decimal.Decimal
@@ -107,21 +107,21 @@ type DashboardBalanceBreakdown struct {
 	StockUSD    *decimal.Decimal
 }
 
-// DashboardBalanceTotals representa la fila de totales
+// DashboardBalanceTotals representa los totales del balance
 type DashboardBalanceTotals struct {
 	ExecutedUSD decimal.Decimal
 	InvestedUSD decimal.Decimal
 	StockUSD    decimal.Decimal
 }
 
-// DashboardCropIncidence representa la incidencia por cultivo
+// DashboardCropIncidence representa la incidencia de costos por cultivo
 type DashboardCropIncidence struct {
-	Crops []DashboardCrop
+	Crops []DashboardCropBreakdown
 	Total *DashboardCropTotal
 }
 
-// DashboardCrop representa los datos de un cultivo específico
-type DashboardCrop struct {
+// DashboardCropBreakdown representa el desglose de costos por cultivo
+type DashboardCropBreakdown struct {
 	Name         string
 	Hectares     decimal.Decimal
 	RotationPct  decimal.Decimal
