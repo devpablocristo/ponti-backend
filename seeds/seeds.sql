@@ -204,9 +204,9 @@ ORDER BY project_id;
 -- MÓDULO 4: RESULTADO OPERATIVO
 -- ========================================
 -- RESULTADOS REALES:
--- Proyecto 1: $0 ingresos - $57,500 costos = -$57,500
--- Proyecto 2: $0 ingresos - $86,250 costos = -$86,250
--- Proyecto 3: $0 ingresos - $0 costos = $0
+-- Proyecto 1: $0 ingresos - $92,500 costos = -$92,500 (-100%)
+-- Proyecto 2: $0 ingresos - $138,750 costos = -$138,750 (-100%)
+-- Proyecto 3: $0 ingresos - $0 costos = $0 (0%)
 SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
 SELECT 
   project_id, 
