@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"time"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
@@ -70,8 +71,11 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		return nil, err
 	}
 
-	// TODO: Implementar el último módulo cuando se requiera
-	// - Módulo 8: Indicadores Operativos
+	// Obtener datos del módulo 8: Indicadores Operativos
+	operationalIndicatorsData, err := r.getOperationalIndicators(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
 
 	// Crear estructura temporal con datos de siembra, costos, cosecha, aportes y resultado operativo
 	var sowingHectares, sowingTotalHectares, sowingProgressPercent decimal.Decimal
@@ -173,9 +177,9 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		// Los demás campos se dejan en cero hasta implementar los otros módulos
 	}
 
-	// Usar el mapper para convertir a dominio, pasando los datos de aportes, balance de gestión y crop incidence
+	// Usar el mapper para convertir a dominio, pasando los datos de aportes, balance de gestión, crop incidence y operational indicators
 	investorContributions := r.mapper.ContributionsProgressToInvestorContribution(contributionsData)
-	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, investorContributions, managementBalanceData), nil
+	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, investorContributions, managementBalanceData, operationalIndicatorsData), nil
 }
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
@@ -1353,26 +1357,121 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 }
 
 // getOperationalIndicators obtiene los indicadores operativos
-// func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain.DashboardFilter) (*models.OperationalIndicatorModel, error) {
-// 	var projectIDs []int64
-// 	var err error
-//
-// 	// Si tenemos ProjectID directamente, usarlo sin buscar
-// 	if filter.ProjectID != nil {
-// 		projectIDs = []int64{*filter.ProjectID}
-// 	} else {
-// 		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
-// 		// (por CustomerID, CampaignID o FieldID)
-// 		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-//
-// 	// Si no hay proyectos relacionados, retornar datos vacíos
-// 	if len(projectIDs) == 0 {
-// 		return &models.OperationalIndicatorModel{}, nil
-// 	}
-//
-// 	// Implementar consulta a dashboard_operational_indicators_view usando project_id = ANY($1)
-// }
+func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain.DashboardFilter) (*models.OperationalIndicatorModel, error) {
+	var projectIDs []int64
+	var err error
+
+	// Si tenemos ProjectID directamente, usarlo sin buscar
+	if filter.ProjectID != nil {
+		projectIDs = []int64{*filter.ProjectID}
+	} else {
+		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
+		// (por CustomerID, CampaignID o FieldID)
+		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Si no hay proyectos relacionados, retornar datos vacíos
+	if len(projectIDs) == 0 {
+		return &models.OperationalIndicatorModel{}, nil
+	}
+
+	query := `
+		SELECT
+			first_workorder_date,
+			first_workorder_number,
+			last_workorder_date,
+			last_workorder_number,
+			last_stock_count_date,
+			campaign_closing_date
+		FROM dashboard_operational_indicators_view
+		WHERE project_id = ANY($1)
+		LIMIT 1
+	`
+
+	args := []interface{}{projectIDs}
+
+	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get operational indicators data", err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		// Leer los valores raw
+		var rawFirstWorkorderDate, rawFirstWorkorderNumber, rawLastWorkorderDate, rawLastWorkorderNumber, rawLastStockCountDate, rawCampaignClosingDate interface{}
+		err = rows.Scan(&rawFirstWorkorderDate, &rawFirstWorkorderNumber, &rawLastWorkorderDate, &rawLastWorkorderNumber, &rawLastStockCountDate, &rawCampaignClosingDate)
+		if err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to scan operational indicators data", err)
+		}
+
+		// Convertir los valores raw a los tipos correctos
+		var firstWorkorderDate, lastWorkorderDate, lastStockCountDate, campaignClosingDate *time.Time
+		var firstWorkorderNumber, lastWorkorderNumber *int64
+
+		// Convertir firstWorkorderDate
+		if rawFirstWorkorderDate != nil {
+			if dateVal, ok := rawFirstWorkorderDate.(time.Time); ok {
+				firstWorkorderDate = &dateVal
+			}
+		}
+
+		// Convertir firstWorkorderNumber
+		if rawFirstWorkorderNumber != nil {
+			if intVal, ok := rawFirstWorkorderNumber.(int64); ok {
+				firstWorkorderNumber = &intVal
+			} else if intVal, ok := rawFirstWorkorderNumber.(int); ok {
+				int64Val := int64(intVal)
+				firstWorkorderNumber = &int64Val
+			}
+		}
+
+		// Convertir lastWorkorderDate
+		if rawLastWorkorderDate != nil {
+			if dateVal, ok := rawLastWorkorderDate.(time.Time); ok {
+				lastWorkorderDate = &dateVal
+			}
+		}
+
+		// Convertir lastWorkorderNumber
+		if rawLastWorkorderNumber != nil {
+			if intVal, ok := rawLastWorkorderNumber.(int64); ok {
+				lastWorkorderNumber = &intVal
+			} else if intVal, ok := rawLastWorkorderNumber.(int); ok {
+				int64Val := int64(intVal)
+				lastWorkorderNumber = &int64Val
+			}
+		}
+
+		// Convertir lastStockCountDate
+		if rawLastStockCountDate != nil {
+			if dateVal, ok := rawLastStockCountDate.(time.Time); ok {
+				lastStockCountDate = &dateVal
+			}
+		}
+
+		// Convertir campaignClosingDate
+		if rawCampaignClosingDate != nil {
+			if dateVal, ok := rawCampaignClosingDate.(time.Time); ok {
+				campaignClosingDate = &dateVal
+			}
+		}
+
+		// Crear el modelo
+		result := models.OperationalIndicatorModel{
+			FirstWorkorderDate:   firstWorkorderDate,
+			FirstWorkorderNumber: firstWorkorderNumber,
+			LastWorkorderDate:    lastWorkorderDate,
+			LastWorkorderNumber:  lastWorkorderNumber,
+			LastStockCountDate:   lastStockCountDate,
+			CampaignClosingDate:  campaignClosingDate,
+		}
+
+		return &result, nil
+	}
+
+	// Si no hay filas, retornar modelo vacío
+	return &models.OperationalIndicatorModel{}, nil
+}

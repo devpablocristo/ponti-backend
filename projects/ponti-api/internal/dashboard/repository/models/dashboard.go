@@ -161,10 +161,10 @@ type InvestorContributionModel struct {
 
 // OperationalIndicatorModel representa el modelo de indicadores operativos
 type OperationalIndicatorModel struct {
-	PrimeraOrdenFecha  *time.Time `db:"primera_orden_fecha"`
-	PrimeraOrdenID     *int64     `db:"primera_orden_id"`
-	UltimaOrdenFecha   *time.Time `db:"ultima_orden_fecha"`
-	UltimaOrdenID      *int64     `db:"ultima_orden_id"`
-	ArqueoStockFecha   *time.Time `db:"arqueo_stock_fecha"`
-	CierreCampanaFecha *time.Time `db:"cierre_campana_fecha"`
+	FirstWorkorderDate   *time.Time `db:"first_workorder_date"`
+	FirstWorkorderNumber *int64     `db:"first_workorder_number"`
+	LastWorkorderDate    *time.Time `db:"last_workorder_date"`
+	LastWorkorderNumber  *int64     `db:"last_workorder_number"`
+	LastStockCountDate   *time.Time `db:"last_stock_count_date"`
+	CampaignClosingDate  *time.Time `db:"campaign_closing_date"`
 }

@@ -146,12 +146,8 @@ type DashboardOperationalIndicators struct {
 
 // DashboardOperationalCard representa una tarjeta de indicador operativo
 type DashboardOperationalCard struct {
-	Key           string
-	Title         string
-	Date          *time.Time
-	WorkorderID   *int64
-	WorkorderCode *string
-	AuditID       *int64
-	AuditCode     *string
-	Status        *string
+	Key         string
+	Title       string
+	Date        *time.Time
+	WorkorderID *int64
 }

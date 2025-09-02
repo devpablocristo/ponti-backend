@@ -19,6 +19,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 	crops []CropIncidenceModel,
 	investors []InvestorContributionModel,
 	managementBalance *ManagementBalanceModel,
+	operationalIndicators *OperationalIndicatorModel,
 ) *domain.DashboardData {
 	if data == nil {
 		return &domain.DashboardData{}
@@ -56,9 +57,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 			Crops: m.cropIncidenceToDomain(crops),
 			Total: nil, // TODO: Implementar cuando se requiera
 		},
-		OperationalIndicators: &domain.DashboardOperationalIndicators{
-			Cards: []domain.DashboardOperationalCard{}, // TODO: Implementar cuando se requiera
-		},
+		OperationalIndicators: m.operationalIndicatorsToDomain(operationalIndicators),
 	}
 }
 
@@ -357,9 +356,50 @@ func (m *DashboardModelMapper) operationalIndicatorsToDomain(model *OperationalI
 		}
 	}
 
-	// TODO: Implementar conversión cuando se requiera
+	cards := []domain.DashboardOperationalCard{}
+
+	// Tarjeta: Primera Orden de Trabajo
+	if model.FirstWorkorderDate != nil {
+		cards = append(cards, domain.DashboardOperationalCard{
+			Key:         "first_workorder",
+			Title:       "Primera Orden de Trabajo",
+			Date:        model.FirstWorkorderDate,
+			WorkorderID: model.FirstWorkorderNumber,
+		})
+	}
+
+	// Tarjeta: Última Orden de Trabajo
+	if model.LastWorkorderDate != nil {
+		cards = append(cards, domain.DashboardOperationalCard{
+			Key:         "last_workorder",
+			Title:       "Última Orden de Trabajo",
+			Date:        model.LastWorkorderDate,
+			WorkorderID: model.LastWorkorderNumber,
+		})
+	}
+
+	// Tarjeta: Último Arqueo de Stock
+	if model.LastStockCountDate != nil {
+		cards = append(cards, domain.DashboardOperationalCard{
+			Key:         "last_stock_count",
+			Title:       "Último Arqueo de Stock",
+			Date:        model.LastStockCountDate,
+			WorkorderID: nil,
+		})
+	}
+
+	// Tarjeta: Cierre de Campaña
+	if model.CampaignClosingDate != nil {
+		cards = append(cards, domain.DashboardOperationalCard{
+			Key:         "campaign_closing",
+			Title:       "Cierre de Campaña",
+			Date:        model.CampaignClosingDate,
+			WorkorderID: nil,
+		})
+	}
+
 	return &domain.DashboardOperationalIndicators{
-		Cards: []domain.DashboardOperationalCard{},
+		Cards: cards,
 	}
 }
 

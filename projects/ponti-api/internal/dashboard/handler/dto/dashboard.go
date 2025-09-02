@@ -258,14 +258,10 @@ type OperationalIndicators struct {
 
 // OperationalCard representa una tarjeta de indicador operativo
 type OperationalCard struct {
-	Key           string     `json:"key"`
-	Title         string     `json:"title"`
-	Date          *time.Time `json:"date"`
-	WorkorderID   *int64     `json:"workorder_id"`
-	WorkorderCode *string    `json:"workorder_code"`
-	AuditID       *int64     `json:"audit_id"`
-	AuditCode     *string    `json:"audit_code"`
-	Status        *string    `json:"status"`
+	Key         string     `json:"key"`
+	Title       string     `json:"title"`
+	Date        *time.Time `json:"date"`
+	WorkorderID *int64     `json:"workorder_id"`
 }
 
 // FromDashboardPayloadResponse convierte directamente la respuesta de la función SQL a DTO
@@ -718,14 +714,10 @@ func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicat
 	cards := make([]OperationalCard, 0, len(indicators.Cards))
 	for _, card := range indicators.Cards {
 		cards = append(cards, OperationalCard{
-			Key:           card.Key,
-			Title:         card.Title,
-			Date:          card.Date,
-			WorkorderID:   card.WorkorderID,
-			WorkorderCode: card.WorkorderCode,
-			AuditID:       card.AuditID,
-			AuditCode:     card.AuditCode,
-			Status:        card.Status,
+			Key:         card.Key,
+			Title:       card.Title,
+			Date:        card.Date,
+			WorkorderID: card.WorkorderID,
 		})
 	}
 
