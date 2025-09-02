@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
@@ -45,14 +46,19 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		return nil, err
 	}
 
-	// TODO: Implementar los otros 5 módulos cuando se requiera
-	// - Módulo 4: Avance de Aportes
+	// Obtener datos del módulo 4: Avance de Aportes
+	contributionsData, err := r.getContributionsProgress(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Implementar los otros 4 módulos cuando se requiera
 	// - Módulo 5: Resultado Operativo
 	// - Módulo 6: Balance de Gestión
 	// - Módulo 7: Incidencia de Costos por Cultivo
 	// - Módulo 8: Indicadores Operativos
 
-	// Crear estructura temporal con datos de siembra, costos y cosecha
+	// Crear estructura temporal con datos de siembra, costos, cosecha y aportes
 	var sowingHectares, sowingTotalHectares, sowingProgressPercent decimal.Decimal
 	var costsExecutedUSD, costsBudgetUSD, costsProgressPercent decimal.Decimal
 	var harvestHectares, harvestTotalHectares, harvestProgressPercent decimal.Decimal
@@ -124,8 +130,9 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		// Los demás campos se dejan en cero hasta implementar los otros módulos
 	}
 
-	// Usar el mapper para convertir a dominio
-	return r.mapper.DashboardDataToDomain(tempData, nil, nil, nil), nil
+	// Usar el mapper para convertir a dominio, pasando los datos de aportes
+	investorContributions := r.mapper.ContributionsProgressToInvestorContribution(contributionsData)
+	return r.mapper.DashboardDataToDomain(tempData, nil, investorContributions, nil), nil
 }
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
@@ -573,29 +580,139 @@ func (r *Repository) getHarvestProgress(ctx context.Context, filter domain.Dashb
 }
 
 // getContributionsProgress obtiene los datos del avance de aportes
-// func (r *Repository) getContributionsProgress(ctx context.Context, filter domain.DashboardFilter) (*models.ContributionsProgressModel, error) {
-// 	var projectIDs []int64
-// 	var err error
-//
-// 	// Si tenemos ProjectID directamente, usarlo sin buscar
-// 	if filter.ProjectID != nil {
-// 		projectIDs = []int64{*filter.ProjectID}
-// 	} else {
-// 		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
-// 		// (por CustomerID, CampaignID o FieldID)
-// 		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-//
-// 	// Si no hay proyectos relacionados, retornar datos vacíos
-// 	if len(projectIDs) == 0 {
-// 		return &models.ContributionsProgressModel{}, nil
-// 	}
-//
-// 	// Implementar consulta a dashboard_contributions_progress_view usando project_id = ANY($1)
-// }
+func (r *Repository) getContributionsProgress(ctx context.Context, filter domain.DashboardFilter) ([]models.ContributionsProgressModel, error) {
+	var projectIDs []int64
+	var err error
+
+	// Si tenemos ProjectID directamente, usarlo sin buscar
+	if filter.ProjectID != nil {
+		projectIDs = []int64{*filter.ProjectID}
+	} else {
+		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
+		// (por CustomerID, CampaignID o FieldID)
+		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Si no hay proyectos relacionados, retornar datos vacíos
+	if len(projectIDs) == 0 {
+		return []models.ContributionsProgressModel{}, nil
+	}
+
+	query := `
+		SELECT 
+			investor_id,
+			investor_name,
+			investor_percentage_pct,
+			contributions_progress_pct
+		FROM dashboard_contributions_progress_view 
+		WHERE project_id = ANY($1)
+		ORDER BY investor_id
+	`
+
+	args := []interface{}{projectIDs}
+
+	// Ejecutar la consulta
+	var results []models.ContributionsProgressModel
+
+	// Obtener las filas de la consulta
+	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get contributions progress data", err)
+	}
+	defer rows.Close()
+
+	// Leer todas las filas
+	for i := 0; rows.Next(); i++ {
+		// Leer los valores raw
+		var rawInvestorID, rawInvestorName, rawPercentage, rawProgressPct interface{}
+		err = rows.Scan(&rawInvestorID, &rawInvestorName, &rawPercentage, &rawProgressPct)
+		if err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to scan contributions progress data", err)
+		}
+
+		// Convertir los valores raw a los tipos correctos
+		var investorID *int64
+		var investorName *string
+		var percentage, progressPct *decimal.Decimal
+
+		// Convertir InvestorID
+		if rawInvestorID != nil {
+			if intVal, ok := rawInvestorID.(int64); ok {
+				investorID = &intVal
+			} else if floatVal, ok := rawInvestorID.(float64); ok {
+				intVal := int64(floatVal)
+				investorID = &intVal
+			} else if intVal, ok := rawInvestorID.(int); ok {
+				int64Val := int64(intVal)
+				investorID = &int64Val
+			}
+		}
+
+		// Convertir InvestorName
+		if rawInvestorName != nil {
+			if strVal, ok := rawInvestorName.(string); ok {
+				investorName = &strVal
+			}
+		}
+
+		// Convertir InvestorPercentage
+		if rawPercentage != nil {
+			if strVal, ok := rawPercentage.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					percentage = &dec
+				}
+			} else if floatVal, ok := rawPercentage.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				percentage = &dec
+			} else if intVal, ok := rawPercentage.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				percentage = &dec
+			} else if intVal, ok := rawPercentage.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				percentage = &dec
+			}
+		}
+
+		// Convertir ContributionsProgressPct
+		if rawProgressPct != nil {
+			if strVal, ok := rawProgressPct.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					progressPct = &dec
+				}
+			} else if floatVal, ok := rawProgressPct.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				progressPct = &dec
+			} else if intVal, ok := rawProgressPct.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				progressPct = &dec
+			} else if intVal, ok := rawProgressPct.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				progressPct = &dec
+			}
+		}
+
+		// Debug: Imprimir valores raw para ver qué llega
+		fmt.Printf("DEBUG: Raw values for row %d - InvestorID: %v (%T), InvestorName: %v (%T), Percentage: %v (%T), ProgressPct: %v (%T)\n",
+			i+1, rawInvestorID, rawInvestorID, rawInvestorName, rawInvestorName, rawPercentage, rawPercentage, rawProgressPct, rawProgressPct)
+		fmt.Printf("DEBUG: Converted values for row %d - InvestorID: %v, InvestorName: %v, Percentage: %v, ProgressPct: %v\n",
+			i+1, investorID, investorName, percentage, progressPct)
+
+		// Crear el resultado individual
+		result := models.ContributionsProgressModel{
+			InvestorID:               investorID,
+			InvestorName:             investorName,
+			InvestorPercentage:       percentage,
+			ContributionsProgressPct: progressPct,
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
+}
 
 // getOperatingResult obtiene los datos del resultado operativo
 // func (r *Repository) getOperatingResult(ctx context.Context, filter domain.DashboardFilter) (*models.OperatingResultModel, error) {

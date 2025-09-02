@@ -93,10 +93,10 @@ type CostsProgressModel struct {
 
 // ContributionsProgressModel representa el modelo de avance de aportes
 type ContributionsProgressModel struct {
-	InvestorID               int64           `db:"investor_id"`
-	InvestorName             string          `db:"investor_name"`
-	InvestorPercentage       decimal.Decimal `db:"investor_percentage_pct"`
-	ContributionsProgressPct decimal.Decimal `db:"contributions_progress_pct"`
+	InvestorID               *int64           `db:"investor_id"`
+	InvestorName             *string          `db:"investor_name"`
+	InvestorPercentage       *decimal.Decimal `db:"investor_percentage_pct"`
+	ContributionsProgressPct *decimal.Decimal `db:"contributions_progress_pct"`
 }
 
 // OperatingResultModel representa el modelo de resultado operativo

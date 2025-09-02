@@ -190,17 +190,93 @@ func (m *DashboardModelMapper) ContributionsProgressToDomain(models []Contributi
 
 	breakdown := make([]domain.DashboardInvestorBreakdown, len(models))
 	for i, model := range models {
+		// Manejar punteros
+		var investorID int64
+		var investorName string
+		var percentage decimal.Decimal
+
+		if model.InvestorID != nil {
+			investorID = *model.InvestorID
+		}
+
+		if model.InvestorName != nil {
+			investorName = *model.InvestorName
+		}
+
+		if model.InvestorPercentage != nil {
+			percentage = *model.InvestorPercentage
+		} else {
+			percentage = decimal.Zero
+		}
+
 		breakdown[i] = domain.DashboardInvestorBreakdown{
-			InvestorID:   model.InvestorID,
-			InvestorName: model.InvestorName,
-			PercentPct:   model.InvestorPercentage,
+			InvestorID:   investorID,
+			InvestorName: investorName,
+			PercentPct:   percentage,
 		}
 	}
 
+	// Calcular el progreso total (promedio de todos los inversores)
+	var totalProgress decimal.Decimal
+	if len(models) > 0 {
+		sum := decimal.Zero
+		count := decimal.Zero
+		for _, model := range models {
+			if model.ContributionsProgressPct != nil {
+				sum = sum.Add(*model.ContributionsProgressPct)
+				count = count.Add(decimal.NewFromInt(1))
+			}
+		}
+		if count.GreaterThan(decimal.Zero) {
+			totalProgress = sum.Div(count)
+		} else {
+			totalProgress = decimal.Zero
+		}
+	} else {
+		totalProgress = decimal.Zero
+	}
+
 	return &domain.DashboardInvestorContributions{
-		ProgressPct: decimal.NewFromInt(100), // Siempre 100% por proyecto
+		ProgressPct: totalProgress,
 		Breakdown:   breakdown,
 	}
+}
+
+// ContributionsProgressToInvestorContribution convierte ContributionsProgressModel a InvestorContributionModel
+func (m *DashboardModelMapper) ContributionsProgressToInvestorContribution(models []ContributionsProgressModel) []InvestorContributionModel {
+	if len(models) == 0 {
+		return []InvestorContributionModel{}
+	}
+
+	result := make([]InvestorContributionModel, len(models))
+	for i, model := range models {
+		// Manejar punteros
+		var investorID int64
+		var investorName string
+		var percentage decimal.Decimal
+
+		if model.InvestorID != nil {
+			investorID = *model.InvestorID
+		}
+
+		if model.InvestorName != nil {
+			investorName = *model.InvestorName
+		}
+
+		if model.InvestorPercentage != nil {
+			percentage = *model.InvestorPercentage
+		} else {
+			percentage = decimal.Zero
+		}
+
+		result[i] = InvestorContributionModel{
+			InvestorID:   investorID,
+			InvestorName: investorName,
+			Percentage:   percentage,
+		}
+	}
+
+	return result
 }
 
 // OperatingResultToDomain convierte OperatingResultModel a domain.DashboardOperatingResult
