@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRACIÓN 000057: FIX INCIDENCIA DE COSTOS POR CULTIVO
+-- MIGRACIÓN 000056: FIX INCIDENCIA DE COSTOS POR CULTIVO
 -- ========================================
 -- 
 -- Objetivo: Crear vista para la incidencia de costos por cultivo

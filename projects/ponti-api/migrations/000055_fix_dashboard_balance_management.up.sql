@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRACIÓN 000056: FIX BALANCE DE GESTIÓN
+-- MIGRACIÓN 000055: FIX BALANCE DE GESTIÓN
 -- ========================================
 -- 
 -- Objetivo: Crear vista para el balance de gestión con desglose completo

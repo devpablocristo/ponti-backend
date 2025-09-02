@@ -1,4 +1,4 @@
--- Migración 000053: Corregir SOLO el avance de cosecha
+-- Migración 000052: Corregir SOLO el avance de cosecha
 -- Enfoque: Vista que calcula correctamente el porcentaje de avance de cosecha
 -- Partir de la migración 000050 (no tocar la 000051 ni 000052)
 

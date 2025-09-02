@@ -1,4 +1,4 @@
--- Migración 000052: Corregir SOLO el avance de costos
+-- Migración 000051: Corregir SOLO el avance de costos
 -- Enfoque: Vista que calcula correctamente el porcentaje de avance de costos
 -- Partir de la migración 000050 (no tocar la 000051)
 

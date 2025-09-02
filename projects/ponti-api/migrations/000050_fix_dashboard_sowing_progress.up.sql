@@ -1,4 +1,4 @@
--- Migración 000051: Corregir SOLO el avance de siembra
+-- Migración 000050: Corregir SOLO el avance de siembra
 -- Enfoque: Vista simplificada que calcula correctamente el porcentaje de siembra
 
 DROP VIEW IF EXISTS dashboard_sowing_progress_view;

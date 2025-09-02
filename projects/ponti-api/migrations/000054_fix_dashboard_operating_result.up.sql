@@ -1,4 +1,4 @@
--- Migración 000055: Corregir SOLO el resultado operativo
+-- Migración 000054: Corregir SOLO el resultado operativo
 -- Enfoque: Vista que calcula correctamente el resultado operativo
 -- Partir de la migración 000050 (no tocar la 000051, 000052, 000053 ni 000054)
 

@@ -1,4 +1,4 @@
--- Migración 000054: Corregir SOLO el avance de aportes
+-- Migración 000053: Corregir SOLO el avance de aportes
 -- Enfoque: Vista que calcula correctamente el porcentaje de avance de aportes
 -- Partir de la migración 000050 (no tocar la 000051, 000052 ni 000053)
 
