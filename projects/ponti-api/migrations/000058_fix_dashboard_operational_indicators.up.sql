@@ -12,7 +12,7 @@ CREATE VIEW dashboard_operational_indicators_view AS
 WITH workorder_costs AS (
   SELECT w.project_id,
          SUM(lb.price*w.effective_area) AS labors_cost_usd,
-         SUM(wi.total_used*s.price) AS supplies_cost_usd
+         SUM(COALESCE(wi.total_used*s.price, 0)) AS supplies_cost_usd
   FROM workorders w
   JOIN labors lb ON lb.id=w.labor_id
   LEFT JOIN workorder_items wi ON wi.workorder_id=w.id
@@ -21,40 +21,61 @@ WITH workorder_costs AS (
 ),
 supply_stocks AS (
   SELECT s.project_id,
-         SUM(CASE WHEN s.type_id = 1 THEN s.price * 1000 ELSE 0 END) AS semilla_stock_usd,
-         SUM(CASE WHEN s.type_id = 3 THEN s.price * 1000 ELSE 0 END) AS insumos_stock_usd
+         SUM(CASE WHEN s.type_id = 1 THEN s.price * 1000 ELSE 0 END) AS seeds_stock_usd,
+         SUM(CASE WHEN s.type_id = 3 THEN s.price * 1000 ELSE 0 END) AS supplies_stock_usd
   FROM supplies s
   GROUP BY s.project_id
+),
+workorder_dates AS (
+  SELECT 
+    w.project_id,
+    MIN(w.date) AS first_workorder_date,
+    MIN(w.id) AS first_workorder_number,
+    MAX(w.date) AS last_workorder_date,
+    MAX(w.id) AS last_workorder_number
+  FROM workorders w
+  GROUP BY w.project_id
+),
+lot_summary AS (
+  SELECT 
+    f.project_id,
+    SUM(CASE WHEN l.sowing_date IS NOT NULL THEN l.hectares ELSE 0 END) AS sowing_hectares,
+    SUM(l.hectares) AS sowing_total_hectares,
+    SUM(CASE WHEN l.tons > 0 THEN l.hectares ELSE 0 END) AS harvest_hectares,
+    SUM(l.hectares) AS harvest_total_hectares
+  FROM fields f
+  LEFT JOIN lots l ON l.field_id=f.id
+  GROUP BY f.project_id
 )
 SELECT
   p.customer_id,
   p.id AS project_id,
   p.campaign_id,
   -- Avance de siembra
-  SUM(CASE WHEN l.sowing_date IS NOT NULL THEN l.hectares ELSE 0 END) AS sowing_hectares,
-  SUM(l.hectares) AS sowing_total_hectares,
+  COALESCE(ls.sowing_hectares, 0) AS sowing_hectares,
+  COALESCE(ls.sowing_total_hectares, 0) AS sowing_total_hectares,
   -- Avance de cosecha
-  SUM(CASE WHEN l.tons > 0 THEN l.hectares ELSE 0 END) AS harvest_hectares,
-  SUM(l.hectares) AS harvest_total_hectares,
+  COALESCE(ls.harvest_hectares, 0) AS harvest_hectares,
+  COALESCE(ls.harvest_total_hectares, 0) AS harvest_total_hectares,
   -- Fechas clave
-  MIN(w.date) AS primera_orden_fecha,
-  MAX(w.date) AS ultima_orden_fecha,
-  NULL::date AS arqueo_stock_fecha, -- placeholder
-  NULL::date AS cierre_campana_fecha, -- placeholder
+  wd.first_workorder_date,
+  wd.first_workorder_number,
+  wd.last_workorder_date,
+  wd.last_workorder_number,
+  NULL::date AS last_stock_count_date, -- placeholder
+  NULL::date AS campaign_closing_date, -- placeholder
   -- Indicadores operativos detallados (calculados)
   COALESCE(wc.supplies_cost_usd * 0.5, 0) AS seeds_executed_usd,    -- Semillas ejecutadas (50% de supplies)
   COALESCE(wc.supplies_cost_usd * 0.6, 0) AS seeds_invested_usd,    -- Semillas invertidas (60% de supplies)
-  COALESCE(ss.semilla_stock_usd, 0) AS seeds_stock_usd,               -- Semillas en stock
+  COALESCE(ss.seeds_stock_usd, 0) AS seeds_stock_usd,               -- Semillas en stock
   COALESCE(wc.supplies_cost_usd * 0.5, 0) AS supplies_executed_usd,    -- Insumos ejecutados (50% de supplies)
   COALESCE(wc.supplies_cost_usd * 0.4, 0) AS supplies_invested_usd,    -- Insumos invertidos (40% de supplies)
-  COALESCE(ss.insumos_stock_usd, 0) AS supplies_stock_usd,               -- Insumos en stock
+  COALESCE(ss.supplies_stock_usd, 0) AS supplies_stock_usd,               -- Insumos en stock
   COALESCE(wc.labors_cost_usd, 0) AS labors_executed_usd,            -- Labores ejecutadas
   COALESCE(wc.labors_cost_usd * 1.2, 0) AS labors_invested_usd,      -- Labores invertidas (120% de ejecutadas)
   COALESCE(wc.labors_cost_usd * 0.3, 0) AS labors_stock_usd            -- Labores en stock (30% de ejecutadas)
 FROM projects p
-LEFT JOIN fields f ON f.project_id=p.id
-LEFT JOIN lots l ON l.field_id=f.id
-LEFT JOIN workorders w ON w.field_id=f.id
+LEFT JOIN lot_summary ls ON ls.project_id=p.id
 LEFT JOIN workorder_costs wc ON wc.project_id=p.id
 LEFT JOIN supply_stocks ss ON ss.project_id=p.id
-GROUP BY p.customer_id,p.id,p.campaign_id,wc.labors_cost_usd,wc.supplies_cost_usd,ss.semilla_stock_usd,ss.insumos_stock_usd;
+LEFT JOIN workorder_dates wd ON wd.project_id=p.id;

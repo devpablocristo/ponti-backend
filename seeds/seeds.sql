@@ -239,27 +239,43 @@ ORDER BY project_id;
 -- MÓDULO 6: BALANCE DE GESTIÓN
 -- ========================================
 -- RESULTADOS REALES:
--- Proyecto 1: $57,500 ejecutados + $1,000 admin = $58,500 total
--- Proyecto 2: $86,250 ejecutados + $500 admin = $86,750 total
--- Proyecto 3: $0 ejecutados + $750 admin = $750 total
+-- Proyecto 1: Semillas $50,000, Insumos $20,000, Labores $22,500 = $92,500 total + $1,000 estructura = $93,500
+-- Proyecto 2: Semillas $75,000, Insumos $30,000, Labores $33,750 = $138,750 total + $500 estructura = $139,250  
+-- Proyecto 3: Todo en $0 + $750 estructura = $750
 SELECT '=== MÓDULO 6: BALANCE DE GESTIÓN ===' as info;
 SELECT 
-  project_id, 
-  balance_executed_costs_usd,
-  balance_budget_cost_usd,
-  balance_operating_result_total_costs_usd,
-  balance_operating_result_usd,
-  balance_operating_result_pct
+  project_id,
+  -- SEMILLA
+  seeds_executed_usd,             -- Semilla Ejecutados
+  seeds_invested_usd,             -- Semilla Invertidos  
+  seeds_stock_usd,                -- Semilla Stock (Invertidos - Ejecutados)
+  -- INSUMOS
+  supplies_executed_usd,          -- Insumos Ejecutados (no semilla)
+  supplies_invested_usd,          -- Insumos Invertidos (no semilla)
+  supplies_stock_usd,             -- Insumos Stock (Invertidos - Ejecutados)
+  -- LABORES
+  labors_executed_usd,            -- Labores Ejecutados
+  labors_invested_usd,            -- Labores Invertidos
+  labors_stock_usd,               -- Labores Stock (Invertidos - Ejecutados)
+  -- COSTOS DIRECTOS TOTALES
+  direct_costs_executed_usd,      -- Costos Directos Ejecutados (Semilla + Insumos + Labores)
+  direct_costs_invested_usd,      -- Costos Directos Invertidos (Semilla + Insumos + Labores)
+  direct_costs_stock_usd,         -- Costos Directos Stock (Invertidos - Ejecutados)
+  -- OTROS COSTOS
+  lease_invested_usd,             -- Arriendo Invertidos (30% de comercializaciones)
+  structure_invested_usd,         -- Estructura Invertidos (admin_cost del proyecto)
+  total_invested_usd              -- Total Invertido (Directos + Arriendo + Estructura)
 FROM dashboard_balance_management_view 
+WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
 -- =============================================
 -- MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO
 -- =============================================
 -- RESULTADOS REALES:
--- Proyecto 1: 200 ha - $57,500 costos = $287.50/ha
--- Proyecto 2: 150 ha - $86,250 costos = $575.00/ha
--- Proyecto 3: 100 ha - $0 costos = $0.00/ha
+-- Proyecto 1: 200 ha totales - Cultivo 1 (Soja): 100 ha (50%) $0 costos = $0/ha, Cultivo 2 (Maíz): 100 ha (50%) $92,500 costos = $925/ha
+-- Proyecto 2: 150 ha totales - Cultivo 1 (Soja): 75 ha (50%) $0 costos = $0/ha, Cultivo 2 (Maíz): 75 ha (50%) $138,750 costos = $1,850/ha
+-- Proyecto 3: 100 ha totales - Sin cultivos específicos, $0 costos = $0/ha
 SELECT '=== MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO ===' as info;
 SELECT 
   project_id, 
@@ -277,17 +293,18 @@ ORDER BY project_id;
 -- MÓDULO 8: INDICADORES OPERATIVOS
 -- ========================================
 -- RESULTADOS REALES:
--- Proyecto 1: Semillas $35,000, Insumos $35,000, Labores $22,500
--- Proyecto 2: Semillas $52,500, Insumos $52,500, Labores $33,750
--- Proyecto 3: Todo en $0, Stock: Semillas $10,000, Insumos $2,000
+-- Proyecto 1: Primera orden 2024-10-15, Última orden 2025-03-20, Arqueo stock 2024-11-10
+-- Proyecto 2: Primera orden 2024-06-01, Última orden 2024-12-20, Arqueo stock 2024-07-01
+-- Proyecto 3: Sin órdenes de trabajo, sin arqueo de stock
 SELECT '=== MÓDULO 8: INDICADORES OPERATIVOS ===' as info;
 SELECT 
-  project_id, 
-  seeds_executed_usd,
-  supplies_executed_usd,
-  labors_executed_usd,
-  seeds_stock_usd,
-  supplies_stock_usd,
-  labors_stock_usd
+  project_id,
+  first_workorder_date,        -- Fecha de la primera orden de trabajo
+  first_workorder_number,      -- Número de la primera orden de trabajo
+  last_workorder_date,         -- Fecha de la última orden de trabajo
+  last_workorder_number,       -- Número de la última orden de trabajo
+  last_stock_count_date,       -- Fecha del último arqueo de stock
+  campaign_closing_date        -- Fecha de cierre de campaña (placeholder)
 FROM dashboard_operational_indicators_view 
+WHERE project_id IN (1,2,3)
 ORDER BY project_id;
