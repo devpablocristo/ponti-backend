@@ -162,16 +162,16 @@ SELECT
   sowing_total_hectares, 
   sowing_progress_pct
 FROM dashboard_sowing_progress_view
-WHERE project_id IN (1)
+WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
 -- ========================================
 -- MÓDULO 2: AVANCE DE COSTOS
 -- ========================================
 -- RESULTADOS REALES:
--- Proyecto 1: $57,500 ejecutados (labores + insumos)
--- Proyecto 2: $86,250 ejecutados (labores + insumos)
--- Proyecto 3: $0 ejecutados
+-- Proyecto 1: $92,500 ejecutados (labores $22,500 + insumos $70,000)
+-- Proyecto 2: $138,750 ejecutados (labores $33,750 + insumos $105,000)
+-- Proyecto 3: $0 ejecutados (sin workorders)
 SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
 SELECT 
   project_id, 
@@ -180,7 +180,7 @@ SELECT
   executed_costs_usd,
   costs_progress_pct
 FROM dashboard_costs_progress_view
-WHERE project_id IN (1)
+WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
 -- ========================================
@@ -197,7 +197,7 @@ SELECT
   harvest_total_hectares, 
   harvest_progress_pct
 FROM dashboard_harvest_progress_view
-WHERE project_id IN (1)
+WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
 -- ========================================
