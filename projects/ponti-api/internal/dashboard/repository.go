@@ -64,8 +64,13 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		return nil, err
 	}
 
-	// TODO: Implementar los otros 2 módulos cuando se requiera
-	// - Módulo 7: Incidencia de Costos por Cultivo
+	// Obtener datos del módulo 7: Incidencia de Costos por Cultivo
+	cropIncidenceData, err := r.getCropIncidence(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Implementar el último módulo cuando se requiera
 	// - Módulo 8: Indicadores Operativos
 
 	// Crear estructura temporal con datos de siembra, costos, cosecha, aportes y resultado operativo
@@ -168,9 +173,9 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		// Los demás campos se dejan en cero hasta implementar los otros módulos
 	}
 
-	// Usar el mapper para convertir a dominio, pasando los datos de aportes y balance de gestión
+	// Usar el mapper para convertir a dominio, pasando los datos de aportes, balance de gestión y crop incidence
 	investorContributions := r.mapper.ContributionsProgressToInvestorContribution(contributionsData)
-	return r.mapper.DashboardDataToDomain(tempData, nil, investorContributions, managementBalanceData), nil
+	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, investorContributions, managementBalanceData), nil
 }
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
@@ -1225,29 +1230,127 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 }
 
 // getCropIncidence obtiene los datos de incidencia de costos por cultivo
-// func (r *Repository) getCropIncidence(ctx context.Context, filter domain.DashboardFilter) ([]models.CropIncidenceModel, error) {
-// 	var projectIDs []int64
-// 	var err error
-//
-// 	// Si tenemos ProjectID directamente, usarlo sin buscar
-// 	if filter.ProjectID != nil {
-// 		projectIDs = []int64{*filter.ProjectID}
-// 	} else {
-// 		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
-// 		// (por CustomerID, CampaignID o FieldID)
-// 		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-//
-// 	// Si no hay proyectos relacionados, retornar datos vacíos
-// 	if len(projectIDs) == 0 {
-// 		return []models.CropIncidenceModel{}, nil
-// 	}
-//
-// 	// Implementar consulta a dashboard_crop_incidence_view usando project_id = ANY($1)
-// }
+func (r *Repository) getCropIncidence(ctx context.Context, filter domain.DashboardFilter) ([]models.CropIncidenceModel, error) {
+	var projectIDs []int64
+	var err error
+
+	// Si tenemos ProjectID directamente, usarlo sin buscar
+	if filter.ProjectID != nil {
+		projectIDs = []int64{*filter.ProjectID}
+	} else {
+		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
+		// (por CustomerID, CampaignID o FieldID)
+		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Si no hay proyectos relacionados, retornar datos vacíos
+	if len(projectIDs) == 0 {
+		return []models.CropIncidenceModel{}, nil
+	}
+
+	// Consultar la vista dashboard_crop_incidence_view
+	query := `
+		SELECT 
+			crop_name,
+			crop_hectares,
+			incidence_pct,
+			cost_per_ha_usd
+		FROM dashboard_crop_incidence_view 
+		WHERE project_id = ANY($1)
+		ORDER BY crop_name
+	`
+
+	args := []interface{}{projectIDs}
+
+	// Ejecutar la consulta
+	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get crop incidence data", err)
+	}
+	defer rows.Close()
+
+	var result []models.CropIncidenceModel
+
+	// Leer todas las filas
+	for rows.Next() {
+		var rawCropName, rawHectares, rawIncidencePct, rawCostPerHa interface{}
+		err = rows.Scan(&rawCropName, &rawHectares, &rawIncidencePct, &rawCostPerHa)
+		if err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to scan crop incidence data", err)
+		}
+
+		// Convertir los valores raw a los tipos correctos
+		var cropName string
+		var hectares, incidencePct, costPerHa decimal.Decimal
+
+		// Convertir cropName
+		if rawCropName != nil {
+			if strVal, ok := rawCropName.(string); ok {
+				cropName = strVal
+			}
+		}
+
+		// Convertir hectares
+		if rawHectares != nil {
+			if strVal, ok := rawHectares.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					hectares = dec
+				}
+			} else if floatVal, ok := rawHectares.(float64); ok {
+				hectares = decimal.NewFromFloat(floatVal)
+			} else if intVal, ok := rawHectares.(int64); ok {
+				hectares = decimal.NewFromInt(intVal)
+			} else if intVal, ok := rawHectares.(int); ok {
+				hectares = decimal.NewFromInt(int64(intVal))
+			}
+		}
+
+		// Convertir incidencePct
+		if rawIncidencePct != nil {
+			if strVal, ok := rawIncidencePct.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					incidencePct = dec
+				}
+			} else if floatVal, ok := rawIncidencePct.(float64); ok {
+				incidencePct = decimal.NewFromFloat(floatVal)
+			} else if intVal, ok := rawIncidencePct.(int64); ok {
+				incidencePct = decimal.NewFromInt(intVal)
+			} else if intVal, ok := rawIncidencePct.(int); ok {
+				incidencePct = decimal.NewFromInt(int64(intVal))
+			}
+		}
+
+		// Convertir costPerHa
+		if rawCostPerHa != nil {
+			if strVal, ok := rawCostPerHa.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					costPerHa = dec
+				}
+			} else if floatVal, ok := rawCostPerHa.(float64); ok {
+				costPerHa = decimal.NewFromFloat(floatVal)
+			} else if intVal, ok := rawCostPerHa.(int64); ok {
+				costPerHa = decimal.NewFromInt(intVal)
+			} else if intVal, ok := rawCostPerHa.(int); ok {
+				costPerHa = decimal.NewFromInt(int64(intVal))
+			}
+		}
+
+		// Crear el modelo
+		cropModel := models.CropIncidenceModel{
+			Name:         cropName,
+			Hectares:     hectares,
+			IncidencePct: incidencePct,
+			CostPerHa:    costPerHa,
+		}
+
+		result = append(result, cropModel)
+	}
+
+	return result, nil
+}
 
 // getOperationalIndicators obtiene los indicadores operativos
 // func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain.DashboardFilter) (*models.OperationalIndicatorModel, error) {

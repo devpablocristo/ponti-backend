@@ -189,8 +189,7 @@ type CostsMetric struct {
 
 // InvestorContributions representa la métrica de contribuciones de inversores
 type InvestorContributions struct {
-	ProgressPct decimal.Decimal `json:"progress_pct"`
-	Breakdown   interface{}     `json:"breakdown"`
+	Breakdown interface{} `json:"breakdown"`
 }
 
 // OperatingResultMetric representa la métrica de resultado operativo
@@ -234,15 +233,14 @@ type BalanceTotals struct {
 
 // CropIncidence representa la incidencia por cultivo
 type CropIncidence struct {
-	Crops []CropData `json:"crops"`
-	Total CropTotal  `json:"total"`
+	Breakdown []CropData `json:"breakdown"`
+	Total     CropTotal  `json:"total"`
 }
 
 // CropData representa los datos de un cultivo específico
 type CropData struct {
 	Name         string          `json:"name"`
 	Hectares     decimal.Decimal `json:"hectares"`
-	RotationPct  decimal.Decimal `json:"rotation_pct"`
 	CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
 	IncidencePct decimal.Decimal `json:"incidence_pct"`
 }
@@ -250,7 +248,6 @@ type CropData struct {
 // CropTotal representa los totales de cultivos
 type CropTotal struct {
 	Hectares          decimal.Decimal `json:"hectares"`
-	RotationPct       decimal.Decimal `json:"rotation_pct"`
 	CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
 }
 
@@ -312,8 +309,7 @@ func createEmptyDashboardResponse() DashboardResponse {
 				BudgetUSD:   decimal.Zero,
 			},
 			InvestorContributions: InvestorContributions{
-				ProgressPct: decimal.Zero,
-				Breakdown:   nil,
+				Breakdown: nil,
 			},
 			OperatingResult: OperatingResultMetric{
 				ProgressPct:   decimal.Zero,
@@ -362,10 +358,9 @@ func createEmptyDashboardResponse() DashboardResponse {
 			},
 		},
 		CropIncidence: CropIncidence{
-			Crops: []CropData{},
+			Breakdown: []CropData{},
 			Total: CropTotal{
 				Hectares:          decimal.Zero,
-				RotationPct:       decimal.Zero,
 				CostUSDPerHectare: decimal.Zero,
 			},
 		},
@@ -424,8 +419,6 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.Metrics.Costs.ExecutedUSD = roundTo3Decimals(response.Metrics.Costs.ExecutedUSD)
 	response.Metrics.Costs.BudgetUSD = roundTo3Decimals(response.Metrics.Costs.BudgetUSD)
 
-	response.Metrics.InvestorContributions.ProgressPct = roundTo3Decimals(response.Metrics.InvestorContributions.ProgressPct)
-
 	response.Metrics.OperatingResult.ProgressPct = roundTo3Decimals(response.Metrics.OperatingResult.ProgressPct)
 	response.Metrics.OperatingResult.ResultUSD = roundTo3Decimals(response.Metrics.OperatingResult.ResultUSD)
 	response.Metrics.OperatingResult.TotalCostsUSD = roundTo3Decimals(response.Metrics.OperatingResult.TotalCostsUSD)
@@ -440,15 +433,15 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	}
 
 	// Redondear incidencia por cultivo
-	for i := range response.CropIncidence.Crops {
-		response.CropIncidence.Crops[i].Hectares = roundTo3Decimals(response.CropIncidence.Crops[i].Hectares)
-		response.CropIncidence.Crops[i].RotationPct = roundTo3Decimals(response.CropIncidence.Crops[i].RotationPct)
-		response.CropIncidence.Crops[i].CostUSDPerHa = roundTo3Decimals(response.CropIncidence.Crops[i].CostUSDPerHa)
-		response.CropIncidence.Crops[i].IncidencePct = roundTo3Decimals(response.CropIncidence.Crops[i].IncidencePct)
+	for i := range response.CropIncidence.Breakdown {
+		response.CropIncidence.Breakdown[i].Hectares = roundTo3Decimals(response.CropIncidence.Breakdown[i].Hectares)
+
+		response.CropIncidence.Breakdown[i].CostUSDPerHa = roundTo3Decimals(response.CropIncidence.Breakdown[i].CostUSDPerHa)
+		response.CropIncidence.Breakdown[i].IncidencePct = roundTo3Decimals(response.CropIncidence.Breakdown[i].IncidencePct)
 	}
 
 	response.CropIncidence.Total.Hectares = roundTo3Decimals(response.CropIncidence.Total.Hectares)
-	response.CropIncidence.Total.RotationPct = roundTo3Decimals(response.CropIncidence.Total.RotationPct)
+
 	response.CropIncidence.Total.CostUSDPerHectare = roundTo3Decimals(response.CropIncidence.Total.CostUSDPerHectare)
 
 	return response
@@ -555,8 +548,7 @@ func convertInvestorContributions(contributions *domain.DashboardInvestorContrib
 	}
 
 	return InvestorContributions{
-		ProgressPct: contributions.ProgressPct,
-		Breakdown:   breakdown,
+		Breakdown: breakdown,
 	}
 }
 
@@ -680,15 +672,28 @@ func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidenc
 		crops = append(crops, CropData{
 			Name:         crop.Name,
 			Hectares:     crop.Hectares,
-			RotationPct:  crop.RotationPct,
 			CostUSDPerHa: crop.CostUSDPerHa,
 			IncidencePct: crop.IncidencePct,
 		})
 	}
 
+	// Calcular totales reales sumando los valores del breakdown
+	var totalHectares, totalCostUSDPerHa, totalIncidencePct decimal.Decimal
+	for _, crop := range crops {
+		totalHectares = totalHectares.Add(crop.Hectares)
+		totalCostUSDPerHa = totalCostUSDPerHa.Add(crop.CostUSDPerHa)
+		totalIncidencePct = totalIncidencePct.Add(crop.IncidencePct)
+	}
+
+	// Crear el total calculado
+	calculatedTotal := CropTotal{
+		Hectares:          totalHectares,
+		CostUSDPerHectare: totalCostUSDPerHa,
+	}
+
 	return CropIncidence{
-		Crops: crops,
-		Total: convertCropTotal(incidence.Total),
+		Breakdown: crops,
+		Total:     calculatedTotal,
 	}
 }
 
@@ -700,7 +705,6 @@ func convertCropTotal(total *domain.DashboardCropTotal) CropTotal {
 
 	return CropTotal{
 		Hectares:          total.Hectares,
-		RotationPct:       total.RotationPct,
 		CostUSDPerHectare: total.CostUSDPerHectare,
 	}
 }
