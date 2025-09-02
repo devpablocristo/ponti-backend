@@ -12,10 +12,10 @@ import (
 
 // DashboardFilterRequest representa el filtro de request para el dashboard
 type DashboardFilterRequest struct {
-	CustomerID *int64 `json:"customer_id" binding:"omitempty"`
-	ProjectID  *int64 `json:"project_id" binding:"omitempty"`
-	CampaignID *int64 `json:"campaign_id" binding:"omitempty"`
-	FieldID    *int64 `json:"field_id" binding:"omitempty"`
+	CustomerIDs []int64 `json:"customer_ids" binding:"omitempty"`
+	ProjectIDs  []int64 `json:"project_ids" binding:"omitempty"`
+	CampaignIDs []int64 `json:"campaign_ids" binding:"omitempty"`
+	FieldIDs    []int64 `json:"field_ids" binding:"omitempty"`
 }
 
 // DashboardRequest representa un request de dashboard (para casos de creación/actualización)
@@ -189,19 +189,22 @@ type CostsMetric struct {
 
 // InvestorContributions representa la métrica de contribuciones de inversores
 type InvestorContributions struct {
-	Breakdown interface{} `json:"breakdown"`
+	ProgressPct decimal.Decimal `json:"progress_pct"`
+	Breakdown   interface{}     `json:"breakdown"`
 }
 
 // OperatingResultMetric representa la métrica de resultado operativo
 type OperatingResultMetric struct {
 	ProgressPct   decimal.Decimal `json:"progress_pct"`
-	ResultUSD     decimal.Decimal `json:"result_usd"`
+	IncomeUSD     decimal.Decimal `json:"income_usd"`
 	TotalCostsUSD decimal.Decimal `json:"total_costs_usd"`
 }
 
 // ManagementBalance representa el balance de gestión
 type ManagementBalance struct {
+	Summary   BalanceSummary     `json:"summary"`
 	Breakdown []BalanceBreakdown `json:"breakdown"`
+	TotalsRow BalanceTotals      `json:"totals_row"`
 }
 
 // BalanceSummary representa el resumen del balance
@@ -233,14 +236,15 @@ type BalanceTotals struct {
 
 // CropIncidence representa la incidencia por cultivo
 type CropIncidence struct {
-	Breakdown []CropData `json:"breakdown"`
-	Total     CropTotal  `json:"total"`
+	Crops []CropData `json:"crops"`
+	Total CropTotal  `json:"total"`
 }
 
 // CropData representa los datos de un cultivo específico
 type CropData struct {
 	Name         string          `json:"name"`
 	Hectares     decimal.Decimal `json:"hectares"`
+	RotationPct  decimal.Decimal `json:"rotation_pct"`
 	CostUSDPerHa decimal.Decimal `json:"cost_usd_per_ha"`
 	IncidencePct decimal.Decimal `json:"incidence_pct"`
 }
@@ -248,6 +252,7 @@ type CropData struct {
 // CropTotal representa los totales de cultivos
 type CropTotal struct {
 	Hectares          decimal.Decimal `json:"hectares"`
+	RotationPct       decimal.Decimal `json:"rotation_pct"`
 	CostUSDPerHectare decimal.Decimal `json:"cost_usd_per_hectare"`
 }
 
@@ -258,10 +263,14 @@ type OperationalIndicators struct {
 
 // OperationalCard representa una tarjeta de indicador operativo
 type OperationalCard struct {
-	Key         string     `json:"key"`
-	Title       string     `json:"title"`
-	Date        *time.Time `json:"date"`
-	WorkorderID *int64     `json:"workorder_id"`
+	Key           string     `json:"key"`
+	Title         string     `json:"title"`
+	Date          *time.Time `json:"date"`
+	WorkorderID   *int64     `json:"workorder_id"`
+	WorkorderCode *string    `json:"workorder_code"`
+	AuditID       *int64     `json:"audit_id"`
+	AuditCode     *string    `json:"audit_code"`
+	Status        *string    `json:"status"`
 }
 
 // FromDashboardPayloadResponse convierte directamente la respuesta de la función SQL a DTO
@@ -305,58 +314,38 @@ func createEmptyDashboardResponse() DashboardResponse {
 				BudgetUSD:   decimal.Zero,
 			},
 			InvestorContributions: InvestorContributions{
-				Breakdown: nil,
+				ProgressPct: decimal.Zero,
+				Breakdown:   nil,
 			},
 			OperatingResult: OperatingResultMetric{
 				ProgressPct:   decimal.Zero,
-				ResultUSD:     decimal.Zero,
+				IncomeUSD:     decimal.Zero,
 				TotalCostsUSD: decimal.Zero,
 			},
 		},
 		ManagementBalance: ManagementBalance{
-			Breakdown: []BalanceBreakdown{
-				{
-					Label:       "Costos Directos",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    nil,
-				},
-				{
-					Label:       "Semilla",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    nil,
-				},
-				{
-					Label:       "Insumos",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    nil,
-				},
-				{
-					Label:       "Labores",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    &decimal.Zero,
-				},
-				{
-					Label:       "Arriendo",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    nil,
-				},
-				{
-					Label:       "Estructura",
-					ExecutedUSD: decimal.Zero,
-					InvestedUSD: decimal.Zero,
-					StockUSD:    nil,
-				},
+			Summary: BalanceSummary{
+				IncomeUSD:              decimal.Zero,
+				DirectCostsExecutedUSD: decimal.Zero,
+				DirectCostsInvestedUSD: decimal.Zero,
+				StockUSD:               decimal.Zero,
+				RentUSD:                decimal.Zero,
+				StructureUSD:           decimal.Zero,
+				OperatingResultUSD:     decimal.Zero,
+				OperatingResultPct:     decimal.Zero,
+			},
+			Breakdown: []BalanceBreakdown{},
+			TotalsRow: BalanceTotals{
+				ExecutedUSD: decimal.Zero,
+				InvestedUSD: decimal.Zero,
+				StockUSD:    decimal.Zero,
 			},
 		},
 		CropIncidence: CropIncidence{
-			Breakdown: []CropData{},
+			Crops: []CropData{},
 			Total: CropTotal{
 				Hectares:          decimal.Zero,
+				RotationPct:       decimal.Zero,
 				CostUSDPerHectare: decimal.Zero,
 			},
 		},
@@ -415,9 +404,21 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.Metrics.Costs.ExecutedUSD = roundTo3Decimals(response.Metrics.Costs.ExecutedUSD)
 	response.Metrics.Costs.BudgetUSD = roundTo3Decimals(response.Metrics.Costs.BudgetUSD)
 
+	response.Metrics.InvestorContributions.ProgressPct = roundTo3Decimals(response.Metrics.InvestorContributions.ProgressPct)
+
 	response.Metrics.OperatingResult.ProgressPct = roundTo3Decimals(response.Metrics.OperatingResult.ProgressPct)
-	response.Metrics.OperatingResult.ResultUSD = roundTo3Decimals(response.Metrics.OperatingResult.ResultUSD)
+	response.Metrics.OperatingResult.IncomeUSD = roundTo3Decimals(response.Metrics.OperatingResult.IncomeUSD)
 	response.Metrics.OperatingResult.TotalCostsUSD = roundTo3Decimals(response.Metrics.OperatingResult.TotalCostsUSD)
+
+	// Redondear balance de gestión
+	response.ManagementBalance.Summary.IncomeUSD = roundTo3Decimals(response.ManagementBalance.Summary.IncomeUSD)
+	response.ManagementBalance.Summary.DirectCostsExecutedUSD = roundTo3Decimals(response.ManagementBalance.Summary.DirectCostsExecutedUSD)
+	response.ManagementBalance.Summary.DirectCostsInvestedUSD = roundTo3Decimals(response.ManagementBalance.Summary.DirectCostsInvestedUSD)
+	response.ManagementBalance.Summary.StockUSD = roundTo3Decimals(response.ManagementBalance.Summary.StockUSD)
+	response.ManagementBalance.Summary.RentUSD = roundTo3Decimals(response.ManagementBalance.Summary.RentUSD)
+	response.ManagementBalance.Summary.StructureUSD = roundTo3Decimals(response.ManagementBalance.Summary.StructureUSD)
+	response.ManagementBalance.Summary.OperatingResultUSD = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultUSD)
+	response.ManagementBalance.Summary.OperatingResultPct = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultPct)
 
 	// Redondear breakdown - solo si StockUSD no es NULL
 	for i := range response.ManagementBalance.Breakdown {
@@ -428,16 +429,21 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 		}
 	}
 
-	// Redondear incidencia por cultivo
-	for i := range response.CropIncidence.Breakdown {
-		response.CropIncidence.Breakdown[i].Hectares = roundTo3Decimals(response.CropIncidence.Breakdown[i].Hectares)
+	// Redondear totals row
+	response.ManagementBalance.TotalsRow.ExecutedUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.ExecutedUSD)
+	response.ManagementBalance.TotalsRow.InvestedUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.InvestedUSD)
+	response.ManagementBalance.TotalsRow.StockUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.StockUSD)
 
-		response.CropIncidence.Breakdown[i].CostUSDPerHa = roundTo3Decimals(response.CropIncidence.Breakdown[i].CostUSDPerHa)
-		response.CropIncidence.Breakdown[i].IncidencePct = roundTo3Decimals(response.CropIncidence.Breakdown[i].IncidencePct)
+	// Redondear incidencia por cultivo
+	for i := range response.CropIncidence.Crops {
+		response.CropIncidence.Crops[i].Hectares = roundTo3Decimals(response.CropIncidence.Crops[i].Hectares)
+		response.CropIncidence.Crops[i].RotationPct = roundTo3Decimals(response.CropIncidence.Crops[i].RotationPct)
+		response.CropIncidence.Crops[i].CostUSDPerHa = roundTo3Decimals(response.CropIncidence.Crops[i].CostUSDPerHa)
+		response.CropIncidence.Crops[i].IncidencePct = roundTo3Decimals(response.CropIncidence.Crops[i].IncidencePct)
 	}
 
 	response.CropIncidence.Total.Hectares = roundTo3Decimals(response.CropIncidence.Total.Hectares)
-
+	response.CropIncidence.Total.RotationPct = roundTo3Decimals(response.CropIncidence.Total.RotationPct)
 	response.CropIncidence.Total.CostUSDPerHectare = roundTo3Decimals(response.CropIncidence.Total.CostUSDPerHectare)
 
 	return response
@@ -447,289 +453,326 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 
 // ToDashboardFilter convierte un DTO de filtro a entidad de dominio
 func ToDashboardFilter(dto DashboardFilterRequest) domain.DashboardFilter {
-	return domain.DashboardFilter{
-		CustomerID: dto.CustomerID,
-		ProjectID:  dto.ProjectID,
-		CampaignID: dto.CampaignID,
-		FieldID:    dto.FieldID,
+	filter := domain.DashboardFilter{}
+
+	// Convertir slices a punteros individuales (el dominio usa punteros, no slices)
+	if len(dto.CustomerIDs) > 0 {
+		filter.CustomerID = &dto.CustomerIDs[0]
+	}
+	if len(dto.ProjectIDs) > 0 {
+		filter.ProjectID = &dto.ProjectIDs[0]
+	}
+	if len(dto.CampaignIDs) > 0 {
+		filter.CampaignID = &dto.CampaignIDs[0]
+	}
+	if len(dto.FieldIDs) > 0 {
+		filter.FieldID = &dto.FieldIDs[0]
+	}
+
+	return filter
+}
+
+// ToDashboardData convierte un DTO de dashboard a entidad de dominio DashboardData
+// (útil para casos donde se recibe un dashboard desde el exterior)
+func ToDashboardData(dto DashboardRequest) *domain.DashboardData {
+	return &domain.DashboardData{
+		Metrics: &domain.DashboardMetrics{
+			Sowing: &domain.DashboardSowing{
+				ProgressPct:   dto.Metrics.Sowing.ProgressPct,
+				Hectares:      dto.Metrics.Sowing.Hectares,
+				TotalHectares: dto.Metrics.Sowing.TotalHectares,
+			},
+			Harvest: &domain.DashboardHarvest{
+				ProgressPct:   dto.Metrics.Harvest.ProgressPct,
+				Hectares:      dto.Metrics.Harvest.Hectares,
+				TotalHectares: dto.Metrics.Harvest.TotalHectares,
+			},
+			Costs: &domain.DashboardCosts{
+				ProgressPct: dto.Metrics.Costs.ProgressPct,
+				ExecutedUSD: dto.Metrics.Costs.ExecutedUSD,
+				BudgetUSD:   dto.Metrics.Costs.BudgetUSD,
+			},
+			InvestorContributions: &domain.DashboardInvestorContributions{
+				ProgressPct: dto.Metrics.InvestorContributions.ProgressPct,
+				Breakdown:   []domain.DashboardInvestorBreakdown{},
+			},
+			OperatingResult: &domain.DashboardOperatingResult{
+				ProgressPct:   dto.Metrics.OperatingResult.ProgressPct,
+				ResultUSD:     dto.Metrics.OperatingResult.IncomeUSD,
+				TotalCostsUSD: dto.Metrics.OperatingResult.TotalCostsUSD,
+			},
+		},
+		ManagementBalance: &domain.DashboardManagementBalance{
+			Summary: &domain.DashboardBalanceSummary{
+				IncomeUSD:              dto.ManagementBalance.Summary.IncomeUSD,
+				DirectCostsExecutedUSD: dto.ManagementBalance.Summary.DirectCostsExecutedUSD,
+				DirectCostsInvestedUSD: dto.ManagementBalance.Summary.DirectCostsInvestedUSD,
+				StockUSD:               dto.ManagementBalance.Summary.StockUSD,
+				RentUSD:                dto.ManagementBalance.Summary.RentUSD,
+				StructureUSD:           dto.ManagementBalance.Summary.StructureUSD,
+				OperatingResultUSD:     dto.ManagementBalance.Summary.OperatingResultUSD,
+				OperatingResultPct:     dto.ManagementBalance.Summary.OperatingResultPct,
+			},
+			Breakdown: []domain.DashboardBalanceBreakdown{},
+			TotalsRow: &domain.DashboardBalanceTotals{
+				ExecutedUSD: dto.ManagementBalance.TotalsRow.ExecutedUSD,
+				InvestedUSD: dto.ManagementBalance.TotalsRow.InvestedUSD,
+				StockUSD:    dto.ManagementBalance.TotalsRow.StockUSD,
+			},
+		},
+		CropIncidence: &domain.DashboardCropIncidence{
+			Crops: []domain.DashboardCropBreakdown{},
+			Total: &domain.DashboardCropTotal{
+				Hectares:          dto.CropIncidence.Total.Hectares,
+				RotationPct:       dto.CropIncidence.Total.RotationPct,
+				CostUSDPerHectare: dto.CropIncidence.Total.CostUSDPerHectare,
+			},
+		},
+		OperationalIndicators: &domain.DashboardOperationalIndicators{
+			Cards: []domain.DashboardOperationalCard{},
+		},
 	}
 }
 
-// FromDashboardData convierte el dominio DashboardData a DTO
-func FromDashboardData(domain *domain.DashboardData) DashboardResponse {
-	if domain == nil {
+// ===== NUEVOS MAPPER FUNCTIONS PARA DOMAIN.DashboardData =====
+
+// FromDashboardData convierte el dominio DashboardData a DTO viejo (formato externo)
+func FromDashboardData(domainData *domain.DashboardData) DashboardResponse {
+	if domainData == nil {
 		return createEmptyDashboardResponse()
 	}
 
-	response := DashboardResponse{
-		Metrics:               convertMetrics(domain.Metrics),
-		ManagementBalance:     convertManagementBalance(domain.ManagementBalance),
-		CropIncidence:         convertCropIncidence(domain.CropIncidence),
-		OperationalIndicators: convertOperationalIndicators(domain.OperationalIndicators),
+	response := DashboardResponse{}
+
+	// Mapear métricas
+	if domainData.Metrics != nil {
+		response.Metrics = Metrics{
+			Sowing:                mapSowingMetric(domainData.Metrics.Sowing),
+			Harvest:               mapHarvestMetric(domainData.Metrics.Harvest),
+			Costs:                 mapCostsMetric(domainData.Metrics.Costs),
+			InvestorContributions: mapInvestorContributions(domainData.Metrics.InvestorContributions),
+			OperatingResult:       mapOperatingResultMetric(domainData.Metrics.OperatingResult),
+		}
 	}
 
-	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	// Mapear balance de gestión
+	if domainData.ManagementBalance != nil {
+		response.ManagementBalance = mapManagementBalance(domainData.ManagementBalance)
+	}
+
+	// Mapear incidencia de cultivos
+	if domainData.CropIncidence != nil {
+		response.CropIncidence = mapCropIncidence(domainData.CropIncidence)
+	}
+
+	// Mapear indicadores operativos
+	if domainData.OperationalIndicators != nil {
+		response.OperationalIndicators = mapOperationalIndicators(domainData.OperationalIndicators)
+	}
+
+	// Aplicar redondeo a 3 decimales
 	response = RoundAllDecimals(response)
 
 	return response
 }
 
-// convertMetrics convierte las métricas del dominio al DTO
-func convertMetrics(metrics *domain.DashboardMetrics) Metrics {
-	if metrics == nil {
-		return Metrics{}
-	}
-
-	return Metrics{
-		Sowing:                convertSowing(metrics.Sowing),
-		Harvest:               convertHarvest(metrics.Harvest),
-		Costs:                 convertCosts(metrics.Costs),
-		InvestorContributions: convertInvestorContributions(metrics.InvestorContributions),
-		OperatingResult:       convertOperatingResult(metrics.OperatingResult),
-	}
-}
-
-// convertSowing convierte la métrica de siembra
-func convertSowing(sowing *domain.DashboardSowing) SowingMetric {
-	if sowing == nil {
-		return SowingMetric{}
+// mapSowingMetric mapea la métrica de siembra del dominio al DTO
+func mapSowingMetric(domainSowing *domain.DashboardSowing) SowingMetric {
+	if domainSowing == nil {
+		return SowingMetric{
+			ProgressPct:   decimal.Zero,
+			Hectares:      decimal.Zero,
+			TotalHectares: decimal.Zero,
+		}
 	}
 
 	return SowingMetric{
-		ProgressPct:   sowing.ProgressPct,
-		Hectares:      sowing.Hectares,
-		TotalHectares: sowing.TotalHectares,
+		ProgressPct:   domainSowing.ProgressPct,
+		Hectares:      domainSowing.Hectares,
+		TotalHectares: domainSowing.TotalHectares,
 	}
 }
 
-// convertHarvest convierte la métrica de cosecha
-func convertHarvest(harvest *domain.DashboardHarvest) HarvestMetric {
-	if harvest == nil {
-		return HarvestMetric{}
+// mapHarvestMetric mapea la métrica de cosecha del dominio al DTO
+func mapHarvestMetric(domainHarvest *domain.DashboardHarvest) HarvestMetric {
+	if domainHarvest == nil {
+		return HarvestMetric{
+			ProgressPct:   decimal.Zero,
+			Hectares:      decimal.Zero,
+			TotalHectares: decimal.Zero,
+		}
 	}
 
 	return HarvestMetric{
-		ProgressPct:   harvest.ProgressPct,
-		Hectares:      harvest.Hectares,
-		TotalHectares: harvest.TotalHectares,
+		ProgressPct:   domainHarvest.ProgressPct,
+		Hectares:      domainHarvest.Hectares,
+		TotalHectares: domainHarvest.TotalHectares,
 	}
 }
 
-// convertCosts convierte la métrica de costos
-func convertCosts(costs *domain.DashboardCosts) CostsMetric {
-	if costs == nil {
-		return CostsMetric{}
+// mapCostsMetric mapea la métrica de costos del dominio al DTO
+func mapCostsMetric(domainCosts *domain.DashboardCosts) CostsMetric {
+	if domainCosts == nil {
+		return CostsMetric{
+			ProgressPct: decimal.Zero,
+			ExecutedUSD: decimal.Zero,
+			BudgetUSD:   decimal.Zero,
+		}
 	}
 
 	return CostsMetric{
-		ProgressPct: costs.ProgressPct,
-		ExecutedUSD: costs.ExecutedUSD,
-		BudgetUSD:   costs.BudgetUSD,
+		ProgressPct: domainCosts.ProgressPct,
+		ExecutedUSD: domainCosts.ExecutedUSD,
+		BudgetUSD:   domainCosts.BudgetUSD,
 	}
 }
 
-// convertInvestorContributions convierte las contribuciones de inversores
-func convertInvestorContributions(contributions *domain.DashboardInvestorContributions) InvestorContributions {
-	if contributions == nil {
-		return InvestorContributions{}
+// mapInvestorContributions mapea las contribuciones de inversores del dominio al DTO
+func mapInvestorContributions(domainContributions *domain.DashboardInvestorContributions) InvestorContributions {
+	if domainContributions == nil {
+		return InvestorContributions{
+			ProgressPct: decimal.Zero,
+			Breakdown:   nil,
+		}
 	}
 
-	breakdown := make([]map[string]interface{}, 0, len(contributions.Breakdown))
-	for _, inv := range contributions.Breakdown {
-		breakdown = append(breakdown, map[string]interface{}{
-			"investor_id":   inv.InvestorID,
-			"investor_name": inv.InvestorName,
-			"percent_pct":   inv.PercentPct.String(),
-		})
+	// Convertir breakdown a interface{} para mantener compatibilidad con el DTO viejo
+	var breakdown interface{}
+	if len(domainContributions.Breakdown) > 0 {
+		breakdown = domainContributions.Breakdown
 	}
 
 	return InvestorContributions{
-		Breakdown: breakdown,
+		ProgressPct: domainContributions.ProgressPct,
+		Breakdown:   breakdown,
 	}
 }
 
-// convertOperatingResult convierte la métrica de resultado operativo
-func convertOperatingResult(result *domain.DashboardOperatingResult) OperatingResultMetric {
-	if result == nil {
-		return OperatingResultMetric{}
+// mapOperatingResultMetric mapea la métrica de resultado operativo del dominio al DTO
+func mapOperatingResultMetric(domainOperating *domain.DashboardOperatingResult) OperatingResultMetric {
+	if domainOperating == nil {
+		return OperatingResultMetric{
+			ProgressPct:   decimal.Zero,
+			IncomeUSD:     decimal.Zero,
+			TotalCostsUSD: decimal.Zero,
+		}
 	}
 
 	return OperatingResultMetric{
-		ProgressPct:   result.ProgressPct,
-		ResultUSD:     result.ResultUSD,
-		TotalCostsUSD: result.TotalCostsUSD,
+		ProgressPct:   domainOperating.ProgressPct,
+		IncomeUSD:     domainOperating.ResultUSD, // Mapear ResultUSD a IncomeUSD para compatibilidad
+		TotalCostsUSD: domainOperating.TotalCostsUSD,
 	}
 }
 
-// convertManagementBalance convierte el balance de gestión
-func convertManagementBalance(balance *domain.DashboardManagementBalance) ManagementBalance {
-	if balance == nil {
-		return ManagementBalance{}
+// mapManagementBalance mapea el balance de gestión del dominio al DTO
+func mapManagementBalance(domainBalance *domain.DashboardManagementBalance) ManagementBalance {
+	if domainBalance == nil {
+		return ManagementBalance{
+			Summary:   BalanceSummary{},
+			Breakdown: []BalanceBreakdown{},
+			TotalsRow: BalanceTotals{},
+		}
 	}
 
-	// Crear breakdown con todos los campos del balance
-	breakdown := []BalanceBreakdown{
-		{
-			Label:       "Costos Directos",
-			ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
-			InvestedUSD: balance.Summary.DirectCostsInvestedUSD,
-			StockUSD:    &balance.Summary.StockUSD,
-		},
-		{
-			Label:       "Semilla",
-			ExecutedUSD: balance.Summary.SemillaCostUSD,
-			InvestedUSD: balance.Summary.SemillaCostUSD,
-			StockUSD:    nil,
-		},
-		{
-			Label:       "Insumos",
-			ExecutedUSD: balance.Summary.InsumosCostUSD,
-			InvestedUSD: balance.Summary.InsumosCostUSD,
-			StockUSD:    nil,
-		},
-		{
-			Label:       "Labores",
-			ExecutedUSD: balance.Summary.LaboresCostUSD,
-			InvestedUSD: balance.Summary.LaboresCostUSD,
-			StockUSD:    &decimal.Zero,
-		},
-		{
-			Label:       "Arriendo",
-			ExecutedUSD: decimal.Zero,
-			InvestedUSD: balance.Summary.RentUSD,
-			StockUSD:    nil,
-		},
-		{
-			Label:       "Estructura",
-			ExecutedUSD: decimal.Zero,
-			InvestedUSD: balance.Summary.StructureUSD,
-			StockUSD:    nil,
-		},
+	balance := ManagementBalance{}
+
+	// Mapear summary
+	if domainBalance.Summary != nil {
+		balance.Summary = BalanceSummary{
+			IncomeUSD:              domainBalance.Summary.IncomeUSD,
+			DirectCostsExecutedUSD: domainBalance.Summary.DirectCostsExecutedUSD,
+			DirectCostsInvestedUSD: domainBalance.Summary.DirectCostsInvestedUSD,
+			StockUSD:               domainBalance.Summary.StockUSD,
+			RentUSD:                domainBalance.Summary.RentUSD,
+			StructureUSD:           domainBalance.Summary.StructureUSD,
+			OperatingResultUSD:     domainBalance.Summary.OperatingResultUSD,
+			OperatingResultPct:     domainBalance.Summary.OperatingResultPct,
+		}
 	}
 
-	return ManagementBalance{
-		Breakdown: breakdown,
+	// Mapear breakdown
+	balance.Breakdown = make([]BalanceBreakdown, len(domainBalance.Breakdown))
+	for i, domainBreakdown := range domainBalance.Breakdown {
+		balance.Breakdown[i] = BalanceBreakdown{
+			Label:       domainBreakdown.Label,
+			ExecutedUSD: domainBreakdown.ExecutedUSD,
+			InvestedUSD: domainBreakdown.InvestedUSD,
+			StockUSD:    domainBreakdown.StockUSD,
+		}
 	}
+
+	// Mapear totals row
+	if domainBalance.TotalsRow != nil {
+		balance.TotalsRow = BalanceTotals{
+			ExecutedUSD: domainBalance.TotalsRow.ExecutedUSD,
+			InvestedUSD: domainBalance.TotalsRow.InvestedUSD,
+			StockUSD:    domainBalance.TotalsRow.StockUSD,
+		}
+	}
+
+	return balance
 }
 
-// convertBalanceSummary convierte el resumen del balance
-func convertBalanceSummary(summary *domain.DashboardBalanceSummary) BalanceSummary {
-	if summary == nil {
-		return BalanceSummary{}
+// mapCropIncidence mapea la incidencia de cultivos del dominio al DTO
+func mapCropIncidence(domainCropIncidence *domain.DashboardCropIncidence) CropIncidence {
+	if domainCropIncidence == nil {
+		return CropIncidence{
+			Crops: []CropData{},
+			Total: CropTotal{},
+		}
 	}
 
-	return BalanceSummary{
-		IncomeUSD:              summary.IncomeUSD,
-		DirectCostsExecutedUSD: summary.DirectCostsExecutedUSD,
-		DirectCostsInvestedUSD: summary.DirectCostsInvestedUSD,
-		StockUSD:               summary.StockUSD,
-		RentUSD:                summary.RentUSD,
-		StructureUSD:           summary.StructureUSD,
-		OperatingResultUSD:     summary.OperatingResultUSD,
-		OperatingResultPct:     summary.OperatingResultPct,
+	cropIncidence := CropIncidence{}
+
+	// Mapear crops
+	cropIncidence.Crops = make([]CropData, len(domainCropIncidence.Crops))
+	for i, domainCrop := range domainCropIncidence.Crops {
+		cropIncidence.Crops[i] = CropData{
+			Name:         domainCrop.Name,
+			Hectares:     domainCrop.Hectares,
+			RotationPct:  domainCrop.RotationPct,
+			CostUSDPerHa: domainCrop.CostUSDPerHa,
+			IncidencePct: domainCrop.IncidencePct,
+		}
 	}
+
+	// Mapear total
+	if domainCropIncidence.Total != nil {
+		cropIncidence.Total = CropTotal{
+			Hectares:          domainCropIncidence.Total.Hectares,
+			RotationPct:       domainCropIncidence.Total.RotationPct,
+			CostUSDPerHectare: domainCropIncidence.Total.CostUSDPerHectare,
+		}
+	}
+
+	return cropIncidence
 }
 
-// convertBalanceBreakdown convierte el desglose del balance
-func convertBalanceBreakdown(breakdown []domain.DashboardBalanceBreakdown) []BalanceBreakdown {
-	result := make([]BalanceBreakdown, 0, len(breakdown))
-	for _, item := range breakdown {
-		result = append(result, BalanceBreakdown{
-			Label:       item.Label,
-			ExecutedUSD: item.ExecutedUSD,
-			InvestedUSD: item.InvestedUSD,
-			StockUSD:    item.StockUSD,
-		})
-	}
-	return result
-}
-
-// convertBalanceTotals convierte los totales del balance
-func convertBalanceTotals(totals *domain.DashboardBalanceTotals) BalanceTotals {
-	if totals == nil {
-		return BalanceTotals{}
+// mapOperationalIndicators mapea los indicadores operativos del dominio al DTO
+func mapOperationalIndicators(domainIndicators *domain.DashboardOperationalIndicators) OperationalIndicators {
+	if domainIndicators == nil {
+		return OperationalIndicators{
+			Cards: []OperationalCard{},
+		}
 	}
 
-	return BalanceTotals{
-		ExecutedUSD: totals.ExecutedUSD,
-		InvestedUSD: totals.InvestedUSD,
-		StockUSD:    totals.StockUSD,
-	}
-}
-
-// convertCropIncidence convierte la incidencia de cultivos
-func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidence {
-	if incidence == nil {
-		return CropIncidence{}
+	indicators := OperationalIndicators{
+		Cards: make([]OperationalCard, len(domainIndicators.Cards)),
 	}
 
-	crops := make([]CropData, 0, len(incidence.Crops))
-	for _, crop := range incidence.Crops {
-		crops = append(crops, CropData{
-			Name:         crop.Name,
-			Hectares:     crop.Hectares,
-			CostUSDPerHa: crop.CostUSDPerHa,
-			IncidencePct: crop.IncidencePct,
-		})
+	for i, domainCard := range domainIndicators.Cards {
+		indicators.Cards[i] = OperationalCard{
+			Key:           domainCard.Key,
+			Title:         domainCard.Title,
+			Date:          domainCard.Date,
+			WorkorderID:   domainCard.WorkorderID,
+			WorkorderCode: nil, // No existe en el dominio interno
+			AuditID:       nil, // No existe en el dominio interno
+			AuditCode:     nil, // No existe en el dominio interno
+			Status:        nil, // No existe en el dominio interno
+		}
 	}
 
-	// Calcular totales reales sumando los valores del breakdown
-	var totalHectares, totalCostUSDPerHa, totalIncidencePct decimal.Decimal
-	for _, crop := range crops {
-		totalHectares = totalHectares.Add(crop.Hectares)
-		totalCostUSDPerHa = totalCostUSDPerHa.Add(crop.CostUSDPerHa)
-		totalIncidencePct = totalIncidencePct.Add(crop.IncidencePct)
-	}
-
-	// Crear el total calculado
-	calculatedTotal := CropTotal{
-		Hectares:          totalHectares,
-		CostUSDPerHectare: totalCostUSDPerHa,
-	}
-
-	return CropIncidence{
-		Breakdown: crops,
-		Total:     calculatedTotal,
-	}
-}
-
-// convertCropTotal convierte los totales de cultivos
-func convertCropTotal(total *domain.DashboardCropTotal) CropTotal {
-	if total == nil {
-		return CropTotal{}
-	}
-
-	return CropTotal{
-		Hectares:          total.Hectares,
-		CostUSDPerHectare: total.CostUSDPerHectare,
-	}
-}
-
-// convertOperationalIndicators convierte los indicadores operativos
-func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicators) OperationalIndicators {
-	if indicators == nil {
-		return OperationalIndicators{}
-	}
-
-	cards := make([]OperationalCard, 0, len(indicators.Cards))
-	for _, card := range indicators.Cards {
-		cards = append(cards, OperationalCard{
-			Key:         card.Key,
-			Title:       card.Title,
-			Date:        card.Date,
-			WorkorderID: card.WorkorderID,
-		})
-	}
-
-	return OperationalIndicators{
-		Cards: cards,
-	}
-}
-
-// ToDashboard convierte un DTO de dashboard a entidad de dominio
-// (útil para casos donde se recibe un dashboard desde el exterior)
-func ToDashboard(dto DashboardRequest) *domain.Dashboard {
-	return &domain.Dashboard{
-		// Campos básicos
-	}
+	return indicators
 }
