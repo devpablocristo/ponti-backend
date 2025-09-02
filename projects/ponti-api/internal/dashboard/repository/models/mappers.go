@@ -47,13 +47,13 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 			},
 			OperatingResult: &domain.DashboardOperatingResult{
 				ProgressPct:   data.OperatingResultPct,
-				IncomeUSD:     data.OperatingIncomeUSD,
+				ResultUSD:     data.OperatingResultUSD,
 				TotalCostsUSD: data.OperatingTotalCostsUSD,
 			},
 		},
 		ManagementBalance: &domain.DashboardManagementBalance{
 			Summary: &domain.DashboardBalanceSummary{
-				IncomeUSD:              data.OperatingIncomeUSD,
+				IncomeUSD:              data.OperatingResultUSD, // Cambiado a ResultUSD
 				DirectCostsExecutedUSD: data.CostosDirectosEjecutados,
 				DirectCostsInvestedUSD: data.CostosDirectosInvertidos,
 				StockUSD:               data.CostosDirectosStock,
@@ -308,7 +308,7 @@ func (m *DashboardModelMapper) OperatingResultToDomain(model *OperatingResultMod
 
 	return &domain.DashboardOperatingResult{
 		ProgressPct:   progressPct,
-		IncomeUSD:     incomeUSD,
+		ResultUSD:     incomeUSD, // Cambiado a ResultUSD
 		TotalCostsUSD: totalCostsUSD,
 	}
 }

@@ -67,7 +67,7 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 	var sowingHectares, sowingTotalHectares, sowingProgressPercent decimal.Decimal
 	var costsExecutedUSD, costsBudgetUSD, costsProgressPercent decimal.Decimal
 	var harvestHectares, harvestTotalHectares, harvestProgressPercent decimal.Decimal
-	var operatingIncomeUSD, operatingTotalCostsUSD, operatingResultUSD, operatingResultPct decimal.Decimal
+	var operatingResultUSD, operatingTotalCostsUSD, operatingResultPct decimal.Decimal
 
 	if sowingData.Hectares != nil {
 		sowingHectares = *sowingData.Hectares
@@ -123,10 +123,10 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		harvestProgressPercent = decimal.Zero
 	}
 
-	if operatingData.IncomeUSD != nil {
-		operatingIncomeUSD = *operatingData.IncomeUSD
+	if operatingData.ResultUSD != nil {
+		operatingResultUSD = *operatingData.ResultUSD
 	} else {
-		operatingIncomeUSD = decimal.Zero
+		operatingResultUSD = decimal.Zero
 	}
 
 	if operatingData.TotalCostsUSD != nil {
@@ -157,9 +157,8 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		HarvestHectares:        harvestHectares,
 		HarvestTotalHectares:   harvestTotalHectares,
 		HarvestProgressPercent: harvestProgressPercent,
-		OperatingIncomeUSD:     operatingIncomeUSD,
-		OperatingTotalCostsUSD: operatingTotalCostsUSD,
 		OperatingResultUSD:     operatingResultUSD,
+		OperatingTotalCostsUSD: operatingTotalCostsUSD,
 		OperatingResultPct:     operatingResultPct,
 		// Los demás campos se dejan en cero hasta implementar los otros módulos
 	}
@@ -778,7 +777,6 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 
 	query := `
 		SELECT 
-			income_usd,
 			operating_result_total_costs_usd,
 			operating_result_usd,
 			operating_result_pct
@@ -803,32 +801,14 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 
 	if hasRows {
 		// Leer los valores raw
-		var rawIncomeUSD, rawTotalCostsUSD, rawResultUSD, rawResultPct interface{}
-		err = rows.Scan(&rawIncomeUSD, &rawTotalCostsUSD, &rawResultUSD, &rawResultPct)
+		var rawTotalCostsUSD, rawResultUSD, rawResultPct interface{}
+		err = rows.Scan(&rawTotalCostsUSD, &rawResultUSD, &rawResultPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan operating result data", err)
 		}
 
 		// Convertir los valores raw a decimal.Decimal
-		var incomeUSD, totalCostsUSD, resultUSD, resultPct *decimal.Decimal
-
-		// Convertir IncomeUSD
-		if rawIncomeUSD != nil {
-			if strVal, ok := rawIncomeUSD.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					incomeUSD = &dec
-				}
-			} else if floatVal, ok := rawIncomeUSD.(float64); ok {
-				dec := decimal.NewFromFloat(floatVal)
-				incomeUSD = &dec
-			} else if intVal, ok := rawIncomeUSD.(int64); ok {
-				dec := decimal.NewFromInt(intVal)
-				incomeUSD = &dec
-			} else if intVal, ok := rawIncomeUSD.(int); ok {
-				dec := decimal.NewFromInt(int64(intVal))
-				incomeUSD = &dec
-			}
-		}
+		var totalCostsUSD, resultUSD, resultPct *decimal.Decimal
 
 		// Convertir TotalCostsUSD
 		if rawTotalCostsUSD != nil {
@@ -886,7 +866,6 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 
 		// Crear el resultado
 		result = models.OperatingResultModel{
-			IncomeUSD:     incomeUSD,
 			TotalCostsUSD: totalCostsUSD,
 			ResultUSD:     resultUSD,
 			ResultPct:     resultPct,

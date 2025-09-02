@@ -196,7 +196,7 @@ type InvestorContributions struct {
 // OperatingResultMetric representa la métrica de resultado operativo
 type OperatingResultMetric struct {
 	ProgressPct   decimal.Decimal `json:"progress_pct"`
-	IncomeUSD     decimal.Decimal `json:"income_usd"`
+	ResultUSD     decimal.Decimal `json:"result_usd"`
 	TotalCostsUSD decimal.Decimal `json:"total_costs_usd"`
 }
 
@@ -319,7 +319,7 @@ func createEmptyDashboardResponse() DashboardResponse {
 			},
 			OperatingResult: OperatingResultMetric{
 				ProgressPct:   decimal.Zero,
-				IncomeUSD:     decimal.Zero,
+				ResultUSD:     decimal.Zero,
 				TotalCostsUSD: decimal.Zero,
 			},
 		},
@@ -407,7 +407,7 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.Metrics.InvestorContributions.ProgressPct = roundTo3Decimals(response.Metrics.InvestorContributions.ProgressPct)
 
 	response.Metrics.OperatingResult.ProgressPct = roundTo3Decimals(response.Metrics.OperatingResult.ProgressPct)
-	response.Metrics.OperatingResult.IncomeUSD = roundTo3Decimals(response.Metrics.OperatingResult.IncomeUSD)
+	response.Metrics.OperatingResult.ResultUSD = roundTo3Decimals(response.Metrics.OperatingResult.ResultUSD)
 	response.Metrics.OperatingResult.TotalCostsUSD = roundTo3Decimals(response.Metrics.OperatingResult.TotalCostsUSD)
 
 	// Redondear balance de gestión
@@ -563,7 +563,7 @@ func convertOperatingResult(result *domain.DashboardOperatingResult) OperatingRe
 
 	return OperatingResultMetric{
 		ProgressPct:   result.ProgressPct,
-		IncomeUSD:     result.IncomeUSD,
+		ResultUSD:     result.ResultUSD,
 		TotalCostsUSD: result.TotalCostsUSD,
 	}
 }

@@ -278,35 +278,84 @@ Resultado Operativo = Ingresos por comercializaciones - Total invertido
 Porcentaje de Rentabilidad = (Resultado Operativo / Total invertido) × 100
 ```
 
-### **🏗️ Ejemplo Práctico:**
+¡Perfecto! 🎯 Te explico de manera simple y completa cómo se obtienen esos 3 valores:
 
-#### **Proyecto "Campo Grande":**
+## 🌱 **¿Cómo Se Calculan los 3 Valores del Dashboard?**
 
-**1. Ingresos por Comercializaciones:**
-- Campo A: $30,000 (30% de ventas)
-- Campo B: $15,000 (arriendo fijo)
-- **Total ingresos**: $45,000
+### **1. `total_costs_usd` ($93,500) - Los Costos Totales**
 
-**2. Total Invertido:**
-- Labores ejecutadas: $20,000
-- Insumos utilizados: $10,000
-- **Total invertido**: $30,000
+**¿Qué es?** La suma de todo lo que se ha gastado en el proyecto.
 
-**3. Cálculo:**
-```
-Resultado Operativo = $45,000 - $30,000 = +$15,000
-Porcentaje = ($15,000 / $30,000) × 100 = +50%
-```
+**¿De dónde viene?**
+- **Labores ejecutadas**: Cada trabajo realizado en el campo (siembra, fertilización, cosecha)
+- **Insumos utilizados**: Fertilizantes, semillas, pesticidas que se compraron y usaron
+- **Fórmula**: `Labores + Insumos = Costos Totales`
 
-### **✅ Resumen:**
+**Ejemplo práctico:**
+- Siembra: $2,500 (50 ha × $50/ha)
+- Fertilización: $3,750 (50 ha × $75/ha)  
+- Cosecha: $5,000 (50 ha × $100/ha)
+- **Total**: $11,250 por lote
 
-- **Los tipos de arriendo** solo determinan **cómo calcular los ingresos** de cada campo
-- **El resultado operativo** se calcula con tu fórmula simple
-- **La rentabilidad** es el porcentaje que mencionaste
+### **2. `result_usd` (-$45,500) - El Resultado Operativo**
 
-**¡Es exactamente eso! Los tipos de arriendo son solo la forma de calcular los ingresos, pero el resultado operativo se calcula con tu fórmula.** 🎯
+**¿Qué es?** Cuánto dinero ganaste o perdiste realmente.
 
-¿Ahora está más claro y simple?
+**¿De dónde viene?**
+- **Ingresos**: Dinero que obtienes por las ventas/comercializaciones
+- **Costos**: Todo lo que gastaste (labores + insumos)
+- **Costo administrativo**: Gastos de oficina, gestión, etc.
+- **Fórmula**: `Ingresos - Costos - Costo Administrativo = Resultado`
+
+**Ejemplo práctico:**
+- Ingresos del proyecto: $48,000
+- Costos totales: $93,500
+- Costo administrativo: $0
+- **Resultado**: $48,000 - $93,500 = **-$45,500** (pérdida)
+
+### **3. `progress_pct` (-48.7%) - El Porcentaje de Rentabilidad**
+
+**¿Qué es?** Qué tan rentable es tu proyecto en porcentaje.
+
+**¿De dónde viene?**
+- **Resultado operativo**: Lo que ganaste o perdiste
+- **Total invertido**: Costos + Costo administrativo
+- **Fórmula**: `(Resultado / Total Invertido) × 100`
+
+**Ejemplo práctico:**
+- Resultado: -$45,500
+- Total invertido: $93,500
+- **Porcentaje**: (-$45,500 ÷ $93,500) × 100 = **-48.7%**
+
+## �� **Relaciones en la Base de Datos:**
+
+### **Tabla `projects`**
+- Contiene el **costo administrativo** de cada proyecto
+- Es el proyecto principal que agrupa todo
+
+### **Tabla `workorders` + `workorder_items`**
+- Registra cada **labor ejecutada** (siembra, fertilización, cosecha)
+- Multiplica hectáreas × precio por hectárea = **costo de labores**
+
+### **Tabla `supplies` + `workorder_items`**
+- Registra cada **insumo utilizado** (fertilizantes, semillas)
+- Multiplica cantidad × precio = **costo de insumos**
+
+### **Tabla `fields` + `lease_types`**
+- Define cómo se calculan los **ingresos** según el tipo de arriendo
+- Cada campo tiene un tipo de arriendo que determina cuánto dinero genera
+
+### **Tabla `crop_commercializations`**
+- Registra las **ventas/comercializaciones** de cada cultivo
+- Es la fuente de los ingresos del proyecto
+
+## 🎯 **Resumen Simple:**
+
+1. **Costos**: Sumas todo lo que gastaste en labores e insumos
+2. **Resultado**: Restas ingresos menos costos menos administrativo
+3. **Porcentaje**: Divides resultado entre total invertido y multiplicas por 100
+
+**¡Es como hacer las cuentas de tu negocio!** 📊
 
 ###########################################################################################################################
 ###########################################################################################################################

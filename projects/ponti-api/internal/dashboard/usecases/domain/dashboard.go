@@ -76,7 +76,7 @@ type DashboardInvestorBreakdown struct {
 // DashboardOperatingResult representa la métrica de resultado operativo
 type DashboardOperatingResult struct {
 	ProgressPct   decimal.Decimal
-	IncomeUSD     decimal.Decimal
+	ResultUSD     decimal.Decimal
 	TotalCostsUSD decimal.Decimal
 }
 
