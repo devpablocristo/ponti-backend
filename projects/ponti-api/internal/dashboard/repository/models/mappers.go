@@ -18,7 +18,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 	data *DashboardDataModel,
 	crops []CropIncidenceModel,
 	investors []InvestorContributionModel,
-	operational *OperationalIndicatorModel,
+	managementBalance *ManagementBalanceModel,
 ) *domain.DashboardData {
 	if data == nil {
 		return &domain.DashboardData{}
@@ -51,29 +51,14 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 				TotalCostsUSD: data.OperatingTotalCostsUSD,
 			},
 		},
-		ManagementBalance: &domain.DashboardManagementBalance{
-			Summary: &domain.DashboardBalanceSummary{
-				IncomeUSD:              data.OperatingResultUSD, // Cambiado a ResultUSD
-				DirectCostsExecutedUSD: data.CostosDirectosEjecutados,
-				DirectCostsInvestedUSD: data.CostosDirectosInvertidos,
-				StockUSD:               data.CostosDirectosStock,
-				RentUSD:                data.ArriendoInvertidosUSD,
-				StructureUSD:           data.EstructuraInvertidosUSD,
-				OperatingResultUSD:     data.OperatingResultUSD,
-				OperatingResultPct:     data.OperatingResultPct,
-			},
-			Breakdown: m.managementBalanceBreakdownFromData(data),
-			TotalsRow: &domain.DashboardBalanceTotals{
-				ExecutedUSD: data.CostosDirectosEjecutados,
-				InvestedUSD: data.CostosDirectosInvertidos,
-				StockUSD:    data.CostosDirectosStock,
-			},
-		},
+		ManagementBalance: m.ManagementBalanceToDomain(managementBalance),
 		CropIncidence: &domain.DashboardCropIncidence{
 			Crops: m.cropIncidenceToDomain(crops),
 			Total: nil, // TODO: Implementar cuando se requiera
 		},
-		OperationalIndicators: m.operationalIndicatorsToDomain(operational),
+		OperationalIndicators: &domain.DashboardOperationalIndicators{
+			Cards: []domain.DashboardOperationalCard{}, // TODO: Implementar cuando se requiera
+		},
 	}
 }
 
@@ -393,6 +378,9 @@ func (m *DashboardModelMapper) managementBalanceSummaryToDomain(model *Managemen
 		StructureUSD:           model.StructureUSD,
 		OperatingResultUSD:     model.OperatingResultUSD,
 		OperatingResultPct:     model.OperatingResultPct,
+		SemillaCostUSD:         model.SemillaCostUSD,
+		InsumosCostUSD:         model.InsumosCostUSD,
+		LaboresCostUSD:         model.LaboresCostUSD,
 	}
 }
 

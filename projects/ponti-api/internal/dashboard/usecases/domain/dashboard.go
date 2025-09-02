@@ -97,6 +97,9 @@ type DashboardBalanceSummary struct {
 	StructureUSD           decimal.Decimal
 	OperatingResultUSD     decimal.Decimal
 	OperatingResultPct     decimal.Decimal
+	SemillaCostUSD         decimal.Decimal
+	InsumosCostUSD         decimal.Decimal
+	LaboresCostUSD         decimal.Decimal
 }
 
 // DashboardBalanceBreakdown representa el desglose del balance por categoría

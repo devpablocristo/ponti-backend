@@ -202,9 +202,7 @@ type OperatingResultMetric struct {
 
 // ManagementBalance representa el balance de gestión
 type ManagementBalance struct {
-	Summary   BalanceSummary     `json:"summary"`
 	Breakdown []BalanceBreakdown `json:"breakdown"`
-	TotalsRow BalanceTotals      `json:"totals_row"`
 }
 
 // BalanceSummary representa el resumen del balance
@@ -324,21 +322,43 @@ func createEmptyDashboardResponse() DashboardResponse {
 			},
 		},
 		ManagementBalance: ManagementBalance{
-			Summary: BalanceSummary{
-				IncomeUSD:              decimal.Zero,
-				DirectCostsExecutedUSD: decimal.Zero,
-				DirectCostsInvestedUSD: decimal.Zero,
-				StockUSD:               decimal.Zero,
-				RentUSD:                decimal.Zero,
-				StructureUSD:           decimal.Zero,
-				OperatingResultUSD:     decimal.Zero,
-				OperatingResultPct:     decimal.Zero,
-			},
-			Breakdown: []BalanceBreakdown{},
-			TotalsRow: BalanceTotals{
-				ExecutedUSD: decimal.Zero,
-				InvestedUSD: decimal.Zero,
-				StockUSD:    decimal.Zero,
+			Breakdown: []BalanceBreakdown{
+				{
+					Label:       "Costos Directos",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    nil,
+				},
+				{
+					Label:       "Semilla",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    nil,
+				},
+				{
+					Label:       "Insumos",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    nil,
+				},
+				{
+					Label:       "Labores",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    &decimal.Zero,
+				},
+				{
+					Label:       "Arriendo",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    nil,
+				},
+				{
+					Label:       "Estructura",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					StockUSD:    nil,
+				},
 			},
 		},
 		CropIncidence: CropIncidence{
@@ -410,16 +430,6 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	response.Metrics.OperatingResult.ResultUSD = roundTo3Decimals(response.Metrics.OperatingResult.ResultUSD)
 	response.Metrics.OperatingResult.TotalCostsUSD = roundTo3Decimals(response.Metrics.OperatingResult.TotalCostsUSD)
 
-	// Redondear balance de gestión
-	response.ManagementBalance.Summary.IncomeUSD = roundTo3Decimals(response.ManagementBalance.Summary.IncomeUSD)
-	response.ManagementBalance.Summary.DirectCostsExecutedUSD = roundTo3Decimals(response.ManagementBalance.Summary.DirectCostsExecutedUSD)
-	response.ManagementBalance.Summary.DirectCostsInvestedUSD = roundTo3Decimals(response.ManagementBalance.Summary.DirectCostsInvestedUSD)
-	response.ManagementBalance.Summary.StockUSD = roundTo3Decimals(response.ManagementBalance.Summary.StockUSD)
-	response.ManagementBalance.Summary.RentUSD = roundTo3Decimals(response.ManagementBalance.Summary.RentUSD)
-	response.ManagementBalance.Summary.StructureUSD = roundTo3Decimals(response.ManagementBalance.Summary.StructureUSD)
-	response.ManagementBalance.Summary.OperatingResultUSD = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultUSD)
-	response.ManagementBalance.Summary.OperatingResultPct = roundTo3Decimals(response.ManagementBalance.Summary.OperatingResultPct)
-
 	// Redondear breakdown - solo si StockUSD no es NULL
 	for i := range response.ManagementBalance.Breakdown {
 		response.ManagementBalance.Breakdown[i].ExecutedUSD = roundTo3Decimals(response.ManagementBalance.Breakdown[i].ExecutedUSD)
@@ -428,11 +438,6 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 			*response.ManagementBalance.Breakdown[i].StockUSD = roundTo3Decimals(*response.ManagementBalance.Breakdown[i].StockUSD)
 		}
 	}
-
-	// Redondear totals row
-	response.ManagementBalance.TotalsRow.ExecutedUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.ExecutedUSD)
-	response.ManagementBalance.TotalsRow.InvestedUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.InvestedUSD)
-	response.ManagementBalance.TotalsRow.StockUSD = roundTo3Decimals(response.ManagementBalance.TotalsRow.StockUSD)
 
 	// Redondear incidencia por cultivo
 	for i := range response.CropIncidence.Crops {
@@ -574,10 +579,48 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		return ManagementBalance{}
 	}
 
+	// Crear breakdown con todos los campos del balance
+	breakdown := []BalanceBreakdown{
+		{
+			Label:       "Costos Directos",
+			ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
+			InvestedUSD: balance.Summary.DirectCostsInvestedUSD,
+			StockUSD:    &balance.Summary.StockUSD,
+		},
+		{
+			Label:       "Semilla",
+			ExecutedUSD: balance.Summary.SemillaCostUSD,
+			InvestedUSD: balance.Summary.SemillaCostUSD,
+			StockUSD:    nil,
+		},
+		{
+			Label:       "Insumos",
+			ExecutedUSD: balance.Summary.InsumosCostUSD,
+			InvestedUSD: balance.Summary.InsumosCostUSD,
+			StockUSD:    nil,
+		},
+		{
+			Label:       "Labores",
+			ExecutedUSD: balance.Summary.LaboresCostUSD,
+			InvestedUSD: balance.Summary.LaboresCostUSD,
+			StockUSD:    &decimal.Zero,
+		},
+		{
+			Label:       "Arriendo",
+			ExecutedUSD: decimal.Zero,
+			InvestedUSD: balance.Summary.RentUSD,
+			StockUSD:    nil,
+		},
+		{
+			Label:       "Estructura",
+			ExecutedUSD: decimal.Zero,
+			InvestedUSD: balance.Summary.StructureUSD,
+			StockUSD:    nil,
+		},
+	}
+
 	return ManagementBalance{
-		Summary:   convertBalanceSummary(balance.Summary),
-		Breakdown: convertBalanceBreakdown(balance.Breakdown),
-		TotalsRow: convertBalanceTotals(balance.TotalsRow),
+		Breakdown: breakdown,
 	}
 }
 

@@ -124,6 +124,9 @@ type ManagementBalanceSummary struct {
 	StructureUSD           decimal.Decimal `db:"estructura_invertidos_usd"`
 	OperatingResultUSD     decimal.Decimal `db:"operating_result_usd"`
 	OperatingResultPct     decimal.Decimal `db:"operating_result_pct"`
+	SemillaCostUSD         decimal.Decimal `db:"semilla_cost"`
+	InsumosCostUSD         decimal.Decimal `db:"insumos_cost"`
+	LaboresCostUSD         decimal.Decimal `db:"labores_cost"`
 }
 
 // ManagementBalanceBreakdown representa el desglose del balance por categoría
