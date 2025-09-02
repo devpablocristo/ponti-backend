@@ -930,23 +930,23 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 				FROM workorders w
 				JOIN workorder_items wi ON wi.workorder_id = w.id
 				JOIN supplies s ON s.id = wi.supply_id
-				WHERE w.project_id = p.id AND s.category = 'semilla'
+				WHERE w.project_id = p.project_id AND s.name ILIKE '%semilla%'
 			), 0) AS semilla_cost,
 			COALESCE((
 				SELECT SUM(wi.total_used * s.price)
 				FROM workorders w
 				JOIN workorder_items wi ON wi.workorder_id = w.id
 				JOIN supplies s ON s.id = wi.supply_id
-				WHERE w.project_id = p.id AND s.category = 'insumos'
+				WHERE w.project_id = p.project_id AND s.name NOT ILIKE '%semilla%'
 			), 0) AS insumos_cost,
 			COALESCE((
 				SELECT SUM(lb.price * w.effective_area)
 				FROM workorders w
 				JOIN labors lb ON lb.id = w.labor_id
-				WHERE w.project_id = p.id
+				WHERE w.project_id = p.project_id
 			), 0) AS labores_cost
 		FROM dashboard_management_balance_view p
-		WHERE project_id = ANY($1)
+		WHERE p.project_id = ANY($1)
 	`
 
 	args := []interface{}{projectIDs}
