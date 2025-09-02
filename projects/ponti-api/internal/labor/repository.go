@@ -220,7 +220,9 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 		Joins("INNER JOIN categories lc ON lb.category_id = lc.id").
 		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
 		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
-		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
+		Joins("LEFT JOIN workorder_items wi ON wi.workorder_id = w.id").
+		Where("wi.id IS NULL")
 
 	if fieldID != 0 {
 		base = base.Where("w.field_id = ?", fieldID)
