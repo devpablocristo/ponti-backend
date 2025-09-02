@@ -34,7 +34,8 @@ INSERT INTO investors (id, name) VALUES
 INSERT INTO projects (id, customer_id, campaign_id, name, admin_cost) VALUES
   (1, 1, 1, 'Proyecto A - Parcial', 1000),      -- 50% sembrado, 100% cosechado
   (2, 1, 1, 'Proyecto B - Completo', 500),      -- 100% sembrado y cosechado
-  (3, 1, 1, 'Proyecto C - Sin Siembra', 750);   -- 0% sembrado, 0% cosechado
+  (3, 1, 1, 'Proyecto C - Sin Siembra', 750),   -- 0% sembrado, 0% cosechado
+  (4, 1, 1, 'Proyecto D - Con Ingresos', 800);  -- 100% sembrado, cosechado y vendido
 
 -- ========================================
 -- RELACIÓN PROYECTO-INVERSOR (CORREGIDO)
@@ -50,15 +51,20 @@ INSERT INTO project_investors (project_id, investor_id, percentage) VALUES
   (2, 5, 40.00),
   
   -- Proyecto 3: 1 inversor (100%)
-  (3, 1, 100.00);
+  (3, 1, 100.00),
+  
+  -- Proyecto 4: 2 inversores (70% + 30% = 100%)
+  (4, 2, 70.00),
+  (4, 3, 30.00);
 
 -- ========================================
 -- TRES CAMPOS CON DIFERENTES ESCENARIOS
 -- ========================================
-INSERT INTO fields (id, project_id, name, lease_type_id) VALUES
-  (101, 1, 'Campo A - Parcial', 1),    -- ID 1 = % INGRESO NETO
-  (102, 2, 'Campo B - Completo', 2),   -- ID 2 = % UTILIDAD
-  (103, 3, 'Campo C - Vacío', 3);      -- ID 3 = ARRIENDO FIJO
+INSERT INTO fields (id, project_id, name, lease_type_id, lease_type_percent, lease_type_value) VALUES
+  (101, 1, 'Campo A - Parcial', 1, 30.00, NULL),    -- ID 1 = % INGRESO NETO (30%)
+  (102, 2, 'Campo B - Completo', 2, 25.00, NULL),   -- ID 2 = % UTILIDAD (25%)
+  (103, 3, 'Campo C - Vacío', 3, NULL, 150.00),      -- ID 3 = ARRIENDO FIJO ($150/ha)
+  (104, 4, 'Campo D - Con Ingresos', 1, 40.00, NULL); -- ID 1 = % INGRESO NETO (40%)
 
 -- ========================================
 -- SEIS LOTES CON DIFERENTES ESTADOS
@@ -74,7 +80,11 @@ INSERT INTO lots (id, field_id, name, hectares, previous_crop_id, current_crop_i
   
   -- Proyecto 3: Campo C - Vacío (0 ha sembradas de 100 ha totales)
   (1005, 103, 'Lote C1', 50, 1, 2, '2024-2025', 100, NULL),            -- 50 ha NO sembradas
-  (1006, 103, 'Lote C2', 50, 2, 1, '2024-2025', 100, NULL);            -- 50 ha NO sembradas
+  (1006, 103, 'Lote C2', 50, 2, 1, '2024-2025', 100, NULL),            -- 50 ha NO sembradas
+  
+  -- Proyecto 4: Campo D - Con Ingresos (120 ha sembradas de 120 ha totales)
+  (1007, 104, 'Lote D1', 60, 1, 2, '2024-2025', 120, '2024-05-01'),    -- 60 ha sembradas
+  (1008, 104, 'Lote D2', 60, 2, 1, '2024-2025', 120, '2024-05-05');    -- 60 ha sembradas
 
 -- ========================================
 -- SEIS LABORES CON PRECIOS REDONDOS
@@ -88,7 +98,12 @@ INSERT INTO labors (id, project_id, name, category_id, price, contractor_name) V
   -- Proyecto 2
   (4, 2, 'Siembra', 9, 50, 'Contratista 1'),
   (5, 2, 'Cosecha', 13, 100, 'Contratista 2'),
-  (6, 2, 'Fertilización', 8, 75, 'Contratista 3');
+  (6, 2, 'Fertilización', 8, 75, 'Contratista 3'),
+  
+  -- Proyecto 4
+  (7, 4, 'Siembra', 9, 50, 'Contratista 1'),      -- ID 9 = Siembra
+  (8, 4, 'Cosecha', 13, 100, 'Contratista 2'),    -- ID 13 = Cosecha
+  (9, 4, 'Fertilización', 8, 75, 'Contratista 3'); -- ID 8 = Fertilizantes
 
 -- ========================================
 -- SEIS INSUMOS CON PRECIOS REDONDOS
@@ -104,7 +119,11 @@ INSERT INTO supplies (id, project_id, name, type_id, category_id, price) VALUES
   
   -- Proyecto 3
   (5, 3, 'Fertilizante', 3, 8, 2),
-  (6, 3, 'Semilla', 1, 1, 10);
+  (6, 3, 'Semilla', 1, 1, 10),
+  
+  -- Proyecto 4
+  (7, 4, 'Fertilizante', 3, 8, 2),           -- ID 3 = Fertilizantes, ID 8 = Fertilizantes
+  (8, 4, 'Semilla', 1, 1, 10);               -- ID 1 = Semillas, ID 1 = Semilla
 
 -- ========================================
 -- WORKORDERS CON DIFERENTES ESCENARIOS
@@ -122,7 +141,25 @@ INSERT INTO workorders (id, project_id, field_id, lot_id, crop_id, labor_id, inv
   
   (7, 2, 102, 1004, 1, 4, 1, '2024-06-05', 75),    -- Siembra Lote B2 - 75 ha × $50 = $3,750
   (8, 2, 102, 1004, 1, 6, 1, '2024-07-05', 75),    -- Fertilización Lote B2 - 75 ha × $75 = $5,625
-  (9, 2, 102, 1004, 1, 5, 1, '2024-12-20', 75);    -- Cosecha Lote B2 - 75 ha × $100 = $7,500
+  (9, 2, 102, 1004, 1, 5, 1, '2024-12-20', 75),    -- Cosecha Lote B2 - 75 ha × $100 = $7,500
+  
+  -- Proyecto 3: Campo C - Con Costos Mínimos (100 ha de 100 ha) - CORREGIDO PARA SER REALISTA
+  (16, 3, 103, 1005, 2, 1, 1, '2024-08-01', 50),    -- Siembra Lote C1 - 50 ha × $50 = $2,500
+  (17, 3, 103, 1005, 2, 3, 1, '2024-09-01', 50),    -- Fertilización Lote C1 - 50 ha × $75 = $3,750
+  (18, 3, 103, 1005, 2, 2, 1, '2025-01-15', 50),    -- Cosecha Lote C1 - 50 ha × $100 = $5,000
+  
+  (19, 3, 103, 1006, 1, 1, 1, '2024-08-05', 50),    -- Siembra Lote C2 - 50 ha × $50 = $2,500
+  (20, 3, 103, 1006, 1, 3, 1, '2024-09-05', 50),    -- Fertilización Lote C2 - 50 ha × $75 = $3,750
+  (21, 3, 103, 1006, 1, 2, 1, '2025-01-20', 50),    -- Cosecha Lote C2 - 50 ha × $100 = $5,000
+  
+  -- Proyecto 4: Campo D - Con Ingresos (120 ha de 120 ha)
+  (10, 4, 104, 1007, 2, 7, 1, '2024-05-01', 60),   -- Siembra Lote D1 - 60 ha × $50 = $3,000
+  (11, 4, 104, 1007, 2, 9, 1, '2024-06-01', 60),   -- Fertilización Lote D1 - 60 ha × $75 = $4,500
+  (12, 4, 104, 1007, 2, 8, 1, '2024-11-15', 60),   -- Cosecha Lote D1 - 60 ha × $100 = $6,000
+  
+  (13, 4, 104, 1008, 1, 7, 1, '2024-05-05', 60),   -- Siembra Lote D2 - 60 ha × $50 = $3,000
+  (14, 4, 104, 1008, 1, 9, 1, '2024-06-05', 60),   -- Fertilización Lote D2 - 60 ha × $75 = $4,500
+  (15, 4, 104, 1008, 1, 8, 1, '2024-11-20', 60);   -- Cosecha Lote D2 - 60 ha × $100 = $6,000
 
 -- ========================================
 -- WORKORDER_ITEMS CON NÚMEROS REDONDOS
@@ -140,7 +177,32 @@ INSERT INTO workorder_items (workorder_id, supply_id, final_dose, total_used) VA
   
   -- Proyecto 2: Semillas
   (4, 4, 50, 3750),      -- Workorder 4: 50 kg/ha × 75 ha = 3,750 kg × $10 = $37,500
-  (7, 4, 50, 3750);      -- Workorder 7: 50 kg/ha × 75 ha = 3,750 kg × $10 = $37,500
+  (7, 4, 50, 3750),      -- Workorder 7: 50 kg/ha × 75 ha = 3,750 kg × $10 = $37,500
+  
+  -- Proyecto 3: Fertilización - CORREGIDO PARA SER REALISTA
+  (17, 5, 100, 5000),    -- Workorder 17: 100 kg/ha × 50 ha = 5,000 kg × $2 = $10,000
+  (20, 5, 100, 5000),    -- Workorder 20: 100 kg/ha × 50 ha = 5,000 kg × $2 = $10,000
+  
+  -- Proyecto 3: Semillas - CORREGIDO PARA SER REALISTA
+  (16, 6, 50, 2500),     -- Workorder 16: 50 kg/ha × 50 ha = 2,500 kg × $10 = $25,000
+  (19, 6, 50, 2500),     -- Workorder 19: 50 kg/ha × 50 ha = 2,500 kg × $10 = $25,000
+  
+  -- Proyecto 4: Fertilización
+  (11, 7, 100, 6000),    -- Workorder 11: 100 kg/ha × 60 ha = 6,000 kg × $2 = $12,000
+  (14, 7, 100, 6000),    -- Workorder 14: 100 kg/ha × 60 ha = 6,000 kg × $2 = $12,000
+  
+  -- Proyecto 4: Semillas
+  (10, 8, 50, 3000),     -- Workorder 10: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
+  (13, 8, 50, 3000);     -- Workorder 13: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
+
+-- ========================================
+-- FACTURA CON INGRESOS PARA PROYECTO 4
+-- ========================================
+-- Proyecto 4: Factura de venta de cosecha (120 ha × 2.5 ton/ha × $400/ton = $120,000)
+-- Usar work_order_id de las cosechas del Proyecto 4 (workorders 12 y 15)
+INSERT INTO invoices (id, work_order_id, number, company, date, status) VALUES
+  (1, 12, 'INV-2024-001', 'Empresa Demo', '2024-12-01', 'paid'),  -- Cosecha Lote D1
+  (2, 15, 'INV-2024-002', 'Empresa Demo', '2024-12-01', 'paid');  -- Cosecha Lote D2
 
 -- ========================================
 -- VER TODAS LAS COLUMNAS DISPONIBLES
@@ -171,7 +233,8 @@ ORDER BY project_id;
 -- RESULTADOS REALES:
 -- Proyecto 1: $92,500 ejecutados (labores $22,500 + insumos $70,000)
 -- Proyecto 2: $138,750 ejecutados (labores $33,750 + insumos $105,000)
--- Proyecto 3: $0 ejecutados (sin workorders)
+-- Proyecto 3: $70,000 ejecutados (labores $20,000 + insumos $50,000) - CORREGIDO
+-- Proyecto 4: $111,000 ejecutados (labores $27,000 + insumos $84,000)
 SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
 SELECT 
   project_id, 
@@ -202,10 +265,12 @@ ORDER BY project_id;
 -- ========================================
 -- MÓDULO 4: RESULTADO OPERATIVO
 -- ========================================
--- RESULTADOS REALES:
--- Proyecto 1: $0 ingresos - $92,500 costos = -$92,500 (-100%)
--- Proyecto 2: $0 ingresos - $138,750 costos = -$138,750 (-100%)
--- Proyecto 3: $0 ingresos - $0 costos = $0 (0%)
+-- RESULTADOS REALES (después de aplicar migración 000061):
+-- Proyecto 1: $48,000 ingresos - $92,500 costos directos - $1,000 admin = -$45,500 (-48.7%)
+-- Proyecto 2: $5,000 ingresos - $138,750 costos directos - $500 admin = -$134,250 (-96.4%)
+-- Proyecto 3: $15,000 ingresos - $70,000 costos directos - $750 admin = -$55,750 (-78.7%) - CORREGIDO
+-- Proyecto 4: $38,400 ingresos - $111,000 costos directos - $800 admin = -$73,400 (-65.7%)
+-- NOTA: Los ingresos se calculan en la vista dashboard_operating_result_view según tipo de arriendo
 SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
 SELECT 
   project_id, 
@@ -214,7 +279,7 @@ SELECT
   operating_result_total_costs_usd,
   operating_result_pct
 FROM dashboard_operating_result_view
-WHERE project_id IN (1,2,3)
+WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
 -- ========================================
@@ -224,6 +289,7 @@ ORDER BY project_id;
 -- Proyecto 1: 3 inversores (40% + 35% + 25% = 100%)
 -- Proyecto 2: 2 inversores (60% + 40% = 100%)
 -- Proyecto 3: 1 inversor (100%)
+-- Proyecto 4: 2 inversores (70% + 30% = 100%)
 SELECT '=== MÓDULO 5: AVANCE DE APORTES ===' as info;
 SELECT 
   project_id, 
@@ -232,6 +298,7 @@ SELECT
   investor_percentage_pct,
   contributions_progress_pct
 FROM dashboard_contributions_progress_view
+WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
 -- ========================================
@@ -240,7 +307,8 @@ ORDER BY project_id;
 -- RESULTADOS REALES:
 -- Proyecto 1: Semillas $50,000, Insumos $20,000, Labores $22,500 = $92,500 total + $1,000 estructura = $93,500
 -- Proyecto 2: Semillas $75,000, Insumos $30,000, Labores $33,750 = $138,750 total + $500 estructura = $139,250  
--- Proyecto 3: Todo en $0 + $750 estructura = $750
+-- Proyecto 3: Semillas $50,000, Insumos $20,000, Labores $20,000 = $90,000 total + $750 estructura = $90,750 - CORREGIDO
+-- Proyecto 4: Semillas $60,000, Insumos $24,000, Labores $27,000 = $111,000 total + $800 estructura = $111,800
 SELECT '=== MÓDULO 6: BALANCE DE GESTIÓN ===' as info;
 SELECT 
   project_id,
@@ -265,7 +333,7 @@ SELECT
   structure_invested_usd,         -- Estructura Invertidos (admin_cost del proyecto)
   total_invested_usd              -- Total Invertido (Directos + Arriendo + Estructura)
 FROM dashboard_balance_management_view 
-WHERE project_id IN (1,2,3)
+WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
 -- =============================================
@@ -275,6 +343,7 @@ ORDER BY project_id;
 -- Proyecto 1: 200 ha totales - Cultivo 1 (Soja): 100 ha (50%) $0 costos = $0/ha, Cultivo 2 (Maíz): 100 ha (50%) $92,500 costos = $925/ha
 -- Proyecto 2: 150 ha totales - Cultivo 1 (Soja): 75 ha (50%) $0 costos = $0/ha, Cultivo 2 (Maíz): 75 ha (50%) $138,750 costos = $1,850/ha
 -- Proyecto 3: 100 ha totales - Sin cultivos específicos, $0 costos = $0/ha
+-- Proyecto 4: 120 ha totales - Cultivo 1 (Soja): 60 ha (50%) $0 costos = $0/ha, Cultivo 2 (Maíz): 60 ha (50%) $111,000 costos = $1,850/ha
 SELECT '=== MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO ===' as info;
 SELECT 
   project_id, 
@@ -295,6 +364,7 @@ ORDER BY project_id;
 -- Proyecto 1: Primera orden 2024-10-15, Última orden 2025-03-20, Arqueo stock 2024-11-10
 -- Proyecto 2: Primera orden 2024-06-01, Última orden 2024-12-20, Arqueo stock 2024-07-01
 -- Proyecto 3: Sin órdenes de trabajo, sin arqueo de stock
+-- Proyecto 4: Primera orden 2024-05-01, Última orden 2024-11-20, Arqueo stock 2024-06-01
 SELECT '=== MÓDULO 8: INDICADORES OPERATIVOS ===' as info;
 SELECT 
   project_id,
@@ -305,5 +375,5 @@ SELECT
   last_stock_count_date,       -- Fecha del último arqueo de stock
   campaign_closing_date        -- Fecha de cierre de campaña (placeholder)
 FROM dashboard_operational_indicators_view 
-WHERE project_id IN (1,2,3)
+WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;

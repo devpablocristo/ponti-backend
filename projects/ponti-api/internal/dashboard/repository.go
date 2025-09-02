@@ -52,16 +52,22 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		return nil, err
 	}
 
-	// TODO: Implementar los otros 4 módulos cuando se requiera
-	// - Módulo 5: Resultado Operativo
+	// Obtener datos del módulo 5: Resultado Operativo
+	operatingData, err := r.getOperatingResult(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Implementar los otros 3 módulos cuando se requiera
 	// - Módulo 6: Balance de Gestión
 	// - Módulo 7: Incidencia de Costos por Cultivo
 	// - Módulo 8: Indicadores Operativos
 
-	// Crear estructura temporal con datos de siembra, costos, cosecha y aportes
+	// Crear estructura temporal con datos de siembra, costos, cosecha, aportes y resultado operativo
 	var sowingHectares, sowingTotalHectares, sowingProgressPercent decimal.Decimal
 	var costsExecutedUSD, costsBudgetUSD, costsProgressPercent decimal.Decimal
 	var harvestHectares, harvestTotalHectares, harvestProgressPercent decimal.Decimal
+	var operatingIncomeUSD, operatingTotalCostsUSD, operatingResultUSD, operatingResultPct decimal.Decimal
 
 	if sowingData.Hectares != nil {
 		sowingHectares = *sowingData.Hectares
@@ -117,6 +123,30 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		harvestProgressPercent = decimal.Zero
 	}
 
+	if operatingData.IncomeUSD != nil {
+		operatingIncomeUSD = *operatingData.IncomeUSD
+	} else {
+		operatingIncomeUSD = decimal.Zero
+	}
+
+	if operatingData.TotalCostsUSD != nil {
+		operatingTotalCostsUSD = *operatingData.TotalCostsUSD
+	} else {
+		operatingTotalCostsUSD = decimal.Zero
+	}
+
+	if operatingData.ResultUSD != nil {
+		operatingResultUSD = *operatingData.ResultUSD
+	} else {
+		operatingResultUSD = decimal.Zero
+	}
+
+	if operatingData.ResultPct != nil {
+		operatingResultPct = *operatingData.ResultPct
+	} else {
+		operatingResultPct = decimal.Zero
+	}
+
 	tempData := &models.DashboardDataModel{
 		SowingHectares:         sowingHectares,
 		SowingTotalHectares:    sowingTotalHectares,
@@ -127,6 +157,10 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		HarvestHectares:        harvestHectares,
 		HarvestTotalHectares:   harvestTotalHectares,
 		HarvestProgressPercent: harvestProgressPercent,
+		OperatingIncomeUSD:     operatingIncomeUSD,
+		OperatingTotalCostsUSD: operatingTotalCostsUSD,
+		OperatingResultUSD:     operatingResultUSD,
+		OperatingResultPct:     operatingResultPct,
 		// Los demás campos se dejan en cero hasta implementar los otros módulos
 	}
 
@@ -715,29 +749,161 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 }
 
 // getOperatingResult obtiene los datos del resultado operativo
-// func (r *Repository) getOperatingResult(ctx context.Context, filter domain.DashboardFilter) (*models.OperatingResultModel, error) {
-// 	var projectIDs []int64
-// 	var err error
-//
-// 	// Si tenemos ProjectID directamente, usarlo sin buscar
-// 	if filter.ProjectID != nil {
-// 		projectIDs = []int64{*filter.ProjectID}
-// 	} else {
-// 		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
-// 		// (por CustomerID, CampaignID o FieldID)
-// 		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-//
-// 	// Si no hay proyectos relacionados, retornar datos vacíos
-// 	if len(projectIDs) == 0 {
-// 		return &models.OperatingResultModel{}, nil
-// 	}
-//
-// 	// Implementar consulta a dashboard_operating_result_view usando project_id = ANY($1)
-// }
+func (r *Repository) getOperatingResult(ctx context.Context, filter domain.DashboardFilter) (*models.OperatingResultModel, error) {
+	var projectIDs []int64
+	var err error
+
+	// Si tenemos ProjectID directamente, usarlo sin buscar
+	if filter.ProjectID != nil {
+		projectIDs = []int64{*filter.ProjectID}
+	} else {
+		// Solo buscar proyectos relacionados si no tenemos ProjectID directo
+		// (por CustomerID, CampaignID o FieldID)
+		projectIDs, err = r.getRelatedProjectIDs(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Si no hay proyectos relacionados, retornar datos vacíos
+	if len(projectIDs) == 0 {
+		zero := decimal.Zero
+		return &models.OperatingResultModel{
+			IncomeUSD:     &zero,
+			TotalCostsUSD: &zero,
+			ResultUSD:     &zero,
+			ResultPct:     &zero,
+		}, nil
+	}
+
+	query := `
+		SELECT 
+			income_usd,
+			operating_result_total_costs_usd,
+			operating_result_usd,
+			operating_result_pct
+		FROM dashboard_operating_result_view 
+		WHERE project_id = ANY($1)
+	`
+
+	args := []interface{}{projectIDs}
+
+	// Ejecutar la consulta
+	var result models.OperatingResultModel
+
+	// Obtener las filas de la consulta
+	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get operating result data", err)
+	}
+	defer rows.Close()
+
+	// Verificar si hay filas
+	hasRows := rows.Next()
+
+	if hasRows {
+		// Leer los valores raw
+		var rawIncomeUSD, rawTotalCostsUSD, rawResultUSD, rawResultPct interface{}
+		err = rows.Scan(&rawIncomeUSD, &rawTotalCostsUSD, &rawResultUSD, &rawResultPct)
+		if err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to scan operating result data", err)
+		}
+
+		// Convertir los valores raw a decimal.Decimal
+		var incomeUSD, totalCostsUSD, resultUSD, resultPct *decimal.Decimal
+
+		// Convertir IncomeUSD
+		if rawIncomeUSD != nil {
+			if strVal, ok := rawIncomeUSD.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					incomeUSD = &dec
+				}
+			} else if floatVal, ok := rawIncomeUSD.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				incomeUSD = &dec
+			} else if intVal, ok := rawIncomeUSD.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				incomeUSD = &dec
+			} else if intVal, ok := rawIncomeUSD.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				incomeUSD = &dec
+			}
+		}
+
+		// Convertir TotalCostsUSD
+		if rawTotalCostsUSD != nil {
+			if strVal, ok := rawTotalCostsUSD.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					totalCostsUSD = &dec
+				}
+			} else if floatVal, ok := rawTotalCostsUSD.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				totalCostsUSD = &dec
+			} else if intVal, ok := rawTotalCostsUSD.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				totalCostsUSD = &dec
+			} else if intVal, ok := rawTotalCostsUSD.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				totalCostsUSD = &dec
+			}
+		}
+
+		// Convertir ResultUSD
+		if rawResultUSD != nil {
+			if strVal, ok := rawResultUSD.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					resultUSD = &dec
+				}
+			} else if floatVal, ok := rawResultUSD.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				resultUSD = &dec
+			} else if intVal, ok := rawResultUSD.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				resultUSD = &dec
+			} else if intVal, ok := rawResultUSD.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				resultUSD = &dec
+			}
+		}
+
+		// Convertir ResultPct
+		if rawResultPct != nil {
+			if strVal, ok := rawResultPct.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					resultPct = &dec
+				}
+			} else if floatVal, ok := rawResultPct.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				resultPct = &dec
+			} else if intVal, ok := rawResultPct.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				resultPct = &dec
+			} else if intVal, ok := rawResultPct.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				resultPct = &dec
+			}
+		}
+
+		// Crear el resultado
+		result = models.OperatingResultModel{
+			IncomeUSD:     incomeUSD,
+			TotalCostsUSD: totalCostsUSD,
+			ResultUSD:     resultUSD,
+			ResultPct:     resultPct,
+		}
+
+		return &result, nil
+	}
+
+	// Si no hay filas, retornar valores por defecto
+	zero := decimal.Zero
+	return &models.OperatingResultModel{
+		IncomeUSD:     &zero,
+		TotalCostsUSD: &zero,
+		ResultUSD:     &zero,
+		ResultPct:     &zero,
+	}, nil
+}
 
 // getManagementBalance obtiene los datos del balance de gestión
 // func (r *Repository) getManagementBalance(ctx context.Context, filter domain.DashboardFilter) (*models.ManagementBalanceModel, error) {

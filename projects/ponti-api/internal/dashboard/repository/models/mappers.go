@@ -285,10 +285,31 @@ func (m *DashboardModelMapper) OperatingResultToDomain(model *OperatingResultMod
 		return &domain.DashboardOperatingResult{}
 	}
 
+	// Manejar punteros a decimal.Decimal
+	var progressPct, incomeUSD, totalCostsUSD decimal.Decimal
+
+	if model.ResultPct != nil {
+		progressPct = *model.ResultPct
+	} else {
+		progressPct = decimal.Zero
+	}
+
+	if model.IncomeUSD != nil {
+		incomeUSD = *model.IncomeUSD
+	} else {
+		incomeUSD = decimal.Zero
+	}
+
+	if model.TotalCostsUSD != nil {
+		totalCostsUSD = *model.TotalCostsUSD
+	} else {
+		totalCostsUSD = decimal.Zero
+	}
+
 	return &domain.DashboardOperatingResult{
-		ProgressPct:   model.ResultPct,
-		IncomeUSD:     model.IncomeUSD,
-		TotalCostsUSD: model.TotalCostsUSD,
+		ProgressPct:   progressPct,
+		IncomeUSD:     incomeUSD,
+		TotalCostsUSD: totalCostsUSD,
 	}
 }
 

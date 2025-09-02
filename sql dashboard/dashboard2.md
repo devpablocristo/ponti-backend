@@ -267,124 +267,46 @@ contributions_progress_pct:    100.00, 100.00, 100.00, 100.00, 100.00, 100.00, 1
   - `operating_result_usd` (resultado en USD)
   - `operating_result_pct` (porcentaje de rentabilidad)
 
-  Te doy el ejemplo del **Resultado Operativo** con el mismo formato:
+¡Exacto! Tienes razón. Es mucho más simple de lo que estaba complicando.
 
-Te doy un ejemplo completo del cálculo del **Resultado Operativo** con la implementación actual (sin valores hardcodeados):
+## porcentaje rojo grande
 
-## **Ejemplo de Cálculo del Resultado Operativo:**
+**SÍ, se hace todo eso con la fórmula que mencionaste:**
 
-### **Datos de Entrada:**
-
-#### **Proyecto A (project_id=1):**
-- **Field 10**: 50 toneladas cosechadas
-- **Field 11**: 75 toneladas cosechadas
-- **Field 12**: 25 toneladas cosechadas
-
-#### **Costos Ejecutados:**
-- **Labores ejecutadas**: $8,000
-- **Insumos utilizados**: $4,000
-
-### **Cálculo Paso a Paso:**
-
-#### **1. CTE `v_income_by_field`:**
-```sql
--- Field 10:
-total_tons = 50 toneladas
-income_usd = 0 (placeholder - debe ser calculado por la app)
-
--- Field 11:
-total_tons = 75 toneladas
-income_usd = 0 (placeholder - debe ser calculado por la app)
-
--- Field 12:
-total_tons = 25 toneladas
-income_usd = 0 (placeholder - debe ser calculado por la app)
+```
+Resultado Operativo = Ingresos por comercializaciones - Total invertido
+Porcentaje de Rentabilidad = (Resultado Operativo / Total invertido) × 100
 ```
 
-#### **2. Cálculo de Ingresos (por la aplicación):**
+### **🏗️ Ejemplo Práctico:**
+
+#### **Proyecto "Campo Grande":**
+
+**1. Ingresos por Comercializaciones:**
+- Campo A: $30,000 (30% de ventas)
+- Campo B: $15,000 (arriendo fijo)
+- **Total ingresos**: $45,000
+
+**2. Total Invertido:**
+- Labores ejecutadas: $20,000
+- Insumos utilizados: $10,000
+- **Total invertido**: $30,000
+
+**3. Cálculo:**
 ```
-Precio configurado por la app: $250 por tonelada
-
-Field 10: 50 ton × $250 = $12,500
-Field 11: 75 ton × $250 = $18,750
-Field 12: 25 ton × $250 = $6,250
-
-Total ingresos del proyecto: $37,500
-```
-
-#### **3. CTE `operating_result`:**
-```sql
-income_usd = $37,500 (A)
-total_invested_usd = $8,000 + $4,000 = $12,000 (B)
-```
-
-#### **4. Cálculo del Resultado Operativo:**
-
-##### **Resultado en USD:**
-```sql
-operating_result_usd = income_usd - total_invested_usd
-operating_result_usd = $37,500 - $12,000 = $25,500
+Resultado Operativo = $45,000 - $30,000 = +$15,000
+Porcentaje = ($15,000 / $30,000) × 100 = +50%
 ```
 
-##### **Porcentaje de Rentabilidad:**
-```sql
-operating_result_pct = ((income_usd - total_invested_usd) / total_invested_usd) × 100
-operating_result_pct = (($37,500 - $12,000) / $12,000) × 100
-operating_result_pct = ($25,500 / $12,000) × 100
-operating_result_pct = 2.125 × 100 = 212.50%
-```
+### **✅ Resumen:**
 
-### **Resultado Final:**
+- **Los tipos de arriendo** solo determinan **cómo calcular los ingresos** de cada campo
+- **El resultado operativo** se calcula con tu fórmula simple
+- **La rentabilidad** es el porcentaje que mencionaste
 
-#### **Campos en la Vista:**
-```sql
--- Para project_id=1:
-total_tons:                   150.00    -- 50 + 75 + 25
-income_usd:                   0.00      -- Placeholder (debe ser calculado por la app)
-total_invested_usd:           12000.00  -- $8,000 + $4,000
-operating_result_usd:         0.00      -- Placeholder (debe ser calculado por la app)
-operating_result_pct:         0.00      -- Placeholder (debe ser calculado por la app)
-```
+**¡Es exactamente eso! Los tipos de arriendo son solo la forma de calcular los ingresos, pero el resultado operativo se calcula con tu fórmula.** 🎯
 
-#### **Valores Calculados por la App:**
-```sql
-income_usd_calculado:         37500.00  -- 150 ton × $250
-operating_result_usd_calculado: 25500.00  -- $37,500 - $12,000
-operating_result_pct_calculado: 212.50    -- (25,500 / 12,000) × 100
-```
-
-### **Interpretación:**
-
-#### **Resultado Positivo:**
-- **USD**: Ganancias operativas de $25,500
-- **%**: Rentabilidad del 212.50% sobre costos invertidos
-- **Estado**: Proyecto muy rentable
-
-#### **Fórmulas Implementadas:**
-```sql
--- En la vista (placeholders):
-total_tons = SUM(lots.tons)
-income_usd = 0 (configurable)
-total_invested_usd = executed_labors_usd + executed_supplies_usd
-
--- En la aplicación (cálculo real):
-income_usd = total_tons × precio_por_tonelada
-operating_result_usd = income_usd - total_invested_usd
-operating_result_pct = (operating_result_usd / total_invested_usd) × 100
-```
-
-### **Resumen:**
-
-**La vista proporciona los datos base:**
-- `total_tons`: Toneladas cosechadas
-- `total_invested_usd`: Costos ejecutados
-
-**La aplicación debe calcular:**
-- `income_usd`: Ingresos por toneladas × precio configurable
-- `operating_result_usd`: Resultado operativo en USD
-- `operating_result_pct`: Porcentaje de rentabilidad
-
-**Sin valores hardcodeados** - todo es dinámico y configurable.
+¿Ahora está más claro y simple?
 
 ###########################################################################################################################
 ###########################################################################################################################

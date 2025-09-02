@@ -101,10 +101,10 @@ type ContributionsProgressModel struct {
 
 // OperatingResultModel representa el modelo de resultado operativo
 type OperatingResultModel struct {
-	IncomeUSD     decimal.Decimal `db:"income_usd"`
-	TotalCostsUSD decimal.Decimal `db:"operating_result_total_costs_usd"`
-	ResultUSD     decimal.Decimal `db:"operating_result_usd"`
-	ResultPct     decimal.Decimal `db:"operating_result_pct"`
+	IncomeUSD     *decimal.Decimal `db:"income_usd"`
+	TotalCostsUSD *decimal.Decimal `db:"operating_result_total_costs_usd"`
+	ResultUSD     *decimal.Decimal `db:"operating_result_usd"`
+	ResultPct     *decimal.Decimal `db:"operating_result_pct"`
 }
 
 // ManagementBalanceModel representa el modelo de balance de gestión
