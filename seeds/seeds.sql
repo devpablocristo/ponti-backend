@@ -196,6 +196,29 @@ INSERT INTO workorder_items (workorder_id, supply_id, final_dose, total_used) VA
   (13, 8, 50, 3000);     -- Workorder 13: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
 
 -- ========================================
+-- COMERCIALIZACIONES DE CULTIVOS
+-- ========================================
+-- Datos de comercialización para activar cálculos de ingresos netos y arriendos
+-- Precios realistas del mercado argentino (USD/ton)
+INSERT INTO crop_commercializations (project_id, crop_id, board_price, freight_cost, commercial_cost, net_price, created_at) VALUES
+  -- Proyecto 1: Soja y Maíz
+  (1, 1, 450.00, 25.00, 15.00, 410.00, '2024-10-01'),  -- Soja: $450 - $25 - $15 = $410/ton
+  (1, 2, 280.00, 20.00, 12.00, 248.00, '2024-10-01'),  -- Maíz: $280 - $20 - $12 = $248/ton
+  
+  -- Proyecto 2: Soja y Maíz
+  (2, 1, 450.00, 25.00, 15.00, 410.00, '2024-06-01'),  -- Soja: $450 - $25 - $15 = $410/ton
+  (2, 2, 280.00, 20.00, 12.00, 248.00, '2024-06-01'),  -- Maíz: $280 - $20 - $12 = $248/ton
+  (2, 3, 320.00, 22.00, 14.00, 284.00, '2024-06-01'),  -- Trigo: $320 - $22 - $14 = $284/ton
+  
+  -- Proyecto 3: Soja y Maíz (para futuras siembras)
+  (3, 1, 450.00, 25.00, 15.00, 410.00, '2024-08-01'),  -- Soja: $450 - $25 - $15 = $410/ton
+  (3, 2, 280.00, 20.00, 12.00, 248.00, '2024-08-01'),  -- Maíz: $280 - $20 - $12 = $248/ton
+  
+  -- Proyecto 4: Soja y Maíz
+  (4, 1, 450.00, 25.00, 15.00, 410.00, '2024-05-01'),  -- Soja: $450 - $25 - $15 = $410/ton
+  (4, 2, 280.00, 20.00, 12.00, 248.00, '2024-05-01');  -- Maíz: $280 - $20 - $12 = $248/ton
+
+-- ========================================
 -- FACTURA CON INGRESOS PARA PROYECTO 4
 -- ========================================
 -- Proyecto 4: Factura de venta de cosecha (120 ha × 2.5 ton/ha × $400/ton = $120,000)
@@ -203,6 +226,46 @@ INSERT INTO workorder_items (workorder_id, supply_id, final_dose, total_used) VA
 INSERT INTO invoices (id, work_order_id, number, company, date, status) VALUES
   (1, 12, 'INV-2024-001', 'Empresa Demo', '2024-12-01', 'paid'),  -- Cosecha Lote D1
   (2, 15, 'INV-2024-002', 'Empresa Demo', '2024-12-01', 'paid');  -- Cosecha Lote D2
+
+-- ========================================
+-- VERIFICACIÓN DE CÁLCULOS DE ARRIENDO CON COMERCIALIZACIONES
+-- ========================================
+-- Verificar que los cálculos de arriendo funcionen con los nuevos datos de comercialización
+SELECT '=== VERIFICACIÓN DE CÁLCULOS DE ARRIENDO ===' as info;
+
+-- Verificar datos de comercialización cargados
+SELECT '=== DATOS DE COMERCIALIZACIÓN ===' as info;
+SELECT 
+  project_id,
+  crop_id,
+  board_price,
+  freight_cost,
+  commercial_cost,
+  net_price,
+  created_at
+FROM crop_commercializations 
+ORDER BY project_id, crop_id;
+
+-- Verificar cálculos de lotes con ingresos netos
+SELECT '=== CÁLCULOS DE LOTES CON INGRESOS NETOS ===' as info;
+SELECT 
+  l.id as lot_id,
+  f.project_id,
+  l.current_crop_id,
+  l.hectares,
+  l.tons,
+  ROUND(l.tons / NULLIF(l.hectares, 0), 2) as yield_tonha,
+  cc.net_price as net_price_usd,
+  ROUND((l.tons / NULLIF(l.hectares, 0)) * cc.net_price, 2) as income_net_per_ha,
+  lt.name as lease_type_name,
+  f.lease_type_percent,
+  f.lease_type_value
+FROM lots l
+LEFT JOIN fields f ON l.field_id = f.id
+LEFT JOIN lease_types lt ON f.lease_type_id = lt.id
+LEFT JOIN crop_commercializations cc ON cc.project_id = f.project_id AND cc.crop_id = l.current_crop_id
+WHERE l.deleted_at IS NULL
+ORDER BY f.project_id, l.id;
 
 -- ========================================
 -- VER TODAS LAS COLUMNAS DISPONIBLES
