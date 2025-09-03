@@ -254,9 +254,9 @@ SELECT
   l.current_crop_id,
   l.hectares,
   l.tons,
-  ROUND(l.tons / NULLIF(l.hectares, 0), 2) as yield_tonha,
+  CAST(l.tons AS DECIMAL(10,2)) / NULLIF(CAST(l.hectares AS DECIMAL(10,2)), 0) as yield_tonha,
   cc.net_price as net_price_usd,
-  ROUND((l.tons / NULLIF(l.hectares, 0)) * cc.net_price, 2) as income_net_per_ha,
+  (CAST(l.tons AS DECIMAL(10,2)) / NULLIF(CAST(l.hectares AS DECIMAL(10,2)), 0)) * CAST(cc.net_price AS DECIMAL(10,2)) as income_net_per_ha,
   lt.name as lease_type_name,
   f.lease_type_percent,
   f.lease_type_value

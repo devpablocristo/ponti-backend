@@ -46,9 +46,16 @@ type LaborRawItem struct {
 	CategoryName    string
 	InvestorName    string
 	USDAvgValue     decimal.Decimal
-	InvoiceID       int64
-	InvoiceNumber   string
-	InvoiceCompany  string
-	InvoiceDate     time.Time
-	InvoiceStatus   string
+
+	// Campos calculados de la vista fix_labors_list
+	NetTotal    decimal.Decimal
+	TotalIVA    decimal.Decimal
+	USDCostHa   decimal.Decimal
+	USDNetTotal decimal.Decimal
+
+	InvoiceID      int64
+	InvoiceNumber  string
+	InvoiceCompany string
+	InvoiceDate    time.Time
+	InvoiceStatus  string
 }

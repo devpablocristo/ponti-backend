@@ -27,9 +27,3 @@ ON fx_rates(effective_date);
 INSERT INTO fx_rates (currency_pair, rate, effective_date) 
 VALUES ('USDARS', 1.0000, CURRENT_DATE)
 ON CONFLICT (currency_pair, effective_date) DO NOTHING;
-
--- Comentarios en español
-COMMENT ON TABLE fx_rates IS 'Tabla de tipos de cambio para conversiones monetarias';
-COMMENT ON COLUMN fx_rates.currency_pair IS 'Par de monedas (ej: USDARS)';
-COMMENT ON COLUMN fx_rates.rate IS 'Tasa de cambio';
-COMMENT ON COLUMN fx_rates.effective_date IS 'Fecha de vigencia de la tasa';
