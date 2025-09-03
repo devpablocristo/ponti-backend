@@ -294,9 +294,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	q := `
         SELECT 
           surface_ha,
-          total_labor_cost AS net_total_cost,
-          labor_cost_per_ha AS avg_cost_per_ha
-        FROM labor_cards_cube_view
+          net_total_cost,
+          avg_cost_per_ha
+        FROM labor_cards_cube_view_v2
         WHERE 1=1
     `
 	var args []any

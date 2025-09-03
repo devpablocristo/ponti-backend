@@ -107,8 +107,8 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		costsExecutedUSD = decimal.Zero
 	}
 
-	if costsData.BudgetTotalUSD != nil {
-		costsBudgetUSD = *costsData.BudgetTotalUSD
+	if costsData.BudgetCostUSD != nil {
+		costsBudgetUSD = *costsData.BudgetCostUSD
 	} else {
 		costsBudgetUSD = decimal.Zero
 	}
@@ -259,7 +259,7 @@ func (r *Repository) getSowingProgress(ctx context.Context, filter domain.Dashbo
 			sowing_hectares,
 			sowing_total_hectares,
 			sowing_progress_pct
-		FROM dashboard_sowing_progress_view 
+		FROM dashboard_sowing_progress_view_v2 
 		WHERE project_id = ANY($1)
 	`
 
@@ -365,24 +365,18 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 	if len(projectIDs) == 0 {
 		zero := decimal.Zero
 		return &models.CostsProgressModel{
-			ExecutedLaborsUSD:   &zero,
-			ExecutedSuppliesUSD: &zero,
-			ExecutedCostsUSD:    &zero,
-			BudgetCostUSD:       &zero,
-			BudgetTotalUSD:      &zero,
-			ProgressPct:         &zero,
+			ExecutedCostsUSD: &zero,
+			BudgetCostUSD:    &zero,
+			ProgressPct:      &zero,
 		}, nil
 	}
 
 	query := `
 		SELECT 
-			executed_labors_usd,
-			executed_supplies_usd,
-			executed_costs_usd,
-			budget_cost_usd,
-			budget_total_usd,
-			costs_progress_pct
-		FROM dashboard_costs_progress_view 
+					executed_costs_usd,
+		budget_cost_usd,
+		costs_progress_pct
+	FROM dashboard_costs_progress_view_v2 
 		WHERE project_id = ANY($1)
 	`
 
@@ -403,38 +397,14 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 
 	if hasRows {
 		// Leer los valores raw
-		var rawLaborsUSD, rawSuppliesUSD, rawCostsUSD, rawBudgetCost, rawBudgetTotal, rawProgressPct interface{}
-		err = rows.Scan(&rawLaborsUSD, &rawSuppliesUSD, &rawCostsUSD, &rawBudgetCost, &rawBudgetTotal, &rawProgressPct)
+		var rawCostsUSD, rawBudgetCost, rawProgressPct interface{}
+		err = rows.Scan(&rawCostsUSD, &rawBudgetCost, &rawProgressPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan costs progress data", err)
 		}
 
 		// Convertir los valores raw a decimal.Decimal
-		var laborsUSD, suppliesUSD, costsUSD, budgetCost, budgetTotal, progressPct *decimal.Decimal
-
-		// Convertir ExecutedLaborsUSD
-		if rawLaborsUSD != nil {
-			if strVal, ok := rawLaborsUSD.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					laborsUSD = &dec
-				}
-			} else if floatVal, ok := rawLaborsUSD.(float64); ok {
-				dec := decimal.NewFromFloat(floatVal)
-				laborsUSD = &dec
-			}
-		}
-
-		// Convertir ExecutedSuppliesUSD
-		if rawSuppliesUSD != nil {
-			if strVal, ok := rawSuppliesUSD.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					suppliesUSD = &dec
-				}
-			} else if floatVal, ok := rawSuppliesUSD.(float64); ok {
-				dec := decimal.NewFromFloat(floatVal)
-				suppliesUSD = &dec
-			}
-		}
+		var costsUSD, budgetCost, progressPct *decimal.Decimal
 
 		// Convertir ExecutedCostsUSD
 		if rawCostsUSD != nil {
@@ -460,18 +430,6 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 			}
 		}
 
-		// Convertir BudgetTotalUSD
-		if rawBudgetTotal != nil {
-			if strVal, ok := rawBudgetTotal.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					budgetTotal = &dec
-				}
-			} else if floatVal, ok := rawBudgetTotal.(float64); ok {
-				dec := decimal.NewFromFloat(floatVal)
-				budgetTotal = &dec
-			}
-		}
-
 		// Convertir ProgressPct
 		if rawProgressPct != nil {
 			if strVal, ok := rawProgressPct.(string); ok {
@@ -486,12 +444,9 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 
 		// Crear el resultado
 		result = models.CostsProgressModel{
-			ExecutedLaborsUSD:   laborsUSD,
-			ExecutedSuppliesUSD: suppliesUSD,
-			ExecutedCostsUSD:    costsUSD,
-			BudgetCostUSD:       budgetCost,
-			BudgetTotalUSD:      budgetTotal,
-			ProgressPct:         progressPct,
+			ExecutedCostsUSD: costsUSD,
+			BudgetCostUSD:    budgetCost,
+			ProgressPct:      progressPct,
 		}
 
 		return &result, nil
@@ -500,12 +455,9 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 	// Si no hay filas, retornar valores por defecto
 	zero := decimal.Zero
 	return &models.CostsProgressModel{
-		ExecutedLaborsUSD:   &zero,
-		ExecutedSuppliesUSD: &zero,
-		ExecutedCostsUSD:    &zero,
-		BudgetCostUSD:       &zero,
-		BudgetTotalUSD:      &zero,
-		ProgressPct:         &zero,
+		ExecutedCostsUSD: &zero,
+		BudgetCostUSD:    &zero,
+		ProgressPct:      &zero,
 	}, nil
 }
 
@@ -541,7 +493,7 @@ func (r *Repository) getHarvestProgress(ctx context.Context, filter domain.Dashb
 			harvest_hectares,
 			harvest_total_hectares,
 			harvest_progress_pct
-		FROM dashboard_harvest_progress_view 
+		FROM dashboard_harvest_progress_view_v2 
 		WHERE project_id = ANY($1)
 	`
 
@@ -654,7 +606,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 			investor_name,
 			investor_percentage_pct,
 			contributions_progress_pct
-		FROM dashboard_contributions_progress_view 
+		FROM dashboard_contributions_progress_view_v2 
 		WHERE project_id = ANY($1)
 		ORDER BY investor_id
 	`
@@ -794,7 +746,7 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 			operating_result_total_costs_usd,
 			operating_result_usd,
 			operating_result_pct
-		FROM dashboard_operating_result_view 
+		FROM dashboard_operating_result_view_v2 
 		WHERE project_id = ANY($1)
 	`
 
@@ -928,7 +880,6 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			income_usd,
 			costos_directos_ejecutados_usd,
 			costos_directos_invertidos_usd,
-			costos_directos_stock_usd,
 			arriendo_invertidos_usd,
 			estructura_invertidos_usd,
 			operating_result_usd,
@@ -954,7 +905,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 				JOIN labors lb ON lb.id = w.labor_id
 				WHERE w.project_id = p.project_id
 			), 0) AS labores_cost
-		FROM dashboard_management_balance_view p
+		FROM dashboard_management_balance_view_v2 p
 		WHERE p.project_id = ANY($1)
 	`
 
@@ -976,8 +927,8 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 
 	if hasRows {
 		// Leer los valores raw
-		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawStock, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct, rawSemillaCost, rawInsumosCost, rawLaboresCost interface{}
-		err = rows.Scan(&rawIncomeUSD, &rawDirectCostsExecuted, &rawDirectCostsInvested, &rawStock, &rawRent, &rawStructure, &rawOperatingResult, &rawOperatingResultPct, &rawSemillaCost, &rawInsumosCost, &rawLaboresCost)
+		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct, rawSemillaCost, rawInsumosCost, rawLaboresCost interface{}
+		err = rows.Scan(&rawIncomeUSD, &rawDirectCostsExecuted, &rawDirectCostsInvested, &rawRent, &rawStructure, &rawOperatingResult, &rawOperatingResultPct, &rawSemillaCost, &rawInsumosCost, &rawLaboresCost)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan management balance data", err)
 		}
@@ -985,7 +936,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 		fmt.Printf("DEBUG: Valores raw leídos - Income: %v, DirectCostsExec: %v, DirectCostsInv: %v\n", rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested)
 
 		// Convertir los valores raw a decimal.Decimal
-		var incomeUSD, directCostsExecuted, directCostsInvested, stock, rent, structure, operatingResult, operatingResultPct, semillaCost, insumosCost, laboresCost *decimal.Decimal
+		var incomeUSD, directCostsExecuted, directCostsInvested, rent, structure, operatingResult, operatingResultPct, semillaCost, insumosCost, laboresCost *decimal.Decimal
 
 		// Convertir IncomeUSD
 		if rawIncomeUSD != nil {
@@ -1038,24 +989,6 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			} else if intVal, ok := rawDirectCostsInvested.(int); ok {
 				dec := decimal.NewFromInt(int64(intVal))
 				directCostsInvested = &dec
-			}
-		}
-
-		// Convertir Stock
-		if rawStock != nil {
-			if strVal, ok := rawStock.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					stock = &dec
-				}
-			} else if floatVal, ok := rawStock.(float64); ok {
-				dec := decimal.NewFromFloat(floatVal)
-				stock = &dec
-			} else if intVal, ok := rawStock.(int64); ok {
-				dec := decimal.NewFromInt(intVal)
-				stock = &dec
-			} else if intVal, ok := rawStock.(int); ok {
-				dec := decimal.NewFromInt(int64(intVal))
-				stock = &dec
 			}
 		}
 
@@ -1191,7 +1124,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 				IncomeUSD:              *incomeUSD,
 				DirectCostsExecutedUSD: *directCostsExecuted,
 				DirectCostsInvestedUSD: *directCostsInvested,
-				StockUSD:               *stock,
+				StockUSD:               decimal.Zero,
 				RentUSD:                *rent,
 				StructureUSD:           *structure,
 				OperatingResultUSD:     *operatingResult,
@@ -1204,7 +1137,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			TotalsRow: &models.ManagementBalanceTotals{
 				TotalExecutedUSD: *directCostsExecuted,
 				TotalInvestedUSD: *directCostsInvested,
-				TotalStockUSD:    *stock,
+				TotalStockUSD:    decimal.Zero,
 			},
 		}
 
@@ -1258,11 +1191,11 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 	// Consultar la vista dashboard_crop_incidence_view
 	query := `
 		SELECT 
+			current_crop_id,
 			crop_name,
 			crop_hectares,
-			incidence_pct,
-			cost_per_ha_usd
-		FROM dashboard_crop_incidence_view 
+			crop_incidence_pct
+		FROM dashboard_crop_incidence_view_v2 
 		WHERE project_id = ANY($1)
 		ORDER BY crop_name
 	`
@@ -1280,15 +1213,27 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 
 	// Leer todas las filas
 	for rows.Next() {
-		var rawCropName, rawHectares, rawIncidencePct, rawCostPerHa interface{}
-		err = rows.Scan(&rawCropName, &rawHectares, &rawIncidencePct, &rawCostPerHa)
+		var rawCropID, rawCropName, rawHectares, rawIncidencePct interface{}
+		err = rows.Scan(&rawCropID, &rawCropName, &rawHectares, &rawIncidencePct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan crop incidence data", err)
 		}
 
 		// Convertir los valores raw a los tipos correctos
+		var cropID int64
 		var cropName string
-		var hectares, incidencePct, costPerHa decimal.Decimal
+		var hectares, incidencePct decimal.Decimal
+
+		// Convertir cropID
+		if rawCropID != nil {
+			if intVal, ok := rawCropID.(int64); ok {
+				cropID = intVal
+			} else if intVal, ok := rawCropID.(int); ok {
+				cropID = int64(intVal)
+			} else if floatVal, ok := rawCropID.(float64); ok {
+				cropID = int64(floatVal)
+			}
+		}
 
 		// Convertir cropName
 		if rawCropName != nil {
@@ -1327,27 +1272,13 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 			}
 		}
 
-		// Convertir costPerHa
-		if rawCostPerHa != nil {
-			if strVal, ok := rawCostPerHa.(string); ok {
-				if dec, err := decimal.NewFromString(strVal); err == nil {
-					costPerHa = dec
-				}
-			} else if floatVal, ok := rawCostPerHa.(float64); ok {
-				costPerHa = decimal.NewFromFloat(floatVal)
-			} else if intVal, ok := rawCostPerHa.(int64); ok {
-				costPerHa = decimal.NewFromInt(intVal)
-			} else if intVal, ok := rawCostPerHa.(int); ok {
-				costPerHa = decimal.NewFromInt(int64(intVal))
-			}
-		}
-
 		// Crear el modelo
 		cropModel := models.CropIncidenceModel{
+			CropID:       cropID,
 			Name:         cropName,
 			Hectares:     hectares,
 			IncidencePct: incidencePct,
-			CostPerHa:    costPerHa,
+			CostPerHa:    decimal.Zero,
 		}
 
 		result = append(result, cropModel)
@@ -1380,13 +1311,13 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 
 	query := `
 		SELECT
-			first_workorder_date,
-			first_workorder_number,
-			last_workorder_date,
-			last_workorder_number,
-			last_stock_count_date,
+			start_date,
+			NULL::INTEGER as first_workorder_number,
+			end_date,
+			NULL::INTEGER as last_workorder_number,
+			NULL::TIMESTAMP as last_stock_count_date,
 			campaign_closing_date
-		FROM dashboard_operational_indicators_view
+		FROM dashboard_operational_indicators_view_v2
 		WHERE project_id = ANY($1)
 		LIMIT 1
 	`

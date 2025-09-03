@@ -35,7 +35,8 @@ INSERT INTO projects (id, customer_id, campaign_id, name, admin_cost) VALUES
   (1, 1, 1, 'Proyecto A - Parcial', 1000),      -- 50% sembrado, 100% cosechado
   (2, 1, 1, 'Proyecto B - Completo', 500),      -- 100% sembrado y cosechado
   (3, 1, 1, 'Proyecto C - Sin Siembra', 750),   -- 0% sembrado, 0% cosechado
-  (4, 1, 1, 'Proyecto D - Con Ingresos', 800);  -- 100% sembrado, cosechado y vendido
+  (4, 1, 1, 'Proyecto D - Con Ingresos', 800),  -- 100% sembrado, cosechado y vendido
+  (5, 1, 1, 'Proyecto prueba Agus', 0);         -- Ejemplo para verificar costos directos
 
 -- ========================================
 -- RELACIÓN PROYECTO-INVERSOR (CORREGIDO)
@@ -55,7 +56,10 @@ INSERT INTO project_investors (project_id, investor_id, percentage) VALUES
   
   -- Proyecto 4: 2 inversores (70% + 30% = 100%)
   (4, 2, 70.00),
-  (4, 3, 30.00);
+  (4, 3, 30.00),
+  
+  -- Proyecto 5: 1 inversor (100%)
+  (5, 1, 100.00);
 
 -- ========================================
 -- TRES CAMPOS CON DIFERENTES ESCENARIOS
@@ -64,7 +68,9 @@ INSERT INTO fields (id, project_id, name, lease_type_id, lease_type_percent, lea
   (101, 1, 'Campo A - Parcial', 1, 30.00, NULL),    -- ID 1 = % INGRESO NETO (30%)
   (102, 2, 'Campo B - Completo', 2, 25.00, NULL),   -- ID 2 = % UTILIDAD (25%)
   (103, 3, 'Campo C - Vacío', 3, NULL, 150.00),      -- ID 3 = ARRIENDO FIJO ($150/ha)
-  (104, 4, 'Campo D - Con Ingresos', 1, 40.00, NULL); -- ID 1 = % INGRESO NETO (40%)
+  (104, 4, 'Campo D - Con Ingresos', 1, 40.00, NULL), -- ID 1 = % INGRESO NETO (40%)
+  (105, 5, 'Ejemplo', 1, NULL, NULL),               -- Campo para proyecto prueba Agus
+  (106, 5, 'Ejemplo 2', 1, NULL, NULL);             -- Campo para proyecto prueba Agus
 
 -- ========================================
 -- SEIS LOTES CON DIFERENTES ESTADOS
@@ -84,7 +90,11 @@ INSERT INTO lots (id, field_id, name, hectares, previous_crop_id, current_crop_i
   
   -- Proyecto 4: Campo D - Con Ingresos (120 ha sembradas de 120 ha totales)
   (1007, 104, 'Lote D1', 60, 1, 2, '2024-2025', 120, '2024-05-01'),    -- 60 ha sembradas
-  (1008, 104, 'Lote D2', 60, 2, 1, '2024-2025', 120, '2024-05-05');    -- 60 ha sembradas
+  (1008, 104, 'Lote D2', 60, 2, 1, '2024-2025', 120, '2024-05-05'),    -- 60 ha sembradas
+  
+  -- Proyecto 5: Campos Ejemplo (35 ha totales)
+  (1009, 105, 'Lote Ejemplo 1', 15, 1, 2, '2024-2025', NULL, NULL),     -- 15 ha para proyecto prueba Agus
+  (1010, 106, 'Lote Ejemplo 2', 20, 2, 1, '2024-2025', NULL, NULL);     -- 20 ha para proyecto prueba Agus
 
 -- ========================================
 -- SEIS LABORES CON PRECIOS REDONDOS
@@ -103,7 +113,10 @@ INSERT INTO labors (id, project_id, name, category_id, price, contractor_name) V
   -- Proyecto 4
   (7, 4, 'Siembra', 9, 50, 'Contratista 1'),      -- ID 9 = Siembra
   (8, 4, 'Cosecha', 13, 100, 'Contratista 2'),    -- ID 13 = Cosecha
-  (9, 4, 'Fertilización', 8, 75, 'Contratista 3'); -- ID 8 = Fertilizantes
+  (9, 4, 'Fertilización', 8, 75, 'Contratista 3'), -- ID 8 = Fertilizantes
+  
+  -- Proyecto 5
+  (10, 5, 'Labor Ejemplo', 9, 5.00, 'Contratista Ejemplo'); -- Labor para proyecto prueba Agus
 
 -- ========================================
 -- SEIS INSUMOS CON PRECIOS REDONDOS
@@ -123,7 +136,10 @@ INSERT INTO supplies (id, project_id, name, type_id, category_id, price) VALUES
   
   -- Proyecto 4
   (7, 4, 'Fertilizante', 3, 8, 2),           -- ID 3 = Fertilizantes, ID 8 = Fertilizantes
-  (8, 4, 'Semilla', 1, 1, 10);               -- ID 1 = Semillas, ID 1 = Semilla
+  (8, 4, 'Semilla', 1, 1, 10),               -- ID 1 = Semillas, ID 1 = Semilla
+  
+  -- Proyecto 5 (reutiliza insumos del proyecto 1)
+  (9, 5, 'Fertilizante Ejemplo', 3, 8, 2);   -- Fertilizante para proyecto prueba Agus
 
 -- ========================================
 -- WORKORDERS CON DIFERENTES ESCENARIOS
@@ -159,7 +175,11 @@ INSERT INTO workorders (id, project_id, field_id, lot_id, crop_id, labor_id, inv
   
   (13, 4, 104, 1008, 1, 7, 1, '2024-05-05', 60),   -- Siembra Lote D2 - 60 ha × $50 = $3,000
   (14, 4, 104, 1008, 1, 9, 1, '2024-06-05', 60),   -- Fertilización Lote D2 - 60 ha × $75 = $4,500
-  (15, 4, 104, 1008, 1, 8, 1, '2024-11-20', 60);   -- Cosecha Lote D2 - 60 ha × $100 = $6,000
+  (15, 4, 104, 1008, 1, 8, 1, '2024-11-20', 60),   -- Cosecha Lote D2 - 60 ha × $100 = $6,000
+  
+  -- Proyecto 5: Ejemplo para verificar costos directos
+  (101, 5, 105, 1009, 1, 10, 1, '2024-10-01', 15.00), -- Labor Ejemplo Lote Ejemplo 1 - 15 ha × $5 = $75
+  (102, 5, 106, 1010, 1, 10, 1, '2024-10-01', 15.00); -- Labor Ejemplo Lote Ejemplo 2 - 15 ha × $5 = $75
 
 -- ========================================
 -- WORKORDER_ITEMS CON NÚMEROS REDONDOS
@@ -193,7 +213,10 @@ INSERT INTO workorder_items (workorder_id, supply_id, final_dose, total_used) VA
   
   -- Proyecto 4: Semillas
   (10, 8, 50, 3000),     -- Workorder 10: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
-  (13, 8, 50, 3000);     -- Workorder 13: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
+  (13, 8, 50, 3000),     -- Workorder 13: 50 kg/ha × 60 ha = 3,000 kg × $10 = $30,000
+  
+  -- Proyecto 5: Solo la primera orden tiene insumos
+  (101, 9, 3.3327, 50);  -- Workorder 101: 3.3327 kg/ha × 15 ha = 50 kg × $2 = $99.98
 
 -- ========================================
 -- COMERCIALIZACIONES DE CULTIVOS
@@ -271,7 +294,7 @@ ORDER BY f.project_id, l.id;
 -- VER TODAS LAS COLUMNAS DISPONIBLES
 -- ========================================
 SELECT '=== VER TODAS LAS COLUMNAS DISPONIBLES ===' as info;
-SELECT * FROM dashboard_sowing_progress_view WHERE project_id = 1 LIMIT 1;
+SELECT * FROM dashboard_sowing_progress_view_v2 WHERE project_id = 1 LIMIT 1;
 
 -- ========================================
 -- MÓDULO 1: AVANCE DE SIEMBRA
@@ -286,7 +309,7 @@ SELECT
   sowing_hectares, 
   sowing_total_hectares, 
   sowing_progress_pct
-FROM dashboard_sowing_progress_view
+FROM dashboard_sowing_progress_view_v2
 WHERE project_id IN (1)
 ORDER BY project_id;
 
@@ -301,10 +324,10 @@ ORDER BY project_id;
 SELECT '=== MÓDULO 2: AVANCE DE COSTOS ===' as info;
 SELECT 
   project_id, 
-  executed_supplies_usd,
   executed_costs_usd,
+  budget_cost_usd,
   costs_progress_pct
-FROM dashboard_costs_progress_view
+FROM dashboard_costs_progress_view_v2
 WHERE project_id IN (1)
 ORDER BY project_id;
 
@@ -321,7 +344,7 @@ SELECT
   harvest_hectares, 
   harvest_total_hectares, 
   harvest_progress_pct
-FROM dashboard_harvest_progress_view
+FROM dashboard_harvest_progress_view_v2
 WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
@@ -333,16 +356,14 @@ ORDER BY project_id;
 -- Proyecto 2: $5,000 ingresos - $138,750 costos directos - $500 admin = -$134,250 (-96.4%)
 -- Proyecto 3: $15,000 ingresos - $70,000 costos directos - $750 admin = -$55,750 (-78.7%) - CORREGIDO
 -- Proyecto 4: $38,400 ingresos - $111,000 costos directos - $800 admin = -$73,400 (-65.7%)
--- NOTA: Los ingresos se calculan en la vista dashboard_operating_result_view según tipo de arriendo
+-- NOTA: Los ingresos se calculan en la vista dashboard_operating_result_view_v2 según tipo de arriendo
 SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
 SELECT 
   project_id, 
-  income_usd,
   operating_result_usd,
   operating_result_total_costs_usd,
   operating_result_pct
-FROM dashboard_operating_result_view
-WHERE project_id IN (1,2,3,4)
+FROM dashboard_operating_result_view_v2
 ORDER BY project_id;
 
 -- ========================================
@@ -360,7 +381,7 @@ SELECT
   investor_name,
   investor_percentage_pct,
   contributions_progress_pct
-FROM dashboard_contributions_progress_view
+FROM dashboard_contributions_progress_view_v2
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
@@ -375,27 +396,14 @@ ORDER BY project_id;
 SELECT '=== MÓDULO 6: BALANCE DE GESTIÓN ===' as info;
 SELECT 
   project_id,
-  -- SEMILLA
-  seeds_executed_usd,             -- Semilla Ejecutados
-  seeds_invested_usd,             -- Semilla Invertidos  
-  seeds_stock_usd,                -- Semilla Stock (Invertidos - Ejecutados)
-  -- INSUMOS
-  supplies_executed_usd,          -- Insumos Ejecutados (no semilla)
-  supplies_invested_usd,          -- Insumos Invertidos (no semilla)
-  supplies_stock_usd,             -- Insumos Stock (Invertidos - Ejecutados)
-  -- LABORES
-  labors_executed_usd,            -- Labores Ejecutados
-  labors_invested_usd,            -- Labores Invertidos
-  labors_stock_usd,               -- Labores Stock (Invertidos - Ejecutados)
-  -- COSTOS DIRECTOS TOTALES
-  direct_costs_executed_usd,      -- Costos Directos Ejecutados (Semilla + Insumos + Labores)
-  direct_costs_invested_usd,      -- Costos Directos Invertidos (Semilla + Insumos + Labores)
-  direct_costs_stock_usd,         -- Costos Directos Stock (Invertidos - Ejecutados)
-  -- OTROS COSTOS
-  lease_invested_usd,             -- Arriendo Invertidos (30% de comercializaciones)
-  structure_invested_usd,         -- Estructura Invertidos (admin_cost del proyecto)
-  total_invested_usd              -- Total Invertido (Directos + Arriendo + Estructura)
-FROM dashboard_balance_management_view 
+  income_usd,                     -- Ingresos
+  costos_directos_ejecutados_usd, -- Costos Directos Ejecutados
+  costos_directos_invertidos_usd, -- Costos Directos Invertidos
+  arriendo_invertidos_usd,        -- Arriendo Invertidos
+  estructura_invertidos_usd,      -- Estructura Invertidos
+  operating_result_usd,           -- Resultado Operativo
+  operating_result_pct            -- Resultado Operativo Porcentaje
+FROM dashboard_management_balance_view_v2 
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
@@ -410,14 +418,11 @@ ORDER BY project_id;
 SELECT '=== MÓDULO 7: INCIDENCIA DE COSTOS POR CULTIVO ===' as info;
 SELECT 
   project_id, 
-  crop_id,
+  current_crop_id,
   crop_name,
   crop_hectares,
-  project_total_hectares,
-  incidence_pct,
-  crop_direct_costs_usd,
-  cost_per_ha_usd
-FROM dashboard_crop_cost_incidence_view 
+  crop_incidence_pct
+FROM dashboard_crop_incidence_view_v2 
 ORDER BY project_id;
 
 -- ========================================
@@ -431,12 +436,73 @@ ORDER BY project_id;
 SELECT '=== MÓDULO 8: INDICADORES OPERATIVOS ===' as info;
 SELECT 
   project_id,
-  first_workorder_date,        -- Fecha de la primera orden de trabajo
-  first_workorder_number,      -- Número de la primera orden de trabajo
-  last_workorder_date,         -- Fecha de la última orden de trabajo
-  last_workorder_number,       -- Número de la última orden de trabajo
-  last_stock_count_date,       -- Fecha del último arqueo de stock
-  campaign_closing_date        -- Fecha de cierre de campaña (placeholder)
-FROM dashboard_operational_indicators_view 
+  start_date,                  -- Fecha de inicio
+  end_date,                    -- Fecha de fin
+  campaign_closing_date        -- Fecha de cierre de campaña
+FROM dashboard_operational_indicators_view_v2 
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
+
+-- ========================================
+-- VERIFICACIÓN DEL EJEMPLO PROYECTO PRUEBA AGUS
+-- ========================================
+SELECT '=== VERIFICACIÓN PROYECTO PRUEBA AGUS ===' as info;
+
+-- Verificar datos del proyecto
+SELECT '=== DATOS DEL PROYECTO ===' as info;
+SELECT 
+  p.id as project_id,
+  p.name as project_name,
+  f.id as field_id,
+  f.name as field_name,
+  l.id as lot_id,
+  l.name as lot_name,
+  l.hectares
+FROM projects p
+LEFT JOIN fields f ON f.project_id = p.id
+LEFT JOIN lots l ON l.field_id = f.id
+WHERE p.id = 5
+ORDER BY f.id, l.id;
+
+-- Verificar órdenes de trabajo
+SELECT '=== ÓRDENES DE TRABAJO ===' as info;
+SELECT 
+  w.id as workorder_id,
+  w.project_id,
+  w.field_id,
+  w.lot_id,
+  w.labor_id,
+  l.name as labor_name,
+  l.price as labor_price,
+  w.effective_area,
+  (l.price * w.effective_area) as labor_cost
+FROM workorders w
+LEFT JOIN labors l ON l.id = w.labor_id
+WHERE w.project_id = 5
+ORDER BY w.id;
+
+-- Verificar items de órdenes de trabajo
+SELECT '=== ITEMS DE ÓRDENES DE TRABAJO ===' as info;
+SELECT 
+  wi.workorder_id,
+  wi.supply_id,
+  s.name as supply_name,
+  s.price as supply_price,
+  wi.final_dose,
+  wi.total_used,
+  (wi.final_dose * s.price) as supply_cost_per_ha
+FROM workorder_items wi
+LEFT JOIN supplies s ON s.id = wi.supply_id
+WHERE wi.workorder_id IN (101, 102)
+ORDER BY wi.workorder_id;
+
+-- Verificar métricas del proyecto
+SELECT '=== MÉTRICAS DEL PROYECTO ===' as info;
+SELECT 
+  project_id,
+  surface_ha,
+  liters,
+  kilograms,
+  direct_cost
+FROM workorder_metrics_view_v2
+WHERE project_id = 5;

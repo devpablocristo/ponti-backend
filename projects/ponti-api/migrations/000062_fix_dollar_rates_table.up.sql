@@ -23,7 +23,15 @@ ON fx_rates(currency_pair, effective_date);
 CREATE INDEX IF NOT EXISTS idx_fx_rates_effective_date 
 ON fx_rates(effective_date);
 
--- Insertar tasa inicial USD/ARS como placeholder
+-- Función para obtener tasa de cambio por defecto
+CREATE OR REPLACE FUNCTION get_default_fx_rate()
+RETURNS DECIMAL AS $$
+BEGIN
+  RETURN 1.0000; -- Tasa base USD/USD
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Insertar tasa inicial USD/ARS usando función
 INSERT INTO fx_rates (currency_pair, rate, effective_date) 
-VALUES ('USDARS', 1.0000, CURRENT_DATE)
+VALUES ('USDARS', get_default_fx_rate(), CURRENT_DATE)
 ON CONFLICT (currency_pair, effective_date) DO NOTHING;

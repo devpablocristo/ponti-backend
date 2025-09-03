@@ -7,6 +7,34 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// BalanceCategory representa categorías canónicas para items del balance
+type BalanceCategory string
+
+const (
+	BalanceCategoryDirectCosts BalanceCategory = "DIRECT_COSTS"
+	BalanceCategorySeed        BalanceCategory = "SEED"
+	BalanceCategorySupplies    BalanceCategory = "SUPPLIES"
+	BalanceCategoryLabors      BalanceCategory = "LABORS"
+	BalanceCategoryLease       BalanceCategory = "LEASE"
+	BalanceCategoryAdmin       BalanceCategory = "ADMIN"
+)
+
+// AllowedBalanceCategories ayuda en validación y (des)serialización
+var AllowedBalanceCategories = map[BalanceCategory]struct{}{
+	BalanceCategoryDirectCosts: {},
+	BalanceCategorySeed:        {},
+	BalanceCategorySupplies:    {},
+	BalanceCategoryLabors:      {},
+	BalanceCategoryLease:       {},
+	BalanceCategoryAdmin:       {},
+}
+
+// Valid verifica si la categoría es válida
+func (c BalanceCategory) Valid() bool {
+	_, ok := AllowedBalanceCategories[c]
+	return ok
+}
+
 // DashboardFilter representa los filtros para obtener datos del dashboard
 type DashboardFilter struct {
 	CustomerID *int64
@@ -125,6 +153,7 @@ type DashboardCropIncidence struct {
 
 // DashboardCropBreakdown representa el desglose de costos por cultivo
 type DashboardCropBreakdown struct {
+	ID           int64
 	Name         string
 	Hectares     decimal.Decimal
 	RotationPct  decimal.Decimal
