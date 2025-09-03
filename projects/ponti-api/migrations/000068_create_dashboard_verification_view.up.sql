@@ -1,12 +1,11 @@
 -- =====================================================
--- 000069: VERIFICATION - Vista de Verificación
+-- 000068: DASHBOARD - Vista de Verificación de Cálculos
 -- =====================================================
--- Entidad: Verification (Verificación)
--- Funcionalidad: Verificar que todos los cálculos funcionen correctamente
+-- Entidad: dashboard (Dashboard)
+-- Funcionalidad: Crear vista de verificación para validar cálculos
 -- =====================================================
 
--- Consultas de verificación para validar que los cálculos funcionen correctamente
--- Esta vista emite verificaciones determinísticas que deben coincidir con los valores esperados
+-- Vista de verificación para validar que todos los cálculos funcionen correctamente
 CREATE OR REPLACE VIEW v_calc_verification AS
 WITH verification_results AS (
     -- Verificación 1: Labor-only order example
@@ -69,7 +68,7 @@ WITH verification_results AS (
         CASE 
             WHEN EXISTS (
                 SELECT 1 FROM v_calc_labors 
-                WHERE cost_ars_per_ha = labor_price_per_ha * usd_ars_rate
+                WHERE cost_ars_per_ha = total_usd_net * usd_ars_rate
                 LIMIT 1
             ) THEN 'PASS: ARS conversion working correctly'
             ELSE 'FAIL: ARS conversion not working'
@@ -151,3 +150,9 @@ SELECT
     description
 FROM verification_results
 ORDER BY test_name;
+
+-- Comentarios en español
+COMMENT ON VIEW v_calc_verification IS 'Vista de verificación para validar que todos los cálculos funcionen correctamente';
+COMMENT ON COLUMN v_calc_verification.test_name IS 'Nombre de la prueba de verificación';
+COMMENT ON COLUMN v_calc_verification.test_result IS 'Resultado de la prueba (PASS/FAIL)';
+COMMENT ON COLUMN v_calc_verification.description IS 'Descripción de lo que se verifica';
