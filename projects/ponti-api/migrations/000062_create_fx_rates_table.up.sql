@@ -1,5 +1,5 @@
 -- =====================================================
--- 000067: FX RATES - Tabla de Tipos de Cambio
+-- 000062: FX RATES - Tabla de Tipos de Cambio
 -- =====================================================
 -- Entidad: FX Rates (Tipos de Cambio)
 -- Funcionalidad: Almacenar tasas de cambio para conversiones de moneda

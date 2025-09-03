@@ -1,5 +1,5 @@
 -- =====================================================
--- 000064: LOTS - Revertir Vistas de Cálculo
+-- 000067: LOTS - Revertir Vistas de Cálculo
 -- =====================================================
 
 DROP VIEW IF EXISTS v_calc_lots;

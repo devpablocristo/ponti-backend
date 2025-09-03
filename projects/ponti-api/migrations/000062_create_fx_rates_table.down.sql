@@ -1,5 +1,5 @@
 -- =====================================================
--- 000067: FX RATES - Revertir Tabla de Tipos de Cambio
+-- 000062: FX RATES - Revertir Tabla de Tipos de Cambio
 -- =====================================================
 
 -- Eliminar tabla de tipos de cambio si la creamos

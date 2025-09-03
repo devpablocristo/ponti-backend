@@ -1,5 +1,5 @@
 -- =====================================================
--- 000068: SUPPORT INDEXES - Índices de Soporte
+-- 000063: SUPPORT INDEXES - Índices de Soporte
 -- =====================================================
 -- Entidad: Database Performance (Rendimiento de Base de Datos)
 -- Funcionalidad: Índices para optimizar consultas de cálculos
@@ -25,5 +25,5 @@ CREATE INDEX IF NOT EXISTS idx_supplies_proj_notdel ON supplies(project_id) WHER
 -- Como no existe tabla harvests, creamos índice en workorders para harvests
 CREATE INDEX IF NOT EXISTS idx_workorders_lot_id_harvest_notdel ON workorders(lot_id) WHERE deleted_at IS NULL;
 
--- crop_commercializations(field_id, crop_id, date) WHERE deleted_at IS NULL
-CREATE INDEX IF NOT EXISTS idx_commercializations_f_c_date_notdel ON crop_commercializations(field_id, crop_id, created_at) WHERE deleted_at IS NULL;
+-- crop_commercializations(project_id, crop_id, created_at) WHERE deleted_at IS NULL
+CREATE INDEX IF NOT EXISTS idx_commercializations_p_c_date_notdel ON crop_commercializations(project_id, crop_id, created_at) WHERE deleted_at IS NULL;
