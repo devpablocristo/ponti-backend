@@ -11,8 +11,11 @@ type ListedSupply struct {
 	ID           int64           `json:"id"`
 	Name         string          `json:"name"`
 	Price        decimal.Decimal `json:"price"`         // Precio
+	UnitID       int64           `json:"unit_id"`       // Unidad ID
 	CategoryName string          `json:"category_name"` // Rubro
+	CategoryID   int64           `json:"category_id"`   // Rubro ID
 	TypeName     string          `json:"type_name"`     // Tipo/Clase
+	TypeID       int64           `json:"type_id"`       // Tipo/Clase ID
 }
 
 // Respuesta principal de listado de supplies
@@ -33,8 +36,11 @@ func NewListSuppliesResponse(
 			ID:           s.ID,
 			Name:         s.Name,
 			Price:        s.Price,        // Precio
+			UnitID:       s.UnitID,       // Unidad ID
 			CategoryName: s.CategoryName, // Rubro
+			CategoryID:   s.CategoryID,   // Rubro ID
 			TypeName:     s.Type.Name,    // Tipo/Clase
+			TypeID:       s.Type.ID,      // Tipo/Clase ID
 		}
 	}
 
