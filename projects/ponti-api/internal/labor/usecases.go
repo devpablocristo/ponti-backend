@@ -5,7 +5,6 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
-	"github.com/shopspring/decimal"
 )
 
 type RepositoryPort interface {
@@ -62,17 +61,9 @@ func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64, 
 func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborListItem, types.PageInfo, error) {
 	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID, usdMonth)
 
+	// Mapear directamente - NO hacer cálculos manuales (ya vienen de la vista)
 	items := make([]domain.LaborListItem, len(rawItems))
 	for i, r := range rawItems {
-		var usdCostHa, usdTotalNet decimal.Decimal
-		netTotal := r.CostHa.Mul(r.SurfaceHa)
-		totalIVA := netTotal.Mul(decimal.NewFromFloat(0.21))
-
-		if !r.USDAvgValue.IsZero() {
-			usdCostHa = r.CostHa.Div(r.USDAvgValue)
-			usdTotalNet = netTotal.Div(r.USDAvgValue)
-		}
-
 		items[i] = domain.LaborListItem{
 			WorkorderID:     r.WorkorderID,
 			WorkorderNumber: r.WorkorderNumber,
@@ -87,10 +78,10 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 			CategoryName:    r.CategoryName,
 			InvestorName:    r.InvestorName,
 			USDAvgValue:     r.USDAvgValue,
-			NetTotal:        netTotal.Round(2),
-			TotalIVA:        totalIVA.Round(2),
-			USDCostHa:       usdCostHa.Round(2),
-			USDNetTotal:     usdTotalNet.Round(2),
+			NetTotal:        r.NetTotal,    // ✅ Viene de la vista (ya calculado correctamente)
+			TotalIVA:        r.TotalIVA,    // ✅ Viene de la vista (10.5% correcto)
+			USDCostHa:       r.USDCostHa,   // ✅ Viene de la vista (ARS correcto)
+			USDNetTotal:     r.USDNetTotal, // ✅ Viene de la vista (ARS correcto)
 			InvoiceID:       r.InvoiceID,
 			InvoiceNumber:   r.InvoiceNumber,
 			InvoiceCompany:  r.InvoiceCompany,

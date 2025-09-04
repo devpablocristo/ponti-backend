@@ -210,32 +210,23 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 
 func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
 
+	// Usar la nueva vista fix_labors_list que ya tiene todos los cálculos correctos
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("workorders AS w").
-		Joins("INNER JOIN projects p    ON w.project_id   = p.id").
-		Joins("INNER JOIN fields f      ON w.field_id     = f.id").
-		Joins("INNER JOIN crops c       ON w.crop_id      = c.id").
-		Joins("INNER JOIN labors lb     ON w.labor_id     = lb.id").
-		Joins("INNER JOIN categories lc ON lb.category_id = lc.id").
-		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
-		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
-		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+		Table("fix_labors_list AS fll")
 
 	if fieldID != 0 {
-		base = base.Where("w.field_id = ?", fieldID)
+		base = base.Where("fll.field_id = ?", fieldID)
 	} else if projectID != 0 {
-		base = base.Where("w.project_id = ?", projectID)
+		base = base.Where("fll.project_id = ?", projectID)
 	} else {
 		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
 			"fieldID or projectID is required", nil)
 	}
 
 	var total int64
-	// Usar COUNT(DISTINCT w.id) para contar correctamente y evitar duplicados
-	// causados por múltiples facturas por workorder
 	countQuery := base.Session(&gorm.Session{})
-	if err := countQuery.Select("COUNT(DISTINCT w.id)").Count(&total).Error; err != nil {
+	if err := countQuery.Select("COUNT(*)").Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to count labors for workorder", err)
 	}
@@ -243,31 +234,28 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.LaborRawItem
-	// Usar GROUP BY para evitar duplicados causados por múltiples facturas por workorder
-	// Las funciones MAX() se usan para campos de factura que pueden tener múltiples valores
+	// Usar la vista que ya tiene todos los cálculos correctos
 	if err := base.Select(`
-			w.id AS workorder_id,
-            w.number                AS workorder_number,
-            w.date                  AS date,
-            p.name                  AS project_name,
-            f.name                  AS field_name,
-            c.name                  AS crop_name,
-            lb.name                 AS labor_name,
-            lc.name                 AS category_name,
-            w.contractor            AS contractor,
-            w.effective_area        AS effective_area,
-            lb.price                AS price,
-            lb.contractor_name      AS contractor_name,
-            inv.name                AS investor_name,
-			pdv.average_value       AS usd_avg_value,
-			MAX(i.id)               AS invoice_id,
-			MAX(i.number)           AS invoice_number,
-			MAX(i.company)          AS invoice_company,
-			MAX(i.date)             AS invoice_date,
-			MAX(i.status)           AS invoice_status
-        `).Where("w.deleted_at IS NULL").
-		Group("w.id, w.number, w.date, p.name, f.name, c.name, lb.name, lc.name, w.contractor, w.effective_area, lb.price, lb.contractor_name, inv.name, pdv.average_value").
-		Order("w.number DESC").
+		workorder_id,
+		workorder_number,
+		date,
+		project_name,
+		field_name,
+		crop_name,
+		labor_name,
+		category_name,
+		contractor,
+		surface_ha,
+		cost_ha,
+		contractor_name,
+		investor_name,
+		usd_avg_value,
+		net_total,
+		total_iva,
+		usd_cost_ha,
+		usd_net_total
+	`).Where("1=1").
+		Order("workorder_number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
@@ -291,11 +279,10 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			CategoryName:    m.CategoryName,
 			InvestorName:    m.InvestorName,
 			USDAvgValue:     m.USDAvgValue,
-			InvoiceID:       m.InvoiceID,
-			InvoiceNumber:   m.InvoiceNumber,
-			InvoiceCompany:  m.InvoiceCompany,
-			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   m.InvoiceStatus,
+			NetTotal:        m.NetTotal,    // ✅ Viene de la vista (ya calculado)
+			TotalIVA:        m.TotalIVA,    // ✅ Viene de la vista (ya calculado)
+			USDCostHa:       m.USDCostHa,   // ✅ Viene de la vista (ya calculado)
+			USDNetTotal:     m.USDNetTotal, // ✅ Viene de la vista (ya calculado)
 		}
 	}
 
@@ -307,9 +294,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	q := `
         SELECT 
           surface_ha,
-          total_labor_cost AS net_total_cost,
-          labor_cost_per_ha AS avg_cost_per_ha
-        FROM labor_cards_cube_view
+          net_total_cost,
+          avg_cost_per_ha
+        FROM labor_cards_cube_view_v2
         WHERE 1=1
     `
 	var args []any

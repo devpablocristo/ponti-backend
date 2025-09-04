@@ -90,9 +90,9 @@ func isValidBusinessName(name string) bool {
 }
 
 // ValidateNonEmptyCollection valida que una colección no esté vacía
-func ValidateNonEmptyCollection(collection interface{}, fieldName string) error {
+func ValidateNonEmptyCollection(collection any, fieldName string) error {
 	switch v := collection.(type) {
-	case []interface{}:
+	case []any:
 		if len(v) == 0 {
 			return validations.Err(fieldName, "cannot be empty")
 		}

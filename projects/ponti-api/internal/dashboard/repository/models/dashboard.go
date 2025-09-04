@@ -27,12 +27,11 @@ type DashboardDataModel struct {
 	HarvestProgressPercent decimal.Decimal `db:"harvest_progress_percent"`
 
 	// Métricas de costos
-	CostsExecutedUSD    decimal.Decimal `db:"costs_executed_usd"`
-	CostsBudgetUSD      decimal.Decimal `db:"costs_budget_usd"`
-	CostsProgressPct    decimal.Decimal `db:"costs_progress_pct"`
-	ExecutedLaborsUSD   decimal.Decimal `db:"executed_labors_usd"`
-	ExecutedSuppliesUSD decimal.Decimal `db:"executed_supplies_usd"`
-	BudgetCostUSD       decimal.Decimal `db:"budget_cost_usd"`
+	CostsExecutedUSD decimal.Decimal `db:"costs_executed_usd"`
+	CostsBudgetUSD   decimal.Decimal `db:"costs_budget_usd"`
+	CostsProgressPct decimal.Decimal `db:"costs_progress_pct"`
+	ExecutedCostsUSD decimal.Decimal `db:"executed_costs_usd"`
+	BudgetCostUSD    decimal.Decimal `db:"budget_cost_usd"`
 
 	// Resultado operativo
 	OperatingIncomeUSD     decimal.Decimal `db:"operating_income_usd"`
@@ -83,12 +82,9 @@ type HarvestProgressModel struct {
 
 // CostsProgressModel representa el modelo de avance de costos
 type CostsProgressModel struct {
-	ExecutedLaborsUSD   *decimal.Decimal `db:"executed_labors_usd"`
-	ExecutedSuppliesUSD *decimal.Decimal `db:"executed_supplies_usd"`
-	ExecutedCostsUSD    *decimal.Decimal `db:"executed_costs_usd"`
-	BudgetCostUSD       *decimal.Decimal `db:"budget_cost_usd"`
-	BudgetTotalUSD      *decimal.Decimal `db:"budget_total_usd"`
-	ProgressPct         *decimal.Decimal `db:"costs_progress_pct"`
+	ExecutedCostsUSD *decimal.Decimal `db:"executed_costs_usd"`
+	BudgetCostUSD    *decimal.Decimal `db:"budget_cost_usd"`
+	ProgressPct      *decimal.Decimal `db:"costs_progress_pct"`
 }
 
 // ContributionsProgressModel representa el modelo de avance de aportes
@@ -146,6 +142,7 @@ type ManagementBalanceTotals struct {
 
 // CropIncidenceModel representa el modelo de incidencia de cultivos
 type CropIncidenceModel struct {
+	CropID       int64           `db:"current_crop_id"`
 	Name         string          `db:"crop_name"`
 	Hectares     decimal.Decimal `db:"crop_hectares"`
 	IncidencePct decimal.Decimal `db:"incidence_pct"`

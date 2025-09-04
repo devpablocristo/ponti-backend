@@ -238,7 +238,7 @@ func TestIsValidBusinessName(t *testing.T) {
 func TestValidateNonEmptyCollection(t *testing.T) {
 	tests := []struct {
 		name       string
-		collection interface{}
+		collection any
 		fieldName  string
 		expected   error
 	}{

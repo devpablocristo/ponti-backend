@@ -52,7 +52,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.SupplyHandler.Routes()
 	deps.CategoryHandler.Routes()
 	deps.ClassTypeHandler.Routes()
-	deps.UnitHandler.Routes()
+	deps.AppParametersHandler.Routes()
 	deps.WorkorderHandler.Routes()
 	deps.DollarHandler.Routes()
 	deps.LaborHandler.Routes()

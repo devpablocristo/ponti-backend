@@ -58,7 +58,7 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 		}
 		if err := tx.Model(&models.ClassType{}).
 			Where("id = ?", c.ID).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"name":       c.Name,
 				"updated_by": c.UpdatedBy,
 			}).Error; err != nil {
