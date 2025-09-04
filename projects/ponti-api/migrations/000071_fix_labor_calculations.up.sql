@@ -33,8 +33,8 @@ SELECT
     -- Total neto: Costo labor * superficie (en USD)
     (lb.price * w.effective_area) AS net_total,
     
-    -- Total IVA: 10.5% del total neto (cambiado de 21% a 10.5%)
-    (lb.price * w.effective_area * 0.105) AS total_iva,
+    -- Total IVA: Usar porcentaje configurable desde app_parameters
+    (lb.price * w.effective_area * get_iva_percentage()) AS total_iva,
     
     -- Costo U$/Ha en pesos: Costo Ha * dólar promedio (mostrar en pesos)
     (lb.price * COALESCE(pdv.average_value, get_default_fx_rate())) AS usd_cost_ha,
@@ -65,7 +65,7 @@ WHERE w.deleted_at IS NULL
 -- ========================================
 -- 2. COMENTARIOS EXPLICATIVOS
 -- ========================================
--- Total IVA: Se cambió de 21% estándar a 10.5% según nueva especificación
+-- Total IVA: Ahora usa get_iva_percentage() desde app_parameters (configurable)
 -- Costo U$/Ha: Se muestra en pesos (USD * tipo de cambio)
 -- Total U Neto: Total en pesos multiplicado por hectáreas
 -- Se usa get_default_fx_rate() como fallback si no hay datos de project_dollar_values

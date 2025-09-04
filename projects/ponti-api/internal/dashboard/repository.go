@@ -212,8 +212,8 @@ func (r *Repository) getRelatedProjectIDs(ctx context.Context, filter domain.Das
 		argIndex++
 	}
 
-	// Convertir []int64 a []interface{} para GORM
-	interfaceArgs := make([]interface{}, len(args))
+	// Convertir []int64 a []any para GORM
+	interfaceArgs := make([]any, len(args))
 	for i, v := range args {
 		interfaceArgs[i] = v
 	}
@@ -263,7 +263,7 @@ func (r *Repository) getSowingProgress(ctx context.Context, filter domain.Dashbo
 		WHERE project_id = ANY($1)
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var result models.SowingProgressModel
@@ -280,7 +280,7 @@ func (r *Repository) getSowingProgress(ctx context.Context, filter domain.Dashbo
 
 	if hasRows {
 		// Leer los valores raw
-		var rawHectares, rawTotalHectares, rawProgressPct interface{}
+		var rawHectares, rawTotalHectares, rawProgressPct any
 		err = rows.Scan(&rawHectares, &rawTotalHectares, &rawProgressPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan sowing progress data", err)
@@ -380,7 +380,7 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 		WHERE project_id = ANY($1)
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var result models.CostsProgressModel
@@ -397,7 +397,7 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 
 	if hasRows {
 		// Leer los valores raw
-		var rawCostsUSD, rawBudgetCost, rawProgressPct interface{}
+		var rawCostsUSD, rawBudgetCost, rawProgressPct any
 		err = rows.Scan(&rawCostsUSD, &rawBudgetCost, &rawProgressPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan costs progress data", err)
@@ -497,7 +497,7 @@ func (r *Repository) getHarvestProgress(ctx context.Context, filter domain.Dashb
 		WHERE project_id = ANY($1)
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var result models.HarvestProgressModel
@@ -514,7 +514,7 @@ func (r *Repository) getHarvestProgress(ctx context.Context, filter domain.Dashb
 
 	if hasRows {
 		// Leer los valores raw
-		var rawHectares, rawTotalHectares, rawProgressPct interface{}
+		var rawHectares, rawTotalHectares, rawProgressPct any
 		err = rows.Scan(&rawHectares, &rawTotalHectares, &rawProgressPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan harvest progress data", err)
@@ -611,7 +611,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 		ORDER BY investor_id
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var results []models.ContributionsProgressModel
@@ -626,7 +626,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 	// Leer todas las filas
 	for i := 0; rows.Next(); i++ {
 		// Leer los valores raw
-		var rawInvestorID, rawInvestorName, rawPercentage, rawProgressPct interface{}
+		var rawInvestorID, rawInvestorName, rawPercentage, rawProgressPct any
 		err = rows.Scan(&rawInvestorID, &rawInvestorName, &rawPercentage, &rawProgressPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan contributions progress data", err)
@@ -750,7 +750,7 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 		WHERE project_id = ANY($1)
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var result models.OperatingResultModel
@@ -767,7 +767,7 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 
 	if hasRows {
 		// Leer los valores raw
-		var rawTotalCostsUSD, rawResultUSD, rawResultPct interface{}
+		var rawTotalCostsUSD, rawResultUSD, rawResultPct any
 		err = rows.Scan(&rawTotalCostsUSD, &rawResultUSD, &rawResultPct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan operating result data", err)
@@ -909,7 +909,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 		WHERE p.project_id = ANY($1)
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	var result models.ManagementBalanceModel
@@ -927,7 +927,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 
 	if hasRows {
 		// Leer los valores raw
-		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct, rawSemillaCost, rawInsumosCost, rawLaboresCost interface{}
+		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct, rawSemillaCost, rawInsumosCost, rawLaboresCost any
 		err = rows.Scan(&rawIncomeUSD, &rawDirectCostsExecuted, &rawDirectCostsInvested, &rawRent, &rawStructure, &rawOperatingResult, &rawOperatingResultPct, &rawSemillaCost, &rawInsumosCost, &rawLaboresCost)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan management balance data", err)
@@ -1200,7 +1200,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 		ORDER BY crop_name
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	// Ejecutar la consulta
 	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
@@ -1213,7 +1213,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 
 	// Leer todas las filas
 	for rows.Next() {
-		var rawCropID, rawCropName, rawHectares, rawIncidencePct interface{}
+		var rawCropID, rawCropName, rawHectares, rawIncidencePct any
 		err = rows.Scan(&rawCropID, &rawCropName, &rawHectares, &rawIncidencePct)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan crop incidence data", err)
@@ -1311,18 +1311,26 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 
 	query := `
 		SELECT
-			start_date,
-			NULL::INTEGER as first_workorder_number,
-			end_date,
-			NULL::INTEGER as last_workorder_number,
-			NULL::TIMESTAMP as last_stock_count_date,
-			campaign_closing_date
-		FROM dashboard_operational_indicators_view_v2
-		WHERE project_id = ANY($1)
+			doi.start_date,
+			(SELECT w.id FROM workorders w 
+			 WHERE w.project_id = doi.project_id 
+			 AND w.date = doi.start_date 
+			 AND w.deleted_at IS NULL 
+			 ORDER BY w.id LIMIT 1) as first_workorder_number,
+			doi.end_date,
+			(SELECT w.id FROM workorders w 
+			 WHERE w.project_id = doi.project_id 
+			 AND w.date = doi.end_date 
+			 AND w.deleted_at IS NULL 
+			 ORDER BY w.id DESC LIMIT 1) as last_workorder_number,
+			(SELECT MAX(s.close_date) FROM stocks s WHERE s.project_id = doi.project_id) as last_stock_count_date,
+			doi.campaign_closing_date
+		FROM dashboard_operational_indicators_view_v2 doi
+		WHERE doi.project_id = ANY($1)
 		LIMIT 1
 	`
 
-	args := []interface{}{projectIDs}
+	args := []any{projectIDs}
 
 	rows, err := r.db.Client().WithContext(ctx).Raw(query, args...).Rows()
 	if err != nil {
@@ -1332,7 +1340,7 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 
 	if rows.Next() {
 		// Leer los valores raw
-		var rawFirstWorkorderDate, rawFirstWorkorderNumber, rawLastWorkorderDate, rawLastWorkorderNumber, rawLastStockCountDate, rawCampaignClosingDate interface{}
+		var rawFirstWorkorderDate, rawFirstWorkorderNumber, rawLastWorkorderDate, rawLastWorkorderNumber, rawLastStockCountDate, rawCampaignClosingDate any
 		err = rows.Scan(&rawFirstWorkorderDate, &rawFirstWorkorderNumber, &rawLastWorkorderDate, &rawLastWorkorderNumber, &rawLastStockCountDate, &rawCampaignClosingDate)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan operational indicators data", err)

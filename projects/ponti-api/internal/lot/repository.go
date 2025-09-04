@@ -220,7 +220,7 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"tons": tons,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot tons", err)
@@ -250,7 +250,7 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"deleted_at": time.Now(),
 				"deleted_by": &userID,
 			}).Error; err != nil {

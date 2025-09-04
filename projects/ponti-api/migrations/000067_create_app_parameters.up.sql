@@ -1,39 +1,71 @@
 -- ========================================
--- MIGRACIÓN 000072: CREAR VALORES DE CÁLCULO
--- Entidad: calc_values (Valores de cálculo configurables)
--- Funcionalidad: Eliminar datos hardcodeados y hacer configurables los valores de cálculo
+-- MIGRACIÓN 000067: CREAR PARÁMETROS DE APLICACIÓN
+-- Entidad: app_parameters (Parámetros unificados del sistema)
+-- Funcionalidad: Unificar units, calc_values y otros datos hardcodeados
 -- ========================================
 
 -- ========================================
--- 1. CREAR TABLA DE VALORES DE CÁLCULO
+-- 1. CREAR TABLA DE PARÁMETROS DE APLICACIÓN
 -- ========================================
-CREATE TABLE IF NOT EXISTS calc_values (
+CREATE TABLE IF NOT EXISTS app_parameters (
     id SERIAL PRIMARY KEY,
     key VARCHAR(100) NOT NULL UNIQUE,
-    value DECIMAL(10,4) NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    type VARCHAR(20) NOT NULL,  -- 'decimal', 'integer', 'string', 'boolean'
+    category VARCHAR(50) NOT NULL,  -- 'units', 'calculations', 'business_rules'
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ========================================
--- 2. INSERTAR VALORES INICIALES (los que estaban hardcodeados)
+-- 2. INSERTAR DATOS UNIFICADOS
 -- ========================================
-INSERT INTO calc_values (key, value, description) VALUES
-('iva_percentage', 0.105, 'Porcentaje de IVA para labores (10.5%)'),
-('campaign_closure_days', 30, 'Días para cierre de campaña después de la fecha de fin'),
-('default_fx_rate', 1.0000, 'Tasa de cambio por defecto USD/USD')
+INSERT INTO app_parameters (key, value, type, category, description) VALUES
+-- UNIDADES (antes unit)
+('unit_liters', 'Lt', 'string', 'units', 'Unit of measurement: Liters'),
+('unit_kilos', 'Kg', 'string', 'units', 'Unit of measurement: Kilograms'),
+('unit_hectares', 'Ha', 'string', 'units', 'Unit of measurement: Hectares'),
+
+-- CÁLCULOS (antes calc_values)
+('iva_percentage', '0.105', 'decimal', 'calculations', 'VAT percentage for labors (10.5%)'),
+('campaign_closure_days', '30', 'integer', 'calculations', 'Days for campaign closure after end date'),
+('default_fx_rate', '1.0000', 'decimal', 'calculations', 'Default exchange rate USD/USD')
 ON CONFLICT (key) DO NOTHING;
 
 -- ========================================
--- 3. CREAR FUNCIONES DE VALORES DE CÁLCULO
+-- 3. CREAR FUNCIONES DE PARÁMETROS
 -- ========================================
+
+-- Función genérica para obtener parámetros
+CREATE OR REPLACE FUNCTION get_app_parameter(p_key VARCHAR)
+RETURNS VARCHAR AS $$
+BEGIN
+  RETURN (SELECT value FROM app_parameters WHERE key = p_key);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Función para obtener parámetros decimales
+CREATE OR REPLACE FUNCTION get_app_parameter_decimal(p_key VARCHAR)
+RETURNS DECIMAL AS $$
+BEGIN
+  RETURN (SELECT value::DECIMAL FROM app_parameters WHERE key = p_key);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Función para obtener parámetros enteros
+CREATE OR REPLACE FUNCTION get_app_parameter_integer(p_key VARCHAR)
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (SELECT value::INTEGER FROM app_parameters WHERE key = p_key);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Función para obtener porcentaje de IVA
 CREATE OR REPLACE FUNCTION get_iva_percentage()
 RETURNS DECIMAL AS $$
 BEGIN
-  RETURN (SELECT value FROM calc_values WHERE key = 'iva_percentage');
+  RETURN get_app_parameter_decimal('iva_percentage');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -41,7 +73,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION get_campaign_closure_days()
 RETURNS INTEGER AS $$
 BEGIN
-  RETURN (SELECT value::INTEGER FROM calc_values WHERE key = 'campaign_closure_days');
+  RETURN get_app_parameter_integer('campaign_closure_days');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -49,7 +81,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION get_default_fx_rate()
 RETURNS DECIMAL AS $$
 BEGIN
-  RETURN (SELECT value FROM calc_values WHERE key = 'default_fx_rate');
+  RETURN get_app_parameter_decimal('default_fx_rate');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -179,18 +211,18 @@ WHERE p.deleted_at IS NULL;
 -- ========================================
 -- 8. CREAR ÍNDICES PARA OPTIMIZACIÓN
 -- ========================================
-CREATE INDEX IF NOT EXISTS idx_calc_values_key ON calc_values(key);
+CREATE INDEX IF NOT EXISTS idx_app_parameters_key ON app_parameters(key);
+CREATE INDEX IF NOT EXISTS idx_app_parameters_category ON app_parameters(category);
 
 -- ========================================
 -- 9. DOCUMENTACIÓN
 -- ========================================
--- Esta migración elimina los siguientes datos hardcodeados:
--- 1. IVA 10.5% → ahora configurable via calc_values.iva_percentage
--- 2. 30 días de cierre → ahora configurable via calc_values.campaign_closure_days
--- 3. Tasa USD/USD 1.0000 → ahora configurable via calc_values.default_fx_rate
--- 4. Progreso aportes 100% → ahora calculado como suma real de porcentajes de participación
+-- Esta migración unifica los siguientes datos:
+-- 1. UNIDADES: unit_liters, unit_kilos, unit_hectares
+-- 2. CÁLCULOS: iva_percentage, campaign_closure_days, default_fx_rate
+-- 3. FUNCIONES: get_app_parameter, get_app_parameter_decimal, get_app_parameter_integer
 --
--- Para cambiar estos valores, actualizar la tabla calc_values:
--- UPDATE calc_values SET value = 0.21 WHERE key = 'iva_percentage';
--- UPDATE calc_values SET value = 45 WHERE key = 'campaign_closure_days';
--- UPDATE calc_values SET value = 1.2000 WHERE key = 'default_fx_rate';
+-- Para cambiar estos valores, actualizar la tabla app_parameters:
+-- UPDATE app_parameters SET value = '0.21' WHERE key = 'iva_percentage';
+-- UPDATE app_parameters SET value = '45' WHERE key = 'campaign_closure_days';
+-- UPDATE app_parameters SET value = '1.2000' WHERE key = 'default_fx_rate';

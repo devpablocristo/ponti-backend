@@ -12,7 +12,7 @@ BEGIN
     RETURN NULL;
   END IF;
   
-  RETURN end_date + INTERVAL '30 days';
+  RETURN end_date + (get_campaign_closure_days() || ' days')::INTERVAL;
 END;
 $$ LANGUAGE plpgsql;
 

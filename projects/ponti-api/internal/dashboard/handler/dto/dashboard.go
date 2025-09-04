@@ -59,7 +59,7 @@ type CostsMetricRequest struct {
 // InvestorContributionsRequest representa la métrica de contribuciones en el request
 type InvestorContributionsRequest struct {
 	ProgressPct decimal.Decimal `json:"progress_pct"`
-	Breakdown   interface{}     `json:"breakdown"`
+	Breakdown   any             `json:"breakdown"`
 }
 
 // OperatingResultMetricRequest representa la métrica de resultado operativo en el request
@@ -132,14 +132,14 @@ type OperationalIndicatorsRequest struct {
 
 // OperationalCardRequest representa una tarjeta de indicador operativo en el request
 type OperationalCardRequest struct {
-	Key           string      `json:"key"`
-	Title         string      `json:"title"`
-	Date          *string     `json:"date"`
-	WorkorderID   interface{} `json:"workorder_id"`
-	WorkorderCode interface{} `json:"workorder_code"`
-	AuditID       interface{} `json:"audit_id"`
-	AuditCode     interface{} `json:"audit_code"`
-	Status        interface{} `json:"status"`
+	Key           string  `json:"key"`
+	Title         string  `json:"title"`
+	Date          *string `json:"date"`
+	WorkorderID   any     `json:"workorder_id"`
+	WorkorderCode any     `json:"workorder_code"`
+	AuditID       any     `json:"audit_id"`
+	AuditCode     any     `json:"audit_code"`
+	Status        any     `json:"status"`
 }
 
 // ===== RESPONSE DTOs =====
@@ -317,7 +317,7 @@ type OperationalItem struct {
 	Type        string  `json:"type"`
 	Title       string  `json:"title"`
 	Date        *string `json:"date"`
-	WorkorderID *int64  `json:"workorder_id"`
+	WorkorderID *int64  `json:"workorder_id,omitempty"`
 }
 
 // OperationalCard representa una tarjeta de indicador operativo (mantenido para compatibilidad)
@@ -329,7 +329,7 @@ type OperationalCard struct {
 }
 
 // FromDashboardPayloadResponse convierte directamente la respuesta de la función SQL a DTO
-func FromDashboardPayloadResponse(payload interface{}) DashboardResponse {
+func FromDashboardPayloadResponse(payload any) DashboardResponse {
 	// Convertir el payload a JSON y luego parsearlo
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
@@ -548,6 +548,7 @@ func FromDashboardData(domain *domain.DashboardData) DashboardResponse {
 	}
 
 	response := DashboardResponse{
+		SchemaVersion:         "1.0.0",
 		Metrics:               convertMetrics(domain.Metrics),
 		ManagementBalance:     convertManagementBalance(domain.ManagementBalance),
 		CropIncidence:         convertCropIncidence(domain.CropIncidence),
@@ -828,11 +829,17 @@ func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicat
 			dateStr = &dateStrVal
 		}
 
+		// Solo incluir workorder_id para tipos que lo requieren
+		var workorderID *int64
+		if card.WorkorderID != nil && (card.Key == "first_workorder" || card.Key == "last_workorder") {
+			workorderID = card.WorkorderID
+		}
+
 		items = append(items, OperationalItem{
 			Type:        card.Key, // Usar Key como Type
 			Title:       card.Title,
 			Date:        dateStr,
-			WorkorderID: card.WorkorderID,
+			WorkorderID: workorderID,
 		})
 	}
 
