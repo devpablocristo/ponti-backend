@@ -373,7 +373,7 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 
 	query := `
 		SELECT 
-					executed_costs_usd,
+		executed_costs_usd,
 		budget_cost_usd,
 		costs_progress_pct
 	FROM dashboard_costs_progress_view_v2 
