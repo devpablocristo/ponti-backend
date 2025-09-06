@@ -18,11 +18,11 @@ func TestGetSowingProgressSQL(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view 
+		FROM dashboard_sowing_progress_view_v2 
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		// Simular filtros
@@ -58,11 +58,11 @@ func TestGetSowingProgressSQL(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view 
+		FROM dashboard_sowing_progress_view_v2 
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 
 		// Sin filtros
 		query += " LIMIT 1"
@@ -90,7 +90,7 @@ func TestSowingProgressFieldMapping(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view 
+		FROM dashboard_sowing_progress_view_v2 
 		WHERE 1=1
 		LIMIT 1
 	`
@@ -100,7 +100,7 @@ func TestSowingProgressFieldMapping(t *testing.T) {
 	}
 
 	// Verificar que la consulta tenga la estructura correcta
-	assert.Contains(t, query, "FROM dashboard_sowing_progress_view")
+	assert.Contains(t, query, "FROM dashboard_sowing_progress_view_v2")
 	assert.Contains(t, query, "WHERE 1=1")
 	assert.Contains(t, query, "LIMIT 1")
 }
@@ -114,7 +114,7 @@ func TestGetRelatedProjectIDsQueryConstruction(t *testing.T) {
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		customerID := int64(1)
@@ -134,7 +134,7 @@ func TestGetRelatedProjectIDsQueryConstruction(t *testing.T) {
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		projectID := int64(5)
@@ -154,7 +154,7 @@ func TestGetRelatedProjectIDsQueryConstruction(t *testing.T) {
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		campaignID := int64(10)
@@ -174,7 +174,7 @@ func TestGetRelatedProjectIDsQueryConstruction(t *testing.T) {
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		fieldID := int64(25)
@@ -194,7 +194,7 @@ func TestGetRelatedProjectIDsQueryConstruction(t *testing.T) {
 		WHERE 1=1
 		`
 
-		args := []interface{}{}
+		args := []any{}
 		argIndex := 1
 
 		customerID := int64(1)
@@ -294,7 +294,7 @@ func TestDecimalFieldMapping(t *testing.T) {
 	// Este test verifica que los campos decimal se mapeen correctamente
 	t.Run("decimal_mapping", func(t *testing.T) {
 		// Simular datos que podrían venir de la base de datos
-		testData := map[string]interface{}{
+		testData := map[string]any{
 			"sowing_hectares":       "10.5",
 			"sowing_total_hectares": "100.0",
 			"sowing_progress_pct":   "10.5",

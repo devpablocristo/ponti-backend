@@ -46,7 +46,7 @@ func (m *MockRepositoryPort) CreateLot(arg0 context.Context, arg1 *domain.Lot) (
 }
 
 // CreateLot indicates an expected call of CreateLot.
-func (mr *MockRepositoryPortMockRecorder) CreateLot(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) CreateLot(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateLot", reflect.TypeOf((*MockRepositoryPort)(nil).CreateLot), arg0, arg1)
 }
@@ -60,7 +60,7 @@ func (m *MockRepositoryPort) DeleteLot(arg0 context.Context, arg1 int64) error {
 }
 
 // DeleteLot indicates an expected call of DeleteLot.
-func (mr *MockRepositoryPortMockRecorder) DeleteLot(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) DeleteLot(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLot", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteLot), arg0, arg1)
 }
@@ -75,7 +75,7 @@ func (m *MockRepositoryPort) GetLot(arg0 context.Context, arg1 int64) (*domain.L
 }
 
 // GetLot indicates an expected call of GetLot.
-func (mr *MockRepositoryPortMockRecorder) GetLot(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) GetLot(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLot", reflect.TypeOf((*MockRepositoryPort)(nil).GetLot), arg0, arg1)
 }
@@ -90,7 +90,7 @@ func (m *MockRepositoryPort) GetMetrics(arg0 context.Context, arg1, arg2, arg3 i
 }
 
 // GetMetrics indicates an expected call of GetMetrics.
-func (mr *MockRepositoryPortMockRecorder) GetMetrics(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) GetMetrics(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetrics", reflect.TypeOf((*MockRepositoryPort)(nil).GetMetrics), arg0, arg1, arg2, arg3)
 }
@@ -108,7 +108,7 @@ func (m *MockRepositoryPort) ListLots(arg0 context.Context, arg1, arg2, arg3 int
 }
 
 // ListLots indicates an expected call of ListLots.
-func (mr *MockRepositoryPortMockRecorder) ListLots(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLots(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLots", reflect.TypeOf((*MockRepositoryPort)(nil).ListLots), arg0, arg1, arg2, arg3, arg4, arg5)
 }
@@ -123,7 +123,7 @@ func (m *MockRepositoryPort) ListLotsByField(arg0 context.Context, arg1 int64) (
 }
 
 // ListLotsByField indicates an expected call of ListLotsByField.
-func (mr *MockRepositoryPortMockRecorder) ListLotsByField(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLotsByField(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLotsByField", reflect.TypeOf((*MockRepositoryPort)(nil).ListLotsByField), arg0, arg1)
 }
@@ -138,7 +138,7 @@ func (m *MockRepositoryPort) ListLotsByProject(arg0 context.Context, arg1 int64)
 }
 
 // ListLotsByProject indicates an expected call of ListLotsByProject.
-func (mr *MockRepositoryPortMockRecorder) ListLotsByProject(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLotsByProject(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLotsByProject", reflect.TypeOf((*MockRepositoryPort)(nil).ListLotsByProject), arg0, arg1)
 }
@@ -153,7 +153,7 @@ func (m *MockRepositoryPort) ListLotsByProjectAndField(arg0 context.Context, arg
 }
 
 // ListLotsByProjectAndField indicates an expected call of ListLotsByProjectAndField.
-func (mr *MockRepositoryPortMockRecorder) ListLotsByProjectAndField(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLotsByProjectAndField(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLotsByProjectAndField", reflect.TypeOf((*MockRepositoryPort)(nil).ListLotsByProjectAndField), arg0, arg1, arg2)
 }
@@ -168,7 +168,7 @@ func (m *MockRepositoryPort) ListLotsByProjectFieldAndCrop(arg0 context.Context,
 }
 
 // ListLotsByProjectFieldAndCrop indicates an expected call of ListLotsByProjectFieldAndCrop.
-func (mr *MockRepositoryPortMockRecorder) ListLotsByProjectFieldAndCrop(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLotsByProjectFieldAndCrop(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLotsByProjectFieldAndCrop", reflect.TypeOf((*MockRepositoryPort)(nil).ListLotsByProjectFieldAndCrop), arg0, arg1, arg2, arg3, arg4)
 }
@@ -182,7 +182,7 @@ func (m *MockRepositoryPort) UpdateLot(arg0 context.Context, arg1 *domain.Lot) e
 }
 
 // UpdateLot indicates an expected call of UpdateLot.
-func (mr *MockRepositoryPortMockRecorder) UpdateLot(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) UpdateLot(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateLot", reflect.TypeOf((*MockRepositoryPort)(nil).UpdateLot), arg0, arg1)
 }
@@ -196,7 +196,7 @@ func (m *MockRepositoryPort) UpdateLotTons(arg0 context.Context, arg1 int64, arg
 }
 
 // UpdateLotTons indicates an expected call of UpdateLotTons.
-func (mr *MockRepositoryPortMockRecorder) UpdateLotTons(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) UpdateLotTons(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateLotTons", reflect.TypeOf((*MockRepositoryPort)(nil).UpdateLotTons), arg0, arg1, arg2)
 }

@@ -1,0 +1,154 @@
+{
+    "metrics": {
+        "sowing": {
+            "progress_pct": "0",
+            "hectares": "0",
+            "total_hectares": "185"
+        },
+        "harvest": {
+            "progress_pct": "0",
+            "hectares": "0",
+            "total_hectares": "185"
+        },
+        "costs": {
+            "progress_pct": "0",
+            "executed_usd": "2325",
+            "budget_usd": "0"
+        },
+       "investor_contributions": {
+            "breakdown": [
+                { "investor_id": 101, "investor_name": "Juan Pérez",  "percent_pct": "50" },
+                { "investor_id": 102, "investor_name": "María Gómez", "percent_pct": "30" },
+                { "investor_id": 103, "investor_name": "ACME Fund",   "percent_pct": "20" }
+            ]
+        },
+        "operating_result": {
+            "progress_pct": "0",
+            "income_usd": "0",
+            "total_costs_usd": "2325"
+        }
+    },
+    "management_balance": {
+        "summary": {
+            "income_usd": "0",
+            "direct_costs_executed_usd": "2325",
+            "direct_costs_invested_usd": "0",
+            "stock_usd": "0",
+            "rent_usd": "0",
+            "structure_usd": "0",
+            "operating_result_usd": "0",
+            "operating_result_pct": "0"
+        },
+        "breakdown": [
+            {
+                "label": "Seed",
+                "executed_usd": "0",
+                "invested_usd": "0",
+                "stock_usd": null
+            },
+            {
+                "label": "Supplies",
+                "executed_usd": "0",
+                "invested_usd": "0",
+                "stock_usd": null
+            },
+            {
+                "label": "Labors",
+                "executed_usd": "2325",
+                "invested_usd": "0",
+                "stock_usd": "0"
+            },
+            {
+                "label": "Rent",
+                "executed_usd": "0",
+                "invested_usd": "0",
+                "stock_usd": "0"
+            },
+            {
+                "label": "Structure",
+                "executed_usd": "0",
+                "invested_usd": "0",
+                "stock_usd": "0"
+            }
+        ],
+        "totals_row": {
+            "executed_usd": "2325",
+            "invested_usd": "0",
+            "stock_usd": "0"
+        }
+    },
+    "crop_incidence": {
+        "crops": [
+            {
+                "name": "Trigo",
+                "hectares": "40",
+                "rotation_pct": "21.62",
+                "cost_usd_per_ha": "6.5",
+                "incidence_pct": "21.62"
+            },
+            {
+                "name": "Maíz",
+                "hectares": "65",
+                "rotation_pct": "35.14",
+                "cost_usd_per_ha": "7.08",
+                "incidence_pct": "35.14"
+            },
+            {
+                "name": "Soja",
+                "hectares": "80",
+                "rotation_pct": "43.24",
+                "cost_usd_per_ha": "3.88",
+                "incidence_pct": "43.24"
+            }
+        ],
+        "total": {
+            "hectares": "185",
+            "rotation_pct": "100",
+            "cost_usd_per_hectare": "5.57"
+        }
+    },
+    "operational_indicators": {
+        "cards": [
+            {
+                "key": "first_workorder",
+                "title": "Primera orden de trabajo",
+                "date": null,
+                "workorder_id": null,
+                "workorder_code": null,
+                "audit_id": null,
+                "audit_code": null,
+                "status": null
+            },
+            {
+                "key": "last_workorder",
+                "title": "Última orden de trabajo",
+                "date": null,
+                "workorder_id": null,
+                "workorder_code": null,
+                "audit_id": null,
+                "audit_code": null,
+                "status": null
+            },
+            {
+                "key": "last_stock_audit",
+                "title": "Último arqueo de stock",
+                "date": null,
+                "workorder_id": null,
+                "workorder_code": null,
+                "audit_id": null,
+                "audit_code": null,
+                "status": null
+            },
+            {
+                "key": "campaign_close",
+                "title": "Cierre de campaña",
+                "date": null,
+                "workorder_id": null,
+                "workorder_code": null,
+                "audit_id": null,
+                "audit_code": null,
+                "status": "pending"
+            }
+        ]
+    }
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/app_parameters"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
@@ -31,7 +32,6 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 )
 
@@ -167,15 +167,15 @@ func Initialize() (*Dependencies, error) {
 	categoryConfigAPIPort := ProvideCategoryConfigAPI(config)
 	categoryMiddlewaresEnginePort := ProvideCategoryMiddlewaresEnginePort(middlewares)
 	categoryHandler := ProvideCategoryHandler(categoryGinEnginePort, categoryUseCasesPort, categoryConfigAPIPort, categoryMiddlewaresEnginePort)
-	unitGinEnginePort := ProvideUnitGinEnginePort(server)
-	unitGormEnginePort := ProvideUnitGormEnginePort(repository)
-	unitRepository := ProvideUnitRepository(unitGormEnginePort)
-	unitRepositoryPort := ProvideUnitRepositoryPort(unitRepository)
-	unitUseCases := ProvideUnitUseCases(unitRepositoryPort)
-	unitUseCasesPort := ProvideUnitUseCasesPort(unitUseCases)
-	unitConfigAPIPort := ProvideUnitConfigAPI(config)
-	unitMiddlewaresEnginePort := ProvideUnitMiddlewaresEnginePort(middlewares)
-	unitHandler := ProvideUnitHandler(unitGinEnginePort, unitUseCasesPort, unitConfigAPIPort, unitMiddlewaresEnginePort)
+	app_parametersGinEnginePort := ProvideAppParametersGinEnginePort(server)
+	app_parametersGormEnginePort := ProvideAppParametersGormEnginePort(repository)
+	app_parametersRepository := ProvideAppParametersRepository(app_parametersGormEnginePort)
+	app_parametersRepositoryPort := ProvideAppParametersRepositoryPort(app_parametersRepository)
+	app_parametersUseCases := ProvideAppParametersUseCases(app_parametersRepositoryPort)
+	app_parametersUseCasesPort := ProvideAppParametersUseCasesPort(app_parametersUseCases)
+	app_parametersConfigAPIPort := ProvideAppParametersConfigAPI(config)
+	app_parametersMiddlewaresEnginePort := ProvideAppParametersMiddlewaresEnginePort(middlewares)
+	app_parametersHandler := ProvideAppParametersHandler(app_parametersGinEnginePort, app_parametersUseCasesPort, app_parametersConfigAPIPort, app_parametersMiddlewaresEnginePort)
 	classtypeGinEnginePort := ProvideClassTypeGinEnginePort(server)
 	classtypeGormEnginePort := ProvideClassTypeGormEnginePort(repository)
 	classtypeRepository := ProvideClassTypeRepository(classtypeGormEnginePort)
@@ -248,7 +248,13 @@ func Initialize() (*Dependencies, error) {
 	supply_movementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
 	supply_movementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
 	supply_movementRepository := ProvideSupplyMovementRepository(supply_movementGormEnginePort)
-	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository)
+	service, err := ProvidePkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	xlsxEnginePort := ProvideXLSXEnginePort(service)
+	exporterAdapterPort := ProvideExporterPort(xlsxEnginePort)
+	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository, exporterAdapterPort)
 	supply_movementUseCasesPort := ProvideSupplyMovementUseCasesPort(supply_movementUseCases)
 	supply_movementConfigAPIPort := ProvideSupplyMovementConfigAPI(config)
 	supply_movementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)
@@ -271,7 +277,7 @@ func Initialize() (*Dependencies, error) {
 		LeaseTypeHandler:         leasetypeHandler,
 		SupplyHandler:            supplyHandler,
 		CategoryHandler:          categoryHandler,
-		UnitHandler:              unitHandler,
+		AppParametersHandler:     app_parametersHandler,
 		ClassTypeHandler:         classtypeHandler,
 		DollarHandler:            dollarHandler,
 		WorkorderHandler:         workorderHandler,
@@ -304,7 +310,7 @@ type Dependencies struct {
 	LeaseTypeHandler         *leasetype.Handler
 	SupplyHandler            *supply.Handler
 	CategoryHandler          *category.Handler
-	UnitHandler              *unit.Handler
+	AppParametersHandler     *app_parameters.Handler
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
 	WorkorderHandler         *workorder.Handler

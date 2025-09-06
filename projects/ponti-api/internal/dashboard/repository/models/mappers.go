@@ -150,8 +150,8 @@ func (m *DashboardModelMapper) CostsProgressToDomain(model *CostsProgressModel) 
 		executedUSD = decimal.Zero
 	}
 
-	if model.BudgetTotalUSD != nil {
-		budgetUSD = *model.BudgetTotalUSD
+	if model.BudgetCostUSD != nil {
+		budgetUSD = *model.BudgetCostUSD
 	} else {
 		budgetUSD = decimal.Zero
 	}
@@ -319,6 +319,7 @@ func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel
 	breakdown := make([]domain.DashboardCropBreakdown, len(models))
 	for i, model := range models {
 		breakdown[i] = domain.DashboardCropBreakdown{
+			ID:           model.CropID,
 			Name:         model.Name,
 			Hectares:     model.Hectares,
 			RotationPct:  decimal.Zero, // TODO: Implementar cuando se requiera

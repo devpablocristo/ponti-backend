@@ -2,20 +2,21 @@ package stock
 
 import (
 	"context"
+	"time"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
-	"time"
 )
 
 type RepositoryPort interface {
-	GetStocks(context.Context, int64, int64, int64, time.Time) ([]*domain.Stock, error)
+	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
-	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
+	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
-	GetStockByPeriodAndProjectId(context.Context, int64, int64, int64) (*domain.Stock, error)
+	GetStockByPeriodAndProjectId(context.Context, int64) (*domain.Stock, error)
 }
 
 type UseCases struct {
@@ -26,8 +27,8 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
 
-func (u *UseCases) GetStocksSummary(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64, closeDate time.Time) ([]*domain.Stock, error) {
-	return u.repo.GetStocks(ctx, projectId, monthPeriod, yearPeriod, closeDate)
+func (u *UseCases) GetStocksSummary(ctx context.Context, projectId int64, closeDate time.Time) ([]*domain.Stock, error) {
+	return u.repo.GetStocks(ctx, projectId, closeDate)
 }
 
 func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, error) {
@@ -35,12 +36,12 @@ func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, err
 }
 
 func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
-	stockFromDb, err := u.repo.GetStockByPeriodAndProjectId(ctx, projectId, monthPeriod, yearPeriod)
+	stockFromDb, err := u.repo.GetStockByPeriodAndProjectId(ctx, projectId)
 	if err != nil {
 		return err
 	}
 
-	err = u.repo.UpdateCloseDateByProject(ctx, projectId, monthPeriod, yearPeriod, stock)
+	err = u.repo.UpdateCloseDateByProject(ctx, projectId, stock)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectId int64
 	if err != nil {
 		return err
 	}
-	return u.repo.UpdateCloseDateByProject(ctx, projectId, monthPeriod, yearPeriod, stock)
+	return nil
 }
 
 func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockId int64, stock *domain.Stock) error {
@@ -66,7 +67,7 @@ func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Sto
 }
 
 func (u *UseCases) GetLastStockByProjectId(ctx context.Context, projectId int64, supplyId int64) (*domain.Stock, bool, error) {
-	return u.repo.GetLastStockByProjectId(ctx, projectId, supplyId )
+	return u.repo.GetLastStockByProjectId(ctx, projectId, supplyId)
 }
 
 func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {

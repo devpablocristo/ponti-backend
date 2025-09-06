@@ -9,13 +9,14 @@ import (
 	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
+	app_parameters "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/app_parameters"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"
-	dashboard "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard"
 	category "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/category"
 	classtype "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/classtype"
 	commercialization "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization"
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
+	dashboard "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard"
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -28,7 +29,6 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
-	unit "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/unit"
 	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
 	"github.com/google/wire"
 )
@@ -51,7 +51,7 @@ type Dependencies struct {
 	LeaseTypeHandler         *leasetype.Handler
 	SupplyHandler            *supply.Handler
 	CategoryHandler          *category.Handler
-	UnitHandler              *unit.Handler
+	AppParametersHandler     *app_parameters.Handler
 	ClassTypeHandler         *classtype.Handler
 	DollarHandler            *dollar.Handler
 	WorkorderHandler         *workorder.Handler
@@ -82,7 +82,7 @@ func Initialize() (*Dependencies, error) {
 		LeaseTypeSet,
 		SupplySet,
 		CategorySet,
-		UnitSet,
+		AppParametersSet,
 		ClassTypeSet,
 		DollarSet,
 		WorkorderSet,
