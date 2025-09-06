@@ -9,6 +9,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	providermodel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/repository/models"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
+	stockmodel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
 	"gorm.io/gorm"
@@ -151,6 +152,49 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 		return types.NewError(types.ErrInternal, "failed to update supply movement", err)
 	}
 
+	return nil
+}
+
+func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
+	var stockModel stockmodel.Stock
+	var supplyModel models.SupplyMovement
+	client := r.db.Client().WithContext(ctx)
+
+	err := client.
+		Where("project_id = ?", projectId).
+		Where("id = ?", supplyId).
+		First(&supplyModel).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return types.NewError(types.ErrNotFound, "supply movement not found", nil)
+		}
+		return err
+	}
+
+	err = client.
+		Where("project_id = ?", projectId).
+		Where("supply_id = ?", supplyModel.SupplyID).
+		Where("close_date IS NOT NULL").
+		First(&stockModel).Error
+	if err == nil {
+		return types.NewError(types.ErrConflict, "ya existe un movimiento de stock cerrado para este supply en el proyecto", nil)
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete stock", err)
+		}
+		if err := tx.Delete(&models.SupplyMovement{}, "project_id = ? AND id = ?", projectId, supplyId).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete supply movement", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

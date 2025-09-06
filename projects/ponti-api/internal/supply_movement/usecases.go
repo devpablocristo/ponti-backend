@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	DeleteSupplyMovement(context.Context, int64, int64) error
 }
 
 type ExporterAdapterPort interface {
@@ -93,6 +94,10 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 
 func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain.SupplyMovement, error) {
 	return u.repo.GetSupplyMovementByID(ctx, id)
+}
+
+func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
+	return u.repo.DeleteSupplyMovement(ctx, projectId, supplyId)
 }
 
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

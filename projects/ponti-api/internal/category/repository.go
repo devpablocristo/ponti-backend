@@ -63,7 +63,7 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 		// Solo actualiza el nombre (puedes extender para UpdatedBy, etc. si lo necesitas)
 		if err := tx.Model(&models.Category{}).
 			Where("id = ?", c.ID).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"name":       c.Name,
 				"updated_by": c.UpdatedBy,
 			}).Error; err != nil {

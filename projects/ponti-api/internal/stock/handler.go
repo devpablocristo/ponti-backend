@@ -15,7 +15,7 @@ import (
 )
 
 type UseCasesPort interface {
-	GetStocksSummary(context.Context, int64, int64, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksSummary(context.Context, int64, time.Time) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
@@ -77,15 +77,6 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
 
-	monthPeriod, err := getMonthPeriodOrDefault(c)
-	if handleError(err, c) {
-		return
-	}
-	yearPeriod, err := getYearPeriodOrDefault(c)
-	if handleError(err, c) {
-		return
-	}
-
 	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
 	if handleError(err, c) {
 		return
@@ -105,7 +96,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 		}
 	}
 
-	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, monthPeriod, yearPeriod, cutoffDate)
+	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, cutoffDate)
 	if handleError(err, c) {
 		return
 	}
