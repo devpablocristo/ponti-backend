@@ -9,6 +9,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/provider/usecase/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	supplyExcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto"
 	createsupplymovement "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/handler/dto/create_supply_movement"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
@@ -21,6 +22,7 @@ type UseCasesPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
 }
 
@@ -58,6 +60,7 @@ func (h *Handler) Routes() {
 		public.POST("", h.CreateSupplyMovement)
 		public.DELETE("/:idSupplyMovement", h.DeleteSupplyMovement)
 		public.GET("", h.GetSupplyMovementsByProjectID)
+		public.GET("/export", h.ExportSupplyMovementsByProjectID)
 	}
 }
 
@@ -129,7 +132,6 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	c.JSON(http.StatusMultiStatus, createsupplymovement.CreateSupplyMovementBulkResponse{
 		SupplyMovements: supplyMovementsResponse,
 	})
-
 }
 
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
@@ -147,7 +149,6 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.NewGetEntrySupplyMovementsResponse(supplyMovements))
-
 }
 
 func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
@@ -214,7 +215,6 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "supply movement updated successfully"})
-
 }
 
 func (h *Handler) GetProviders(c *gin.Context) {
@@ -235,4 +235,25 @@ func handleError(err error, c *gin.Context) bool {
 	apiErr, _ := types.NewAPIError(err)
 	c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 	return true
+}
+
+func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	projectIdStr := c.Param("id")
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	data, err := h.ucs.ExportSupplyMovementsByProjectID(ctx, projectId)
+	if handleError(err, c) {
+		return
+	}
+
+	filename := supplyExcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
