@@ -21,6 +21,7 @@ type UseCasesPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	DeleteSupplyMovement(context.Context, int64, int64) error
 }
 
 type GinEnginePort interface {
@@ -55,11 +56,8 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL + "/projects/:id/supply-movements")
 	{
 		public.POST("", h.CreateSupplyMovement)
-	}
-
-	publicGroup := r.Group(baseURL + "/projects/:id/supply-movements")
-	{
-		publicGroup.GET("", h.GetSupplyMovementsByProjectID)
+		public.DELETE("/:idSupplyMovement", h.DeleteSupplyMovement)
+		public.GET("", h.GetSupplyMovementsByProjectID)
 	}
 }
 
@@ -152,6 +150,30 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 
 }
 
+func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	supplyMovementStr := c.Param("idSupplyMovement")
+	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementId)
+	if handleError(err, c) {
+		return
+	}
+
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "supply movement deleted successfully"})
+
+}
+
 func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req dto.UpdateSupplyMovementEntryRequest
@@ -165,7 +187,6 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	if handleError(err, c) {
 		return
 	}
-
 
 	supplyMovementStr := c.Param("idSupplyMovement")
 	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
