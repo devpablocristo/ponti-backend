@@ -12,7 +12,7 @@ import (
 )
 
 // ProvideDashboardRepository crea la implementación concreta de dashboard.Repository.
-func ProvideDashboardRepository(repo dashboard.GormEngine) *dashboard.Repository {
+func ProvideDashboardRepository(repo dashboard.GormEnginePort) *dashboard.Repository {
 	return dashboard.NewRepository(repo)
 }
 
@@ -48,8 +48,8 @@ func ProvideDashboardConfigAPI(cfg *config.Config) dashboard.ConfigAPIPort {
 	return &cfg.API
 }
 
-// ProvideDashboardGormEnginePort adapta *pgorm.Repository a dashboard.GormEngine.
-func ProvideDashboardGormEnginePort(r *pgorm.Repository) dashboard.GormEngine {
+// ProvideDashboardGormEnginePort adapta *pgorm.Repository a dashboard.GormEnginePort.
+func ProvideDashboardGormEnginePort(r *pgorm.Repository) dashboard.GormEnginePort {
 	return r
 }
 

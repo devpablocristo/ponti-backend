@@ -3,21 +3,22 @@ package dashboard
 import (
 	"context"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 )
 
 type RepositoryPort interface {
-	GetDashboard(context.Context, domain.DashboardFilter) (*domain.Dashboard, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type UseCases struct {
 	repo RepositoryPort
 }
 
+// NewUseCases creates a new instance of Dashboard use cases.
 func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
 
-func (uc *UseCases) GetDashboard(ctx context.Context, filt domain.DashboardFilter) (*domain.Dashboard, error) {
-	return uc.repo.GetDashboard(ctx, filt)
+func (u *UseCases) GetDashboard(ctx context.Context, filter domain.DashboardFilter) (*domain.DashboardData, error) {
+	return u.repo.GetDashboard(ctx, filter)
 }

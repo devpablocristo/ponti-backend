@@ -148,6 +148,7 @@ build:
 
 clean:
 	@echo "Cleaning: stopping services, removing containers, volumes, networks and build artifacts..."
+	@docker compose -f $(DOCKER_COMPOSE_YML) down -v --remove-orphans
 	@docker system prune -f --volumes
 	@rm -rf $(BUILD_DIR)
 	@echo "Clean completed."

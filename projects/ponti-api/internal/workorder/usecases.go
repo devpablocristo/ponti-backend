@@ -17,12 +17,18 @@ type RepositoryPort interface {
 	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
 }
 
-type UseCases struct {
-	repo RepositoryPort
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []domain.WorkorderListElement) ([]byte, error)
+	Close() error
 }
 
-func NewUseCases(r RepositoryPort) *UseCases {
-	return &UseCases{repo: r}
+type UseCases struct {
+	repo  RepositoryPort
+	excel ExporterAdapterPort
+}
+
+func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: r, excel: excel}
 }
 
 func (u *UseCases) CreateWorkorder(ctx context.Context, o *domain.Workorder) (int64, error) {
@@ -65,4 +71,21 @@ func (u *UseCases) ListWorkorders(
 // GetMetrics delega al repositorio
 func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkorderFilter) (*domain.WorkorderMetrics, error) {
 	return u.repo.GetMetrics(ctx, f)
+}
+
+func (u *UseCases) ExportWorkorders(ctx context.Context, filt domain.WorkorderFilter, inp types.Input) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, _, err := u.ListWorkorders(ctx, filt, inp)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list Workorders", err)
+	}
+
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }

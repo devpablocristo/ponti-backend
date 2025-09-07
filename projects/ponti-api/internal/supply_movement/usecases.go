@@ -20,17 +20,26 @@ type RepositoryPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	DeleteSupplyMovement(context.Context, int64, int64) error
+}
+
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []*domain.SupplyMovement) ([]byte, error)
+	Close() error
 }
 
 type UseCases struct {
 	repo          RepositoryPort
 	stockUseCases stockUseCases.UseCasesPort
+	excel         ExporterAdapterPort
 }
 
 func NewUseCases(
 	repo RepositoryPort,
-	stockUseCases stockUseCases.UseCasesPort) *UseCases {
-	return &UseCases{repo: repo, stockUseCases: stockUseCases}
+	stockUseCases stockUseCases.UseCasesPort,
+	excel ExporterAdapterPort,
+) *UseCases {
+	return &UseCases{repo: repo, stockUseCases: stockUseCases, excel: excel}
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
@@ -87,6 +96,10 @@ func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain
 	return u.repo.GetSupplyMovementByID(ctx, id)
 }
 
+func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
+	return u.repo.DeleteSupplyMovement(ctx, projectId, supplyId)
+}
+
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	return u.repo.GetProviders(ctx)
 }
@@ -115,7 +128,6 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 }
 
 func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
-
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
 		return types.NewError(types.ErrValidation, "quantity must be less than real stock units", nil)
 	}
@@ -132,4 +144,21 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 	_, err := u.CreateSupplyMovement(ctx, &movementIn)
 
 	return err
+}
+
+func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, err := u.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list Supply Movements", err)
+	}
+
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }

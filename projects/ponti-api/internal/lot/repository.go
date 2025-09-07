@@ -220,7 +220,7 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"tons": tons,
 			}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot tons", err)
@@ -250,7 +250,7 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
-			Updates(map[string]interface{}{
+			Updates(map[string]any{
 				"deleted_at": time.Now(),
 				"deleted_by": &userID,
 			}).Error; err != nil {
@@ -324,7 +324,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
 	}
 
-	base := r.db.Client().WithContext(ctx).Table("lot_metrics_view")
+	base := r.db.Client().WithContext(ctx).Table("fix_lots_metrics")
 
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
@@ -368,7 +368,7 @@ func (r *Repository) ListLots(
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 
-	base := r.db.Client().WithContext(ctx).Table("lot_table_view")
+	base := r.db.Client().WithContext(ctx).Table("fix_lot_list")
 
 	// filtros
 	if fieldID > 0 {

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	workorderexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
@@ -21,6 +22,7 @@ type UseCasesPort interface {
 	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
+	ExportWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -68,6 +70,7 @@ func (h *Handler) Routes() {
 		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
 		grp.GET("", h.ListWorkorders)
 		grp.GET("/metrics", h.GetMetrics)
+		grp.GET("/export", h.ExportWorkorders)
 	}
 }
 
@@ -249,4 +252,22 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+}
+
+func (h *Handler) ExportWorkorders(c *gin.Context) {
+	filt := parseFilters(c)
+	input := types.NewInput(c.Request)
+
+	data, err := h.ucs.ExportWorkorders(c, filt, input)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+
+	filename := workorderexcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

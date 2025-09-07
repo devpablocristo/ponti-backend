@@ -8,12 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
+
+	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 )
 
 type UseCasesPort interface {
-	GetDashboard(context.Context, domain.DashboardFilter) (*domain.Dashboard, error)
+	GetDashboard(context.Context, domain.DashboardFilter) (*domain.DashboardData, error)
 }
 
 type GinEnginePort interface {
@@ -32,6 +33,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
+// Handler encapsulates all dependencies for the Dashboard HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -39,81 +41,69 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
+// NewHandler creates a new Dashboard handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
-	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
+	return &Handler{
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
+	}
 }
 
+// Routes registers all dashboard routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	base := h.acf.APIBaseURL() + "/dashboard"
+	baseURL := h.acf.APIBaseURL() + "/dashboard"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
 	}
 
-	grp := r.Group(base)
+	public := r.Group(baseURL)
 	{
-		grp.GET("", h.GetDashboard)
+		public.GET("", h.GetDashboard)
 	}
 }
 
+// GetDashboard retrieves dashboard data based on query parameters.
 func (h *Handler) GetDashboard(c *gin.Context) {
-	// Crear DTO de filtro desde los query parameters
-	filterDTO := dto.DashboardFilterRequest{}
+	// Parse query parameters for filters
+	var filter domain.DashboardFilter
 
-	// Parse customer_id parameter (solo 1 ID)
-	if v := c.Query("customer_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id format"})
-			return
+	if customerIDStr := c.Query("customer_id"); customerIDStr != "" {
+		if id, err := strconv.ParseInt(customerIDStr, 10, 64); err == nil {
+			filter.CustomerID = &id
 		}
-		filterDTO.CustomerIDs = []int64{id}
 	}
 
-	// Parse project_id parameter (solo 1 ID)
-	if v := c.Query("project_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id format"})
-			return
+	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
+		if id, err := strconv.ParseInt(projectIDStr, 10, 64); err == nil {
+			filter.ProjectID = &id
 		}
-		filterDTO.ProjectIDs = []int64{id}
 	}
 
-	// Parse campaign_id parameter (solo 1 ID)
-	if v := c.Query("campaign_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id format"})
-			return
+	if campaignIDStr := c.Query("campaign_id"); campaignIDStr != "" {
+		if id, err := strconv.ParseInt(campaignIDStr, 10, 64); err == nil {
+			filter.CampaignID = &id
 		}
-		filterDTO.CampaignIDs = []int64{id}
 	}
 
-	// Parse field_id parameter (solo 1 ID)
-	if v := c.Query("field_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id format"})
-			return
+	if fieldIDStr := c.Query("field_id"); fieldIDStr != "" {
+		if id, err := strconv.ParseInt(fieldIDStr, 10, 64); err == nil {
+			filter.FieldID = &id
 		}
-		filterDTO.FieldIDs = []int64{id}
 	}
 
-	// Usar el mapper para convertir DTO a entidad de dominio
-	f := dto.ToDashboardFilter(filterDTO)
-
-	// Obtener el dashboard desde la vista SQL
-	dashboard, err := h.ucs.GetDashboard(c.Request.Context(), f)
+	// Get dashboard data
+	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
-	// Convertir directamente desde el dominio a DTO (ya incluye redondeo a 3 decimales)
-	response := dto.FromDashboard(dashboard)
-
+	// Convert to DTO response
+	response := dto.FromDashboardData(dashboardData)
 	c.JSON(http.StatusOK, response)
 }
