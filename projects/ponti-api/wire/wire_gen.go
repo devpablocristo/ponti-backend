@@ -213,7 +213,13 @@ func Initialize() (*Dependencies, error) {
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
 	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
-	laborUseCases := ProvideLaborUseCases(laborRepositoryPort)
+	laborExcelService, err := ProvideLaborPkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	laborXLSXEnginePort := ProvideLaborXLSXEnginePort(laborExcelService)
+	laborExporterAdapterPort := ProvideLaborExporterPort(laborXLSXEnginePort)
+	laborUseCases := ProvideLaborUseCases(laborRepositoryPort, laborExporterAdapterPort)
 	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
 	laborMiddlewaresEnginePort := ProvideLaborMiddlewaresEnginePort(middlewares)
@@ -248,7 +254,11 @@ func Initialize() (*Dependencies, error) {
 	supply_movementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
 	supply_movementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
 	supply_movementRepository := ProvideSupplyMovementRepository(supply_movementGormEnginePort)
-	supply_movementXLSXEnginePort := ProvideSupplyMovementXLSXEnginePort(service)
+	supplyMovementExcelService, err := ProvideSupplyMovementPkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	supply_movementXLSXEnginePort := ProvideSupplyMovementXLSXEnginePort(supplyMovementExcelService)
 	supply_movementExporterAdapterPort := ProvideSupplyMovementExporterPort(supply_movementXLSXEnginePort)
 	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository, supply_movementExporterAdapterPort)
 	supply_movementUseCasesPort := ProvideSupplyMovementUseCasesPort(supply_movementUseCases)
