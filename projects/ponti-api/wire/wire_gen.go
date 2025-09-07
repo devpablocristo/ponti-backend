@@ -248,13 +248,9 @@ func Initialize() (*Dependencies, error) {
 	supply_movementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
 	supply_movementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
 	supply_movementRepository := ProvideSupplyMovementRepository(supply_movementGormEnginePort)
-	service, err := ProvidePkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	xlsxEnginePort := ProvideXLSXEnginePort(service)
-	exporterAdapterPort := ProvideExporterPort(xlsxEnginePort)
-	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository, exporterAdapterPort)
+	supply_movementXLSXEnginePort := ProvideSupplyMovementXLSXEnginePort(service)
+	supply_movementExporterAdapterPort := ProvideSupplyMovementExporterPort(supply_movementXLSXEnginePort)
+	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository, supply_movementExporterAdapterPort)
 	supply_movementUseCasesPort := ProvideSupplyMovementUseCasesPort(supply_movementUseCases)
 	supply_movementConfigAPIPort := ProvideSupplyMovementConfigAPI(config)
 	supply_movementMiddlewaresEnginePort := ProvideSupplyMovementMiddlewaresEnginePort(middlewares)

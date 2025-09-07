@@ -101,6 +101,6 @@ var WorkorderSet = wire.NewSet(
 	ProvideWorkorderGinEnginePort,
 	ProvideWorkorderMiddlewaresEnginePort,
 	ProvidePkgExcelService,
-	ProvideXLSXEnginePort,
 	ProvideExporterPort,
+	ProvideXLSXEnginePort,
 )
