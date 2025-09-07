@@ -1,14 +1,19 @@
 package wire
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/google/wire"
 
 	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	workorder "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder"
+	workorderexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/excel"
 )
 
 // ProvideWorkorderRepository crea la implementación concreta de workorder.Repository.
@@ -21,9 +26,32 @@ func ProvideWorkorderRepositoryPort(r *workorder.Repository) workorder.Repositor
 	return r
 }
 
+// Crea el engine de Excel ya configurado
+func ProvidePkgExcelService() (*pkgexcel.Service, error) {
+	fp := filepath.Join(os.TempDir(), workorderexcel.DefaultFilename)
+	write := true
+	return pkgexcel.Bootstrap(
+		fp,
+		workorderexcel.SheetName,
+		workorderexcel.DateFormat,
+		&write,
+		workorderexcel.ColumnWidths,
+	)
+}
+
+// bindea el engine como la interfaz XLSXEnginePort
+func ProvideXLSXEnginePort(s *pkgexcel.Service) workorder.XLSXEnginePort {
+	return s
+}
+
+// Crea el adaptador de exportación que usa el engine
+func ProvideExporterPort(eng workorder.XLSXEnginePort) workorder.ExporterAdapterPort {
+	return workorder.NewExcelExporter(eng)
+}
+
 // ProvideWorkorderUseCases agrupa repositorios en workorder.UseCases.
-func ProvideWorkorderUseCases(repo workorder.RepositoryPort) *workorder.UseCases {
-	return workorder.NewUseCases(repo)
+func ProvideWorkorderUseCases(repo workorder.RepositoryPort, exp workorder.ExporterAdapterPort) *workorder.UseCases {
+	return workorder.NewUseCases(repo, exp)
 }
 
 // ProvideWorkorderUseCasesPort adapta *workorder.UseCases a la interfaz workorder.UseCasesPort.
@@ -72,4 +100,7 @@ var WorkorderSet = wire.NewSet(
 	ProvideWorkorderGormEnginePort,
 	ProvideWorkorderGinEnginePort,
 	ProvideWorkorderMiddlewaresEnginePort,
+	ProvidePkgExcelService,
+	ProvideExporterPort,
+	ProvideXLSXEnginePort,
 )

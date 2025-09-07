@@ -24,26 +24,33 @@ func ProvideSupplyMovementRepositoryPort(r *supply_movement.Repository) supply_m
 	return r
 }
 
+type SupplyMovementExcelService struct {
+	*pkgexcel.Service
+}
+
 // Crea el engine de Excel ya configurado
-func ProvidePkgExcelService() (*pkgexcel.Service, error) {
+func ProvideSupplyMovementPkgExcelService() (*SupplyMovementExcelService, error) {
 	fp := filepath.Join(os.TempDir(), supplyExcel.DefaultFilename)
 	write := true
-	return pkgexcel.Bootstrap(
-		fp,
+	s, err := pkgexcel.Bootstrap(fp,
 		supplyExcel.SheetName,
 		supplyExcel.DateFormat,
 		&write,
 		supplyExcel.ColumnWidths,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return &SupplyMovementExcelService{s}, nil
 }
 
 // bindea el engine como la interfaz XLSXEnginePort
-func ProvideXLSXEnginePort(s *pkgexcel.Service) supply_movement.XLSXEnginePort {
+func ProvideSupplyMovementXLSXEnginePort(s *pkgexcel.Service) supply_movement.XLSXEnginePort {
 	return s
 }
 
 // Crea el adaptador de exportación que usa el engine
-func ProvideExporterPort(eng supply_movement.XLSXEnginePort) supply_movement.ExporterAdapterPort {
+func ProvideSupplyMovementExporterPort(eng supply_movement.XLSXEnginePort) supply_movement.ExporterAdapterPort {
 	return supply_movement.NewExcelExporter(eng)
 }
 
@@ -91,7 +98,7 @@ var SupplyMovementSet = wire.NewSet(
 	ProvideSupplyMovementGormEnginePort,
 	ProvideSupplyMovementGinEnginePort,
 	ProvideSupplyMovementMiddlewaresEnginePort,
-	ProvidePkgExcelService,
-	ProvideXLSXEnginePort,
-	ProvideExporterPort,
+	ProvideSupplyMovementPkgExcelService,
+	ProvideSupplyMovementExporterPort,
+	ProvideSupplyMovementXLSXEnginePort,
 )

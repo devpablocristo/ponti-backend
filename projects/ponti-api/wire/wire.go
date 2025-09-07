@@ -88,8 +88,8 @@ func Initialize() (*Dependencies, error) {
 		WorkorderSet,
 		LaborSet,
 		StockSet,
-		SupplyMovementSet,
 		InvoiceSet,
+		SupplyMovementSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
