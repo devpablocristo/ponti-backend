@@ -45,7 +45,7 @@ func ProvideSupplyMovementPkgExcelService() (*SupplyMovementExcelService, error)
 }
 
 // bindea el engine como la interfaz XLSXEnginePort
-func ProvideSupplyMovementXLSXEnginePort(s *pkgexcel.Service) supply_movement.XLSXEnginePort {
+func ProvideSupplyMovementXLSXEnginePort(s *SupplyMovementExcelService) supply_movement.XLSXEnginePort {
 	return s
 }
 

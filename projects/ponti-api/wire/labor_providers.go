@@ -24,26 +24,33 @@ func ProvideLaborRepositoryPort(r *labor.Repository) labor.RepositoryPort {
 	return r
 }
 
+type LaborExcelService struct {
+	*pkgexcel.Service
+}
+
 // Crea el engine de Excel ya configurado
-func ProvidePkgExcelService() (*pkgexcel.Service, error) {
+func ProvideLaborPkgExcelService() (*LaborExcelService, error) {
 	fp := filepath.Join(os.TempDir(), labexcel.DefaultFilename)
 	write := true
-	return pkgexcel.Bootstrap(
-		fp,
+	s, err := pkgexcel.Bootstrap(fp,
 		labexcel.SheetName,
 		labexcel.DateFormat,
 		&write,
 		labexcel.ColumnWidths,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return &LaborExcelService{s}, nil
 }
 
 // bindea el engine como la interfaz XLSXEnginePort
-func ProvideXLSXEnginePort(s *pkgexcel.Service) labor.XLSXEnginePort {
+func ProvideLaborXLSXEnginePort(s *LaborExcelService) labor.XLSXEnginePort {
 	return s
 }
 
 // Crea el adaptador de exportación que usa el engine
-func ProvideExporterPort(eng labor.XLSXEnginePort) labor.ExporterAdapterPort {
+func ProvideLaborExporterPort(eng labor.XLSXEnginePort) labor.ExporterAdapterPort {
 	return labor.NewExcelExporter(eng)
 }
 
@@ -91,7 +98,7 @@ var LaborSet = wire.NewSet(
 	ProvideLaborGormEnginePort,
 	ProvideLaborGinEnginePort,
 	ProvideLaborMiddlewaresEnginePort,
-	ProvidePkgExcelService,
-	ProvideXLSXEnginePort,
-	ProvideExporterPort,
+	ProvideLaborPkgExcelService,
+	ProvideLaborXLSXEnginePort,
+	ProvideLaborExporterPort,
 )
