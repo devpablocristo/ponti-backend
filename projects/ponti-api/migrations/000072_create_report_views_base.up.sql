@@ -1,11 +1,11 @@
 -- ========================================
--- MIGRACIÓN 000072: CREAR VISTAS BASE DE REPORTES
--- Entidad: report (Crear vistas base para reportes)
--- Funcionalidad: Vista optimizada para reportes de métricas por campo y cultivo
+-- MIGRACIÓN 000072: CREAR VISTA BÁSICA DE REPORTES
+-- Entidad: report (Crear vista básica para reportes)
+-- Funcionalidad: Vista básica con métricas simples para reportes de campo/cultivo
 -- ========================================
 
 -- ========================================
--- 1. CREAR VISTA REPORT_FIELD_CROP_METRICS_VIEW_V2
+-- 1. CREAR VISTA BÁSICA REPORT_FIELD_CROP_METRICS_VIEW_V2
 -- ========================================
 DROP VIEW IF EXISTS report_field_crop_metrics_view_v2;
 
