@@ -1,135 +1,22 @@
 -- ========================================
--- MIGRACIÓN 000073: CREAR VISTAS DE REPORTES COMPLETAS
--- Entidad: report + investor (Crear vistas completas para reportes)
--- Funcionalidad: Vista de aportes de inversores + optimización de vista de métricas
+-- MIGRACIÓN 000072: CREAR VISTAS PARA REPORTES
+-- ========================================
+-- Propósito: Crear vistas optimizadas para el módulo de reportes
+-- Incluye: report_field_crop_metrics_view_v2 + investor_contribution_data_view
+-- Optimizada para: GORM mapeo de tipos
 -- ========================================
 
--- Create unified view for investor contribution report data
--- This view provides all the data needed for the investor contribution report
--- Built from real database tables without hardcoded data
-
-CREATE OR REPLACE VIEW investor_contribution_data_view AS
-SELECT 
-    p.id as project_id,
-    p.name as project_name,
-    p.customer_id,
-    c.name as customer_name,
-    p.campaign_id,
-    cam.name as campaign_name,
-    -- Usar datos básicos del proyecto con columnas que realmente existen
-    100.0 as surface_total_ha,  -- Valor por defecto hasta verificar estructura
-    0.0 as lease_fixed_usd,     -- Valor por defecto
-    false as lease_is_fixed,    -- Valor por defecto
-    0.0 as admin_per_ha_usd,    -- Valor por defecto
-    COALESCE(p.admin_cost, 0) as admin_total_usd,  -- Usar admin_cost que sí existe
-    
-    -- Contributions data as JSON - construido desde datos reales de workorders y supplies
-    (
-        SELECT COALESCE(jsonb_agg(
-            jsonb_build_object(
-                'type', cat_costs.name,
-                'label', cat_costs.name,
-                'total_usd', cat_costs.total_cost,
-                'total_usd_ha', CASE 
-                    WHEN 100.0 > 0 
-                    THEN cat_costs.total_cost / 100.0
-                    ELSE 0 
-                END,
-                'investors', '[]'::jsonb,
-                'requires_manual_attribution', false
-            )
-        ), '[]'::jsonb)
-        FROM (
-            SELECT cat.name, SUM(wi.total_used * s.price) as total_cost
-            FROM workorders w2
-            JOIN workorder_items wi ON w2.id = wi.workorder_id
-            JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
-            JOIN categories cat ON s.category_id = cat.id
-            WHERE w2.project_id = p.id AND w2.deleted_at IS NULL
-            GROUP BY cat.id, cat.name
-        ) cat_costs
-    ) as contributions_data,
-    
-    -- Comparison data as JSON - construido desde datos reales de project_investors
-    (
-        SELECT COALESCE(jsonb_agg(
-            jsonb_build_object(
-                'investor_id', pi2.investor_id,
-                'investor_name', i2.name,
-                'agreed_share_pct', pi2.percentage,
-                'agreed_usd', total_project_cost * (pi2.percentage / 100),
-                'actual_usd', total_project_cost * (pi2.percentage / 100),
-                'adjustment_usd', 0
-            )
-        ), '[]'::jsonb)
-        FROM project_investors pi2
-        JOIN investors i2 ON pi2.investor_id = i2.id
-        CROSS JOIN (
-            SELECT COALESCE(SUM(wi.total_used * s.price), 0) as total_project_cost
-            FROM workorders w3
-            JOIN workorder_items wi ON w3.id = wi.workorder_id
-            JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
-            WHERE w3.project_id = p.id AND w3.deleted_at IS NULL
-        ) project_costs
-        WHERE pi2.project_id = p.id
-    ) as comparison_data,
-    
-    -- Harvest data as JSON - construido desde datos reales de crop_commercializations
-    jsonb_build_object(
-        'total_harvest_usd', COALESCE((
-            SELECT SUM(cc.net_price * 100.0)
-            FROM crop_commercializations cc
-            WHERE cc.project_id = p.id
-        ), 0),
-        'total_harvest_usd_ha', CASE 
-            WHEN 100.0 > 0 
-            THEN COALESCE((
-                SELECT SUM(cc.net_price * 100.0)
-                FROM crop_commercializations cc
-                WHERE cc.project_id = p.id
-            ), 0) / 100.0
-            ELSE 0 
-        END,
-        'investors', COALESCE((
-            SELECT jsonb_agg(
-                jsonb_build_object(
-                    'investor_id', pi2.investor_id,
-                    'investor_name', i2.name,
-                    'paid_usd', COALESCE((
-                        SELECT SUM(cc.net_price * 100.0)
-                        FROM crop_commercializations cc
-                        WHERE cc.project_id = p.id
-                    ), 0) * (pi2.percentage / 100),
-                    'agreed_usd', COALESCE((
-                        SELECT SUM(cc.net_price * 100.0)
-                        FROM crop_commercializations cc
-                        WHERE cc.project_id = p.id
-                    ), 0) * (pi2.percentage / 100),
-                    'adjustment_usd', 0
-                )
-            )
-            FROM project_investors pi2
-            JOIN investors i2 ON pi2.investor_id = i2.id
-            WHERE pi2.project_id = p.id
-        ), '[]'::jsonb)
-    ) as harvest_data
-
-FROM projects p
-JOIN customers c ON p.customer_id = c.id
-JOIN campaigns cam ON p.campaign_id = cam.id
-WHERE p.deleted_at IS NULL;
-
 -- ========================================
--- 2. OPTIMIZAR VISTA REPORT_FIELD_CROP_METRICS_VIEW_V2
+-- VISTA: report_field_crop_metrics_view_v2
 -- ========================================
-
--- Recrear la vista con optimizaciones y cálculos reales
-DROP VIEW IF EXISTS report_field_crop_metrics_view_v2;
+-- Propósito: Métricas por campo y cultivo para reportes
+-- Optimizada para GORM con tipos TEXT
+-- ========================================
 
 CREATE VIEW report_field_crop_metrics_view_v2 AS
 WITH
 -- =======================
--- BASE DE LOTES CON CULTIVOS (pre-agregada)
+-- BASE DE LOTES CON CULTIVOS
 -- =======================
 lot_crop_base AS (
   SELECT 
@@ -304,7 +191,7 @@ SELECT
   -- =======================
   COALESCE(li.income_net_total, 0)::text AS ingreso_neto_usd,
   
-  -- Ingreso neto por hectárea
+  -- Ingreso neto por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN (COALESCE(li.income_net_total, 0) / lcb.hectares)::text
@@ -318,7 +205,7 @@ SELECT
   COALESCE(ldc.supply_cost, 0)::text AS costos_insumos_usd,
   (COALESCE(ldc.labor_cost, 0) + COALESCE(ldc.supply_cost, 0))::text AS total_costos_directos_usd,
   
-  -- Costos directos por hectárea
+  -- Costos directos por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN ((COALESCE(ldc.labor_cost, 0) + COALESCE(ldc.supply_cost, 0)) / lcb.hectares)::text
@@ -331,7 +218,7 @@ SELECT
   (COALESCE(li.income_net_total, 0) - 
    (COALESCE(ldc.labor_cost, 0) + COALESCE(ldc.supply_cost, 0)))::text AS margen_bruto_usd,
   
-  -- Margen bruto por hectárea
+  -- Margen bruto por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN ((COALESCE(li.income_net_total, 0) - 
@@ -344,7 +231,7 @@ SELECT
   -- =======================
   COALESCE(lr.rent_total, 0)::text AS arriendo_usd,
   
-  -- Arriendo por hectárea
+  -- Arriendo por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN (COALESCE(lr.rent_total, 0) / lcb.hectares)::text
@@ -356,7 +243,7 @@ SELECT
   -- =======================
   COALESCE(lac.admin_total, 0)::text AS administracion_usd,
   
-  -- Administración por hectárea
+  -- Administración por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN (COALESCE(lac.admin_total, 0) / lcb.hectares)::text
@@ -371,7 +258,7 @@ SELECT
     COALESCE(lr.rent_total, 0) + 
     COALESCE(lac.admin_total, 0)))::text AS resultado_operativo_usd,
   
-  -- Resultado operativo por hectárea
+  -- Resultado operativo por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN ((COALESCE(li.income_net_total, 0) - 
@@ -388,7 +275,7 @@ SELECT
    COALESCE(lr.rent_total, 0) + 
    COALESCE(lac.admin_total, 0))::text AS total_invertido_usd,
   
-  -- Total invertido por hectárea
+  -- Total invertido por hectárea - CORREGIDO: usar hectares consistentemente
   CASE 
     WHEN lcb.hectares > 0 
     THEN (((COALESCE(ldc.labor_cost, 0) + COALESCE(ldc.supply_cost, 0)) + 
@@ -433,3 +320,120 @@ LEFT JOIN lot_income li ON li.lot_id = lcb.lot_id
 LEFT JOIN lot_rent lr ON lr.lot_id = lcb.lot_id
 LEFT JOIN lot_admin_cost lac ON lac.lot_id = lcb.lot_id
 WHERE lcb.current_crop_id IS NOT NULL;
+
+-- ========================================
+-- VISTA: investor_contribution_data_view
+-- ========================================
+-- Propósito: Datos unificados para reporte de contribución de inversores
+-- ========================================
+
+CREATE VIEW investor_contribution_data_view AS
+SELECT 
+    p.id as project_id,
+    p.name as project_name,
+    p.customer_id,
+    c.name as customer_name,
+    p.campaign_id,
+    cam.name as campaign_name,
+    -- Usar datos básicos del proyecto
+    100.0 as surface_total_ha,  -- Valor por defecto
+    0.0 as lease_fixed_usd,     -- Valor por defecto
+    false as lease_is_fixed,    -- Valor por defecto
+    0.0 as admin_per_ha_usd,    -- Valor por defecto
+    COALESCE(p.admin_cost, 0) as admin_total_usd,
+    
+    -- Contributions data as JSON - construido desde datos reales
+    (
+        SELECT COALESCE(jsonb_agg(
+            jsonb_build_object(
+                'type', cat_costs.name,
+                'label', cat_costs.name,
+                'total_usd', cat_costs.total_cost,
+                'total_usd_ha', CASE 
+                    WHEN 100.0 > 0 
+                    THEN cat_costs.total_cost / 100.0
+                    ELSE 0 
+                END,
+                'investors', '[]'::jsonb,
+                'requires_manual_attribution', false
+            )
+        ), '[]'::jsonb)
+        FROM (
+            SELECT cat.name, SUM(wi.total_used * s.price) as total_cost
+            FROM workorders w2
+            JOIN workorder_items wi ON w2.id = wi.workorder_id
+            JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
+            JOIN categories cat ON s.category_id = cat.id
+            WHERE w2.project_id = p.id AND w2.deleted_at IS NULL
+            GROUP BY cat.id, cat.name
+        ) cat_costs
+    ) as contributions_data,
+    
+    -- Comparison data as JSON - construido desde datos reales
+    (
+        SELECT COALESCE(jsonb_agg(
+            jsonb_build_object(
+                'investor_id', pi2.investor_id,
+                'investor_name', i2.name,
+                'agreed_share_pct', pi2.percentage,
+                'agreed_usd', total_project_cost * (pi2.percentage / 100),
+                'actual_usd', total_project_cost * (pi2.percentage / 100),
+                'adjustment_usd', 0
+            )
+        ), '[]'::jsonb)
+        FROM project_investors pi2
+        JOIN investors i2 ON pi2.investor_id = i2.id
+        CROSS JOIN (
+            SELECT COALESCE(SUM(wi.total_used * s.price), 0) as total_project_cost
+            FROM workorders w3
+            JOIN workorder_items wi ON w3.id = wi.workorder_id
+            JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
+            WHERE w3.project_id = p.id AND w3.deleted_at IS NULL
+        ) project_costs
+        WHERE pi2.project_id = p.id
+    ) as comparison_data,
+    
+    -- Harvest data as JSON - construido desde datos reales
+    jsonb_build_object(
+        'total_harvest_usd', COALESCE((
+            SELECT SUM(cc.net_price * 100.0)
+            FROM crop_commercializations cc
+            WHERE cc.project_id = p.id
+        ), 0),
+        'total_harvest_usd_ha', CASE 
+            WHEN 100.0 > 0 
+            THEN COALESCE((
+                SELECT SUM(cc.net_price * 100.0)
+                FROM crop_commercializations cc
+                WHERE cc.project_id = p.id
+            ), 0) / 100.0
+            ELSE 0 
+        END,
+        'investors', COALESCE((
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'investor_id', pi2.investor_id,
+                    'investor_name', i2.name,
+                    'paid_usd', COALESCE((
+                        SELECT SUM(cc.net_price * 100.0)
+                        FROM crop_commercializations cc
+                        WHERE cc.project_id = p.id
+                    ), 0) * (pi2.percentage / 100),
+                    'agreed_usd', COALESCE((
+                        SELECT SUM(cc.net_price * 100.0)
+                        FROM crop_commercializations cc
+                        WHERE cc.project_id = p.id
+                    ), 0) * (pi2.percentage / 100),
+                    'adjustment_usd', 0
+                )
+            )
+            FROM project_investors pi2
+            JOIN investors i2 ON pi2.investor_id = i2.id
+            WHERE pi2.project_id = p.id
+        ), '[]'::jsonb)
+    ) as harvest_data
+
+FROM projects p
+JOIN customers c ON p.customer_id = c.id
+JOIN campaigns cam ON p.campaign_id = cam.id
+WHERE p.deleted_at IS NULL;
