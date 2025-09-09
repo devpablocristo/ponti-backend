@@ -26,6 +26,7 @@ import (
 	lot "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	project "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	report "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
@@ -48,6 +49,7 @@ type Dependencies struct {
 	FieldHandler             *field.Handler
 	ManagerHandler           *manager.Handler
 	ProjectHandler           *project.Handler
+	ReportHandler            *report.ReportHandler
 	LeaseTypeHandler         *leasetype.Handler
 	SupplyHandler            *supply.Handler
 	CategoryHandler          *category.Handler
@@ -79,6 +81,7 @@ func Initialize() (*Dependencies, error) {
 		FieldSet,
 		ManagerSet,
 		ProjectSet,
+		ReportSet,
 		LeaseTypeSet,
 		SupplySet,
 		CategorySet,
