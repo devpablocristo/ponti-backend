@@ -34,31 +34,34 @@ func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 	out := make([]ExcelDto, 0, len(items))
 
 	for _, it := range items {
+		// Filtrar solo elementos donde InvoiceDate no es IsZero()
+		if it.InvoiceDate != nil && !it.InvoiceDate.IsZero() {
 
-		// InvoiceDate ya es *time.Time, no necesita conversión
-		invDate := it.InvoiceDate
+			// InvoiceDate ya es *time.Time, no necesita conversión
+			invDate := it.InvoiceDate
 
-		out = append(out, ExcelDto{
-			WorkorderNumber: it.WorkorderNumber,
-			Date:            it.Date,
-			ProjectName:     it.ProjectName,
-			FieldName:       it.FieldName,
-			CropName:        it.CropName,
-			LaborName:       it.LaborName,
-			Contractor:      it.Contractor,
-			SurfaceHa:       it.SurfaceHa,
-			CostHa:          it.CostHa,
-			InvestorName:    it.InvestorName,
-			USDAvgValue:     it.USDAvgValue,
-			NetTotal:        it.NetTotal,
-			TotalIVA:        it.TotalIVA,
-			USDCostHa:       it.USDCostHa,
-			USDNetTotal:     it.USDNetTotal,
-			InvoiceNumber:   it.InvoiceNumber,
-			InvoiceCompany:  it.InvoiceCompany,
-			InvoiceDate:     invDate,
-			InvoiceStatus:   it.InvoiceStatus,
-		})
+			out = append(out, ExcelDto{
+				WorkorderNumber: it.WorkorderNumber,
+				Date:            it.Date,
+				ProjectName:     it.ProjectName,
+				FieldName:       it.FieldName,
+				CropName:        it.CropName,
+				LaborName:       it.LaborName,
+				Contractor:      it.Contractor,
+				SurfaceHa:       it.SurfaceHa,
+				CostHa:          it.CostHa,
+				InvestorName:    it.InvestorName,
+				USDAvgValue:     it.USDAvgValue,
+				NetTotal:        it.NetTotal,
+				TotalIVA:        it.TotalIVA,
+				USDCostHa:       it.USDCostHa,
+				USDNetTotal:     it.USDNetTotal,
+				InvoiceNumber:   it.InvoiceNumber,
+				InvoiceCompany:  it.InvoiceCompany,
+				InvoiceDate:     invDate,
+				InvoiceStatus:   it.InvoiceStatus,
+			})
+		}
 	}
 
 	return out
