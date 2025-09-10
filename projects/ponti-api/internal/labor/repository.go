@@ -210,15 +210,47 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 
 func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
 
-	// Usar la nueva vista fix_labors_list que ya tiene todos los cálculos correctos
+	// Usar consulta directa con joins para obtener todos los campos necesarios
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("fix_labors_list AS fll")
+		Table("workorders AS w").
+		Select(`
+			w.id                    AS workorder_id,
+			w.number                AS workorder_number,
+			w.date                  AS date,
+			p.id                    AS project_id,
+			f.id                    AS field_id,
+			p.name                  AS project_name,
+			f.name                  AS field_name,
+			c.name                  AS crop_name,
+			lb.name                 AS labor_name,
+			lc.name                 AS category_name,
+			w.contractor            AS contractor,
+			w.effective_area        AS surface_ha,
+			lb.price                AS cost_ha,
+			lb.contractor_name      AS contractor_name,
+			inv.name                AS investor_name,
+			pdv.average_value       AS usd_avg_value,
+			i.id                    AS invoice_id,
+			i.number                AS invoice_number,
+			i.company               AS invoice_company,
+			i.date                  AS invoice_date,
+			i.status                AS invoice_status
+		`).
+		Joins("INNER JOIN projects p ON w.project_id = p.id").
+		Joins("INNER JOIN fields f ON w.field_id = f.id").
+		Joins("INNER JOIN crops c ON w.crop_id = c.id").
+		Joins("INNER JOIN labors lb ON w.labor_id = lb.id").
+		Joins("INNER JOIN categories lc ON lb.category_id = lc.id").
+		Joins("INNER JOIN investors inv ON w.investor_id = inv.id").
+		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
+		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
+		Where("w.deleted_at IS NULL AND p.deleted_at IS NULL")
 
 	if fieldID != 0 {
-		base = base.Where("fll.field_id = ?", fieldID)
+		base = base.Where("f.id = ?", fieldID)
 	} else if projectID != 0 {
-		base = base.Where("fll.project_id = ?", projectID)
+		base = base.Where("p.id = ?", projectID)
 	} else {
 		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
 			"fieldID or projectID is required", nil)
@@ -234,28 +266,7 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.LaborRawItem
-	// Usar la vista que ya tiene todos los cálculos correctos
-	if err := base.Select(`
-		workorder_id,
-		workorder_number,
-		date,
-		project_name,
-		field_name,
-		crop_name,
-		labor_name,
-		category_name,
-		contractor,
-		surface_ha,
-		cost_ha,
-		contractor_name,
-		investor_name,
-		usd_avg_value,
-		net_total,
-		total_iva,
-		usd_cost_ha,
-		usd_net_total
-	`).Where("1=1").
-		Order("workorder_number DESC").
+	if err := base.Order("w.number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
@@ -265,6 +276,17 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	list := make([]domain.LaborRawItem, len(rows))
 	for i, m := range rows {
+		// Calcular valores de USD dinámicamente
+		netTotal := m.SurfaceHa.Mul(m.CostHa)
+
+		// Usar porcentaje de IVA por defecto (10.5%)
+		// TODO: Implementar obtención dinámica desde app_parameters
+		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
+		totalIVA := netTotal.Mul(ivaPercentage)
+
+		usdCostHa := m.CostHa.Div(m.USDAvgValue)
+		usdNetTotal := netTotal.Div(m.USDAvgValue)
+
 		list[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
 			WorkorderNumber: m.WorkorderNumber,
@@ -279,10 +301,15 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			CategoryName:    m.CategoryName,
 			InvestorName:    m.InvestorName,
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        m.NetTotal,    // ✅ Viene de la vista (ya calculado)
-			TotalIVA:        m.TotalIVA,    // ✅ Viene de la vista (ya calculado)
-			USDCostHa:       m.USDCostHa,   // ✅ Viene de la vista (ya calculado)
-			USDNetTotal:     m.USDNetTotal, // ✅ Viene de la vista (ya calculado)
+			NetTotal:        netTotal,
+			TotalIVA:        totalIVA,
+			USDCostHa:       usdCostHa,
+			USDNetTotal:     usdNetTotal,
+			InvoiceID:       m.InvoiceID,
+			InvoiceNumber:   m.InvoiceNumber,
+			InvoiceCompany:  m.InvoiceCompany,
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   m.InvoiceStatus,
 		}
 	}
 

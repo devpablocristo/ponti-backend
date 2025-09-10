@@ -27,9 +27,9 @@ type LaborRawItem struct {
 	USDCostHa   decimal.Decimal `gorm:"column:usd_cost_ha"`
 	USDNetTotal decimal.Decimal `gorm:"column:usd_net_total"`
 
-	InvoiceID      int64     `gorm:"column:invoice_id"`
-	InvoiceNumber  string    `gorm:"column:invoice_number"`
-	InvoiceCompany string    `gorm:"column:invoice_company"`
-	InvoiceDate    time.Time `gorm:"column:invoice_date"`
-	InvoiceStatus  string    `gorm:"column:invoice_status"`
+	InvoiceID      int64      `gorm:"column:invoice_id"`
+	InvoiceNumber  string     `gorm:"column:invoice_number"`
+	InvoiceCompany string     `gorm:"column:invoice_company"`
+	InvoiceDate    *time.Time `gorm:"column:invoice_date"`
+	InvoiceStatus  string     `gorm:"column:invoice_status"`
 }

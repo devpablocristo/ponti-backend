@@ -11,6 +11,7 @@ import (
 	labexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/utils"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 
@@ -292,6 +293,9 @@ func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
 		return
 	}
 
+	// Mapear nombre de mes en inglés al formato MM si es necesario
+	usdMonth = utils.MonthNameToNumber(usdMonth)
+
 	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID, usdMonth)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
@@ -335,6 +339,11 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
 		return
 	}
+
+	// Mapear nombre de mes en inglés al formato MM si es necesario
+	originalMonth := usdMonth
+	usdMonth = utils.MonthNameToNumber(usdMonth)
+	fmt.Printf("DEBUG: Original month: '%s' -> Mapped month: '%s'\n", originalMonth, usdMonth)
 
 	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
 	if err != nil {
