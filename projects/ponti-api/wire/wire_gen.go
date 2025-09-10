@@ -29,6 +29,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement"
@@ -140,6 +141,15 @@ func Initialize() (*Dependencies, error) {
 	projectConfigAPIPort := ProvideProjectConfigAPI(config)
 	projectMiddlewaresEnginePort := ProvideProjectMiddlewaresEnginePort(middlewares)
 	projectHandler := ProvideProjectHandler(projectGinEnginePort, projectUseCasesPort, projectConfigAPIPort, projectMiddlewaresEnginePort)
+	reportGinEnginePort := ProvideReportGinEnginePort(server)
+	reportGormEnginePort := ProvideReportGormEnginePort(repository)
+	reportRepository := ProvideReportRepository(reportGormEnginePort)
+	reportRepositoryPort := ProvideReportRepositoryPort(reportRepository)
+	reportUseCase := ProvideReportUseCases(reportRepositoryPort)
+	reportUseCasePort := ProvideReportUseCasesPort(reportUseCase)
+	reportConfigAPIPort := ProvideReportConfigAPI(config)
+	reportMiddlewaresEnginePort := ProvideReportMiddlewaresEnginePort(middlewares)
+	reportHandler := ProvideReportHandler(reportGinEnginePort, reportUseCasePort, reportConfigAPIPort, reportMiddlewaresEnginePort)
 	leasetypeGinEnginePort := ProvideLeaseTypeGinEnginePort(server)
 	leasetypeGormEnginePort := ProvideLeaseTypeGormEnginePort(repository)
 	leasetypeRepository := ProvideLeaseTypeRepository(leasetypeGormEnginePort)
@@ -280,6 +290,7 @@ func Initialize() (*Dependencies, error) {
 		FieldHandler:             fieldHandler,
 		ManagerHandler:           managerHandler,
 		ProjectHandler:           projectHandler,
+		ReportHandler:            reportHandler,
 		LeaseTypeHandler:         leasetypeHandler,
 		SupplyHandler:            supplyHandler,
 		CategoryHandler:          categoryHandler,
@@ -313,6 +324,7 @@ type Dependencies struct {
 	FieldHandler             *field.Handler
 	ManagerHandler           *manager.Handler
 	ProjectHandler           *project.Handler
+	ReportHandler            *report.ReportHandler
 	LeaseTypeHandler         *leasetype.Handler
 	SupplyHandler            *supply.Handler
 	CategoryHandler          *category.Handler
