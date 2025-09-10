@@ -1,3 +1,5 @@
+Fix Labores Lista Labores:
+
 el vista 74 corrige el problema de duplicados de labores:
 
 ## �� **¿QUÉ CORRIGE Y CÓMO LO HACE?**
