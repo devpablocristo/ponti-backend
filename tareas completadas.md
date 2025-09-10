@@ -1,0 +1,1 @@
+lista de labores repetida, arreglada.

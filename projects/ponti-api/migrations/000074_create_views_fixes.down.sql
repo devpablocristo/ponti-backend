@@ -1,12 +1,14 @@
 -- ========================================
--- MIGRACIÓN 000071: CORREGIR CÁLCULOS DE LABORES
--- Entidad: labors (Corregir cálculos de IVA, costos en pesos y totales netos)
--- Funcionalidad: Crear vista fix_labors_list con cálculos correctos
+-- ROLLBACK: MIGRACIÓN 000082 - VISTA VIEWS_FIXES
 -- ========================================
 
--- ========================================
--- 1. CREAR VISTA FIX_LABORS_LIST CON CÁLCULOS CORREGIDOS
--- ========================================
+-- Eliminar vista de fixes
+DROP VIEW IF EXISTS views_fixes;
+
+-- Eliminar función helper
+DROP FUNCTION IF EXISTS get_project_dollar_value(BIGINT, VARCHAR);
+
+-- Restaurar vista original fix_labors_list (con el problema de duplicación)
 CREATE OR REPLACE VIEW fix_labors_list AS
 SELECT
     w.id AS workorder_id,
@@ -61,11 +63,3 @@ LEFT JOIN project_dollar_values pdv ON pdv.project_id = w.project_id
     AND pdv.deleted_at IS NULL
 WHERE w.deleted_at IS NULL
     AND p.deleted_at IS NULL;
-
--- ========================================
--- 2. COMENTARIOS EXPLICATIVOS
--- ========================================
--- Total IVA: Ahora usa get_iva_percentage() desde app_parameters (configurable)
--- Costo U$/Ha: Se muestra en pesos (USD * tipo de cambio)
--- Total U Neto: Total en pesos multiplicado por hectáreas
--- Se usa get_default_fx_rate() como fallback si no hay datos de project_dollar_values
