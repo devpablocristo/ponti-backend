@@ -29,7 +29,7 @@ type LaborListItem struct {
 	InvoiceID       int64           `json:"invoice_id"`
 	InvoiceNumber   string          `json:"invoice_number"`
 	InvoiceCompany  string          `json:"invoice_company"`
-	InvoiceDate     time.Time       `json:"invoice_date"`
+	InvoiceDate     *time.Time      `json:"invoice_date"`
 	InvoiceStatus   string          `json:"invoice_status"`
 }
 

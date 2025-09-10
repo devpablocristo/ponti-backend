@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRACIÓN 000082: CREAR VISTA VIEWS_FIXES
+-- MIGRACIÓN 000074: CREAR VISTA VIEWS_FIXES
 -- ========================================
 -- Propósito: Vista centralizada para todos los fixes de vistas
 -- Incluye: fix_labors_list_duplication, y otros fixes futuros
@@ -49,10 +49,16 @@ SELECT
     'placeholder' AS fix_type;
 
 -- ========================================
--- 3. RECREAR VISTA FIX_LABORS_LIST CORREGIDA
+-- 3. RECREAR VISTA FIX_LABORS_LIST SIN VALORES HARDCODEADOS
 -- ========================================
 DROP VIEW IF EXISTS fix_labors_list;
 
+-- ========================================
+-- VISTA BASE SIN VALORES HARDCODEADOS
+-- ========================================
+-- Esta vista proporciona los datos base sin cálculos de USD
+-- Los cálculos de USD se harán dinámicamente en el código Go
+-- ========================================
 CREATE OR REPLACE VIEW fix_labors_list AS
 SELECT
     w.id AS workorder_id,
@@ -70,33 +76,6 @@ SELECT
     lb.price AS cost_ha,
     lb.contractor_name,
     inv.name AS investor_name,
-    
-    -- FIX: Usar función que obtiene el valor específico del mes (evita duplicación)
-    -- NOTA: Esta vista ahora usa un mes por defecto, pero el código Go debe filtrar por mes
-    COALESCE(
-        get_project_dollar_value(w.project_id, '01'), -- Mes por defecto (formato correcto)
-        get_default_fx_rate()
-    ) AS usd_avg_value,
-    
-    -- Cálculos corregidos según especificaciones:
-    
-    -- Total neto: Costo labor * superficie (en USD)
-    (lb.price * w.effective_area) AS net_total,
-    
-    -- Total IVA: Usar porcentaje configurable desde app_parameters
-    (lb.price * w.effective_area * get_iva_percentage()) AS total_iva,
-    
-    -- Costo U$/Ha en pesos: Costo Ha * dólar promedio (mostrar en pesos)
-    (lb.price * COALESCE(
-        get_project_dollar_value(w.project_id, '01'), -- Mes por defecto (formato correcto)
-        get_default_fx_rate()
-    )) AS usd_cost_ha,
-    
-    -- Total U Neto en pesos: Total costo en pesos * Has
-    (lb.price * COALESCE(
-        get_project_dollar_value(w.project_id, '01'), -- Mes por defecto (formato correcto)
-        get_default_fx_rate()
-    ) * w.effective_area) AS usd_net_total,
     
     -- Campos de factura
     i.id AS invoice_id,
@@ -119,7 +98,7 @@ WHERE w.deleted_at IS NULL
 -- ========================================
 -- 4. COMENTARIOS EXPLICATIVOS
 -- ========================================
--- La vista fix_labors_list ahora usa get_project_dollar_value() que evita duplicación
--- El código Go debe modificar la consulta para usar el mes específico:
--- Ejemplo: WHERE usd_avg_value = get_project_dollar_value(project_id, '2024-01')
--- O mejor aún, hacer la consulta directamente con el filtro por mes
+-- La vista fix_labors_list ahora es una vista base sin valores hardcodeados
+-- Los cálculos de USD se realizan dinámicamente en el código Go usando el parámetro usd_month
+-- Esto cumple con las reglas del proyecto de no usar valores hardcodeados
+-- ========================================

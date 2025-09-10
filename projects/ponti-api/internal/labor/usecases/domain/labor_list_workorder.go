@@ -25,11 +25,11 @@ type LaborListItem struct {
 	USDCostHa       decimal.Decimal // costo de dolar por ha
 	USDNetTotal     decimal.Decimal // total neto dolar
 
-	InvoiceID      int64     // id de la factura
-	InvoiceNumber  string    // numero de factura
-	InvoiceCompany string    // empresa de la factura
-	InvoiceDate    time.Time // fecha de factura
-	InvoiceStatus  string    // estado de factura
+	InvoiceID      int64      // id de la factura
+	InvoiceNumber  string     // numero de factura
+	InvoiceCompany string     // empresa de la factura
+	InvoiceDate    *time.Time // fecha de factura
+	InvoiceStatus  string     // estado de factura
 }
 
 type LaborRawItem struct {
@@ -56,6 +56,6 @@ type LaborRawItem struct {
 	InvoiceID      int64
 	InvoiceNumber  string
 	InvoiceCompany string
-	InvoiceDate    time.Time
+	InvoiceDate    *time.Time
 	InvoiceStatus  string
 }

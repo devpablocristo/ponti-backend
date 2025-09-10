@@ -35,11 +35,8 @@ func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 
 	for _, it := range items {
 
-		var invDate *time.Time
-		if !it.InvoiceDate.IsZero() {
-			d := it.InvoiceDate
-			invDate = &d
-		}
+		// InvoiceDate ya es *time.Time, no necesita conversión
+		invDate := it.InvoiceDate
 
 		out = append(out, ExcelDto{
 			WorkorderNumber: it.WorkorderNumber,
