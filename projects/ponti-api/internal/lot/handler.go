@@ -86,7 +86,7 @@ func (h *Handler) Routes() {
 		public.GET("/:id", h.GetLot)
 		public.PUT("/:id", ValidateLotUpdate(), h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
-		// public.GET("/export", h.ExportLots)
+		public.GET("/export", h.ExportLots)
 	}
 }
 

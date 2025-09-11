@@ -108,7 +108,13 @@ func Initialize() (*Dependencies, error) {
 	lotGormEnginePort := ProvideLotGormEnginePort(repository)
 	lotRepository := ProvideLotRepository(lotGormEnginePort)
 	lotRepositoryPort := ProvideLotRepositoryPort(lotRepository)
-	lotUseCases := ProvideLotUseCases(lotRepositoryPort)
+	lotExcelService, err := ProvideLotPkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	xlsxEnginePort := ProvideLotXLSXEnginePort(lotExcelService)
+	exporterAdapterPort := ProvideLotExporterPort(xlsxEnginePort)
+	lotUseCases := ProvideLotUseCases(lotRepositoryPort, exporterAdapterPort)
 	lotUseCasesPort := ProvideLotUseCasesPort(lotUseCases)
 	lotConfigAPIPort := ProvideLotConfigAPI(config)
 	lotMiddlewaresEnginePort := ProvideLotMiddlewaresEnginePort(middlewares)
@@ -212,9 +218,9 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	xlsxEnginePort := ProvideXLSXEnginePort(service)
-	exporterAdapterPort := ProvideExporterPort(xlsxEnginePort)
-	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort, exporterAdapterPort)
+	workorderXLSXEnginePort := ProvideXLSXEnginePort(service)
+	workorderExporterAdapterPort := ProvideExporterPort(workorderXLSXEnginePort)
+	workorderUseCases := ProvideWorkorderUseCases(workorderRepositoryPort, workorderExporterAdapterPort)
 	workorderUseCasesPort := ProvideWorkorderUseCasesPort(workorderUseCases)
 	workorderConfigAPIPort := ProvideWorkorderConfigAPI(config)
 	workorderMiddlewaresEnginePort := ProvideWorkorderMiddlewaresEnginePort(middlewares)
