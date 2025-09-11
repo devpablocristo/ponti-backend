@@ -17,6 +17,7 @@ type RepositoryPort interface {
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectId(context.Context, int64) (*domain.Stock, error)
+	GetStocksPeriods(context.Context, int64) ([]string, error)
 }
 
 type UseCases struct {
@@ -29,6 +30,10 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 
 func (u *UseCases) GetStocksSummary(ctx context.Context, projectId int64, closeDate time.Time) ([]*domain.Stock, error) {
 	return u.repo.GetStocks(ctx, projectId, closeDate)
+}
+
+func (u *UseCases) GetStocksPeriods(ctx context.Context, projectId int64) ([]string, error) {
+	return u.repo.GetStocksPeriods(ctx, projectId)
 }
 
 func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, error) {

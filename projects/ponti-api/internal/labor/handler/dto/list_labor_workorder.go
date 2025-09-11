@@ -22,7 +22,7 @@ type LaborRawItem struct {
 	USDAvgValue     decimal.Decimal `json:"usd_avg_value"`
 	InvoiceNumber   string          `json:"invoice_number"`
 	InvoiceCompany  string          `json:"invoice_company"`
-	InvoiceDate     time.Time       `json:"invoice_date"`
+	InvoiceDate     *time.Time      `json:"invoice_date"`
 	InvoiceStatus   string          `json:"invoice_status"`
 }
 

@@ -16,12 +16,14 @@ import (
 
 type UseCasesPort interface {
 	GetStocksSummary(context.Context, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksPeriods(context.Context, int64) ([]string, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
 }
+
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
 	RunServer(ctx context.Context) error
@@ -69,6 +71,7 @@ func (h *Handler) Routes() {
 	}
 	public := r.Group(baseURL)
 	public.GET("/summary", h.getStocksSummary)
+	public.GET("/periods", h.getStocksPeriods)
 	public.PUT("/close-date", h.UpdateStocksCloseDate)
 	public.PUT("/real-stock/:stockId", h.UpdateRealStock)
 }
@@ -103,6 +106,23 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 
 	resp := dto.NewGetStocksListed(stocks)
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) getStocksPeriods(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectIdStr := c.Param("id")
+
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	periods, err := h.ucs.GetStocksPeriods(ctx, projectId)
+	if handleError(err, c) {
+		return
+	}
+
+	c.JSON(http.StatusOK, periods)
 }
 
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field

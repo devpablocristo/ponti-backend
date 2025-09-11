@@ -561,13 +561,44 @@ INSERT INTO crop_commercializations (project_id, crop_id, board_price, freight_c
   (4, 2, 280.00, 20.00, 12.00, 248.00, '2024-05-01');  -- Maíz: $280 - $20 - $12 = $248/ton
 
 -- ========================================
+-- VALORES DEL DÓLAR PARA PROYECTO 1
+-- ========================================
+-- Proyecto 1: Valores del dólar para diferentes meses
+INSERT INTO project_dollar_values (project_id, year, month, start_value, end_value, average_value) VALUES
+  (1, 2024, '01', 850.00, 900.00, 875.00),  -- Enero 2024
+  (1, 2024, '02', 900.00, 950.00, 925.00),  -- Febrero 2024
+  (1, 2024, '03', 950.00, 1000.00, 975.00), -- Marzo 2024
+  (1, 2024, '04', 1000.00, 1050.00, 1025.00), -- Abril 2024
+  (1, 2024, '05', 1050.00, 1100.00, 1075.00), -- Mayo 2024
+  (1, 2024, '06', 1100.00, 1150.00, 1125.00), -- Junio 2024
+  (1, 2024, '07', 1150.00, 1200.00, 1175.00), -- Julio 2024
+  (1, 2024, '08', 1200.00, 1250.00, 1225.00), -- Agosto 2024
+  (1, 2024, '09', 1250.00, 1300.00, 1275.00), -- Septiembre 2024
+  (1, 2024, '10', 1300.00, 1350.00, 1325.00), -- Octubre 2024
+  (1, 2024, '11', 1350.00, 1400.00, 1375.00), -- Noviembre 2024
+  (1, 2024, '12', 1400.00, 1450.00, 1425.00), -- Diciembre 2024
+  (1, 2025, '01', 1450.00, 1500.00, 1475.00), -- Enero 2025
+  (1, 2025, '02', 1500.00, 1550.00, 1525.00), -- Febrero 2025
+  (1, 2025, '03', 1550.00, 1600.00, 1575.00); -- Marzo 2025
+
+-- ========================================
+-- FACTURAS PARA PROYECTO 1
+-- ========================================
+-- Proyecto 1: Facturas de labores ejecutadas
+-- Workorders del Proyecto 1: 1 (Siembra), 2 (Fertilización), 3 (Cosecha)
+INSERT INTO invoices (id, work_order_id, number, company, date, status) VALUES
+  (1, 1, 'INV-2024-001', 'Contratista 1', '2024-10-20', 'paid'),    -- Siembra Lote A1
+  (2, 2, 'INV-2024-002', 'Contratista 3', '2024-11-15', 'paid'),    -- Fertilización Lote A1
+  (3, 3, 'INV-2024-003', 'Contratista 2', '2025-03-25', 'pending'); -- Cosecha Lote A1
+
+-- ========================================
 -- FACTURA CON INGRESOS PARA PROYECTO 4
 -- ========================================
 -- Proyecto 4: Factura de venta de cosecha (120 ha × 2.5 ton/ha × $400/ton = $120,000)
 -- Usar work_order_id de las cosechas del Proyecto 4 (workorders 12 y 15)
 INSERT INTO invoices (id, work_order_id, number, company, date, status) VALUES
-  (1, 12, 'INV-2024-001', 'Empresa Demo', '2024-12-01', 'paid'),  -- Cosecha Lote D1
-  (2, 15, 'INV-2024-002', 'Empresa Demo', '2024-12-01', 'paid');  -- Cosecha Lote D2
+  (4, 12, 'INV-2024-004', 'Empresa Demo', '2024-12-01', 'paid'),  -- Cosecha Lote D1
+  (5, 15, 'INV-2024-005', 'Empresa Demo', '2024-12-01', 'paid');  -- Cosecha Lote D2
 
 -- ========================================
 -- VERIFICACIÓN DE CÁLCULOS DE ARRIENDO CON COMERCIALIZACIONES

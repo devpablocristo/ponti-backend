@@ -19,6 +19,7 @@ type Stock struct {
 	CloseDate       *time.Time
 	SupplyMovements []supplymovementdomain.SupplyMovement
 	RealStockUnits  decimal.Decimal
+	Consumed        decimal.Decimal
 	InitialStock    decimal.Decimal
 	YearPeriod      int64
 	MonthPeriod     int64
@@ -30,7 +31,7 @@ func (s *Stock) GetTotalUSD() decimal.Decimal {
 }
 
 func (s *Stock) GetStockUnits() decimal.Decimal {
-	
+
 	return s.GetEntryStock().Sub(s.GetOutStock())
 }
 
@@ -38,9 +39,9 @@ func (s *Stock) GetStockDifference() decimal.Decimal {
 	return s.RealStockUnits.Sub(s.GetStockUnits())
 }
 
-func (s *Stock) GetEntryStock() decimal.Decimal{
+func (s *Stock) GetEntryStock() decimal.Decimal {
 	var stockUnits decimal.Decimal
-	for _, supplyMovement := range s.SupplyMovements{
+	for _, supplyMovement := range s.SupplyMovements {
 		if supplyMovement.IsEntry {
 			stockUnits = stockUnits.Add(supplyMovement.Quantity)
 		}
@@ -49,9 +50,9 @@ func (s *Stock) GetEntryStock() decimal.Decimal{
 	return stockUnits
 }
 
-func (s *Stock) GetOutStock() decimal.Decimal{
+func (s *Stock) GetOutStock() decimal.Decimal {
 	var stockUnits decimal.Decimal
-	for _, supplyMovement := range s.SupplyMovements{
+	for _, supplyMovement := range s.SupplyMovements {
 		if !supplyMovement.IsEntry {
 			stockUnits = stockUnits.Add(supplyMovement.Quantity)
 		}

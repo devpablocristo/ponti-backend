@@ -7,6 +7,8 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
+	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +40,9 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 		Where("projects.id = ?", projectId)
 
 	if closeDate != t {
-		query.Where("stocks.close_date < ?", closeDate)
+		query.Where("stocks.close_date = ?", closeDate)
+	} else {
+		query.Where("stocks.close_date IS NULL")
 	}
 
 	var stockModels []models.Stock
@@ -48,9 +52,41 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 
 	stocks := make([]*domain.Stock, 0, len(stockModels))
 	for i := range stockModels {
+		var consumed decimal.Decimal
+		err := db.Model(&workordermodels.WorkorderItem{}).
+			Joins("JOIN workorders ON workorders.id = workorder_items.workorder_id").
+			Where("workorders.project_id = ? AND workorder_items.supply_id = ?", projectId, stockModels[i].SupplyID).
+			Select("COALESCE(SUM(workorder_items.total_used), 0)").
+			Scan(&consumed).Error
+		if err != nil {
+			return nil, err
+		}
+		stockModels[i].Consumed = consumed
+
 		stocks = append(stocks, stockModels[i].ToDomain())
 	}
 	return stocks, nil
+}
+
+func (r *Repository) GetStocksPeriods(ctx context.Context, projectId int64) ([]string, error) {
+	var rawPeriods []time.Time
+
+	err := r.db.Client().WithContext(ctx).
+		Model(&models.Stock{}).
+		Where("project_id = ? AND close_date IS NOT NULL", projectId).
+		Distinct("close_date").
+		Pluck("close_date", &rawPeriods).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	periods := make([]string, len(rawPeriods))
+	for i, t := range rawPeriods {
+		periods[i] = t.Format("2006-01-02")
+	}
+
+	return periods, nil
 }
 
 func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int64, error) {

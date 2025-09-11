@@ -29,6 +29,7 @@ type GetStockSummary struct {
 	SupplyUnitPrice decimal.Decimal `json:"supply_unit_price"`
 	EntryStock      decimal.Decimal `json:"entry_stock"`
 	OutStock        decimal.Decimal `json:"out_stock"`
+	Consumed        decimal.Decimal `json:"consumed"`
 }
 
 // FromDomain maps domain.Stock to GetStock DTO
@@ -47,6 +48,7 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		SupplyUnitPrice: s.Supply.Price,
 		EntryStock:      s.GetEntryStock(),
 		OutStock:        s.GetOutStock(),
+		Consumed:        s.Consumed,
 	}
 }
 
