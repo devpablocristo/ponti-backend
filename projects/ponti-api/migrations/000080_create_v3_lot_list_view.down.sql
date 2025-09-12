@@ -1,0 +1,16 @@
+-- ========================================
+-- MIGRACIÓN 000079: ELIMINAR VISTA v3_lot_list (DOWN)
+-- ========================================
+-- 
+-- Objetivo: Eliminar la vista creada en la migración UP
+-- Fecha: 2025-09-12
+-- Autor: Sistema
+-- 
+-- Nota: Código en inglés, comentarios en español.
+
+-- -------------------------------------------------------------------
+-- v3_lot_list: rollback elimina la vista
+-- -------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v3_lot_list;
+
+
