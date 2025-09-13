@@ -343,10 +343,10 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	// - áreas: SUM directo
 	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
 	const sel = `
-        COALESCE(SUM(seeded_area), 0) AS seeded_area,
-        COALESCE(SUM(harvested_area), 0) AS harvested_area,
-        COALESCE(SUM(yield_tn_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS yield_tn_per_ha,
-        COALESCE(SUM(cost_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS cost_per_ha
+        COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+        COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+        COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
+        COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha
     `
 
 	var row rowAgg

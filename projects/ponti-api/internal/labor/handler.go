@@ -24,7 +24,7 @@ type UseCasesPort interface {
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
-	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
+	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64, string) ([]byte, error)
@@ -95,9 +95,9 @@ func (h *Handler) Routes() {
 
 func (h *Handler) CreateLabor(c *gin.Context) {
 	var req dto.LaborList
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -112,7 +112,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	_, err = h.ucps.GetProject(ctx, projectId)
+	_, err = h.ucps.GetProject(ctx, projectID)
 
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
@@ -131,7 +131,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	for _, labor := range req.Labors {
 		var laborResponse dto.CreateLabor
 
-		laborId, err := h.ucs.CreateLabor(ctx, labor.ToDomain(projectId, userID))
+		laborID, err := h.ucs.CreateLabor(ctx, labor.ToDomain(projectID, userID))
 		if err != nil {
 			laborResponse = dto.CreateLabor{
 				LaborID:     0,
@@ -141,7 +141,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 			}
 		} else {
 			laborResponse = dto.CreateLabor{
-				LaborID:   laborId,
+				LaborID:   laborID,
 				LaborName: labor.Name,
 				IsSaved:   true,
 			}
@@ -160,16 +160,16 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
-	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage, projectId)
+	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage, projectID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -181,9 +181,9 @@ func (h *Handler) ListLabor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -208,7 +208,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain(projectId, userID)); err != nil {
+	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain(projectID, userID)); err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
@@ -217,9 +217,9 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLabor(c *gin.Context) {
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	_, err := strconv.ParseInt(projectIdStr, 10, 64)
+	_, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -254,9 +254,9 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborCategories(c *gin.Context) {
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	_, err := strconv.ParseInt(projectIdStr, 10, 64)
+	_, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -269,7 +269,7 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 		return
 	}
 
-	laborCategories, err := h.ucs.ListLaborCategoriesByTypeId(c, id)
+	laborCategories, err := h.ucs.ListLaborCategoriesByTypeID(c, id)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

@@ -1,3 +1,4 @@
+// Package labor contiene la implementación del repositorio para el módulo de labor
 package labor
 
 import (
@@ -82,7 +83,7 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 	return nil
 }
 
-func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId int64) ([]domain.ListedLabor, int64, error) {
+func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
 	var list []models.Labor
 	var total int64
 
@@ -96,7 +97,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 	if err := db0.
 		Preload("Category").
 		Select("id, name, contractor_name, price, category_id").
-		Where("project_id = ?", projectId).
+		Where("project_id = ?", projectID).
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -119,14 +120,14 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectId
 	return labors, total, nil
 }
 
-func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int64) ([]domain.LaborCategory, error) {
+func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int64) ([]domain.LaborCategory, error) {
 	var laborCategoriesModels []models.LaborCategory
 	db0 :=
 		r.db.
 			Client().
 			WithContext(ctx).
 			Model(&models.LaborCategory{}).
-			Where("type_id = ?", typeId)
+			Where("type_id = ?", typeID)
 
 	if err := db0.Find(&laborCategoriesModels).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list labor categories", err)
@@ -147,62 +148,89 @@ func (r *Repository) ListLaborCategoriesByTypeId(ctx context.Context, typeId int
 }
 
 func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
-	var rawModels []models.LaborRawItem
+	var v3Models []models.LaborListItem
 
+	// Usar la vista v3_labor_list como base y agregar campos adicionales
 	err := r.db.Client().
 		WithContext(ctx).
-		Table("workorders AS w").
+		Table("v3_labor_list AS v3").
 		Select(`
-            w.number                AS workorder_number,
-            w.date                  AS date,
-            p.name                  AS project_name,
-            f.name                  AS field_name,
-            c.name                  AS crop_name,
-            lb.name                 AS labor_name,
-            w.contractor            AS contractor,
-            w.effective_area        AS effective_area,
-            lb.price                AS price,
-            lb.contractor_name      AS contractor_name,
-            inv.name                AS investor_name,
-			pdv.average_value       AS usd_avg_value,
-			i.number                AS invoice_number,
-			i.company               AS invoice_company,
-			i.date                  AS invoice_date,
-			i.status                AS invoice_status
+            v3.workorder_id,
+            v3.workorder_number,
+            v3.date,
+            v3.project_name,
+            v3.field_name,
+            COALESCE(v3.crop_name, '') AS crop_name,
+            v3.labor_name,
+            v3.contractor,
+            v3.surface_ha,
+            v3.cost_per_ha,
+            COALESCE(v3.labor_category_name, '') AS category_name,
+            COALESCE(v3.investor_name, '') AS investor_name,
+			pdv.average_value AS usd_avg_value,
+			i.id AS invoice_id,
+			i.number AS invoice_number,
+			i.company AS invoice_company,
+			i.date AS invoice_date,
+			i.status AS invoice_status
         `).
-		Joins("INNER JOIN projects p   ON w.project_id    = p.id").
-		Joins("INNER JOIN fields f     ON w.field_id      = f.id").
-		Joins("INNER JOIN crops c      ON w.crop_id       = c.id").
-		Joins("INNER JOIN labors lb    ON w.labor_id      = lb.id").
-		Joins("INNER JOIN investors inv ON w.investor_id  = inv.id").
-		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
-		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
-		Where("w.id = ?", workorderID).
-		Scan(&rawModels).Error
+		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
+		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
+		Where("v3.workorder_id = ?", workorderID).
+		Scan(&v3Models).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
 	}
 
-	raws := make([]domain.LaborRawItem, len(rawModels))
-	for i, m := range rawModels {
+	// Convertir a LaborRawItem para mantener compatibilidad
+	raws := make([]domain.LaborRawItem, len(v3Models))
+	for i, m := range v3Models {
+		cropName := ""
+		if m.CropName != nil {
+			cropName = *m.CropName
+		}
+		categoryName := ""
+		if m.LaborCategoryName != nil {
+			categoryName = *m.LaborCategoryName
+		}
+		investorName := ""
+		if m.InvestorName != nil {
+			investorName = *m.InvestorName
+		}
+
+		invoiceNumber := ""
+		if m.InvoiceNumber != nil {
+			invoiceNumber = *m.InvoiceNumber
+		}
+		invoiceCompany := ""
+		if m.InvoiceCompany != nil {
+			invoiceCompany = *m.InvoiceCompany
+		}
+		invoiceStatus := ""
+		if m.InvoiceStatus != nil {
+			invoiceStatus = *m.InvoiceStatus
+		}
+
 		raws[i] = domain.LaborRawItem{
+			WorkorderID:     m.WorkorderID,
 			WorkorderNumber: m.WorkorderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
-			CropName:        m.CropName,
+			CropName:        cropName,
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          m.CostHa,
-			CategoryName:    m.CategoryName,
-			InvestorName:    m.InvestorName,
+			CostHa:          m.CostPerHa,
+			CategoryName:    categoryName,
+			InvestorName:    investorName,
 			USDAvgValue:     m.USDAvgValue,
-			InvoiceNumber:   m.InvoiceNumber,
-			InvoiceCompany:  m.InvoiceCompany,
+			InvoiceID:       0,
+			InvoiceNumber:   invoiceNumber,
+			InvoiceCompany:  invoiceCompany,
 			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   m.InvoiceStatus,
+			InvoiceStatus:   invoiceStatus,
 		}
 	}
 	return raws, nil
@@ -210,47 +238,40 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 
 func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
 
-	// Usar consulta directa con joins para obtener todos los campos necesarios
+	// Usar la vista v3_labor_list como base y agregar campos adicionales
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("workorders AS w").
+		Table("v3_labor_list AS v3").
 		Select(`
-			w.id                    AS workorder_id,
-			w.number                AS workorder_number,
-			w.date                  AS date,
-			p.id                    AS project_id,
-			f.id                    AS field_id,
-			p.name                  AS project_name,
-			f.name                  AS field_name,
-			c.name                  AS crop_name,
-			lb.name                 AS labor_name,
-			lc.name                 AS category_name,
-			w.contractor            AS contractor,
-			w.effective_area        AS surface_ha,
-			lb.price                AS cost_ha,
-			lb.contractor_name      AS contractor_name,
-			inv.name                AS investor_name,
-			pdv.average_value       AS usd_avg_value,
-			i.id                    AS invoice_id,
-			i.number                AS invoice_number,
-			i.company               AS invoice_company,
-			i.date                  AS invoice_date,
-			i.status                AS invoice_status
+			v3.workorder_id,
+			v3.workorder_number,
+			v3.date,
+			v3.project_id,
+			v3.field_id,
+			v3.project_name,
+			v3.field_name,
+			COALESCE(v3.crop_name, '') AS crop_name,
+			v3.labor_name,
+			COALESCE(v3.labor_category_name, '') AS category_name,
+			v3.contractor,
+			v3.surface_ha,
+			v3.cost_per_ha,
+			v3.contractor_name,
+			COALESCE(v3.investor_name, '') AS investor_name,
+			pdv.average_value AS usd_avg_value,
+			i.id AS invoice_id,
+			i.number AS invoice_number,
+			i.company AS invoice_company,
+			i.date AS invoice_date,
+			i.status AS invoice_status
 		`).
-		Joins("INNER JOIN projects p ON w.project_id = p.id").
-		Joins("INNER JOIN fields f ON w.field_id = f.id").
-		Joins("INNER JOIN crops c ON w.crop_id = c.id").
-		Joins("INNER JOIN labors lb ON w.labor_id = lb.id").
-		Joins("INNER JOIN categories lc ON lb.category_id = lc.id").
-		Joins("INNER JOIN investors inv ON w.investor_id = inv.id").
-		Joins("LEFT JOIN invoices i ON i.work_order_id = w.id").
-		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = w.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
-		Where("w.deleted_at IS NULL AND p.deleted_at IS NULL")
+		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
+		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
 
 	if fieldID != 0 {
-		base = base.Where("f.id = ?", fieldID)
+		base = base.Where("v3.field_id = ?", fieldID)
 	} else if projectID != 0 {
-		base = base.Where("p.id = ?", projectID)
+		base = base.Where("v3.project_id = ?", projectID)
 	} else {
 		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
 			"fieldID or projectID is required", nil)
@@ -265,8 +286,8 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
-	var rows []models.LaborRawItem
-	if err := base.Order("w.number DESC").
+	var rows []models.LaborListItem
+	if err := base.Order("v3.workorder_number DESC").
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Scan(&rows).Error; err != nil {
@@ -277,15 +298,41 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 	list := make([]domain.LaborRawItem, len(rows))
 	for i, m := range rows {
 		// Calcular valores de USD dinámicamente
-		netTotal := m.SurfaceHa.Mul(m.CostHa)
+		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
 		// Usar porcentaje de IVA por defecto (10.5%)
 		// TODO: Implementar obtención dinámica desde app_parameters
 		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
 		totalIVA := netTotal.Mul(ivaPercentage)
 
-		usdCostHa := m.CostHa.Div(m.USDAvgValue)
+		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
 		usdNetTotal := netTotal.Div(m.USDAvgValue)
+
+		// Manejar campos opcionales
+		cropName := ""
+		if m.CropName != nil {
+			cropName = *m.CropName
+		}
+		categoryName := ""
+		if m.LaborCategoryName != nil {
+			categoryName = *m.LaborCategoryName
+		}
+		investorName := ""
+		if m.InvestorName != nil {
+			investorName = *m.InvestorName
+		}
+		invoiceNumber := ""
+		if m.InvoiceNumber != nil {
+			invoiceNumber = *m.InvoiceNumber
+		}
+		invoiceCompany := ""
+		if m.InvoiceCompany != nil {
+			invoiceCompany = *m.InvoiceCompany
+		}
+		invoiceStatus := ""
+		if m.InvoiceStatus != nil {
+			invoiceStatus = *m.InvoiceStatus
+		}
 
 		list[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
@@ -293,23 +340,23 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
-			CropName:        m.CropName,
+			CropName:        cropName,
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          m.CostHa,
-			CategoryName:    m.CategoryName,
-			InvestorName:    m.InvestorName,
+			CostHa:          m.CostPerHa,
+			CategoryName:    categoryName,
+			InvestorName:    investorName,
 			USDAvgValue:     m.USDAvgValue,
 			NetTotal:        netTotal,
 			TotalIVA:        totalIVA,
 			USDCostHa:       usdCostHa,
 			USDNetTotal:     usdNetTotal,
-			InvoiceID:       m.InvoiceID,
-			InvoiceNumber:   m.InvoiceNumber,
-			InvoiceCompany:  m.InvoiceCompany,
+			InvoiceID:       0,
+			InvoiceNumber:   invoiceNumber,
+			InvoiceCompany:  invoiceCompany,
 			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   m.InvoiceStatus,
+			InvoiceStatus:   invoiceStatus,
 		}
 	}
 
