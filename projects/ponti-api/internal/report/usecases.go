@@ -38,10 +38,6 @@ func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 
 // GetFieldCropReport obtiene el reporte por campo/cultivo
 func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error) {
-	// Validar filtros requeridos
-	if err := uc.validateFieldCropFilters(filters); err != nil {
-		return nil, fmt.Errorf("filtros inválidos: %w", err)
-	}
 
 	// Obtener reporte del repositorio
 	report, err := uc.repository.BuildFieldCrop(filters)
@@ -53,12 +49,6 @@ func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domai
 }
 
 // ===== VALIDACIONES =====
-
-// validateFieldCropFilters valida los filtros para el reporte de campo/cultivo
-func (uc *ReportUseCase) validateFieldCropFilters(filters domain.ReportFilter) error {
-	// Todos los filtros son opcionales - no hay validaciones requeridas
-	return nil
-}
 
 // GetInvestorContributionReport obtiene el reporte de aportes de inversores
 func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {

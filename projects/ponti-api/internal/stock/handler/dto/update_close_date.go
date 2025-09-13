@@ -28,7 +28,7 @@ type UpdateCloseDateResponse struct {
 
 func (r *UpdateCloseDateRequest) Validate() error {
 	var timeZero time.Time
-	if r.CloseDate == timeZero {
+	if r.CloseDate.Equal(timeZero) {
 		return types.NewError(types.ErrValidation, "close_date is required", nil)
 	}
 	return nil
