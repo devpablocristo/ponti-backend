@@ -3,8 +3,9 @@ package dto
 import (
 	"encoding/json"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
 type LotMetrics struct {

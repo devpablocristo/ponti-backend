@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
-	"github.com/gin-gonic/gin"
 )
 
 // UseCasesPort define la interfaz para los casos de uso

@@ -3,8 +3,9 @@ package dto
 import (
 	"encoding/json"
 
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 )
 
 type LaborMetrics struct {

@@ -1,6 +1,10 @@
 package dto
 
 import (
+	"encoding/json"
+
+	"github.com/shopspring/decimal"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
 
@@ -45,9 +49,23 @@ func NewListProjectsResponse(
 }
 
 type ProjectsResponse struct {
-	Data          []Project `json:"data"`
-	TotalHectares float64   `json:"total_hectares"`
-	PageInfo      PageInfo  `json:"page_info"`
+	Data          []Project       `json:"data"`
+	TotalHectares decimal.Decimal `json:"total_hectares"`
+	PageInfo      PageInfo        `json:"page_info"`
+}
+
+// MarshalJSON aplica redondeo de 3 decimales al campo TotalHectares
+func (p ProjectsResponse) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		Data          []Project `json:"data"`
+		TotalHectares string    `json:"total_hectares"`
+		PageInfo      PageInfo  `json:"page_info"`
+	}{
+		Data:          p.Data,
+		TotalHectares: p.TotalHectares.Round(3).String(),
+		PageInfo:      p.PageInfo,
+	}
+	return json.Marshal(aux)
 }
 
 func NewProjectsResponse(

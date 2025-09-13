@@ -1,9 +1,10 @@
 package dto
 
 import (
+	"github.com/shopspring/decimal"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
-	"github.com/shopspring/decimal"
 )
 
 type CreateLaborRequest struct {

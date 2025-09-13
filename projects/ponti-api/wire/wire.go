@@ -8,6 +8,7 @@ import (
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	gin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	app_parameters "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/app_parameters"
 	campaign "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign"

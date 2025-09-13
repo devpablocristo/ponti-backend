@@ -6,8 +6,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
@@ -16,7 +18,7 @@ import (
 
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
-	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, float64, int64, error)
+	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)

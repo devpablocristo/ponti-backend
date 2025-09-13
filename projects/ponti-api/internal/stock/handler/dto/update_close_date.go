@@ -1,10 +1,12 @@
 package dto
 
 import (
+	"time"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
-	"time"
 )
 
 type UpdateCloseDateRequest struct {

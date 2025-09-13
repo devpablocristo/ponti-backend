@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
 // GormEnginePort define la interfaz para el motor GORM

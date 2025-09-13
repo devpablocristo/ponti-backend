@@ -1,9 +1,10 @@
 package dto
 
 import (
+	"github.com/shopspring/decimal"
+
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
-	"github.com/shopspring/decimal"
 )
 
 type UpdateRealStockRequest struct {

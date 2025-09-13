@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
 type LotDate struct {
