@@ -295,7 +295,7 @@ CREATE TABLE public.workorder_items (
 
 
 --
--- Name: workorders; Type: TABLE; Schema: public; Owner: -
+-- Name:  workorders; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.workorders (

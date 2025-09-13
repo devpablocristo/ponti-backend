@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000080: CREATE v3_lot_views (UP)
+-- MIGRATION 000079: CREATE v3_lot_views (UP)
 -- ========================================
 -- 
 -- Purpose: Create lot metrics and list views

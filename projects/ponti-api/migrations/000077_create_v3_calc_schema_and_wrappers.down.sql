@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000076: DROP calc SCHEMA AND WRAPPERS (DOWN)
+-- MIGRATION 000077: DROP calc SCHEMA AND WRAPPERS (DOWN)
 -- ========================================
 -- 
 -- Purpose: Revert creation of calc schema and public wrappers
@@ -10,7 +10,7 @@
 
 BEGIN;
 
--- No hay wrappers public.calculate_* que eliminar en v3 puro
+-- No hay wrappers públicos que eliminar
 
 -- Eliminar funciones en schema calc
 DROP FUNCTION IF EXISTS v3_calc.norm_dose(numeric, numeric);
@@ -38,6 +38,7 @@ DROP FUNCTION IF EXISTS v3_calc.safe_div_dp(double precision, double precision);
 DROP FUNCTION IF EXISTS v3_calc.safe_div(numeric, numeric);
 DROP FUNCTION IF EXISTS v3_calc.coalesce0(double precision);
 DROP FUNCTION IF EXISTS v3_calc.coalesce0(numeric);
+DROP FUNCTION IF EXISTS v3_calc.calculate_campaign_closing_date(date);
 
 -- Eliminar schema v3_calc
 DROP SCHEMA IF EXISTS v3_calc;

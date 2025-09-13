@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000080: DROP v3_lot_views (DOWN)
+-- MIGRATION 000078: DROP v3_workorder_views (DOWN)
 -- ========================================
 -- 
 -- Purpose: Drop the views created in the UP migration
@@ -9,11 +9,11 @@
 -- Note: Code in English, comments in Spanish.
 
 -- -------------------------------------------------------------------
--- v3_lot_metrics: rollback elimina la vista
+-- v3_workorder_metrics: rollback elimina la vista
 -- -------------------------------------------------------------------
-DROP VIEW IF EXISTS public.v3_lot_metrics;
+DROP VIEW IF EXISTS public.v3_workorder_metrics;
 
 -- -------------------------------------------------------------------
--- v3_lot_list: rollback elimina la vista
+-- v3_workorder_list: rollback elimina la vista
 -- -------------------------------------------------------------------
-DROP VIEW IF EXISTS public.v3_lot_list;
+DROP VIEW IF EXISTS public.v3_workorder_list;

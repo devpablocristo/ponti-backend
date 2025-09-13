@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000083: CREATE v3_report_views (UP)
+-- MIGRATION 000082: CREATE v3_report_views (UP)
 -- ========================================
 -- 
 -- Purpose: Create report field crop metrics view
@@ -64,4 +64,5 @@ LEFT JOIN public.crop_commercializations cc
   ON cc.project_id = lb.project_id
  AND cc.crop_id   = lb.current_crop_id
  AND cc.deleted_at IS NULL
-WHERE lb.current_crop_id IS NOT NULL;
+WHERE lb.current_crop_id IS NOT NULL
+GROUP BY lb.project_id, lb.field_id, lb.field_name, lb.current_crop_id, lb.crop_name;

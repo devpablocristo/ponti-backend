@@ -73,7 +73,7 @@ SELECT
   -- Fechas operativas
   w_min.start_date,
   w_max.end_date,
-  public.calculate_campaign_closing_date(w_max.end_date)                AS campaign_closing_date
+  v3_calc.calculate_campaign_closing_date(w_max.end_date)                AS campaign_closing_date
 
 FROM public.projects p
 LEFT JOIN lots_base lb ON lb.project_id = p.id

@@ -72,64 +72,27 @@ DROP FUNCTION IF EXISTS calc.norm_dose(numeric, numeric);
 -- Eliminar tipos ENUM legacy (serán recreados en v3)
 DROP TYPE IF EXISTS movement_type CASCADE;
 
--- Eliminar todas las tablas existentes (serán recreadas en v3)
+-- NO eliminar tablas base - las migraciones v3 las necesitan
+-- Solo eliminar tablas específicas que no se usan en v3
 DROP TABLE IF EXISTS supply_movements CASCADE;
 DROP TABLE IF EXISTS stocks CASCADE;
 DROP TABLE IF EXISTS invoices CASCADE;
 DROP TABLE IF EXISTS project_managers CASCADE;
 DROP TABLE IF EXISTS managers CASCADE;
-DROP TABLE IF EXISTS crop_commercializations CASCADE;
-DROP TABLE IF EXISTS workorder_items CASCADE;
-DROP TABLE IF EXISTS workorders CASCADE;
-DROP TABLE IF EXISTS project_investors CASCADE;
-DROP TABLE IF EXISTS investors CASCADE;
-DROP TABLE IF EXISTS supplies CASCADE;
-DROP TABLE IF EXISTS labors CASCADE;
-DROP TABLE IF EXISTS labor_categories CASCADE;
-DROP TABLE IF EXISTS labor_types CASCADE;
-DROP TABLE IF EXISTS categories CASCADE;
-DROP TABLE IF EXISTS types CASCADE;
-DROP TABLE IF EXISTS lots CASCADE;
-DROP TABLE IF EXISTS crops CASCADE;
-DROP TABLE IF EXISTS fields CASCADE;
-DROP TABLE IF EXISTS lease_types CASCADE;
-DROP TABLE IF EXISTS projects CASCADE;
-DROP TABLE IF EXISTS campaigns CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS project_dollar_values CASCADE;
-DROP TABLE IF EXISTS providers CASCADE;
-DROP TABLE IF EXISTS app_parameters CASCADE;
-DROP TABLE IF EXISTS fx_rates CASCADE;
-DROP TABLE IF EXISTS schema_migrations CASCADE;
+-- Mantener tablas base necesarias para v3:
+-- crop_commercializations, workorder_items, workorders, project_investors, 
+-- investors, supplies, labors, labor_categories, labor_types, categories, 
+-- types, lots, crops, fields, lease_types, projects, campaigns, customers, 
+-- users, project_dollar_values, providers, app_parameters, fx_rates
+-- NO eliminar schema_migrations - la herramienta de migración la necesita
+-- DROP TABLE IF EXISTS schema_migrations CASCADE;
 
--- Eliminar secuencias
-DROP SEQUENCE IF EXISTS users_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS customers_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS campaigns_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS projects_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS lease_types_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS fields_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS crops_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS lots_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS types_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS categories_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS labor_types_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS labor_categories_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS labors_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS supplies_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS investors_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS workorders_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS workorder_items_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS crop_commercializations_id_seq CASCADE;
+-- NO eliminar secuencias de tablas base - las migraciones v3 las necesitan
+-- Solo eliminar secuencias de tablas que se eliminaron arriba
 DROP SEQUENCE IF EXISTS managers_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS invoices_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS stocks_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS supply_movements_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS providers_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS project_dollar_values_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS app_parameters_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS fx_rates_id_seq CASCADE;
 
 -- Eliminar funciones
 DROP FUNCTION IF EXISTS public.update_timestamp() CASCADE;

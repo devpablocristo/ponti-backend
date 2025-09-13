@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000078: CREATE v3_calc SCHEMA - SSOT/DRY CALCULATIONS (UP)
+-- MIGRATION 000077: CREATE v3_calc SCHEMA - SSOT/DRY CALCULATIONS (UP)
 -- ========================================
 -- 
 -- Purpose: Single Source of Truth for all calculations (DRY principle)
@@ -227,7 +227,21 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE WHEN area > 0 THEN dose / area ELSE NULL END
 $$;
 
--- Nota: public.calculate_campaign_closing_date() queda igual, ya usa get_campaign_closure_days().
+-- =============================================================================
+-- LAYER 7: CAMPAIGN DATE CALCULATIONS (Business date logic)
+-- =============================================================================
+-- Purpose: Campaign-related date calculations for business operations
+
+-- Función para calcular fecha de cierre de campaña
+CREATE OR REPLACE FUNCTION v3_calc.calculate_campaign_closing_date(end_date date) RETURNS date
+LANGUAGE sql STABLE AS $$
+  SELECT CASE 
+    WHEN end_date IS NULL THEN NULL
+    ELSE end_date + INTERVAL '30 days'  -- 30 días después del fin de workorders
+  END::date
+$$;
+
+-- No se necesita wrapper público - las vistas v3 usan directamente v3_calc.*
 
 -- =============================================================================
 -- LAYER 4: LOT-LEVEL BUSINESS QUERIES (Data Access Layer)

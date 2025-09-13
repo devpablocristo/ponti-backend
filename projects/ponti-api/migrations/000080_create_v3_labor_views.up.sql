@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000081: CREATE v3_labor_views (UP)
+-- MIGRATION 000080: CREATE v3_labor_views (UP)
 -- ========================================
 -- 
 -- Purpose: Create labor metrics and list views
@@ -34,7 +34,7 @@ agg AS (
     field_id,
     COUNT(DISTINCT workorder_id) AS total_workorders,
     SUM(effective_area) AS surface_ha,
-    SUM(labor_price_per_ha * effective_area) AS total_labor_cost,
+    SUM(v3_calc.labor_cost(labor_price_per_ha, effective_area)) AS total_labor_cost,
     MIN(date) AS first_workorder_date,
     MAX(date) AS last_workorder_date
   FROM wo

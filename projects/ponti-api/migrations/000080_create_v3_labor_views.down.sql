@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000081: DROP v3_labor_views (DOWN)
+-- MIGRATION 000080: DROP v3_labor_views (DOWN)
 -- ========================================
 -- 
 -- Purpose: Drop the views created in the UP migration
