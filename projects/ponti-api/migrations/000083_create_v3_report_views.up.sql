@@ -1,8 +1,8 @@
 -- ========================================
--- MIGRATION 000084: CREATE v3_report_field_crop_metrics_view VIEW (UP)
+-- MIGRATION 000083: CREATE v3_report_views (UP)
 -- ========================================
 -- 
--- Purpose: Field/crop metrics view supported by v3 base views
+-- Purpose: Create report field crop metrics view
 -- Date: 2025-09-12
 -- Author: System
 -- 
@@ -65,5 +65,3 @@ LEFT JOIN public.crop_commercializations cc
  AND cc.crop_id   = lb.current_crop_id
  AND cc.deleted_at IS NULL
 WHERE lb.current_crop_id IS NOT NULL;
-
-
