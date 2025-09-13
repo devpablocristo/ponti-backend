@@ -44,16 +44,17 @@ func (m *Stock) ToDomain() *domain.Stock {
 	}
 
 	return &domain.Stock{
-		ID:              m.ID,
-		Project:         m.Project.ToDomain(),
-		Supply:          m.Supply.ToDomain(),
-		CloseDate:       m.CloseDate,
-		RealStockUnits:  m.RealStockUnits,
-		YearPeriod:      m.YearPeriod,
-		MonthPeriod:     m.MonthPeriod,
-		Investor:        m.Investor.ToDomain(),
-		SupplyMovements: supplyMovementsDomains,
-		Consumed:        m.Consumed,
+		ID:               m.ID,
+		Project:          m.Project.ToDomain(),
+		Supply:           m.Supply.ToDomain(),
+		CloseDate:        m.CloseDate,
+		RealStockUnits:   m.RealStockUnits,
+		YearPeriod:       m.YearPeriod,
+		MonthPeriod:      m.MonthPeriod,
+		Investor:         m.Investor.ToDomain(),
+		SupplyMovements:  supplyMovementsDomains,
+		Consumed:         m.Consumed,
+		UnitsTransferred: m.UnitsConsumed,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
