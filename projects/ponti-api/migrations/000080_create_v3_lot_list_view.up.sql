@@ -1,12 +1,12 @@
 -- ========================================
--- MIGRACIÓN 000079: CREAR VISTA v3_lot_list (UP)
+-- MIGRATION 000080: CREATE v3_lot_list VIEW (UP)
 -- ========================================
 -- 
--- Objetivo: Lista amigable de lotes basada en métricas v3_lot_metrics
--- Fecha: 2025-09-12
--- Autor: Sistema
+-- Purpose: User-friendly lot list based on v3_lot_metrics
+-- Date: 2025-09-12
+-- Author: System
 -- 
--- Nota: Código en inglés, comentarios en español.
+-- Note: Code in English, comments in Spanish.
 
 -- -------------------------------------------------------------------
 -- v3_lot_list: listado por lote con datos base y métricas
@@ -60,22 +60,22 @@ SELECT
   b.current_crop_id,
   b.current_crop,
   b.hectares,
-  calc.seeded_area_for_lot(b.lot_id)::numeric           AS sowed_area_ha,
-  calc.harvested_area_for_lot(b.lot_id)::numeric        AS harvested_area_ha,
-  calc.yield_tn_per_ha_for_lot(b.lot_id)               AS yield_tn_per_ha,
-  public.calculate_cost_per_ha(COALESCE(calc.direct_cost_for_lot(b.lot_id),0)::numeric, b.hectares::numeric) AS cost_usd_per_ha,
-  calc.income_net_per_ha_for_lot(b.lot_id)::numeric     AS income_net_per_ha_usd,
-  calc.rent_per_ha_for_lot(b.lot_id)::numeric           AS rent_per_ha_usd,
-  calc.admin_cost_per_ha_for_lot(b.lot_id)::numeric     AS admin_cost_per_ha_usd,
-  calc.active_total_per_ha_for_lot(b.lot_id)::numeric   AS active_total_per_ha_usd,
-  calc.operating_result_per_ha_for_lot(b.lot_id)::numeric AS operating_result_per_ha_usd,
+  v3_calc.seeded_area_for_lot(b.lot_id)::numeric           AS sowed_area_ha,
+  v3_calc.harvested_area_for_lot(b.lot_id)::numeric        AS harvested_area_ha,
+  v3_calc.yield_tn_per_ha_for_lot(b.lot_id)               AS yield_tn_per_ha,
+  public.calculate_cost_per_ha(COALESCE(v3_calc.direct_cost_for_lot(b.lot_id),0)::numeric, b.hectares::numeric) AS cost_usd_per_ha,
+  v3_calc.income_net_per_ha_for_lot(b.lot_id)::numeric     AS income_net_per_ha_usd,
+  v3_calc.rent_per_ha_for_lot(b.lot_id)::numeric           AS rent_per_ha_usd,
+  v3_calc.admin_cost_per_ha_for_lot(b.lot_id)::numeric     AS admin_cost_per_ha_usd,
+  v3_calc.active_total_per_ha_for_lot(b.lot_id)::numeric   AS active_total_per_ha_usd,
+  v3_calc.operating_result_per_ha_for_lot(b.lot_id)::numeric AS operating_result_per_ha_usd,
   -- Totales
-  calc.income_net_total_for_lot(b.lot_id)::numeric      AS income_net_total_usd,
-  COALESCE(calc.direct_cost_for_lot(b.lot_id),0)::numeric AS direct_cost_total_usd,
-  (calc.rent_per_ha_for_lot(b.lot_id) * b.hectares)::numeric  AS rent_total_usd,
-  (calc.admin_cost_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS admin_total_usd,
-  (calc.active_total_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS active_total_usd,
-  (calc.operating_result_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS operating_result_total_usd,
+  v3_calc.income_net_total_for_lot(b.lot_id)::numeric      AS income_net_total_usd,
+  COALESCE(v3_calc.direct_cost_for_lot(b.lot_id),0)::numeric AS direct_cost_total_usd,
+  (v3_calc.rent_per_ha_for_lot(b.lot_id) * b.hectares)::numeric  AS rent_total_usd,
+  (v3_calc.admin_cost_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS admin_total_usd,
+  (v3_calc.active_total_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS active_total_usd,
+  (v3_calc.operating_result_per_ha_for_lot(b.lot_id) * b.hectares)::numeric AS operating_result_total_usd,
   wd.lot_sowing_date,
   wd.lot_harvest_date,
   b.tons,

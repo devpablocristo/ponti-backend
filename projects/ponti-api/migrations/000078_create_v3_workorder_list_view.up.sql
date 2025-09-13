@@ -23,10 +23,13 @@ SELECT
   wi.final_dose                              AS dose_per_ha,
   s.price                                    AS unit_price,
   -- costo por ha del insumo
-  public.calculate_cost_per_ha(
-    (wi.final_dose::double precision * s.price)::numeric,
-    1 -- costo ya es por ha, se documenta con 1 ha
-  )::numeric                                                        AS supply_cost_per_ha,
+  CASE WHEN wi.final_dose IS NOT NULL AND s.price IS NOT NULL
+       THEN public.calculate_cost_per_ha(
+              (wi.final_dose::double precision * s.price)::numeric,
+              1 -- costo ya es por ha, se documenta con 1 ha
+            )::numeric
+       ELSE 0
+  END                                                               AS supply_cost_per_ha,
   -- costo total del insumo para la WO (usa la función existente)
   public.calculate_supply_cost(wi.final_dose::double precision,
                                s.price::numeric,

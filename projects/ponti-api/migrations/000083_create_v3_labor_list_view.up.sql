@@ -1,12 +1,12 @@
 -- ========================================
--- MIGRACIÓN 000082: CREAR VISTA v3_labor_list (UP)
+-- MIGRATION 000083: CREATE v3_labor_list VIEW (UP)
 -- ========================================
 -- 
--- Objetivo: Listado de labores con info de WO, proyecto, field, lote, cultivo
--- Fecha: 2025-09-12
--- Autor: Sistema
+-- Purpose: Labor listing with WO, project, field, lot, crop info
+-- Date: 2025-09-12
+-- Author: System
 -- 
--- Nota: Código en inglés, comentarios en español.
+-- Note: Code in English, comments in Spanish.
 
 -- -------------------------------------------------------------------
 -- v3_labor_list: listado de órdenes de trabajo con datos relevantes

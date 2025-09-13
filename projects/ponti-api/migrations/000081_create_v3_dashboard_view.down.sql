@@ -1,12 +1,12 @@
 -- ========================================
--- MIGRACIÓN 000080: ELIMINAR VISTA v3_dashboard (DOWN)
+-- MIGRATION 000081: DROP v3_dashboard VIEW (DOWN)
 -- ========================================
 -- 
--- Objetivo: Eliminar la vista creada en la migración UP
--- Fecha: 2025-09-12
--- Autor: Sistema
+-- Purpose: Drop the view created in the UP migration
+-- Date: 2025-09-12
+-- Author: System
 -- 
--- Nota: Código en inglés, comentarios en español.
+-- Note: Code in English, comments in Spanish.
 
 -- -------------------------------------------------------------------
 -- v3_dashboard: rollback elimina la vista

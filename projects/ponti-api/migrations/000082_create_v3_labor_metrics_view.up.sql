@@ -1,12 +1,12 @@
 -- ========================================
--- MIGRACIÓN 000081: CREAR VISTA v3_labor_metrics (UP)
+-- MIGRATION 000082: CREATE v3_labor_metrics VIEW (UP)
 -- ========================================
 -- 
--- Objetivo: Métricas de labores por proyecto/field
--- Fecha: 2025-09-12
--- Autor: Sistema
+-- Purpose: Labor metrics by project/field
+-- Date: 2025-09-12
+-- Author: System
 -- 
--- Nota: Código en inglés, comentarios en español.
+-- Note: Code in English, comments in Spanish.
 
 -- -------------------------------------------------------------------
 -- v3_labor_metrics: métricas agregadas de labores
