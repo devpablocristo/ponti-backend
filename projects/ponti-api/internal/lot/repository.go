@@ -411,11 +411,11 @@ func (r *Repository) ListLots(
 	             id, lot_name, variety, sowed_area_ha, hectares, season, updated_at, tons,
 	             previous_crop_id, previous_crop,
 	             current_crop_id, current_crop,
-	             admin_cost_per_ha,
-	             harvested_area, harvest_date,
+	             admin_cost_per_ha_usd AS admin_cost_per_ha,
+	             harvested_area_ha AS harvested_area, lot_harvest_date AS harvest_date,
 	             cost_usd_per_ha, yield_tn_per_ha,
-	             income_net_per_ha, rent_per_ha,
-	             active_total_per_ha, operating_result_per_ha
+	             income_net_per_ha_usd AS income_net_per_ha, rent_per_ha_usd AS rent_per_ha,
+	             active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha
 	         `).
 		Order("id DESC").Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {
