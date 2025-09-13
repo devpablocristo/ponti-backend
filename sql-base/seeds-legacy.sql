@@ -644,7 +644,7 @@ ORDER BY f.project_id, l.id;
 -- VER TODAS LAS COLUMNAS DISPONIBLES
 -- ========================================
 SELECT '=== VER TODAS LAS COLUMNAS DISPONIBLES ===' as info;
-SELECT * FROM v3_dashboard WHERE project_id = 1 LIMIT 1;
+SELECT * FROM dashboard_sowing_progress_view_v2 WHERE project_id = 1 LIMIT 1;
 
 -- ========================================
 -- MÓDULO 1: AVANCE DE SIEMBRA
@@ -659,7 +659,7 @@ SELECT
   sowing_hectares, 
   sowing_total_hectares, 
   sowing_progress_pct
-FROM v3_dashboard
+FROM dashboard_sowing_progress_view_v2
 WHERE project_id IN (1)
 ORDER BY project_id;
 
@@ -677,7 +677,7 @@ SELECT
   executed_costs_usd,
   budget_cost_usd,
   costs_progress_pct
-FROM v3_dashboard
+FROM dashboard_costs_progress_view_v2
 WHERE project_id IN (1)
 ORDER BY project_id;
 
@@ -694,7 +694,7 @@ SELECT
   harvest_hectares, 
   harvest_total_hectares, 
   harvest_progress_pct
-FROM v3_dashboard
+FROM dashboard_harvest_progress_view_v2
 WHERE project_id IN (1,2,3)
 ORDER BY project_id;
 
@@ -706,14 +706,14 @@ ORDER BY project_id;
 -- Proyecto 2: $5,000 ingresos - $138,750 costos directos - $500 admin = -$134,250 (-96.4%)
 -- Proyecto 3: $15,000 ingresos - $70,000 costos directos - $750 admin = -$55,750 (-78.7%) - CORREGIDO
 -- Proyecto 4: $38,400 ingresos - $111,000 costos directos - $800 admin = -$73,400 (-65.7%)
--- NOTA: Los ingresos se calculan en la vista v3_dashboard según tipo de arriendo
+-- NOTA: Los ingresos se calculan en la vista dashboard_operating_result_view_v2 según tipo de arriendo
 SELECT '=== MÓDULO 4: RESULTADO OPERATIVO ===' as info;
 SELECT 
   project_id, 
   operating_result_usd,
   operating_result_total_costs_usd,
   operating_result_pct
-FROM v3_dashboard
+FROM dashboard_operating_result_view_v2
 ORDER BY project_id;
 
 -- ========================================
@@ -731,7 +731,7 @@ SELECT
   investor_name,
   investor_percentage_pct,
   contributions_progress_pct
-FROM v3_dashboard_contributions_progress
+FROM dashboard_contributions_progress_view_v2
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
@@ -753,7 +753,7 @@ SELECT
   estructura_invertidos_usd,      -- Estructura Invertidos
   operating_result_usd,           -- Resultado Operativo
   operating_result_pct            -- Resultado Operativo Porcentaje
-FROM v3_dashboard_management_balance 
+FROM dashboard_management_balance_view_v2 
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
@@ -772,7 +772,7 @@ SELECT
   crop_name,
   crop_hectares,
   crop_incidence_pct
-FROM v3_dashboard_crop_incidence 
+FROM dashboard_crop_incidence_view_v2 
 ORDER BY project_id;
 
 -- ========================================
@@ -789,7 +789,7 @@ SELECT
   start_date,                  -- Fecha de inicio
   end_date,                    -- Fecha de fin
   campaign_closing_date        -- Fecha de cierre de campaña
-FROM v3_dashboard 
+FROM dashboard_operational_indicators_view_v2 
 WHERE project_id IN (1,2,3,4)
 ORDER BY project_id;
 
@@ -853,8 +853,8 @@ SELECT
   surface_ha,
   liters,
   kilograms,
-  direct_cost_usd
-FROM v3_workorder_metrics
+  direct_cost
+FROM workorder_metrics_view_v2
 WHERE project_id = 5;
 
 -- ========================================

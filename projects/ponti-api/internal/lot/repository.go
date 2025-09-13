@@ -324,7 +324,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
 	}
 
-	base := r.db.Client().WithContext(ctx).Table("fix_lots_metrics")
+	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics")
 
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
@@ -368,7 +368,7 @@ func (r *Repository) ListLots(
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 
-	base := r.db.Client().WithContext(ctx).Table("fix_lot_list")
+	base := r.db.Client().WithContext(ctx).Table("v3_lot_list")
 
 	// filtros
 	if fieldID > 0 {

@@ -321,31 +321,29 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	q := `
         SELECT 
           surface_ha,
-          net_total_cost,
-          avg_cost_per_ha
-        FROM labor_cards_cube_view_v2
+          total_labor_cost,
+          avg_labor_cost_per_ha
+        FROM v3_labor_metrics
         WHERE 1=1
     `
 	var args []any
 
 	// Filtros: se decide el nivel de agrupación
 	if f.ProjectID != nil && f.FieldID != nil {
-		q += " AND project_id = ? AND field_id = ? AND level = 'project+field'"
+		q += " AND project_id = ? AND field_id = ?"
 		args = append(args, *f.ProjectID, *f.FieldID)
 	} else if f.ProjectID != nil {
-		q += " AND project_id = ? AND level = 'project'"
+		q += " AND project_id = ?"
 		args = append(args, *f.ProjectID)
 	} else if f.FieldID != nil {
-		q += " AND field_id = ? AND level = 'field'"
+		q += " AND field_id = ?"
 		args = append(args, *f.FieldID)
-	} else {
-		q += " AND level = 'global'"
 	}
 
 	var row struct {
 		SurfaceHa    decimal.Decimal `gorm:"column:surface_ha"`
-		NetTotalCost decimal.Decimal `gorm:"column:net_total_cost"`
-		AvgCostPerHa decimal.Decimal `gorm:"column:avg_cost_per_ha"`
+		NetTotalCost decimal.Decimal `gorm:"column:total_labor_cost"`
+		AvgCostPerHa decimal.Decimal `gorm:"column:avg_labor_cost_per_ha"`
 	}
 
 	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {

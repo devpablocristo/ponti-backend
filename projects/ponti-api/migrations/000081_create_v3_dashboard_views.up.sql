@@ -21,14 +21,39 @@ WITH lots_base AS (
   WHERE l.deleted_at IS NULL
 ),
 w_min AS (
-  SELECT project_id, MIN(date) AS start_date
-  FROM public.workorders
+  SELECT 
+    project_id, 
+    MIN(date) AS start_date,
+    -- FIX: Incluir número de la primera orden
+    (SELECT id FROM public.workorders w2 
+     WHERE w2.project_id = w.project_id 
+       AND w2.date = MIN(w.date) 
+       AND w2.deleted_at IS NULL 
+     LIMIT 1) AS first_workorder_id
+  FROM public.workorders w
   WHERE deleted_at IS NULL
   GROUP BY project_id
 ),
 w_max AS (
-  SELECT project_id, MAX(date) AS end_date
-  FROM public.workorders
+  SELECT 
+    project_id, 
+    MAX(date) AS end_date,
+    -- FIX: Incluir número de la última orden
+    (SELECT id FROM public.workorders w2 
+     WHERE w2.project_id = w.project_id 
+       AND w2.date = MAX(w.date) 
+       AND w2.deleted_at IS NULL 
+     LIMIT 1) AS last_workorder_id
+  FROM public.workorders w
+  WHERE deleted_at IS NULL
+  GROUP BY project_id
+),
+-- FIX: Agregar CTE para fecha de último arqueo de stock
+last_stock_count AS (
+  SELECT 
+    project_id,
+    MAX(close_date) AS last_stock_count_date
+  FROM public.stocks
   WHERE deleted_at IS NULL
   GROUP BY project_id
 )
@@ -55,34 +80,41 @@ SELECT
 
   -- Costos e ingresos agregados calculados vía funciones SSOT (v3_calc.*)
   COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0) AS executed_costs_usd,
-  COALESCE(p.admin_cost, 0)                              AS budget_cost_usd,
+  v3_calc.total_budget_cost_for_project(p.id)              AS budget_cost_usd,  -- FIX: Usar presupuesto real
   v3_calc.percentage(
     COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::numeric,
-    COALESCE(p.admin_cost, 0)::numeric
+    v3_calc.total_budget_cost_for_project(p.id)::numeric
   )                                                       AS costs_progress_pct,
 
   COALESCE(SUM(v3_calc.income_net_total_for_lot(lb.lot_id)), 0) AS income_usd,
-  COALESCE(SUM(v3_calc.operating_result_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)
-                                                                             AS operating_result_usd,
-  COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)        AS operating_result_total_costs_usd,
+  -- FIX: Usar función corregida para resultado operativo
+  v3_calc.operating_result_total_for_project(p.id)        AS operating_result_usd,
+  -- FIX: Usar total invertido en lugar de solo costos directos
+  v3_calc.total_invested_cost_for_project(p.id)           AS operating_result_total_costs_usd,
+  -- FIX: Usar solo costos directos para cálculo de porcentaje (según especificación)
   v3_calc.renta_pct(
-    COALESCE(SUM(v3_calc.operating_result_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::double precision,
-    COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::double precision
+    v3_calc.operating_result_total_for_project(p.id),
+    v3_calc.total_costs_for_project(p.id)
   )                                                       AS operating_result_pct,
 
-  -- Fechas operativas
+  -- FIX: Fechas operativas con números de órdenes
   w_min.start_date,
   w_max.end_date,
-  v3_calc.calculate_campaign_closing_date(w_max.end_date)                AS campaign_closing_date
+  v3_calc.calculate_campaign_closing_date(w_max.end_date) AS campaign_closing_date,
+  w_min.first_workorder_id,  -- FIX: Agregar número de primera orden
+  w_max.last_workorder_id,   -- FIX: Agregar número de última orden
+  lsc.last_stock_count_date  -- FIX: Agregar fecha de último arqueo
 
 FROM public.projects p
 LEFT JOIN lots_base lb ON lb.project_id = p.id
 LEFT JOIN w_min ON w_min.project_id = p.id
 LEFT JOIN w_max ON w_max.project_id = p.id
+LEFT JOIN last_stock_count lsc ON lsc.project_id = p.id  -- FIX: Agregar join para stock
 WHERE p.deleted_at IS NULL
 GROUP BY
   p.customer_id, p.id, p.campaign_id, p.admin_cost,
-  w_min.start_date, w_max.end_date;
+  w_min.start_date, w_max.end_date, w_min.first_workorder_id, w_max.last_workorder_id,
+  lsc.last_stock_count_date;
 
 
 
@@ -97,11 +129,8 @@ SELECT
   pi.investor_id             AS investor_id,
   i.name                     AS investor_name,
   pi.percentage              AS investor_percentage_pct,
-  -- Progreso de aportes como porcentaje de la suma declarada vs 100
-  v3_calc.percentage(
-    (SUM(pi.percentage) OVER (PARTITION BY p.id))::numeric,
-    100::numeric
-  )            AS contributions_progress_pct
+  -- FIX: Mostrar directamente el porcentaje del inversor individual
+  pi.percentage::numeric     AS contributions_progress_pct  -- FIX: Usar porcentaje individual
 FROM public.projects p
 JOIN public.project_investors pi ON pi.project_id = p.id AND pi.deleted_at IS NULL
 JOIN public.investors i          ON i.id = pi.investor_id AND i.deleted_at IS NULL
@@ -131,19 +160,16 @@ SELECT
   -- Costos directos ejecutados (labores + insumos)
   COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)                  AS costos_directos_ejecutados_usd,
 
-  -- Costos directos invertidos (labores+insumos+arriendo+estructura)
-  (
-    COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::double precision
-    + COALESCE(SUM(v3_calc.rent_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::double precision
-    + COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::double precision
-  )                                                                        AS costos_directos_invertidos_usd,
+  -- FIX: Costos directos invertidos (solo labores + insumos)
+  v3_calc.direct_costs_invested_for_project(p.id)                           AS costos_directos_invertidos_usd,
 
-  -- Componentes de invertidos
+  -- Componentes de invertidos (mantener separados)
   COALESCE(SUM(v3_calc.rent_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)     AS arriendo_invertidos_usd,
   COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0) AS estructura_invertidos_usd,
 
   -- Resultado operativo y ratio
   COALESCE(SUM(v3_calc.operating_result_per_ha_for_lot(lb.lot_id) * lb.hectares), 0) AS operating_result_usd,
+  -- FIX: Usar solo costos directos para cálculo de porcentaje (según especificación)
   v3_calc.renta_pct(
     COALESCE(SUM(v3_calc.operating_result_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::double precision,
     COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::double precision
@@ -171,22 +197,33 @@ WITH lot_base AS (
   LEFT JOIN public.crops c ON c.id = l.current_crop_id AND c.deleted_at IS NULL
   WHERE l.deleted_at IS NULL AND l.hectares IS NOT NULL AND l.hectares > 0
 ),
-total_by_project AS (
-  SELECT project_id, SUM(hectares)::numeric AS total_hectares
-  FROM lot_base
-  GROUP BY project_id
-),
 by_crop AS (
-  SELECT project_id, current_crop_id, crop_name, SUM(hectares)::numeric AS crop_hectares
+  SELECT 
+    project_id, 
+    current_crop_id, 
+    crop_name, 
+    SUM(hectares)::numeric AS crop_hectares,
+    -- FIX: Calcular costos por cultivo
+    v3_calc.total_costs_for_crop(project_id, current_crop_id) AS crop_costs_usd
   FROM lot_base
   WHERE current_crop_id IS NOT NULL
   GROUP BY project_id, current_crop_id, crop_name
+),
+total_by_project AS (
+  SELECT 
+    project_id, 
+    SUM(crop_costs_usd)::numeric AS total_costs_usd
+  FROM by_crop
+  GROUP BY project_id
 )
 SELECT
   bc.project_id,
   bc.current_crop_id,
   bc.crop_name,
   bc.crop_hectares,
-  v3_calc.percentage(bc.crop_hectares, t.total_hectares) AS crop_incidence_pct
+  -- FIX: Calcular incidencia por costos en lugar de hectáreas
+  v3_calc.percentage(bc.crop_costs_usd::numeric, t.total_costs_usd) AS crop_incidence_pct,
+  -- IMPLEMENTAR: Costo por hectárea del cultivo
+  v3_calc.cost_per_ha_for_crop(bc.project_id, bc.current_crop_id)::numeric AS cost_per_ha_usd
 FROM by_crop bc
 JOIN total_by_project t ON t.project_id = bc.project_id;

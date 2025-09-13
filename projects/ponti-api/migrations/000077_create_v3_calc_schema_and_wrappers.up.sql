@@ -430,6 +430,149 @@ LANGUAGE sql STABLE AS $$
          )
 $$;
 
+-- =============================================================================
+-- FUNCIONES ADICIONALES PARA DASHBOARD FIXES
+-- =============================================================================
+-- Agregar estas funciones antes del COMMIT para completar la funcionalidad del dashboard
+
+-- Función para calcular presupuesto total de costos por proyecto
+CREATE OR REPLACE FUNCTION v3_calc.total_budget_cost_for_project(p_project_id bigint) RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  -- Por ahora retornamos un valor placeholder hasta que se implemente
+  -- el sistema de presupuestos. En el futuro esto debería consultar
+  -- una tabla de presupuestos o calcular basado en labores/insumos planificados
+  SELECT COALESCE(p.admin_cost * 10, 0)::numeric  -- Placeholder: 10x admin_cost
+  FROM public.projects p
+  WHERE p.id = p_project_id AND p.deleted_at IS NULL
+$$;
+
+-- Función para calcular total invertido por proyecto (costos directos + arriendo + estructura)
+CREATE OR REPLACE FUNCTION v3_calc.total_invested_cost_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Costos directos ejecutados
+    (SELECT COALESCE(SUM(v3_calc.direct_cost_for_lot(l.id)), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+    +
+    -- Arriendo invertido
+    (SELECT COALESCE(SUM(v3_calc.rent_per_ha_for_lot(l.id) * l.hectares), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+    +
+    -- Estructura invertida
+    (SELECT COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular resultado operativo correcto (ingresos - costos directos - admin)
+CREATE OR REPLACE FUNCTION v3_calc.operating_result_total_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Ingresos netos totales
+    (SELECT COALESCE(SUM(v3_calc.income_net_total_for_lot(l.id)), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+    -
+    -- Costos directos ejecutados
+    (SELECT COALESCE(SUM(v3_calc.direct_cost_for_lot(l.id)), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+    -
+    -- Costo administrativo total
+    (SELECT COALESCE(p.admin_cost, 0)::double precision
+     FROM public.projects p
+     WHERE p.id = p_project_id AND p.deleted_at IS NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular costos directos invertidos (solo labores + insumos)
+CREATE OR REPLACE FUNCTION v3_calc.direct_costs_invested_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Labores invertidas (ejecutadas + no ejecutadas)
+    (SELECT COALESCE(SUM(lb.price * l.hectares), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     JOIN public.labors lb ON lb.project_id = f.project_id AND lb.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+    +
+    -- Insumos invertidos (usados + no usados) - usar datos de stocks
+    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::double precision
+     FROM public.supplies s
+     JOIN public.stocks st ON st.supply_id = s.id AND st.deleted_at IS NULL
+     WHERE s.project_id = p_project_id AND s.deleted_at IS NULL
+       AND st.initial_units IS NOT NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular costos totales por cultivo
+CREATE OR REPLACE FUNCTION v3_calc.total_costs_for_crop(p_project_id bigint, p_crop_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Costos directos ejecutados para el cultivo
+    (SELECT COALESCE(SUM(v3_calc.direct_cost_for_lot(l.id)), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id 
+       AND l.current_crop_id = p_crop_id 
+       AND l.deleted_at IS NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular costos totales del proyecto
+CREATE OR REPLACE FUNCTION v3_calc.total_costs_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Costos directos ejecutados para todo el proyecto
+    (SELECT COALESCE(SUM(v3_calc.direct_cost_for_lot(l.id)), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular stock disponible por proyecto
+CREATE OR REPLACE FUNCTION v3_calc.stock_value_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Stock disponible = insumos comprados - insumos consumidos
+    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::double precision
+     FROM public.supplies s
+     JOIN public.stocks st ON st.supply_id = s.id AND st.deleted_at IS NULL
+     WHERE s.project_id = p_project_id 
+       AND s.deleted_at IS NULL
+       AND st.initial_units IS NOT NULL)
+    -
+    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::double precision
+     FROM public.workorders w
+     JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+     JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+     WHERE w.project_id = p_project_id AND w.deleted_at IS NULL)
+  , 0)::double precision
+$$;
+
+-- Función para calcular costo por hectárea por cultivo
+CREATE OR REPLACE FUNCTION v3_calc.cost_per_ha_for_crop(p_project_id bigint, p_crop_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT v3_calc.per_ha_dp(
+    v3_calc.total_costs_for_crop(p_project_id, p_crop_id),
+    (SELECT COALESCE(SUM(l.hectares), 0)::double precision
+     FROM public.lots l
+     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+     WHERE f.project_id = p_project_id 
+       AND l.current_crop_id = p_crop_id 
+       AND l.deleted_at IS NULL)
+  )
+$$;
+
 COMMIT;
 
 

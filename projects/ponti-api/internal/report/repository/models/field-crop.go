@@ -67,9 +67,9 @@ type FieldCropMetricModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// ACTUALIZADO: Usar vista v2 activa (no deprecada)
+// ACTUALIZADO: Usar vista v3 (SSOT)
 func (FieldCropMetricModel) TableName() string {
-	return "report_field_crop_metrics_view_v2"
+	return "v3_report_field_crop_metrics_view"
 }
 
 // LaborMetricModel representa el modelo de base de datos para métricas de labores
