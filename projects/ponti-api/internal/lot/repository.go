@@ -149,6 +149,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		if l.Hectares.GreaterThan(decimal.Zero) {
 			updateFields["hectares"] = l.Hectares
 		}
+		// Solo actualizar cultivos si se envían explícitamente
 		if l.PreviousCrop.ID > 0 {
 			updateFields["previous_crop_id"] = l.PreviousCrop.ID
 		}
@@ -164,16 +165,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		res := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
-			Updates(map[string]any{
-				"name":             l.Name,
-				"hectares":         l.Hectares,
-				"previous_crop_id": l.PreviousCrop.ID,
-				"current_crop_id":  l.CurrentCrop.ID,
-				"season":           l.Season,
-				"variety":          l.Variety,
-				"updated_by":       &userID,
-				"updated_at":       nowTS,
-			})
+			Updates(updateFields)
 		if res.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
 		}
@@ -324,7 +316,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
 	}
 
-	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics")
+	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics").Debug()
 
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
@@ -335,11 +327,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	if cropID > 0 {
-		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
+		// Usar consulta SQL raw para el filtro por cultivo
+		base = base.Where("lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
 	}
 
-	// La vista ya viene agregada por (project_id, field_id, previous_crop_id, current_crop_id).
-	// Si los filtros devuelven varias filas, re-agregamos:
+	// La vista v3_lot_metrics no está agregada, por lo que re-agregamos:
 	// - áreas: SUM directo
 	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
 	const sel = `

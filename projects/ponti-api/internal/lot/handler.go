@@ -17,6 +17,7 @@ import (
 	// project
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -163,6 +164,12 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		return
 	}
 	dom.ID = id
+
+	// Obtener user ID del contexto para campos de auditoría
+	if userID, err := sharedmodels.ConvertStringToID(c.Request.Context()); err == nil {
+		dom.Base.UpdatedBy = &userID
+	}
+
 	// Si el cliente no envía field_id, usamos el existente para evitar inconsistencias
 	if dom.FieldID == 0 {
 		if cur, getErr := h.ucs.GetLot(c.Request.Context(), id); getErr == nil {
