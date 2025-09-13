@@ -389,14 +389,14 @@ func (r *Repository) ListLots(
 	}
 
 	var sumSowedArea decimal.Decimal
-	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area),0)").Scan(&sumSowedArea).Error; err != nil {
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area_ha),0)").Scan(&sumSowedArea).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
 	}
 
 	// sumCost: promedio ponderado de cost_usd_per_ha por sowed_area (para la card "Costo por hectárea")
 	var sumCost decimal.Decimal
 	if err := base.Session(&gorm.Session{}).
-		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area) / NULLIF(SUM(sowed_area),0), 0)").
+		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0)").
 		Scan(&sumCost).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
 	}
@@ -408,7 +408,7 @@ func (r *Repository) ListLots(
 	if err := base.Session(&gorm.Session{}).
 		Select(`
 	             project_id, field_id, project_name, field_name,
-	             id, lot_name, variety, sowed_area, hectares, season, updated_at, tons,
+	             id, lot_name, variety, sowed_area_ha, hectares, season, updated_at, tons,
 	             previous_crop_id, previous_crop,
 	             current_crop_id, current_crop,
 	             admin_cost_per_ha,
