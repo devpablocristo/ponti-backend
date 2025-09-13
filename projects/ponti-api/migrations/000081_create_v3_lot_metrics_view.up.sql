@@ -47,7 +47,7 @@ SELECT
   (COALESCE(v3_calc.active_total_per_ha_for_lot(b.lot_id), 0) * b.hectares)::numeric AS active_total_usd,
   (COALESCE(v3_calc.operating_result_per_ha_for_lot(b.lot_id), 0) * b.hectares)::numeric AS operating_result_total_usd,
   -- Per-ha usando wrapper SSOT
-  public.calculate_cost_per_ha(COALESCE(v3_calc.direct_cost_for_lot(b.lot_id), 0)::numeric, b.hectares::numeric) AS direct_cost_per_ha_usd
+  v3_calc.cost_per_ha(COALESCE(v3_calc.direct_cost_for_lot(b.lot_id), 0)::numeric, b.hectares::numeric) AS direct_cost_per_ha_usd
 FROM lot_base b;
 
 

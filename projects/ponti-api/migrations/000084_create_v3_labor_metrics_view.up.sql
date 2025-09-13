@@ -45,7 +45,7 @@ SELECT
   a.field_id,
   a.surface_ha,
   a.total_labor_cost,
-  public.calculate_cost_per_ha(a.total_labor_cost, a.surface_ha) AS avg_labor_cost_per_ha,
+  v3_calc.cost_per_ha(a.total_labor_cost, a.surface_ha) AS avg_labor_cost_per_ha,
   a.total_workorders,
   a.first_workorder_date,
   a.last_workorder_date

@@ -32,7 +32,7 @@ SELECT
   lb.contractor_name,
   w.effective_area      AS surface_ha,
   lb.price              AS cost_per_ha,
-  public.calculate_labor_cost(lb.price::numeric, w.effective_area::numeric) AS total_labor_cost,
+  v3_calc.labor_cost(lb.price::numeric, w.effective_area::numeric) AS total_labor_cost,
   w.investor_id,
   i.name                AS investor_name
 FROM public.workorders w

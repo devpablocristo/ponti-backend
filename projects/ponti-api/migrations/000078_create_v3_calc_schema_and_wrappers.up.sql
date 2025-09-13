@@ -1,9 +1,9 @@
 -- ========================================
--- MIGRATION 000076: CREATE calc SCHEMA AND public WRAPPERS (UP)
+-- MIGRATION 000078: CREATE v3_calc SCHEMA - SSOT/DRY CALCULATIONS (UP)
 -- ========================================
 -- 
--- Purpose: Centralize calculations (DRY/SSOT) in calc schema and expose wrappers in public
--- Date: 2025-09-12
+-- Purpose: Single Source of Truth for all calculations (DRY principle)
+-- Date: 2025-09-13
 -- Author: System
 -- 
 -- Note: Code in English, comments in Spanish.
@@ -11,17 +11,31 @@
 BEGIN;
 
 -- ============================================================================
--- SSOT de cálculos (DRY) — esquema v3_calc
---  - Helpers genéricos (safe_div, %)
---  - Cálculos de negocio por-ha / por-lote / costos / rentas
---  - Wrappers de compatibilidad en schema public (mantienen firmas existentes)
+-- SINGLE SOURCE OF TRUTH (SSOT) - v3_calc schema
+-- 
+-- DRY Principle Implementation:
+--  ✓ Centralized calculations (no duplication across views/code)
+--  ✓ Immutable functions (deterministic, cacheable)
+--  ✓ Safe operations (division by zero protection)
+--  ✓ Consistent business logic (same formula everywhere)
+--  ✓ Composable functions (small, reusable pieces)
+--  ✓ Type safety (proper numeric/double precision handling)
+-- 
+-- Best Practices Applied:
+--  ✓ Schema separation (v3_calc namespace isolation)
+--  ✓ Function naming convention (descriptive, consistent)
+--  ✓ Parameter validation (COALESCE for null safety)
+--  ✓ Performance optimization (STABLE vs IMMUTABLE)
+--  ✓ Documentation (clear purpose for each function)
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS v3_calc;
 
--- -----------------------------
--- Helpers genéricos / seguros
--- -----------------------------
+-- =============================================================================
+-- LAYER 1: SAFE MATHEMATICAL OPERATIONS (Foundation)
+-- =============================================================================
+-- Purpose: Null-safe arithmetic operations that prevent division by zero
+-- and handle edge cases consistently across all business calculations
 CREATE OR REPLACE FUNCTION v3_calc.coalesce0(numeric) RETURNS numeric
 LANGUAGE sql IMMUTABLE AS $$
   SELECT COALESCE($1, 0)
@@ -52,7 +66,10 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT LEAST(v3_calc.safe_div($1, $2) * 100, 100)
 $$;
 
--- Conversión genérica a "por ha"
+-- =============================================================================
+-- LAYER 2: BUSINESS UNIT CONVERSIONS (Per-hectare calculations)
+-- =============================================================================
+-- Purpose: Standardized per-hectare conversions used across all agricultural metrics
 CREATE OR REPLACE FUNCTION v3_calc.per_ha(numeric, numeric) RETURNS numeric
 LANGUAGE sql IMMUTABLE AS $$
   SELECT v3_calc.safe_div($1, $2)
@@ -63,9 +80,10 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT v3_calc.safe_div_dp($1, $2)
 $$;
 
--- -----------------------------------
--- Cálculos de dominio (agro / gestión)
--- -----------------------------------
+-- =============================================================================
+-- LAYER 3: AGRICULTURAL DOMAIN CALCULATIONS (Business Logic)
+-- =============================================================================
+-- Purpose: Core agricultural business calculations following domain rules
 
 -- Dosis normalizada (suma de dosis sobre superficie)
 CREATE OR REPLACE FUNCTION v3_calc.dose_per_ha(total_dose numeric, surface_ha numeric) RETURNS numeric
@@ -209,53 +227,16 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE WHEN area > 0 THEN dose / area ELSE NULL END
 $$;
 
--- -------------------------------------------------------
--- Wrappers de compatibilidad (mantienen firmas en schema public)
--- -------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.calculate_cost_per_ha(p_total_cost numeric, p_hectares numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.cost_per_ha(p_total_cost, p_hectares)
-$$;
-
--- Overload para aceptar hectares como double precision
-CREATE OR REPLACE FUNCTION public.calculate_cost_per_ha(p_total_cost numeric, p_hectares double precision) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.cost_per_ha(p_total_cost, p_hectares::numeric)
-$$;
-
-CREATE OR REPLACE FUNCTION public.calculate_harvested_area(p_tons numeric, p_hectares numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.harvested_area(p_tons, p_hectares)
-$$;
-
-CREATE OR REPLACE FUNCTION public.calculate_labor_cost(p_labor_price numeric, p_effective_area numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.labor_cost(p_labor_price, p_effective_area)
-$$;
-
-CREATE OR REPLACE FUNCTION public.calculate_sowed_area(p_sowing_date date, p_hectares numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.seeded_area(p_sowing_date, p_hectares)
-$$;
-
-CREATE OR REPLACE FUNCTION public.calculate_supply_cost(p_final_dose double precision, p_supply_price numeric, p_effective_area numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.supply_cost(p_final_dose, p_supply_price, p_effective_area)
-$$;
-
-CREATE OR REPLACE FUNCTION public.calculate_yield(p_tons numeric, p_hectares numeric) RETURNS numeric
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT v3_calc.yield_tn_per_ha_over_hectares(p_tons, p_hectares)
-$$;
-
 -- Nota: public.calculate_campaign_closing_date() queda igual, ya usa get_campaign_closure_days().
 
--- -------------------------------------------------------
--- Helpers de consulta de negocio (leen tablas transaccionales)
---  Estos reemplazan el uso de vistas base_* en vistas v3
--- -------------------------------------------------------
+-- =============================================================================
+-- LAYER 4: LOT-LEVEL BUSINESS QUERIES (Data Access Layer)
+-- =============================================================================
+-- Purpose: Lot-specific calculations that read transactional tables
+-- These replace base_* views with direct, optimized queries
+-- Performance: STABLE functions (can be cached within transaction)
 
--- Helpers básicos de lot (evitan repetir SELECT contra public.lots)
+-- Basic lot data accessors (DRY: avoid repeating SELECT against public.lots)
 CREATE OR REPLACE FUNCTION v3_calc.lot_hectares(p_lot_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(l.hectares, 0)
@@ -270,7 +251,7 @@ LANGUAGE sql STABLE AS $$
   WHERE l.id = p_lot_id AND l.deleted_at IS NULL
 $$;
 
--- Costo de labores por lote
+-- COST CALCULATIONS (SSOT for all cost-related business logic)
 CREATE OR REPLACE FUNCTION v3_calc.labor_cost_for_lot(p_lot_id bigint) RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM(lb.price * w.effective_area), 0)::numeric
@@ -282,7 +263,7 @@ LANGUAGE sql STABLE AS $$
     AND w.lot_id = p_lot_id
 $$;
 
--- Costo de insumos por lote
+-- Supply cost calculation (aggregates all supply items for a lot)
 CREATE OR REPLACE FUNCTION v3_calc.supply_cost_for_lot(p_lot_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::double precision
@@ -296,14 +277,17 @@ LANGUAGE sql STABLE AS $$
     AND w.lot_id = p_lot_id
 $$;
 
--- Costo directo por lote
+-- Total direct cost (SSOT: labor + supply costs combined)
 CREATE OR REPLACE FUNCTION v3_calc.direct_cost_for_lot(p_lot_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(v3_calc.labor_cost_for_lot(p_lot_id), 0)::double precision
        + COALESCE(v3_calc.supply_cost_for_lot(p_lot_id), 0)
 $$;
 
--- Precio neto (USD/tn) vigente para el lote (según project/crop)
+-- =============================================================================
+-- LAYER 5: INCOME CALCULATIONS (Revenue and pricing logic)
+-- =============================================================================
+-- Net price lookup (gets current pricing for lot's crop in project)
 CREATE OR REPLACE FUNCTION v3_calc.net_price_usd_for_lot(p_lot_id bigint) RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(cc.net_price, 0)
@@ -318,7 +302,7 @@ LANGUAGE sql STABLE AS $$
   LIMIT 1
 $$;
 
--- Ingreso neto total por lote (USD)
+-- Total net income for lot (tons × net_price)
 CREATE OR REPLACE FUNCTION v3_calc.income_net_total_for_lot(p_lot_id bigint) RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(l.tons, 0)::numeric * COALESCE(v3_calc.net_price_usd_for_lot(l.id), 0)::numeric
@@ -326,7 +310,7 @@ LANGUAGE sql STABLE AS $$
   WHERE l.id = p_lot_id AND l.deleted_at IS NULL
 $$;
 
--- Ingreso neto por ha (USD/ha)
+-- Income per hectare (applies per-ha conversion to total income)
 CREATE OR REPLACE FUNCTION v3_calc.income_net_per_ha_for_lot(p_lot_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT v3_calc.safe_div_dp(
@@ -335,7 +319,10 @@ LANGUAGE sql STABLE AS $$
          )
 $$;
 
--- Hectáreas totales por proyecto (para prorrateo de admin)
+-- =============================================================================
+-- LAYER 6: PROJECT-LEVEL AGGREGATIONS (Administrative calculations)
+-- =============================================================================
+-- Total hectares for project (used for admin cost proration)
 CREATE OR REPLACE FUNCTION v3_calc.total_hectares_for_project(p_project_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM(l.hectares), 0)::double precision

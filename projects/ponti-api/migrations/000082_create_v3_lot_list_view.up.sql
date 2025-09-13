@@ -63,7 +63,7 @@ SELECT
   v3_calc.seeded_area_for_lot(b.lot_id)::numeric           AS sowed_area_ha,
   v3_calc.harvested_area_for_lot(b.lot_id)::numeric        AS harvested_area_ha,
   v3_calc.yield_tn_per_ha_for_lot(b.lot_id)               AS yield_tn_per_ha,
-  public.calculate_cost_per_ha(COALESCE(v3_calc.direct_cost_for_lot(b.lot_id),0)::numeric, b.hectares::numeric) AS cost_usd_per_ha,
+  v3_calc.cost_per_ha(COALESCE(v3_calc.direct_cost_for_lot(b.lot_id),0)::numeric, b.hectares::numeric) AS cost_usd_per_ha,
   v3_calc.income_net_per_ha_for_lot(b.lot_id)::numeric     AS income_net_per_ha_usd,
   v3_calc.rent_per_ha_for_lot(b.lot_id)::numeric           AS rent_per_ha_usd,
   v3_calc.admin_cost_per_ha_for_lot(b.lot_id)::numeric     AS admin_cost_per_ha_usd,

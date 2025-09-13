@@ -10,13 +10,7 @@
 
 BEGIN;
 
--- Eliminar wrappers en public (mantener orden para evitar dependencias)
-DROP FUNCTION IF EXISTS public.calculate_yield(numeric, numeric);
-DROP FUNCTION IF EXISTS public.calculate_supply_cost(double precision, numeric, numeric);
-DROP FUNCTION IF EXISTS public.calculate_sowed_area(date, numeric);
-DROP FUNCTION IF EXISTS public.calculate_labor_cost(numeric, numeric);
-DROP FUNCTION IF EXISTS public.calculate_harvested_area(numeric, numeric);
-DROP FUNCTION IF EXISTS public.calculate_cost_per_ha(numeric, numeric);
+-- No hay wrappers public.calculate_* que eliminar en v3 puro
 
 -- Eliminar funciones en schema calc
 DROP FUNCTION IF EXISTS v3_calc.norm_dose(numeric, numeric);

@@ -24,16 +24,16 @@ SELECT
   s.price                                    AS unit_price,
   -- costo por ha del insumo
   CASE WHEN wi.final_dose IS NOT NULL AND s.price IS NOT NULL
-       THEN public.calculate_cost_per_ha(
+       THEN v3_calc.cost_per_ha(
               (wi.final_dose::double precision * s.price)::numeric,
               1 -- costo ya es por ha, se documenta con 1 ha
             )::numeric
        ELSE 0
   END                                                               AS supply_cost_per_ha,
-  -- costo total del insumo para la WO (usa la función existente)
-  public.calculate_supply_cost(wi.final_dose::double precision,
-                               s.price::numeric,
-                               w.effective_area)::numeric           AS supply_total_cost
+  -- costo total del insumo para la WO (usa la función SSOT)
+  v3_calc.supply_cost(wi.final_dose::double precision,
+                      s.price::numeric,
+                      w.effective_area)::numeric           AS supply_total_cost
 FROM public.workorders w
 JOIN public.projects   p ON p.id = w.project_id   AND p.deleted_at IS NULL
 JOIN public.fields     f ON f.id = w.field_id     AND f.deleted_at IS NULL

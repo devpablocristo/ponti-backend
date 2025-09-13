@@ -51,7 +51,7 @@ surface_v2 AS (
 labor_costs AS (
   SELECT
     project_id, field_id, lot_id,
-    SUM(public.calculate_labor_cost(labor_price, effective_area))::numeric AS labor_cost_usd
+    SUM(v3_calc.labor_cost(labor_price, effective_area))::numeric AS labor_cost_usd
   FROM base
   GROUP BY project_id, field_id, lot_id
 ),
@@ -60,9 +60,9 @@ supply_metrics AS (
     b.project_id, b.field_id, b.lot_id,
     SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS liters,
     SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS kilograms,
-    SUM(public.calculate_supply_cost(wi.final_dose::double precision,
-                                     s.price::numeric,
-                                     b.effective_area))::numeric          AS supplies_cost_usd
+    SUM(v3_calc.supply_cost(wi.final_dose::double precision,
+                            s.price::numeric,
+                            b.effective_area))::numeric          AS supplies_cost_usd
   FROM base b
   LEFT JOIN public.workorder_items wi
          ON wi.workorder_id = b.workorder_id AND wi.deleted_at IS NULL
@@ -81,7 +81,7 @@ SELECT
   COALESCE(sm.supplies_cost_usd, 0)::numeric             AS supplies_cost_usd,
   (COALESCE(lc.labor_cost_usd, 0)::numeric +
    COALESCE(sm.supplies_cost_usd, 0)::numeric)           AS direct_cost_usd,
-  public.calculate_cost_per_ha(
+  v3_calc.cost_per_ha(
     COALESCE(lc.labor_cost_usd,0)::numeric + COALESCE(sm.supplies_cost_usd,0)::numeric,
     COALESCE(sur.surface_ha,0)::numeric
   )                                                       AS avg_cost_per_ha_usd,
