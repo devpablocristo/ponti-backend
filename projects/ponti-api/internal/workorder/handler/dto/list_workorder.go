@@ -66,14 +66,14 @@ func (w WorkorderListElement) MarshalJSON() ([]byte, error) {
 		LaborCategoryName: w.LaborCategoryName,
 		TypeName:          w.TypeName,
 		Contractor:        w.Contractor,
-		SurfaceHa:         w.SurfaceHa.Round(2),
+		SurfaceHa:         w.SurfaceHa.Round(3),
 		SupplyName:        w.SupplyName,
 		Consumption:       w.Consumption,
 		CategoryName:      w.CategoryName,
 		Dose:              w.Dose,
-		CostPerHa:         w.CostPerHa.Round(2),
-		UnitPrice:         w.UnitPrice.Round(2),
-		TotalCost:         w.TotalCost.Round(2),
+		CostPerHa:         w.CostPerHa.Round(3),
+		UnitPrice:         w.UnitPrice.Round(3),
+		TotalCost:         w.TotalCost.Round(3),
 	}
 	return json.Marshal(aux)
 }

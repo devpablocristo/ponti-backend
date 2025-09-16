@@ -573,6 +573,24 @@ LANGUAGE sql STABLE AS $$
   )
 $$;
 
+-- =============================================================================
+-- FIX: ADMIN_COST TYPE CHANGE (BIGINT to NUMERIC for decimal.Decimal compatibility)
+-- =============================================================================
+-- Eliminar vistas que dependen de admin_cost antes del cambio de tipo
+DROP VIEW IF EXISTS v3_dashboard CASCADE;
+DROP VIEW IF EXISTS v3_dashboard_metrics CASCADE;
+DROP VIEW IF EXISTS v3_dashboard_balance CASCADE;
+DROP VIEW IF EXISTS v3_dashboard_management CASCADE;
+DROP VIEW IF EXISTS v3_dashboard_crop_incidence CASCADE;
+DROP VIEW IF EXISTS v3_dashboard_operational_indicators CASCADE;
+
+-- Cambiar el tipo de admin_cost de BIGINT a NUMERIC(15,3) para compatibilidad con decimal.Decimal
+ALTER TABLE projects 
+ALTER COLUMN admin_cost TYPE NUMERIC(15,3) USING admin_cost::NUMERIC(15,3);
+
+-- Comentario para documentar el cambio
+COMMENT ON COLUMN projects.admin_cost IS 'Costo administrativo del proyecto en USD con 3 decimales de precisión';
+
 COMMIT;
 
 

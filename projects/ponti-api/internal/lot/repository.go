@@ -310,10 +310,11 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
 	type rowAgg struct {
-		SeededArea    decimal.Decimal `gorm:"column:seeded_area"`
-		HarvestedArea decimal.Decimal `gorm:"column:harvested_area"`
-		YieldTnPerHa  decimal.Decimal `gorm:"column:yield_tn_per_ha"`
-		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
+		SeededArea      decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
+		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
+		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
 	}
 
 	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics").Debug()
@@ -334,11 +335,13 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	// La vista v3_lot_metrics no está agregada, por lo que re-agregamos:
 	// - áreas: SUM directo
 	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
+	// - superficie_total: MAX (es la misma para todos los lotes del campo)
 	const sel = `
         COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
         COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
         COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
-        COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha
+        COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha,
+        COALESCE(MAX(superficie_total), 0) AS superficie_total
     `
 
 	var row rowAgg
@@ -347,10 +350,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	}
 
 	return &domain.LotMetrics{
-		SeededArea:     row.SeededArea,
-		HarvestedArea:  row.HarvestedArea,
-		YieldTnPerHa:   row.YieldTnPerHa,
-		CostPerHectare: row.CostPerHa,
+		SeededArea:      row.SeededArea,
+		HarvestedArea:   row.HarvestedArea,
+		YieldTnPerHa:    row.YieldTnPerHa,
+		CostPerHectare:  row.CostPerHa,
+		SuperficieTotal: row.SuperficieTotal,
 	}, nil
 }
 
