@@ -1,19 +1,14 @@
 -- ========================================
--- MIGRATION 000076: DROP ALL LEGACY VIEWS AND SCHEMAS (UP)
+-- MIGRATION 000076: DROP ALL LEGACY VIEWS 
 -- ========================================
 -- 
--- Purpose: Clean slate - remove all legacy views, schemas and functions
+-- Purpose: Clean slate - remove all legacy views
 -- Date: 2025-09-13
 -- Author: System
 -- 
 -- Note: Code in English, comments in Spanish.
 
 BEGIN;
-
--- Eliminar schemas completos (CASCADE elimina todo su contenido)
-/* DROP SCHEMA IF EXISTS calc CASCADE;
-DROP SCHEMA IF EXISTS calc_common CASCADE;
-DROP SCHEMA IF EXISTS report CASCADE; */
 
 -- Eliminar todas las vistas legacy del dashboard
 DROP VIEW IF EXISTS dashboard_contributions_progress_view CASCADE;
@@ -66,43 +61,87 @@ DROP VIEW IF EXISTS investor_contribution_data_view CASCADE;
 -- Eliminar vistas auxiliares
 DROP VIEW IF EXISTS views_fixes CASCADE;
 
--- Eliminar funciones legacy que puedan estar sueltas
-DROP FUNCTION IF EXISTS calc.norm_dose(numeric, numeric);
+-- Eliminar vistas adicionales que se crearon en migraciones anteriores
+DROP VIEW IF EXISTS dashboard_crop_incidence_view CASCADE;
 
--- Eliminar tipos ENUM legacy (serán recreados en v3)
-/* DROP TYPE IF EXISTS movement_type CASCADE; */
+-- Eliminar cualquier vista que contenga 'lot' en el nombre (por si acaso)
+DO $$
+DECLARE
+    view_name text;
+BEGIN
+    FOR view_name IN 
+        SELECT viewname 
+        FROM pg_views 
+        WHERE viewname LIKE '%lot%' 
+        AND viewname NOT LIKE 'v3_%'
+        AND viewname NOT LIKE 'pg_%'
+    LOOP
+        EXECUTE 'DROP VIEW IF EXISTS ' || view_name || ' CASCADE';
+    END LOOP;
+END $$;
 
--- NO eliminar tablas base - las migraciones v3 las necesitan
--- Solo eliminar tablas específicas que no se usan en v3
-/* DROP TABLE IF EXISTS supply_movements CASCADE;
-DROP TABLE IF EXISTS stocks CASCADE;
-DROP TABLE IF EXISTS invoices CASCADE;
-DROP TABLE IF EXISTS project_managers CASCADE;
-DROP TABLE IF EXISTS managers CASCADE; */
--- Mantener tablas base necesarias para v3:
--- crop_commercializations, workorder_items, workorders, project_investors, 
--- investors, supplies, labors, labor_categories, labor_types, categories, 
--- types, lots, crops, fields, lease_types, projects, campaigns, customers, 
--- users, project_dollar_values, providers, app_parameters, fx_rates
--- NO eliminar schema_migrations - la herramienta de migración la necesita
--- DROP TABLE IF EXISTS schema_migrations CASCADE;
+-- Eliminar cualquier vista que contenga 'dashboard' en el nombre (por si acaso)
+DO $$
+DECLARE
+    view_name text;
+BEGIN
+    FOR view_name IN 
+        SELECT viewname 
+        FROM pg_views 
+        WHERE viewname LIKE '%dashboard%' 
+        AND viewname NOT LIKE 'v3_%'
+        AND viewname NOT LIKE 'pg_%'
+    LOOP
+        EXECUTE 'DROP VIEW IF EXISTS ' || view_name || ' CASCADE';
+    END LOOP;
+END $$;
 
--- NO eliminar secuencias de tablas base - las migraciones v3 las necesitan
--- Solo eliminar secuencias de tablas que se eliminaron arriba
-/* DROP SEQUENCE IF EXISTS managers_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS invoices_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS stocks_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS supply_movements_id_seq CASCADE; */
+-- Eliminar cualquier vista que contenga 'workorder' en el nombre (por si acaso)
+DO $$
+DECLARE
+    view_name text;
+BEGIN
+    FOR view_name IN 
+        SELECT viewname 
+        FROM pg_views 
+        WHERE viewname LIKE '%workorder%' 
+        AND viewname NOT LIKE 'v3_%'
+        AND viewname NOT LIKE 'pg_%'
+    LOOP
+        EXECUTE 'DROP VIEW IF EXISTS ' || view_name || ' CASCADE';
+    END LOOP;
+END $$;
 
--- Eliminar funciones
-/* DROP FUNCTION IF EXISTS public.update_timestamp() CASCADE;
-DROP FUNCTION IF EXISTS public.get_app_parameter(character varying) CASCADE;
-DROP FUNCTION IF EXISTS public.get_app_parameter_decimal(character varying) CASCADE;
-DROP FUNCTION IF EXISTS public.get_app_parameter_integer(character varying) CASCADE;
-DROP FUNCTION IF EXISTS public.get_campaign_closure_days() CASCADE;
-DROP FUNCTION IF EXISTS public.get_default_fx_rate() CASCADE;
-DROP FUNCTION IF EXISTS public.get_iva_percentage() CASCADE;
-DROP FUNCTION IF EXISTS public.get_project_dollar_value(bigint, character varying) CASCADE;
-DROP FUNCTION IF EXISTS public.calculate_campaign_closing_date(date) CASCADE; */
+-- Eliminar cualquier vista que contenga 'labor' en el nombre (por si acaso)
+DO $$
+DECLARE
+    view_name text;
+BEGIN
+    FOR view_name IN 
+        SELECT viewname 
+        FROM pg_views 
+        WHERE viewname LIKE '%labor%' 
+        AND viewname NOT LIKE 'v3_%'
+        AND viewname NOT LIKE 'pg_%'
+    LOOP
+        EXECUTE 'DROP VIEW IF EXISTS ' || view_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- Eliminar cualquier vista que contenga 'report' en el nombre (por si acaso)
+DO $$
+DECLARE
+    view_name text;
+BEGIN
+    FOR view_name IN 
+        SELECT viewname 
+        FROM pg_views 
+        WHERE viewname LIKE '%report%' 
+        AND viewname NOT LIKE 'v3_%'
+        AND viewname NOT LIKE 'pg_%'
+    LOOP
+        EXECUTE 'DROP VIEW IF EXISTS ' || view_name || ' CASCADE';
+    END LOOP;
+END $$;
 
 COMMIT;
