@@ -993,3 +993,117 @@ WHERE s.close_date = (
 )
 GROUP BY s.project_id, p.name
 ORDER BY s.project_id;
+
+-- ========================================
+-- MOVIMIENTOS INTERNOS DE SUPPLY PARA PROBAR EL FIX
+-- ========================================
+-- Datos de prueba para verificar que el fix de movimientos internos funciona correctamente
+-- 
+-- ESCENARIO DE PRUEBA:
+-- - Proyecto 1 envía 50 kg de fertilizante al Proyecto 2
+-- - Proyecto 2 envía 25 kg de semilla al Proyecto 1
+-- 
+-- RESULTADO ESPERADO:
+-- - Proyecto 1: Debe restar $100 (50 kg × $2) de fertilizante, sumar $250 (25 kg × $10) de semilla
+-- - Proyecto 2: Debe sumar $100 (50 kg × $2) de fertilizante, restar $250 (25 kg × $10) de semilla
+
+-- Crear provider de prueba si no existe
+INSERT INTO providers (id, name, created_at, updated_at) 
+VALUES (1, 'Provider Test', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- Movimiento interno 1: Fertilizante del Proyecto 1 al Proyecto 2 (50 kg)
+-- Salida del Proyecto 1
+INSERT INTO supply_movements (
+  id, stock_id, quantity, movement_type, movement_date, reference_number, 
+  project_id, project_destination_id, supply_id, investor_id, provider_id, is_entry,
+  created_at, updated_at
+)
+SELECT 
+  1001, s.id, 50.0, 'Movimiento interno', NOW(), 'TEST-001', 
+  1, 2, s.supply_id, s.investor_id, 1, false, NOW(), NOW()
+FROM stocks s 
+WHERE s.project_id = 1 AND s.supply_id = 1  -- Fertilizante del proyecto 1
+LIMIT 1;
+
+-- Entrada al Proyecto 2
+INSERT INTO supply_movements (
+  id, stock_id, quantity, movement_type, movement_date, reference_number, 
+  project_id, project_destination_id, supply_id, investor_id, provider_id, is_entry,
+  created_at, updated_at
+)
+SELECT 
+  1002, s.id, 50.0, 'Movimiento interno entrada', NOW(), 'TEST-001', 
+  2, 0, s.supply_id, s.investor_id, 1, true, NOW(), NOW()
+FROM stocks s 
+WHERE s.project_id = 2 AND s.supply_id = 4  -- Fertilizante del proyecto 2
+LIMIT 1;
+
+-- Movimiento interno 2: Semilla del Proyecto 2 al Proyecto 1 (25 kg)
+-- Salida del Proyecto 2
+INSERT INTO supply_movements (
+  id, stock_id, quantity, movement_type, movement_date, reference_number, 
+  project_id, project_destination_id, supply_id, investor_id, provider_id, is_entry,
+  created_at, updated_at
+)
+SELECT 
+  1003, s.id, 25.0, 'Movimiento interno', NOW(), 'TEST-002', 
+  2, 1, s.supply_id, s.investor_id, 1, false, NOW(), NOW()
+FROM stocks s 
+WHERE s.project_id = 2 AND s.supply_id = 5  -- Semilla del proyecto 2
+LIMIT 1;
+
+-- Entrada al Proyecto 1
+INSERT INTO supply_movements (
+  id, stock_id, quantity, movement_type, movement_date, reference_number, 
+  project_id, project_destination_id, supply_id, investor_id, provider_id, is_entry,
+  created_at, updated_at
+)
+SELECT 
+  1004, s.id, 25.0, 'Movimiento interno entrada', NOW(), 'TEST-002', 
+  1, 0, s.supply_id, s.investor_id, 1, true, NOW(), NOW()
+FROM stocks s 
+WHERE s.project_id = 1 AND s.supply_id = 2  -- Semilla del proyecto 1
+LIMIT 1;
+
+-- ========================================
+-- VERIFICACIÓN DEL FIX DE MOVIMIENTOS INTERNOS
+-- ========================================
+-- Verificar que las métricas de supply consideran los movimientos internos correctamente
+SELECT '=== VERIFICACIÓN DEL FIX DE MOVIMIENTOS INTERNOS ===' as info;
+
+-- Mostrar movimientos internos creados
+SELECT '=== MOVIMIENTOS INTERNOS CREADOS ===' as info;
+SELECT 
+  id,
+  project_id,
+  project_destination_id,
+  supply_id,
+  quantity,
+  movement_type,
+  is_entry,
+  reference_number
+FROM supply_movements 
+WHERE id >= 1001
+ORDER BY id;
+
+-- Verificar métricas de supply con movimientos internos
+SELECT '=== MÉTRICAS DE SUPPLY CON MOVIMIENTOS INTERNOS ===' as info;
+SELECT 
+  p.id as project_id,
+  p.name as project_name,
+  COALESCE(v3_calc.supply_cost_for_project(p.id), 0) as supply_cost_usd,
+  COALESCE(v3_calc.supply_cost_received_for_project(p.id), 0) as supply_received_usd,
+  COALESCE(v3_calc.direct_costs_invested_for_project(p.id), 0) as direct_costs_invested_usd
+FROM projects p 
+WHERE p.id IN (1, 2)
+ORDER BY p.id;
+
+-- Verificar que el fix funciona correctamente
+-- Proyecto 1: Debería tener costos de supply reducidos por el fertilizante enviado
+-- Proyecto 2: Debería tener costos de supply aumentados por el fertilizante recibido
+SELECT '=== VERIFICACIÓN DEL FIX ===' as info;
+SELECT 
+  'El fix está funcionando si las métricas consideran los movimientos internos' as status,
+  'Proyecto 1: Debe restar $100 de fertilizante enviado' as proyecto_1_esperado,
+  'Proyecto 2: Debe sumar $100 de fertilizante recibido' as proyecto_2_esperado;

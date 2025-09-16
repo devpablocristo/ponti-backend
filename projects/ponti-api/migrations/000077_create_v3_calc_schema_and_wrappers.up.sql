@@ -278,17 +278,35 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- Supply cost calculation (aggregates all supply items for a lot)
+-- FIX: Considera tanto workorder_items como movimientos internos de salida
 CREATE OR REPLACE FUNCTION v3_calc.supply_cost_for_lot(p_lot_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::double precision
-  FROM public.workorders w
-  JOIN public.workorder_items wi ON wi.workorder_id = w.id
-  JOIN public.supplies s ON s.id = wi.supply_id
-  WHERE w.deleted_at IS NULL
-    AND w.effective_area > 0
-    AND wi.final_dose > 0
-    AND s.price IS NOT NULL
-    AND w.lot_id = p_lot_id
+  SELECT COALESCE(
+    -- Costos por workorder_items (uso directo en workorders)
+    (SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::double precision
+     FROM public.workorders w
+     JOIN public.workorder_items wi ON wi.workorder_id = w.id
+     JOIN public.supplies s ON s.id = wi.supply_id
+     WHERE w.deleted_at IS NULL
+       AND w.effective_area > 0
+       AND wi.final_dose > 0
+       AND s.price IS NOT NULL
+       AND w.lot_id = p_lot_id)
+    +
+    -- Costos por movimientos internos de salida (insumos transferidos a otros proyectos)
+    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::double precision
+     FROM public.supply_movements sm
+     JOIN public.supplies s ON s.id = sm.supply_id
+     JOIN public.workorders w ON w.lot_id = p_lot_id
+     WHERE sm.deleted_at IS NULL
+       AND s.deleted_at IS NULL
+       AND w.deleted_at IS NULL
+       AND sm.movement_type = 'Movimiento interno'
+       AND sm.is_entry = false
+       AND sm.project_id = w.project_id
+       AND s.price IS NOT NULL
+       AND sm.quantity > 0)
+  , 0)::double precision
 $$;
 
 -- Total direct cost (SSOT: labor + supply costs combined)
@@ -296,6 +314,56 @@ CREATE OR REPLACE FUNCTION v3_calc.direct_cost_for_lot(p_lot_id bigint) RETURNS 
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(v3_calc.labor_cost_for_lot(p_lot_id), 0)::double precision
        + COALESCE(v3_calc.supply_cost_for_lot(p_lot_id), 0)
+$$;
+
+-- =============================================================================
+-- SUPPLY COST FUNCTIONS FOR INTERNAL MOVEMENTS
+-- =============================================================================
+-- Función para calcular costos de supply para un proyecto considerando movimientos internos
+CREATE OR REPLACE FUNCTION v3_calc.supply_cost_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Costos por workorder_items (uso directo en workorders)
+    (SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::double precision
+     FROM public.workorders w
+     JOIN public.workorder_items wi ON wi.workorder_id = w.id
+     JOIN public.supplies s ON s.id = wi.supply_id
+     WHERE w.deleted_at IS NULL
+       AND w.effective_area > 0
+       AND wi.final_dose > 0
+       AND s.price IS NOT NULL
+       AND w.project_id = p_project_id)
+    +
+    -- Costos por movimientos internos de salida (insumos transferidos a otros proyectos)
+    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::double precision
+     FROM public.supply_movements sm
+     JOIN public.supplies s ON s.id = sm.supply_id
+     WHERE sm.deleted_at IS NULL
+       AND s.deleted_at IS NULL
+       AND sm.movement_type = 'Movimiento interno'
+       AND sm.is_entry = false
+       AND sm.project_id = p_project_id
+       AND s.price IS NOT NULL
+       AND sm.quantity > 0)
+  , 0)::double precision
+$$;
+
+-- Función para calcular costos de supply recibidos por movimientos internos
+CREATE OR REPLACE FUNCTION v3_calc.supply_cost_received_for_project(p_project_id bigint) RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    -- Costos por movimientos internos de entrada (insumos recibidos de otros proyectos)
+    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::double precision
+     FROM public.supply_movements sm
+     JOIN public.supplies s ON s.id = sm.supply_id
+     WHERE sm.deleted_at IS NULL
+       AND s.deleted_at IS NULL
+       AND sm.movement_type = 'Movimiento interno entrada'
+       AND sm.is_entry = true
+       AND sm.project_id = p_project_id
+       AND s.price IS NOT NULL
+       AND sm.quantity > 0)
+  , 0)::double precision
 $$;
 
 -- =============================================================================
@@ -494,6 +562,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- Función para calcular costos directos invertidos (solo labores + insumos)
+-- FIX: Considera movimientos internos en el cálculo de costos invertidos
 CREATE OR REPLACE FUNCTION v3_calc.direct_costs_invested_for_project(p_project_id bigint) RETURNS double precision
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
@@ -510,6 +579,9 @@ LANGUAGE sql STABLE AS $$
      JOIN public.stocks st ON st.supply_id = s.id AND st.deleted_at IS NULL
      WHERE s.project_id = p_project_id AND s.deleted_at IS NULL
        AND st.initial_units IS NOT NULL)
+    +
+    -- Insumos recibidos por movimientos internos
+    v3_calc.supply_cost_received_for_project(p_project_id)
   , 0)::double precision
 $$;
 
