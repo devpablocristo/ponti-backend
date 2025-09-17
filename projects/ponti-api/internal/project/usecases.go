@@ -3,7 +3,10 @@ package project
 import (
 	"context"
 
+	"github.com/shopspring/decimal"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	domainField "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
 )
@@ -11,7 +14,7 @@ import (
 type RepositoryPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
-	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, float64, int64, error)
+	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
@@ -58,7 +61,7 @@ func (u *UseCases) GetProject(ctx context.Context, id int64) (*domain.Project, e
 	return u.repo.GetProject(ctx, id)
 }
 
-func (u *UseCases) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, float64, int64, error) {
+func (u *UseCases) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, decimal.Decimal, int64, error) {
 	return u.repo.GetProjects(ctx, name, customerID, campaignID, page, perPage)
 }
 

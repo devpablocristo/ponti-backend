@@ -220,8 +220,8 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 	}
 
 	// Agregar filas detalladas de supplies y labors
-	rows = append(rows, r.buildSupplyDetailRows(metricMap, columnMap)...)
-	rows = append(rows, r.buildLaborDetailRows(metricMap, columnMap)...)
+	rows = append(rows, r.buildSupplyDetailRows(columnMap)...)
+	rows = append(rows, r.buildLaborDetailRows(columnMap)...)
 
 	return rows
 }
@@ -251,14 +251,14 @@ func (r *ReportRepository) buildRow(key, unit, valueType string, metricMap map[s
 }
 
 // buildSupplyDetailRows construye las filas detalladas de supplies
-func (r *ReportRepository) buildSupplyDetailRows(metricMap map[string]domain.FieldCropMetric, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Retornar filas con valores en cero ya que no hay datos detallados disponibles
 	return r.buildEmptySupplyRows(columnMap)
 
 }
 
 // buildLaborDetailRows construye las filas detalladas de labores
-func (r *ReportRepository) buildLaborDetailRows(metricMap map[string]domain.FieldCropMetric, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Retornar filas con valores en cero ya que no hay datos detallados disponibles
 	return r.buildEmptyLaborRows(columnMap)
 

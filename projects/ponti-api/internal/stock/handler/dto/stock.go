@@ -4,8 +4,9 @@ import (
 	"strings"
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 )
 
 type GetStocksResponse struct {

@@ -3,9 +3,11 @@ package dto
 import (
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 )
 
 type LaborListItem struct {

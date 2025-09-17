@@ -18,7 +18,7 @@ func TestGetSowingProgressSQL(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view_v2 
+		FROM v3_dashboard 
 		WHERE 1=1
 		`
 
@@ -58,7 +58,7 @@ func TestGetSowingProgressSQL(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view_v2 
+		FROM v3_dashboard 
 		WHERE 1=1
 		`
 
@@ -90,7 +90,7 @@ func TestSowingProgressFieldMapping(t *testing.T) {
 			COALESCE(sowing_hectares, 0) as sowing_hectares,
 			COALESCE(sowing_total_hectares, 0) as sowing_total_hectares,
 			COALESCE(sowing_progress_pct, 0) as sowing_progress_pct
-		FROM dashboard_sowing_progress_view_v2 
+		FROM v3_dashboard 
 		WHERE 1=1
 		LIMIT 1
 	`
@@ -100,7 +100,7 @@ func TestSowingProgressFieldMapping(t *testing.T) {
 	}
 
 	// Verificar que la consulta tenga la estructura correcta
-	assert.Contains(t, query, "FROM dashboard_sowing_progress_view_v2")
+	assert.Contains(t, query, "FROM v3_dashboard")
 	assert.Contains(t, query, "WHERE 1=1")
 	assert.Contains(t, query, "LIMIT 1")
 }

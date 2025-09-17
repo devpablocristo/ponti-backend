@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
 // GormEnginePort define la interfaz para el motor GORM
@@ -50,14 +51,9 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 
 	query := fmt.Sprintf(`
 		SELECT project_id, field_id, field_name, current_crop_id, crop_name,
-		       superficie_ha, produccion_tn, area_sembrada_ha, area_cosechada_ha,
-		       rendimiento_tn_ha, precio_bruto_usd_tn, gasto_flete_usd_tn, gasto_comercial_usd_tn, precio_neto_usd_tn,
-		       ingreso_neto_usd, ingreso_neto_usd_ha, costos_labores_usd, costos_insumos_usd, 
-		       total_costos_directos_usd, costos_directos_usd_ha, margen_bruto_usd, margen_bruto_usd_ha,
-		       arriendo_usd, arriendo_usd_ha, administracion_usd, administracion_usd_ha,
-		       resultado_operativo_usd, resultado_operativo_usd_ha, total_invertido_usd, total_invertido_usd_ha,
-		       renta_pct, rinde_indiferencia_usd_tn
-		FROM report_field_crop_metrics_view_v2 
+		       income_usd, costos_directos_ejecutados_usd, costos_directos_invertidos_usd,
+		       arriendo_invertidos_usd, estructura_invertidos_usd, operating_result_usd, operating_result_pct
+		FROM v3_report_field_crop_metrics_view 
 		WHERE project_id IN (%s)
 	`, strings.Join(placeholders, ","))
 
@@ -72,7 +68,7 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 		args = append(args, *filters.FieldID)
 	}
 
-	// Ejecutar consulta EXACTAMENTE como en el dashboard
+	// Ejecutar consulta con la nueva estructura v3
 	rows, err := r.db.Client().WithContext(context.Background()).Raw(query, args...).Rows()
 	if err != nil {
 		return nil, fmt.Errorf("error al ejecutar consulta: %w", err)
@@ -81,31 +77,21 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 
 	var metrics []domain.FieldCropMetric
 	for rows.Next() {
-		// Leer valores raw EXACTAMENTE como en el dashboard
+		// Leer valores raw de la vista v3
 		var rawProjectID, rawFieldID, rawCropID any
 		var fieldName, cropName string
-		var rawSuperficieHa, rawProduccionTn, rawAreaSembradaHa, rawAreaCosechadaHa any
-		var rawRendimientoTnHa, rawPrecioBrutoUsdTn, rawGastoFleteUsdTn, rawGastoComercialUsdTn, rawPrecioNetoUsdTn any
-		var rawIngresoNetoUsd, rawIngresoNetoUsdHa, rawCostosLaboresUsd, rawCostosInsumosUsd any
-		var rawTotalCostosDirectosUsd, rawCostosDirectosUsdHa, rawMargenBrutoUsd, rawMargenBrutoUsdHa any
-		var rawArriendoUsd, rawArriendoUsdHa, rawAdministracionUsd, rawAdministracionUsdHa any
-		var rawResultadoOperativoUsd, rawResultadoOperativoUsdHa, rawTotalInvertidoUsd, rawTotalInvertidoUsdHa any
-		var rawRentaPct, rawRindeIndiferenciaUsdTn any
+		var rawIncomeUsd, rawCostosDirectosEjecutadosUsd, rawCostosDirectosInvertidosUsd any
+		var rawArriendoInvertidosUsd, rawEstructuraInvertidosUsd, rawOperatingResultUsd, rawOperatingResultPct any
 
 		if err := rows.Scan(
 			&rawProjectID, &rawFieldID, &fieldName, &rawCropID, &cropName,
-			&rawSuperficieHa, &rawProduccionTn, &rawAreaSembradaHa, &rawAreaCosechadaHa,
-			&rawRendimientoTnHa, &rawPrecioBrutoUsdTn, &rawGastoFleteUsdTn, &rawGastoComercialUsdTn, &rawPrecioNetoUsdTn,
-			&rawIngresoNetoUsd, &rawIngresoNetoUsdHa, &rawCostosLaboresUsd, &rawCostosInsumosUsd,
-			&rawTotalCostosDirectosUsd, &rawCostosDirectosUsdHa, &rawMargenBrutoUsd, &rawMargenBrutoUsdHa,
-			&rawArriendoUsd, &rawArriendoUsdHa, &rawAdministracionUsd, &rawAdministracionUsdHa,
-			&rawResultadoOperativoUsd, &rawResultadoOperativoUsdHa, &rawTotalInvertidoUsd, &rawTotalInvertidoUsdHa,
-			&rawRentaPct, &rawRindeIndiferenciaUsdTn,
+			&rawIncomeUsd, &rawCostosDirectosEjecutadosUsd, &rawCostosDirectosInvertidosUsd,
+			&rawArriendoInvertidosUsd, &rawEstructuraInvertidosUsd, &rawOperatingResultUsd, &rawOperatingResultPct,
 		); err != nil {
 			return nil, fmt.Errorf("error al escanear fila: %w", err)
 		}
 
-		// Convertir valores raw EXACTAMENTE como en el dashboard
+		// Convertir valores raw
 		projectID := r.convertToInt64(rawProjectID)
 		fieldID := r.convertToInt64(rawFieldID)
 		cropID := r.convertToInt64(rawCropID)
@@ -116,33 +102,33 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 			FieldName:               fieldName,
 			CropID:                  cropID,
 			CropName:                cropName,
-			SuperficieHa:            r.convertToDecimal(rawSuperficieHa),
-			ProduccionTn:            r.convertToDecimal(rawProduccionTn),
-			AreaSembradaHa:          r.convertToDecimal(rawAreaSembradaHa),
-			AreaCosechadaHa:         r.convertToDecimal(rawAreaCosechadaHa),
-			RendimientoTnHa:         r.convertToDecimal(rawRendimientoTnHa),
-			PrecioBrutoUsdTn:        r.convertToDecimal(rawPrecioBrutoUsdTn),
-			GastoFleteUsdTn:         r.convertToDecimal(rawGastoFleteUsdTn),
-			GastoComercialUsdTn:     r.convertToDecimal(rawGastoComercialUsdTn),
-			PrecioNetoUsdTn:         r.convertToDecimal(rawPrecioNetoUsdTn),
-			IngresoNetoUsd:          r.convertToDecimal(rawIngresoNetoUsd),
-			IngresoNetoUsdHa:        r.convertToDecimal(rawIngresoNetoUsdHa),
-			CostosLaboresUsd:        r.convertToDecimal(rawCostosLaboresUsd),
-			CostosInsumosUsd:        r.convertToDecimal(rawCostosInsumosUsd),
-			TotalCostosDirectosUsd:  r.convertToDecimal(rawTotalCostosDirectosUsd),
-			CostosDirectosUsdHa:     r.convertToDecimal(rawCostosDirectosUsdHa),
-			MargenBrutoUsd:          r.convertToDecimal(rawMargenBrutoUsd),
-			MargenBrutoUsdHa:        r.convertToDecimal(rawMargenBrutoUsdHa),
-			ArriendoUsd:             r.convertToDecimal(rawArriendoUsd),
-			ArriendoUsdHa:           r.convertToDecimal(rawArriendoUsdHa),
-			AdministracionUsd:       r.convertToDecimal(rawAdministracionUsd),
-			AdministracionUsdHa:     r.convertToDecimal(rawAdministracionUsdHa),
-			ResultadoOperativoUsd:   r.convertToDecimal(rawResultadoOperativoUsd),
-			ResultadoOperativoUsdHa: r.convertToDecimal(rawResultadoOperativoUsdHa),
-			TotalInvertidoUsd:       r.convertToDecimal(rawTotalInvertidoUsd),
-			TotalInvertidoUsdHa:     r.convertToDecimal(rawTotalInvertidoUsdHa),
-			RentaPct:                r.convertToDecimal(rawRentaPct),
-			RindeIndiferenciaUsdTn:  r.convertToDecimal(rawRindeIndiferenciaUsdTn),
+			SuperficieHa:            decimal.Zero, // No disponible en v3
+			ProduccionTn:            decimal.Zero, // No disponible en v3
+			AreaSembradaHa:          decimal.Zero, // No disponible en v3
+			AreaCosechadaHa:         decimal.Zero, // No disponible en v3
+			RendimientoTnHa:         decimal.Zero, // No disponible en v3
+			PrecioBrutoUsdTn:        decimal.Zero, // No disponible en v3
+			GastoFleteUsdTn:         decimal.Zero, // No disponible en v3
+			GastoComercialUsdTn:     decimal.Zero, // No disponible en v3
+			PrecioNetoUsdTn:         decimal.Zero, // No disponible en v3
+			IngresoNetoUsd:          r.convertToDecimal(rawIncomeUsd),
+			IngresoNetoUsdHa:        decimal.Zero, // No disponible en v3
+			CostosLaboresUsd:        decimal.Zero, // No disponible en v3
+			CostosInsumosUsd:        decimal.Zero, // No disponible en v3
+			TotalCostosDirectosUsd:  r.convertToDecimal(rawCostosDirectosEjecutadosUsd),
+			CostosDirectosUsdHa:     decimal.Zero, // No disponible en v3
+			MargenBrutoUsd:          decimal.Zero, // No disponible en v3
+			MargenBrutoUsdHa:        decimal.Zero, // No disponible en v3
+			ArriendoUsd:             r.convertToDecimal(rawArriendoInvertidosUsd),
+			ArriendoUsdHa:           decimal.Zero, // No disponible en v3
+			AdministracionUsd:       r.convertToDecimal(rawEstructuraInvertidosUsd),
+			AdministracionUsdHa:     decimal.Zero, // No disponible en v3
+			ResultadoOperativoUsd:   r.convertToDecimal(rawOperatingResultUsd),
+			ResultadoOperativoUsdHa: decimal.Zero, // No disponible en v3
+			TotalInvertidoUsd:       r.convertToDecimal(rawCostosDirectosInvertidosUsd),
+			TotalInvertidoUsdHa:     decimal.Zero, // No disponible en v3
+			RentaPct:                r.convertToDecimal(rawOperatingResultPct),
+			RindeIndiferenciaUsdTn:  decimal.Zero, // No disponible en v3
 		}
 		metrics = append(metrics, metric)
 	}

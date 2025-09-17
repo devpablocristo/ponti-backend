@@ -2,8 +2,9 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
 /* =========================

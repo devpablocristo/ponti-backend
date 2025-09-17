@@ -13,7 +13,7 @@ type RepositoryPort interface {
 	DeleteLabor(context.Context, int64) error
 	GetWorkordersByLaborID(ctx context.Context, laborID int64) (int64, error)
 	UpdateLabor(context.Context, *domain.Labor) error
-	ListLaborCategoriesByTypeId(context.Context, int64) ([]domain.LaborCategory, error)
+	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborRawItem, types.PageInfo, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
@@ -36,27 +36,27 @@ func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64,
 	return u.repo.CreateLabor(ctx, labor)
 }
 
-func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectId int64) ([]domain.ListedLabor, int64, error) {
-	return u.repo.ListLabor(ctx, page, perPage, projectId)
+func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
+	return u.repo.ListLabor(ctx, page, perPage, projectID)
 }
 
-func (u *UseCases) DeleteLabor(ctx context.Context, laborId int64) error {
-	count, err := u.repo.GetWorkordersByLaborID(ctx, laborId)
+func (u *UseCases) DeleteLabor(ctx context.Context, laborID int64) error {
+	count, err := u.repo.GetWorkordersByLaborID(ctx, laborID)
 	if err != nil {
 		return err
 	}
 	if count > 0 {
 		return types.NewError(types.ErrConflict, "labor is being used in a workorder", nil)
 	}
-	return u.repo.DeleteLabor(ctx, laborId)
+	return u.repo.DeleteLabor(ctx, laborID)
 }
 
 func (u *UseCases) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
 	return u.repo.UpdateLabor(ctx, labor)
 }
 
-func (u *UseCases) ListLaborCategoriesByTypeId(ctx context.Context, typeId int64) ([]domain.LaborCategory, error) {
-	return u.repo.ListLaborCategoriesByTypeId(ctx, typeId)
+func (u *UseCases) ListLaborCategoriesByTypeID(ctx context.Context, typeID int64) ([]domain.LaborCategory, error) {
+	return u.repo.ListLaborCategoriesByTypeID(ctx, typeID)
 }
 
 func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
@@ -69,30 +69,7 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 	// Mapear directamente - NO hacer cálculos manuales (ya vienen de la vista)
 	items := make([]domain.LaborListItem, len(rawItems))
 	for i, r := range rawItems {
-		items[i] = domain.LaborListItem{
-			WorkorderID:     r.WorkorderID,
-			WorkorderNumber: r.WorkorderNumber,
-			Date:            r.Date,
-			ProjectName:     r.ProjectName,
-			FieldName:       r.FieldName,
-			CropName:        r.CropName,
-			LaborName:       r.LaborName,
-			Contractor:      r.Contractor,
-			SurfaceHa:       r.SurfaceHa,
-			CostHa:          r.CostHa,
-			CategoryName:    r.CategoryName,
-			InvestorName:    r.InvestorName,
-			USDAvgValue:     r.USDAvgValue,
-			NetTotal:        r.NetTotal,    // ✅ Viene de la vista (ya calculado correctamente)
-			TotalIVA:        r.TotalIVA,    // ✅ Viene de la vista (10.5% correcto)
-			USDCostHa:       r.USDCostHa,   // ✅ Viene de la vista (ARS correcto)
-			USDNetTotal:     r.USDNetTotal, // ✅ Viene de la vista (ARS correcto)
-			InvoiceID:       r.InvoiceID,
-			InvoiceNumber:   r.InvoiceNumber,
-			InvoiceCompany:  r.InvoiceCompany,
-			InvoiceDate:     r.InvoiceDate,
-			InvoiceStatus:   r.InvoiceStatus,
-		}
+		items[i] = domain.LaborListItem(r)
 	}
 
 	return items, pageInfo, err

@@ -1,8 +1,9 @@
 package domain
 
 import (
-	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/shopspring/decimal"
+
+	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 )
 
 type CropCommercialization struct {
@@ -22,7 +23,7 @@ func (cc *CropCommercialization) CalculateNetPrice() decimal.Decimal {
 	boardPricePercentage := cc.BoardPrice.Mul(cc.CommercialCost).Div(decimal.NewFromInt(100))
 
 	// boardPrice - freigthCost - boardPricePercentage = NetPrice
-	netPrice := cc.BoardPrice.Sub(cc.FreightCost).Sub(boardPricePercentage).Round(2)
+	netPrice := cc.BoardPrice.Sub(cc.FreightCost).Sub(boardPricePercentage)
 
 	return netPrice
 }

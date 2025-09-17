@@ -21,7 +21,7 @@ type LotTable struct {
 	CurrentCrop    string          `gorm:"column:current_crop"`
 	CurrentCropID  int64           `gorm:"column:current_crop_id"`
 	Variety        string          `gorm:"column:variety"`
-	SowedArea      decimal.Decimal `gorm:"column:sowed_area"`
+	SowedArea      decimal.Decimal `gorm:"column:sowed_area_ha"`
 	Hectares       decimal.Decimal `gorm:"column:hectares"`
 	Season         string          `gorm:"column:season"`
 	Tons           decimal.Decimal `gorm:"column:tons"`

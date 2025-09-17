@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	casmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/repository/models"
 	cropmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/repository/models"
 	cusmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer/repository/models"
@@ -24,7 +26,6 @@ import (
 	base "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
-// TODO: aplicar custom errors
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
@@ -177,7 +178,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 	return projects, total, nil
 }
 
-func (r *Repository) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, float64, int64, error) {
+func (r *Repository) GetProjects(ctx context.Context, name string, customerID int64, campaignID int64, page, perPage int) ([]domain.Project, decimal.Decimal, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -205,17 +206,17 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 
 	if err := baseClient.
 		Count(&total).Error; err != nil {
-		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
-	var totalHectares float64
+	var totalHectares decimal.Decimal
 
 	if err := sumClient.
 		Joins("JOIN fields ON fields.project_id = projects.id").
 		Joins("JOIN lots ON lots.field_id = fields.id").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
-		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
 	}
 
 	if err := baseClient.
@@ -227,7 +228,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&projects).Error; err != nil {
-		return nil, 0, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
 	}
 
 	var projectList []domain.Project

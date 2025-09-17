@@ -235,8 +235,8 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter
 		  COALESCE(SUM(surface_ha), 0) AS surface_ha,
 		  COALESCE(SUM(liters), 0) AS liters,
 		  COALESCE(SUM(kilograms), 0) AS kilograms,
-		  COALESCE(SUM(direct_cost), 0) AS direct_cost
-		FROM workorder_metrics_view_v2
+		  COALESCE(SUM(direct_cost_usd), 0) AS direct_cost
+		FROM v3_workorder_metrics
 		WHERE 1=1
 	`
 	var args []any
