@@ -1,14 +1,20 @@
 INSERT INTO crops (id, name) VALUES
 (1, 'Soja'),
 (2, 'Maíz'),
-(3, 'Trigo'),
-(4, 'Girasol'),
-(5, 'Sorgo'),
-(6, 'Cebada'),
-(7, 'Alfalfa'),
-(8, 'Maní'),
-(9, 'Centeno'),
-(10, 'Avena');
+(3, 'Maíz PPM'),
+(4, 'Maíz color'),
+(5, 'Poroto'),
+(6, 'Poroto negro'),
+(7, 'Poroto blanco'),
+(8, 'Poroto rojo'),
+(9, 'Poroto Mung'),
+(10, 'Poroto crawberry'),
+(11, 'Trigo'),
+(12, 'Girasol'),
+(13, 'Sorgo'),
+(14, 'Garbanzo'),
+(15, 'Sésamo');
+
 
 INSERT INTO lease_types (name) VALUES
 ('% INGRESO NETO'),

@@ -12,17 +12,18 @@ import (
 )
 
 type Stock struct {
-	ID              int64
-	Project         *projdom.Project
-	Supply          *supplydomain.Supply
-	Investor        *domain.Investor
-	CloseDate       *time.Time
-	SupplyMovements []supplymovementdomain.SupplyMovement
-	RealStockUnits  decimal.Decimal
-	Consumed        decimal.Decimal
-	InitialStock    decimal.Decimal
-	YearPeriod      int64
-	MonthPeriod     int64
+	ID               int64
+	Project          *projdom.Project
+	Supply           *supplydomain.Supply
+	Investor         *domain.Investor
+	CloseDate        *time.Time
+	SupplyMovements  []supplymovementdomain.SupplyMovement
+	RealStockUnits   decimal.Decimal
+	Consumed         decimal.Decimal
+	UnitsTransferred decimal.Decimal
+	InitialStock     decimal.Decimal
+	YearPeriod       int64
+	MonthPeriod      int64
 	shareddomain.Base
 }
 
@@ -32,7 +33,7 @@ func (s *Stock) GetTotalUSD() decimal.Decimal {
 
 func (s *Stock) GetStockUnits() decimal.Decimal {
 
-	return s.GetEntryStock().Sub(s.GetOutStock())
+	return s.GetEntryStock().Sub(s.Consumed)
 }
 
 func (s *Stock) GetStockDifference() decimal.Decimal {
@@ -45,6 +46,10 @@ func (s *Stock) GetEntryStock() decimal.Decimal {
 		if supplyMovement.IsEntry {
 			stockUnits = stockUnits.Add(supplyMovement.Quantity)
 		}
+	}
+
+	if s.UnitsTransferred.GreaterThan(decimal.Zero) {
+		stockUnits = stockUnits.Sub(s.UnitsTransferred)
 	}
 
 	return stockUnits

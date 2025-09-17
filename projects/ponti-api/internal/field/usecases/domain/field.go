@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"github.com/shopspring/decimal"
+
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
@@ -11,8 +13,8 @@ type Field struct {
 	ProjectID         int64
 	Name              string
 	LeaseType         *leasetypedom.LeaseType
-	LeaseTypePercent  *float64
-	LeaseTypeValue    *float64
+	LeaseTypePercent  *decimal.Decimal
+	LeaseTypeValue    *decimal.Decimal
 	Lots              []lotdom.Lot
 	shareddomain.Base // Incluye CreatedAt, UpdatedAt, etc
 }

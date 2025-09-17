@@ -1,8 +1,11 @@
 package dto
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 
 	campdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/campaign/usecases/domain"
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
@@ -13,7 +16,6 @@ import (
 	lotdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	managerdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/manager/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project/usecases/domain"
-	"github.com/shopspring/decimal"
 )
 
 type Project struct {
@@ -54,14 +56,47 @@ type Investor struct {
 }
 
 type Field struct {
-	ID               int64    `json:"id,omitempty"`
-	ProjectID        int64    `json:"project_id,omitempty"`
-	Name             string   `json:"name" binding:"required"`
-	LeaseTypeName    string   `json:"lease_type_name"`
-	LeaseTypeID      int64    `json:"lease_type_id" binding:"required"`
-	LeaseTypePercent *float64 `json:"lease_type_percent"`
-	LeaseTypeValue   *float64 `json:"lease_type_value"`
-	Lots             []Lot    `json:"lots" binding:"required,dive,required"`
+	ID               int64            `json:"id,omitempty"`
+	ProjectID        int64            `json:"project_id,omitempty"`
+	Name             string           `json:"name" binding:"required"`
+	LeaseTypeName    string           `json:"lease_type_name"`
+	LeaseTypeID      int64            `json:"lease_type_id" binding:"required"`
+	LeaseTypePercent *decimal.Decimal `json:"lease_type_percent"`
+	LeaseTypeValue   *decimal.Decimal `json:"lease_type_value"`
+	Lots             []Lot            `json:"lots" binding:"required,dive,required"`
+}
+
+// MarshalJSON aplica redondeo de 3 decimales a los campos decimales
+func (f Field) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		ID               int64   `json:"id,omitempty"`
+		ProjectID        int64   `json:"project_id,omitempty"`
+		Name             string  `json:"name"`
+		LeaseTypeName    string  `json:"lease_type_name"`
+		LeaseTypeID      int64   `json:"lease_type_id"`
+		LeaseTypePercent *string `json:"lease_type_percent"`
+		LeaseTypeValue   *string `json:"lease_type_value"`
+		Lots             []Lot   `json:"lots"`
+	}{
+		ID:            f.ID,
+		ProjectID:     f.ProjectID,
+		Name:          f.Name,
+		LeaseTypeName: f.LeaseTypeName,
+		LeaseTypeID:   f.LeaseTypeID,
+		Lots:          f.Lots,
+	}
+
+	if f.LeaseTypePercent != nil {
+		val := f.LeaseTypePercent.Round(3).String()
+		aux.LeaseTypePercent = &val
+	}
+
+	if f.LeaseTypeValue != nil {
+		val := f.LeaseTypeValue.Round(3).String()
+		aux.LeaseTypeValue = &val
+	}
+
+	return json.Marshal(aux)
 }
 
 type Lot struct {

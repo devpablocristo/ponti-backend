@@ -6,12 +6,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
-	"github.com/gin-gonic/gin"
 )
 
 type UseCasesPort interface {
@@ -22,6 +25,7 @@ type UseCasesPort interface {
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
+	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 }
 
 type GinEnginePort interface {

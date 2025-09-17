@@ -67,6 +67,11 @@ func FromDomain(o *domain.Workorder) *Workorder {
 		EffectiveArea: o.EffectiveArea,
 	}
 
+	// Solo establecer ID si es mayor que 0 (para updates)
+	if o.ID > 0 {
+		w.ID = o.ID
+	}
+
 	if len(o.Items) > 0 {
 		items := make([]WorkorderItem, len(o.Items))
 		for i, it := range o.Items {

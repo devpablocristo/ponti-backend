@@ -132,6 +132,20 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockId int64, st
 	return nil
 }
 
+func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
+	result := r.db.Client().WithContext(ctx).
+		Model(&models.Stock{}).
+		Where("id = ?", stockDomain.ID).
+		Update("units_consumed", gorm.Expr("units_consumed + ?", quantity))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, "no stock found to update", nil)
+	}
+	return nil
+}
+
 func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 	err := r.db.Client().WithContext(ctx).

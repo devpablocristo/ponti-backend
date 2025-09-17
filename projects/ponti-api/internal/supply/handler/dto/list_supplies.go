@@ -1,9 +1,11 @@
 package dto
 
 import (
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 )
 
 // Estructura de supply para listados con información completa

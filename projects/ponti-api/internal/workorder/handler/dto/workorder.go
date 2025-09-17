@@ -73,7 +73,7 @@ func (r Workorder) MarshalJSON() ([]byte, error) {
 		Observations:  r.Observations,
 		Date:          r.Date,
 		InvestorID:    r.InvestorID,
-		EffectiveArea: r.EffectiveArea.Round(2),
+		EffectiveArea: r.EffectiveArea.Round(3),
 		Items:         r.Items,
 	}
 	return json.Marshal(aux)

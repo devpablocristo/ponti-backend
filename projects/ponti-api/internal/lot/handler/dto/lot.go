@@ -3,10 +3,11 @@ package dto
 import (
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	cropdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
-	"github.com/shopspring/decimal"
 )
 
 type Lot struct {

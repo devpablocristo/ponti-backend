@@ -28,8 +28,9 @@ type Lot struct {
 }
 
 type LotMetrics struct {
-	SeededArea     decimal.Decimal
-	HarvestedArea  decimal.Decimal
-	YieldTnPerHa   decimal.Decimal
-	CostPerHectare decimal.Decimal
+	SeededArea      decimal.Decimal
+	HarvestedArea   decimal.Decimal
+	YieldTnPerHa    decimal.Decimal
+	CostPerHectare  decimal.Decimal
+	SuperficieTotal decimal.Decimal
 }

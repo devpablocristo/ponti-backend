@@ -59,12 +59,21 @@ func (d *LotUpdate) ToDomain() (*domain.Lot, error) {
 		}
 	}
 
-	return &domain.Lot{
+	// Solo crear objetos Crop si se envían explícitamente
+	var previousCrop, currentCrop cropdom.Crop
+	if d.PreviousCropID > 0 {
+		previousCrop = cropdom.Crop{ID: d.PreviousCropID, Name: d.PreviousCropName}
+	}
+	if d.CurrentCropID > 0 {
+		currentCrop = cropdom.Crop{ID: d.CurrentCropID, Name: d.CurrentCropName}
+	}
+
+	lot := &domain.Lot{
 		Name:         d.Name,
 		FieldID:      d.FieldID,
 		Hectares:     d.Hectares,
-		PreviousCrop: cropdom.Crop{ID: d.PreviousCropID, Name: d.PreviousCropName},
-		CurrentCrop:  cropdom.Crop{ID: d.CurrentCropID, Name: d.CurrentCropName},
+		PreviousCrop: previousCrop,
+		CurrentCrop:  currentCrop,
 		Season:       d.Season,
 		Variety:      d.Variety,
 		Dates:        dates,
@@ -72,5 +81,12 @@ func (d *LotUpdate) ToDomain() (*domain.Lot, error) {
 		Base: shareddomain.Base{
 			UpdatedAt: d.UpdatedAt,
 		},
-	}, nil
+	}
+
+	// Preservar UpdatedBy si se proporciona en el DTO
+	if d.UpdatedBy != nil {
+		lot.Base.UpdatedBy = d.UpdatedBy
+	}
+
+	return lot, nil
 }
