@@ -16,6 +16,7 @@ import (
 type UseCasesPort interface {
 	GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error)
+	GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
 // GinEnginePort define la interfaz para el motor Gin
@@ -68,101 +69,80 @@ func (h *ReportHandler) Routes() {
 
 	reports := r.Group(baseURL)
 	{
-		// Reporte por campo/cultivo
-		reports.GET("/field-crop", h.GetFieldCropReport)
-		// Reporte de aportes de inversores
-		reports.GET("/investor-contribution", h.GetInvestorContributionReport)
+		// Handler genérico para todos los reportes
+		reports.GET("/:type", h.GetReport)
 	}
 }
 
-// ===== ENDPOINTS =====
+// ===== HANDLER GENÉRICO =====
 
-// GetFieldCropReport obtiene el reporte por campo/cultivo en formato tabla
-// @Summary Obtener reporte por campo/cultivo
-// @Description Obtiene el reporte detallado por campo y cultivo con métricas financieras en formato tabla
+// GetReport maneja todas las peticiones de reportes de forma unificada
+// @Summary Obtener reporte genérico
+// @Description Obtiene reportes financieros y operativos por tipo
 // @Tags reports
 // @Accept json
 // @Produce json
+// @Param type path string true "Tipo de reporte" Enums(field-crop, investor-contribution, summary-results)
 // @Param customer_id query int false "ID del cliente"
 // @Param project_id query int false "ID del proyecto"
-// @Param campaign_id query int false "ID de la campaña"
+// @Param campaign_id query int false "Campaign ID"
 // @Param field_id query int false "ID del campo"
-// @Success 200 {object} dto.ReportTableResponse
+// @Success 200 {object} interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /reports/field-crop [get]
-func (h *ReportHandler) GetFieldCropReport(c *gin.Context) {
-	// Parsear filtros de query parameters
-	filters, err := h.parseFilters(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Filtros inválidos",
-			"details": err.Error(),
-		})
+// @Router /reports/{type} [get]
+func (h *ReportHandler) GetReport(c *gin.Context) {
+	reportType := c.Param("type")
+
+	// Validar tipo de reporte
+	if !h.isValidReportType(reportType) {
+		h.sendErrorResponse(c, http.StatusBadRequest, "Invalid report type", "Valid types: field-crop, investor-contribution, summary-results")
 		return
 	}
 
-	// Obtener reporte en formato tabla con supplies y labors detallados
-	report, err := h.ucs.GetFieldCropReport(filters)
+	// Parsear filtros según el tipo de reporte
+	filters, err := h.parseFiltersByType(c, reportType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Error interno del servidor",
-			"details": err.Error(),
-		})
+		h.sendErrorResponse(c, http.StatusBadRequest, "Invalid filters", err.Error())
 		return
 	}
 
-	// Mapear del dominio al DTO
-	dtoResponse := dto.FromDomainFieldCrop(*report)
-
-	c.JSON(http.StatusOK, dtoResponse)
-}
-
-// GetInvestorContributionReport obtiene el reporte de aportes de inversores
-// @Summary Obtener reporte de aportes de inversores
-// @Description Obtiene el reporte detallado de aportes de inversores por categorías
-// @Tags reports
-// @Accept json
-// @Produce json
-// @Param project_id query int false "ID del proyecto"
-// @Param customer_id query int false "ID del cliente"
-// @Param campaign_id query int false "ID de la campaña"
-// @Param field_id query int false "ID del campo"
-// @Success 200 {object} dto.InvestorContributionReportResponse
-// @Failure 400 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
-// @Router /reports/investor-contribution [get]
-func (h *ReportHandler) GetInvestorContributionReport(c *gin.Context) {
-	// Parsear filtros de query parameters
-	filters, err := h.parseFilters(c)
+	// Obtener reporte según el tipo
+	report, err := h.buildReportByType(c, reportType, filters)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Filtros inválidos",
-			"details": err.Error(),
-		})
+		h.sendErrorResponse(c, http.StatusInternalServerError, "Internal server error", err.Error())
 		return
 	}
 
-	// Obtener reporte de aportes de inversores
-	report, err := h.ucs.GetInvestorContributionReport(c.Request.Context(), filters)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Error interno del servidor",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Mapear del dominio al DTO
-	dtoResponse := dto.FromDomainInvestorReport(report)
-
-	c.JSON(http.StatusOK, dtoResponse)
+	h.sendSuccessResponse(c, report)
 }
 
 // ===== FUNCIONES AUXILIARES =====
 
-// parseFilters parsea los filtros de los query parameters
-func (h *ReportHandler) parseFilters(c *gin.Context) (domain.ReportFilter, error) {
+// isValidReportType valida si el tipo de reporte es válido
+func (h *ReportHandler) isValidReportType(reportType string) bool {
+	validTypes := map[string]bool{
+		"field-crop":            true,
+		"investor-contribution": true,
+		"summary-results":       true,
+	}
+	return validTypes[reportType]
+}
+
+// parseFiltersByType parsea los filtros según el tipo de reporte
+func (h *ReportHandler) parseFiltersByType(c *gin.Context, reportType string) (interface{}, error) {
+	switch reportType {
+	case "field-crop", "investor-contribution":
+		return h.parseReportFilters(c)
+	case "summary-results":
+		return h.parseSummaryFilters(c)
+	default:
+		return nil, nil
+	}
+}
+
+// parseReportFilters parsea filtros para reportes estándar
+func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter, error) {
 	filters := domain.ReportFilter{}
 
 	// Parsear customer_id
@@ -202,4 +182,55 @@ func (h *ReportHandler) parseFilters(c *gin.Context) (domain.ReportFilter, error
 	}
 
 	return filters, nil
+}
+
+// parseSummaryFilters parsea filtros para reporte de resumen
+func (h *ReportHandler) parseSummaryFilters(c *gin.Context) (domain.SummaryResultsFilter, error) {
+	var request dto.SummaryResultsRequest
+	if err := c.ShouldBindQuery(&request); err != nil {
+		return domain.SummaryResultsFilter{}, err
+	}
+	return dto.ToDomainSummaryResultsFilter(request), nil
+}
+
+// buildReportByType construye el reporte según el tipo
+func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, filters interface{}) (interface{}, error) {
+	switch reportType {
+	case "field-crop":
+		report, err := h.ucs.GetFieldCropReport(filters.(domain.ReportFilter))
+		if err != nil {
+			return nil, err
+		}
+		return dto.BuildFieldCropResponse(report), nil
+
+	case "investor-contribution":
+		report, err := h.ucs.GetInvestorContributionReport(c.Request.Context(), filters.(domain.ReportFilter))
+		if err != nil {
+			return nil, err
+		}
+		return dto.FromDomainInvestorReport(report), nil
+
+	case "summary-results":
+		report, err := h.ucs.GetSummaryResultsReport(filters.(domain.SummaryResultsFilter))
+		if err != nil {
+			return nil, err
+		}
+		return dto.FromDomainSummaryResults(report), nil
+
+	default:
+		return nil, nil
+	}
+}
+
+// sendErrorResponse envía una respuesta de error estandarizada
+func (h *ReportHandler) sendErrorResponse(c *gin.Context, statusCode int, message string, details string) {
+	c.JSON(statusCode, gin.H{
+		"error":   message,
+		"details": details,
+	})
+}
+
+// sendSuccessResponse envía una respuesta exitosa
+func (h *ReportHandler) sendSuccessResponse(c *gin.Context, data interface{}) {
+	c.JSON(http.StatusOK, data)
 }

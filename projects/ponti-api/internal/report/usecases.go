@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
@@ -14,12 +15,14 @@ type ReportRepositoryPort interface {
 	GetProjectInfo(projectID int64) (*domain.ProjectInfo, error)
 	BuildFieldCrop(filters domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error)
+	GetSummaryResults(filters domain.SummaryResultsFilter) ([]domain.SummaryResults, error)
 }
 
 // ReportUseCasePort define la interfaz del caso de uso
 type ReportUseCasePort interface {
 	GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error)
+	GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
 // ReportUseCase implementa la lógica de negocio para reportes
@@ -50,6 +53,14 @@ func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domai
 
 // ===== VALIDACIONES =====
 
+// validateAtLeastOneFilter valida que al menos un filtro esté presente
+func (uc *ReportUseCase) validateAtLeastOneFilter(projectID, customerID, campaignID, fieldID *int64) error {
+	if projectID == nil && customerID == nil && campaignID == nil && fieldID == nil {
+		return fmt.Errorf("at least one filter must be specified (project_id, customer_id, campaign_id, or field_id)")
+	}
+	return nil
+}
+
 // GetInvestorContributionReport obtiene el reporte de aportes de inversores
 func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {
 	// Todos los filtros son opcionales - no hay validaciones requeridas
@@ -61,4 +72,55 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 	}
 
 	return report, nil
+}
+
+// ===== REPORTE DE RESUMEN DE RESULTADOS =====
+
+// GetSummaryResultsReport obtiene el reporte de resumen de resultados
+func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
+	// Validar que al menos un filtro esté presente
+	if err := uc.validateAtLeastOneFilter(filters.ProjectID, filters.CustomerID, filters.CampaignID, filters.FieldID); err != nil {
+		return nil, err
+	}
+
+	// Obtener datos del repositorio
+	results, err := uc.repository.GetSummaryResults(filters)
+	if err != nil {
+		return nil, fmt.Errorf("error obteniendo resumen de resultados: %w", err)
+	}
+
+	if len(results) == 0 {
+		return &domain.SummaryResultsResponse{
+			Cultivos: []domain.SummaryResults{},
+			Totales:  domain.ProjectTotals{},
+		}, nil
+	}
+
+	// Obtener información del proyecto (usar el primer resultado)
+	projectID := results[0].ProjectID
+	projectInfo, err := uc.repository.GetProjectInfo(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting project information: %w", err)
+	}
+
+	// Calcular totales del proyecto
+	resultsPtr := make([]*domain.SummaryResults, len(results))
+	for i := range results {
+		resultsPtr[i] = &results[i]
+	}
+	totales := models.CalculateProjectTotals(resultsPtr)
+
+	// Construir respuesta
+	response := &domain.SummaryResultsResponse{
+		ProjectID:    projectInfo.ProjectID,
+		ProjectName:  projectInfo.ProjectName,
+		CustomerID:   projectInfo.CustomerID,
+		CustomerName: projectInfo.CustomerName,
+		CampaignID:   projectInfo.CampaignID,
+		CampaignName: projectInfo.CampaignName,
+		Cultivos:     results,
+		Totales:      *totales,
+	}
+
+	return response, nil
 }

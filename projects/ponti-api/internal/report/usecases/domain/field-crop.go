@@ -83,31 +83,6 @@ type FieldCropMetric struct {
 	RindeIndiferenciaUsdTn decimal.Decimal `json:"rinde_indiferencia_usd_tn"`
 }
 
-// LaborMetric representa una métrica de labor
-type LaborMetric struct {
-	LaborID        int64           `json:"labor_id"`
-	LaborName      string          `json:"labor_name"`
-	CategoryID     int64           `json:"category_id"`
-	CategoryName   string          `json:"category_name"`
-	SurfaceHa      decimal.Decimal `json:"surface_ha"`
-	CostUsd        decimal.Decimal `json:"cost_usd"`
-	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
-	WorkOrderCount int64           `json:"workorder_count"`
-}
-
-// SupplyMetric representa una métrica de supply
-type SupplyMetric struct {
-	SupplyID       int64           `json:"supply_id"`
-	SupplyName     string          `json:"supply_name"`
-	CategoryID     int64           `json:"category_id"`
-	CategoryName   string          `json:"category_name"`
-	SurfaceHa      decimal.Decimal `json:"surface_ha"`
-	QuantityUsed   decimal.Decimal `json:"quantity_used"`
-	CostUsd        decimal.Decimal `json:"cost_usd"`
-	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
-	WorkOrderCount int64           `json:"workorder_count"`
-}
-
 // ===== TABLE DOMAIN MODELS =====
 
 // FieldCrop representa la tabla de reporte field-crop
@@ -142,4 +117,29 @@ type FieldCropRow struct {
 // FieldCropValue representa un valor en la tabla
 type FieldCropValue struct {
 	Number decimal.Decimal `json:"number"`
+}
+
+// LaborMetric representa una métrica de labor
+type LaborMetric struct {
+	LaborID        int64           `json:"labor_id"`
+	LaborName      string          `json:"labor_name"`
+	CategoryID     int64           `json:"category_id"`
+	CategoryName   string          `json:"category_name"`
+	SurfaceHa      decimal.Decimal `json:"surface_ha"`
+	CostUsd        decimal.Decimal `json:"cost_usd"`
+	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
+	WorkOrderCount int64           `json:"workorder_count"`
+}
+
+// SupplyMetric representa una métrica de supply
+type SupplyMetric struct {
+	SupplyID       int64           `json:"supply_id"`
+	SupplyName     string          `json:"supply_name"`
+	CategoryID     int64           `json:"category_id"`
+	CategoryName   string          `json:"category_name"`
+	SurfaceHa      decimal.Decimal `json:"surface_ha"`
+	QuantityUsed   decimal.Decimal `json:"quantity_used"`
+	CostUsd        decimal.Decimal `json:"cost_usd"`
+	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
+	WorkOrderCount int64           `json:"workorder_count"`
 }
