@@ -8,6 +8,13 @@
 -- 
 -- Note: Code in English, comments in Spanish.
 
+-- Sincronizar category_id de labores para usar la tabla categories
+UPDATE labors 
+SET category_id = c.id
+FROM labor_categories lc
+JOIN categories c ON c.name = lc.name AND c.type_id = lc.type_id
+WHERE labors.category_id = lc.id;
+
 -- -------------------------------------------------------------------
 -- v3_labor_metrics: métricas agregadas de labores
 -- -------------------------------------------------------------------
