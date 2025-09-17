@@ -23,7 +23,7 @@ type LaborListItem struct {
 	LaborID           int64           `gorm:"column:labor_id"`
 	LaborName         string          `gorm:"column:labor_name"`
 	LaborCategoryID   *int64          `gorm:"column:labor_category_id"`
-	LaborCategoryName *string         `gorm:"column:labor_category_name"`
+	LaborCategoryName *string         `gorm:"column:category_name"`
 	Contractor        string          `gorm:"column:contractor"`
 	ContractorName    string          `gorm:"column:contractor_name"`
 	SurfaceHa         decimal.Decimal `gorm:"column:surface_ha"`
