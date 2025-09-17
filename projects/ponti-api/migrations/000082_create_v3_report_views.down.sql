@@ -12,3 +12,13 @@
 -- v3_report_field_crop_metrics_view: rollback elimina la vista
 -- -------------------------------------------------------------------
 DROP VIEW IF EXISTS public.v3_report_field_crop_metrics_view;
+
+-- -------------------------------------------------------------------
+-- v3_report_summary_results_view: rollback elimina la vista
+-- -------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v3_report_summary_results_view;
+
+-- -------------------------------------------------------------------
+-- v3_investor_contribution_data_view: rollback elimina la vista
+-- -------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v3_investor_contribution_data_view;
