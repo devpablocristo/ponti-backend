@@ -32,139 +32,7 @@ func NewReportRepository(db GormEnginePort) *ReportRepository {
 	}
 }
 
-// ===== FUNCIONES GENÉRICAS =====
-
-// convertToInt64 convierte valores raw a int64
-func (r *ReportRepository) convertToInt64(raw any) int64 {
-	if raw == nil {
-		return 0
-	}
-
-	switch v := raw.(type) {
-	case int64:
-		return v
-	case int:
-		return int64(v)
-	case float64:
-		return int64(v)
-	case string:
-		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return val
-		}
-	}
-	return 0
-}
-
-// convertToDecimal convierte valores raw a decimal.Decimal
-func (r *ReportRepository) convertToDecimal(raw any) decimal.Decimal {
-	if raw == nil {
-		return decimal.Zero
-	}
-
-	switch v := raw.(type) {
-	case string:
-		if dec, err := decimal.NewFromString(v); err == nil {
-			return dec
-		}
-	case float64:
-		return decimal.NewFromFloat(v)
-	case int64:
-		return decimal.NewFromInt(v)
-	case int:
-		return decimal.NewFromInt(int64(v))
-	}
-	return decimal.Zero
-}
-
-// getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
-func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
-	// Si tenemos ProjectID directamente, usarlo sin buscar
-	if filter.ProjectID != nil {
-		return []int64{*filter.ProjectID}, nil
-	}
-
-	// Si no hay filtros, devolver todos los proyectos
-	if filter.CustomerID == nil && filter.CampaignID == nil && filter.FieldID == nil {
-		query := `SELECT DISTINCT p.id FROM projects p WHERE p.deleted_at IS NULL`
-		var projectIDs []int64
-		if err := r.db.Client().Raw(query).Scan(&projectIDs).Error; err != nil {
-			return nil, fmt.Errorf("error al obtener todos los proyectos: %w", err)
-		}
-		return projectIDs, nil
-	}
-
-	query := `
-		SELECT DISTINCT p.id
-		FROM projects p
-		WHERE p.deleted_at IS NULL
-	`
-
-	var args []any
-	argIndex := 1
-
-	// Aplicar filtros si están presentes
-	if filter.CustomerID != nil {
-		query += " AND p.customer_id = $" + fmt.Sprintf("%d", argIndex)
-		args = append(args, *filter.CustomerID)
-		argIndex++
-	}
-	if filter.CampaignID != nil {
-		query += " AND p.campaign_id = $" + fmt.Sprintf("%d", argIndex)
-		args = append(args, *filter.CampaignID)
-		argIndex++
-	}
-	if filter.FieldID != nil {
-		query += " AND EXISTS (SELECT 1 FROM fields f WHERE f.id = $" + fmt.Sprintf("%d", argIndex) + " AND f.project_id = p.id)"
-		args = append(args, *filter.FieldID)
-		argIndex++
-	}
-
-	var projectIDs []int64
-	if err := r.db.Client().Raw(query, args...).Scan(&projectIDs).Error; err != nil {
-		return nil, fmt.Errorf("error al obtener proyectos relacionados: %w", err)
-	}
-
-	return projectIDs, nil
-}
-
-// getProjectInfo obtiene la información básica del proyecto
-func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.ProjectInfo, error) {
-	// Obtener project IDs relacionados con los filtros
-	projectIDs, err := r.getRelatedProjectIDs(filters)
-	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
-	}
-
-	if len(projectIDs) == 0 {
-		return &domain.ProjectInfo{}, nil
-	}
-
-	// Usar el primer proyecto para la información básica
-	projectID := projectIDs[0]
-
-	var projectInfo domain.ProjectInfo
-
-	query := `
-		SELECT 
-			p.id as project_id,
-			p.name as project_name,
-			c.id as customer_id,
-			c.name as customer_name,
-			camp.id as campaign_id,
-			camp.name as campaign_name
-		FROM projects p
-		LEFT JOIN customers c ON p.customer_id = c.id
-		LEFT JOIN campaigns camp ON p.campaign_id = camp.id
-		WHERE p.id = ? AND p.deleted_at IS NULL
-	`
-
-	err = r.db.Client().Raw(query, projectID).Scan(&projectInfo).Error
-	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
-	}
-
-	return &projectInfo, nil
-}
+// ===== FUNCIONES PRINCIPALES =====
 
 // ===== REPORTE POR CAMPO/CULTIVO =====
 
@@ -394,16 +262,16 @@ func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.Fiel
 	// Cargar categorías de insumos desde la base de datos
 	supplyCategories, err := r.getSupplyCategories()
 	if err != nil {
-		// Fallback a categorías por defecto si hay error
+		// Fallback a categorías por defecto si hay error (usando solo categorías de 000013)
 		supplyCategories = map[string]string{
-			"supply_semillas":      "Semillas",
-			"supply_curasemillas":  "Seed Treatment",
+			"supply_semilla":       "Semilla",
+			"supply_coadyuvantes":  "Coadyuvantes",
+			"supply_curasemillas":  "Curasemillas",
 			"supply_herbicidas":    "Herbicidas",
 			"supply_insecticidas":  "Insecticidas",
-			"supply_coadyuvantes":  "Coadyuvantes",
-			"supply_fertilizantes": "Fertilizantes",
 			"supply_fungicidas":    "Fungicidas",
-			"supply_otros":         "Otros insumos",
+			"supply_otros_insumos": "Otros Insumos",
+			"supply_fertilizantes": "Fertilizantes",
 		}
 	}
 
@@ -430,11 +298,11 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 	// Cargar categorías de labores desde la base de datos
 	laborCategories, err := r.getLaborCategories()
 	if err != nil {
-		// Fallback a categorías por defecto si hay error (usando nombres de BD)
+		// Fallback a categorías por defecto si hay error (usando solo categorías de 000013)
 		laborCategories = map[string]string{
 			"labor_siembra":       "Siembra",
 			"labor_pulverizacion": "Pulverización",
-			"labor_otras":         "Otras Labores",
+			"labor_otras_labores": "Otras Labores",
 			"labor_riego":         "Riego",
 			"labor_cosecha":       "Cosecha",
 		}
@@ -461,12 +329,11 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 // getSupplyCategories obtiene las categorías de insumos desde la base de datos
 func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 	query := `
-		SELECT c.id, c.name, t.name as type_name
+		SELECT c.id, c.name, c.type_id
 		FROM categories c
-		JOIN types t ON c.type_id = t.id
 		WHERE c.deleted_at IS NULL 
-		AND t.name IN ('Semilla', 'Agroquímicos', 'Fertilizantes')
-		ORDER BY t.name, c.name
+		AND c.type_id IN (1, 2, 3)
+		ORDER BY c.type_id, c.name
 	`
 
 	rows, err := r.db.Client().Raw(query).Rows()
@@ -478,17 +345,18 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 	categories := make(map[string]string)
 	for rows.Next() {
 		var id int64
-		var name, typeName string
-		if err := rows.Scan(&id, &name, &typeName); err != nil {
+		var name string
+		var typeID int64
+		if err := rows.Scan(&id, &name, &typeID); err != nil {
 			continue
 		}
 
-		// Crear clave basada en el tipo y nombre
+		// Crear clave basada en el tipo y nombre (usando solo categorías de 000013)
 		var key string
-		switch typeName {
-		case "Semilla":
-			key = "supply_semillas"
-		case "Agrochemicals":
+		switch typeID {
+		case 1: // Semilla
+			key = "supply_semilla"
+		case 2: // Agroquímicos
 			switch name {
 			case "Coadyuvantes":
 				key = "supply_coadyuvantes"
@@ -501,11 +369,11 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 			case "Fungicidas":
 				key = "supply_fungicidas"
 			case "Otros Insumos":
-				key = "supply_otros"
+				key = "supply_otros_insumos"
 			default:
 				key = fmt.Sprintf("supply_%d", id) // Fallback usando ID
 			}
-		case "Fertilizantes":
+		case 3: // Fertilizantes
 			key = "supply_fertilizantes"
 		default:
 			key = fmt.Sprintf("supply_%d", id) // Fallback usando ID
@@ -520,11 +388,10 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 // getLaborCategories obtiene las categorías de labores desde la base de datos
 func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 	query := `
-		SELECT c.id, c.name, t.name as type_name
+		SELECT c.id, c.name, c.type_id
 		FROM categories c
-		JOIN types t ON c.type_id = t.id
 		WHERE c.deleted_at IS NULL 
-		AND t.name = 'Labores'
+		AND c.type_id = 4
 		ORDER BY c.name
 	`
 
@@ -537,12 +404,13 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 	categories := make(map[string]string)
 	for rows.Next() {
 		var id int64
-		var name, typeName string
-		if err := rows.Scan(&id, &name, &typeName); err != nil {
+		var name string
+		var typeID int64
+		if err := rows.Scan(&id, &name, &typeID); err != nil {
 			continue
 		}
 
-		// Crear clave basada en el nombre
+		// Crear clave basada en el nombre (usando solo categorías de 000013)
 		var key string
 		switch name {
 		case "Siembra":
@@ -550,7 +418,7 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 		case "Pulverización":
 			key = "labor_pulverizacion"
 		case "Otras Labores":
-			key = "labor_otras"
+			key = "labor_otras_labores"
 		case "Riego":
 			key = "labor_riego"
 		case "Cosecha":
@@ -853,4 +721,137 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 	}
 
 	return results, nil
+}
+
+// ===== FUNCIONES AUXILIARES =====
+
+// convertToInt64 convierte valores raw a int64
+func (r *ReportRepository) convertToInt64(raw any) int64 {
+	if raw == nil {
+		return 0
+	}
+
+	switch v := raw.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return val
+		}
+	}
+	return 0
+}
+
+// convertToDecimal convierte valores raw a decimal.Decimal
+func (r *ReportRepository) convertToDecimal(raw any) decimal.Decimal {
+	if raw == nil {
+		return decimal.Zero
+	}
+
+	switch v := raw.(type) {
+	case string:
+		if dec, err := decimal.NewFromString(v); err == nil {
+			return dec
+		}
+	case float64:
+		return decimal.NewFromFloat(v)
+	case int64:
+		return decimal.NewFromInt(v)
+	case int:
+		return decimal.NewFromInt(int64(v))
+	}
+	return decimal.Zero
+}
+
+// getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
+func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
+	// Si tenemos ProjectID directamente, usarlo sin buscar
+	if filter.ProjectID != nil {
+		return []int64{*filter.ProjectID}, nil
+	}
+
+	// Si no hay filtros, devolver todos los proyectos
+	if filter.CustomerID == nil && filter.CampaignID == nil && filter.FieldID == nil {
+		query := `SELECT DISTINCT p.id FROM projects p WHERE p.deleted_at IS NULL`
+		var projectIDs []int64
+		if err := r.db.Client().Raw(query).Scan(&projectIDs).Error; err != nil {
+			return nil, fmt.Errorf("error al obtener todos los proyectos: %w", err)
+		}
+		return projectIDs, nil
+	}
+
+	query := `
+		SELECT DISTINCT p.id
+		FROM projects p
+		WHERE p.deleted_at IS NULL
+	`
+
+	var args []any
+	argIndex := 1
+
+	// Aplicar filtros si están presentes
+	if filter.CustomerID != nil {
+		query += " AND p.customer_id = $" + fmt.Sprintf("%d", argIndex)
+		args = append(args, *filter.CustomerID)
+		argIndex++
+	}
+	if filter.CampaignID != nil {
+		query += " AND p.campaign_id = $" + fmt.Sprintf("%d", argIndex)
+		args = append(args, *filter.CampaignID)
+		argIndex++
+	}
+	if filter.FieldID != nil {
+		query += " AND EXISTS (SELECT 1 FROM fields f WHERE f.id = $" + fmt.Sprintf("%d", argIndex) + " AND f.project_id = p.id)"
+		args = append(args, *filter.FieldID)
+	}
+
+	var projectIDs []int64
+	if err := r.db.Client().Raw(query, args...).Scan(&projectIDs).Error; err != nil {
+		return nil, fmt.Errorf("error al obtener proyectos relacionados: %w", err)
+	}
+
+	return projectIDs, nil
+}
+
+// getProjectInfo obtiene la información básica del proyecto
+func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.ProjectInfo, error) {
+	// Obtener project IDs relacionados con los filtros
+	projectIDs, err := r.getRelatedProjectIDs(filters)
+	if err != nil {
+		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+	}
+
+	if len(projectIDs) == 0 {
+		return &domain.ProjectInfo{}, nil
+	}
+
+	// Usar el primer proyecto para la información básica
+	projectID := projectIDs[0]
+
+	var projectInfo domain.ProjectInfo
+
+	query := `
+		SELECT 
+			p.id as project_id,
+			p.name as project_name,
+			c.id as customer_id,
+			c.name as customer_name,
+			camp.id as campaign_id,
+			camp.name as campaign_name
+		FROM projects p
+		LEFT JOIN customers c ON p.customer_id = c.id
+		LEFT JOIN campaigns camp ON p.campaign_id = camp.id
+		WHERE p.id = ? AND p.deleted_at IS NULL
+	`
+
+	err = r.db.Client().Raw(query, projectID).Scan(&projectInfo).Error
+	if err != nil {
+		return nil, fmt.Errorf("error getting project information: %w", err)
+	}
+
+	return &projectInfo, nil
 }

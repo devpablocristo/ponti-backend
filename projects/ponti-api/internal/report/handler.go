@@ -14,15 +14,15 @@ import (
 
 // UseCasesPort define la interfaz para los casos de uso
 type UseCasesPort interface {
-	GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error)
-	GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error)
-	GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
+	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
+	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
+	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
 // GinEnginePort define la interfaz para el motor Gin
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
-	RunServer(ctx context.Context) error
+	RunServer(context.Context) error
 }
 
 // ConfigAPIPort define la interfaz para la configuración de API
@@ -77,20 +77,6 @@ func (h *ReportHandler) Routes() {
 // ===== HANDLER GENÉRICO =====
 
 // GetReport maneja todas las peticiones de reportes de forma unificada
-// @Summary Obtener reporte genérico
-// @Description Obtiene reportes financieros y operativos por tipo
-// @Tags reports
-// @Accept json
-// @Produce json
-// @Param type path string true "Tipo de reporte" Enums(field-crop, investor-contribution, summary-results)
-// @Param customer_id query int false "ID del cliente"
-// @Param project_id query int false "ID del proyecto"
-// @Param campaign_id query int false "Campaign ID"
-// @Param field_id query int false "ID del campo"
-// @Success 200 {object} interface{}
-// @Failure 400 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
-// @Router /reports/{type} [get]
 func (h *ReportHandler) GetReport(c *gin.Context) {
 	reportType := c.Param("type")
 

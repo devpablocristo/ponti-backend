@@ -79,7 +79,17 @@ WITH lot_base AS (
     c.name AS crop_name,
     l.hectares,
     COALESCE(l.tons, 0)::numeric AS tons,
-    v3_calc.seeded_area(l.sowing_date, l.hectares::numeric)::double precision AS seeded_area_ha
+    -- Superficie sembrada: suma de effective_area de workorders de tipo siembra
+    COALESCE((
+      SELECT SUM(w.effective_area)
+      FROM public.workorders w
+      JOIN public.labors lab ON w.labor_id = lab.id
+      JOIN public.categories cat ON lab.category_id = cat.id
+      WHERE w.lot_id = l.id 
+        AND w.deleted_at IS NULL
+        AND cat.name = 'Siembra'
+        AND cat.type_id = 4
+    ), 0)::numeric AS seeded_area_ha
   FROM public.lots l
   JOIN public.fields   f ON f.id = l.field_id AND f.deleted_at IS NULL
   JOIN public.projects p ON p.id = f.project_id AND p.deleted_at IS NULL
@@ -95,27 +105,48 @@ by_crop AS (
     -- Superficie total por cultivo
     COALESCE(SUM(lb.seeded_area_ha), 0)::numeric AS surface_ha,
     
-    -- Ingreso neto total por cultivo
-    COALESCE(SUM(v3_calc.income_net_total_for_lot(lb.lot_id)), 0)::numeric AS net_income_usd,
+    -- Ingreso neto total por cultivo: superficie * ingreso neto por ha (de comercializaciones)
+    COALESCE(SUM(lb.seeded_area_ha * (
+      SELECT COALESCE(cc.net_price, 0)
+      FROM public.crop_commercializations cc
+      WHERE cc.project_id = lb.project_id 
+        AND cc.crop_id = lb.current_crop_id
+        AND cc.deleted_at IS NULL
+      LIMIT 1
+    )), 0)::numeric AS net_income_usd,
     
     -- Costos directos totales por cultivo (labores + insumos)
     COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::numeric AS direct_costs_usd,
     
-    -- Arriendo total por cultivo
-    COALESCE(SUM(v3_calc.rent_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS rent_usd,
+    -- Arriendo total por cultivo: superficie * costo de arriendo por ha (usando función SSOT)
+    COALESCE(SUM(lb.seeded_area_ha * v3_calc.rent_per_ha_for_lot(lb.lot_id)), 0)::numeric AS rent_usd,
     
-    -- Estructura total por cultivo
-    COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS structure_usd,
+    -- Estructura total por cultivo: costo fijo * superficie (usando función SSOT)
+    COALESCE(SUM(lb.seeded_area_ha * v3_calc.admin_cost_per_ha_for_lot(lb.lot_id)), 0)::numeric AS structure_usd,
     
-    -- Total invertido por cultivo
+    -- Total invertido por cultivo: Costos directos + Arriendo + Estructura
     (
       COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::numeric
-      + COALESCE(SUM(v3_calc.rent_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric
-      + COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric
+      + COALESCE(SUM(lb.seeded_area_ha * v3_calc.rent_per_ha_for_lot(lb.lot_id)), 0)::numeric
+      + COALESCE(SUM(lb.seeded_area_ha * v3_calc.admin_cost_per_ha_for_lot(lb.lot_id)), 0)::numeric
     ) AS total_invested_usd,
     
-    -- Resultado operativo total por cultivo
-    COALESCE(SUM(v3_calc.operating_result_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS operating_result_usd
+    -- Resultado operativo total por cultivo: Ingreso Neto - Total Invertido
+    (
+      COALESCE(SUM(lb.seeded_area_ha * (
+        SELECT COALESCE(cc.net_price, 0)
+        FROM public.crop_commercializations cc
+        WHERE cc.project_id = lb.project_id 
+          AND cc.crop_id = lb.current_crop_id
+          AND cc.deleted_at IS NULL
+        LIMIT 1
+      )), 0)::numeric
+      - (
+        COALESCE(SUM(v3_calc.direct_cost_for_lot(lb.lot_id)), 0)::numeric
+        + COALESCE(SUM(lb.seeded_area_ha * v3_calc.rent_per_ha_for_lot(lb.lot_id)), 0)::numeric
+        + COALESCE(SUM(lb.seeded_area_ha * v3_calc.admin_cost_per_ha_for_lot(lb.lot_id)), 0)::numeric
+      )
+    ) AS operating_result_usd
     
   FROM lot_base lb
   WHERE lb.current_crop_id IS NOT NULL
@@ -216,6 +247,7 @@ contribution_categories AS (
       JOIN categories cat ON s.category_id = cat.id
       WHERE w.project_id = pb.project_id 
         AND w.deleted_at IS NULL
+        AND cat.type_id = 2
         AND cat.name IN ('Coadyuvantes', 'Curasemillas', 'Herbicidas', 'Insecticidas', 'Fungicidas', 'Otros Insumos')
     ), 0)::numeric AS agrochemicals_total,
     
@@ -229,6 +261,7 @@ contribution_categories AS (
       WHERE w.project_id = pb.project_id 
         AND w.deleted_at IS NULL
         AND cat.name = 'Semilla'
+        AND cat.type_id = 1
     ), 0)::numeric AS seeds_total,
     
     -- Labores Generales: labores que NO son siembra, riego ni cosecha
@@ -236,10 +269,11 @@ contribution_categories AS (
       SELECT SUM(l.price * w.effective_area)
       FROM workorders w
       JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
-      JOIN labor_categories lc ON l.category_id = lc.id
+      JOIN categories cat ON l.category_id = cat.id
       WHERE w.project_id = pb.project_id 
         AND w.deleted_at IS NULL
-        AND lc.name IN ('Pulverización', 'Otras Labores')
+        AND cat.type_id = 4
+        AND cat.name IN ('Pulverización', 'Otras Labores')
     ), 0)::numeric AS general_labors_total,
     
     -- Siembra: labores de siembra
@@ -247,10 +281,11 @@ contribution_categories AS (
       SELECT SUM(l.price * w.effective_area)
       FROM workorders w
       JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
-      JOIN labor_categories lc ON l.category_id = lc.id
+      JOIN categories cat ON l.category_id = cat.id
       WHERE w.project_id = pb.project_id 
         AND w.deleted_at IS NULL
-        AND lc.name = 'Siembra'
+        AND cat.name = 'Siembra'
+        AND cat.type_id = 4
     ), 0)::numeric AS sowing_total,
     
     -- Riego: labores de riego
@@ -258,10 +293,11 @@ contribution_categories AS (
       SELECT SUM(l.price * w.effective_area)
       FROM workorders w
       JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
-      JOIN labor_categories lc ON l.category_id = lc.id
+      JOIN categories cat ON l.category_id = cat.id
       WHERE w.project_id = pb.project_id 
         AND w.deleted_at IS NULL
-        AND lc.name = 'Riego'
+        AND cat.name = 'Riego'
+        AND cat.type_id = 4
     ), 0)::numeric AS irrigation_total,
     
     -- Arriendo: solo si es fijo (ya calculado en project_base)
@@ -343,7 +379,7 @@ contributions_data AS (
         -- Semillas
         SELECT 
           'seeds'::text AS type,
-          'Semillas'::text AS label,
+          'Semilla'::text AS label,
           cc.seeds_total AS total_usd,
           COALESCE((
             SELECT jsonb_agg(
