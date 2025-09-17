@@ -33,10 +33,10 @@ type SummaryResultsResponse struct {
 	CampaignName string `json:"campaign_name"`
 
 	// Resultados por cultivo
-	Cultivos []CropSummaryResponse `json:"cultivos"`
+	Crops []CropSummaryResponse `json:"crops"`
 
 	// Totales del proyecto
-	Totales ProjectTotalsResponse `json:"totales"`
+	Totals ProjectTotalsResponse `json:"totals"`
 }
 
 // CropSummaryResponse represents a crop summary in the report.
@@ -45,26 +45,26 @@ type CropSummaryResponse struct {
 	CropName string `json:"crop_name"`
 
 	// Métricas por cultivo
-	SuperficieHa          decimal.Decimal `json:"superficie_ha"`
-	IngresoNetoUsd        decimal.Decimal `json:"ingreso_neto_usd"`
-	CostosDirectosUsd     decimal.Decimal `json:"costos_directos_usd"`
-	ArriendoUsd           decimal.Decimal `json:"arriendo_usd"`
-	EstructuraUsd         decimal.Decimal `json:"estructura_usd"`
-	TotalInvertidoUsd     decimal.Decimal `json:"total_invertido_usd"`
-	ResultadoOperativoUsd decimal.Decimal `json:"resultado_operativo_usd"`
-	RentaCultivoPct       decimal.Decimal `json:"renta_cultivo_pct"`
+	SurfaceHa          decimal.Decimal `json:"surface_ha"`
+	NetIncomeUsd       decimal.Decimal `json:"net_income_usd"`
+	DirectCostsUsd     decimal.Decimal `json:"direct_costs_usd"`
+	RentUsd            decimal.Decimal `json:"rent_usd"`
+	StructureUsd       decimal.Decimal `json:"structure_usd"`
+	TotalInvestedUsd   decimal.Decimal `json:"total_invested_usd"`
+	OperatingResultUsd decimal.Decimal `json:"operating_result_usd"`
+	CropReturnPct      decimal.Decimal `json:"crop_return_pct"`
 }
 
 // ProjectTotalsResponse represents the project totals in the report.
 type ProjectTotalsResponse struct {
-	TotalSuperficieHa          decimal.Decimal `json:"total_superficie_ha"`
-	TotalIngresoNetoUsd        decimal.Decimal `json:"total_ingreso_neto_usd"`
-	TotalCostosDirectosUsd     decimal.Decimal `json:"total_costos_directos_usd"`
-	TotalArriendoUsd           decimal.Decimal `json:"total_arriendo_usd"`
-	TotalEstructuraUsd         decimal.Decimal `json:"total_estructura_usd"`
-	TotalInvertidoProyectoUsd  decimal.Decimal `json:"total_invertido_proyecto_usd"`
-	TotalResultadoOperativoUsd decimal.Decimal `json:"total_resultado_operativo_usd"`
-	RentaProyectoPct           decimal.Decimal `json:"renta_proyecto_pct"`
+	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
+	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
+	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
+	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
+	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
+	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
 }
 
 /* =========================
@@ -84,32 +84,32 @@ func ToDomainSummaryResultsFilter(in SummaryResultsRequest) domain.SummaryResult
 // FromDomainSummaryResults maps domain to DTO response.
 func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsResponse {
 	// Mapear cultivos
-	cultivos := make([]CropSummaryResponse, len(d.Cultivos))
-	for i, cultivo := range d.Cultivos {
-		cultivos[i] = CropSummaryResponse{
-			CropID:                cultivo.CropID,
-			CropName:              cultivo.CropName,
-			SuperficieHa:          cultivo.SuperficieHa,
-			IngresoNetoUsd:        cultivo.IngresoNetoUsd,
-			CostosDirectosUsd:     cultivo.CostosDirectosUsd,
-			ArriendoUsd:           cultivo.ArriendoUsd,
-			EstructuraUsd:         cultivo.EstructuraUsd,
-			TotalInvertidoUsd:     cultivo.TotalInvertidoUsd,
-			ResultadoOperativoUsd: cultivo.ResultadoOperativoUsd,
-			RentaCultivoPct:       cultivo.RentaCultivoPct,
+	crops := make([]CropSummaryResponse, len(d.Crops))
+	for i, crop := range d.Crops {
+		crops[i] = CropSummaryResponse{
+			CropID:             crop.CropID,
+			CropName:           crop.CropName,
+			SurfaceHa:          crop.SurfaceHa,
+			NetIncomeUsd:       crop.NetIncomeUsd,
+			DirectCostsUsd:     crop.DirectCostsUsd,
+			RentUsd:            crop.RentUsd,
+			StructureUsd:       crop.StructureUsd,
+			TotalInvestedUsd:   crop.TotalInvestedUsd,
+			OperatingResultUsd: crop.OperatingResultUsd,
+			CropReturnPct:      crop.CropReturnPct,
 		}
 	}
 
 	// Mapear totales
-	totales := ProjectTotalsResponse{
-		TotalSuperficieHa:          d.Totales.TotalSuperficieHa,
-		TotalIngresoNetoUsd:        d.Totales.TotalIngresoNetoUsd,
-		TotalCostosDirectosUsd:     d.Totales.TotalCostosDirectosUsd,
-		TotalArriendoUsd:           d.Totales.TotalArriendoUsd,
-		TotalEstructuraUsd:         d.Totales.TotalEstructuraUsd,
-		TotalInvertidoProyectoUsd:  d.Totales.TotalInvertidoProyectoUsd,
-		TotalResultadoOperativoUsd: d.Totales.TotalResultadoOperativoUsd,
-		RentaProyectoPct:           d.Totales.RentaProyectoPct,
+	totals := ProjectTotalsResponse{
+		TotalSurfaceHa:          d.Totals.TotalSurfaceHa,
+		TotalNetIncomeUsd:       d.Totals.TotalNetIncomeUsd,
+		TotalDirectCostsUsd:     d.Totals.TotalDirectCostsUsd,
+		TotalRentUsd:            d.Totals.TotalRentUsd,
+		TotalStructureUsd:       d.Totals.TotalStructureUsd,
+		TotalInvestedProjectUsd: d.Totals.TotalInvestedProjectUsd,
+		TotalOperatingResultUsd: d.Totals.TotalOperatingResultUsd,
+		ProjectReturnPct:        d.Totals.ProjectReturnPct,
 	}
 
 	return &SummaryResultsResponse{
@@ -119,7 +119,7 @@ func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsR
 		CustomerName: d.CustomerName,
 		CampaignID:   d.CampaignID,
 		CampaignName: d.CampaignName,
-		Cultivos:     cultivos,
-		Totales:      totales,
+		Crops:        crops,
+		Totals:       totals,
 	}
 }

@@ -14,36 +14,36 @@ type SummaryResults struct {
 	CropName  string `json:"crop_name"`
 
 	// Métricas por cultivo
-	SuperficieHa          decimal.Decimal `json:"superficie_ha"`
-	IngresoNetoUsd        decimal.Decimal `json:"ingreso_neto_usd"`
-	CostosDirectosUsd     decimal.Decimal `json:"costos_directos_usd"`
-	ArriendoUsd           decimal.Decimal `json:"arriendo_usd"`
-	EstructuraUsd         decimal.Decimal `json:"estructura_usd"`
-	TotalInvertidoUsd     decimal.Decimal `json:"total_invertido_usd"`
-	ResultadoOperativoUsd decimal.Decimal `json:"resultado_operativo_usd"`
-	RentaCultivoPct       decimal.Decimal `json:"renta_cultivo_pct"`
+	SurfaceHa          decimal.Decimal `json:"surface_ha"`
+	NetIncomeUsd       decimal.Decimal `json:"net_income_usd"`
+	DirectCostsUsd     decimal.Decimal `json:"direct_costs_usd"`
+	RentUsd            decimal.Decimal `json:"rent_usd"`
+	StructureUsd       decimal.Decimal `json:"structure_usd"`
+	TotalInvestedUsd   decimal.Decimal `json:"total_invested_usd"`
+	OperatingResultUsd decimal.Decimal `json:"operating_result_usd"`
+	CropReturnPct      decimal.Decimal `json:"crop_return_pct"`
 
 	// Totales del proyecto (para comparación)
-	TotalSuperficieHa          decimal.Decimal `json:"total_superficie_ha"`
-	TotalIngresoNetoUsd        decimal.Decimal `json:"total_ingreso_neto_usd"`
-	TotalCostosDirectosUsd     decimal.Decimal `json:"total_costos_directos_usd"`
-	TotalArriendoUsd           decimal.Decimal `json:"total_arriendo_usd"`
-	TotalEstructuraUsd         decimal.Decimal `json:"total_estructura_usd"`
-	TotalInvertidoProyectoUsd  decimal.Decimal `json:"total_invertido_proyecto_usd"`
-	TotalResultadoOperativoUsd decimal.Decimal `json:"total_resultado_operativo_usd"`
-	RentaProyectoPct           decimal.Decimal `json:"renta_proyecto_pct"`
+	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
+	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
+	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
+	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
+	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
+	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
 }
 
 // ProjectTotals representa los totales del proyecto
 type ProjectTotals struct {
-	TotalSuperficieHa          decimal.Decimal `json:"total_superficie_ha"`
-	TotalIngresoNetoUsd        decimal.Decimal `json:"total_ingreso_neto_usd"`
-	TotalCostosDirectosUsd     decimal.Decimal `json:"total_costos_directos_usd"`
-	TotalArriendoUsd           decimal.Decimal `json:"total_arriendo_usd"`
-	TotalEstructuraUsd         decimal.Decimal `json:"total_estructura_usd"`
-	TotalInvertidoProyectoUsd  decimal.Decimal `json:"total_invertido_usd"`
-	TotalResultadoOperativoUsd decimal.Decimal `json:"total_resultado_operativo_usd"`
-	RentaProyectoPct           decimal.Decimal `json:"renta_proyecto_pct"`
+	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
+	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
+	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
+	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
+	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
+	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
 }
 
 // SummaryResultsResponse representa la respuesta completa del reporte
@@ -56,10 +56,10 @@ type SummaryResultsResponse struct {
 	CampaignName string `json:"campaign_name"`
 
 	// Resultados por cultivo
-	Cultivos []SummaryResults `json:"cultivos"`
+	Crops []SummaryResults `json:"crops"`
 
 	// Totales del proyecto
-	Totales ProjectTotals `json:"totales"`
+	Totals ProjectTotals `json:"totals"`
 }
 
 // ===== FILTROS =====

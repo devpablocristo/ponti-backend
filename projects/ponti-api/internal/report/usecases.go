@@ -91,8 +91,8 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 
 	if len(results) == 0 {
 		return &domain.SummaryResultsResponse{
-			Cultivos: []domain.SummaryResults{},
-			Totales:  domain.ProjectTotals{},
+			Crops:  []domain.SummaryResults{},
+			Totals: domain.ProjectTotals{},
 		}, nil
 	}
 
@@ -118,8 +118,8 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 		CustomerName: projectInfo.CustomerName,
 		CampaignID:   projectInfo.CampaignID,
 		CampaignName: projectInfo.CampaignName,
-		Cultivos:     results,
-		Totales:      *totales,
+		Crops:        results,
+		Totals:       *totales,
 	}
 
 	return response, nil

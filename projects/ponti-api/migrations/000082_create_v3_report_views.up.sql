@@ -185,9 +185,13 @@ WITH project_base AS (
     cam.name AS campaign_name,
     -- Calcular superficie total usando funciones SSOT
     COALESCE(SUM(l.hectares), 0)::numeric AS surface_total_ha,
-    -- Datos de arriendo usando funciones SSOT
+    -- Datos de arriendo usando funciones SSOT - solo si es fijo
     COALESCE(SUM(v3_calc.rent_per_ha_for_lot(l.id) * l.hectares), 0)::numeric AS lease_fixed_usd,
-    false AS lease_is_fixed, -- Por defecto, se puede calcular dinámicamente
+    CASE 
+      WHEN COALESCE(SUM(v3_calc.rent_per_ha_for_lot(l.id) * l.hectares), 0) > 0 
+      THEN true 
+      ELSE false 
+    END AS lease_is_fixed,
     -- Datos de administración usando funciones SSOT
     COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0)::numeric AS admin_per_ha_usd,
     COALESCE(SUM(v3_calc.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0)::numeric AS admin_total_usd
@@ -199,69 +203,326 @@ WITH project_base AS (
   WHERE p.deleted_at IS NULL
   GROUP BY p.id, p.name, p.customer_id, c.name, p.campaign_id, cam.name
 ),
+-- Categorías de aportes según documentación
+contribution_categories AS (
+  SELECT
+    pb.project_id,
+    -- Agroquímicos: supplies con categorías de agroquímicos
+    COALESCE((
+      SELECT SUM(wi.total_used * s.price)
+      FROM workorders w
+      JOIN workorder_items wi ON w.id = wi.workorder_id
+      JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
+      JOIN categories cat ON s.category_id = cat.id
+      WHERE w.project_id = pb.project_id 
+        AND w.deleted_at IS NULL
+        AND cat.name IN ('Coadyuvantes', 'Curasemillas', 'Herbicidas', 'Insecticidas', 'Fungicidas', 'Otros Insumos')
+    ), 0)::numeric AS agrochemicals_total,
+    
+    -- Semillas: supplies con categoría de semillas
+    COALESCE((
+      SELECT SUM(wi.total_used * s.price)
+      FROM workorders w
+      JOIN workorder_items wi ON w.id = wi.workorder_id
+      JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
+      JOIN categories cat ON s.category_id = cat.id
+      WHERE w.project_id = pb.project_id 
+        AND w.deleted_at IS NULL
+        AND cat.name = 'Semilla'
+    ), 0)::numeric AS seeds_total,
+    
+    -- Labores Generales: labores que NO son siembra, riego ni cosecha
+    COALESCE((
+      SELECT SUM(l.price * w.effective_area)
+      FROM workorders w
+      JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
+      JOIN labor_categories lc ON l.category_id = lc.id
+      WHERE w.project_id = pb.project_id 
+        AND w.deleted_at IS NULL
+        AND lc.name IN ('Pulverización', 'Otras Labores')
+    ), 0)::numeric AS general_labors_total,
+    
+    -- Siembra: labores de siembra
+    COALESCE((
+      SELECT SUM(l.price * w.effective_area)
+      FROM workorders w
+      JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
+      JOIN labor_categories lc ON l.category_id = lc.id
+      WHERE w.project_id = pb.project_id 
+        AND w.deleted_at IS NULL
+        AND lc.name = 'Siembra'
+    ), 0)::numeric AS sowing_total,
+    
+    -- Riego: labores de riego
+    COALESCE((
+      SELECT SUM(l.price * w.effective_area)
+      FROM workorders w
+      JOIN labors l ON w.labor_id = l.id AND l.deleted_at IS NULL
+      JOIN labor_categories lc ON l.category_id = lc.id
+      WHERE w.project_id = pb.project_id 
+        AND w.deleted_at IS NULL
+        AND lc.name = 'Riego'
+    ), 0)::numeric AS irrigation_total,
+    
+    -- Arriendo: solo si es fijo (ya calculado en project_base)
+    pb.lease_fixed_usd AS rent_total,
+    
+    -- Administración: ya calculado en project_base
+    pb.admin_total_usd AS administration_total
+    
+  FROM project_base pb
+),
+-- Aportes reales por inversor (simplificado - asumiendo distribución igual)
+investor_contributions AS (
+  SELECT
+    pb.project_id,
+    pi.investor_id,
+    i.name AS investor_name,
+    pi.percentage,
+    -- Calcular aportes reales por categoría (simplificado)
+    (cc.agrochemicals_total * pi.percentage / 100) AS agrochemicals_contribution,
+    (cc.seeds_total * pi.percentage / 100) AS seeds_contribution,
+    (cc.general_labors_total * pi.percentage / 100) AS general_labors_contribution,
+    (cc.sowing_total * pi.percentage / 100) AS sowing_contribution,
+    (cc.irrigation_total * pi.percentage / 100) AS irrigation_contribution,
+    -- Arriendo y administración requieren carga manual
+    0 AS rent_contribution,
+    0 AS administration_contribution
+  FROM project_base pb
+  JOIN contribution_categories cc ON cc.project_id = pb.project_id
+  JOIN project_investors pi ON pi.project_id = pb.project_id
+  JOIN investors i ON pi.investor_id = i.id
+),
 contributions_data AS (
   SELECT
     pb.project_id,
-    -- Contributions data as JSON - construido desde datos reales usando funciones SSOT
+    -- Contributions data as JSON - construido según documentación
     (
       SELECT COALESCE(jsonb_agg(
         jsonb_build_object(
-          'type', cat_costs.name,
-          'label', cat_costs.name,
-          'total_usd', cat_costs.total_cost,
+          'type', cat_data.type,
+          'label', cat_data.label,
+          'total_usd', cat_data.total_usd,
           'total_usd_ha', CASE 
             WHEN pb.surface_total_ha > 0 
-            THEN cat_costs.total_cost / pb.surface_total_ha
+            THEN cat_data.total_usd / pb.surface_total_ha
             ELSE 0 
           END,
-          'investors', '[]'::jsonb,
-          'requires_manual_attribution', false
+          'investors', cat_data.investors,
+          'requires_manual_attribution', cat_data.requires_manual_attribution
         )
       ), '[]'::jsonb)
       FROM (
-        SELECT cat.name, SUM(wi.total_used * s.price) as total_cost
-        FROM workorders w2
-        JOIN workorder_items wi ON w2.id = wi.workorder_id
-        JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
-        JOIN categories cat ON s.category_id = cat.id
-        WHERE w2.project_id = pb.project_id AND w2.deleted_at IS NULL
-        GROUP BY cat.id, cat.name
-      ) cat_costs
+        -- Agroquímicos
+        SELECT 
+          'agrochemicals'::text AS type,
+          'Agroquímicos'::text AS label,
+          cc.agrochemicals_total AS total_usd,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'investor_id', ic.investor_id,
+                'investor_name', ic.investor_name,
+                'amount_usd', ic.agrochemicals_contribution,
+                'share_pct', CASE 
+                  WHEN cc.agrochemicals_total > 0 
+                  THEN (ic.agrochemicals_contribution / cc.agrochemicals_total * 100)
+                  ELSE 0 
+                END
+              )
+            )
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id
+          ), '[]'::jsonb) AS investors,
+          false AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id
+        
+        UNION ALL
+        
+        -- Semillas
+        SELECT 
+          'seeds'::text AS type,
+          'Semillas'::text AS label,
+          cc.seeds_total AS total_usd,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'investor_id', ic.investor_id,
+                'investor_name', ic.investor_name,
+                'amount_usd', ic.seeds_contribution,
+                'share_pct', CASE 
+                  WHEN cc.seeds_total > 0 
+                  THEN (ic.seeds_contribution / cc.seeds_total * 100)
+                  ELSE 0 
+                END
+              )
+            )
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id
+          ), '[]'::jsonb) AS investors,
+          false AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id
+        
+        UNION ALL
+        
+        -- Labores Generales
+        SELECT 
+          'general_labors'::text AS type,
+          'Labores Generales'::text AS label,
+          cc.general_labors_total AS total_usd,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'investor_id', ic.investor_id,
+                'investor_name', ic.investor_name,
+                'amount_usd', ic.general_labors_contribution,
+                'share_pct', CASE 
+                  WHEN cc.general_labors_total > 0 
+                  THEN (ic.general_labors_contribution / cc.general_labors_total * 100)
+                  ELSE 0 
+                END
+              )
+            )
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id
+          ), '[]'::jsonb) AS investors,
+          false AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id
+        
+        UNION ALL
+        
+        -- Siembra
+        SELECT 
+          'sowing'::text AS type,
+          'Siembra'::text AS label,
+          cc.sowing_total AS total_usd,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'investor_id', ic.investor_id,
+                'investor_name', ic.investor_name,
+                'amount_usd', ic.sowing_contribution,
+                'share_pct', CASE 
+                  WHEN cc.sowing_total > 0 
+                  THEN (ic.sowing_contribution / cc.sowing_total * 100)
+                  ELSE 0 
+                END
+              )
+            )
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id
+          ), '[]'::jsonb) AS investors,
+          false AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id
+        
+        UNION ALL
+        
+        -- Riego
+        SELECT 
+          'irrigation'::text AS type,
+          'Riego'::text AS label,
+          cc.irrigation_total AS total_usd,
+          COALESCE((
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'investor_id', ic.investor_id,
+                'investor_name', ic.investor_name,
+                'amount_usd', ic.irrigation_contribution,
+                'share_pct', CASE 
+                  WHEN cc.irrigation_total > 0 
+                  THEN (ic.irrigation_contribution / cc.irrigation_total * 100)
+                  ELSE 0 
+                END
+              )
+            )
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id
+          ), '[]'::jsonb) AS investors,
+          false AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id
+        
+        UNION ALL
+        
+        -- Arriendo Capitalizable
+        SELECT 
+          'capitalizable_lease'::text AS type,
+          'Arriendo Capitalizable'::text AS label,
+          cc.rent_total AS total_usd,
+          '[]'::jsonb AS investors,
+          true AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id AND cc.rent_total > 0
+        
+        UNION ALL
+        
+        -- Administración y Estructura
+        SELECT 
+          'administration_structure'::text AS type,
+          'Administración y Estructura'::text AS label,
+          cc.administration_total AS total_usd,
+          '[]'::jsonb AS investors,
+          true AS requires_manual_attribution
+        FROM contribution_categories cc
+        WHERE cc.project_id = pb.project_id AND cc.administration_total > 0
+        
+      ) cat_data
     ) as contributions_data
   FROM project_base pb
+),
+-- Cálculo de totales para comparación
+project_totals AS (
+  SELECT
+    pb.project_id,
+    (cc.agrochemicals_total + cc.seeds_total + cc.general_labors_total + 
+     cc.sowing_total + cc.irrigation_total + cc.rent_total + cc.administration_total) AS total_contributions
+  FROM project_base pb
+  JOIN contribution_categories cc ON cc.project_id = pb.project_id
 ),
 comparison_data AS (
   SELECT
     pb.project_id,
-    -- Comparison data as JSON - construido desde datos reales
+    -- Comparison data as JSON - calculado según documentación
     (
       SELECT COALESCE(jsonb_agg(
         jsonb_build_object(
-          'investor_id', pi2.investor_id,
-          'investor_name', i2.name,
-          'agreed_share_pct', pi2.percentage,
-          'agreed_usd', total_project_cost * (pi2.percentage / 100),
-          'actual_usd', total_project_cost * (pi2.percentage / 100),
-          'adjustment_usd', 0
+          'investor_id', pi.investor_id,
+          'investor_name', i.name,
+          'agreed_share_pct', pi.percentage,
+          'agreed_usd', pt.total_contributions * (pi.percentage / 100),
+          'actual_usd', COALESCE((
+            SELECT SUM(ic.agrochemicals_contribution + ic.seeds_contribution + 
+                      ic.general_labors_contribution + ic.sowing_contribution + 
+                      ic.irrigation_contribution + ic.rent_contribution + 
+                      ic.administration_contribution)
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id AND ic.investor_id = pi.investor_id
+          ), 0),
+          'adjustment_usd', COALESCE((
+            SELECT SUM(ic.agrochemicals_contribution + ic.seeds_contribution + 
+                      ic.general_labors_contribution + ic.sowing_contribution + 
+                      ic.irrigation_contribution + ic.rent_contribution + 
+                      ic.administration_contribution)
+            FROM investor_contributions ic
+            WHERE ic.project_id = pb.project_id AND ic.investor_id = pi.investor_id
+          ), 0) - (pt.total_contributions * (pi.percentage / 100))
         )
       ), '[]'::jsonb)
-      FROM project_investors pi2
-      JOIN investors i2 ON pi2.investor_id = i2.id
-      CROSS JOIN (
-        SELECT COALESCE(SUM(wi.total_used * s.price), 0) as total_project_cost
-        FROM workorders w3
-        JOIN workorder_items wi ON w3.id = wi.workorder_id
-        JOIN supplies s ON wi.supply_id = s.id AND s.deleted_at IS NULL
-        WHERE w3.project_id = pb.project_id AND w3.deleted_at IS NULL
-      ) project_costs
-      WHERE pi2.project_id = pb.project_id
+      FROM project_investors pi
+      JOIN investors i ON pi.investor_id = i.id
+      JOIN project_totals pt ON pt.project_id = pb.project_id
+      WHERE pi.project_id = pb.project_id
     ) as comparison_data
   FROM project_base pb
 ),
 harvest_data AS (
   SELECT
     pb.project_id,
-    -- Harvest data as JSON - construido desde datos reales usando funciones SSOT
+    -- Harvest data as JSON - calculado según documentación
     jsonb_build_object(
       'total_harvest_usd', COALESCE((
         SELECT SUM(v3_calc.income_net_total_for_lot(l.id))
@@ -282,26 +543,26 @@ harvest_data AS (
       'investors', COALESCE((
         SELECT jsonb_agg(
           jsonb_build_object(
-            'investor_id', pi2.investor_id,
-            'investor_name', i2.name,
-            'paid_usd', COALESCE((
-              SELECT SUM(v3_calc.income_net_total_for_lot(l.id))
-              FROM lots l
-              JOIN fields f ON l.field_id = f.id
-              WHERE f.project_id = pb.project_id AND l.deleted_at IS NULL
-            ), 0) * (pi2.percentage / 100),
+            'investor_id', pi.investor_id,
+            'investor_name', i.name,
+            'paid_usd', 0, -- Los pagos reales de cosecha no están en la BD actualmente
             'agreed_usd', COALESCE((
               SELECT SUM(v3_calc.income_net_total_for_lot(l.id))
               FROM lots l
               JOIN fields f ON l.field_id = f.id
               WHERE f.project_id = pb.project_id AND l.deleted_at IS NULL
-            ), 0) * (pi2.percentage / 100),
-            'adjustment_usd', 0
+            ), 0) * (pi.percentage / 100),
+            'adjustment_usd', 0 - (COALESCE((
+              SELECT SUM(v3_calc.income_net_total_for_lot(l.id))
+              FROM lots l
+              JOIN fields f ON l.field_id = f.id
+              WHERE f.project_id = pb.project_id AND l.deleted_at IS NULL
+            ), 0) * (pi.percentage / 100)) -- Ajuste = Pagado - Acordado
           )
         )
-        FROM project_investors pi2
-        JOIN investors i2 ON pi2.investor_id = i2.id
-        WHERE pi2.project_id = pb.project_id
+        FROM project_investors pi
+        JOIN investors i ON pi.investor_id = i.id
+        WHERE pi.project_id = pb.project_id
       ), '[]'::jsonb)
     ) as harvest_data
   FROM project_base pb

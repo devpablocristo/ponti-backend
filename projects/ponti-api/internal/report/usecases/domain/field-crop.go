@@ -34,53 +34,53 @@ type FieldCropMetric struct {
 	CropName  string `json:"crop_name"`
 
 	// Información general
-	SuperficieHa    decimal.Decimal `json:"superficie_ha"`
-	ProduccionTn    decimal.Decimal `json:"produccion_tn"`
-	AreaSembradaHa  decimal.Decimal `json:"area_sembrada_ha"`
-	AreaCosechadaHa decimal.Decimal `json:"area_cosechada_ha"`
+	SurfaceHa       decimal.Decimal `json:"surface_ha"`
+	ProductionTn    decimal.Decimal `json:"production_tn"`
+	SownAreaHa      decimal.Decimal `json:"sown_area_ha"`
+	HarvestedAreaHa decimal.Decimal `json:"harvested_area_ha"`
 
 	// Rendimiento
-	RendimientoTnHa decimal.Decimal `json:"rendimiento_tn_ha"`
+	YieldTnHa decimal.Decimal `json:"yield_tn_ha"`
 
 	// Precios y comercialización
-	PrecioBrutoUsdTn    decimal.Decimal `json:"precio_bruto_usd_tn"`
-	GastoFleteUsdTn     decimal.Decimal `json:"gasto_flete_usd_tn"`
-	GastoComercialUsdTn decimal.Decimal `json:"gasto_comercial_usd_tn"`
-	PrecioNetoUsdTn     decimal.Decimal `json:"precio_neto_usd_tn"`
+	GrossPriceUsdTn     decimal.Decimal `json:"gross_price_usd_tn"`
+	FreightCostUsdTn    decimal.Decimal `json:"freight_cost_usd_tn"`
+	CommercialCostUsdTn decimal.Decimal `json:"commercial_cost_usd_tn"`
+	NetPriceUsdTn       decimal.Decimal `json:"net_price_usd_tn"`
 
 	// Ingreso neto
-	IngresoNetoUsd   decimal.Decimal `json:"ingreso_neto_usd"`
-	IngresoNetoUsdHa decimal.Decimal `json:"ingreso_neto_usd_ha"`
+	NetIncomeUsd   decimal.Decimal `json:"net_income_usd"`
+	NetIncomeUsdHa decimal.Decimal `json:"net_income_usd_ha"`
 
 	// Costos directos
-	CostosLaboresUsd       decimal.Decimal `json:"costos_labores_usd"`
-	CostosInsumosUsd       decimal.Decimal `json:"costos_insumos_usd"`
-	TotalCostosDirectosUsd decimal.Decimal `json:"total_costos_directos_usd"`
-	CostosDirectosUsdHa    decimal.Decimal `json:"costos_directos_usd_ha"`
+	LaborCostsUsd       decimal.Decimal `json:"labor_costs_usd"`
+	SupplyCostsUsd      decimal.Decimal `json:"supply_costs_usd"`
+	TotalDirectCostsUsd decimal.Decimal `json:"total_direct_costs_usd"`
+	DirectCostsUsdHa    decimal.Decimal `json:"direct_costs_usd_ha"`
 
 	// Margen bruto
-	MargenBrutoUsd   decimal.Decimal `json:"margen_bruto_usd"`
-	MargenBrutoUsdHa decimal.Decimal `json:"margen_bruto_usd_ha"`
+	GrossMarginUsd   decimal.Decimal `json:"gross_margin_usd"`
+	GrossMarginUsdHa decimal.Decimal `json:"gross_margin_usd_ha"`
 
 	// Arriendo
-	ArriendoUsd   decimal.Decimal `json:"arriendo_usd"`
-	ArriendoUsdHa decimal.Decimal `json:"arriendo_usd_ha"`
+	RentUsd   decimal.Decimal `json:"rent_usd"`
+	RentUsdHa decimal.Decimal `json:"rent_usd_ha"`
 
 	// Costos administrativos
-	AdministracionUsd   decimal.Decimal `json:"administracion_usd"`
-	AdministracionUsdHa decimal.Decimal `json:"administracion_usd_ha"`
+	AdministrationUsd   decimal.Decimal `json:"administration_usd"`
+	AdministrationUsdHa decimal.Decimal `json:"administration_usd_ha"`
 
 	// Resultado operativo
-	ResultadoOperativoUsd   decimal.Decimal `json:"resultado_operativo_usd"`
-	ResultadoOperativoUsdHa decimal.Decimal `json:"resultado_operativo_usd_ha"`
+	OperatingResultUsd   decimal.Decimal `json:"operating_result_usd"`
+	OperatingResultUsdHa decimal.Decimal `json:"operating_result_usd_ha"`
 
 	// Total invertido
-	TotalInvertidoUsd   decimal.Decimal `json:"total_invertido_usd"`
-	TotalInvertidoUsdHa decimal.Decimal `json:"total_invertido_usd_ha"`
+	TotalInvestedUsd   decimal.Decimal `json:"total_invested_usd"`
+	TotalInvestedUsdHa decimal.Decimal `json:"total_invested_usd_ha"`
 
 	// Métricas calculadas
-	RentaPct               decimal.Decimal `json:"renta_pct"`
-	RindeIndiferenciaUsdTn decimal.Decimal `json:"rinde_indiferencia_usd_tn"`
+	ReturnPct              decimal.Decimal `json:"return_pct"`
+	IndifferenceYieldUsdTn decimal.Decimal `json:"indifference_yield_usd_tn"`
 }
 
 // ===== TABLE DOMAIN MODELS =====

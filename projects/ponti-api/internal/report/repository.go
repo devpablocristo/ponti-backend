@@ -234,38 +234,38 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 		cropID := r.convertToInt64(rawCropID)
 
 		metric := domain.FieldCropMetric{
-			ProjectID:               projectID,
-			FieldID:                 fieldID,
-			FieldName:               fieldName,
-			CropID:                  cropID,
-			CropName:                cropName,
-			SuperficieHa:            decimal.Zero, // No disponible en v3
-			ProduccionTn:            decimal.Zero, // No disponible en v3
-			AreaSembradaHa:          decimal.Zero, // No disponible en v3
-			AreaCosechadaHa:         decimal.Zero, // No disponible en v3
-			RendimientoTnHa:         decimal.Zero, // No disponible en v3
-			PrecioBrutoUsdTn:        decimal.Zero, // No disponible en v3
-			GastoFleteUsdTn:         decimal.Zero, // No disponible en v3
-			GastoComercialUsdTn:     decimal.Zero, // No disponible en v3
-			PrecioNetoUsdTn:         decimal.Zero, // No disponible en v3
-			IngresoNetoUsd:          r.convertToDecimal(rawIncomeUsd),
-			IngresoNetoUsdHa:        decimal.Zero, // No disponible en v3
-			CostosLaboresUsd:        decimal.Zero, // No disponible en v3
-			CostosInsumosUsd:        decimal.Zero, // No disponible en v3
-			TotalCostosDirectosUsd:  r.convertToDecimal(rawDirectCostsExecutedUsd),
-			CostosDirectosUsdHa:     decimal.Zero, // No disponible en v3
-			MargenBrutoUsd:          decimal.Zero, // No disponible en v3
-			MargenBrutoUsdHa:        decimal.Zero, // No disponible en v3
-			ArriendoUsd:             r.convertToDecimal(rawRentInvestedUsd),
-			ArriendoUsdHa:           decimal.Zero, // No disponible en v3
-			AdministracionUsd:       r.convertToDecimal(rawStructureInvestedUsd),
-			AdministracionUsdHa:     decimal.Zero, // No disponible en v3
-			ResultadoOperativoUsd:   r.convertToDecimal(rawOperatingResultUsd),
-			ResultadoOperativoUsdHa: decimal.Zero, // No disponible en v3
-			TotalInvertidoUsd:       r.convertToDecimal(rawDirectCostsInvestedUsd),
-			TotalInvertidoUsdHa:     decimal.Zero, // No disponible en v3
-			RentaPct:                r.convertToDecimal(rawOperatingResultPct),
-			RindeIndiferenciaUsdTn:  decimal.Zero, // No disponible en v3
+			ProjectID:              projectID,
+			FieldID:                fieldID,
+			FieldName:              fieldName,
+			CropID:                 cropID,
+			CropName:               cropName,
+			SurfaceHa:              decimal.Zero, // No disponible en v3
+			ProductionTn:           decimal.Zero, // No disponible en v3
+			SownAreaHa:             decimal.Zero, // No disponible en v3
+			HarvestedAreaHa:        decimal.Zero, // No disponible en v3
+			YieldTnHa:              decimal.Zero, // No disponible en v3
+			GrossPriceUsdTn:        decimal.Zero, // No disponible en v3
+			FreightCostUsdTn:       decimal.Zero, // No disponible en v3
+			CommercialCostUsdTn:    decimal.Zero, // No disponible en v3
+			NetPriceUsdTn:          decimal.Zero, // No disponible en v3
+			NetIncomeUsd:           r.convertToDecimal(rawIncomeUsd),
+			NetIncomeUsdHa:         decimal.Zero, // No disponible en v3
+			LaborCostsUsd:          decimal.Zero, // No disponible en v3
+			SupplyCostsUsd:         decimal.Zero, // No disponible en v3
+			TotalDirectCostsUsd:    r.convertToDecimal(rawDirectCostsExecutedUsd),
+			DirectCostsUsdHa:       decimal.Zero, // No disponible en v3
+			GrossMarginUsd:         decimal.Zero, // No disponible en v3
+			GrossMarginUsdHa:       decimal.Zero, // No disponible en v3
+			RentUsd:                r.convertToDecimal(rawRentInvestedUsd),
+			RentUsdHa:              decimal.Zero, // No disponible en v3
+			AdministrationUsd:      r.convertToDecimal(rawStructureInvestedUsd),
+			AdministrationUsdHa:    decimal.Zero, // No disponible en v3
+			OperatingResultUsd:     r.convertToDecimal(rawOperatingResultUsd),
+			OperatingResultUsdHa:   decimal.Zero, // No disponible en v3
+			TotalInvestedUsd:       r.convertToDecimal(rawDirectCostsInvestedUsd),
+			TotalInvestedUsdHa:     decimal.Zero, // No disponible en v3
+			ReturnPct:              r.convertToDecimal(rawOperatingResultPct),
+			IndifferenceYieldUsdTn: decimal.Zero, // No disponible en v3
 		}
 		metrics = append(metrics, metric)
 	}
@@ -317,33 +317,33 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 	// Definir filas del reporte
 	rows := []domain.FieldCropRow{
 		// Información básica
-		r.buildRow("surface", "ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SuperficieHa }),
-		r.buildRow("production", "tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ProduccionTn }),
-		r.buildRow("yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.RendimientoTnHa }),
+		r.buildRow("surface", "ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SurfaceHa }),
+		r.buildRow("production", "tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ProductionTn }),
+		r.buildRow("yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.YieldTnHa }),
 
 		// Precios y comercialización
-		r.buildRow("freight_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GastoFleteUsdTn }),
-		r.buildRow("commercial_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GastoComercialUsdTn }),
-		r.buildRow("net_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.PrecioNetoUsdTn }),
-		r.buildRow("gross_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.PrecioBrutoUsdTn }),
-		r.buildRow("net_income", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.IngresoNetoUsdHa }),
+		r.buildRow("freight_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.FreightCostUsdTn }),
+		r.buildRow("commercial_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.CommercialCostUsdTn }),
+		r.buildRow("net_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.NetPriceUsdTn }),
+		r.buildRow("gross_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossPriceUsdTn }),
+		r.buildRow("net_income", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa }),
 
 		// Costos directos
-		r.buildRow("labors_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosLaboresUsd }),
-		r.buildRow("supplies_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosInsumosUsd }),
-		r.buildRow("total_direct_costs", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosDirectosUsdHa }),
-		r.buildRow("gross_margin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.MargenBrutoUsdHa }),
+		r.buildRow("labors_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsd }),
+		r.buildRow("supplies_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsd }),
+		r.buildRow("total_direct_costs", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa }),
+		r.buildRow("gross_margin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa }),
 
 		// Costos adicionales
-		r.buildRow("lease", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ArriendoUsdHa }),
-		r.buildRow("admin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministracionUsdHa }),
-		r.buildRow("operating_result", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ResultadoOperativoUsdHa }),
+		r.buildRow("lease", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.RentUsdHa }),
+		r.buildRow("admin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministrationUsdHa }),
+		r.buildRow("operating_result", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.OperatingResultUsdHa }),
 
 		// Métricas adicionales
-		r.buildRow("total_invested", "usd", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvertidoUsd }),
-		r.buildRow("return_pct", "%", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.RentaPct }),
+		r.buildRow("total_invested", "usd", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }),
+		r.buildRow("return_pct", "%", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }),
 		r.buildRow("indifference_yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return decimal.Zero }),
-		r.buildRow("indifference_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.RindeIndiferenciaUsdTn }),
+		r.buildRow("indifference_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }),
 	}
 
 	// Agregar filas detalladas de supplies y labors
@@ -430,11 +430,11 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 	// Cargar categorías de labores desde la base de datos
 	laborCategories, err := r.getLaborCategories()
 	if err != nil {
-		// Fallback a categorías por defecto si hay error
+		// Fallback a categorías por defecto si hay error (usando nombres de BD)
 		laborCategories = map[string]string{
 			"labor_siembra":       "Siembra",
-			"labor_pulverizacion": "Spraying",
-			"labor_otras":         "Otras labores",
+			"labor_pulverizacion": "Pulverización",
+			"labor_otras":         "Otras Labores",
 			"labor_riego":         "Riego",
 			"labor_cosecha":       "Cosecha",
 		}
@@ -547,7 +547,7 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 		switch name {
 		case "Siembra":
 			key = "labor_siembra"
-		case "Spraying":
+		case "Pulverización":
 			key = "labor_pulverizacion"
 		case "Otras Labores":
 			key = "labor_otras"

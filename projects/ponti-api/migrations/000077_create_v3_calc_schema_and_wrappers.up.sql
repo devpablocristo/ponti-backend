@@ -237,7 +237,7 @@ CREATE OR REPLACE FUNCTION v3_calc.calculate_campaign_closing_date(end_date date
 LANGUAGE sql STABLE AS $$
   SELECT CASE 
     WHEN end_date IS NULL THEN NULL
-    ELSE end_date + INTERVAL '30 days'  -- 30 días después del fin de workorders
+    ELSE end_date + (get_campaign_closure_days() || ' days')::INTERVAL  -- Usar valor de app_parameters
   END::date
 $$;
 
