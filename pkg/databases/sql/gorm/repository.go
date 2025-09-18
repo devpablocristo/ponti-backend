@@ -189,6 +189,9 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 			DisableForeignKeyConstraintWhenMigrating: true,
 		})
+		if err != nil {
+			return fmt.Errorf("failed to open sql.DB: %w", err)
+		}
 
 		sqlDB, err := db.DB()
 		if err != nil {
