@@ -15,6 +15,7 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 	// Log del contexto de consola de debug
 	switch platform {
 	case pkgenv.Local:
+	case pkgenv.GCP:
 		switch env {
 		case pkgenv.Dev:
 			if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
@@ -35,15 +36,15 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 			log.Fatalf("Unsupported environment: %s", env)
 		}
 
-	case pkgenv.GCP:
-		switch env {
-		case pkgenv.Dev, pkgenv.Stg, pkgenv.Prod:
-			if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
-				log.Fatalf("Failed to run SQL migrations: %v", err)
-			}
-		default:
-			log.Fatalf("Unsupported environment: %s", env)
+	/*case pkgenv.GCP:
+	switch env {
+	case pkgenv.Dev, pkgenv.Stg, pkgenv.Prod:
+		if err := runMigrationsWithInstance(deps.GormRepo.GetSQLDB(), deps.Config.DB, deps.Config.Migrations); err != nil {
+			log.Fatalf("Failed to run SQL migrations: %v", err)
 		}
+	default:
+		log.Fatalf("Unsupported environment: %s", env)
+	}*/
 
 	default:
 		log.Fatalf("Unsupported platform: %s", platform)
