@@ -42,7 +42,8 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 	if closeDate != t {
 		query.Where("stocks.close_date = ?", closeDate)
 	} else {
-		query.Where("stocks.close_date IS NULL")
+		// Si no se especifica fecha, obtener todos los stocks (sin filtro de fecha)
+		// query.Where("stocks.close_date IS NOT NULL")
 	}
 
 	var stockModels []models.Stock
@@ -50,19 +51,48 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 		return nil, err
 	}
 
-	stocks := make([]*domain.Stock, 0, len(stockModels))
-	for i := range stockModels {
-		var consumed decimal.Decimal
+	// OPTIMIZACIÓN: Calcular consumed en una sola consulta para evitar N+1 problem
+	if len(stockModels) > 0 {
+		var consumedResults []struct {
+			SupplyID int64           `gorm:"column:supply_id"`
+			Consumed decimal.Decimal `gorm:"column:consumed"`
+		}
+
+		// Obtener todos los supply_ids
+		supplyIDs := make([]int64, len(stockModels))
+		for i, stock := range stockModels {
+			supplyIDs[i] = stock.SupplyID
+		}
+
+		// Calcular consumed para todos los supplies en una sola consulta
 		err := db.Model(&workordermodels.WorkorderItem{}).
 			Joins("JOIN workorders ON workorders.id = workorder_items.workorder_id").
-			Where("workorders.project_id = ? AND workorder_items.supply_id = ?", projectId, stockModels[i].SupplyID).
-			Select("COALESCE(SUM(workorder_items.total_used), 0)").
-			Scan(&consumed).Error
+			Where("workorders.project_id = ? AND workorder_items.supply_id IN (?)", projectId, supplyIDs).
+			Select("workorder_items.supply_id, COALESCE(SUM(workorder_items.total_used), 0) as consumed").
+			Group("workorder_items.supply_id").
+			Scan(&consumedResults).Error
 		if err != nil {
 			return nil, err
 		}
-		stockModels[i].Consumed = consumed
 
+		// Crear mapa de consumed por supply_id
+		consumedMap := make(map[int64]decimal.Decimal)
+		for _, result := range consumedResults {
+			consumedMap[result.SupplyID] = result.Consumed
+		}
+
+		// Asignar consumed a cada stock
+		for i := range stockModels {
+			if consumed, exists := consumedMap[stockModels[i].SupplyID]; exists {
+				stockModels[i].Consumed = consumed
+			} else {
+				stockModels[i].Consumed = decimal.Zero
+			}
+		}
+	}
+
+	stocks := make([]*domain.Stock, 0, len(stockModels))
+	for i := range stockModels {
 		stocks = append(stocks, stockModels[i].ToDomain())
 	}
 	return stocks, nil
