@@ -84,9 +84,9 @@ func (r *Repository) Connect(config ConfigPort) error {
 }
 
 func getDialector(config ConfigPort) (gorm.Dialector, error) {
-	if os.Getenv("K_SERVICE") != "" {
-		return connectWithConnectorIAMAuthN(config)
-	}
+	// if os.Getenv("K_SERVICE") != "" {
+	//	return connectWithConnectorIAMAuthN(config)
+	//}
 
 	var dialector gorm.Dialector
 	switch config.GetDBType() {
