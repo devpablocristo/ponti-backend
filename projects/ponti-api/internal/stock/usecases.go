@@ -18,14 +18,21 @@ type RepositoryPort interface {
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectId(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
+	ListAllStocks(context.Context) ([]*domain.Stock, error)
+}
+
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []*domain.Stock) ([]byte, error)
+	Close() error
 }
 
 type UseCases struct {
-	repo RepositoryPort
+	repo  RepositoryPort
+	excel ExporterAdapterPort
 }
 
-func NewUseCases(repo RepositoryPort) *UseCases {
-	return &UseCases{repo: repo}
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, excel: excel}
 }
 
 func (u *UseCases) GetStocksSummary(ctx context.Context, projectId int64, closeDate time.Time) ([]*domain.Stock, error) {
@@ -53,7 +60,6 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectId int64
 
 	newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, stockFromDb)
 	_, err = u.repo.CreateStock(ctx, &newStock)
-
 	if err != nil {
 		return err
 	}
@@ -107,5 +113,21 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 		newYearPeriod = yearPeriod
 	}
 	return newMonthPeriod, newYearPeriod
+}
 
+func (u *UseCases) ExportAllStocks(ctx context.Context) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, err := u.repo.ListAllStocks(ctx)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list Stocks", err)
+	}
+
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }

@@ -256,7 +256,13 @@ func Initialize() (*Dependencies, error) {
 	stockGormEnginePort := ProvideStockGormEnginePort(repository)
 	stockRepository := ProvideStockRepository(stockGormEnginePort)
 	stockRepositoryPort := ProvideStockRepositoryPort(stockRepository)
-	stockUseCases := ProvideStockUseCases(stockRepositoryPort)
+	supplyMovementExcelService, err := ProvideSupplyMovementPkgExcelService()
+	if err != nil {
+		return nil, err
+	}
+	stockXLSXEnginePort := ProvideStockXLSXEnginePort(supplyMovementExcelService)
+	stockExporterAdapterPort := ProvideStockExporterPort(stockXLSXEnginePort)
+	stockUseCases := ProvideStockUseCases(stockRepositoryPort, stockExporterAdapterPort)
 	stockUseCasesPort := ProvideStockUseCasesPort(stockUseCases)
 	stockConfigAPIPort := ProvideStockConfigAPI(config)
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
@@ -264,10 +270,6 @@ func Initialize() (*Dependencies, error) {
 	supply_movementGinEnginePort := ProvideSupplyMovementGinEnginePort(server)
 	supply_movementGormEnginePort := ProvideSupplyMovementGormEnginePort(repository)
 	supply_movementRepository := ProvideSupplyMovementRepository(supply_movementGormEnginePort)
-	supplyMovementExcelService, err := ProvideSupplyMovementPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
 	supply_movementXLSXEnginePort := ProvideSupplyMovementXLSXEnginePort(supplyMovementExcelService)
 	supply_movementExporterAdapterPort := ProvideSupplyMovementExporterPort(supply_movementXLSXEnginePort)
 	supply_movementUseCases := ProvideSupplyMovementUseCases(stockUseCases, supply_movementRepository, supply_movementExporterAdapterPort)

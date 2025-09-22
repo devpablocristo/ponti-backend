@@ -9,6 +9,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
+	stockExcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,7 @@ type UseCasesPort interface {
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
+	ExportAllStocks(ctx context.Context) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -52,7 +54,8 @@ func NewHandler(
 	s GinEnginePort,
 	c ConfigAPIPort,
 	m MiddlewaresEnginePort,
-	ucps project.UseCasesPort) *Handler {
+	ucps project.UseCasesPort,
+) *Handler {
 	return &Handler{
 		ucs:  u,
 		gsv:  s,
@@ -64,16 +67,24 @@ func NewHandler(
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.acf.APIBaseURL() + "/projects/:id/stocks"
+	baseURL := h.acf.APIBaseURL()
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
 	}
-	public := r.Group(baseURL)
-	public.GET("/summary", h.getStocksSummary)
-	public.GET("/periods", h.getStocksPeriods)
-	public.PUT("/close-date", h.UpdateStocksCloseDate)
-	public.PUT("/real-stock/:stockId", h.UpdateRealStock)
+
+	publicExcel := r.Group(baseURL + "/stocks/export")
+	{
+		publicExcel.GET("/all", h.ExportAllStocks)
+	}
+
+	public := r.Group(baseURL + "/projects/:id/stocks")
+	{
+		public.GET("/summary", h.getStocksSummary)
+		public.GET("/periods", h.getStocksPeriods)
+		public.PUT("/close-date", h.UpdateStocksCloseDate)
+		public.PUT("/real-stock/:stockId", h.UpdateRealStock)
+	}
 }
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
@@ -271,4 +282,17 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 		return 0, types.NewMissingFieldError("year_period")
 	}
 	return getYearPeriodOrDefault(c)
+}
+
+func (h *Handler) ExportAllStocks(c *gin.Context) {
+	data, err := h.ucs.ExportAllStocks(c)
+	if handleError(err, c) {
+		return
+	}
+
+	filename := stockExcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
