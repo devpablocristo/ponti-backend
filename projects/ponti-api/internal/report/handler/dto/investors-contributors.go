@@ -2,8 +2,9 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
 /* =========================
@@ -14,9 +15,9 @@ import (
 type ContributionCategoryType string
 
 const (
-	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"            // Insumos: Agroquímicos
+	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"            // Supplies: Agrochemicals
 	ContributionSeeds                   ContributionCategoryType = "seeds"                    // Insumos: Semillas
-	ContributionGeneralLabors           ContributionCategoryType = "general_labors"           // Labores: Pulverización, Otras (no siembra/riego/cosecha)
+	ContributionGeneralLabors           ContributionCategoryType = "general_labors"           // Labors: Spraying, Others (not sowing/irrigation/harvest)
 	ContributionSowing                  ContributionCategoryType = "sowing"                   // Labor: Siembra
 	ContributionIrrigation              ContributionCategoryType = "irrigation"               // Labor: Riego
 	ContributionCapitalizableLease      ContributionCategoryType = "capitalizable_lease"      // Arriendo: solo la parte fija
@@ -57,7 +58,7 @@ type InvestorShareResponse struct {
 // ContributionCategoryResponse aggregates totals and investor breakdown for a category.
 type ContributionCategoryResponse struct {
 	Type  ContributionCategoryType `json:"type"`
-	Label string                   `json:"label"` // e.g., "Agroquímicos", "Semillas", etc.
+	Label string                   `json:"label"` // e.g., "Agrochemicals", "Seeds", etc.
 
 	// Totales de la categoría
 	TotalUsd   decimal.Decimal `json:"total_usd"`

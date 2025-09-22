@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
 )
 
 type LaborRawItem struct {

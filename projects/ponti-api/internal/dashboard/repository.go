@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 )
 
 type GormEnginePort interface {
@@ -149,12 +151,6 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		operatingTotalCostsUSD = decimal.Zero
 	}
 
-	if operatingData.ResultUSD != nil {
-		operatingResultUSD = *operatingData.ResultUSD
-	} else {
-		operatingResultUSD = decimal.Zero
-	}
-
 	if operatingData.ResultPct != nil {
 		operatingResultPct = *operatingData.ResultPct
 	} else {
@@ -259,7 +255,7 @@ func (r *Repository) getSowingProgress(ctx context.Context, filter domain.Dashbo
 			sowing_hectares,
 			sowing_total_hectares,
 			sowing_progress_pct
-		FROM dashboard_sowing_progress_view_v2 
+		FROM v3_dashboard 
 		WHERE project_id = ANY($1)
 	`
 
@@ -376,7 +372,7 @@ func (r *Repository) getCostsProgress(ctx context.Context, filter domain.Dashboa
 		executed_costs_usd,
 		budget_cost_usd,
 		costs_progress_pct
-	FROM dashboard_costs_progress_view_v2 
+	FROM v3_dashboard 
 		WHERE project_id = ANY($1)
 	`
 
@@ -493,7 +489,7 @@ func (r *Repository) getHarvestProgress(ctx context.Context, filter domain.Dashb
 			harvest_hectares,
 			harvest_total_hectares,
 			harvest_progress_pct
-		FROM dashboard_harvest_progress_view_v2 
+		FROM v3_dashboard 
 		WHERE project_id = ANY($1)
 	`
 
@@ -606,7 +602,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 			investor_name,
 			investor_percentage_pct,
 			contributions_progress_pct
-		FROM dashboard_contributions_progress_view_v2 
+		FROM v3_dashboard_contributions_progress 
 		WHERE project_id = ANY($1)
 		ORDER BY investor_id
 	`
@@ -746,7 +742,7 @@ func (r *Repository) getOperatingResult(ctx context.Context, filter domain.Dashb
 			operating_result_total_costs_usd,
 			operating_result_usd,
 			operating_result_pct
-		FROM dashboard_operating_result_view_v2 
+		FROM v3_dashboard 
 		WHERE project_id = ANY($1)
 	`
 
@@ -905,7 +901,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 				JOIN labors lb ON lb.id = w.labor_id
 				WHERE w.project_id = p.project_id
 			), 0) AS labores_cost
-		FROM dashboard_management_balance_view_v2 p
+		FROM v3_dashboard_management_balance p
 		WHERE p.project_id = ANY($1)
 	`
 
@@ -1188,14 +1184,14 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 		return []models.CropIncidenceModel{}, nil
 	}
 
-	// Consultar la vista dashboard_crop_incidence_view
+	// Consultar la vista v3_dashboard_crop_incidence
 	query := `
 		SELECT 
 			current_crop_id,
 			crop_name,
 			crop_hectares,
 			crop_incidence_pct
-		FROM dashboard_crop_incidence_view_v2 
+		FROM v3_dashboard_crop_incidence 
 		WHERE project_id = ANY($1)
 		ORDER BY crop_name
 	`
@@ -1311,22 +1307,14 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 
 	query := `
 		SELECT
-			doi.start_date,
-			(SELECT w.id FROM workorders w 
-			 WHERE w.project_id = doi.project_id 
-			 AND w.date = doi.start_date 
-			 AND w.deleted_at IS NULL 
-			 ORDER BY w.id LIMIT 1) as first_workorder_number,
-			doi.end_date,
-			(SELECT w.id FROM workorders w 
-			 WHERE w.project_id = doi.project_id 
-			 AND w.date = doi.end_date 
-			 AND w.deleted_at IS NULL 
-			 ORDER BY w.id DESC LIMIT 1) as last_workorder_number,
-			(SELECT MAX(s.close_date) FROM stocks s WHERE s.project_id = doi.project_id) as last_stock_count_date,
-			doi.campaign_closing_date
-		FROM dashboard_operational_indicators_view_v2 doi
-		WHERE doi.project_id = ANY($1)
+			start_date,
+			end_date,
+			campaign_closing_date,
+			first_workorder_id,
+			last_workorder_id,
+			last_stock_count_date
+		FROM v3_dashboard 
+		WHERE project_id = ANY($1)
 		LIMIT 1
 	`
 
@@ -1340,54 +1328,27 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 
 	if rows.Next() {
 		// Leer los valores raw
-		var rawFirstWorkorderDate, rawFirstWorkorderNumber, rawLastWorkorderDate, rawLastWorkorderNumber, rawLastStockCountDate, rawCampaignClosingDate any
-		err = rows.Scan(&rawFirstWorkorderDate, &rawFirstWorkorderNumber, &rawLastWorkorderDate, &rawLastWorkorderNumber, &rawLastStockCountDate, &rawCampaignClosingDate)
+		var rawStartDate, rawEndDate, rawCampaignClosingDate, rawFirstWorkorderID, rawLastWorkorderID, rawLastStockCountDate any
+		err = rows.Scan(&rawStartDate, &rawEndDate, &rawCampaignClosingDate, &rawFirstWorkorderID, &rawLastWorkorderID, &rawLastStockCountDate)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan operational indicators data", err)
 		}
 
 		// Convertir los valores raw a los tipos correctos
-		var firstWorkorderDate, lastWorkorderDate, lastStockCountDate, campaignClosingDate *time.Time
-		var firstWorkorderNumber, lastWorkorderNumber *int64
+		var startDate, endDate, campaignClosingDate, lastStockCountDate *time.Time
+		var firstWorkorderID, lastWorkorderID *int64
 
-		// Convertir firstWorkorderDate
-		if rawFirstWorkorderDate != nil {
-			if dateVal, ok := rawFirstWorkorderDate.(time.Time); ok {
-				firstWorkorderDate = &dateVal
+		// Convertir startDate
+		if rawStartDate != nil {
+			if dateVal, ok := rawStartDate.(time.Time); ok {
+				startDate = &dateVal
 			}
 		}
 
-		// Convertir firstWorkorderNumber
-		if rawFirstWorkorderNumber != nil {
-			if intVal, ok := rawFirstWorkorderNumber.(int64); ok {
-				firstWorkorderNumber = &intVal
-			} else if intVal, ok := rawFirstWorkorderNumber.(int); ok {
-				int64Val := int64(intVal)
-				firstWorkorderNumber = &int64Val
-			}
-		}
-
-		// Convertir lastWorkorderDate
-		if rawLastWorkorderDate != nil {
-			if dateVal, ok := rawLastWorkorderDate.(time.Time); ok {
-				lastWorkorderDate = &dateVal
-			}
-		}
-
-		// Convertir lastWorkorderNumber
-		if rawLastWorkorderNumber != nil {
-			if intVal, ok := rawLastWorkorderNumber.(int64); ok {
-				lastWorkorderNumber = &intVal
-			} else if intVal, ok := rawLastWorkorderNumber.(int); ok {
-				int64Val := int64(intVal)
-				lastWorkorderNumber = &int64Val
-			}
-		}
-
-		// Convertir lastStockCountDate
-		if rawLastStockCountDate != nil {
-			if dateVal, ok := rawLastStockCountDate.(time.Time); ok {
-				lastStockCountDate = &dateVal
+		// Convertir endDate
+		if rawEndDate != nil {
+			if dateVal, ok := rawEndDate.(time.Time); ok {
+				endDate = &dateVal
 			}
 		}
 
@@ -1398,12 +1359,33 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, filter domain
 			}
 		}
 
+		// Convertir firstWorkorderID
+		if rawFirstWorkorderID != nil {
+			if idVal, ok := rawFirstWorkorderID.(int64); ok {
+				firstWorkorderID = &idVal
+			}
+		}
+
+		// Convertir lastWorkorderID
+		if rawLastWorkorderID != nil {
+			if idVal, ok := rawLastWorkorderID.(int64); ok {
+				lastWorkorderID = &idVal
+			}
+		}
+
+		// Convertir lastStockCountDate
+		if rawLastStockCountDate != nil {
+			if dateVal, ok := rawLastStockCountDate.(time.Time); ok {
+				lastStockCountDate = &dateVal
+			}
+		}
+
 		// Crear el modelo
 		result := models.OperationalIndicatorModel{
-			FirstWorkorderDate:   firstWorkorderDate,
-			FirstWorkorderNumber: firstWorkorderNumber,
-			LastWorkorderDate:    lastWorkorderDate,
-			LastWorkorderNumber:  lastWorkorderNumber,
+			FirstWorkorderDate:   startDate,
+			FirstWorkorderNumber: firstWorkorderID,
+			LastWorkorderDate:    endDate,
+			LastWorkorderNumber:  lastWorkorderID,
 			LastStockCountDate:   lastStockCountDate,
 			CampaignClosingDate:  campaignClosingDate,
 		}

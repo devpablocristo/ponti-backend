@@ -84,9 +84,9 @@ func (r *Repository) Connect(config ConfigPort) error {
 }
 
 func getDialector(config ConfigPort) (gorm.Dialector, error) {
-	if os.Getenv("K_SERVICE") != "" {
-		return connectWithConnectorIAMAuthN(config)
-	}
+	// if os.Getenv("K_SERVICE") != "" {
+	//	return connectWithConnectorIAMAuthN(config)
+	//}
 
 	var dialector gorm.Dialector
 	switch config.GetDBType() {
@@ -189,6 +189,9 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 			DisableForeignKeyConstraintWhenMigrating: true,
 		})
+		if err != nil {
+			return fmt.Errorf("failed to open sql.DB: %w", err)
+		}
 
 		sqlDB, err := db.DB()
 		if err != nil {

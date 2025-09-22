@@ -2,6 +2,7 @@ package supply_movement
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -130,6 +131,10 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
 		return types.NewError(types.ErrValidation, "quantity must be less than real stock units", nil)
+	}
+
+	if err := u.stockUseCases.UpdateUnitsConsumed(ctx, stockOrigin, movement.Quantity); err != nil {
+		return fmt.Errorf("error updating units consumed: %w", err)
 	}
 
 	movementIn := *movement

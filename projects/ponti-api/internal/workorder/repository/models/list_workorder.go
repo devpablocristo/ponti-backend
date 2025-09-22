@@ -23,13 +23,13 @@ type WorkorderListElement struct {
 	SupplyName        string          `gorm:"column:supply_name"`
 	Consumption       decimal.Decimal `gorm:"column:consumption"`
 	CategoryName      string          `gorm:"column:category_name"`
-	Dose              decimal.Decimal `gorm:"column:dose"`
-	CostPerHa         decimal.Decimal `gorm:"column:cost_per_ha"`
+	Dose              decimal.Decimal `gorm:"column:dose_per_ha"`
+	CostPerHa         decimal.Decimal `gorm:"column:supply_cost_per_ha"`
 	UnitPrice         decimal.Decimal `gorm:"column:unit_price"`
-	TotalCost         decimal.Decimal `gorm:"column:total_cost"`
+	TotalCost         decimal.Decimal `gorm:"column:supply_total_cost"`
 }
 
 // TableName apunta a la vista
 func (WorkorderListElement) TableName() string {
-	return "workorder_list_view"
+	return "v3_workorder_list"
 }

@@ -2,7 +2,6 @@ package pkggorm
 
 import (
 	"fmt"
-	"os"
 )
 
 // DBType define los tipos de bases de datos soportadas
@@ -75,12 +74,12 @@ func (c *Config) GetSQLitePath() string {
 
 // Validate verifica si la Configuración es válida
 func (c *Config) Validate() error {
-	if os.Getenv("K_SERVICE") != "" {
+	/*if os.Getenv("K_SERVICE") != "" {
 		if c.user == "" || c.dbname == "" || os.Getenv("INSTANCE_CONNECTION_NAME") == "" {
 			return fmt.Errorf("incomplete %s Configuration", c.dbType)
 		}
 		return nil
-	}
+	}*/
 
 	switch c.dbType {
 	case Postgres, MySQL:

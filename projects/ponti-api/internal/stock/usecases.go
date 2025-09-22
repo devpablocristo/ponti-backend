@@ -7,6 +7,7 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type RepositoryPort interface {
@@ -19,6 +20,7 @@ type RepositoryPort interface {
 	GetStockByPeriodAndProjectId(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
+	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 }
 
 type ExporterAdapterPort interface {
@@ -79,6 +81,10 @@ func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Sto
 
 func (u *UseCases) GetLastStockByProjectId(ctx context.Context, projectId int64, supplyId int64) (*domain.Stock, bool, error) {
 	return u.repo.GetLastStockByProjectId(ctx, projectId, supplyId)
+}
+
+func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
+	return u.repo.UpdateUnitsConsumed(ctx, stockDomain, quantity)
 }
 
 func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {

@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
 )
 
 // ===== REQUEST DTOs =====
@@ -716,49 +717,8 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 }
 
 // convertBalanceSummary convierte el resumen del balance
-func convertBalanceSummary(summary *domain.DashboardBalanceSummary) BalanceSummary {
-	if summary == nil {
-		return BalanceSummary{}
-	}
-
-	return BalanceSummary{
-		IncomeUSD:              summary.IncomeUSD,
-		DirectCostsExecutedUSD: summary.DirectCostsExecutedUSD,
-		DirectCostsInvestedUSD: summary.DirectCostsInvestedUSD,
-		StockUSD:               summary.StockUSD,
-		RentUSD:                summary.RentUSD,
-		StructureUSD:           summary.StructureUSD,
-		OperatingResultUSD:     summary.OperatingResultUSD,
-		OperatingResultPct:     summary.OperatingResultPct,
-	}
-}
 
 // convertBalanceBreakdown convierte el desglose del balance
-func convertBalanceBreakdown(breakdown []domain.DashboardBalanceBreakdown) []BalanceBreakdown {
-	result := make([]BalanceBreakdown, 0, len(breakdown))
-	for _, item := range breakdown {
-		result = append(result, BalanceBreakdown{
-			Label:       item.Label,
-			ExecutedUSD: item.ExecutedUSD,
-			InvestedUSD: item.InvestedUSD,
-			StockUSD:    item.StockUSD,
-		})
-	}
-	return result
-}
-
-// convertBalanceTotals convierte los totales del balance
-func convertBalanceTotals(totals *domain.DashboardBalanceTotals) BalanceTotals {
-	if totals == nil {
-		return BalanceTotals{}
-	}
-
-	return BalanceTotals{
-		ExecutedUSD: totals.ExecutedUSD,
-		InvestedUSD: totals.InvestedUSD,
-		StockUSD:    totals.StockUSD,
-	}
-}
 
 // convertCropIncidence convierte la incidencia de cultivos
 func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidence {
@@ -799,18 +759,6 @@ func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidenc
 	return CropIncidence{
 		Items: items,
 		Total: calculatedTotal,
-	}
-}
-
-// convertCropTotal convierte los totales de cultivos
-func convertCropTotal(total *domain.DashboardCropTotal) CropTotal {
-	if total == nil {
-		return CropTotal{}
-	}
-
-	return CropTotal{
-		Hectares:        total.Hectares,
-		AvgCostPerHaUSD: total.CostUSDPerHectare, // Mapear CostUSDPerHectare a AvgCostPerHaUSD
 	}
 }
 

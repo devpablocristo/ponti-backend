@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
 type LotDate struct {
@@ -86,21 +88,21 @@ func (e LotListElement) MarshalJSON() ([]byte, error) {
 		PreviousCrop:         e.PreviousCrop,
 		CurrentCrop:          e.CurrentCrop,
 		Variety:              e.Variety,
-		SowedArea:            e.SowedArea.Round(2).String(),
-		Hectares:             e.Hectares.Round(2).String(),
+		SowedArea:            e.SowedArea.Round(3).String(),
+		Hectares:             e.Hectares.Round(3).String(),
 		Season:               e.Season,
-		Tons:                 e.Tons.Round(2).String(),
+		Tons:                 e.Tons.Round(3).String(),
 		Dates:                e.Dates,
-		AdminCost:            e.AdminCost.Round(2).String(),
+		AdminCost:            e.AdminCost.Round(3).String(),
 		UpdatedAt:            e.UpdatedAt,
-		HarvestedArea:        e.HarvestedArea.Round(2).String(),
+		HarvestedArea:        e.HarvestedArea.Round(3).String(),
 		HarvestDate:          e.HarvestDate,
-		CostUsdPerHa:         e.CostUsdPerHa.Round(2).String(),
-		YieldTnPerHa:         e.YieldTnPerHa.Round(2).String(),
-		IncomeNetPerHa:       e.IncomeNetPerHa.Round(2).String(),
-		RentPerHa:            e.RentPerHa.Round(2).String(),
-		ActiveTotalPerHa:     e.ActiveTotalPerHa.Round(2).String(),
-		OperatingResultPerHa: e.OperatingResultPerHa.Round(2).String(),
+		CostUsdPerHa:         e.CostUsdPerHa.Round(3).String(),
+		YieldTnPerHa:         e.YieldTnPerHa.Round(3).String(),
+		IncomeNetPerHa:       e.IncomeNetPerHa.Round(3).String(),
+		RentPerHa:            e.RentPerHa.Round(3).String(),
+		ActiveTotalPerHa:     e.ActiveTotalPerHa.Round(3).String(),
+		OperatingResultPerHa: e.OperatingResultPerHa.Round(3).String(),
 	}
 	return json.Marshal(aux)
 }
@@ -115,8 +117,8 @@ func (t LotListTotals) MarshalJSON() ([]byte, error) {
 		SumSowedArea string `json:"sum_sowed_area"`
 		SumCost      string `json:"sum_cost"`
 	}{
-		SumSowedArea: t.SumSowedArea.Round(2).String(),
-		SumCost:      t.SumCost.Round(2).String(),
+		SumSowedArea: t.SumSowedArea.Round(3).String(),
+		SumCost:      t.SumCost.Round(3).String(),
 	}
 	return json.Marshal(aux)
 }

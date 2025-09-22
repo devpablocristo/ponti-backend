@@ -32,7 +32,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "surface",
 			Unit:     "ha",
 			Category: CategorySurface,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.SuperficieHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.SurfaceHa },
 		},
 
 		// Toneladas por tipo de cultivo
@@ -40,7 +40,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "production",
 			Unit:     "tn",
 			Category: CategoryProduction,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.ProduccionTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.ProductionTn },
 		},
 
 		// Rendimiento por tipo de cultivo (Toneladas / Hectáreas)
@@ -48,7 +48,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "yield",
 			Unit:     "tn/ha",
 			Category: CategoryProduction,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.RendimientoTnHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.YieldTnHa },
 		},
 
 		// Gasto de flete por tipo de cultivo
@@ -56,7 +56,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "freight_cost",
 			Unit:     "usd/tn",
 			Category: CategoryPrice,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.GastoFleteUsdTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.FreightCostUsdTn },
 		},
 
 		// Gasto comercial por tipo de cultivo
@@ -64,7 +64,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "commercial_cost",
 			Unit:     "usd/tn",
 			Category: CategoryPrice,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.GastoComercialUsdTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.CommercialCostUsdTn },
 		},
 
 		// Precio neto por tipo de cultivo
@@ -72,7 +72,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "net_price",
 			Unit:     "usd/tn",
 			Category: CategoryPrice,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.PrecioNetoUsdTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.NetPriceUsdTn },
 		},
 
 		// Precio bruto por tonelada
@@ -80,7 +80,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "gross_price",
 			Unit:     "usd/tn",
 			Category: CategoryPrice,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.PrecioBrutoUsdTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossPriceUsdTn },
 		},
 
 		// Ingreso neto por hectárea
@@ -88,7 +88,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "net_income",
 			Unit:     "usd/ha",
 			Category: CategoryProfit,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.IngresoNetoUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa },
 		},
 
 		// Total de labor por hectárea
@@ -96,7 +96,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "labors_cost",
 			Unit:     "usd/ha",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosLaboresUsd.Div(m.SuperficieHa) },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsd.Div(m.SurfaceHa) },
 		},
 
 		// Total de insumos por hectárea
@@ -104,7 +104,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "supplies_cost",
 			Unit:     "usd/ha",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosInsumosUsd.Div(m.SuperficieHa) },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsd.Div(m.SurfaceHa) },
 		},
 
 		// Total costos directos por hectárea
@@ -112,7 +112,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "total_direct_costs",
 			Unit:     "usd/ha",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.CostosDirectosUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa },
 		},
 
 		// Margen bruto por hectárea
@@ -120,7 +120,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "gross_margin",
 			Unit:     "usd/ha",
 			Category: CategoryProfit,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.MargenBrutoUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa },
 		},
 
 		// Arriendo por hectárea
@@ -128,7 +128,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "lease",
 			Unit:     "usd/ha",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.ArriendoUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.RentUsdHa },
 		},
 
 		// Costo administrativo por hectárea
@@ -136,7 +136,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "admin",
 			Unit:     "usd/ha",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministracionUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministrationUsdHa },
 		},
 
 		// Resultado operativo por hectárea
@@ -144,7 +144,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "operating_result",
 			Unit:     "usd/ha",
 			Category: CategoryProfit,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.ResultadoOperativoUsdHa },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.OperatingResultUsdHa },
 		},
 
 		// Total invertido (Costos directos + Arriendo + Administración)
@@ -152,7 +152,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "total_invested",
 			Unit:     "usd",
 			Category: CategoryCost,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvertidoUsd },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd },
 		},
 
 		// Renta (Resultado operativo / Total invertido)
@@ -160,7 +160,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "return_pct",
 			Unit:     "%",
 			Category: CategoryProfit,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.RentaPct },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct },
 		},
 
 		// Rinde indiferencia
@@ -168,7 +168,7 @@ func GetAvailableMetrics() []MetricDefinition {
 			Key:      "indifference_yield",
 			Unit:     "tn/ha",
 			Category: CategoryProfit,
-			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.RindeIndiferenciaUsdTn },
+			GetValue: func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn },
 		},
 
 		// Precio indiferencia (calculado como Total invertido / Rendimiento)
@@ -177,10 +177,10 @@ func GetAvailableMetrics() []MetricDefinition {
 			Unit:     "usd/tn",
 			Category: CategoryProfit,
 			GetValue: func(m domain.FieldCropMetric) decimal.Decimal {
-				if m.RendimientoTnHa.IsZero() {
+				if m.YieldTnHa.IsZero() {
 					return decimal.Zero
 				}
-				return m.TotalInvertidoUsd.Div(m.RendimientoTnHa)
+				return m.TotalInvestedUsd.Div(m.YieldTnHa)
 			},
 		},
 	}

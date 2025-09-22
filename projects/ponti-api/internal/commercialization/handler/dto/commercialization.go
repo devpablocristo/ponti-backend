@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/commercialization/usecases/domain"
-	decimal "github.com/shopspring/decimal"
 )
 
 type CommercializationResponse struct {

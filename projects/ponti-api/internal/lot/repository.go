@@ -149,6 +149,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		if l.Hectares.GreaterThan(decimal.Zero) {
 			updateFields["hectares"] = l.Hectares
 		}
+		// Solo actualizar cultivos si se envían explícitamente
 		if l.PreviousCrop.ID > 0 {
 			updateFields["previous_crop_id"] = l.PreviousCrop.ID
 		}
@@ -164,16 +165,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		res := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
-			Updates(map[string]any{
-				"name":             l.Name,
-				"hectares":         l.Hectares,
-				"previous_crop_id": l.PreviousCrop.ID,
-				"current_crop_id":  l.CurrentCrop.ID,
-				"season":           l.Season,
-				"variety":          l.Variety,
-				"updated_by":       &userID,
-				"updated_at":       nowTS,
-			})
+			Updates(updateFields)
 		if res.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
 		}
@@ -318,13 +310,14 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
 	type rowAgg struct {
-		SeededArea    decimal.Decimal `gorm:"column:seeded_area"`
-		HarvestedArea decimal.Decimal `gorm:"column:harvested_area"`
-		YieldTnPerHa  decimal.Decimal `gorm:"column:yield_tn_per_ha"`
-		CostPerHa     decimal.Decimal `gorm:"column:cost_per_ha"`
+		SeededArea      decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
+		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
+		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
 	}
 
-	base := r.db.Client().WithContext(ctx).Table("fix_lots_metrics")
+	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics").Debug()
 
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
@@ -335,18 +328,20 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	if cropID > 0 {
-		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
+		// Usar consulta SQL raw para el filtro por cultivo
+		base = base.Where("lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
 	}
 
-	// La vista ya viene agregada por (project_id, field_id, previous_crop_id, current_crop_id).
-	// Si los filtros devuelven varias filas, re-agregamos:
+	// La vista v3_lot_metrics no está agregada, por lo que re-agregamos:
 	// - áreas: SUM directo
 	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
+	// - superficie_total: MAX (es la misma para todos los lotes del campo)
 	const sel = `
-        COALESCE(SUM(seeded_area), 0) AS seeded_area,
-        COALESCE(SUM(harvested_area), 0) AS harvested_area,
-        COALESCE(SUM(yield_tn_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS yield_tn_per_ha,
-        COALESCE(SUM(cost_per_ha * seeded_area) / NULLIF(SUM(seeded_area),0), 0) AS cost_per_ha
+        COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+        COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+        COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
+        COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha,
+        COALESCE(MAX(superficie_total), 0) AS superficie_total
     `
 
 	var row rowAgg
@@ -355,10 +350,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	}
 
 	return &domain.LotMetrics{
-		SeededArea:     row.SeededArea,
-		HarvestedArea:  row.HarvestedArea,
-		YieldTnPerHa:   row.YieldTnPerHa,
-		CostPerHectare: row.CostPerHa,
+		SeededArea:      row.SeededArea,
+		HarvestedArea:   row.HarvestedArea,
+		YieldTnPerHa:    row.YieldTnPerHa,
+		CostPerHectare:  row.CostPerHa,
+		SuperficieTotal: row.SuperficieTotal,
 	}, nil
 }
 
@@ -368,7 +364,7 @@ func (r *Repository) ListLots(
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 
-	base := r.db.Client().WithContext(ctx).Table("fix_lot_list")
+	base := r.db.Client().WithContext(ctx).Table("v3_lot_list")
 
 	// filtros
 	if fieldID > 0 {
@@ -389,14 +385,14 @@ func (r *Repository) ListLots(
 	}
 
 	var sumSowedArea decimal.Decimal
-	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area),0)").Scan(&sumSowedArea).Error; err != nil {
+	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area_ha),0)").Scan(&sumSowedArea).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
 	}
 
 	// sumCost: promedio ponderado de cost_usd_per_ha por sowed_area (para la card "Costo por hectárea")
 	var sumCost decimal.Decimal
 	if err := base.Session(&gorm.Session{}).
-		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area) / NULLIF(SUM(sowed_area),0), 0)").
+		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0)").
 		Scan(&sumCost).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
 	}
@@ -408,14 +404,14 @@ func (r *Repository) ListLots(
 	if err := base.Session(&gorm.Session{}).
 		Select(`
 	             project_id, field_id, project_name, field_name,
-	             id, lot_name, variety, sowed_area, hectares, season, updated_at, tons,
+	             id, lot_name, variety, sowed_area_ha, hectares, season, updated_at, tons,
 	             previous_crop_id, previous_crop,
 	             current_crop_id, current_crop,
-	             admin_cost_per_ha,
-	             harvested_area, harvest_date,
+	             admin_cost_per_ha_usd AS admin_cost_per_ha,
+	             harvested_area_ha AS harvested_area, lot_harvest_date AS harvest_date,
 	             cost_usd_per_ha, yield_tn_per_ha,
-	             income_net_per_ha, rent_per_ha,
-	             active_total_per_ha, operating_result_per_ha
+	             income_net_per_ha_usd AS income_net_per_ha, rent_per_ha_usd AS rent_per_ha,
+	             active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha
 	         `).
 		Order("id DESC").Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {

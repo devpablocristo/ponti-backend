@@ -1,10 +1,12 @@
 package dto
 
 import (
+	"time"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	shareddomain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/usecases/domain"
-	"time"
 )
 
 type UpdateCloseDateRequest struct {
@@ -26,7 +28,7 @@ type UpdateCloseDateResponse struct {
 
 func (r *UpdateCloseDateRequest) Validate() error {
 	var timeZero time.Time
-	if r.CloseDate == timeZero {
+	if r.CloseDate.Equal(timeZero) {
 		return types.NewError(types.ErrValidation, "close_date is required", nil)
 	}
 	return nil

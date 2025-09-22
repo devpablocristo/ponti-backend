@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
 	"github.com/shopspring/decimal"
+
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar/usecases/domain"
 )
 
 type MonthResponse struct {
