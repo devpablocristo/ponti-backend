@@ -7,6 +7,7 @@ var ColumnWidths = []float64{
 	22, // INVERSOR
 	25, // INSUMO
 	15, // CANTIDAD
+	15, // UNIDAD
 	20, // RUBRO
 	20, // TIPO/CLASE
 	25, // PROVEEDOR

@@ -9,6 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	// project
+
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
 )
 
@@ -26,12 +28,18 @@ type RepositoryPort interface {
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 }
 
-type UseCases struct {
-	repo RepositoryPort
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []domain.LotTable) ([]byte, error)
+	Close() error
 }
 
-func NewUseCases(repo RepositoryPort) *UseCases {
-	return &UseCases{repo: repo}
+type UseCases struct {
+	repo  RepositoryPort
+	excel ExporterAdapterPort
+}
+
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, excel: excel}
 }
 
 func (u *UseCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
@@ -83,4 +91,21 @@ func (u *UseCases) ListLots(
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 	return u.repo.ListLots(ctx, projectID, fieldID, cropID, page, pageSize)
+}
+
+func (u *UseCases) ExportLots(ctx context.Context, projectID, fieldID, cropID int64, page, pageSize int) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, _, _, _, err := u.ListLots(ctx, projectID, fieldID, cropID, page, pageSize)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list lots", err)
+	}
+
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }

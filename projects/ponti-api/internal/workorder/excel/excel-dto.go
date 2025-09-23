@@ -8,23 +8,23 @@ import (
 )
 
 type WorkorderExcelDto struct {
-	Number       string          `excel:"NUMERO DE ORDEN"`
-	ProjectName  string          `excel:"PROYECTO"`
-	FieldName    string          `excel:"CAMPO"`
-	LotName      string          `excel:"LOTE"`
-	Date         time.Time       `excel:"FECHA"`
-	CropName     string          `excel:"CULTIVO"`
-	LaborName    string          `excel:"LABOR"`
-	TypeName     string          `excel:"TIPO/CLASE"`
-	Contractor   string          `excel:"CONTRATISTA"`
-	SurfaceHa    decimal.Decimal `excel:"SUPERFICIE"`
-	SupplyName   string          `excel:"INSUMO"`
-	Consumption  decimal.Decimal `excel:"CONSUMO"`
-	CategoryName string          `excel:"RUBRO"`
-	Dose         decimal.Decimal `excel:"DOSIS"`
-	CostPerHa    decimal.Decimal `excel:"COST U$/HA"`
-	UnitPrice    decimal.Decimal `excel:"PRECIO UNIDAD"`
-	TotalCost    decimal.Decimal `excel:"TOTAL COSTO"`
+	Number       string    `excel:"NUMERO DE ORDEN"`
+	ProjectName  string    `excel:"PROYECTO"`
+	FieldName    string    `excel:"CAMPO"`
+	LotName      string    `excel:"LOTE"`
+	Date         time.Time `excel:"FECHA"`
+	CropName     string    `excel:"CULTIVO"`
+	LaborName    string    `excel:"LABOR"`
+	TypeName     string    `excel:"TIPO/CLASE"`
+	Contractor   string    `excel:"CONTRATISTA"`
+	SurfaceHa    float64   `excel:"SUPERFICIE"`
+	SupplyName   string    `excel:"INSUMO"`
+	Consumption  float64   `excel:"CONSUMO"`
+	CategoryName string    `excel:"RUBRO"`
+	Dose         float64   `excel:"DOSIS"`
+	CostPerHa    float64   `excel:"COST U$/HA"`
+	UnitPrice    float64   `excel:"PRECIO UNIDAD"`
+	TotalCost    float64   `excel:"TOTAL COSTO"`
 }
 
 func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExcelDto {
@@ -41,16 +41,25 @@ func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExce
 			LaborName:    it.LaborName,
 			TypeName:     it.TypeName,
 			Contractor:   it.Contractor,
-			SurfaceHa:    it.SurfaceHa,
+			SurfaceHa:    decToFloat(it.SurfaceHa, 0),
 			SupplyName:   it.SupplyName,
-			Consumption:  it.Consumption,
+			Consumption:  decToFloat(it.Consumption, 0),
 			CategoryName: it.CategoryName,
-			Dose:         it.Dose,
-			CostPerHa:    it.CostPerHa,
-			UnitPrice:    it.UnitPrice,
-			TotalCost:    it.TotalCost,
+			Dose:         decToFloat(it.Dose, 2),
+			CostPerHa:    decToFloat(it.CostPerHa, 2),
+			UnitPrice:    decToFloat(it.UnitPrice, 2),
+			TotalCost:    decToFloat(it.UnitPrice, 2),
 		})
 	}
 
 	return out
+}
+
+// helper para convertir decimal en float64 con redondeo opcional
+func decToFloat(d decimal.Decimal, scale int32) float64 {
+	if scale >= 0 {
+		d = d.Round(scale)
+	}
+	f, _ := d.Float64()
+	return f
 }

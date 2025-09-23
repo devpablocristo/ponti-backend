@@ -14,6 +14,9 @@ import (
 	// pkg
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
+	// excel
+	lotExcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/excel"
+
 	// project
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
@@ -32,6 +35,7 @@ type UseCasesPort interface {
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
 	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
 	ListLots(context.Context, int64, int64, int64, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
+	ExportLots(context.Context, int64, int64, int64, int, int) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -83,6 +87,7 @@ func (h *Handler) Routes() {
 		public.GET("/:id", h.GetLot)
 		public.PUT("/:id", ValidateLotUpdate(), h.UpdateLot)
 		public.DELETE("/:id", h.DeleteLot)
+		public.GET("/export", h.ExportLots)
 	}
 }
 
@@ -230,4 +235,36 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+}
+
+func (h *Handler) ExportLots(c *gin.Context) {
+	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
+	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "1000"))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 1000
+	}
+	// Los filtros por ID son opcionales para permitir búsquedas globales
+	// Si no se proporcionan filtros, se retornan todos los lotes
+	// Cap de paginación
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+
+	data, err := h.ucs.ExportLots(c.Request.Context(), projectID, fieldID, cropID, page, pageSize)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
+	}
+
+	filename := lotExcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
