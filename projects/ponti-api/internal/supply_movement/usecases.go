@@ -130,7 +130,7 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 
 func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
-		return types.NewError(types.ErrValidation, "quantity must be less than real stock units", nil)
+		return types.NewError(types.ErrValidation, fmt.Sprintf("La cantidad que desea mover es mayor al stock real: %s", stockOrigin.RealStockUnits.String()), nil)
 	}
 
 	if err := u.stockUseCases.UpdateUnitsConsumed(ctx, stockOrigin, movement.Quantity); err != nil {
