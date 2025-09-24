@@ -106,7 +106,6 @@ func (r *Repository) GetStocksPeriods(ctx context.Context, projectId int64) ([]s
 		Where("project_id = ? AND close_date IS NOT NULL", projectId).
 		Distinct("close_date").
 		Pluck("close_date", &rawPeriods).Error
-
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +212,6 @@ func (r *Repository) GetLastStockByProjectId(ctx context.Context, projectId int6
 	}
 
 	return stockModel.ToDomain(), false, nil
-
 }
 
 func (r *Repository) GetStockByPeriodAndProjectId(ctx context.Context, projectId int64) (*domain.Stock, error) {
@@ -227,11 +225,28 @@ func (r *Repository) GetStockByPeriodAndProjectId(ctx context.Context, projectId
 		Where("project_id = ?", projectId).
 		Where("close_date IS NULL").
 		First(&stockModel).Error
-
 	if err != nil {
 		return nil, err
 	}
 
 	return stockModel.ToDomain(), nil
+}
 
+func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error) {
+	var stockModel []models.Stock
+
+	db := r.db.Client().WithContext(ctx).
+		Preload("Supply").
+		Preload("Supply.Type").
+		Preload("Investor").
+		Preload("SupplyMovements")
+
+	if err := db.Find(&stockModel).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domain.Stock, 0, len(stockModel))
+	for i := range stockModel {
+		out = append(out, stockModel[i].ToDomain())
+	}
+	return out, nil
 }
