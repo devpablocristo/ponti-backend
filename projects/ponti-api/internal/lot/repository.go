@@ -72,11 +72,7 @@ func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]doma
 		Find(&lots).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list lots", err)
 	}
-	res := make([]domain.Lot, len(lots))
-	for i := range lots {
-		res[i] = *lots[i].ToDomain()
-	}
-	return res, nil
+	return mapLotsToDomain(lots), nil
 }
 
 // GetLot obtiene un lote por ID.
@@ -261,11 +257,7 @@ func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list lots by project", err)
 	}
-	res := make([]domain.Lot, len(lots))
-	for i := range lots {
-		res[i] = *lots[i].ToDomain()
-	}
-	return res, nil
+	return mapLotsToDomain(lots), nil
 }
 
 func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, fieldID int64) ([]domain.Lot, error) {
@@ -277,11 +269,7 @@ func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, f
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list lots by project and field", err)
 	}
-	res := make([]domain.Lot, len(lots))
-	for i := range lots {
-		res[i] = *lots[i].ToDomain()
-	}
-	return res, nil
+	return mapLotsToDomain(lots), nil
 }
 
 func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID, fieldID, cropID int64, cropType string) ([]domain.Lot, error) {
@@ -301,60 +289,66 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list lots by project, field and crop", err)
 	}
-	res := make([]domain.Lot, len(lots))
-	for i := range lots {
-		res[i] = *lots[i].ToDomain()
-	}
-	return res, nil
+	return mapLotsToDomain(lots), nil
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
 	type rowAgg struct {
-		SeededArea      decimal.Decimal `gorm:"column:seeded_area"`
-		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
-		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
-		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
-		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
+		SeededArea      *decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea   *decimal.Decimal `gorm:"column:harvested_area"`
+		YieldTnPerHa    *decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+		CostPerHa       *decimal.Decimal `gorm:"column:cost_per_ha"`
+		SuperficieTotal *decimal.Decimal `gorm:"column:superficie_total"`
 	}
 
-	base := r.db.Client().WithContext(ctx).Table("v3_lot_metrics").Debug()
+	// Construir la consulta SQL raw directamente
+	var whereClause string
+	var args []interface{}
 
-	// Los filtros por ID son opcionales para permitir búsquedas globales
 	if fieldID > 0 {
-		base = base.Where("field_id = ?", fieldID)
+		whereClause = "WHERE field_id = ?"
+		args = append(args, fieldID)
 	} else if projectID > 0 {
-		base = base.Where("project_id = ?", projectID)
+		whereClause = "WHERE project_id = ?"
+		args = append(args, projectID)
 	}
-	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
 
 	if cropID > 0 {
-		// Usar consulta SQL raw para el filtro por cultivo
-		base = base.Where("lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
+		if whereClause == "" {
+			whereClause = "WHERE lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)"
+		} else {
+			whereClause += " AND lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)"
+		}
+		args = append(args, cropID, cropID)
 	}
 
-	// La vista v3_lot_metrics no está agregada, por lo que re-agregamos:
-	// - áreas: SUM directo
-	// - yield y costo: promedio ponderado por seeded_area de cada fila agregada
-	// - superficie_total: MAX (es la misma para todos los lotes del campo)
-	const sel = `
-        COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
-        COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-        COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
-        COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha,
-        COALESCE(MAX(superficie_total), 0) AS superficie_total
-    `
+	// Consulta SQL raw para evitar problemas con GORM y agregaciones
+	query := `
+        SELECT 
+            COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+            COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+            COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
+            COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha,
+            COALESCE(MAX(superficie_total), 0) AS superficie_total
+        FROM v3_lot_metrics 
+        ` + whereClause
 
 	var row rowAgg
-	if err := base.Select(sel).Scan(&row).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list lot metrics", err)
+	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to scan lot metrics", err)
+	}
+
+	// Validar que se obtuvieron valores válidos
+	if row.SeededArea == nil || row.HarvestedArea == nil || row.YieldTnPerHa == nil || row.CostPerHa == nil || row.SuperficieTotal == nil {
+		return nil, types.NewError(types.ErrInternal, "failed to get valid lot metrics data", nil)
 	}
 
 	return &domain.LotMetrics{
-		SeededArea:      row.SeededArea,
-		HarvestedArea:   row.HarvestedArea,
-		YieldTnPerHa:    row.YieldTnPerHa,
-		CostPerHectare:  row.CostPerHa,
-		SuperficieTotal: row.SuperficieTotal,
+		SeededArea:      *row.SeededArea,
+		HarvestedArea:   *row.HarvestedArea,
+		YieldTnPerHa:    *row.YieldTnPerHa,
+		CostPerHectare:  *row.CostPerHa,
+		SuperficieTotal: *row.SuperficieTotal,
 	}, nil
 }
 
@@ -381,12 +375,12 @@ func (r *Repository) ListLots(
 	// totales
 	var total int64
 	if err := base.Session(&gorm.Session{}).Count(&total).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, err
+		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to count lots", err)
 	}
 
 	var sumSowedArea decimal.Decimal
 	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area_ha),0)").Scan(&sumSowedArea).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, err
+		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to sum sowed area", err)
 	}
 
 	// sumCost: promedio ponderado de cost_usd_per_ha por sowed_area (para la card "Costo por hectárea")
@@ -394,7 +388,7 @@ func (r *Repository) ListLots(
 	if err := base.Session(&gorm.Session{}).
 		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0)").
 		Scan(&sumCost).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, err
+		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to calculate cost per hectare", err)
 	}
 
 	// página
@@ -430,7 +424,7 @@ func (r *Repository) ListLots(
 			Where("lot_id IN ? AND deleted_at IS NULL", lotIDs).
 			Order("lot_id, sequence"). // orden consistente
 			Scan(&allDates).Error; err != nil {
-			return nil, 0, decimal.Zero, decimal.Zero, err
+			return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to get lot dates", err)
 		}
 		datesByLot := make(map[int64][]models.LotDates)
 		for _, d := range allDates {
@@ -442,6 +436,15 @@ func (r *Repository) ListLots(
 	}
 
 	return domainRows, int(total), sumSowedArea, sumCost, nil
+}
+
+// mapLotsToDomain convierte slice de models.Lot a slice de domain.Lot
+func mapLotsToDomain(lots []models.Lot) []domain.Lot {
+	res := make([]domain.Lot, len(lots))
+	for i := range lots {
+		res[i] = *lots[i].ToDomain()
+	}
+	return res
 }
 
 func convertStringToID(ctx context.Context) (int64, error) {
