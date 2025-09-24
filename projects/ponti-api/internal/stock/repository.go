@@ -42,8 +42,8 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 	if closeDate != t {
 		query.Where("stocks.close_date = ?", closeDate)
 	} else {
-		// Si no se especifica fecha, obtener todos los stocks (sin filtro de fecha)
-		// query.Where("stocks.close_date IS NOT NULL")
+		// Si no se especifica fecha, obtener el stock activo (sin filtro de fecha)
+		query.Where("stocks.close_date IS NULL")
 	}
 
 	var stockModels []models.Stock
