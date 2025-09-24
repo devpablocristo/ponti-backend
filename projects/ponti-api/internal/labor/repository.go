@@ -122,12 +122,11 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 
 func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int64) ([]domain.LaborCategory, error) {
 	var laborCategoriesModels []models.LaborCategory
-	db0 :=
-		r.db.
-			Client().
-			WithContext(ctx).
-			Model(&models.LaborCategory{}).
-			Where("type_id = ?", typeID)
+	db0 := r.db.
+		Client().
+		WithContext(ctx).
+		Model(&models.LaborCategory{}).
+		Where("type_id = ?", typeID)
 
 	if err := db0.Find(&laborCategoriesModels).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list labor categories", err)
@@ -178,7 +177,6 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
 		Where("v3.workorder_id = ?", workorderID).
 		Scan(&v3Models).Error
-
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
 	}
@@ -237,7 +235,6 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 }
 
 func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
-
 	// Usar la vista v3_labor_list como base y agregar campos adicionales
 	base := r.db.Client().
 		WithContext(ctx).
@@ -366,7 +363,7 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
 	q := `
-        SELECT 
+        SELECT
           surface_ha,
           total_labor_cost,
           avg_labor_cost_per_ha
@@ -402,4 +399,115 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 		NetTotalCost: row.NetTotalCost,
 		AvgCostPerHa: row.AvgCostPerHa,
 	}, nil
+}
+
+func (r *Repository) ListAllGroupLabor(ctx context.Context, usdMonth string) ([]domain.LaborRawItem, error) {
+	base := r.db.Client().
+		WithContext(ctx).
+		Table("v3_labor_list AS v3").
+		Select(`
+            v3.workorder_id,
+			v3.workorder_number,
+			v3.date,
+			v3.project_id,
+			v3.field_id,
+			v3.project_name,
+			v3.field_name,
+			COALESCE(v3.crop_name, '') AS crop_name,
+			v3.labor_name,
+			COALESCE(v3.labor_category_name, '') AS category_name,
+			v3.contractor,
+			v3.surface_ha,
+			v3.cost_per_ha,
+			v3.contractor_name,
+			COALESCE(v3.investor_name, '') AS investor_name,
+			pdv.average_value AS usd_avg_value,
+			i.id AS invoice_id,
+			i.number AS invoice_number,
+			i.company AS invoice_company,
+			i.date AS invoice_date,
+			i.status AS invoice_status
+        `).
+		Joins(`LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id AND i.deleted_at IS NULL`).
+		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+
+	var rows []models.LaborListItem
+
+	if err := base.Order("v3.workorder_number DESC").Scan(&rows).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to list grouped labors", err)
+	}
+
+	list := make([]domain.LaborRawItem, len(rows))
+	for i, m := range rows {
+		// Calcular valores de USD dinámicamente
+		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
+
+		// Usar porcentaje de IVA por defecto (10.5%)
+		// TODO: Implementar obtención dinámica desde app_parameters
+		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
+		totalIVA := netTotal.Mul(ivaPercentage)
+
+		usd := m.USDAvgValue
+		var usdCostHa, usdNetTotal decimal.Decimal
+		if usd.GreaterThan(decimal.Zero) {
+			usdCostHa = m.CostPerHa.Div(usd)
+			usdNetTotal = netTotal.Div(usd)
+		} else {
+			// usd <= 0 dejamos USD en 0 (sin dividir)
+			usdCostHa = decimal.Zero
+			usdNetTotal = decimal.Zero
+		}
+
+		// Manejar campos opcionales
+		cropName := ""
+		if m.CropName != nil {
+			cropName = *m.CropName
+		}
+		categoryName := ""
+		if m.LaborCategoryName != nil {
+			categoryName = *m.LaborCategoryName
+		}
+		investorName := ""
+		if m.InvestorName != nil {
+			investorName = *m.InvestorName
+		}
+		invoiceNumber := ""
+		if m.InvoiceNumber != nil {
+			invoiceNumber = *m.InvoiceNumber
+		}
+		invoiceCompany := ""
+		if m.InvoiceCompany != nil {
+			invoiceCompany = *m.InvoiceCompany
+		}
+		invoiceStatus := ""
+		if m.InvoiceStatus != nil {
+			invoiceStatus = *m.InvoiceStatus
+		}
+
+		list[i] = domain.LaborRawItem{
+			WorkorderID:     m.WorkorderID,
+			WorkorderNumber: m.WorkorderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			CropName:        cropName,
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          m.CostPerHa,
+			CategoryName:    categoryName,
+			InvestorName:    investorName,
+			USDAvgValue:     m.USDAvgValue,
+			NetTotal:        netTotal,
+			TotalIVA:        totalIVA,
+			USDCostHa:       usdCostHa,
+			USDNetTotal:     usdNetTotal,
+			InvoiceID:       0,
+			InvoiceNumber:   invoiceNumber,
+			InvoiceCompany:  invoiceCompany,
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   invoiceStatus,
+		}
+	}
+	return list, nil
 }

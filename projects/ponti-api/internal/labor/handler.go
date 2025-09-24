@@ -28,6 +28,7 @@ type UseCasesPort interface {
 	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64, string) ([]byte, error)
+	ExportAllGroupLabors(context.Context, string) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
@@ -89,6 +90,7 @@ func (h *Handler) Routes() {
 		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
 		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
 		workorderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
+		workorderGroup.GET("/export/all", h.ExportAllGroupLabors)
 		workorderGroup.GET("/metrics", h.GetMetrics)
 	}
 }
@@ -113,7 +115,6 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	_, err = h.ucps.GetProject(ctx, projectID)
-
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -278,7 +279,6 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 
 	resp := dto.NewLaborCategoriesListResponse(laborCategories)
 	c.JSON(http.StatusOK, resp)
-
 }
 
 func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
@@ -356,7 +356,6 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	resp := dto.FromDomainList(pageInfo, list)
 
 	c.JSON(http.StatusOK, resp)
-
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
@@ -427,6 +426,26 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+}
+
+func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
+	usdMonth := strings.TrimSpace(c.Query("usd_month"))
+	if usdMonth == "" {
+		types.NewErrorResponseHelper().BadRequest(c, "usd_month requires a month", nil)
+		return
+	}
+
+	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), usdMonth)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
+	}
+
+	filename := "labors_table.xlsx"
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 // ----- HELPER -----

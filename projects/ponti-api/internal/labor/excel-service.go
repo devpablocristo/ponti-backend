@@ -36,4 +36,17 @@ func (e *ExcelExporter) Export(ctx context.Context, items []domain.LaborListItem
 	return buf.Bytes(), nil
 }
 
+func (e *ExcelExporter) ExportTable(ctx context.Context, items []domain.LaborListItem) ([]byte, error) {
+	_ = ctx
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+	rows := labexcel.BuildExcelTableDTO(items)
+	var buf bytes.Buffer
+	if err := e.eng.ExportToWriter(rows, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func (e *ExcelExporter) Close() error { return e.eng.Close() }
