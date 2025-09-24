@@ -441,7 +441,7 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 		return
 	}
 
-	filename := "labores_tabla.xlsx"
+	filename := "tabla_labores.xlsx"
 
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
