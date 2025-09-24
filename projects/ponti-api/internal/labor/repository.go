@@ -186,51 +186,25 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 	// Convertir a LaborRawItem para mantener compatibilidad
 	raws := make([]domain.LaborRawItem, len(v3Models))
 	for i, m := range v3Models {
-		cropName := ""
-		if m.CropName != nil {
-			cropName = *m.CropName
-		}
-		categoryName := ""
-		if m.LaborCategoryName != nil {
-			categoryName = *m.LaborCategoryName
-		}
-		investorName := ""
-		if m.InvestorName != nil {
-			investorName = *m.InvestorName
-		}
-
-		invoiceNumber := ""
-		if m.InvoiceNumber != nil {
-			invoiceNumber = *m.InvoiceNumber
-		}
-		invoiceCompany := ""
-		if m.InvoiceCompany != nil {
-			invoiceCompany = *m.InvoiceCompany
-		}
-		invoiceStatus := ""
-		if m.InvoiceStatus != nil {
-			invoiceStatus = *m.InvoiceStatus
-		}
-
 		raws[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
 			WorkorderNumber: m.WorkorderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
-			CropName:        cropName,
+			CropName:        safeStringPtr(m.CropName),
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
 			CostHa:          m.CostPerHa,
-			CategoryName:    categoryName,
-			InvestorName:    investorName,
+			CategoryName:    safeStringPtr(m.LaborCategoryName),
+			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			InvoiceID:       0,
-			InvoiceNumber:   invoiceNumber,
-			InvoiceCompany:  invoiceCompany,
+			InvoiceID:       *m.InvoiceID,
+			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
 			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   invoiceStatus,
+			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
 		}
 	}
 	return raws, nil
@@ -300,39 +274,17 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 		// Calcular valores de USD dinámicamente
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
-		// Usar porcentaje de IVA por defecto (10.5%)
-		// TODO: Implementar obtención dinámica desde app_parameters
-		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
+		// Obtener porcentaje de IVA dinámicamente desde app_parameters
+		ivaPercentage, err := r.getIVAPercentage(ctx)
+		if err != nil {
+			// Si hay error, usar valor por defecto y logear el error
+			// TODO: Implementar logging apropiado
+			ivaPercentage = decimal.NewFromFloat(0.105) // 10.5%
+		}
 		totalIVA := netTotal.Mul(ivaPercentage)
 
 		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
 		usdNetTotal := netTotal.Div(m.USDAvgValue)
-
-		// Manejar campos opcionales
-		cropName := ""
-		if m.CropName != nil {
-			cropName = *m.CropName
-		}
-		categoryName := ""
-		if m.LaborCategoryName != nil {
-			categoryName = *m.LaborCategoryName
-		}
-		investorName := ""
-		if m.InvestorName != nil {
-			investorName = *m.InvestorName
-		}
-		invoiceNumber := ""
-		if m.InvoiceNumber != nil {
-			invoiceNumber = *m.InvoiceNumber
-		}
-		invoiceCompany := ""
-		if m.InvoiceCompany != nil {
-			invoiceCompany = *m.InvoiceCompany
-		}
-		invoiceStatus := ""
-		if m.InvoiceStatus != nil {
-			invoiceStatus = *m.InvoiceStatus
-		}
 
 		list[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
@@ -340,28 +292,59 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
-			CropName:        cropName,
+			CropName:        safeStringPtr(m.CropName),
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
 			CostHa:          m.CostPerHa,
-			CategoryName:    categoryName,
-			InvestorName:    investorName,
+			CategoryName:    safeStringPtr(m.LaborCategoryName),
+			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
 			NetTotal:        netTotal,
 			TotalIVA:        totalIVA,
 			USDCostHa:       usdCostHa,
 			USDNetTotal:     usdNetTotal,
-			InvoiceID:       0,
-			InvoiceNumber:   invoiceNumber,
-			InvoiceCompany:  invoiceCompany,
+			InvoiceID:       *m.InvoiceID,
+			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
 			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   invoiceStatus,
+			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
 		}
 	}
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
+}
+
+// getIVAPercentage obtiene el porcentaje de IVA desde app_parameters
+func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
+	var value string
+	err := r.db.Client().WithContext(ctx).
+		Table("app_parameters").
+		Select("value").
+		Where("key = ?", "iva_percentage").
+		Scan(&value).Error
+
+	if err != nil {
+		// Si no se encuentra el parámetro, usar valor por defecto
+		return decimal.NewFromFloat(0.105), nil
+	}
+
+	ivaDecimal, err := decimal.NewFromString(value)
+	if err != nil {
+		// Si hay error al parsear, usar valor por defecto
+		return decimal.NewFromFloat(0.105), nil
+	}
+
+	return ivaDecimal, nil
+}
+
+// safeStringPtr convierte un string pointer a string seguro
+func safeStringPtr(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
