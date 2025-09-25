@@ -35,8 +35,11 @@ type SummaryResultsResponse struct {
 	// Resultados por cultivo
 	Crops []CropSummaryResponse `json:"crops"`
 
-	// Totales del proyecto
+	// Totales del proyecto (GRAL CAMPOS)
 	Totals ProjectTotalsResponse `json:"totals"`
+
+	// Resumen general de cultivos (GRAL CULTIVOS)
+	GeneralCrops GeneralCropsResponse `json:"general_crops"`
 }
 
 // CropSummaryResponse represents a crop summary in the report.
@@ -55,8 +58,20 @@ type CropSummaryResponse struct {
 	CropReturnPct      decimal.Decimal `json:"crop_return_pct"`
 }
 
-// ProjectTotalsResponse represents the project totals in the report.
+// ProjectTotalsResponse represents the project totals in the report (GRAL CAMPOS).
 type ProjectTotalsResponse struct {
+	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
+	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
+	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
+	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
+	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
+	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
+}
+
+// GeneralCropsResponse represents the general crops summary (GRAL CULTIVOS).
+type GeneralCropsResponse struct {
 	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
 	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
 	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
@@ -112,6 +127,18 @@ func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsR
 		ProjectReturnPct:        d.Totals.ProjectReturnPct,
 	}
 
+	// Mapear cultivos generales (GRAL CULTIVOS)
+	generalCrops := GeneralCropsResponse{
+		TotalSurfaceHa:          d.GeneralCrops.TotalSurfaceHa,
+		TotalNetIncomeUsd:       d.GeneralCrops.TotalNetIncomeUsd,
+		TotalDirectCostsUsd:     d.GeneralCrops.TotalDirectCostsUsd,
+		TotalRentUsd:            d.GeneralCrops.TotalRentUsd,
+		TotalStructureUsd:       d.GeneralCrops.TotalStructureUsd,
+		TotalInvestedProjectUsd: d.GeneralCrops.TotalInvestedProjectUsd,
+		TotalOperatingResultUsd: d.GeneralCrops.TotalOperatingResultUsd,
+		ProjectReturnPct:        d.GeneralCrops.ProjectReturnPct,
+	}
+
 	return &SummaryResultsResponse{
 		ProjectID:    d.ProjectID,
 		ProjectName:  d.ProjectName,
@@ -121,5 +148,6 @@ func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsR
 		CampaignName: d.CampaignName,
 		Crops:        crops,
 		Totals:       totals,
+		GeneralCrops: generalCrops,
 	}
 }
