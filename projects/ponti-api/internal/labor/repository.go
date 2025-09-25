@@ -186,6 +186,12 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 	// Convertir a LaborRawItem para mantener compatibilidad
 	raws := make([]domain.LaborRawItem, len(v3Models))
 	for i, m := range v3Models {
+		// Manejar InvoiceID de forma segura
+		var invoiceID int64
+		if m.InvoiceID != nil {
+			invoiceID = *m.InvoiceID
+		}
+
 		raws[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
 			WorkorderNumber: m.WorkorderNumber,
@@ -200,7 +206,7 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			InvoiceID:       *m.InvoiceID,
+			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
 			InvoiceDate:     m.InvoiceDate,
@@ -286,6 +292,12 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
 		usdNetTotal := netTotal.Div(m.USDAvgValue)
 
+		// Manejar InvoiceID de forma segura
+		var invoiceID int64
+		if m.InvoiceID != nil {
+			invoiceID = *m.InvoiceID
+		}
+
 		list[i] = domain.LaborRawItem{
 			WorkorderID:     m.WorkorderID,
 			WorkorderNumber: m.WorkorderNumber,
@@ -300,11 +312,11 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        netTotal,
+			NetTotal:        usdNetTotal, // esto esta pesos y deberia esta dolares, esta mal nombre
 			TotalIVA:        totalIVA,
 			USDCostHa:       usdCostHa,
-			USDNetTotal:     usdNetTotal,
-			InvoiceID:       *m.InvoiceID,
+			USDNetTotal:     netTotal, // hay error en los nombres, hay cambiar los valores aqui
+			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
 			InvoiceDate:     m.InvoiceDate,

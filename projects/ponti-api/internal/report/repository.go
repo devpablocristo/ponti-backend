@@ -464,17 +464,22 @@ func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.
 	var campaignID *int64
 	var campaignName *string
 
+	// Crear punteros a valores locales para evitar problemas de referencia
 	if projectInfo.CustomerID != 0 {
-		customerID = &projectInfo.CustomerID
+		customerIDValue := projectInfo.CustomerID
+		customerID = &customerIDValue
 	}
 	if projectInfo.CustomerName != "" {
-		customerName = &projectInfo.CustomerName
+		customerNameValue := projectInfo.CustomerName
+		customerName = &customerNameValue
 	}
 	if projectInfo.CampaignID != 0 {
-		campaignID = &projectInfo.CampaignID
+		campaignIDValue := projectInfo.CampaignID
+		campaignID = &campaignIDValue
 	}
 	if projectInfo.CampaignName != "" {
-		campaignName = &projectInfo.CampaignName
+		campaignNameValue := projectInfo.CampaignName
+		campaignName = &campaignNameValue
 	}
 
 	return &domain.FieldCrop{
