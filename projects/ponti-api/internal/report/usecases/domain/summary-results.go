@@ -34,8 +34,20 @@ type SummaryResults struct {
 	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
 }
 
-// ProjectTotals representa los totales del proyecto
+// ProjectTotals representa los totales del proyecto (GRAL CAMPOS).
 type ProjectTotals struct {
+	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
+	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
+	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
+	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
+	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
+	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
+}
+
+// GeneralCrops representa el resumen general de cultivos (GRAL CULTIVOS).
+type GeneralCrops struct {
 	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
 	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
 	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
@@ -58,8 +70,11 @@ type SummaryResultsResponse struct {
 	// Resultados por cultivo
 	Crops []SummaryResults `json:"crops"`
 
-	// Totales del proyecto
+	// Totales del proyecto (GRAL CAMPOS)
 	Totals ProjectTotals `json:"totals"`
+
+	// Resumen general de cultivos (GRAL CULTIVOS)
+	GeneralCrops GeneralCrops `json:"general_crops"`
 }
 
 // ===== FILTROS =====
