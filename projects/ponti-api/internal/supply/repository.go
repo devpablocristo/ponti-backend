@@ -193,3 +193,28 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 		return nil
 	})
 }
+
+func (r *Repository) ListAllSupplies(ctx context.Context) ([]domain.Supply, int64, error) {
+	base := r.db.Client().WithContext(ctx).Model(&models.Supply{})
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count supplies", err)
+	}
+
+	var rows []models.Supply
+	db := base.
+		Preload("Category").
+		Preload("Type").
+		Order("name")
+
+	if err := db.Find(&rows).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list all supplies", err)
+	}
+
+	out := make([]domain.Supply, len(rows))
+	for i := range rows {
+		out[i] = *rows[i].ToDomain()
+	}
+	return out, total, nil
+}
