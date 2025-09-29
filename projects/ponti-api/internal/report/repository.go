@@ -3,7 +3,6 @@ package report
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -502,36 +501,6 @@ func (r *ReportRepository) GetProjectInfo(projectID int64) (*domain.ProjectInfo,
 	return r.getProjectInfo(filters)
 }
 
-// parseContributionsFromJSON parsea el JSON de contributions
-func (r *ReportRepository) parseContributionsFromJSON(jsonData string) ([]domain.ContributionCategory, error) {
-	var contributions []domain.ContributionCategory
-	err := json.Unmarshal([]byte(jsonData), &contributions)
-	if err != nil {
-		return nil, fmt.Errorf("error parseando JSON de contributions: %w", err)
-	}
-	return contributions, nil
-}
-
-// parseComparisonFromJSON parsea el JSON de comparison
-func (r *ReportRepository) parseComparisonFromJSON(jsonData string) ([]domain.InvestorContributionComparison, error) {
-	var comparison []domain.InvestorContributionComparison
-	err := json.Unmarshal([]byte(jsonData), &comparison)
-	if err != nil {
-		return nil, fmt.Errorf("error parseando JSON de comparison: %w", err)
-	}
-	return comparison, nil
-}
-
-// parseHarvestFromJSON parsea el JSON de harvest
-func (r *ReportRepository) parseHarvestFromJSON(jsonData string) (domain.HarvestSettlement, error) {
-	var harvest domain.HarvestSettlement
-	err := json.Unmarshal([]byte(jsonData), &harvest)
-	if err != nil {
-		return domain.HarvestSettlement{}, fmt.Errorf("error parseando JSON de harvest: %w", err)
-	}
-	return harvest, nil
-}
-
 // GetInvestorContributionReport obtiene el reporte de aportes de inversores
 func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {
 	// Obtener project IDs relacionados con los filtros
@@ -578,22 +547,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 		args[i] = id
 	}
 
-	var results []struct {
-		ProjectID         int64           `gorm:"column:project_id"`
-		ProjectName       string          `gorm:"column:project_name"`
-		CustomerID        int64           `gorm:"column:customer_id"`
-		CustomerName      string          `gorm:"column:customer_name"`
-		CampaignID        int64           `gorm:"column:campaign_id"`
-		CampaignName      string          `gorm:"column:campaign_name"`
-		SurfaceTotalHa    decimal.Decimal `gorm:"column:surface_total_ha"`
-		LeaseFixedUsd     decimal.Decimal `gorm:"column:lease_fixed_usd"`
-		LeaseIsFixed      bool            `gorm:"column:lease_is_fixed"`
-		AdminPerHaUsd     decimal.Decimal `gorm:"column:admin_per_ha_usd"`
-		AdminTotalUsd     decimal.Decimal `gorm:"column:admin_total_usd"`
-		ContributionsData string          `gorm:"column:contributions_data"`
-		ComparisonData    string          `gorm:"column:comparison_data"`
-		HarvestData       string          `gorm:"column:harvest_data"`
-	}
+	var results []models.InvestorContributionDataModel
 
 	err = r.db.Client().Raw(query, args...).Scan(&results).Error
 	if err != nil {
@@ -608,48 +562,10 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 	// En el futuro se podría implementar una lógica de agregación más sofisticada
 	firstResult := results[0]
 
-	// Construir reporte desde los datos de la vista
-	report := &domain.InvestorContributionReport{
-		ProjectID:    firstResult.ProjectID,
-		ProjectName:  firstResult.ProjectName,
-		CustomerID:   firstResult.CustomerID,
-		CustomerName: firstResult.CustomerName,
-		CampaignID:   firstResult.CampaignID,
-		CampaignName: firstResult.CampaignName,
-		General: domain.GeneralProjectData{
-			SurfaceTotalHa: firstResult.SurfaceTotalHa,
-			LeaseFixedUsd:  firstResult.LeaseFixedUsd,
-			LeaseIsFixed:   firstResult.LeaseIsFixed,
-			AdminPerHaUsd:  firstResult.AdminPerHaUsd,
-			AdminTotalUsd:  firstResult.AdminTotalUsd,
-		},
-	}
-
-	// Parsear JSON de contributions
-	if firstResult.ContributionsData != "" {
-		contributions, err := r.parseContributionsFromJSON(firstResult.ContributionsData)
-		if err != nil {
-			return nil, fmt.Errorf("error parseando contributions: %w", err)
-		}
-		report.Contributions = contributions
-	}
-
-	// Parsear JSON de comparison
-	if firstResult.ComparisonData != "" {
-		comparison, err := r.parseComparisonFromJSON(firstResult.ComparisonData)
-		if err != nil {
-			return nil, fmt.Errorf("error parseando comparison: %w", err)
-		}
-		report.Comparison = comparison
-	}
-
-	// Parsear JSON de harvest
-	if firstResult.HarvestData != "" {
-		harvest, err := r.parseHarvestFromJSON(firstResult.HarvestData)
-		if err != nil {
-			return nil, fmt.Errorf("error parseando harvest: %w", err)
-		}
-		report.Harvest = harvest
+	// Usar el mapper del modelo para convertir al domain
+	report, err := firstResult.ToDomainInvestorContributionReport()
+	if err != nil {
+		return nil, fmt.Errorf("error convirtiendo modelo a domain: %w", err)
 	}
 
 	return report, nil
