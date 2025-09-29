@@ -308,14 +308,14 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          m.CostPerHa,
+			CostHa:          usdCostHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        usdNetTotal, // esto esta pesos y deberia esta dolares, esta mal nombre
+			NetTotal:        usdNetTotal, // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
 			TotalIVA:        totalIVA,
-			USDCostHa:       usdCostHa,
-			USDNetTotal:     netTotal, // hay error en los nombres, hay cambiar los valores aqui
+			USDCostHa:       m.CostPerHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
+			USDNetTotal:     netTotal,    // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
 			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
