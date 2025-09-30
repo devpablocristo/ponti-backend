@@ -342,9 +342,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	}
 
 	// Mapear nombre de mes en inglés al formato MM si es necesario
-	originalMonth := usdMonth
 	usdMonth = utils.MonthNameToNumber(usdMonth)
-	fmt.Printf("DEBUG: Original month: '%s' -> Mapped month: '%s'\n", originalMonth, usdMonth)
 
 	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
 	if err != nil {

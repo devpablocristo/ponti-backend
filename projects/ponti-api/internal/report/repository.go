@@ -539,8 +539,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 		WHERE project_id IN (%s)
 	`, strings.Join(placeholders, ","))
 
-	// Debug: usar vista v3
-	fmt.Printf("DEBUG: Usando vista v3_investor_contribution_data_view\n")
+	// Usar vista v3
 
 	args := make([]any, len(projectIDs))
 	for i, id := range projectIDs {
