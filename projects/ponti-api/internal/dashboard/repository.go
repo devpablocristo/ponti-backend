@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -689,11 +688,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, filter domain
 			}
 		}
 
-		// Debug: Imprimir valores raw para ver qué llega
-		fmt.Printf("DEBUG: Raw values for row %d - InvestorID: %v (%T), InvestorName: %v (%T), Percentage: %v (%T), ProgressPct: %v (%T)\n",
-			i+1, rawInvestorID, rawInvestorID, rawInvestorName, rawInvestorName, rawPercentage, rawPercentage, rawProgressPct, rawProgressPct)
-		fmt.Printf("DEBUG: Converted values for row %d - InvestorID: %v, InvestorName: %v, Percentage: %v, ProgressPct: %v\n",
-			i+1, investorID, investorName, percentage, progressPct)
+		// Procesar valores de la base de datos
 
 		// Crear el resultado individual
 		result := models.ContributionsProgressModel{
@@ -865,11 +860,8 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 
 	// Si no hay proyectos relacionados, retornar datos vacíos
 	if len(projectIDs) == 0 {
-		fmt.Printf("DEBUG: No hay proyectos relacionados para balance de gestión\n")
 		return &models.ManagementBalanceModel{}, nil
 	}
-
-	fmt.Printf("DEBUG: Buscando balance de gestión para proyectos: %v\n", projectIDs)
 
 	query := `
 		SELECT 
@@ -919,7 +911,6 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 
 	// Verificar si hay filas
 	hasRows := rows.Next()
-	fmt.Printf("DEBUG: ¿Hay filas en balance de gestión? %v\n", hasRows)
 
 	if hasRows {
 		// Leer los valores raw
@@ -928,8 +919,6 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan management balance data", err)
 		}
-
-		fmt.Printf("DEBUG: Valores raw leídos - Income: %v, DirectCostsExec: %v, DirectCostsInv: %v\n", rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested)
 
 		// Convertir los valores raw a decimal.Decimal
 		var incomeUSD, directCostsExecuted, directCostsInvested, rent, structure, operatingResult, operatingResultPct, semillaCost, insumosCost, laboresCost *decimal.Decimal

@@ -216,9 +216,8 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 	return raws, nil
 }
 
-func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
-
-	// Usar la vista v3_labor_list como base y agregar campos adicionales
+func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborListItem, types.PageInfo, error) {
+	// Usar directamente la vista v3_labor_list con todos sus campos calculados
 	base := r.db.Client().
 		WithContext(ctx).
 		Table("v3_labor_list AS v3").
@@ -230,21 +229,168 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			v3.field_id,
 			v3.project_name,
 			v3.field_name,
+			v3.lot_id,
+			v3.lot_name,
+			v3.crop_id,
 			COALESCE(v3.crop_name, '') AS crop_name,
+			v3.labor_id,
 			v3.labor_name,
-			COALESCE(v3.labor_category_name, '') AS category_name,
+			v3.labor_category_id,
+			COALESCE(v3.labor_category_name, '') AS labor_category_name,
 			v3.contractor,
+			v3.contractor_name,
 			v3.surface_ha,
 			v3.cost_per_ha,
-			v3.contractor_name,
-			COALESCE(v3.investor_name, '') AS investor_name,
+			v3.total_labor_cost,
+			v3.dollar_average_month,
+			v3.usd_cost_ha,
+			v3.usd_net_total,
 			pdv.average_value AS usd_avg_value,
+			v3.investor_id,
+			COALESCE(v3.investor_name, '') AS investor_name,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
 			i.date AS invoice_date,
 			i.status AS invoice_status
 		`).
+		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
+		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+
+	if fieldID != 0 {
+		base = base.Where("v3.field_id = ?", fieldID)
+	} else if projectID != 0 {
+		base = base.Where("v3.project_id = ?", projectID)
+	} else {
+		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
+			"fieldID or projectID is required", nil)
+	}
+
+	var total int64
+	countQuery := base.Session(&gorm.Session{})
+	if err := countQuery.Select("COUNT(*)").Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to count labors for workorder", err)
+	}
+
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
+	var rows []models.LaborListItem
+	if err := base.Order("v3.workorder_number DESC").
+		Limit(int(inp.PageSize)).
+		Offset(offset).
+		Scan(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
+			"failed to list grouped labors", err)
+	}
+
+	list := make([]domain.LaborListItem, len(rows))
+	for i, m := range rows {
+		// Calcular valores de USD dinámicamente (igual que el método viejo)
+		netTotal := m.SurfaceHa.Mul(m.CostPerHa).Mul(m.USDAvgValue)
+
+		// Obtener porcentaje de IVA dinámicamente desde app_parameters
+		ivaPercentage, err := r.getIVAPercentage(ctx)
+		if err != nil {
+			// Si hay error, usar valor por defecto y logear el error
+			// TODO: Implementar logging apropiado
+			ivaPercentage = decimal.NewFromFloat(1.105) // 10.5%
+		}
+		totalIVA := netTotal.Mul(ivaPercentage)
+
+		usdCostHa := m.USDCostHa.Div(m.USDAvgValue).Mul(m.USDAvgValue)
+		usdNetTotal := m.USDNetTotal.Div(m.USDAvgValue).Mul(m.USDAvgValue)
+
+		// Manejar InvoiceID de forma segura
+		var invoiceID int64
+		if m.InvoiceID != nil {
+			invoiceID = *m.InvoiceID
+		}
+
+		list[i] = domain.LaborListItem{
+			WorkorderID:     m.WorkorderID,
+			WorkorderNumber: m.WorkorderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			CropName:        safeStringPtr(m.CropName),
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          m.CostPerHa.Mul(m.USDAvgValue), // Costo calculado en USD por hectárea
+			CategoryName:    safeStringPtr(m.LaborCategoryName),
+			InvestorName:    safeStringPtr(m.InvestorName),
+			USDAvgValue:     m.USDAvgValue, // Valor del dólar en pesos
+			NetTotal:        netTotal,      // Total neto calculado en USD
+			TotalIVA:        totalIVA,      // Total IVA en USD (calculado dinámicamente)
+			USDCostHa:       usdCostHa,     // Costo original en USD por hectárea
+			USDNetTotal:     usdNetTotal,   // Total en USD (calculado dinámicamente)
+			InvoiceID:       invoiceID,
+			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
+		}
+	}
+
+	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
+	return list, pageInfo, nil
+}
+
+// getIVAPercentage obtiene el porcentaje de IVA desde app_parameters
+func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
+	var value string
+	err := r.db.Client().WithContext(ctx).
+		Table("app_parameters").
+		Select("value").
+		Where("key = ?", "iva_percentage").
+		Scan(&value).Error
+
+	if err != nil {
+		// Si no se encuentra el parámetro, usar valor por defecto
+		return decimal.NewFromFloat(1.105), nil
+	}
+
+	ivaDecimal, err := decimal.NewFromString(value)
+	if err != nil {
+		// Si hay error al parsear, usar valor por defecto
+		return decimal.NewFromFloat(1.105), nil
+	}
+
+	return ivaDecimal, nil
+}
+
+// TODO: Eliminar este método
+// ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA
+// Este método implementa la lógica original con cálculos en Go y join con project_dollar_values
+func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
+	// Usar la vista v3_labor_list como base y agregar campos adicionales
+	base := r.db.Client().
+		WithContext(ctx).
+		Table("v3_labor_list AS v3").
+		Select(`
+				v3.workorder_id,
+				v3.workorder_number,
+				v3.date,
+				v3.project_id,
+				v3.field_id,
+				v3.project_name,
+				v3.field_name,
+				COALESCE(v3.crop_name, '') AS crop_name,
+				v3.labor_name,
+				COALESCE(v3.labor_category_name, '') AS category_name,
+				v3.contractor,
+				v3.surface_ha,
+				v3.cost_per_ha,
+				v3.contractor_name,
+				COALESCE(v3.investor_name, '') AS investor_name,
+				pdv.average_value AS usd_avg_value,
+				i.id AS invoice_id,
+				i.number AS invoice_number,
+				i.company AS invoice_company,
+				i.date AS invoice_date,
+				i.status AS invoice_status
+			`).
 		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
 		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
 
@@ -277,18 +423,20 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	list := make([]domain.LaborRawItem, len(rows))
 	for i, m := range rows {
-		// Calcular valores correctamente: USD a pesos (multiplicar por dólar promedio)
-		usdCostHa := m.CostPerHa.Mul(m.USDAvgValue) // Costo USD/ha * dólar promedio = costo pesos/ha
-		usdNetTotal := usdCostHa.Mul(m.SurfaceHa)   // Costo pesos/ha * superficie = total pesos
+		// Calcular valores de USD dinámicamente
+		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
 		// Obtener porcentaje de IVA dinámicamente desde app_parameters
 		ivaPercentage, err := r.getIVAPercentage(ctx)
 		if err != nil {
 			// Si hay error, usar valor por defecto y logear el error
 			// TODO: Implementar logging apropiado
-			ivaPercentage = decimal.NewFromFloat(0.105) // 10.5%
+			ivaPercentage = decimal.NewFromFloat(1.105) // 10.5%
 		}
-		totalIVA := usdNetTotal.Mul(ivaPercentage)
+		totalIVA := netTotal.Mul(ivaPercentage)
+
+		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
+		usdNetTotal := netTotal.Div(m.USDAvgValue)
 
 		// Manejar InvoiceID de forma segura
 		var invoiceID int64
@@ -306,14 +454,14 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          usdCostHa, // Costo en pesos por hectárea
+			CostHa:          usdCostHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        usdNetTotal,                  // Total neto en pesos
-			TotalIVA:        totalIVA,                     // IVA calculado sobre total pesos
-			USDCostHa:       m.CostPerHa,                  // Costo original en USD por hectárea
-			USDNetTotal:     m.CostPerHa.Mul(m.SurfaceHa), // Total en USD (precio USD * superficie)
+			NetTotal:        usdNetTotal, // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
+			TotalIVA:        totalIVA,
+			USDCostHa:       m.CostPerHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
+			USDNetTotal:     netTotal,    // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
 			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
@@ -324,29 +472,6 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
-}
-
-// getIVAPercentage obtiene el porcentaje de IVA desde app_parameters
-func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
-	var value string
-	err := r.db.Client().WithContext(ctx).
-		Table("app_parameters").
-		Select("value").
-		Where("key = ?", "iva_percentage").
-		Scan(&value).Error
-
-	if err != nil {
-		// Si no se encuentra el parámetro, usar valor por defecto
-		return decimal.NewFromFloat(0.105), nil
-	}
-
-	ivaDecimal, err := decimal.NewFromString(value)
-	if err != nil {
-		// Si hay error al parsear, usar valor por defecto
-		return decimal.NewFromFloat(0.105), nil
-	}
-
-	return ivaDecimal, nil
 }
 
 // safeStringPtr convierte un string pointer a string seguro
