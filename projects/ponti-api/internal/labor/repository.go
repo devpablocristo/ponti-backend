@@ -277,8 +277,9 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 
 	list := make([]domain.LaborRawItem, len(rows))
 	for i, m := range rows {
-		// Calcular valores de USD dinámicamente
-		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
+		// Calcular valores correctamente: USD a pesos (multiplicar por dólar promedio)
+		usdCostHa := m.CostPerHa.Mul(m.USDAvgValue) // Costo USD/ha * dólar promedio = costo pesos/ha
+		usdNetTotal := usdCostHa.Mul(m.SurfaceHa)   // Costo pesos/ha * superficie = total pesos
 
 		// Obtener porcentaje de IVA dinámicamente desde app_parameters
 		ivaPercentage, err := r.getIVAPercentage(ctx)
@@ -287,10 +288,7 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			// TODO: Implementar logging apropiado
 			ivaPercentage = decimal.NewFromFloat(0.105) // 10.5%
 		}
-		totalIVA := netTotal.Mul(ivaPercentage)
-
-		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
-		usdNetTotal := netTotal.Div(m.USDAvgValue)
+		totalIVA := usdNetTotal.Mul(ivaPercentage)
 
 		// Manejar InvoiceID de forma segura
 		var invoiceID int64
@@ -308,14 +306,14 @@ func (r *Repository) ListGroupLabor(ctx context.Context, inp types.Input, projec
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          usdCostHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
+			CostHa:          usdCostHa, // Costo en pesos por hectárea
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        usdNetTotal, // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
-			TotalIVA:        totalIVA,
-			USDCostHa:       m.CostPerHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
-			USDNetTotal:     netTotal,    // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
+			NetTotal:        usdNetTotal,                  // Total neto en pesos
+			TotalIVA:        totalIVA,                     // IVA calculado sobre total pesos
+			USDCostHa:       m.CostPerHa,                  // Costo original en USD por hectárea
+			USDNetTotal:     m.CostPerHa.Mul(m.SurfaceHa), // Total en USD (precio USD * superficie)
 			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
