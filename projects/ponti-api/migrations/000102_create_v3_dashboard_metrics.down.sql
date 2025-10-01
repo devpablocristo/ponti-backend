@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000100: CREATE v3_dashboard VIEW (DOWN)
+-- MIGRATION 000102: CREATE v3_dashboard VIEW (DOWN)
 -- ========================================
 -- 
 -- Purpose: Eliminar vista de métricas del dashboard

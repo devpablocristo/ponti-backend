@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRATION 000100: CREATE v3_dashboard VIEW (UP)
+-- MIGRATION 000102: CREATE v3_dashboard VIEW (UP)
 -- ========================================
 -- 
 -- Purpose: Vista de métricas del dashboard agregadas por proyecto desde lotes
@@ -123,16 +123,37 @@ SELECT
   -- Ingresos: suma de ingresos netos de todos los lotes desde función SSOT
   COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) AS income_usd,
   -- Resultado operativo: Ingresos - Costos directos - Admin cost - Arriendo
+  -- Admin cost: p.admin_cost * total_hectares (50 * 300 = 15,000)
+  -- Arriendo: f.lease_type_value * total_hectares (100 * 300 = 30,000)
   (COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) - 
-   COALESCE(SUM(lm.direct_cost_usd), 0) - 
-   COALESCE(p.admin_cost, 0) - 
-   COALESCE(p.rent_cost, 0))::double precision AS operating_result_usd,
-  -- Costos totales invertidos: usando función SSOT a nivel proyecto
-  v3_calc.total_invested_cost_for_project(p.id) AS operating_result_total_costs_usd,
+   COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) - 
+   COALESCE(p.admin_cost * ph.total_hectares, 0) - 
+   COALESCE((SELECT f.lease_type_value * ph.total_hectares 
+             FROM fields f 
+             WHERE f.project_id = p.id AND f.deleted_at IS NULL 
+             LIMIT 1), 0))::double precision AS operating_result_usd,
+  -- Total activos: suma de costos directos + arriendo + admin por proyecto
+  (COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) + 
+   COALESCE(p.admin_cost * ph.total_hectares, 0) + 
+   COALESCE((SELECT f.lease_type_value * ph.total_hectares 
+             FROM fields f 
+             WHERE f.project_id = p.id AND f.deleted_at IS NULL 
+             LIMIT 1), 0))::double precision AS operating_result_total_costs_usd,
   -- Porcentaje de margen operativo (rentabilidad)
   v3_calc.renta_pct(
-    v3_calc.operating_result_total_for_project(p.id),
-    v3_calc.total_costs_for_project(p.id)
+    (COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) - 
+     COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) - 
+     COALESCE(p.admin_cost * ph.total_hectares, 0) - 
+     COALESCE((SELECT f.lease_type_value * ph.total_hectares 
+               FROM fields f 
+               WHERE f.project_id = p.id AND f.deleted_at IS NULL 
+               LIMIT 1), 0))::double precision,
+    (COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) + 
+     COALESCE(p.admin_cost * ph.total_hectares, 0) + 
+     COALESCE((SELECT f.lease_type_value * ph.total_hectares 
+               FROM fields f 
+               WHERE f.project_id = p.id AND f.deleted_at IS NULL 
+               LIMIT 1), 0))::double precision
   ) AS operating_result_pct,
 
   -- ========================================
@@ -163,9 +184,10 @@ GROUP BY
   p.customer_id, 
   p.id, 
   p.campaign_id,
+  p.admin_cost,
+  ph.total_hectares,
   w_min.start_date, 
   w_max.end_date, 
   w_min.first_workorder_id, 
   w_max.last_workorder_id,
   lsc.last_stock_count_date;
-
