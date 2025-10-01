@@ -122,16 +122,8 @@ SELECT
   -- ========================================
   -- Ingresos: suma de ingresos netos de todos los lotes desde función SSOT
   COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) AS income_usd,
-  -- Resultado operativo: Ingresos - Costos directos - Admin cost - Arriendo
-  -- Admin cost: p.admin_cost * total_hectares (50 * 300 = 15,000)
-  -- Arriendo: f.lease_type_value * total_hectares (100 * 300 = 30,000)
-  (COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) - 
-   COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) - 
-   COALESCE(p.admin_cost * ph.total_hectares, 0) - 
-   COALESCE((SELECT f.lease_type_value * ph.total_hectares 
-             FROM fields f 
-             WHERE f.project_id = p.id AND f.deleted_at IS NULL 
-             LIMIT 1), 0))::double precision AS operating_result_usd,
+  -- Resultado operativo: usando función SSOT corregida
+  v3_calc.operating_result_total_for_project(p.id) AS operating_result_usd,
   -- Total activos: suma de costos directos + arriendo + admin por proyecto
   (COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) + 
    COALESCE(p.admin_cost * ph.total_hectares, 0) + 
@@ -141,13 +133,7 @@ SELECT
              LIMIT 1), 0))::double precision AS operating_result_total_costs_usd,
   -- Porcentaje de margen operativo (rentabilidad)
   v3_calc.renta_pct(
-    (COALESCE(SUM(v3_calc.income_net_total_for_lot(lm.lot_id)), 0) - 
-     COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) - 
-     COALESCE(p.admin_cost * ph.total_hectares, 0) - 
-     COALESCE((SELECT f.lease_type_value * ph.total_hectares 
-               FROM fields f 
-               WHERE f.project_id = p.id AND f.deleted_at IS NULL 
-               LIMIT 1), 0))::double precision,
+    v3_calc.operating_result_total_for_project(p.id),
     (COALESCE(v3_calc.direct_costs_total_for_project(p.id), 0) + 
      COALESCE(p.admin_cost * ph.total_hectares, 0) + 
      COALESCE((SELECT f.lease_type_value * ph.total_hectares 
