@@ -1179,7 +1179,8 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 			current_crop_id,
 			crop_name,
 			crop_hectares,
-			crop_incidence_pct
+			crop_incidence_pct,
+			cost_per_ha_usd
 		FROM v3_dashboard_crop_incidence 
 		WHERE project_id = ANY($1)
 		ORDER BY crop_name
@@ -1198,8 +1199,8 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 
 	// Leer todas las filas
 	for rows.Next() {
-		var rawCropID, rawCropName, rawHectares, rawIncidencePct any
-		err = rows.Scan(&rawCropID, &rawCropName, &rawHectares, &rawIncidencePct)
+		var rawCropID, rawCropName, rawHectares, rawIncidencePct, rawCostPerHa any
+		err = rows.Scan(&rawCropID, &rawCropName, &rawHectares, &rawIncidencePct, &rawCostPerHa)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan crop incidence data", err)
 		}
@@ -1207,7 +1208,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 		// Convertir los valores raw a los tipos correctos
 		var cropID int64
 		var cropName string
-		var hectares, incidencePct decimal.Decimal
+		var hectares, incidencePct, costPerHa decimal.Decimal
 
 		// Convertir cropID
 		if rawCropID != nil {
@@ -1257,13 +1258,28 @@ func (r *Repository) getCropIncidence(ctx context.Context, filter domain.Dashboa
 			}
 		}
 
+		// Convertir costPerHa
+		if rawCostPerHa != nil {
+			if strVal, ok := rawCostPerHa.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					costPerHa = dec
+				}
+			} else if floatVal, ok := rawCostPerHa.(float64); ok {
+				costPerHa = decimal.NewFromFloat(floatVal)
+			} else if intVal, ok := rawCostPerHa.(int64); ok {
+				costPerHa = decimal.NewFromInt(intVal)
+			} else if intVal, ok := rawCostPerHa.(int); ok {
+				costPerHa = decimal.NewFromInt(int64(intVal))
+			}
+		}
+
 		// Crear el modelo
 		cropModel := models.CropIncidenceModel{
 			CropID:       cropID,
 			Name:         cropName,
 			Hectares:     hectares,
 			IncidencePct: incidencePct,
-			CostPerHa:    decimal.Zero,
+			CostPerHa:    costPerHa,
 		}
 
 		result = append(result, cropModel)
