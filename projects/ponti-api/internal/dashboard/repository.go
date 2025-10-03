@@ -872,27 +872,10 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			estructura_invertidos_usd,
 			operating_result_usd,
 			operating_result_pct,
-			-- Calcular costos reales desde las tablas
-			COALESCE((
-				SELECT SUM(wi.total_used * s.price)
-				FROM workorders w
-				JOIN workorder_items wi ON wi.workorder_id = w.id
-				JOIN supplies s ON s.id = wi.supply_id
-				WHERE w.project_id = p.project_id AND s.name ILIKE '%semilla%'
-			), 0) AS semilla_cost,
-			COALESCE((
-				SELECT SUM(wi.total_used * s.price)
-				FROM workorders w
-				JOIN workorder_items wi ON wi.workorder_id = w.id
-				JOIN supplies s ON s.id = wi.supply_id
-				WHERE w.project_id = p.project_id AND s.name NOT ILIKE '%semilla%'
-			), 0) AS insumos_cost,
-			COALESCE((
-				SELECT SUM(lb.price * w.effective_area)
-				FROM workorders w
-				JOIN labors lb ON lb.id = w.labor_id
-				WHERE w.project_id = p.project_id
-			), 0) AS labores_cost
+			-- Usar campos de la vista v3_dashboard_management_balance de migración 000104
+			semilla_cost,
+			insumos_cost,
+			labores_cost
 		FROM v3_dashboard_management_balance p
 		WHERE p.project_id = ANY($1)
 	`

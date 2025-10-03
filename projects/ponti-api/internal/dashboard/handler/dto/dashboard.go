@@ -655,7 +655,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		return ManagementBalance{}
 	}
 
-	// Crear totales
+	// Crear totales usando SOLO datos de BD (sin hardcoding)
 	totals := BalanceTotals{
 		ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
 		InvestedUSD: balance.Summary.DirectCostsInvestedUSD,
@@ -676,14 +676,14 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Category:    BalanceCategorySeed,
 			Label:       "Semilla",
 			ExecutedUSD: balance.Summary.SemillaCostUSD,
-			InvestedUSD: balance.Summary.SemillaCostUSD,
+			InvestedUSD: balance.Summary.SemillaCostUSD, // TODO: Usar valor de BD cuando esté disponible
 			Order:       1,
 		},
 		{
 			Category:    BalanceCategorySupplies,
-			Label:       "Insumos",
+			Label:       "Agroquímicos",
 			ExecutedUSD: balance.Summary.InsumosCostUSD,
-			InvestedUSD: balance.Summary.InsumosCostUSD,
+			InvestedUSD: balance.Summary.InsumosCostUSD, // TODO: Usar valor de BD cuando esté disponible
 			Order:       2,
 		},
 		{
@@ -697,14 +697,14 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		{
 			Category:    BalanceCategoryLease,
 			Label:       "Arriendo",
-			ExecutedUSD: decimal.Zero,
+			ExecutedUSD: decimal.Zero, // TODO: Calcular según tipo de arriendo
 			InvestedUSD: balance.Summary.RentUSD,
 			Order:       4,
 		},
 		{
 			Category:    BalanceCategoryAdmin,
 			Label:       "Estructura",
-			ExecutedUSD: decimal.Zero,
+			ExecutedUSD: decimal.Zero, // TODO: Calcular según lógica de negocio
 			InvestedUSD: balance.Summary.StructureUSD,
 			Order:       5,
 		},
