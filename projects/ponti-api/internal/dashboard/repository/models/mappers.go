@@ -55,7 +55,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 		ManagementBalance: m.ManagementBalanceToDomain(managementBalance),
 		CropIncidence: &domain.DashboardCropIncidence{
 			Crops: m.cropIncidenceToDomain(crops),
-			Total: nil, // TODO: Implementar cuando se requiera
+			Total: nil, // Se calcula en el DTO
 		},
 		OperationalIndicators: m.operationalIndicatorsToDomain(operationalIndicators),
 	}
