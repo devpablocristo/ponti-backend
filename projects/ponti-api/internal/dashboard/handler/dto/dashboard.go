@@ -737,17 +737,19 @@ func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidenc
 		})
 	}
 
-	// Calcular totales reales sumando los valores de los items
-	var totalHectares, totalCostUSDPerHa decimal.Decimal
+	// Calcular totales agregando los datos de los items
+	var totalHectares, totalCostUSD decimal.Decimal
 	for _, item := range items {
 		totalHectares = totalHectares.Add(item.Hectares)
-		totalCostUSDPerHa = totalCostUSDPerHa.Add(item.CostPerHaUSD)
+		// Costo total del cultivo = costo por hectárea × hectáreas del cultivo
+		cropTotalCost := item.CostPerHaUSD.Mul(item.Hectares)
+		totalCostUSD = totalCostUSD.Add(cropTotalCost)
 	}
 
-	// Calcular promedio de costo por hectárea
+	// Calcular costo promedio por hectárea: costo total / hectáreas totales
 	var avgCostPerHaUSD decimal.Decimal
 	if !totalHectares.IsZero() {
-		avgCostPerHaUSD = totalCostUSDPerHa.Div(totalHectares)
+		avgCostPerHaUSD = totalCostUSD.Div(totalHectares)
 	}
 
 	// Crear el total calculado
