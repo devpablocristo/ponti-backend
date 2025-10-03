@@ -357,46 +357,36 @@ func (m *DashboardModelMapper) operationalIndicatorsToDomain(model *OperationalI
 		}
 	}
 
-	cards := []domain.DashboardOperationalCard{}
-
-	// Tarjeta: Primera Orden de Trabajo
-	if model.FirstWorkorderDate != nil {
-		cards = append(cards, domain.DashboardOperationalCard{
+	// Siempre crear las 4 cards en orden, aunque no tengan datos
+	cards := []domain.DashboardOperationalCard{
+		// Card 1: Primera orden de trabajo
+		{
 			Key:         "first_workorder",
-			Title:       "Primera Orden de Trabajo",
+			Title:       "Primera orden de trabajo",
 			Date:        model.FirstWorkorderDate,
 			WorkorderID: model.FirstWorkorderNumber,
-		})
-	}
-
-	// Tarjeta: Última Orden de Trabajo
-	if model.LastWorkorderDate != nil {
-		cards = append(cards, domain.DashboardOperationalCard{
+		},
+		// Card 2: Última orden de trabajo
+		{
 			Key:         "last_workorder",
-			Title:       "Última Orden de Trabajo",
+			Title:       "Última orden de trabajo",
 			Date:        model.LastWorkorderDate,
 			WorkorderID: model.LastWorkorderNumber,
-		})
-	}
-
-	// Tarjeta: Último Arqueo de Stock
-	if model.LastStockCountDate != nil {
-		cards = append(cards, domain.DashboardOperationalCard{
+		},
+		// Card 3: Arqueo de stock
+		{
 			Key:         "last_stock_count",
-			Title:       "Último Arqueo de Stock",
+			Title:       "Arqueo de stock",
 			Date:        model.LastStockCountDate,
 			WorkorderID: nil,
-		})
-	}
-
-	// Tarjeta: Cierre de Campaña
-	if model.CampaignClosingDate != nil {
-		cards = append(cards, domain.DashboardOperationalCard{
+		},
+		// Card 4: Cierre de campaña
+		{
 			Key:         "campaign_closing",
-			Title:       "Cierre de Campaña",
+			Title:       "Cierre de campaña",
 			Date:        model.CampaignClosingDate,
 			WorkorderID: nil,
-		})
+		},
 	}
 
 	return &domain.DashboardOperationalIndicators{
