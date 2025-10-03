@@ -415,7 +415,9 @@ func (m *DashboardModelMapper) managementBalanceSummaryToDomain(model *Managemen
 		DirectCostsExecutedUSD:    model.DirectCostsExecutedUSD,
 		DirectCostsInvestedUSD:    model.DirectCostsInvestedUSD,
 		StockUSD:                  model.StockUSD,
+		RentExecutedUSD:           model.RentExecutedUSD,
 		RentUSD:                   model.RentUSD,
+		StructureExecutedUSD:      model.StructureExecutedUSD,
 		StructureUSD:              model.StructureUSD,
 		OperatingResultUSD:        model.OperatingResultUSD,
 		OperatingResultPct:        model.OperatingResultPct,
@@ -423,7 +425,9 @@ func (m *DashboardModelMapper) managementBalanceSummaryToDomain(model *Managemen
 		InsumosCostUSD:            model.InsumosCostUSD,
 		LaboresCostUSD:            model.LaboresCostUSD,
 		SemillasInvertidosUSD:     model.SemillasInvertidosUSD,
+		SemillasStockUSD:          model.SemillasStockUSD,
 		AgroquimicosInvertidosUSD: model.AgroquimicosInvertidosUSD,
+		AgroquimicosStockUSD:      model.AgroquimicosStockUSD,
 		LaboresInvertidosUSD:      model.LaboresInvertidosUSD,
 	}
 }

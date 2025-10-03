@@ -121,7 +121,9 @@ type DashboardBalanceSummary struct {
 	DirectCostsExecutedUSD    decimal.Decimal
 	DirectCostsInvestedUSD    decimal.Decimal
 	StockUSD                  decimal.Decimal
+	RentExecutedUSD           decimal.Decimal
 	RentUSD                   decimal.Decimal
+	StructureExecutedUSD      decimal.Decimal
 	StructureUSD              decimal.Decimal
 	OperatingResultUSD        decimal.Decimal
 	OperatingResultPct        decimal.Decimal
@@ -129,7 +131,9 @@ type DashboardBalanceSummary struct {
 	InsumosCostUSD            decimal.Decimal
 	LaboresCostUSD            decimal.Decimal
 	SemillasInvertidosUSD     decimal.Decimal
+	SemillasStockUSD          decimal.Decimal
 	AgroquimicosInvertidosUSD decimal.Decimal
+	AgroquimicosStockUSD      decimal.Decimal
 	LaboresInvertidosUSD      decimal.Decimal
 }
 
