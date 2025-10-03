@@ -676,21 +676,21 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Category:    BalanceCategorySeed,
 			Label:       "Semilla",
 			ExecutedUSD: balance.Summary.SemillaCostUSD,
-			InvestedUSD: balance.Summary.SemillaCostUSD, // TODO: Usar valor de BD cuando esté disponible
+			InvestedUSD: balance.Summary.SemillasInvertidosUSD,
 			Order:       1,
 		},
 		{
 			Category:    BalanceCategorySupplies,
 			Label:       "Agroquímicos",
 			ExecutedUSD: balance.Summary.InsumosCostUSD,
-			InvestedUSD: balance.Summary.InsumosCostUSD, // TODO: Usar valor de BD cuando esté disponible
+			InvestedUSD: balance.Summary.AgroquimicosInvertidosUSD,
 			Order:       2,
 		},
 		{
 			Category:    BalanceCategoryLabors,
 			Label:       "Labores",
 			ExecutedUSD: balance.Summary.LaboresCostUSD,
-			InvestedUSD: balance.Summary.LaboresCostUSD,
+			InvestedUSD: balance.Summary.LaboresInvertidosUSD,
 			StockUSD:    &decimal.Zero,
 			Order:       3,
 		},

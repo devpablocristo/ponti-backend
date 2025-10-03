@@ -117,17 +117,20 @@ type DashboardManagementBalance struct {
 
 // DashboardBalanceSummary representa el resumen del balance
 type DashboardBalanceSummary struct {
-	IncomeUSD              decimal.Decimal
-	DirectCostsExecutedUSD decimal.Decimal
-	DirectCostsInvestedUSD decimal.Decimal
-	StockUSD               decimal.Decimal
-	RentUSD                decimal.Decimal
-	StructureUSD           decimal.Decimal
-	OperatingResultUSD     decimal.Decimal
-	OperatingResultPct     decimal.Decimal
-	SemillaCostUSD         decimal.Decimal
-	InsumosCostUSD         decimal.Decimal
-	LaboresCostUSD         decimal.Decimal
+	IncomeUSD                 decimal.Decimal
+	DirectCostsExecutedUSD    decimal.Decimal
+	DirectCostsInvestedUSD    decimal.Decimal
+	StockUSD                  decimal.Decimal
+	RentUSD                   decimal.Decimal
+	StructureUSD              decimal.Decimal
+	OperatingResultUSD        decimal.Decimal
+	OperatingResultPct        decimal.Decimal
+	SemillaCostUSD            decimal.Decimal
+	InsumosCostUSD            decimal.Decimal
+	LaboresCostUSD            decimal.Decimal
+	SemillasInvertidosUSD     decimal.Decimal
+	AgroquimicosInvertidosUSD decimal.Decimal
+	LaboresInvertidosUSD      decimal.Decimal
 }
 
 // DashboardBalanceBreakdown representa el desglose del balance por categoría

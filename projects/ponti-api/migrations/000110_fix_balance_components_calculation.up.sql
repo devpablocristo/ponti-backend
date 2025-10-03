@@ -48,36 +48,91 @@ SELECT
   ) AS operating_result_pct,
   
   -- ========================================
-  -- COSTOS DIRECTOS (EJECUTADOS + INVERTIDOS + STOCK)
+  -- COSTOS DIRECTOS (EJECUTADOS + INVERTIDOS + STOCK) - CORREGIDO EN 000110
   -- ========================================
   -- Ejecutados: desde v3_workorder_metrics (función corregida de 000100)
   v3_calc.direct_costs_total_for_project(p.id) AS costos_directos_ejecutados_usd,
-  -- Invertidos: labores planificadas + insumos en stock
-  v3_calc.direct_costs_invested_for_project_mb(p.id) AS costos_directos_invertidos_usd,
+  -- Invertidos: supply_movements (Stock + Remito oficial) + labores ejecutadas
+  COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) + COALESCE(SUM(v3_calc.labor_cost_for_lot_mb(lb.lot_id)), 0) AS costos_directos_invertidos_usd,
   -- Stock: invertidos - ejecutados
-  v3_calc.stock_value_for_project_mb(p.id) AS costos_directos_stock_usd,
+  (COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) + COALESCE(SUM(v3_calc.labor_cost_for_lot_mb(lb.lot_id)), 0)) - 
+  v3_calc.direct_costs_total_for_project(p.id) AS costos_directos_stock_usd,
   
   -- ========================================
-  -- SEMILLAS (EJECUTADOS + INVERTIDOS + STOCK)
+  -- SEMILLAS (EJECUTADOS + INVERTIDOS + STOCK) - CORREGIDO EN 000110
   -- ========================================
   -- Ejecutados: suma de semillas desde workorder_items (unit_id = 2)
   COALESCE(SUM(v3_calc.supply_cost_seeds_for_lot_mb(lb.lot_id)), 0) AS semillas_ejecutados_usd,
-  -- Invertidos: usando función SSOT corregida (stock + movimientos stock + remito)
-  v3_calc.seeds_invested_for_project_mb(p.id) AS semillas_invertidos_usd,
+  -- Invertidos: suma de supply_movements de semillas (Stock + Remito oficial)
+  COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    JOIN categories c ON c.id = s.category_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND c.name = 'Semilla'
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) AS semillas_invertidos_usd,
   -- Stock: invertidos - ejecutados
-  v3_calc.seeds_invested_for_project_mb(p.id) - 
-  COALESCE(SUM(v3_calc.supply_cost_seeds_for_lot_mb(lb.lot_id)), 0) AS semillas_stock_usd,
+  COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    JOIN categories c ON c.id = s.category_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND c.name = 'Semilla'
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) - COALESCE(SUM(v3_calc.supply_cost_seeds_for_lot_mb(lb.lot_id)), 0) AS semillas_stock_usd,
   
   -- ========================================
-  -- AGROQUÍMICOS (EJECUTADOS + INVERTIDOS + STOCK)
+  -- AGROQUÍMICOS (EJECUTADOS + INVERTIDOS + STOCK) - CORREGIDO EN 000110
   -- ========================================
   -- Ejecutados: suma de agroquímicos desde workorder_items (unit_id = 1)
   COALESCE(SUM(v3_calc.supply_cost_agrochemicals_for_lot_mb(lb.lot_id)), 0) AS agroquimicos_ejecutados_usd,
-  -- Invertidos: usando función SSOT corregida (stock + movimientos stock + remito)
-  v3_calc.agrochemicals_invested_for_project_mb(p.id) AS agroquimicos_invertidos_usd,
+  -- Invertidos: suma de supply_movements de agroquímicos (Stock + Remito oficial)
+  COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    JOIN categories c ON c.id = s.category_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND c.name != 'Semilla'
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) AS agroquimicos_invertidos_usd,
   -- Stock: invertidos - ejecutados
-  v3_calc.agrochemicals_invested_for_project_mb(p.id) - 
-  COALESCE(SUM(v3_calc.supply_cost_agrochemicals_for_lot_mb(lb.lot_id)), 0) AS agroquimicos_stock_usd,
+  COALESCE((
+    SELECT SUM(sm.quantity * s.price)
+    FROM supply_movements sm
+    JOIN supplies s ON s.id = sm.supply_id
+    JOIN categories c ON c.id = s.category_id
+    WHERE sm.project_id = p.id 
+      AND sm.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND c.name != 'Semilla'
+      AND sm.movement_type IN ('Stock', 'Remito oficial')
+  ), 0) - COALESCE(SUM(v3_calc.supply_cost_agrochemicals_for_lot_mb(lb.lot_id)), 0) AS agroquimicos_stock_usd,
   
   -- ========================================
   -- LABORES (EJECUTADOS + INVERTIDOS, STOCK = 0)

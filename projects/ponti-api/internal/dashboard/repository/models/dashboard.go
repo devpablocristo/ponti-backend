@@ -112,17 +112,20 @@ type ManagementBalanceModel struct {
 
 // ManagementBalanceSummary representa el resumen del balance de gestión
 type ManagementBalanceSummary struct {
-	IncomeUSD              decimal.Decimal `db:"income_usd"`
-	DirectCostsExecutedUSD decimal.Decimal `db:"costos_directos_ejecutados_usd"`
-	DirectCostsInvestedUSD decimal.Decimal `db:"costos_directos_invertidos_usd"`
-	StockUSD               decimal.Decimal `db:"costos_directos_stock_usd"`
-	RentUSD                decimal.Decimal `db:"arriendo_invertidos_usd"`
-	StructureUSD           decimal.Decimal `db:"estructura_invertidos_usd"`
-	OperatingResultUSD     decimal.Decimal `db:"operating_result_usd"`
-	OperatingResultPct     decimal.Decimal `db:"operating_result_pct"`
-	SemillaCostUSD         decimal.Decimal `db:"semilla_cost"`
-	InsumosCostUSD         decimal.Decimal `db:"insumos_cost"`
-	LaboresCostUSD         decimal.Decimal `db:"labores_cost"`
+	IncomeUSD                 decimal.Decimal `db:"income_usd"`
+	DirectCostsExecutedUSD    decimal.Decimal `db:"costos_directos_ejecutados_usd"`
+	DirectCostsInvestedUSD    decimal.Decimal `db:"costos_directos_invertidos_usd"`
+	StockUSD                  decimal.Decimal `db:"costos_directos_stock_usd"`
+	RentUSD                   decimal.Decimal `db:"arriendo_invertidos_usd"`
+	StructureUSD              decimal.Decimal `db:"estructura_invertidos_usd"`
+	OperatingResultUSD        decimal.Decimal `db:"operating_result_usd"`
+	OperatingResultPct        decimal.Decimal `db:"operating_result_pct"`
+	SemillaCostUSD            decimal.Decimal `db:"semilla_cost"`
+	InsumosCostUSD            decimal.Decimal `db:"insumos_cost"`
+	LaboresCostUSD            decimal.Decimal `db:"labores_cost"`
+	SemillasInvertidosUSD     decimal.Decimal `db:"semillas_invertidos_usd"`
+	AgroquimicosInvertidosUSD decimal.Decimal `db:"agroquimicos_invertidos_usd"`
+	LaboresInvertidosUSD      decimal.Decimal `db:"labores_invertidos_usd"`
 }
 
 // ManagementBalanceBreakdown representa el desglose del balance por categoría

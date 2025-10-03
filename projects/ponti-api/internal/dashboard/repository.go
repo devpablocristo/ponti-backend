@@ -872,10 +872,14 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			estructura_invertidos_usd,
 			operating_result_usd,
 			operating_result_pct,
-			-- Usar campos de la vista v3_dashboard_management_balance de migración 000104
+			-- Campos de ejecutados (corregidos en migración 000110)
 			semilla_cost,
 			insumos_cost,
-			labores_cost
+			labores_cost,
+			-- Campos de invertidos (agregados en migración 000110)
+			semillas_invertidos_usd,
+			agroquimicos_invertidos_usd,
+			labores_invertidos_usd
 		FROM v3_dashboard_management_balance p
 		WHERE p.project_id = ANY($1)
 	`
@@ -897,14 +901,17 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 
 	if hasRows {
 		// Leer los valores raw
-		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct, rawSemillaCost, rawInsumosCost, rawLaboresCost any
-		err = rows.Scan(&rawIncomeUSD, &rawDirectCostsExecuted, &rawDirectCostsInvested, &rawRent, &rawStructure, &rawOperatingResult, &rawOperatingResultPct, &rawSemillaCost, &rawInsumosCost, &rawLaboresCost)
+		var rawIncomeUSD, rawDirectCostsExecuted, rawDirectCostsInvested, rawRent, rawStructure, rawOperatingResult, rawOperatingResultPct any
+		var rawSemillaCost, rawInsumosCost, rawLaboresCost, rawSemillasInvertidos, rawAgroquimicosInvertidos, rawLaboresInvertidos any
+		err = rows.Scan(&rawIncomeUSD, &rawDirectCostsExecuted, &rawDirectCostsInvested, &rawRent, &rawStructure, &rawOperatingResult, &rawOperatingResultPct,
+			&rawSemillaCost, &rawInsumosCost, &rawLaboresCost, &rawSemillasInvertidos, &rawAgroquimicosInvertidos, &rawLaboresInvertidos)
 		if err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to scan management balance data", err)
 		}
 
 		// Convertir los valores raw a decimal.Decimal
-		var incomeUSD, directCostsExecuted, directCostsInvested, rent, structure, operatingResult, operatingResultPct, semillaCost, insumosCost, laboresCost *decimal.Decimal
+		var incomeUSD, directCostsExecuted, directCostsInvested, rent, structure, operatingResult, operatingResultPct *decimal.Decimal
+		var semillaCost, insumosCost, laboresCost, semillasInvertidos, agroquimicosInvertidos, laboresInvertidos *decimal.Decimal
 
 		// Convertir IncomeUSD
 		if rawIncomeUSD != nil {
@@ -1086,20 +1093,77 @@ func (r *Repository) getManagementBalance(ctx context.Context, filter domain.Das
 			}
 		}
 
+		// Convertir SemillasInvertidos
+		if rawSemillasInvertidos != nil {
+			if strVal, ok := rawSemillasInvertidos.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					semillasInvertidos = &dec
+				}
+			} else if floatVal, ok := rawSemillasInvertidos.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				semillasInvertidos = &dec
+			} else if intVal, ok := rawSemillasInvertidos.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				semillasInvertidos = &dec
+			} else if intVal, ok := rawSemillasInvertidos.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				semillasInvertidos = &dec
+			}
+		}
+
+		// Convertir AgroquimicosInvertidos
+		if rawAgroquimicosInvertidos != nil {
+			if strVal, ok := rawAgroquimicosInvertidos.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					agroquimicosInvertidos = &dec
+				}
+			} else if floatVal, ok := rawAgroquimicosInvertidos.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				agroquimicosInvertidos = &dec
+			} else if intVal, ok := rawAgroquimicosInvertidos.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				agroquimicosInvertidos = &dec
+			} else if intVal, ok := rawAgroquimicosInvertidos.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				agroquimicosInvertidos = &dec
+			}
+		}
+
+		// Convertir LaboresInvertidos
+		if rawLaboresInvertidos != nil {
+			if strVal, ok := rawLaboresInvertidos.(string); ok {
+				if dec, err := decimal.NewFromString(strVal); err == nil {
+					laboresInvertidos = &dec
+				}
+			} else if floatVal, ok := rawLaboresInvertidos.(float64); ok {
+				dec := decimal.NewFromFloat(floatVal)
+				laboresInvertidos = &dec
+			} else if intVal, ok := rawLaboresInvertidos.(int64); ok {
+				dec := decimal.NewFromInt(intVal)
+				laboresInvertidos = &dec
+			} else if intVal, ok := rawLaboresInvertidos.(int); ok {
+				dec := decimal.NewFromInt(int64(intVal))
+				laboresInvertidos = &dec
+			}
+		}
+
 		// Crear el resultado con estructura anidada
 		result = models.ManagementBalanceModel{
 			Summary: &models.ManagementBalanceSummary{
-				IncomeUSD:              *incomeUSD,
-				DirectCostsExecutedUSD: *directCostsExecuted,
-				DirectCostsInvestedUSD: *directCostsInvested,
-				StockUSD:               decimal.Zero,
-				RentUSD:                *rent,
-				StructureUSD:           *structure,
-				OperatingResultUSD:     *operatingResult,
-				OperatingResultPct:     *operatingResultPct,
-				SemillaCostUSD:         *semillaCost,
-				InsumosCostUSD:         *insumosCost,
-				LaboresCostUSD:         *laboresCost,
+				IncomeUSD:                 *incomeUSD,
+				DirectCostsExecutedUSD:    *directCostsExecuted,
+				DirectCostsInvestedUSD:    *directCostsInvested,
+				StockUSD:                  decimal.Zero,
+				RentUSD:                   *rent,
+				StructureUSD:              *structure,
+				OperatingResultUSD:        *operatingResult,
+				OperatingResultPct:        *operatingResultPct,
+				SemillaCostUSD:            *semillaCost,
+				InsumosCostUSD:            *insumosCost,
+				LaboresCostUSD:            *laboresCost,
+				SemillasInvertidosUSD:     *semillasInvertidos,
+				AgroquimicosInvertidosUSD: *agroquimicosInvertidos,
+				LaboresInvertidosUSD:      *laboresInvertidos,
 			},
 			Breakdown: []models.ManagementBalanceBreakdown{}, // TODO: Implementar cuando se requiera
 			TotalsRow: &models.ManagementBalanceTotals{
