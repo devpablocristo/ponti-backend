@@ -116,7 +116,9 @@ type ManagementBalanceSummary struct {
 	DirectCostsExecutedUSD    decimal.Decimal `db:"costos_directos_ejecutados_usd"`
 	DirectCostsInvestedUSD    decimal.Decimal `db:"costos_directos_invertidos_usd"`
 	StockUSD                  decimal.Decimal `db:"costos_directos_stock_usd"`
+	RentExecutedUSD           decimal.Decimal `db:"arriendo_ejecutados_usd"`
 	RentUSD                   decimal.Decimal `db:"arriendo_invertidos_usd"`
+	StructureExecutedUSD      decimal.Decimal `db:"estructura_ejecutados_usd"`
 	StructureUSD              decimal.Decimal `db:"estructura_invertidos_usd"`
 	OperatingResultUSD        decimal.Decimal `db:"operating_result_usd"`
 	OperatingResultPct        decimal.Decimal `db:"operating_result_pct"`
@@ -124,7 +126,9 @@ type ManagementBalanceSummary struct {
 	InsumosCostUSD            decimal.Decimal `db:"insumos_cost"`
 	LaboresCostUSD            decimal.Decimal `db:"labores_cost"`
 	SemillasInvertidosUSD     decimal.Decimal `db:"semillas_invertidos_usd"`
+	SemillasStockUSD          decimal.Decimal `db:"semillas_stock_usd"`
 	AgroquimicosInvertidosUSD decimal.Decimal `db:"agroquimicos_invertidos_usd"`
+	AgroquimicosStockUSD      decimal.Decimal `db:"agroquimicos_stock_usd"`
 	LaboresInvertidosUSD      decimal.Decimal `db:"labores_invertidos_usd"`
 }
 

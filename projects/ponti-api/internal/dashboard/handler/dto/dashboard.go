@@ -677,6 +677,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Label:       "Semilla",
 			ExecutedUSD: balance.Summary.SemillaCostUSD,
 			InvestedUSD: balance.Summary.SemillasInvertidosUSD,
+			StockUSD:    &balance.Summary.SemillasStockUSD,
 			Order:       1,
 		},
 		{
@@ -684,6 +685,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Label:       "Agroquímicos",
 			ExecutedUSD: balance.Summary.InsumosCostUSD,
 			InvestedUSD: balance.Summary.AgroquimicosInvertidosUSD,
+			StockUSD:    &balance.Summary.AgroquimicosStockUSD,
 			Order:       2,
 		},
 		{
@@ -697,14 +699,14 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		{
 			Category:    BalanceCategoryLease,
 			Label:       "Arriendo",
-			ExecutedUSD: decimal.Zero, // TODO: Calcular según tipo de arriendo
+			ExecutedUSD: balance.Summary.RentExecutedUSD,
 			InvestedUSD: balance.Summary.RentUSD,
 			Order:       4,
 		},
 		{
 			Category:    BalanceCategoryAdmin,
 			Label:       "Estructura",
-			ExecutedUSD: decimal.Zero, // TODO: Calcular según lógica de negocio
+			ExecutedUSD: balance.Summary.StructureExecutedUSD,
 			InvestedUSD: balance.Summary.StructureUSD,
 			Order:       5,
 		},
