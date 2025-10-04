@@ -2,6 +2,7 @@
 
 ## 🚨 REGLAS CRÍTICAS
 - NUNCA usar valores hardcodeados a menos que se autorice explícitamente
+- NUNCA usar ROUND() en migraciones SQL, mantener precisión completa
 - NUNCA cambiar nada que no sea quirúrgicamente lo que se pide
 - Siempre usar parámetros dinámicos y configurables
 - Siempre comenzar con TLDR
@@ -29,7 +30,7 @@
 - Priorizar SQL migrations sobre modelos Go
 - No modificar migraciones existentes, crear nuevas
 - Usar seeds-dashboard.sql para datos de prueba
-- No hacer redondeo en SQL, hacerlo en aplicación
+- NUNCA usar ROUND() en migraciones SQL, mantener precisión completa
 - Migraciones en inglés, comentarios en español
 
 ## Tests
