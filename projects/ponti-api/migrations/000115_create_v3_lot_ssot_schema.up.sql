@@ -2,11 +2,16 @@
 -- MIGRACIÓN 000115: CREATE v3_lot_ssot SCHEMA (UP)
 -- ========================================
 -- 
--- Propósito: Crear esquema v3_lot_ssot con TODAS las funciones de lotes
+-- Propósito: Crear esquema v3_lot_ssot con TODAS las funciones de lotes (CONSOLIDADO DRY)
 -- Dependencias: Requiere v3_core_ssot (migración 000113)
--- Alcance: Funciones transversales (8) + exclusivas de lots (11) = 19 funciones
+-- Alcance: 25 funciones (consolidadas desde workorder_ssot y dashboard_ssot)
 -- Fecha: 2025-10-04
 -- Autor: Sistema
+-- 
+-- CONSOLIDACIÓN DRY:
+-- - Agregadas: supply_cost_for_lot_base, supply_cost_for_lot_by_category
+-- - Movidas desde workorder_ssot: surface_for_lot, liters_for_lot, kilograms_for_lot
+-- - Elimina duplicados de: labor_cost_for_lot_wo, supply_cost_*_mb
 -- 
 -- Nota: Código en inglés, comentarios en español
 -- Usa v3_core_ssot para operaciones matemáticas básicas
@@ -43,10 +48,13 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- ========================================
--- GRUPO 2: COSTOS POR LOTE (2 funciones) - EXCLUSIVAS LOTS
+-- GRUPO 2: COSTOS Y AGREGACIONES POR LOTE (8 funciones) - CONSOLIDADO DRY
 -- ========================================
--- Propósito: Calcular costos básicos por lote (usadas internamente)
+-- Propósito: Funciones consolidadas desde v3_workorder_ssot y v3_dashboard_ssot
+-- Eliminadas: labor_cost_for_lot_wo, supply_cost_for_lot_wo, surface/liters/kilograms_for_lot
+--             labor_cost_for_lot_mb, supply_cost_seeds/agrochemicals_for_lot_mb
 
+-- 2.1: Costo de labor (SSOT único)
 CREATE OR REPLACE FUNCTION v3_lot_ssot.labor_cost_for_lot(p_lot_id bigint) 
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
@@ -59,6 +67,83 @@ LANGUAGE sql STABLE AS $$
     AND w.lot_id = p_lot_id
 $$;
 
+-- 2.2: Costo de insumos base (solo workorder_items, sin movimientos internos)
+CREATE OR REPLACE FUNCTION v3_lot_ssot.supply_cost_for_lot_base(p_lot_id bigint)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    SUM(v3_core_ssot.supply_cost(
+      wi.final_dose::double precision,
+      s.price::numeric,
+      w.effective_area::numeric
+    )), 0
+  )::numeric
+  FROM public.workorders w
+  LEFT JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+  LEFT JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  WHERE w.lot_id = p_lot_id
+    AND w.deleted_at IS NULL
+$$;
+
+-- 2.3: Costo de insumos por categoría (para management balance)
+CREATE OR REPLACE FUNCTION v3_lot_ssot.supply_cost_for_lot_by_category(p_lot_id bigint, p_category_name text)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    SUM(wi.final_dose * s.price * w.effective_area), 0
+  )::numeric
+  FROM public.workorders w
+  JOIN public.workorder_items wi ON wi.workorder_id = w.id
+  JOIN public.supplies s ON s.id = wi.supply_id
+  JOIN public.categories c ON c.id = s.category_id
+  WHERE w.lot_id = p_lot_id
+    AND c.name = p_category_name
+    AND w.deleted_at IS NULL
+    AND w.effective_area > 0
+    AND wi.final_dose > 0
+    AND s.price IS NOT NULL
+$$;
+
+-- 2.4: Superficie total trabajada en el lote
+CREATE OR REPLACE FUNCTION v3_lot_ssot.surface_for_lot(p_lot_id bigint)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(SUM(w.effective_area), 0)::numeric
+  FROM public.workorders w
+  WHERE w.lot_id = p_lot_id
+    AND w.deleted_at IS NULL
+    AND w.effective_area > 0
+$$;
+
+-- 2.5: Litros de insumos aplicados en el lote
+CREATE OR REPLACE FUNCTION v3_lot_ssot.liters_for_lot(p_lot_id bigint)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * w.effective_area) ELSE 0 END), 0
+  )::numeric
+  FROM public.workorders w
+  LEFT JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+  LEFT JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  WHERE w.lot_id = p_lot_id
+    AND w.deleted_at IS NULL
+$$;
+
+-- 2.6: Kilogramos de insumos aplicados en el lote
+CREATE OR REPLACE FUNCTION v3_lot_ssot.kilograms_for_lot(p_lot_id bigint)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * w.effective_area) ELSE 0 END), 0
+  )::numeric
+  FROM public.workorders w
+  LEFT JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+  LEFT JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  WHERE w.lot_id = p_lot_id
+    AND w.deleted_at IS NULL
+$$;
+
+-- 2.7: Costo de insumos completo (con movimientos internos) - MANTENER como estaba
 CREATE OR REPLACE FUNCTION v3_lot_ssot.supply_cost_for_lot(p_lot_id bigint) 
 RETURNS double precision
 LANGUAGE sql STABLE AS $$
