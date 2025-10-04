@@ -294,61 +294,47 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
 	type rowAgg struct {
-		SeededArea      *decimal.Decimal `gorm:"column:seeded_area"`
-		HarvestedArea   *decimal.Decimal `gorm:"column:harvested_area"`
-		YieldTnPerHa    *decimal.Decimal `gorm:"column:yield_tn_per_ha"`
-		CostPerHa       *decimal.Decimal `gorm:"column:cost_per_ha"`
-		SuperficieTotal *decimal.Decimal `gorm:"column:superficie_total"`
+		SeededArea      decimal.Decimal `gorm:"column:seeded_area"`
+		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
+		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
+		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
+		SuperficieTotal decimal.Decimal `gorm:"column:project_total_hectares"`
 	}
 
-	// Construir la consulta SQL raw directamente
-	var whereClause string
-	var args []interface{}
+	// Construir query base
+	query := r.db.Client().WithContext(ctx).Table("v3_lot_metrics")
 
+	// Aplicar filtros
 	if fieldID > 0 {
-		whereClause = "WHERE field_id = ?"
-		args = append(args, fieldID)
+		query = query.Where("lot_id IN (SELECT id FROM lots WHERE field_id = ? AND deleted_at IS NULL)", fieldID)
 	} else if projectID > 0 {
-		whereClause = "WHERE project_id = ?"
-		args = append(args, projectID)
+		query = query.Where("project_id = ?", projectID)
 	}
 
 	if cropID > 0 {
-		if whereClause == "" {
-			whereClause = "WHERE lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)"
-		} else {
-			whereClause += " AND lot_id IN (SELECT id FROM lots WHERE current_crop_id = ? OR previous_crop_id = ?)"
-		}
-		args = append(args, cropID, cropID)
+		query = query.Where("lot_id IN (SELECT id FROM lots WHERE (current_crop_id = ? OR previous_crop_id = ?) AND deleted_at IS NULL)", cropID, cropID)
 	}
 
-	// Consulta SQL raw para evitar problemas con GORM y agregaciones
-	query := `
-        SELECT 
-            COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
-            COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-            COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS yield_tn_per_ha,
-            COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0) AS cost_per_ha,
-            COALESCE(MAX(superficie_total), 0) AS superficie_total
-        FROM v3_lot_metrics 
-        ` + whereClause
-
+	// Ejecutar query con agregaciones
 	var row rowAgg
-	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
+	err := query.Select(`
+		COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+		COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+		COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
+		COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS cost_per_ha,
+		COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares
+	`).Scan(&row).Error
+
+	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to scan lot metrics", err)
 	}
 
-	// Validar que se obtuvieron valores válidos
-	if row.SeededArea == nil || row.HarvestedArea == nil || row.YieldTnPerHa == nil || row.CostPerHa == nil || row.SuperficieTotal == nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get valid lot metrics data", nil)
-	}
-
 	return &domain.LotMetrics{
-		SeededArea:      *row.SeededArea,
-		HarvestedArea:   *row.HarvestedArea,
-		YieldTnPerHa:    *row.YieldTnPerHa,
-		CostPerHectare:  *row.CostPerHa,
-		SuperficieTotal: *row.SuperficieTotal,
+		SeededArea:      row.SeededArea,
+		HarvestedArea:   row.HarvestedArea,
+		YieldTnPerHa:    row.YieldTnPerHa,
+		CostPerHectare:  row.CostPerHa,
+		SuperficieTotal: row.SuperficieTotal,
 	}, nil
 }
 

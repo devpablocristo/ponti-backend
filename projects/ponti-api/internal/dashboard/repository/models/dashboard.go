@@ -14,6 +14,36 @@ type DashboardModel struct {
 	sharedmodels.Base
 }
 
+// DashboardMetricsModel representa las métricas principales del dashboard desde v3_dashboard_metrics
+type DashboardMetricsModel struct {
+	CustomerID int64 `gorm:"column:customer_id"`
+	ProjectID  int64 `gorm:"column:project_id"`
+	CampaignID int64 `gorm:"column:campaign_id"`
+
+	// Métricas de siembra
+	SowingHectares      decimal.Decimal `gorm:"column:sowing_hectares"`
+	SowingTotalHectares decimal.Decimal `gorm:"column:sowing_total_hectares"`
+	SowingProgressPct   decimal.Decimal `gorm:"column:sowing_progress_pct"`
+
+	// Métricas de cosecha
+	HarvestHectares      decimal.Decimal `gorm:"column:harvest_hectares"`
+	HarvestTotalHectares decimal.Decimal `gorm:"column:harvest_total_hectares"`
+	HarvestProgressPct   decimal.Decimal `gorm:"column:harvest_progress_pct"`
+
+	// Métricas de costos
+	ExecutedCostsUSD decimal.Decimal `gorm:"column:executed_costs_usd"`
+	BudgetCostUSD    decimal.Decimal `gorm:"column:budget_cost_usd"`
+	CostsProgressPct decimal.Decimal `gorm:"column:costs_progress_pct"`
+
+	// Resultado operativo
+	OperatingResultIncomeUSD     decimal.Decimal `gorm:"column:operating_result_income_usd"`
+	OperatingResultUSD           decimal.Decimal `gorm:"column:operating_result_usd"`
+	OperatingResultTotalCostsUSD decimal.Decimal `gorm:"column:operating_result_total_costs_usd"`
+	OperatingResultPct           decimal.Decimal `gorm:"column:operating_result_pct"`
+
+	ProjectTotalHectares decimal.Decimal `gorm:"column:project_total_hectares"`
+}
+
 // DashboardDataModel representa el modelo de datos del dashboard consolidado
 type DashboardDataModel struct {
 	// Métricas de siembra
@@ -89,10 +119,10 @@ type CostsProgressModel struct {
 
 // ContributionsProgressModel representa el modelo de avance de aportes
 type ContributionsProgressModel struct {
-	InvestorID               *int64           `db:"investor_id"`
-	InvestorName             *string          `db:"investor_name"`
-	InvestorPercentage       *decimal.Decimal `db:"investor_percentage_pct"`
-	ContributionsProgressPct *decimal.Decimal `db:"contributions_progress_pct"`
+	InvestorID               *int64           `gorm:"column:investor_id"`
+	InvestorName             *string          `gorm:"column:investor_name"`
+	InvestorPercentage       *decimal.Decimal `gorm:"column:investor_percentage_pct"`
+	ContributionsProgressPct *decimal.Decimal `gorm:"column:contributions_progress_pct"`
 }
 
 // OperatingResultModel representa el modelo de resultado operativo
@@ -112,24 +142,24 @@ type ManagementBalanceModel struct {
 
 // ManagementBalanceSummary representa el resumen del balance de gestión
 type ManagementBalanceSummary struct {
-	IncomeUSD                 decimal.Decimal `db:"income_usd"`
-	DirectCostsExecutedUSD    decimal.Decimal `db:"costos_directos_ejecutados_usd"`
-	DirectCostsInvestedUSD    decimal.Decimal `db:"costos_directos_invertidos_usd"`
-	StockUSD                  decimal.Decimal `db:"costos_directos_stock_usd"`
-	RentExecutedUSD           decimal.Decimal `db:"arriendo_ejecutados_usd"`
-	RentUSD                   decimal.Decimal `db:"arriendo_invertidos_usd"`
-	StructureExecutedUSD      decimal.Decimal `db:"estructura_ejecutados_usd"`
-	StructureUSD              decimal.Decimal `db:"estructura_invertidos_usd"`
-	OperatingResultUSD        decimal.Decimal `db:"operating_result_usd"`
-	OperatingResultPct        decimal.Decimal `db:"operating_result_pct"`
-	SemillaCostUSD            decimal.Decimal `db:"semilla_cost"`
-	InsumosCostUSD            decimal.Decimal `db:"insumos_cost"`
-	LaboresCostUSD            decimal.Decimal `db:"labores_cost"`
-	SemillasInvertidosUSD     decimal.Decimal `db:"semillas_invertidos_usd"`
-	SemillasStockUSD          decimal.Decimal `db:"semillas_stock_usd"`
-	AgroquimicosInvertidosUSD decimal.Decimal `db:"agroquimicos_invertidos_usd"`
-	AgroquimicosStockUSD      decimal.Decimal `db:"agroquimicos_stock_usd"`
-	LaboresInvertidosUSD      decimal.Decimal `db:"labores_invertidos_usd"`
+	IncomeUSD                 decimal.Decimal `gorm:"column:income_usd"`
+	DirectCostsExecutedUSD    decimal.Decimal `gorm:"column:costos_directos_ejecutados_usd"`
+	DirectCostsInvestedUSD    decimal.Decimal `gorm:"column:costos_directos_invertidos_usd"`
+	StockUSD                  decimal.Decimal `gorm:"column:costos_directos_stock_usd"`
+	RentExecutedUSD           decimal.Decimal `gorm:"column:arriendo_ejecutados_usd"`
+	RentUSD                   decimal.Decimal `gorm:"column:arriendo_invertidos_usd"`
+	StructureExecutedUSD      decimal.Decimal `gorm:"column:estructura_ejecutados_usd"`
+	StructureUSD              decimal.Decimal `gorm:"column:estructura_invertidos_usd"`
+	OperatingResultUSD        decimal.Decimal `gorm:"column:operating_result_usd"`
+	OperatingResultPct        decimal.Decimal `gorm:"column:operating_result_pct"`
+	SemillaCostUSD            decimal.Decimal `gorm:"column:semilla_cost"`
+	InsumosCostUSD            decimal.Decimal `gorm:"column:insumos_cost"`
+	LaboresCostUSD            decimal.Decimal `gorm:"column:labores_cost"`
+	SemillasInvertidosUSD     decimal.Decimal `gorm:"column:semillas_invertidos_usd"`
+	SemillasStockUSD          decimal.Decimal `gorm:"column:semillas_stock_usd"`
+	AgroquimicosInvertidosUSD decimal.Decimal `gorm:"column:agroquimicos_invertidos_usd"`
+	AgroquimicosStockUSD      decimal.Decimal `gorm:"column:agroquimicos_stock_usd"`
+	LaboresInvertidosUSD      decimal.Decimal `gorm:"column:labores_invertidos_usd"`
 }
 
 // ManagementBalanceBreakdown representa el desglose del balance por categoría
@@ -149,11 +179,11 @@ type ManagementBalanceTotals struct {
 
 // CropIncidenceModel representa el modelo de incidencia de cultivos
 type CropIncidenceModel struct {
-	CropID       int64           `db:"current_crop_id"`
-	Name         string          `db:"crop_name"`
-	Hectares     decimal.Decimal `db:"crop_hectares"`
-	IncidencePct decimal.Decimal `db:"incidence_pct"`
-	CostPerHa    decimal.Decimal `db:"cost_per_ha_usd"`
+	CropID       int64           `gorm:"column:current_crop_id"`
+	Name         string          `gorm:"column:crop_name"`
+	Hectares     decimal.Decimal `gorm:"column:crop_hectares"`
+	IncidencePct decimal.Decimal `gorm:"column:crop_incidence_pct"`
+	CostPerHa    decimal.Decimal `gorm:"column:cost_per_ha_usd"`
 }
 
 // InvestorContributionModel representa el modelo de contribución de inversores
@@ -165,10 +195,10 @@ type InvestorContributionModel struct {
 
 // OperationalIndicatorModel representa el modelo de indicadores operativos
 type OperationalIndicatorModel struct {
-	FirstWorkorderDate   *time.Time `db:"first_workorder_date"`
-	FirstWorkorderNumber *int64     `db:"first_workorder_number"`
-	LastWorkorderDate    *time.Time `db:"last_workorder_date"`
-	LastWorkorderNumber  *int64     `db:"last_workorder_number"`
-	LastStockCountDate   *time.Time `db:"last_stock_count_date"`
-	CampaignClosingDate  *time.Time `db:"campaign_closing_date"`
+	FirstWorkorderDate   *time.Time `gorm:"column:start_date"`
+	FirstWorkorderNumber *int64     `gorm:"column:first_workorder_id"`
+	LastWorkorderDate    *time.Time `gorm:"column:end_date"`
+	LastWorkorderNumber  *int64     `gorm:"column:last_workorder_id"`
+	LastStockCountDate   *time.Time `gorm:"column:last_stock_count_date"`
+	CampaignClosingDate  *time.Time `gorm:"column:campaign_closing_date"`
 }
