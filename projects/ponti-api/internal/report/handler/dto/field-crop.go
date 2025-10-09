@@ -25,10 +25,10 @@ type ReportFilterRequest struct {
 type ReportTableResponse struct {
 	ProjectID    int64               `json:"project_id"`
 	ProjectName  string              `json:"project_name"`
-	CustomerID   *int64              `json:"customer_id,omitempty"`
-	CustomerName *string             `json:"customer_name,omitempty"`
-	CampaignID   *int64              `json:"campaign_id,omitempty"`
-	CampaignName *string             `json:"campaign_name,omitempty"`
+	CustomerID   int64               `json:"customer_id"`
+	CustomerName string              `json:"customer_name"`
+	CampaignID   int64               `json:"campaign_id"`
+	CampaignName string              `json:"campaign_name"`
 	Columns      []ReportTableColumn `json:"columns"`
 	Rows         []ReportTableRow    `json:"rows"`
 }

@@ -532,37 +532,14 @@ func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.
 	// Construir filas del reporte
 	rows := r.buildReportRows(metrics, columns)
 
-	// Convertir ProjectInfo a los tipos correctos
-	var customerID *int64
-	var customerName *string
-	var campaignID *int64
-	var campaignName *string
-
-	// Crear punteros a valores locales para evitar problemas de referencia
-	if projectInfo.CustomerID != 0 {
-		customerIDValue := projectInfo.CustomerID
-		customerID = &customerIDValue
-	}
-	if projectInfo.CustomerName != "" {
-		customerNameValue := projectInfo.CustomerName
-		customerName = &customerNameValue
-	}
-	if projectInfo.CampaignID != 0 {
-		campaignIDValue := projectInfo.CampaignID
-		campaignID = &campaignIDValue
-	}
-	if projectInfo.CampaignName != "" {
-		campaignNameValue := projectInfo.CampaignName
-		campaignName = &campaignNameValue
-	}
-
+	// Asignar valores directamente (no son opcionales en el frontend)
 	return &domain.FieldCrop{
 		ProjectID:    projectInfo.ProjectID,
 		ProjectName:  projectInfo.ProjectName,
-		CustomerID:   customerID,
-		CustomerName: customerName,
-		CampaignID:   campaignID,
-		CampaignName: campaignName,
+		CustomerID:   projectInfo.CustomerID,
+		CustomerName: projectInfo.CustomerName,
+		CampaignID:   projectInfo.CampaignID,
+		CampaignName: projectInfo.CampaignName,
 		Columns:      columns,
 		Rows:         rows,
 	}, nil
