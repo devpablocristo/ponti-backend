@@ -37,7 +37,9 @@ type FieldCropMetricModel struct {
 
 	// Costos directos
 	LaborCostsUsd       decimal.Decimal `gorm:"column:costos_labores_usd"`
+	LaborCostsUsdHa     decimal.Decimal `gorm:"column:costos_labores_usd_ha"` // TODO: Agregar a vista SQL v3
 	SupplyCostsUsd      decimal.Decimal `gorm:"column:costos_insumos_usd"`
+	SupplyCostsUsdHa    decimal.Decimal `gorm:"column:costos_insumos_usd_ha"` // TODO: Agregar a vista SQL v3
 	TotalDirectCostsUsd decimal.Decimal `gorm:"column:total_costos_directos_usd"`
 	DirectCostsUsdHa    decimal.Decimal `gorm:"column:costos_directos_usd_ha"`
 
@@ -67,9 +69,9 @@ type FieldCropMetricModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// ACTUALIZADO: Usar vista v3 (SSOT)
+// ACTUALIZADO: Usar vista v3 (SSOT) - Migración 000130
 func (FieldCropMetricModel) TableName() string {
-	return "v3_report_field_crop_metrics_view"
+	return "v3_report_field_crop_metrics"
 }
 
 // LaborMetricModel representa el modelo de base de datos para métricas de labores
@@ -105,6 +107,49 @@ type SupplyMetricModel struct {
 	WorkOrderCount int64           `gorm:"column:workorder_count"`
 }
 
+// FieldCropLaborDetailModel representa el modelo de la vista v3_report_field_crop_labores
+// Migración 000130
+type FieldCropLaborDetailModel struct {
+	ProjectID int64 `gorm:"column:project_id"`
+	FieldID   int64 `gorm:"column:field_id"`
+	CropID    int64 `gorm:"column:current_crop_id"`
+
+	// Desglose por categoría de labor (USD/ha)
+	SiembraUsdHa       decimal.Decimal `gorm:"column:siembra_usd_ha"`
+	PulverizacionUsdHa decimal.Decimal `gorm:"column:pulverizacion_usd_ha"`
+	RiegoUsdHa         decimal.Decimal `gorm:"column:riego_usd_ha"`
+	CosechaUsdHa       decimal.Decimal `gorm:"column:cosecha_usd_ha"`
+	OtrasLaboresUsdHa  decimal.Decimal `gorm:"column:otras_labores_usd_ha"`
+	TotalLaboresUsdHa  decimal.Decimal `gorm:"column:total_labores_usd_ha"`
+}
+
+// TableName especifica el nombre de la tabla para GORM
+func (FieldCropLaborDetailModel) TableName() string {
+	return "v3_report_field_crop_labores"
+}
+
+// FieldCropSupplyDetailModel representa el modelo de la vista v3_report_field_crop_insumos
+// Migración 000130
+type FieldCropSupplyDetailModel struct {
+	ProjectID int64 `gorm:"column:project_id"`
+	FieldID   int64 `gorm:"column:field_id"`
+	CropID    int64 `gorm:"column:current_crop_id"`
+
+	// Desglose por categoría de insumo (USD/ha)
+	SemillasUsdHa     decimal.Decimal `gorm:"column:semillas_usd_ha"`
+	CurasemillasUsdHa decimal.Decimal `gorm:"column:curasemillas_usd_ha"`
+	HerbicidasUsdHa   decimal.Decimal `gorm:"column:herbicidas_usd_ha"`
+	InsecticidasUsdHa decimal.Decimal `gorm:"column:insecticidas_usd_ha"`
+	FungicidasUsdHa   decimal.Decimal `gorm:"column:fungicidas_usd_ha"`
+	CoadyuvantesUsdHa decimal.Decimal `gorm:"column:coadyuvantes_usd_ha"`
+	TotalInsumosUsdHa decimal.Decimal `gorm:"column:total_insumos_usd_ha"`
+}
+
+// TableName especifica el nombre de la tabla para GORM
+func (FieldCropSupplyDetailModel) TableName() string {
+	return "v3_report_field_crop_insumos"
+}
+
 // ===== MAPPERS =====
 
 // ToDomainFieldCropMetric convierte de modelo a dominio
@@ -127,7 +172,9 @@ func (m *FieldCropMetricModel) ToDomainFieldCropMetric() *domain.FieldCropMetric
 		NetIncomeUsd:           m.NetIncomeUsd,
 		NetIncomeUsdHa:         m.NetIncomeUsdHa,
 		LaborCostsUsd:          m.LaborCostsUsd,
+		LaborCostsUsdHa:        m.LaborCostsUsdHa, // TODO: Ahora viene de la vista v3
 		SupplyCostsUsd:         m.SupplyCostsUsd,
+		SupplyCostsUsdHa:       m.SupplyCostsUsdHa, // TODO: Ahora viene de la vista v3
 		TotalDirectCostsUsd:    m.TotalDirectCostsUsd,
 		DirectCostsUsdHa:       m.DirectCostsUsdHa,
 		GrossMarginUsd:         m.GrossMarginUsd,

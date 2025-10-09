@@ -54,7 +54,9 @@ type FieldCropMetric struct {
 
 	// Costos directos
 	LaborCostsUsd       decimal.Decimal `json:"labor_costs_usd"`
+	LaborCostsUsdHa     decimal.Decimal `json:"labor_costs_usd_ha"` // TODO: Campo agregado para vista v3
 	SupplyCostsUsd      decimal.Decimal `json:"supply_costs_usd"`
+	SupplyCostsUsdHa    decimal.Decimal `json:"supply_costs_usd_ha"` // TODO: Campo agregado para vista v3
 	TotalDirectCostsUsd decimal.Decimal `json:"total_direct_costs_usd"`
 	DirectCostsUsdHa    decimal.Decimal `json:"direct_costs_usd_ha"`
 

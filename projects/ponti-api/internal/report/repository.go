@@ -47,94 +47,27 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 		return []domain.FieldCropMetric{}, nil
 	}
 
-	// Usar IN en lugar de ANY para evitar problemas de mapeo de arrays
-	placeholders := make([]string, len(projectIDs))
-	for i := range projectIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-	}
+	// Usar GORM para mapear automáticamente desde la vista v3_report_field_crop_metrics
+	var modelResults []models.FieldCropMetricModel
 
-	query := fmt.Sprintf(`
-		SELECT project_id, field_id, field_name, current_crop_id, crop_name,
-		       income_usd, direct_costs_executed_usd, direct_costs_invested_usd,
-		       rent_invested_usd, structure_invested_usd, operating_result_usd, operating_result_pct
-		FROM v3_report_field_crop_metrics_view 
-		WHERE project_id IN (%s)
-	`, strings.Join(placeholders, ","))
-
-	args := make([]any, len(projectIDs))
-	for i, id := range projectIDs {
-		args[i] = id
-	}
+	// Construir query base con GORM
+	query := r.db.Client().Model(&models.FieldCropMetricModel{}).
+		Where("project_id IN ?", projectIDs)
 
 	// Aplicar filtros adicionales
 	if filters.FieldID != nil {
-		query += " AND field_id = $" + fmt.Sprintf("%d", len(args)+1)
-		args = append(args, *filters.FieldID)
+		query = query.Where("field_id = ?", *filters.FieldID)
 	}
 
-	// Ejecutar consulta con la nueva estructura v3
-	rows, err := r.db.Client().WithContext(context.Background()).Raw(query, args...).Rows()
-	if err != nil {
-		return nil, fmt.Errorf("error al ejecutar consulta: %w", err)
+	// Ejecutar query
+	if err := query.Find(&modelResults).Error; err != nil {
+		return nil, fmt.Errorf("error al obtener métricas: %w", err)
 	}
-	defer rows.Close()
 
-	var metrics []domain.FieldCropMetric
-	for rows.Next() {
-		// Leer valores raw de la vista v3
-		var rawProjectID, rawFieldID, rawCropID any
-		var fieldName, cropName string
-		var rawIncomeUsd, rawDirectCostsExecutedUsd, rawDirectCostsInvestedUsd any
-		var rawRentInvestedUsd, rawStructureInvestedUsd, rawOperatingResultUsd, rawOperatingResultPct any
-
-		if err := rows.Scan(
-			&rawProjectID, &rawFieldID, &fieldName, &rawCropID, &cropName,
-			&rawIncomeUsd, &rawDirectCostsExecutedUsd, &rawDirectCostsInvestedUsd,
-			&rawRentInvestedUsd, &rawStructureInvestedUsd, &rawOperatingResultUsd, &rawOperatingResultPct,
-		); err != nil {
-			return nil, fmt.Errorf("error al escanear fila: %w", err)
-		}
-
-		// Convertir valores raw
-		projectID := r.convertToInt64(rawProjectID)
-		fieldID := r.convertToInt64(rawFieldID)
-		cropID := r.convertToInt64(rawCropID)
-
-		metric := domain.FieldCropMetric{
-			ProjectID:              projectID,
-			FieldID:                fieldID,
-			FieldName:              fieldName,
-			CropID:                 cropID,
-			CropName:               cropName,
-			SurfaceHa:              decimal.Zero, // No disponible en v3
-			ProductionTn:           decimal.Zero, // No disponible en v3
-			SownAreaHa:             decimal.Zero, // No disponible en v3
-			HarvestedAreaHa:        decimal.Zero, // No disponible en v3
-			YieldTnHa:              decimal.Zero, // No disponible en v3
-			GrossPriceUsdTn:        decimal.Zero, // No disponible en v3
-			FreightCostUsdTn:       decimal.Zero, // No disponible en v3
-			CommercialCostUsdTn:    decimal.Zero, // No disponible en v3
-			NetPriceUsdTn:          decimal.Zero, // No disponible en v3
-			NetIncomeUsd:           r.convertToDecimal(rawIncomeUsd),
-			NetIncomeUsdHa:         decimal.Zero, // No disponible en v3
-			LaborCostsUsd:          decimal.Zero, // No disponible en v3
-			SupplyCostsUsd:         decimal.Zero, // No disponible en v3
-			TotalDirectCostsUsd:    r.convertToDecimal(rawDirectCostsExecutedUsd),
-			DirectCostsUsdHa:       decimal.Zero, // No disponible en v3
-			GrossMarginUsd:         decimal.Zero, // No disponible en v3
-			GrossMarginUsdHa:       decimal.Zero, // No disponible en v3
-			RentUsd:                r.convertToDecimal(rawRentInvestedUsd),
-			RentUsdHa:              decimal.Zero, // No disponible en v3
-			AdministrationUsd:      r.convertToDecimal(rawStructureInvestedUsd),
-			AdministrationUsdHa:    decimal.Zero, // No disponible en v3
-			OperatingResultUsd:     r.convertToDecimal(rawOperatingResultUsd),
-			OperatingResultUsdHa:   decimal.Zero, // No disponible en v3
-			TotalInvestedUsd:       r.convertToDecimal(rawDirectCostsInvestedUsd),
-			TotalInvestedUsdHa:     decimal.Zero, // No disponible en v3
-			ReturnPct:              r.convertToDecimal(rawOperatingResultPct),
-			IndifferenceYieldUsdTn: decimal.Zero, // No disponible en v3
-		}
-		metrics = append(metrics, metric)
+	// Convertir modelos a dominio
+	metrics := make([]domain.FieldCropMetric, len(modelResults))
+	for i, model := range modelResults {
+		metrics[i] = *model.ToDomainFieldCropMetric()
 	}
 
 	return metrics, nil
@@ -153,8 +86,8 @@ func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]d
 			c.name as crop_name
 		FROM fields f
 		JOIN lots l ON f.id = l.field_id AND l.deleted_at IS NULL
-		JOIN crops c ON (l.current_crop_id = c.id OR l.previous_crop_id = c.id) AND c.deleted_at IS NULL
-		WHERE f.project_id = ? AND f.deleted_at IS NULL
+		JOIN crops c ON l.current_crop_id = c.id AND c.deleted_at IS NULL
+		WHERE f.project_id = ? AND f.deleted_at IS NULL AND l.current_crop_id IS NOT NULL
 		ORDER BY f.id, c.id
 	`
 
@@ -196,8 +129,10 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 		r.buildRow("net_income", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa }),
 
 		// Costos directos
-		r.buildRow("labors_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsd }),
-		r.buildRow("supplies_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsd }),
+		// TODO: Cambiar a usar LaborCostsUsdHa cuando esté disponible en la vista v3
+		r.buildRow("labors_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsdHa }),
+		// TODO: Cambiar a usar SupplyCostsUsdHa cuando esté disponible en la vista v3
+		r.buildRow("supplies_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsdHa }),
 		r.buildRow("total_direct_costs", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa }),
 		r.buildRow("gross_margin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa }),
 
@@ -244,16 +179,156 @@ func (r *ReportRepository) buildRow(key, unit, valueType string, metricMap map[s
 	}
 }
 
-// buildSupplyDetailRows construye las filas detalladas de supplies
+// buildSupplyDetailRows construye las filas detalladas de supplies desde v3_report_field_crop_insumos
 func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
-	// Retornar filas con valores en cero ya que no hay datos detallados disponibles
-	return r.buildEmptySupplyRows(columnMap)
+	// Consultar vista v3_report_field_crop_insumos (migración 000130)
+	var supplyDetails []models.FieldCropSupplyDetailModel
+
+	// Extraer project_ids de las columnas
+	projectIDs := make(map[int64]bool)
+	for _, col := range columnMap {
+		projectIDs[col.FieldID] = true
+	}
+
+	// Construir query
+	query := r.db.Client().Model(&models.FieldCropSupplyDetailModel{})
+	if len(projectIDs) > 0 {
+		fieldIDs := make([]int64, 0, len(projectIDs))
+		for fid := range projectIDs {
+			fieldIDs = append(fieldIDs, fid)
+		}
+		query = query.Where("field_id IN ?", fieldIDs)
+	}
+
+	// Ejecutar query
+	if err := query.Find(&supplyDetails).Error; err != nil {
+		// Si hay error, retornar filas vacías
+		return r.buildEmptySupplyRows(columnMap)
+	}
+
+	// Mapear resultados: field_id-crop_id -> SupplyDetailModel
+	supplyMap := make(map[string]models.FieldCropSupplyDetailModel)
+	for _, detail := range supplyDetails {
+		key := fmt.Sprintf("%d-%d", detail.FieldID, detail.CropID)
+		supplyMap[key] = detail
+	}
+
+	// Construir filas
+	rows := []domain.FieldCropRow{
+		r.buildSupplyRow("supply_semilla", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),
+		r.buildSupplyRow("supply_coadyuvantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CoadyuvantesUsdHa }),
+		r.buildSupplyRow("supply_curasemillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CurasemillasUsdHa }),
+		r.buildSupplyRow("supply_herbicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.HerbicidasUsdHa }),
+		r.buildSupplyRow("supply_insecticidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.InsecticidasUsdHa }),
+		r.buildSupplyRow("supply_fungicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FungicidasUsdHa }),
+		// Otros Insumos y Fertilizantes no están en la vista, dejarlos en 0
+		r.buildSupplyRow("supply_otros_insumos", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return decimal.Zero }),
+		r.buildSupplyRow("supply_fertilizantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return decimal.Zero }),
+	}
+
+	return rows
 }
 
-// buildLaborDetailRows construye las filas detalladas de labores
+// buildLaborDetailRows construye las filas detalladas de labores desde v3_report_field_crop_labores
 func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
-	// Retornar filas con valores en cero ya que no hay datos detallados disponibles
-	return r.buildEmptyLaborRows(columnMap)
+	// Consultar vista v3_report_field_crop_labores (migración 000130)
+	var laborDetails []models.FieldCropLaborDetailModel
+
+	// Extraer field_ids de las columnas
+	fieldIDs := make(map[int64]bool)
+	for _, col := range columnMap {
+		fieldIDs[col.FieldID] = true
+	}
+
+	// Construir query
+	query := r.db.Client().Model(&models.FieldCropLaborDetailModel{})
+	if len(fieldIDs) > 0 {
+		fieldIDList := make([]int64, 0, len(fieldIDs))
+		for fid := range fieldIDs {
+			fieldIDList = append(fieldIDList, fid)
+		}
+		query = query.Where("field_id IN ?", fieldIDList)
+	}
+
+	// Ejecutar query
+	if err := query.Find(&laborDetails).Error; err != nil {
+		// Si hay error, retornar filas vacías
+		return r.buildEmptyLaborRows(columnMap)
+	}
+
+	// Mapear resultados: field_id-crop_id -> LaborDetailModel
+	laborMap := make(map[string]models.FieldCropLaborDetailModel)
+	for _, detail := range laborDetails {
+		key := fmt.Sprintf("%d-%d", detail.FieldID, detail.CropID)
+		laborMap[key] = detail
+	}
+
+	// Construir filas
+	rows := []domain.FieldCropRow{
+		r.buildLaborRow("labor_siembra", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.SiembraUsdHa }),
+		r.buildLaborRow("labor_pulverizacion", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.PulverizacionUsdHa }),
+		r.buildLaborRow("labor_riego", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.RiegoUsdHa }),
+		r.buildLaborRow("labor_cosecha", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.CosechaUsdHa }),
+		r.buildLaborRow("labor_otras_labores", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.OtrasLaboresUsdHa }),
+	}
+
+	return rows
+}
+
+// buildSupplyRow construye una fila de insumo desde el mapa de detalles
+func (r *ReportRepository) buildSupplyRow(
+	key string,
+	unit string,
+	columnMap map[string]domain.FieldCropColumn,
+	supplyMap map[string]models.FieldCropSupplyDetailModel,
+	extractor func(models.FieldCropSupplyDetailModel) decimal.Decimal,
+) domain.FieldCropRow {
+	values := make(map[string]domain.FieldCropValue)
+
+	for colID, col := range columnMap {
+		// Buscar en el mapa de detalles
+		mapKey := fmt.Sprintf("%d-%d", col.FieldID, col.CropID)
+		if detail, found := supplyMap[mapKey]; found {
+			values[colID] = domain.FieldCropValue{Number: extractor(detail)}
+		} else {
+			values[colID] = domain.FieldCropValue{Number: decimal.Zero}
+		}
+	}
+
+	return domain.FieldCropRow{
+		Key:       key,
+		Unit:      unit,
+		ValueType: "number",
+		Values:    values,
+	}
+}
+
+// buildLaborRow construye una fila de labor desde el mapa de detalles
+func (r *ReportRepository) buildLaborRow(
+	key string,
+	unit string,
+	columnMap map[string]domain.FieldCropColumn,
+	laborMap map[string]models.FieldCropLaborDetailModel,
+	extractor func(models.FieldCropLaborDetailModel) decimal.Decimal,
+) domain.FieldCropRow {
+	values := make(map[string]domain.FieldCropValue)
+
+	for colID, col := range columnMap {
+		// Buscar en el mapa de detalles
+		mapKey := fmt.Sprintf("%d-%d", col.FieldID, col.CropID)
+		if detail, found := laborMap[mapKey]; found {
+			values[colID] = domain.FieldCropValue{Number: extractor(detail)}
+		} else {
+			values[colID] = domain.FieldCropValue{Number: decimal.Zero}
+		}
+	}
+
+	return domain.FieldCropRow{
+		Key:       key,
+		Unit:      unit,
+		ValueType: "number",
+		Values:    values,
+	}
 }
 
 // buildEmptySupplyRows construye filas vacías de supplies
