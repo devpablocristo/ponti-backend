@@ -238,9 +238,10 @@ func GroupFieldCropMetricsByCrop(metrics []*domain.FieldCropMetric) map[string][
 	return grouped
 }
 
-// CalculateCropTotals calcula los totales por cultivo
+// CalculateCropTotals calcula los totales por cultivo usando helpers (DRY)
 func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.FieldCropMetric {
 	totals := make(map[string]domain.FieldCropMetric)
+	aggregator := NewMetricAggregator()
 
 	// Agrupar por cultivo
 	grouped := make(map[string][]*domain.FieldCropMetric)
@@ -252,83 +253,21 @@ func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.Fi
 		grouped[cropName] = append(grouped[cropName], metric)
 	}
 
-	// Calcular totales para cada cultivo
+	// Calcular totales para cada cultivo usando helpers
 	for cropName, cropMetrics := range grouped {
 		if len(cropMetrics) == 0 {
 			continue
 		}
 
-		total := domain.FieldCropMetric{
-			CropName: cropName,
-		}
+		// Sumar métricas usando helper
+		total := aggregator.SumMetrics(cropMetrics)
+		total.CropName = cropName
 
-		for _, metric := range cropMetrics {
-			// Sumar valores numéricos
-			total.SurfaceHa = total.SurfaceHa.Add(metric.SurfaceHa)
-			total.ProductionTn = total.ProductionTn.Add(metric.ProductionTn)
-			total.SownAreaHa = total.SownAreaHa.Add(metric.SownAreaHa)
-			total.HarvestedAreaHa = total.HarvestedAreaHa.Add(metric.HarvestedAreaHa)
-			total.NetIncomeUsd = total.NetIncomeUsd.Add(metric.NetIncomeUsd)
-			total.LaborCostsUsd = total.LaborCostsUsd.Add(metric.LaborCostsUsd)
-			total.SupplyCostsUsd = total.SupplyCostsUsd.Add(metric.SupplyCostsUsd)
-			total.TotalDirectCostsUsd = total.TotalDirectCostsUsd.Add(metric.TotalDirectCostsUsd)
-			total.GrossMarginUsd = total.GrossMarginUsd.Add(metric.GrossMarginUsd)
-			total.RentUsd = total.RentUsd.Add(metric.RentUsd)
-			total.AdministrationUsd = total.AdministrationUsd.Add(metric.AdministrationUsd)
-			total.OperatingResultUsd = total.OperatingResultUsd.Add(metric.OperatingResultUsd)
-			total.TotalInvestedUsd = total.TotalInvestedUsd.Add(metric.TotalInvestedUsd)
-		}
+		// Calcular ratios usando helper
+		aggregator.CalculateRatios(&total)
 
-		// Calcular promedios y ratios
-		if total.HarvestedAreaHa.GreaterThan(decimal.Zero) {
-			total.YieldTnHa = total.ProductionTn.Div(total.HarvestedAreaHa)
-		}
-
-		if total.SownAreaHa.GreaterThan(decimal.Zero) {
-			total.NetIncomeUsdHa = total.NetIncomeUsd.Div(total.SownAreaHa)
-			total.DirectCostsUsdHa = total.TotalDirectCostsUsd.Div(total.SownAreaHa)
-			total.GrossMarginUsdHa = total.GrossMarginUsd.Div(total.SownAreaHa)
-			total.RentUsdHa = total.RentUsd.Div(total.SownAreaHa)
-			total.AdministrationUsdHa = total.AdministrationUsd.Div(total.SownAreaHa)
-			total.OperatingResultUsdHa = total.OperatingResultUsd.Div(total.SownAreaHa)
-			total.TotalInvestedUsdHa = total.TotalInvestedUsd.Div(total.SownAreaHa)
-		}
-
-		// Calcular renta
-		if total.TotalInvestedUsd.GreaterThan(decimal.Zero) {
-			total.ReturnPct = total.OperatingResultUsd.Div(total.TotalInvestedUsd)
-		}
-
-		// Calcular rinde indiferencia
-		if total.YieldTnHa.GreaterThan(decimal.Zero) {
-			total.IndifferenceYieldUsdTn = total.TotalInvestedUsd.Div(total.YieldTnHa)
-		}
-
-		// Promedio de precios (usar el primer valor no cero)
-		for _, metric := range cropMetrics {
-			if metric.GrossPriceUsdTn.GreaterThan(decimal.Zero) {
-				total.GrossPriceUsdTn = metric.GrossPriceUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.FreightCostUsdTn.GreaterThan(decimal.Zero) {
-				total.FreightCostUsdTn = metric.FreightCostUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.CommercialCostUsdTn.GreaterThan(decimal.Zero) {
-				total.CommercialCostUsdTn = metric.CommercialCostUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.NetPriceUsdTn.GreaterThan(decimal.Zero) {
-				total.NetPriceUsdTn = metric.NetPriceUsdTn
-				break
-			}
-		}
+		// Copiar precios usando helper
+		aggregator.CopyFirstNonZeroPrice(cropMetrics, &total)
 
 		totals[cropName] = total
 	}
@@ -336,53 +275,16 @@ func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.Fi
 	return totals
 }
 
-// CalculateGrandTotal calcula el total general
+// CalculateGrandTotal calcula el total general usando helpers (DRY)
 func CalculateGrandTotal(metrics []*domain.FieldCropMetric) domain.FieldCropMetric {
-	total := domain.FieldCropMetric{
-		CropName: "TOTAL GENERAL",
-	}
+	aggregator := NewMetricAggregator()
 
-	for _, metric := range metrics {
-		// Sumar valores numéricos
-		total.SurfaceHa = total.SurfaceHa.Add(metric.SurfaceHa)
-		total.ProductionTn = total.ProductionTn.Add(metric.ProductionTn)
-		total.SownAreaHa = total.SownAreaHa.Add(metric.SownAreaHa)
-		total.HarvestedAreaHa = total.HarvestedAreaHa.Add(metric.HarvestedAreaHa)
-		total.NetIncomeUsd = total.NetIncomeUsd.Add(metric.NetIncomeUsd)
-		total.LaborCostsUsd = total.LaborCostsUsd.Add(metric.LaborCostsUsd)
-		total.SupplyCostsUsd = total.SupplyCostsUsd.Add(metric.SupplyCostsUsd)
-		total.TotalDirectCostsUsd = total.TotalDirectCostsUsd.Add(metric.TotalDirectCostsUsd)
-		total.GrossMarginUsd = total.GrossMarginUsd.Add(metric.GrossMarginUsd)
-		total.RentUsd = total.RentUsd.Add(metric.RentUsd)
-		total.AdministrationUsd = total.AdministrationUsd.Add(metric.AdministrationUsd)
-		total.OperatingResultUsd = total.OperatingResultUsd.Add(metric.OperatingResultUsd)
-		total.TotalInvestedUsd = total.TotalInvestedUsd.Add(metric.TotalInvestedUsd)
-	}
+	// Sumar todas las métricas usando helper
+	total := aggregator.SumMetrics(metrics)
+	total.CropName = "TOTAL GENERAL"
 
-	// Calcular promedios y ratios
-	if total.HarvestedAreaHa.GreaterThan(decimal.Zero) {
-		total.YieldTnHa = total.ProductionTn.Div(total.HarvestedAreaHa)
-	}
-
-	if total.SownAreaHa.GreaterThan(decimal.Zero) {
-		total.NetIncomeUsdHa = total.NetIncomeUsd.Div(total.SownAreaHa)
-		total.DirectCostsUsdHa = total.TotalDirectCostsUsd.Div(total.SownAreaHa)
-		total.GrossMarginUsdHa = total.GrossMarginUsd.Div(total.SownAreaHa)
-		total.RentUsdHa = total.RentUsd.Div(total.SownAreaHa)
-		total.AdministrationUsdHa = total.AdministrationUsd.Div(total.SownAreaHa)
-		total.OperatingResultUsdHa = total.OperatingResultUsd.Div(total.SownAreaHa)
-		total.TotalInvestedUsdHa = total.TotalInvestedUsd.Div(total.SownAreaHa)
-	}
-
-	// Calcular renta
-	if total.TotalInvestedUsd.GreaterThan(decimal.Zero) {
-		total.ReturnPct = total.OperatingResultUsd.Div(total.TotalInvestedUsd)
-	}
-
-	// Calcular rinde indiferencia
-	if total.YieldTnHa.GreaterThan(decimal.Zero) {
-		total.IndifferenceYieldUsdTn = total.TotalInvestedUsd.Div(total.YieldTnHa)
-	}
+	// Calcular ratios usando helper
+	aggregator.CalculateRatios(&total)
 
 	return total
 }

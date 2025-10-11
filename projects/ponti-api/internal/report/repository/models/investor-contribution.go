@@ -163,7 +163,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	return report, nil
 }
 
-// mapContributionsToDomain mapea contribuciones del modelo al domain
+// mapContributionsToDomain mapea contribuciones del modelo al domain usando helpers (DRY)
 func (m *InvestorContributionDataModel) mapContributionsToDomain(contributions []ContributionCategoryModel) []domain.ContributionCategory {
 	domainContributions := make([]domain.ContributionCategory, len(contributions))
 	for i, c := range contributions {
@@ -174,7 +174,7 @@ func (m *InvestorContributionDataModel) mapContributionsToDomain(contributions [
 			Label:                     c.Label,
 			TotalUsd:                  c.TotalUsd,
 			TotalUsdHa:                c.TotalUsdHa,
-			Investors:                 m.mapInvestorSharesToDomain(c.Investors),
+			Investors:                 ConvertInvestorSharesSlice(c.Investors),
 			RequiresManualAttribution: c.RequiresManualAttribution,
 			AttributionNote:           c.AttributionNote,
 		}
@@ -200,7 +200,7 @@ func (m *InvestorContributionDataModel) mapComparisonsToDomain(comparisons []Inv
 	return domainComparisons
 }
 
-// mapHarvestToDomain mapea harvest del modelo al domain
+// mapHarvestToDomain mapea harvest del modelo al domain usando helpers (DRY)
 func (m *InvestorContributionDataModel) mapHarvestToDomain(harvest HarvestSettlementModel) domain.HarvestSettlement {
 	domainRows := make([]domain.HarvestRow, len(harvest.Rows))
 	for i, r := range harvest.Rows {
@@ -209,29 +209,13 @@ func (m *InvestorContributionDataModel) mapHarvestToDomain(harvest HarvestSettle
 			Type:       domain.HarvestRowType(r.Type),
 			TotalUsd:   r.TotalUsd,
 			TotalUsdHa: r.TotalUsdHa,
-			Investors:  m.mapInvestorSharesToDomain(r.Investors),
+			Investors:  ConvertInvestorSharesSlice(r.Investors),
 		}
 	}
 
 	return domain.HarvestSettlement{
 		Rows:                    domainRows,
-		FooterPaymentAgreed:     m.mapInvestorSharesToDomain(harvest.FooterPaymentAgreed),
-		FooterPaymentAdjustment: m.mapInvestorSharesToDomain(harvest.FooterPaymentAdjustment),
+		FooterPaymentAgreed:     ConvertInvestorSharesSlice(harvest.FooterPaymentAgreed),
+		FooterPaymentAdjustment: ConvertInvestorSharesSlice(harvest.FooterPaymentAdjustment),
 	}
-}
-
-// mapInvestorSharesToDomain mapea shares de inversores del modelo al domain
-func (m *InvestorContributionDataModel) mapInvestorSharesToDomain(shares []InvestorShareModel) []domain.InvestorShare {
-	domainShares := make([]domain.InvestorShare, len(shares))
-	for i, s := range shares {
-		domainShares[i] = domain.InvestorShare{
-			InvestorRef: domain.InvestorRef{
-				InvestorID:   s.InvestorID,
-				InvestorName: s.InvestorName,
-			},
-			AmountUsd: s.AmountUsd,
-			SharePct:  s.SharePct,
-		}
-	}
-	return domainShares
 }

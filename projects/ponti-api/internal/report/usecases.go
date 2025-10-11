@@ -6,10 +6,14 @@ import (
 	"fmt"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/repository/models"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/mappers"
 )
 
-// ReportRepositoryPort define la interfaz del repositorio
+// ===== PORTS (Hexagonal Architecture) =====
+
+// ReportRepositoryPort define la interfaz del repositorio (Puerto de salida)
 type ReportRepositoryPort interface {
 	GetFieldCropMetrics(domain.ReportFilter) ([]domain.FieldCropMetric, error)
 	GetProjectInfo(int64) (*domain.ProjectInfo, error)
@@ -18,22 +22,28 @@ type ReportRepositoryPort interface {
 	GetSummaryResults(domain.SummaryResultsFilter) ([]domain.SummaryResults, error)
 }
 
-// ReportUseCasePort define la interfaz del caso de uso
+// ReportUseCasePort define la interfaz del caso de uso (Puerto de entrada)
 type ReportUseCasePort interface {
 	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
 	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
+// ===== USE CASE IMPLEMENTATION =====
+
 // ReportUseCase implementa la lógica de negocio para reportes
 type ReportUseCase struct {
-	repository ReportRepositoryPort
+	repository    ReportRepositoryPort
+	validator     *usecases.ReportFilterValidator
+	summaryMapper *mappers.SummaryResponseMapper
 }
 
 // NewReportUseCase crea una nueva instancia del caso de uso
 func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 	return &ReportUseCase{
-		repository: repository,
+		repository:    repository,
+		validator:     usecases.NewReportFilterValidator(),
+		summaryMapper: mappers.NewSummaryResponseMapper(),
 	}
 }
 
@@ -69,7 +79,7 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 // GetSummaryResultsReport obtiene el reporte de resumen de resultados
 func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
 	// Validar que al menos un filtro esté presente
-	if err := uc.validateAtLeastOneFilter(filters.ProjectID, filters.CustomerID, filters.CampaignID, filters.FieldID); err != nil {
+	if err := uc.validator.ValidateAtLeastOneFilter(filters); err != nil {
 		return nil, err
 	}
 
@@ -79,48 +89,40 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 		return nil, fmt.Errorf("error obteniendo resumen de resultados: %w", err)
 	}
 
+	// Retornar respuesta vacía si no hay resultados
 	if len(results) == 0 {
-		return &domain.SummaryResultsResponse{
-			Crops:  []domain.SummaryResults{},
-			Totals: domain.ProjectTotals{},
-		}, nil
+		return uc.buildEmptySummaryResponse(), nil
 	}
 
-	// Obtener información del proyecto (usar el primer resultado)
-	projectID := results[0].ProjectID
-	projectInfo, err := uc.repository.GetProjectInfo(projectID)
+	// Construir respuesta con datos
+	return uc.buildSummaryResponse(results)
+}
+
+// ===== FUNCIONES PRIVADAS (DRY) =====
+
+// buildEmptySummaryResponse construye una respuesta vacía usando el mapper
+func (uc *ReportUseCase) buildEmptySummaryResponse() *domain.SummaryResultsResponse {
+	return uc.summaryMapper.BuildEmptyResponse()
+}
+
+// buildSummaryResponse construye la respuesta completa con datos usando el mapper
+func (uc *ReportUseCase) buildSummaryResponse(results []domain.SummaryResults) (*domain.SummaryResultsResponse, error) {
+	// Obtener información del proyecto del primer resultado
+	projectInfo, err := uc.repository.GetProjectInfo(results[0].ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting project information: %w", err)
 	}
 
 	// Calcular totales del proyecto
-	resultsPtr := make([]*domain.SummaryResults, len(results))
-	for i := range results {
-		resultsPtr[i] = &results[i]
-	}
-	totales := models.CalculateProjectTotals(resultsPtr)
+	totales := uc.calculateProjectTotals(results)
 
-	// Construir respuesta
-	response := &domain.SummaryResultsResponse{
-		ProjectID:    projectInfo.ProjectID,
-		ProjectName:  projectInfo.ProjectName,
-		CustomerID:   projectInfo.CustomerID,
-		CustomerName: projectInfo.CustomerName,
-		CampaignID:   projectInfo.CampaignID,
-		CampaignName: projectInfo.CampaignName,
-		Crops:        results,
-		Totals:       *totales,
-	}
-
-	return response, nil
+	// Usar el mapper para construir la respuesta
+	return uc.summaryMapper.BuildResponse(projectInfo, results, totales), nil
 }
 
-// ===== VALIDACIONES =====
-
-// validateAtLeastOneFilter valida que al menos un filtro esté presente
-func (uc *ReportUseCase) validateAtLeastOneFilter(projectID, customerID, campaignID, fieldID *int64) error {
-	if projectID == nil && customerID == nil && campaignID == nil && fieldID == nil {
-		return fmt.Errorf("at least one filter must be specified (project_id, customer_id, campaign_id, or field_id)")
-	}
-	return nil
+// calculateProjectTotals calcula los totales del proyecto
+func (uc *ReportUseCase) calculateProjectTotals(results []domain.SummaryResults) *domain.ProjectTotals {
+	// Usar el mapper para convertir a punteros
+	resultsPtr := uc.summaryMapper.ConvertToPointers(results)
+	return models.CalculateProjectTotals(resultsPtr)
 }
