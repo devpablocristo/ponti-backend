@@ -16,8 +16,9 @@ func NewSummaryResponseMapper() *SummaryResponseMapper {
 // BuildEmptyResponse construye una respuesta vacía
 func (m *SummaryResponseMapper) BuildEmptyResponse() *domain.SummaryResultsResponse {
 	return &domain.SummaryResultsResponse{
-		Crops:  []domain.SummaryResults{},
-		Totals: domain.ProjectTotals{},
+		Crops:        []domain.SummaryResults{},
+		Totals:       domain.ProjectTotals{},
+		GeneralCrops: domain.GeneralCrops{},
 	}
 }
 
@@ -27,6 +28,18 @@ func (m *SummaryResponseMapper) BuildResponse(
 	crops []domain.SummaryResults,
 	totals *domain.ProjectTotals,
 ) *domain.SummaryResultsResponse {
+	// GRAL CULTIVOS debe tener los mismos valores que los totales del proyecto
+	generalCrops := domain.GeneralCrops{
+		TotalSurfaceHa:          totals.TotalSurfaceHa,
+		TotalNetIncomeUsd:       totals.TotalNetIncomeUsd,
+		TotalDirectCostsUsd:     totals.TotalDirectCostsUsd,
+		TotalRentUsd:            totals.TotalRentUsd,
+		TotalStructureUsd:       totals.TotalStructureUsd,
+		TotalInvestedProjectUsd: totals.TotalInvestedProjectUsd,
+		TotalOperatingResultUsd: totals.TotalOperatingResultUsd,
+		ProjectReturnPct:        totals.ProjectReturnPct,
+	}
+
 	return &domain.SummaryResultsResponse{
 		ProjectID:    projectInfo.ProjectID,
 		ProjectName:  projectInfo.ProjectName,
@@ -36,6 +49,7 @@ func (m *SummaryResponseMapper) BuildResponse(
 		CampaignName: projectInfo.CampaignName,
 		Crops:        crops,
 		Totals:       *totals,
+		GeneralCrops: generalCrops,
 	}
 }
 

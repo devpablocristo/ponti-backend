@@ -548,14 +548,10 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 			customer_name,
 			campaign_id,
 			campaign_name,
-			surface_total_ha,
-			lease_fixed_usd,
-			lease_is_fixed,
-			admin_per_ha_usd,
-			admin_total_usd,
-			contributions_data,
-			comparison_data,
-			harvest_data
+			general_project_data::text,
+			contribution_categories::text,
+			investor_contribution_comparison::text,
+			harvest_settlement::text
 		FROM v3_investor_contribution_data_view
 		WHERE project_id IN (%s)
 	`, strings.Join(placeholders, ","))

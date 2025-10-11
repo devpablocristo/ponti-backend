@@ -31,38 +31,38 @@ var (
 
 // Extractores de precios y comercialización
 var (
-	ExtractFreightCost     MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.FreightCostUsdTn }
-	ExtractCommercialCost  MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.CommercialCostUsdTn }
-	ExtractNetPrice        MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.NetPriceUsdTn }
-	ExtractGrossPrice      MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossPriceUsdTn }
-	ExtractNetIncome       MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa }
+	ExtractFreightCost    MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.FreightCostUsdTn }
+	ExtractCommercialCost MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.CommercialCostUsdTn }
+	ExtractNetPrice       MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.NetPriceUsdTn }
+	ExtractGrossPrice     MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossPriceUsdTn }
+	ExtractNetIncome      MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa }
 )
 
 // Extractores de costos directos
 var (
-	ExtractLaborCosts        MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsdHa }
-	ExtractSupplyCosts       MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsdHa }
-	ExtractDirectCosts       MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa }
-	ExtractGrossMargin       MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa }
+	ExtractLaborCosts  MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsdHa }
+	ExtractSupplyCosts MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsdHa }
+	ExtractDirectCosts MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa }
+	ExtractGrossMargin MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa }
 )
 
 // Extractores de costos adicionales
 var (
-	ExtractRent              MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.RentUsdHa }
-	ExtractAdministration    MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministrationUsdHa }
-	ExtractOperatingResult   MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.OperatingResultUsdHa }
+	ExtractRent            MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.RentUsdHa }
+	ExtractAdministration  MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministrationUsdHa }
+	ExtractOperatingResult MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.OperatingResultUsdHa }
 )
 
 // Extractores de métricas adicionales
 var (
-	ExtractTotalInvested        MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }
-	ExtractReturnPct            MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }
-	ExtractIndifferenceYield    MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }
+	ExtractTotalInvested     MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }
+	ExtractReturnPct         MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }
+	ExtractIndifferenceYield MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }
 )
 
 // ===== EXTRACTORES CALCULADOS =====
 
-// ExtractIndifferencePrice calcula el precio de indiferencia
+// ExtractIndifferencePrice calcula el precio NETO de indiferencia
 // Precio Indiferencia = Total Invertido por HA / Rendimiento
 // A qué precio necesito vender para cubrir mis costos
 func ExtractIndifferencePrice(m domain.FieldCropMetric) decimal.Decimal {
@@ -160,4 +160,3 @@ func BuildDetailRow(
 		Values:    values,
 	}
 }
-
