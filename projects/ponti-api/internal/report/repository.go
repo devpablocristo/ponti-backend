@@ -144,7 +144,14 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 		// Métricas adicionales
 		r.buildRow("total_invested", "usd", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }),
 		r.buildRow("return_pct", "%", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }),
-		r.buildRow("indifference_yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return decimal.Zero }),
+		r.buildRow("indifference_yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal {
+			// Rinde Indiferencia = Total Invertido por HA / Precio Neto
+			// Cuántas tn/ha necesito para cubrir mis costos
+			if m.NetPriceUsdTn.GreaterThan(decimal.Zero) {
+				return m.TotalInvestedUsdHa.Div(m.NetPriceUsdTn)
+			}
+			return decimal.Zero
+		}),
 		r.buildRow("indifference_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }),
 	}
 
