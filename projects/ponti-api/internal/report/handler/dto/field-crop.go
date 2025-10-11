@@ -86,7 +86,8 @@ func FromDomainFieldCrop(table domain.FieldCrop) ReportTableResponse {
 		values := make(map[string]NumberValue)
 		for fieldCropKey, value := range row.Values {
 			values[fieldCropKey] = NumberValue{
-				Number: value.Number.String(),
+				// Formatear con 3 decimales según regla del proyecto para dashboard
+				Number: value.Number.StringFixed(3),
 			}
 		}
 

@@ -2,8 +2,9 @@ package dto
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
-	"github.com/shopspring/decimal"
 )
+
+// Nota: Decimal3 está definido en summary-results.go para evitar duplicación
 
 // -------------------------------
 // Entidades básicas de inversores
@@ -18,25 +19,25 @@ type InvestorRef struct {
 // InvestorHeader: chapita de cabecera (ej: "Agrolaits 50%").
 type InvestorHeader struct {
 	InvestorRef
-	SharePct decimal.Decimal `json:"share_pct"` // % global acordado
+	SharePct Decimal3 `json:"share_pct"` // % global acordado
 }
 
 // InvestorShare: celda por inversor en una fila.
 type InvestorShare struct {
 	InvestorRef
-	AmountUsd decimal.Decimal `json:"amount_usd"` // Monto USD en la celda
-	SharePct  decimal.Decimal `json:"share_pct"`  // % de esa fila
+	AmountUsd Decimal3 `json:"amount_usd"` // Monto USD en la celda
+	SharePct  Decimal3 `json:"share_pct"`  // % de esa fila
 }
 
 // -------------------------------
 // Datos generales del proyecto
 // -------------------------------
 type GeneralProjectData struct {
-	SurfaceTotalHa decimal.Decimal `json:"surface_total_ha"` // Hectáreas totales
-	LeaseFixedUsd  decimal.Decimal `json:"lease_fixed_usd"`  // Arriendo fijo por ha
-	LeaseIsFixed   bool            `json:"lease_is_fixed"`   // true = arriendo fijo
-	AdminPerHaUsd  decimal.Decimal `json:"admin_per_ha_usd"` // Administración por ha
-	AdminTotalUsd  decimal.Decimal `json:"admin_total_usd"`  // Administración total
+	SurfaceTotalHa Decimal3 `json:"surface_total_ha"` // Hectáreas totales
+	LeaseFixedUsd  Decimal3 `json:"lease_fixed_usd"`  // Arriendo fijo por ha
+	LeaseIsFixed   bool     `json:"lease_is_fixed"`   // true = arriendo fijo
+	AdminPerHaUsd  Decimal3 `json:"admin_per_ha_usd"` // Administración por ha
+	AdminTotalUsd  Decimal3 `json:"admin_total_usd"`  // Administración total
 }
 
 // -------------------------------
@@ -62,8 +63,8 @@ type ContributionCategory struct {
 	SortIndex                 int                      `json:"sort_index"`
 	Type                      ContributionCategoryType `json:"type"`
 	Label                     string                   `json:"label"` // etiqueta visible (ej: "Agroquímicos")
-	TotalUsd                  decimal.Decimal          `json:"total_usd"`
-	TotalUsdHa                decimal.Decimal          `json:"total_usd_ha"`
+	TotalUsd                  Decimal3                 `json:"total_usd"`
+	TotalUsdHa                Decimal3                 `json:"total_usd_ha"`
 	Investors                 []InvestorShare          `json:"investors"`
 	RequiresManualAttribution bool                     `json:"requires_manual_attribution"`
 	AttributionNote           *string                  `json:"attribution_note,omitempty"`
@@ -71,8 +72,8 @@ type ContributionCategory struct {
 
 // PreHarvestTotals: fila "Totales" en la tabla de aportes pre-cosecha
 type PreHarvestTotals struct {
-	TotalUsd   decimal.Decimal `json:"total_usd"`
-	TotalUsdHa decimal.Decimal `json:"total_us_ha"`
+	TotalUsd   Decimal3        `json:"total_usd"`
+	TotalUsdHa Decimal3        `json:"total_us_ha"`
 	Investors  []InvestorShare `json:"investors"`
 }
 
@@ -81,10 +82,10 @@ type PreHarvestTotals struct {
 // -------------------------------------------------
 type InvestorContributionComparison struct {
 	InvestorRef
-	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"`
-	AgreedUsd      decimal.Decimal `json:"agreed_usd"`
-	ActualUsd      decimal.Decimal `json:"actual_usd"`
-	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`
+	AgreedSharePct Decimal3 `json:"agreed_share_pct"`
+	AgreedUsd      Decimal3 `json:"agreed_usd"`
+	ActualUsd      Decimal3 `json:"actual_usd"`
+	AdjustmentUsd  Decimal3 `json:"adjustment_usd"`
 }
 
 // -------------------------------
@@ -102,8 +103,8 @@ const (
 type HarvestRow struct {
 	Key        string          `json:"key"`  // "harvest" o "totals"
 	Type       HarvestRowType  `json:"type"` // enum backend
-	TotalUsd   decimal.Decimal `json:"total_usd"`
-	TotalUsdHa decimal.Decimal `json:"total_us_ha"`
+	TotalUsd   Decimal3        `json:"total_usd"`
+	TotalUsdHa Decimal3        `json:"total_us_ha"`
 	Investors  []InvestorShare `json:"investors"`
 }
 
@@ -165,7 +166,7 @@ func fromDomainInvestorHeaders(domainHeaders []domain.InvestorHeader) []Investor
 				InvestorID:   h.InvestorID,
 				InvestorName: h.InvestorName,
 			},
-			SharePct: h.SharePct,
+			SharePct: NewDecimal3(h.SharePct),
 		}
 	}
 	return headers
@@ -174,11 +175,11 @@ func fromDomainInvestorHeaders(domainHeaders []domain.InvestorHeader) []Investor
 // fromDomainGeneralProjectData mapea datos generales del proyecto
 func fromDomainGeneralProjectData(domainGeneral domain.GeneralProjectData) GeneralProjectData {
 	return GeneralProjectData{
-		SurfaceTotalHa: domainGeneral.SurfaceTotalHa,
-		LeaseFixedUsd:  domainGeneral.LeaseFixedUsd,
+		SurfaceTotalHa: NewDecimal3(domainGeneral.SurfaceTotalHa),
+		LeaseFixedUsd:  NewDecimal3(domainGeneral.LeaseFixedUsd),
 		LeaseIsFixed:   domainGeneral.LeaseIsFixed,
-		AdminPerHaUsd:  domainGeneral.AdminPerHaUsd,
-		AdminTotalUsd:  domainGeneral.AdminTotalUsd,
+		AdminPerHaUsd:  NewDecimal3(domainGeneral.AdminPerHaUsd),
+		AdminTotalUsd:  NewDecimal3(domainGeneral.AdminTotalUsd),
 	}
 }
 
@@ -191,8 +192,8 @@ func fromDomainContributionCategories(domainCategories []domain.ContributionCate
 			SortIndex:                 c.SortIndex,
 			Type:                      ContributionCategoryType(c.Type),
 			Label:                     c.Label,
-			TotalUsd:                  c.TotalUsd,
-			TotalUsdHa:                c.TotalUsdHa,
+			TotalUsd:                  NewDecimal3(c.TotalUsd),
+			TotalUsdHa:                NewDecimal3(c.TotalUsdHa),
 			Investors:                 fromDomainInvestorShares(c.Investors),
 			RequiresManualAttribution: c.RequiresManualAttribution,
 			AttributionNote:           c.AttributionNote,
@@ -204,8 +205,8 @@ func fromDomainContributionCategories(domainCategories []domain.ContributionCate
 // fromDomainPreHarvestTotals mapea totales pre-cosecha
 func fromDomainPreHarvestTotals(domainTotals domain.PreHarvestTotals) PreHarvestTotals {
 	return PreHarvestTotals{
-		TotalUsd:   domainTotals.TotalUsd,
-		TotalUsdHa: domainTotals.TotalUsdHa,
+		TotalUsd:   NewDecimal3(domainTotals.TotalUsd),
+		TotalUsdHa: NewDecimal3(domainTotals.TotalUsdHa),
 		Investors:  fromDomainInvestorShares(domainTotals.Investors),
 	}
 }
@@ -219,10 +220,10 @@ func fromDomainInvestorContributionComparisons(domainComparisons []domain.Invest
 				InvestorID:   c.InvestorID,
 				InvestorName: c.InvestorName,
 			},
-			AgreedSharePct: c.AgreedSharePct,
-			AgreedUsd:      c.AgreedUsd,
-			ActualUsd:      c.ActualUsd,
-			AdjustmentUsd:  c.AdjustmentUsd,
+			AgreedSharePct: NewDecimal3(c.AgreedSharePct),
+			AgreedUsd:      NewDecimal3(c.AgreedUsd),
+			ActualUsd:      NewDecimal3(c.ActualUsd),
+			AdjustmentUsd:  NewDecimal3(c.AdjustmentUsd),
 		}
 	}
 	return comparisons
@@ -244,8 +245,8 @@ func fromDomainHarvestRows(domainRows []domain.HarvestRow) []HarvestRow {
 		rows[i] = HarvestRow{
 			Key:        r.Key,
 			Type:       HarvestRowType(r.Type),
-			TotalUsd:   r.TotalUsd,
-			TotalUsdHa: r.TotalUsdHa,
+			TotalUsd:   NewDecimal3(r.TotalUsd),
+			TotalUsdHa: NewDecimal3(r.TotalUsdHa),
 			Investors:  fromDomainInvestorShares(r.Investors),
 		}
 	}
@@ -261,8 +262,8 @@ func fromDomainInvestorShares(domainShares []domain.InvestorShare) []InvestorSha
 				InvestorID:   s.InvestorID,
 				InvestorName: s.InvestorName,
 			},
-			AmountUsd: s.AmountUsd,
-			SharePct:  s.SharePct,
+			AmountUsd: NewDecimal3(s.AmountUsd),
+			SharePct:  NewDecimal3(s.SharePct),
 		}
 	}
 	return shares

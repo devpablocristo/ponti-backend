@@ -4,7 +4,6 @@ package report
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -101,59 +100,12 @@ func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]d
 
 // buildReportRows construye las filas del reporte
 func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, columns []domain.FieldCropColumn) []domain.FieldCropRow {
-	// Crear mapa de métricas por field_crop_key
-	metricMap := make(map[string]domain.FieldCropMetric)
-	for _, metric := range metrics {
-		key := fmt.Sprintf("%d-%d", metric.FieldID, metric.CropID)
-		metricMap[key] = metric
-	}
+	// Crear mapas de métricas y columnas
+	metricMap := r.createMetricMap(metrics)
+	columnMap := r.createColumnMap(columns)
 
-	// Crear mapa de columnas
-	columnMap := make(map[string]domain.FieldCropColumn)
-	for _, col := range columns {
-		columnMap[col.ID] = col
-	}
-
-	// Definir filas del reporte
-	rows := []domain.FieldCropRow{
-		// Información básica
-		r.buildRow("surface", "ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SurfaceHa }),
-		r.buildRow("production", "tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ProductionTn }),
-		r.buildRow("yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.YieldTnHa }),
-
-		// Precios y comercialización
-		r.buildRow("freight_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.FreightCostUsdTn }),
-		r.buildRow("commercial_cost", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.CommercialCostUsdTn }),
-		r.buildRow("net_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.NetPriceUsdTn }),
-		r.buildRow("gross_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossPriceUsdTn }),
-		r.buildRow("net_income", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.NetIncomeUsdHa }),
-
-		// Costos directos
-		// TODO: Cambiar a usar LaborCostsUsdHa cuando esté disponible en la vista v3
-		r.buildRow("labors_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.LaborCostsUsdHa }),
-		// TODO: Cambiar a usar SupplyCostsUsdHa cuando esté disponible en la vista v3
-		r.buildRow("supplies_cost", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.SupplyCostsUsdHa }),
-		r.buildRow("total_direct_costs", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.DirectCostsUsdHa }),
-		r.buildRow("gross_margin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.GrossMarginUsdHa }),
-
-		// Costos adicionales
-		r.buildRow("lease", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.RentUsdHa }),
-		r.buildRow("admin", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.AdministrationUsdHa }),
-		r.buildRow("operating_result", "usd/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.OperatingResultUsdHa }),
-
-		// Métricas adicionales
-		r.buildRow("total_invested", "usd", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }),
-		r.buildRow("return_pct", "%", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }),
-		r.buildRow("indifference_yield", "tn/ha", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal {
-			// Rinde Indiferencia = Total Invertido por HA / Precio Neto
-			// Cuántas tn/ha necesito para cubrir mis costos
-			if m.NetPriceUsdTn.GreaterThan(decimal.Zero) {
-				return m.TotalInvestedUsdHa.Div(m.NetPriceUsdTn)
-			}
-			return decimal.Zero
-		}),
-		r.buildRow("indifference_price", "usd/tn", "number", metricMap, columnMap, func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }),
-	}
+	// Construir filas principales usando configuraciones (DRY)
+	rows := r.buildMainRows(metricMap, columnMap)
 
 	// Agregar filas detalladas de supplies y labors
 	rows = append(rows, r.buildSupplyDetailRows(columnMap)...)
@@ -162,28 +114,38 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 	return rows
 }
 
-// buildRow construye una fila del reporte
-func (r *ReportRepository) buildRow(key, unit, valueType string, metricMap map[string]domain.FieldCropMetric, columnMap map[string]domain.FieldCropColumn, getValue func(domain.FieldCropMetric) decimal.Decimal) domain.FieldCropRow {
-	values := make(map[string]domain.FieldCropValue)
+// createMetricMap crea un mapa de métricas indexado por field_crop_key
+func (r *ReportRepository) createMetricMap(metrics []domain.FieldCropMetric) map[string]domain.FieldCropMetric {
+	metricMap := make(map[string]domain.FieldCropMetric, len(metrics))
+	for _, metric := range metrics {
+		key := fmt.Sprintf("%d-%d", metric.FieldID, metric.CropID)
+		metricMap[key] = metric
+	}
+	return metricMap
+}
 
-	for colID := range columnMap {
-		if metric, exists := metricMap[colID]; exists {
-			values[colID] = domain.FieldCropValue{
-				Number: getValue(metric),
-			}
-		} else {
-			values[colID] = domain.FieldCropValue{
-				Number: decimal.Zero,
-			}
-		}
+// createColumnMap crea un mapa de columnas indexado por ID
+func (r *ReportRepository) createColumnMap(columns []domain.FieldCropColumn) map[string]domain.FieldCropColumn {
+	columnMap := make(map[string]domain.FieldCropColumn, len(columns))
+	for _, col := range columns {
+		columnMap[col.ID] = col
+	}
+	return columnMap
+}
+
+// buildMainRows construye las filas principales usando configuraciones predefinidas (DRY)
+func (r *ReportRepository) buildMainRows(
+	metricMap map[string]domain.FieldCropMetric,
+	columnMap map[string]domain.FieldCropColumn,
+) []domain.FieldCropRow {
+	configs := GetMainRowConfigs()
+	rows := make([]domain.FieldCropRow, len(configs))
+
+	for i, config := range configs {
+		rows[i] = BuildRowFromConfig(config, metricMap, columnMap)
 	}
 
-	return domain.FieldCropRow{
-		Key:       key,
-		Unit:      unit,
-		ValueType: valueType,
-		Values:    values,
-	}
+	return rows
 }
 
 // buildSupplyDetailRows construye las filas detalladas de supplies desde v3_report_field_crop_insumos
@@ -703,48 +665,6 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 }
 
 // ===== FUNCIONES AUXILIARES =====
-
-// convertToInt64 convierte valores raw a int64
-func (r *ReportRepository) convertToInt64(raw any) int64 {
-	if raw == nil {
-		return 0
-	}
-
-	switch v := raw.(type) {
-	case int64:
-		return v
-	case int:
-		return int64(v)
-	case float64:
-		return int64(v)
-	case string:
-		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return val
-		}
-	}
-	return 0
-}
-
-// convertToDecimal convierte valores raw a decimal.Decimal
-func (r *ReportRepository) convertToDecimal(raw any) decimal.Decimal {
-	if raw == nil {
-		return decimal.Zero
-	}
-
-	switch v := raw.(type) {
-	case string:
-		if dec, err := decimal.NewFromString(v); err == nil {
-			return dec
-		}
-	case float64:
-		return decimal.NewFromFloat(v)
-	case int64:
-		return decimal.NewFromInt(v)
-	case int:
-		return decimal.NewFromInt(int64(v))
-	}
-	return decimal.Zero
-}
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
 func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
