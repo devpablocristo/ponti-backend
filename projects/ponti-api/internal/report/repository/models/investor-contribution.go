@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 	"github.com/shopspring/decimal"
@@ -10,21 +11,20 @@ import (
 // ===== MODELOS PARA APORTES DE INVERSORES =====
 
 // InvestorContributionDataModel modelo para los datos de aportes de inversores desde la vista
+// La vista v3_investor_contribution_data_view devuelve datos en formato JSONB
 type InvestorContributionDataModel struct {
-	ProjectID         int64           `gorm:"column:project_id"`
-	ProjectName       string          `gorm:"column:project_name"`
-	CustomerID        int64           `gorm:"column:customer_id"`
-	CustomerName      string          `gorm:"column:customer_name"`
-	CampaignID        int64           `gorm:"column:campaign_id"`
-	CampaignName      string          `gorm:"column:campaign_name"`
-	SurfaceTotalHa    decimal.Decimal `gorm:"column:surface_total_ha"`
-	LeaseFixedUsd     decimal.Decimal `gorm:"column:lease_fixed_usd"`
-	LeaseIsFixed      bool            `gorm:"column:lease_is_fixed"`
-	AdminPerHaUsd     decimal.Decimal `gorm:"column:admin_per_ha_usd"`
-	AdminTotalUsd     decimal.Decimal `gorm:"column:admin_total_usd"`
-	ContributionsData string          `gorm:"column:contributions_data"`
-	ComparisonData    string          `gorm:"column:comparison_data"`
-	HarvestData       string          `gorm:"column:harvest_data"`
+	ProjectID    int64  `gorm:"column:project_id"`
+	ProjectName  string `gorm:"column:project_name"`
+	CustomerID   int64  `gorm:"column:customer_id"`
+	CustomerName string `gorm:"column:customer_name"`
+	CampaignID   int64  `gorm:"column:campaign_id"`
+	CampaignName string `gorm:"column:campaign_name"`
+
+	// Datos en formato JSONB desde la vista
+	GeneralProjectDataJSON             string `gorm:"column:general_project_data"`
+	ContributionCategoriesJSON         string `gorm:"column:contribution_categories"`
+	InvestorContributionComparisonJSON string `gorm:"column:investor_contribution_comparison"`
+	HarvestSettlementJSON              string `gorm:"column:harvest_settlement"`
 }
 
 // InvestorHeaderModel modelo para headers de inversores
@@ -45,7 +45,7 @@ type InvestorShareModel struct {
 // GeneralProjectDataModel modelo para datos generales del proyecto
 type GeneralProjectDataModel struct {
 	SurfaceTotalHa decimal.Decimal `json:"surface_total_ha"`
-	LeaseFixedUsd  decimal.Decimal `json:"lease_fixed_usd"`
+	LeaseFixedUsd  decimal.Decimal `json:"lease_fixed_total_usd"` // Corregido: coincide con vista SQL
 	LeaseIsFixed   bool            `json:"lease_is_fixed"`
 	AdminPerHaUsd  decimal.Decimal `json:"admin_per_ha_usd"`
 	AdminTotalUsd  decimal.Decimal `json:"admin_total_usd"`
@@ -75,9 +75,9 @@ type PreHarvestTotalsModel struct {
 type InvestorContributionComparisonModel struct {
 	InvestorID     *int64          `json:"investor_id,omitempty"`
 	InvestorName   *string         `json:"investor_name,omitempty"`
-	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"`
-	AgreedUsd      decimal.Decimal `json:"agreed_usd"`
-	ActualUsd      decimal.Decimal `json:"actual_usd"`
+	AgreedSharePct decimal.Decimal `json:"share_pct_agreed"`        // Corregido: coincide con vista SQL
+	AgreedUsd      decimal.Decimal `json:"agreed_contribution_usd"` // Corregido: coincide con vista SQL
+	ActualUsd      decimal.Decimal `json:"real_contribution_usd"`   // Corregido: coincide con vista SQL
 	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`
 }
 
@@ -116,6 +116,7 @@ type InvestorContributionReportModel struct {
 // ===== MAPPERS =====
 
 // ToDomainInvestorContributionReport convierte el modelo al domain
+// Deserializa los datos JSONB de la vista v3_investor_contribution_data_view
 func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*domain.InvestorContributionReport, error) {
 	report := &domain.InvestorContributionReport{
 		ProjectID:    m.ProjectID,
@@ -124,38 +125,46 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 		CustomerName: m.CustomerName,
 		CampaignID:   m.CampaignID,
 		CampaignName: m.CampaignName,
-		General: domain.GeneralProjectData{
-			SurfaceTotalHa: m.SurfaceTotalHa,
-			LeaseFixedUsd:  m.LeaseFixedUsd,
-			LeaseIsFixed:   m.LeaseIsFixed,
-			AdminPerHaUsd:  m.AdminPerHaUsd,
-			AdminTotalUsd:  m.AdminTotalUsd,
-		},
 	}
 
-	// Parsear contributions si existe
-	if m.ContributionsData != "" {
+	// Parsear datos generales del proyecto desde JSONB
+	if m.GeneralProjectDataJSON != "" {
+		var generalData GeneralProjectDataModel
+		if err := json.Unmarshal([]byte(m.GeneralProjectDataJSON), &generalData); err != nil {
+			return nil, fmt.Errorf("error deserializando general_project_data: %w", err)
+		}
+		report.General = domain.GeneralProjectData{
+			SurfaceTotalHa: generalData.SurfaceTotalHa,
+			LeaseFixedUsd:  generalData.LeaseFixedUsd,
+			LeaseIsFixed:   generalData.LeaseIsFixed,
+			AdminPerHaUsd:  generalData.AdminPerHaUsd,
+			AdminTotalUsd:  generalData.AdminTotalUsd,
+		}
+	}
+
+	// Parsear contributions desde JSONB
+	if m.ContributionCategoriesJSON != "" {
 		var contributions []ContributionCategoryModel
-		if err := json.Unmarshal([]byte(m.ContributionsData), &contributions); err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(m.ContributionCategoriesJSON), &contributions); err != nil {
+			return nil, fmt.Errorf("error deserializando contribution_categories: %w", err)
 		}
 		report.Contributions = m.mapContributionsToDomain(contributions)
 	}
 
-	// Parsear comparison si existe
-	if m.ComparisonData != "" {
+	// Parsear comparison desde JSONB
+	if m.InvestorContributionComparisonJSON != "" {
 		var comparisons []InvestorContributionComparisonModel
-		if err := json.Unmarshal([]byte(m.ComparisonData), &comparisons); err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(m.InvestorContributionComparisonJSON), &comparisons); err != nil {
+			return nil, fmt.Errorf("error deserializando investor_contribution_comparison: %w", err)
 		}
 		report.Comparison = m.mapComparisonsToDomain(comparisons)
 	}
 
-	// Parsear harvest si existe
-	if m.HarvestData != "" {
+	// Parsear harvest desde JSONB
+	if m.HarvestSettlementJSON != "" {
 		var harvest HarvestSettlementModel
-		if err := json.Unmarshal([]byte(m.HarvestData), &harvest); err != nil {
-			return nil, err
+		if err := json.Unmarshal([]byte(m.HarvestSettlementJSON), &harvest); err != nil {
+			return nil, fmt.Errorf("error deserializando harvest_settlement: %w", err)
 		}
 		report.Harvest = m.mapHarvestToDomain(harvest)
 	}
