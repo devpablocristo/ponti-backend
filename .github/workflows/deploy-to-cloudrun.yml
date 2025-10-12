@@ -87,7 +87,7 @@ jobs:
           # Ejecutar migraciones
           echo "🗄️ Running migrations..."
           ./migrate -path ./projects/ponti-api/migrations \
-            -database "postgresql://${{ secrets.DB_USER }}@localhost:5432/${{ secrets.DB_NAME }}?sslmode=disable" \
+            -database "postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ secrets.DB_NAME }}?sslmode=disable" \
             up
           
           MIGRATION_STATUS=$?
