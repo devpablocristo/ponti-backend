@@ -46,7 +46,6 @@ jobs:
 
       - name: Build, tag, and push image to Artifact Registry
         id: build-image
-        working-directory: ./projects/ponti-api
         run: |
           IMAGE_TAG=${GITHUB_SHA::7}
           
