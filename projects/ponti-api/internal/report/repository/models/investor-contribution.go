@@ -21,8 +21,10 @@ type InvestorContributionDataModel struct {
 	CampaignName string `gorm:"column:campaign_name"`
 
 	// Datos en formato JSONB desde la vista
+	InvestorHeadersJSON                string `gorm:"column:investor_headers"`
 	GeneralProjectDataJSON             string `gorm:"column:general_project_data"`
 	ContributionCategoriesJSON         string `gorm:"column:contribution_categories"`
+	PreHarvestJSON                     string `gorm:"column:pre_harvest"`
 	InvestorContributionComparisonJSON string `gorm:"column:investor_contribution_comparison"`
 	HarvestSettlementJSON              string `gorm:"column:harvest_settlement"`
 }
@@ -127,6 +129,15 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 		CampaignName: m.CampaignName,
 	}
 
+	// Parsear investor headers desde JSONB
+	if m.InvestorHeadersJSON != "" && m.InvestorHeadersJSON != "null" {
+		var headers []InvestorHeaderModel
+		if err := json.Unmarshal([]byte(m.InvestorHeadersJSON), &headers); err != nil {
+			return nil, fmt.Errorf("error deserializando investor_headers: %w (JSON: %s)", err, m.InvestorHeadersJSON)
+		}
+		report.InvestorHeaders = m.mapInvestorHeadersToDomain(headers)
+	}
+
 	// Parsear datos generales del proyecto desde JSONB
 	if m.GeneralProjectDataJSON != "" {
 		var generalData GeneralProjectDataModel
@@ -151,6 +162,19 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 		report.Contributions = m.mapContributionsToDomain(contributions)
 	}
 
+	// Parsear pre-harvest totals desde JSONB
+	if m.PreHarvestJSON != "" && m.PreHarvestJSON != "null" {
+		var preHarvest PreHarvestTotalsModel
+		if err := json.Unmarshal([]byte(m.PreHarvestJSON), &preHarvest); err != nil {
+			return nil, fmt.Errorf("error deserializando pre_harvest: %w (JSON: %s)", err, m.PreHarvestJSON)
+		}
+		report.PreHarvest = domain.PreHarvestTotals{
+			TotalUsd:   preHarvest.TotalUsd,
+			TotalUsdHa: preHarvest.TotalUsdHa,
+			Investors:  ConvertInvestorSharesSlice(preHarvest.Investors),
+		}
+	}
+
 	// Parsear comparison desde JSONB
 	if m.InvestorContributionComparisonJSON != "" {
 		var comparisons []InvestorContributionComparisonModel
@@ -170,6 +194,21 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	}
 
 	return report, nil
+}
+
+// mapInvestorHeadersToDomain mapea headers de inversores del modelo al domain
+func (m *InvestorContributionDataModel) mapInvestorHeadersToDomain(headers []InvestorHeaderModel) []domain.InvestorHeader {
+	domainHeaders := make([]domain.InvestorHeader, len(headers))
+	for i, h := range headers {
+		domainHeaders[i] = domain.InvestorHeader{
+			InvestorRef: domain.InvestorRef{
+				InvestorID:   h.InvestorID,
+				InvestorName: h.InvestorName,
+			},
+			SharePct: h.SharePct,
+		}
+	}
+	return domainHeaders
 }
 
 // mapContributionsToDomain mapea contribuciones del modelo al domain usando helpers (DRY)
