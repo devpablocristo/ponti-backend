@@ -2,6 +2,8 @@
 package mappers
 
 import (
+	"github.com/shopspring/decimal"
+
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
@@ -28,17 +30,8 @@ func (m *SummaryResponseMapper) BuildResponse(
 	crops []domain.SummaryResults,
 	totals *domain.ProjectTotals,
 ) *domain.SummaryResultsResponse {
-	// GRAL CULTIVOS debe tener los mismos valores que los totales del proyecto
-	generalCrops := domain.GeneralCrops{
-		TotalSurfaceHa:          totals.TotalSurfaceHa,
-		TotalNetIncomeUsd:       totals.TotalNetIncomeUsd,
-		TotalDirectCostsUsd:     totals.TotalDirectCostsUsd,
-		TotalRentUsd:            totals.TotalRentUsd,
-		TotalStructureUsd:       totals.TotalStructureUsd,
-		TotalInvestedProjectUsd: totals.TotalInvestedProjectUsd,
-		TotalOperatingResultUsd: totals.TotalOperatingResultUsd,
-		ProjectReturnPct:        totals.ProjectReturnPct,
-	}
+	// GRAL CULTIVOS debe mostrar valores por hectárea (promedios)
+	generalCrops := m.calculateGeneralCrops(totals)
 
 	return &domain.SummaryResultsResponse{
 		ProjectID:    projectInfo.ProjectID,
@@ -60,4 +53,31 @@ func (m *SummaryResponseMapper) ConvertToPointers(results []domain.SummaryResult
 		pointers[i] = &results[i]
 	}
 	return pointers
+}
+
+// calculateGeneralCrops calcula los valores por hectárea para GRAL CULTIVOS
+func (m *SummaryResponseMapper) calculateGeneralCrops(totals *domain.ProjectTotals) domain.GeneralCrops {
+	return domain.GeneralCrops{
+		// Superficie total se mantiene igual
+		TotalSurfaceHa: totals.TotalSurfaceHa,
+
+		// Todos los demás valores se dividen por superficie para obtener promedio por hectárea
+		TotalNetIncomeUsd:       m.divideByHectares(totals.TotalNetIncomeUsd, totals.TotalSurfaceHa),
+		TotalDirectCostsUsd:     m.divideByHectares(totals.TotalDirectCostsUsd, totals.TotalSurfaceHa),
+		TotalRentUsd:            m.divideByHectares(totals.TotalRentUsd, totals.TotalSurfaceHa),
+		TotalStructureUsd:       m.divideByHectares(totals.TotalStructureUsd, totals.TotalSurfaceHa),
+		TotalInvestedProjectUsd: m.divideByHectares(totals.TotalInvestedProjectUsd, totals.TotalSurfaceHa),
+		TotalOperatingResultUsd: m.divideByHectares(totals.TotalOperatingResultUsd, totals.TotalSurfaceHa),
+
+		// Porcentaje se mantiene igual (no se divide)
+		ProjectReturnPct: totals.ProjectReturnPct,
+	}
+}
+
+// divideByHectares divide un valor por hectáreas de manera segura
+func (m *SummaryResponseMapper) divideByHectares(value, hectares decimal.Decimal) decimal.Decimal {
+	if hectares.IsZero() || hectares.LessThanOrEqual(decimal.Zero) {
+		return decimal.Zero
+	}
+	return value.Div(hectares)
 }
