@@ -102,7 +102,7 @@ jobs:
             --cpu=1 \
             --max-instances=10 \
             --timeout=300s \
-            --set-env-vars="DEPLOY_PLATFORM=gcp,DEPLOY_ENV=prod,DB_HOST=${{ secrets.DB_HOST }},DB_PORT=5432,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SSL_MODE=require" \
+            --set-env-vars="DEPLOY_PLATFORM=gcp,DEPLOY_ENV=prod,DB_HOST=34.133.49.164,DB_PORT=5432,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SSL_MODE=require" \
             --quiet
           
           echo "✅ Deployment completed"
