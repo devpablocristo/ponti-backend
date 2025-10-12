@@ -60,48 +60,11 @@ jobs:
           echo "image=$FULL_IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "✅ Image pushed successfully"
 
-      # Ejecutar migraciones de base de datos antes del deploy
-      - name: Run Database Migrations
-        run: |
-          echo "🔄 Running database migrations..."
-          
-          # Instalar Cloud SQL Proxy
-          echo "📥 Installing Cloud SQL Proxy..."
-          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
-          chmod +x cloud_sql_proxy
-          
-          # Iniciar Cloud SQL Proxy en background
-          echo "🔌 Starting Cloud SQL Proxy..."
-          ./cloud_sql_proxy -instances=${{ secrets.INSTANCE_CONNECTION_NAME }}=tcp:5432 &
-          PROXY_PID=$!
-          
-          # Esperar a que el proxy esté listo
-          echo "⏳ Waiting for proxy to be ready..."
-          sleep 5
-          
-          # Instalar golang-migrate
-          echo "📥 Installing golang-migrate..."
-          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz | tar xvz
-          chmod +x migrate
-          
-          # Ejecutar migraciones
-          echo "🗄️ Running migrations..."
-          ./migrate -path ./projects/ponti-api/migrations \
-            -database "postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/${{ secrets.DB_NAME }}?sslmode=disable" \
-            up
-          
-          MIGRATION_STATUS=$?
-          
-          # Detener Cloud SQL Proxy
-          echo "🛑 Stopping Cloud SQL Proxy..."
-          kill $PROXY_PID
-          
-          if [ $MIGRATION_STATUS -eq 0 ]; then
-            echo "✅ Migrations completed successfully"
-          else
-            echo "❌ Migrations failed"
-            exit 1
-          fi
+      # NOTA: Migraciones comentadas temporalmente - se aplicarán manualmente
+      # - name: Run Database Migrations
+      #   run: |
+      #     echo "🔄 Running database migrations..."
+      #     # ... código comentado ...
 
       - name: Deploy to Cloud Run
         run: |
