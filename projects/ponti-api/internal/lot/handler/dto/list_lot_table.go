@@ -97,7 +97,7 @@ func (e LotListElement) MarshalJSON() ([]byte, error) {
 		UpdatedAt:            e.UpdatedAt,
 		HarvestedArea:        e.HarvestedArea.Round(3).String(),
 		HarvestDate:          e.HarvestDate,
-		CostUsdPerHa:         e.CostUsdPerHa.Round(0).String(),
+		CostUsdPerHa:         e.CostUsdPerHa.Round(2).String(),
 		YieldTnPerHa:         e.YieldTnPerHa.Round(2).String(),
 		IncomeNetPerHa:       e.IncomeNetPerHa.Round(3).String(),
 		RentPerHa:            e.RentPerHa.Round(3).String(),
@@ -118,7 +118,7 @@ func (t LotListTotals) MarshalJSON() ([]byte, error) {
 		SumCost      string `json:"sum_cost"`
 	}{
 		SumSowedArea: t.SumSowedArea.Round(1).String(),
-		SumCost:      t.SumCost.Round(0).String(),
+		SumCost:      t.SumCost.Round(2).String(),
 	}
 	return json.Marshal(aux)
 }

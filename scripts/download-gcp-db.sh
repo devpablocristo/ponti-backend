@@ -8,7 +8,7 @@ set -Eeuo pipefail
 ### ===== Origen (GCP) =====
 SRC_USER="${SRC_USER:-soalen-db-v3}"
 SRC_PASS="${SRC_PASS:-Soalen*25.}"
-SRC_HOST="${SRC_HOST:-34.176.31.249}"
+SRC_HOST="${SRC_HOST:-34.133.49.164}"
 SRC_DB="${SRC_DB:-ponti_api_db}"
 SRC_PORT="${SRC_PORT:-5432}"
 SRC_SSL="${SRC_SSL:-require}"    # require | verify-full

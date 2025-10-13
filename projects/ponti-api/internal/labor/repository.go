@@ -489,41 +489,83 @@ func safeStringPtr(ptr *string) string {
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
-	q := `
-        SELECT 
-          surface_ha,
-          total_labor_cost,
-          avg_labor_cost_per_ha
-        FROM v3_labor_metrics
-        WHERE 1=1
-    `
-	var args []any
-
-	// Filtros: se decide el nivel de agrupación
-	if f.ProjectID != nil && f.FieldID != nil {
-		q += " AND project_id = ? AND field_id = ?"
-		args = append(args, *f.ProjectID, *f.FieldID)
-	} else if f.ProjectID != nil {
-		q += " AND project_id = ?"
-		args = append(args, *f.ProjectID)
-	} else if f.FieldID != nil {
-		q += " AND field_id = ?"
-		args = append(args, *f.FieldID)
-	}
-
 	var row struct {
 		SurfaceHa    decimal.Decimal `gorm:"column:surface_ha"`
 		NetTotalCost decimal.Decimal `gorm:"column:total_labor_cost"`
 		AvgCostPerHa decimal.Decimal `gorm:"column:avg_labor_cost_per_ha"`
 	}
 
-	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+	// Caso 1: project_id Y field_id → devolver métricas de un campo específico
+	if f.ProjectID != nil && f.FieldID != nil {
+		q := `
+			SELECT 
+				surface_ha,
+				total_labor_cost,
+				avg_labor_cost_per_ha
+			FROM v3_labor_metrics
+			WHERE project_id = ? AND field_id = ?
+		`
+		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID, *f.FieldID).Scan(&row).Error; err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+		}
+
+		return &domain.LaborMetrics{
+			SurfaceHa:    row.SurfaceHa,
+			NetTotalCost: row.NetTotalCost,
+			AvgCostPerHa: row.AvgCostPerHa,
+		}, nil
 	}
 
+	// Caso 2: SOLO project_id (sin field_id) → sumar métricas de todos los campos del proyecto
+	if f.ProjectID != nil {
+		q := `
+			SELECT 
+				COALESCE(SUM(surface_ha), 0) as surface_ha,
+				COALESCE(SUM(total_labor_cost), 0) as total_labor_cost,
+				CASE 
+					WHEN COALESCE(SUM(surface_ha), 0) > 0 
+					THEN COALESCE(SUM(total_labor_cost), 0) / COALESCE(SUM(surface_ha), 0)
+					ELSE 0 
+				END as avg_labor_cost_per_ha
+			FROM v3_labor_metrics
+			WHERE project_id = ?
+		`
+		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID).Scan(&row).Error; err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+		}
+
+		return &domain.LaborMetrics{
+			SurfaceHa:    row.SurfaceHa,
+			NetTotalCost: row.NetTotalCost,
+			AvgCostPerHa: row.AvgCostPerHa,
+		}, nil
+	}
+
+	// Caso 3: SOLO field_id → devolver métricas de ese campo específico
+	if f.FieldID != nil {
+		q := `
+			SELECT 
+				surface_ha,
+				total_labor_cost,
+				avg_labor_cost_per_ha
+			FROM v3_labor_metrics
+			WHERE field_id = ?
+		`
+		if err := r.db.Client().WithContext(ctx).Raw(q, *f.FieldID).Scan(&row).Error; err != nil {
+			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+		}
+
+		return &domain.LaborMetrics{
+			SurfaceHa:    row.SurfaceHa,
+			NetTotalCost: row.NetTotalCost,
+			AvgCostPerHa: row.AvgCostPerHa,
+		}, nil
+	}
+
+	// Si no hay filtros, devolver ceros
 	return &domain.LaborMetrics{
-		SurfaceHa:    row.SurfaceHa,
-		NetTotalCost: row.NetTotalCost,
-		AvgCostPerHa: row.AvgCostPerHa,
+		SurfaceHa:    decimal.Zero,
+		NetTotalCost: decimal.Zero,
+		AvgCostPerHa: decimal.Zero,
 	}, nil
 }
