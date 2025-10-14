@@ -16,11 +16,13 @@ type RepositoryPort interface {
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
 	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
+	ListAllGroupLabor(context.Context, string) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
 type ExporterAdapterPort interface {
 	Export(ctx context.Context, items []domain.LaborListItem) ([]byte, error)
+	ExportTable(ctx context.Context, items []domain.LaborListItem) ([]byte, error)
 	Close() error
 }
 type UseCases struct {
@@ -90,6 +92,27 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 
 	return u.excel.Export(ctx, items)
 }
+
+func (u *UseCases) ExportAllGroupLabors(ctx context.Context, usdMonth string) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	raw, err := u.repo.ListAllGroupLabor(ctx, usdMonth)
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "list group labor", err)
+	}
+	items := make([]domain.LaborListItem, len(raw))
+	for i, r := range raw {
+		items[i] = domain.LaborListItem(r)
+	}
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.ExportTable(ctx, items)
+}
+
 func (u *UseCases) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
 	return u.repo.GetMetrics(ctx, f)
 }
