@@ -551,7 +551,6 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 			investor_headers::text,
 			general_project_data::text,
 			contribution_categories::text,
-			pre_harvest::text,
 			investor_contribution_comparison::text,
 			harvest_settlement::text
 		FROM v3_investor_contribution_data_view

@@ -24,7 +24,6 @@ type InvestorContributionDataModel struct {
 	InvestorHeadersJSON                string `gorm:"column:investor_headers"`
 	GeneralProjectDataJSON             string `gorm:"column:general_project_data"`
 	ContributionCategoriesJSON         string `gorm:"column:contribution_categories"`
-	PreHarvestJSON                     string `gorm:"column:pre_harvest"`
 	InvestorContributionComparisonJSON string `gorm:"column:investor_contribution_comparison"`
 	HarvestSettlementJSON              string `gorm:"column:harvest_settlement"`
 }
@@ -160,19 +159,9 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 			return nil, fmt.Errorf("error deserializando contribution_categories: %w", err)
 		}
 		report.Contributions = m.mapContributionsToDomain(contributions)
-	}
 
-	// Parsear pre-harvest totals desde JSONB
-	if m.PreHarvestJSON != "" && m.PreHarvestJSON != "null" {
-		var preHarvest PreHarvestTotalsModel
-		if err := json.Unmarshal([]byte(m.PreHarvestJSON), &preHarvest); err != nil {
-			return nil, fmt.Errorf("error deserializando pre_harvest: %w (JSON: %s)", err, m.PreHarvestJSON)
-		}
-		report.PreHarvest = domain.PreHarvestTotals{
-			TotalUsd:   preHarvest.TotalUsd,
-			TotalUsdHa: preHarvest.TotalUsdHa,
-			Investors:  ConvertInvestorSharesSlice(preHarvest.Investors),
-		}
+		// Calcular PreHarvest sumando todas las categorías
+		report.PreHarvest = m.calculatePreHarvestFromContributions(contributions)
 	}
 
 	// Parsear comparison desde JSONB
@@ -265,5 +254,54 @@ func (m *InvestorContributionDataModel) mapHarvestToDomain(harvest HarvestSettle
 		Rows:                    domainRows,
 		FooterPaymentAgreed:     ConvertInvestorSharesSlice(harvest.FooterPaymentAgreed),
 		FooterPaymentAdjustment: ConvertInvestorSharesSlice(harvest.FooterPaymentAdjustment),
+	}
+}
+
+// calculatePreHarvestFromContributions calcula los totales de pre-harvest sumando todas las categorías
+func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(contributions []ContributionCategoryModel) domain.PreHarvestTotals {
+	var totalUsd decimal.Decimal
+	var totalUsdHa decimal.Decimal
+
+	// Mapa para acumular montos por inversor
+	investorTotals := make(map[int64]*domain.InvestorShare)
+
+	for _, category := range contributions {
+		totalUsd = totalUsd.Add(category.TotalUsd)
+		totalUsdHa = totalUsdHa.Add(category.TotalUsdHa)
+
+		// Sumar los montos de cada inversor
+		for _, investor := range category.Investors {
+			if investor.InvestorID == nil {
+				continue
+			}
+
+			if _, exists := investorTotals[*investor.InvestorID]; !exists {
+				investorTotals[*investor.InvestorID] = &domain.InvestorShare{
+					InvestorRef: domain.InvestorRef{
+						InvestorID:   investor.InvestorID,
+						InvestorName: investor.InvestorName,
+					},
+					AmountUsd: decimal.Zero,
+					SharePct:  decimal.Zero,
+				}
+			}
+			investorTotals[*investor.InvestorID].AmountUsd = investorTotals[*investor.InvestorID].AmountUsd.Add(investor.AmountUsd)
+		}
+	}
+
+	// Convertir el mapa a slice y calcular porcentajes
+	investors := make([]domain.InvestorShare, 0, len(investorTotals))
+	for _, inv := range investorTotals {
+		// Calcular el porcentaje del total
+		if !totalUsd.IsZero() {
+			inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
+		}
+		investors = append(investors, *inv)
+	}
+
+	return domain.PreHarvestTotals{
+		TotalUsd:   totalUsd,
+		TotalUsdHa: totalUsdHa,
+		Investors:  investors,
 	}
 }
