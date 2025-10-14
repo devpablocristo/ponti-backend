@@ -410,13 +410,17 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		}
 		filt.ProjectID = &id
 	}
+	// Permitir field_id=0 para indicar "todos los campos"
 	if v := c.Query("field_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
+		if err != nil {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
 			return
 		}
-		filt.FieldID = &id
+		// Solo setear field_id si es > 0 (field_id=0 = todos los campos)
+		if id > 0 {
+			filt.FieldID = &id
+		}
 	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
