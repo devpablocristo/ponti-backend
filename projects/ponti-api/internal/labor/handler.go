@@ -410,8 +410,8 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		}
 		filt.ProjectID = &id
 	}
-	// Permitir field_id=0 para indicar "todos los campos"
-	if v := c.Query("field_id"); v != "" {
+	// Permitir field_id=0 o "null" para indicar "todos los campos"
+	if v := c.Query("field_id"); v != "" && v != "null" && v != "undefined" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
