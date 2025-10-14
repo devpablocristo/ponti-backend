@@ -21,6 +21,14 @@
 -- Note: Code in English, comments in Spanish.
 
 -- ============================================================================
+-- DROP EXISTING VIEWS (en orden inverso de dependencias)
+-- ============================================================================
+DROP VIEW IF EXISTS public.v3_investor_contribution_data_view CASCADE;
+DROP VIEW IF EXISTS public.v3_report_investor_distributions CASCADE;
+DROP VIEW IF EXISTS public.v3_report_investor_contribution_categories CASCADE;
+DROP VIEW IF EXISTS public.v3_report_investor_project_base CASCADE;
+
+-- ============================================================================
 -- VISTA 1 de 4: v3_report_investor_project_base
 -- ============================================================================
 -- Purpose: Datos Generales del Proyecto para el informe de inversores
@@ -32,7 +40,7 @@
 --   - Admin.Proyecto/ha: Valor de costo por ha por administrar (desde clientes y sociedades)
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v3_report_investor_project_base AS
+CREATE VIEW public.v3_report_investor_project_base AS
 SELECT
   -- Identificación del proyecto
   p.id AS project_id,
@@ -124,7 +132,7 @@ COMMENT ON VIEW public.v3_report_investor_project_base IS
 --   - v3_lot_ssot.labor_cost_for_lot() para labores (filtrando por categoría)
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v3_report_investor_contribution_categories AS
+CREATE VIEW public.v3_report_investor_contribution_categories AS
 WITH lot_base AS (
   -- Base de lotes por proyecto para calcular totales
   SELECT
@@ -283,7 +291,7 @@ COMMENT ON VIEW public.v3_report_investor_contribution_categories IS
 --   - Por ahora, se distribuyen según % acordado (simplificación)
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v3_report_investor_distributions AS
+CREATE VIEW public.v3_report_investor_distributions AS
 WITH investor_base AS (
   -- Base de inversores por proyecto con sus % acordados
   SELECT
@@ -455,7 +463,7 @@ COMMENT ON VIEW public.v3_report_investor_distributions IS
 -- Esta vista genera la estructura JSON completa esperada por el frontend
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v3_investor_contribution_data_view AS
+CREATE VIEW public.v3_investor_contribution_data_view AS
 WITH harvest_data AS (
   -- =========================================================================
   -- SECCIÓN 4: LIQUIDACIÓN DE COSECHA
