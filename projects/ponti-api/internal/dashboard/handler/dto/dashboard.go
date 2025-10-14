@@ -173,9 +173,9 @@ func (c BalanceCategory) Valid() bool {
 	return ok
 }
 
-// roundTo3Decimals redondea un decimal a 3 decimales de precisión
-func roundTo3Decimals(d decimal.Decimal) decimal.Decimal {
-	return d.Round(3)
+// roundToNearestInteger redondea un decimal al entero más cercano
+func roundToNearestInteger(d decimal.Decimal) decimal.Decimal {
+	return d.Round(0)
 }
 
 // DashboardResponse representa la respuesta del dashboard con la estructura exacta del JSON
@@ -344,7 +344,7 @@ func FromDashboardPayloadResponse(payload any) DashboardResponse {
 		return createEmptyDashboardResponse()
 	}
 
-	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	// Aplicar redondeo al entero más cercano a todos los campos decimal
 	response = RoundAllDecimals(response)
 
 	return response
@@ -460,7 +460,7 @@ func FromDashboard(domain *domain.Dashboard) DashboardResponse {
 		return DashboardResponse{}
 	}
 
-	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	// Aplicar redondeo al entero más cercano a todos los campos decimal
 	response = RoundAllDecimals(response)
 
 	return response
@@ -479,53 +479,53 @@ func StringPtr(s string) *string {
 	return &s
 }
 
-// RoundAllDecimals aplica redondeo a 3 decimales a todos los campos decimal
+// RoundAllDecimals aplica redondeo al entero más cercano a todos los campos decimal
 func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	// Redondear métricas
-	response.Metrics.Sowing.ProgressPct = roundTo3Decimals(response.Metrics.Sowing.ProgressPct)
-	response.Metrics.Sowing.Hectares = roundTo3Decimals(response.Metrics.Sowing.Hectares)
-	response.Metrics.Sowing.TotalHectares = roundTo3Decimals(response.Metrics.Sowing.TotalHectares)
+	response.Metrics.Sowing.ProgressPct = roundToNearestInteger(response.Metrics.Sowing.ProgressPct)
+	response.Metrics.Sowing.Hectares = roundToNearestInteger(response.Metrics.Sowing.Hectares)
+	response.Metrics.Sowing.TotalHectares = roundToNearestInteger(response.Metrics.Sowing.TotalHectares)
 
-	response.Metrics.Harvest.ProgressPct = roundTo3Decimals(response.Metrics.Harvest.ProgressPct)
-	response.Metrics.Harvest.Hectares = roundTo3Decimals(response.Metrics.Harvest.Hectares)
-	response.Metrics.Harvest.TotalHectares = roundTo3Decimals(response.Metrics.Harvest.TotalHectares)
+	response.Metrics.Harvest.ProgressPct = roundToNearestInteger(response.Metrics.Harvest.ProgressPct)
+	response.Metrics.Harvest.Hectares = roundToNearestInteger(response.Metrics.Harvest.Hectares)
+	response.Metrics.Harvest.TotalHectares = roundToNearestInteger(response.Metrics.Harvest.TotalHectares)
 
-	response.Metrics.Costs.ProgressPct = roundTo3Decimals(response.Metrics.Costs.ProgressPct)
-	response.Metrics.Costs.ExecutedUSD = roundTo3Decimals(response.Metrics.Costs.ExecutedUSD)
-	response.Metrics.Costs.BudgetUSD = roundTo3Decimals(response.Metrics.Costs.BudgetUSD)
+	response.Metrics.Costs.ProgressPct = roundToNearestInteger(response.Metrics.Costs.ProgressPct)
+	response.Metrics.Costs.ExecutedUSD = roundToNearestInteger(response.Metrics.Costs.ExecutedUSD)
+	response.Metrics.Costs.BudgetUSD = roundToNearestInteger(response.Metrics.Costs.BudgetUSD)
 
 	// Redondear contribuciones de inversores
 	for i := range response.Metrics.InvestorContributions.Items {
-		response.Metrics.InvestorContributions.Items[i].SharePct = roundTo3Decimals(response.Metrics.InvestorContributions.Items[i].SharePct)
+		response.Metrics.InvestorContributions.Items[i].SharePct = roundToNearestInteger(response.Metrics.InvestorContributions.Items[i].SharePct)
 	}
 
-	response.Metrics.OperatingResult.MarginPct = roundTo3Decimals(response.Metrics.OperatingResult.MarginPct)
-	response.Metrics.OperatingResult.ResultUSD = roundTo3Decimals(response.Metrics.OperatingResult.ResultUSD)
-	response.Metrics.OperatingResult.TotalCostsUSD = roundTo3Decimals(response.Metrics.OperatingResult.TotalCostsUSD)
+	response.Metrics.OperatingResult.MarginPct = roundToNearestInteger(response.Metrics.OperatingResult.MarginPct)
+	response.Metrics.OperatingResult.ResultUSD = roundToNearestInteger(response.Metrics.OperatingResult.ResultUSD)
+	response.Metrics.OperatingResult.TotalCostsUSD = roundToNearestInteger(response.Metrics.OperatingResult.TotalCostsUSD)
 
 	// Redondear totales del balance de gestión
-	response.ManagementBalance.Totals.ExecutedUSD = roundTo3Decimals(response.ManagementBalance.Totals.ExecutedUSD)
-	response.ManagementBalance.Totals.InvestedUSD = roundTo3Decimals(response.ManagementBalance.Totals.InvestedUSD)
-	response.ManagementBalance.Totals.StockUSD = roundTo3Decimals(response.ManagementBalance.Totals.StockUSD)
+	response.ManagementBalance.Totals.ExecutedUSD = roundToNearestInteger(response.ManagementBalance.Totals.ExecutedUSD)
+	response.ManagementBalance.Totals.InvestedUSD = roundToNearestInteger(response.ManagementBalance.Totals.InvestedUSD)
+	response.ManagementBalance.Totals.StockUSD = roundToNearestInteger(response.ManagementBalance.Totals.StockUSD)
 
 	// Redondear items del balance de gestión
 	for i := range response.ManagementBalance.Items {
-		response.ManagementBalance.Items[i].ExecutedUSD = roundTo3Decimals(response.ManagementBalance.Items[i].ExecutedUSD)
-		response.ManagementBalance.Items[i].InvestedUSD = roundTo3Decimals(response.ManagementBalance.Items[i].InvestedUSD)
+		response.ManagementBalance.Items[i].ExecutedUSD = roundToNearestInteger(response.ManagementBalance.Items[i].ExecutedUSD)
+		response.ManagementBalance.Items[i].InvestedUSD = roundToNearestInteger(response.ManagementBalance.Items[i].InvestedUSD)
 		if response.ManagementBalance.Items[i].StockUSD != nil {
-			*response.ManagementBalance.Items[i].StockUSD = roundTo3Decimals(*response.ManagementBalance.Items[i].StockUSD)
+			*response.ManagementBalance.Items[i].StockUSD = roundToNearestInteger(*response.ManagementBalance.Items[i].StockUSD)
 		}
 	}
 
 	// Redondear incidencia por cultivo
 	for i := range response.CropIncidence.Items {
-		response.CropIncidence.Items[i].Hectares = roundTo3Decimals(response.CropIncidence.Items[i].Hectares)
-		response.CropIncidence.Items[i].CostPerHaUSD = roundTo3Decimals(response.CropIncidence.Items[i].CostPerHaUSD)
-		response.CropIncidence.Items[i].IncidencePct = roundTo3Decimals(response.CropIncidence.Items[i].IncidencePct)
+		response.CropIncidence.Items[i].Hectares = roundToNearestInteger(response.CropIncidence.Items[i].Hectares)
+		response.CropIncidence.Items[i].CostPerHaUSD = roundToNearestInteger(response.CropIncidence.Items[i].CostPerHaUSD)
+		response.CropIncidence.Items[i].IncidencePct = roundToNearestInteger(response.CropIncidence.Items[i].IncidencePct)
 	}
 
-	response.CropIncidence.Total.Hectares = roundTo3Decimals(response.CropIncidence.Total.Hectares)
-	response.CropIncidence.Total.AvgCostPerHaUSD = roundTo3Decimals(response.CropIncidence.Total.AvgCostPerHaUSD)
+	response.CropIncidence.Total.Hectares = roundToNearestInteger(response.CropIncidence.Total.Hectares)
+	response.CropIncidence.Total.AvgCostPerHaUSD = roundToNearestInteger(response.CropIncidence.Total.AvgCostPerHaUSD)
 
 	return response
 }
@@ -556,7 +556,7 @@ func FromDashboardData(domain *domain.DashboardData) DashboardResponse {
 		OperationalIndicators: convertOperationalIndicators(domain.OperationalIndicators),
 	}
 
-	// Aplicar redondeo a 3 decimales a todos los campos decimal
+	// Aplicar redondeo al entero más cercano a todos los campos decimal
 	response = RoundAllDecimals(response)
 
 	return response
@@ -655,7 +655,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		return ManagementBalance{}
 	}
 
-	// Crear totales
+	// Crear totales usando SOLO datos de BD (sin hardcoding)
 	totals := BalanceTotals{
 		ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
 		InvestedUSD: balance.Summary.DirectCostsInvestedUSD,
@@ -676,35 +676,37 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Category:    BalanceCategorySeed,
 			Label:       "Semilla",
 			ExecutedUSD: balance.Summary.SemillaCostUSD,
-			InvestedUSD: balance.Summary.SemillaCostUSD,
+			InvestedUSD: balance.Summary.SemillasInvertidosUSD,
+			StockUSD:    &balance.Summary.SemillasStockUSD,
 			Order:       1,
 		},
 		{
 			Category:    BalanceCategorySupplies,
-			Label:       "Insumos",
+			Label:       "Agroquímicos",
 			ExecutedUSD: balance.Summary.InsumosCostUSD,
-			InvestedUSD: balance.Summary.InsumosCostUSD,
+			InvestedUSD: balance.Summary.AgroquimicosInvertidosUSD,
+			StockUSD:    &balance.Summary.AgroquimicosStockUSD,
 			Order:       2,
 		},
 		{
 			Category:    BalanceCategoryLabors,
 			Label:       "Labores",
 			ExecutedUSD: balance.Summary.LaboresCostUSD,
-			InvestedUSD: balance.Summary.LaboresCostUSD,
+			InvestedUSD: balance.Summary.LaboresInvertidosUSD,
 			StockUSD:    &decimal.Zero,
 			Order:       3,
 		},
 		{
 			Category:    BalanceCategoryLease,
 			Label:       "Arriendo",
-			ExecutedUSD: decimal.Zero,
+			ExecutedUSD: balance.Summary.RentExecutedUSD,
 			InvestedUSD: balance.Summary.RentUSD,
 			Order:       4,
 		},
 		{
 			Category:    BalanceCategoryAdmin,
 			Label:       "Estructura",
-			ExecutedUSD: decimal.Zero,
+			ExecutedUSD: balance.Summary.StructureExecutedUSD,
 			InvestedUSD: balance.Summary.StructureUSD,
 			Order:       5,
 		},
@@ -737,17 +739,19 @@ func convertCropIncidence(incidence *domain.DashboardCropIncidence) CropIncidenc
 		})
 	}
 
-	// Calcular totales reales sumando los valores de los items
-	var totalHectares, totalCostUSDPerHa decimal.Decimal
+	// Calcular totales agregando los datos de los items
+	var totalHectares, totalCostUSD decimal.Decimal
 	for _, item := range items {
 		totalHectares = totalHectares.Add(item.Hectares)
-		totalCostUSDPerHa = totalCostUSDPerHa.Add(item.CostPerHaUSD)
+		// Costo total del cultivo = costo por hectárea × hectáreas del cultivo
+		cropTotalCost := item.CostPerHaUSD.Mul(item.Hectares)
+		totalCostUSD = totalCostUSD.Add(cropTotalCost)
 	}
 
-	// Calcular promedio de costo por hectárea
+	// Calcular costo promedio por hectárea: costo total / hectáreas totales
 	var avgCostPerHaUSD decimal.Decimal
 	if !totalHectares.IsZero() {
-		avgCostPerHaUSD = totalCostUSDPerHa.Div(totalHectares)
+		avgCostPerHaUSD = totalCostUSD.Div(totalHectares)
 	}
 
 	// Crear el total calculado

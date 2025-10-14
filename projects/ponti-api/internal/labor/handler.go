@@ -342,9 +342,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	}
 
 	// Mapear nombre de mes en inglés al formato MM si es necesario
-	originalMonth := usdMonth
 	usdMonth = utils.MonthNameToNumber(usdMonth)
-	fmt.Printf("DEBUG: Original month: '%s' -> Mapped month: '%s'\n", originalMonth, usdMonth)
 
 	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
 	if err != nil {
@@ -411,13 +409,17 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		}
 		filt.ProjectID = &id
 	}
-	if v := c.Query("field_id"); v != "" {
+	// Permitir field_id=0 o "null" para indicar "todos los campos"
+	if v := c.Query("field_id"); v != "" && v != "null" && v != "undefined" {
 		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
+		if err != nil {
 			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
 			return
 		}
-		filt.FieldID = &id
+		// Solo setear field_id si es > 0 (field_id=0 = todos los campos)
+		if id > 0 {
+			filt.FieldID = &id
+		}
 	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {

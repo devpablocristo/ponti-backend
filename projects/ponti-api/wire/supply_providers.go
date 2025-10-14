@@ -1,14 +1,19 @@
 package wire
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/google/wire"
 
 	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 
 	config "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/cmd/config"
 	supply "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply"
+	supplyExcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/excel"
 )
 
 // ProvideSupplyRepository crea la implementación concreta de supply.Repository.
@@ -21,9 +26,39 @@ func ProvideSupplyRepositoryPort(r *supply.Repository) supply.RepositoryPort {
 	return r
 }
 
+type SupplyExcelService struct {
+	*pkgexcel.Service
+}
+
+// Crea el engine de Excel ya configurado
+func ProvideSupplyPkgExcelService() (*SupplyExcelService, error) {
+	fp := filepath.Join(os.TempDir(), supplyExcel.DefaultFilename)
+	write := true
+	s, err := pkgexcel.Bootstrap(fp,
+		supplyExcel.SheetName,
+		supplyExcel.DateFormat,
+		&write,
+		supplyExcel.ColumnWidths,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &SupplyExcelService{s}, nil
+}
+
+// bindea el engine como la interfaz XLSXEnginePort
+func ProvideSupplyXLSXEnginePort(s *SupplyMovementExcelService) supply.XLSXEnginePort {
+	return s
+}
+
+// Crea el adaptador de exportación que usa el engine
+func ProvideSupplyExporterPort(eng supply.XLSXEnginePort) supply.ExporterAdapterPort {
+	return supply.NewExcelExporter(eng)
+}
+
 // ProvideSupplyUseCases agrupa repositorios en supply.UseCases.
-func ProvideSupplyUseCases(repo supply.RepositoryPort) *supply.UseCases {
-	return supply.NewUseCases(repo)
+func ProvideSupplyUseCases(repo supply.RepositoryPort, exp supply.ExporterAdapterPort) *supply.UseCases {
+	return supply.NewUseCases(repo, exp)
 }
 
 // ProvideSupplyUseCasesPort adapta *supply.UseCases a la interfaz supply.UseCasesPort.
@@ -72,4 +107,7 @@ var SupplySet = wire.NewSet(
 	ProvideSupplyGormEnginePort,
 	ProvideSupplyGinEnginePort,
 	ProvideSupplyMiddlewaresEnginePort,
+	ProvideSupplyPkgExcelService,
+	ProvideSupplyExporterPort,
+	ProvideSupplyXLSXEnginePort,
 )

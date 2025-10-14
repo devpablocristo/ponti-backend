@@ -1,88 +1,162 @@
-// Package domain holds the domain models for investor contribution reports.
+// Package domain: modelos de dominio para el informe de aportes de inversores.
 package domain
 
-import (
-	"github.com/shopspring/decimal"
-)
+import "github.com/shopspring/decimal"
 
-// ContributionCategoryType enumerates contribution categories.
+// =====================================================================================
+// ENUMS / CONSTANTES
+// =====================================================================================
+
+// ContributionCategoryType tipos de filas de la tabla "Aportes pre-cosecha"
+// Deben mapear 1:1 con la maqueta (Agroquímicos, Semilla, Labores grales, etc.).
 type ContributionCategoryType string
 
 const (
-	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"
-	ContributionSeeds                   ContributionCategoryType = "seeds"
-	ContributionGeneralLabors           ContributionCategoryType = "general_labors"
-	ContributionSowing                  ContributionCategoryType = "sowing"
-	ContributionIrrigation              ContributionCategoryType = "irrigation"
-	ContributionCapitalizableLease      ContributionCategoryType = "capitalizable_lease"
-	ContributionAdministrationStructure ContributionCategoryType = "administration_structure"
+	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"            // Agroquímicos
+	ContributionSeeds                   ContributionCategoryType = "seeds"                    // Semilla
+	ContributionGeneralLabors           ContributionCategoryType = "general_labors"           // Labores grales
+	ContributionSowing                  ContributionCategoryType = "sowing"                   // Siembra
+	ContributionIrrigation              ContributionCategoryType = "irrigation"               // Riego
+	ContributionCapitalizableLease      ContributionCategoryType = "capitalizable_lease"      // Arriendo (capitalizable/fijo según el proyecto)
+	ContributionAdministrationStructure ContributionCategoryType = "administration_structure" // Administración y estructura
 )
 
-// GeneralProjectData represents base project data for the report.
-type GeneralProjectData struct {
-	SurfaceTotalHa decimal.Decimal `json:"surface_total_ha"`
-	LeaseFixedUsd  decimal.Decimal `json:"lease_fixed_usd"`
-	LeaseIsFixed   bool            `json:"lease_is_fixed"`
-	LeaseNote      *string         `json:"lease_note,omitempty"`
-	AdminPerHaUsd  decimal.Decimal `json:"admin_per_ha_usd"`
-	AdminTotalUsd  decimal.Decimal `json:"admin_total_usd"`
+// =====================================================================================
+// OBJETOS BÁSICOS (INVERSORES)
+// =====================================================================================
+
+// InvestorRef referencia mínima a un inversor (ID/nombre).
+// Se usa en varias estructuras para no repetir campos.
+type InvestorRef struct {
+	InvestorID   *int64
+	InvestorName *string
 }
 
-// InvestorShare represents the contribution of a single investor in a category.
+// InvestorHeader datos para la "chapita" de cabecera por inversor (p. ej. "Agrolaits 50%").
+// La UI usa esta lista para mostrar las cabeceras sobre las columnas de inversores.
+type InvestorHeader struct {
+	InvestorRef
+	SharePct decimal.Decimal // Porcentaje global acordado (0..100) que se muestra en la cabecera.
+}
+
+// InvestorShare asignación monetaria por inversor dentro de una fila/categoría.
+// "share_pct" es el % de esa FILA (no el global de cabecera).
 type InvestorShare struct {
-	InvestorID   *int64          `json:"investor_id,omitempty"`
-	InvestorName *string         `json:"investor_name,omitempty"`
-	AmountUsd    decimal.Decimal `json:"amount_usd"`
-	SharePct     decimal.Decimal `json:"share_pct"`
+	InvestorRef
+	AmountUsd decimal.Decimal // Monto USD asignado al inversor en esa fila.
+	SharePct  decimal.Decimal // % dentro de la categoría/fila (0..100).
 }
 
-// ContributionCategory represents a category of contributions.
+// =====================================================================================
+// DATOS GENERALES DEL PROYECTO (encabezado del informe)
+// =====================================================================================
+
+// GeneralProjectData datos base del proyecto que afectan el informe.
+// En la maqueta se usan para costos por ha (admin, arriendo fijo, etc.).
+type GeneralProjectData struct {
+	SurfaceTotalHa decimal.Decimal // Superficie total del proyecto (ha).
+	LeaseFixedUsd  decimal.Decimal // Arriendo fijo por ha (si aplica en el proyecto).
+	LeaseIsFixed   bool            // true => arriendo fijo (no prorratea con % de inversores).
+	AdminPerHaUsd  decimal.Decimal // Costo de administración por ha.
+	AdminTotalUsd  decimal.Decimal // Costo de administración total.
+}
+
+// =====================================================================================
+// APORTES PRE-COSECHA (tabla principal)
+// =====================================================================================
+
+// ContributionCategory representa UNA fila de la tabla "Aportes pre-cosecha".
+// - sort_index mantiene el orden visual igual a la maqueta.
+// - investors contiene las columnas por inversor con monto y % de esa fila.
+// - total_usd y total_usd_ha corresponden a las columnas "TOTAL US" y "TOTAL US/HA".
 type ContributionCategory struct {
-	Type                      ContributionCategoryType `json:"type"`
-	Label                     string                   `json:"label"`
-	TotalUsd                  decimal.Decimal          `json:"total_usd"`
-	TotalUsdHa                decimal.Decimal          `json:"total_usd_ha"`
-	Investors                 []InvestorShare          `json:"investors"`
-	RequiresManualAttribution bool                     `json:"requires_manual_attribution"`
-	AttributionNote           *string                  `json:"attribution_note,omitempty"`
+	Key                       string                   // clave estable en inglés (ej: "agrochemicals")
+	SortIndex                 int                      // Orden de la fila en la tabla.
+	Type                      ContributionCategoryType // Tipo de categoría (enum).
+	Label                     string                   // Texto a mostrar (p. ej., "Agroquímicos").
+	TotalUsd                  decimal.Decimal          // Total USD de la fila.
+	TotalUsdHa                decimal.Decimal          // Total USD/ha de la fila.
+	Investors                 []InvestorShare          // Columnas por inversor en esta fila.
+	RequiresManualAttribution bool                     // true si la fila requiere asignación manual (100/0, etc.).
+	AttributionNote           *string                  // Texto opcional para explicar la regla de asignación.
 }
 
-// InvestorContributionComparison compares agreed vs actual per investor.
+// PreHarvestTotals corresponde a la FILA "Totales" de la sección "Aportes pre-cosecha".
+// Incluye totales generales y el desglose por inversor de esa fila.
+type PreHarvestTotals struct {
+	TotalUsd   decimal.Decimal // Suma de todas las filas (columna TOTAL US).
+	TotalUsdHa decimal.Decimal // Suma por ha (columna TOTAL US/HA).
+	Investors  []InvestorShare // Totales por inversor (columnas de inversores en la fila "Totales").
+}
+
+// =====================================================================================
+// APORTE ACORDADO / AJUSTE DE APORTE (bloque bajo la tabla)
+// =====================================================================================
+
+// InvestorContributionComparison compara lo acordado vs lo efectivamente aportado.
+// Se usa para renderizar "Aporte acordado" y "Ajuste de aporte" por inversor.
 type InvestorContributionComparison struct {
-	InvestorID     *int64          `json:"investor_id,omitempty"`
-	InvestorName   *string         `json:"investor_name,omitempty"`
-	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"`
-	AgreedUsd      decimal.Decimal `json:"agreed_usd"`
-	ActualUsd      decimal.Decimal `json:"actual_usd"`
-	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`
+	InvestorRef
+	AgreedSharePct decimal.Decimal // % acordado global (0..100) para el inversor.
+	AgreedUsd      decimal.Decimal // Monto acordado total (USD).
+	ActualUsd      decimal.Decimal // Monto efectivamente aportado (USD).
+	AdjustmentUsd  decimal.Decimal // Diferencia: AgreedUsd - ActualUsd (positivo => debe aportar).
 }
 
-// HarvestInvestorSettlement represents harvest settlement for a single investor.
-type HarvestInvestorSettlement struct {
-	InvestorID    *int64          `json:"investor_id,omitempty"`
-	InvestorName  *string         `json:"investor_name,omitempty"`
-	PaidUsd       decimal.Decimal `json:"paid_usd"`
-	AgreedUsd     decimal.Decimal `json:"agreed_usd"`
-	AdjustmentUsd decimal.Decimal `json:"adjustment_usd"`
+// =====================================================================================
+// PAGOS DE COSECHA (sección inferior)
+// =====================================================================================
+
+type HarvestRowType string
+
+const (
+	HarvestRowHarvest HarvestRowType = "harvest" // fila detalle "Cosecha"
+	HarvestRowTotals  HarvestRowType = "totals"  // fila "Totales"
+)
+
+// HarvestRow representa una fila en pagos de cosecha
+type HarvestRow struct {
+	Key        string         // "harvest" o "totals"
+	Type       HarvestRowType // enum backend
+	TotalUsd   decimal.Decimal
+	TotalUsdHa decimal.Decimal
+	Investors  []InvestorShare
 }
 
-// HarvestSettlement represents harvest totals and per-investor settlements.
+// HarvestSettlement sección completa de pagos de cosecha
 type HarvestSettlement struct {
-	TotalHarvestUsd   decimal.Decimal             `json:"total_harvest_usd"`
-	TotalHarvestUsdHa decimal.Decimal             `json:"total_harvest_usd_ha"`
-	Investors         []HarvestInvestorSettlement `json:"investors"`
+	Rows                    []HarvestRow    // 2 filas: harvest y totals
+	FooterPaymentAgreed     []InvestorShare // fila "Pago acordado"
+	FooterPaymentAdjustment []InvestorShare // fila "Ajuste de pago"
 }
 
-// InvestorContributionReport represents the complete investor contribution report.
+// =====================================================================================
+// INFORME COMPLETO (root DTO consumido por la UI)
+// =====================================================================================
+
+// InvestorContributionReport objeto raíz que consolida todas las secciones del informe.
 type InvestorContributionReport struct {
-	ProjectID     int64                            `json:"project_id"`
-	ProjectName   string                           `json:"project_name"`
-	CustomerID    int64                            `json:"customer_id"`
-	CustomerName  string                           `json:"customer_name"`
-	CampaignID    int64                            `json:"campaign_id"`
-	CampaignName  string                           `json:"campaign_name"`
-	General       GeneralProjectData               `json:"general"`
-	Contributions []ContributionCategory           `json:"contributions"`
-	Comparison    []InvestorContributionComparison `json:"comparison"`
-	Harvest       HarvestSettlement                `json:"harvest"`
+	// ---- Identificación / metadatos del proyecto ----
+	ProjectID    int64  // ID interno del proyecto.
+	ProjectName  string // Nombre del proyecto.
+	CustomerID   int64  // ID del cliente/propietario.
+	CustomerName string // Nombre del cliente.
+	CampaignID   int64  // ID de campaña.
+	CampaignName string // Nombre de campaña.
+
+	// ---- Cabecera de inversores (chapitas con % global) ----
+	InvestorHeaders []InvestorHeader // Ordenadas de izquierda a derecha como en la maqueta.
+
+	// ---- Datos generales del proyecto ----
+	General GeneralProjectData // Costos por ha y totales relevantes.
+
+	// ---- Aportes pre-cosecha ----
+	Contributions []ContributionCategory // Filas de la tabla (en el orden provisto por sort_index).
+	PreHarvest    PreHarvestTotals       // Fila "Totales" de la tabla.
+
+	// ---- Aporte acordado / Ajuste de aporte ----
+	Comparison []InvestorContributionComparison // Una entrada por inversor.
+
+	// ---- Pagos de cosecha ----
+	Harvest HarvestSettlement // Totales de cosecha + liquidación por inversor.
 }

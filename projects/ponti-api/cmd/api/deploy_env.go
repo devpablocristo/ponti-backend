@@ -12,10 +12,8 @@ func setDeployEnv(ctx context.Context, deps *wire.Dependencies) {
 	platform := pkgenv.GetPlatformFromString(deps.Config.Deploy.Platform)
 	env := pkgenv.GetEnvFromString(deps.Config.Deploy.Environment)
 
-	// Log del contexto de consola de debug
 	switch platform {
-	case pkgenv.Local:
-	case pkgenv.GCP:
+	case pkgenv.Local, pkgenv.GCP:
 		switch env {
 		case pkgenv.Dev:
 			if err := runMigrations(deps.Config.DB, deps.Config.Migrations); err != nil {
