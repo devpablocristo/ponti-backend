@@ -15,7 +15,7 @@ type RepositoryPort interface {
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
-	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborRawItem, types.PageInfo, error)
+	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 

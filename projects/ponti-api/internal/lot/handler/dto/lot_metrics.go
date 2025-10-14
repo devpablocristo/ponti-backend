@@ -27,9 +27,9 @@ func (m LotMetrics) MarshalJSON() ([]byte, error) {
 	}{
 		SeededArea:      m.SeededArea.Round(3).String(),
 		HarvestedArea:   m.HarvestedArea.Round(3).String(),
-		YieldTnPerHa:    m.YieldTnPerHa.Round(3).String(),
-		CostPerHectare:  m.CostPerHectare.Round(3).String(),
-		SuperficieTotal: m.SuperficieTotal.Round(3).String(),
+		YieldTnPerHa:    m.YieldTnPerHa.Round(2).String(),
+		CostPerHectare:  m.CostPerHectare.Round(0).String(),
+		SuperficieTotal: m.SuperficieTotal.Round(1).String(),
 	}
 	return json.Marshal(aux)
 }

@@ -167,4 +167,16 @@ func TestConvertCropIncidence(t *testing.T) {
 		assert.NotEqual(t, int64(i+1), item.CropID,
 			"Item %d no debe usar índice temporal %d como crop_id", i, i+1)
 	}
+
+	// Verificar el cálculo correcto del total
+	// Soja: 100 ha × 500 USD/ha = 50,000 USD
+	// Maíz: 200 ha × 300 USD/ha = 60,000 USD
+	// Total: 110,000 USD / 300 ha = 366.67 USD/ha (aproximadamente)
+	expectedTotalHectares := decimal.NewFromInt(300)                                // 100 + 200
+	expectedAvgCostPerHa := decimal.NewFromInt(110000).Div(decimal.NewFromInt(300)) // 110,000 / 300
+
+	assert.True(t, expectedTotalHectares.Equal(dtoIncidence.Total.Hectares),
+		"Total hectáreas debe ser 300, obtenido: %s", dtoIncidence.Total.Hectares)
+	assert.True(t, expectedAvgCostPerHa.Sub(dtoIncidence.Total.AvgCostPerHaUSD).Abs().LessThan(decimal.NewFromFloat(0.01)),
+		"Costo promedio por hectárea debe ser aproximadamente 366.67 USD/ha, obtenido: %s", dtoIncidence.Total.AvgCostPerHaUSD)
 }

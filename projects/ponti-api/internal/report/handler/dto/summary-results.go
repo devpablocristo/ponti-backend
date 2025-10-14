@@ -2,10 +2,27 @@
 package dto
 
 import (
+	"encoding/json"
+
 	"github.com/shopspring/decimal"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
+
+// Decimal3 es un wrapper de decimal.Decimal que serializa con 3 decimales
+type Decimal3 struct {
+	decimal.Decimal
+}
+
+// MarshalJSON implementa json.Marshaler para formatear con 3 decimales
+func (d Decimal3) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Decimal.StringFixed(3))
+}
+
+// NewDecimal3 crea un Decimal3 desde un decimal.Decimal
+func NewDecimal3(d decimal.Decimal) Decimal3 {
+	return Decimal3{Decimal: d}
+}
 
 /* =========================
    REQUEST DTOs
@@ -47,39 +64,39 @@ type CropSummaryResponse struct {
 	CropID   int64  `json:"crop_id"`
 	CropName string `json:"crop_name"`
 
-	// Métricas por cultivo
-	SurfaceHa          decimal.Decimal `json:"surface_ha"`
-	NetIncomeUsd       decimal.Decimal `json:"net_income_usd"`
-	DirectCostsUsd     decimal.Decimal `json:"direct_costs_usd"`
-	RentUsd            decimal.Decimal `json:"rent_usd"`
-	StructureUsd       decimal.Decimal `json:"structure_usd"`
-	TotalInvestedUsd   decimal.Decimal `json:"total_invested_usd"`
-	OperatingResultUsd decimal.Decimal `json:"operating_result_usd"`
-	CropReturnPct      decimal.Decimal `json:"crop_return_pct"`
+	// Métricas por cultivo (formato 3 decimales)
+	SurfaceHa          Decimal3 `json:"surface_ha"`
+	NetIncomeUsd       Decimal3 `json:"net_income_usd"`
+	DirectCostsUsd     Decimal3 `json:"direct_costs_usd"`
+	RentUsd            Decimal3 `json:"rent_usd"`
+	StructureUsd       Decimal3 `json:"structure_usd"`
+	TotalInvestedUsd   Decimal3 `json:"total_invested_usd"`
+	OperatingResultUsd Decimal3 `json:"operating_result_usd"`
+	CropReturnPct      Decimal3 `json:"crop_return_pct"`
 }
 
 // ProjectTotalsResponse represents the project totals in the report (GRAL CAMPOS).
 type ProjectTotalsResponse struct {
-	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
-	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
-	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
-	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
-	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
-	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
-	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
-	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
+	TotalSurfaceHa          Decimal3 `json:"total_surface_ha"`
+	TotalNetIncomeUsd       Decimal3 `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     Decimal3 `json:"total_direct_costs_usd"`
+	TotalRentUsd            Decimal3 `json:"total_rent_usd"`
+	TotalStructureUsd       Decimal3 `json:"total_structure_usd"`
+	TotalInvestedProjectUsd Decimal3 `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd Decimal3 `json:"total_operating_result_usd"`
+	ProjectReturnPct        Decimal3 `json:"project_return_pct"`
 }
 
 // GeneralCropsResponse represents the general crops summary (GRAL CULTIVOS).
 type GeneralCropsResponse struct {
-	TotalSurfaceHa          decimal.Decimal `json:"total_surface_ha"`
-	TotalNetIncomeUsd       decimal.Decimal `json:"total_net_income_usd"`
-	TotalDirectCostsUsd     decimal.Decimal `json:"total_direct_costs_usd"`
-	TotalRentUsd            decimal.Decimal `json:"total_rent_usd"`
-	TotalStructureUsd       decimal.Decimal `json:"total_structure_usd"`
-	TotalInvestedProjectUsd decimal.Decimal `json:"total_invested_project_usd"`
-	TotalOperatingResultUsd decimal.Decimal `json:"total_operating_result_usd"`
-	ProjectReturnPct        decimal.Decimal `json:"project_return_pct"`
+	TotalSurfaceHa          Decimal3 `json:"total_surface_ha"`
+	TotalNetIncomeUsd       Decimal3 `json:"total_net_income_usd"`
+	TotalDirectCostsUsd     Decimal3 `json:"total_direct_costs_usd"`
+	TotalRentUsd            Decimal3 `json:"total_rent_usd"`
+	TotalStructureUsd       Decimal3 `json:"total_structure_usd"`
+	TotalInvestedProjectUsd Decimal3 `json:"total_invested_project_usd"`
+	TotalOperatingResultUsd Decimal3 `json:"total_operating_result_usd"`
+	ProjectReturnPct        Decimal3 `json:"project_return_pct"`
 }
 
 /* =========================
@@ -98,45 +115,45 @@ func ToDomainSummaryResultsFilter(in SummaryResultsRequest) domain.SummaryResult
 
 // FromDomainSummaryResults maps domain to DTO response.
 func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsResponse {
-	// Mapear cultivos
+	// Mapear cultivos (con formato de 3 decimales)
 	crops := make([]CropSummaryResponse, len(d.Crops))
 	for i, crop := range d.Crops {
 		crops[i] = CropSummaryResponse{
 			CropID:             crop.CropID,
 			CropName:           crop.CropName,
-			SurfaceHa:          crop.SurfaceHa,
-			NetIncomeUsd:       crop.NetIncomeUsd,
-			DirectCostsUsd:     crop.DirectCostsUsd,
-			RentUsd:            crop.RentUsd,
-			StructureUsd:       crop.StructureUsd,
-			TotalInvestedUsd:   crop.TotalInvestedUsd,
-			OperatingResultUsd: crop.OperatingResultUsd,
-			CropReturnPct:      crop.CropReturnPct,
+			SurfaceHa:          NewDecimal3(crop.SurfaceHa),
+			NetIncomeUsd:       NewDecimal3(crop.NetIncomeUsd),
+			DirectCostsUsd:     NewDecimal3(crop.DirectCostsUsd),
+			RentUsd:            NewDecimal3(crop.RentUsd),
+			StructureUsd:       NewDecimal3(crop.StructureUsd),
+			TotalInvestedUsd:   NewDecimal3(crop.TotalInvestedUsd),
+			OperatingResultUsd: NewDecimal3(crop.OperatingResultUsd),
+			CropReturnPct:      NewDecimal3(crop.CropReturnPct),
 		}
 	}
 
-	// Mapear totales
+	// Mapear totales (con formato de 3 decimales)
 	totals := ProjectTotalsResponse{
-		TotalSurfaceHa:          d.Totals.TotalSurfaceHa,
-		TotalNetIncomeUsd:       d.Totals.TotalNetIncomeUsd,
-		TotalDirectCostsUsd:     d.Totals.TotalDirectCostsUsd,
-		TotalRentUsd:            d.Totals.TotalRentUsd,
-		TotalStructureUsd:       d.Totals.TotalStructureUsd,
-		TotalInvestedProjectUsd: d.Totals.TotalInvestedProjectUsd,
-		TotalOperatingResultUsd: d.Totals.TotalOperatingResultUsd,
-		ProjectReturnPct:        d.Totals.ProjectReturnPct,
+		TotalSurfaceHa:          NewDecimal3(d.Totals.TotalSurfaceHa),
+		TotalNetIncomeUsd:       NewDecimal3(d.Totals.TotalNetIncomeUsd),
+		TotalDirectCostsUsd:     NewDecimal3(d.Totals.TotalDirectCostsUsd),
+		TotalRentUsd:            NewDecimal3(d.Totals.TotalRentUsd),
+		TotalStructureUsd:       NewDecimal3(d.Totals.TotalStructureUsd),
+		TotalInvestedProjectUsd: NewDecimal3(d.Totals.TotalInvestedProjectUsd),
+		TotalOperatingResultUsd: NewDecimal3(d.Totals.TotalOperatingResultUsd),
+		ProjectReturnPct:        NewDecimal3(d.Totals.ProjectReturnPct),
 	}
 
-	// Mapear cultivos generales (GRAL CULTIVOS)
+	// Mapear cultivos generales (GRAL CULTIVOS) con formato de 3 decimales
 	generalCrops := GeneralCropsResponse{
-		TotalSurfaceHa:          d.GeneralCrops.TotalSurfaceHa,
-		TotalNetIncomeUsd:       d.GeneralCrops.TotalNetIncomeUsd,
-		TotalDirectCostsUsd:     d.GeneralCrops.TotalDirectCostsUsd,
-		TotalRentUsd:            d.GeneralCrops.TotalRentUsd,
-		TotalStructureUsd:       d.GeneralCrops.TotalStructureUsd,
-		TotalInvestedProjectUsd: d.GeneralCrops.TotalInvestedProjectUsd,
-		TotalOperatingResultUsd: d.GeneralCrops.TotalOperatingResultUsd,
-		ProjectReturnPct:        d.GeneralCrops.ProjectReturnPct,
+		TotalSurfaceHa:          NewDecimal3(d.GeneralCrops.TotalSurfaceHa),
+		TotalNetIncomeUsd:       NewDecimal3(d.GeneralCrops.TotalNetIncomeUsd),
+		TotalDirectCostsUsd:     NewDecimal3(d.GeneralCrops.TotalDirectCostsUsd),
+		TotalRentUsd:            NewDecimal3(d.GeneralCrops.TotalRentUsd),
+		TotalStructureUsd:       NewDecimal3(d.GeneralCrops.TotalStructureUsd),
+		TotalInvestedProjectUsd: NewDecimal3(d.GeneralCrops.TotalInvestedProjectUsd),
+		TotalOperatingResultUsd: NewDecimal3(d.GeneralCrops.TotalOperatingResultUsd),
+		ProjectReturnPct:        NewDecimal3(d.GeneralCrops.ProjectReturnPct),
 	}
 
 	return &SummaryResultsResponse{

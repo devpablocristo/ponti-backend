@@ -1,223 +1,270 @@
-// Package dto holds the Data Transfer Objects for the Investor Contribution Report.
 package dto
 
 import (
-	"github.com/shopspring/decimal"
-
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
 )
 
-/* =========================
-   ENUMS
-========================= */
+// Nota: Decimal3 está definido en summary-results.go para evitar duplicación
 
-// ContributionCategoryType enumerates contribution categories.
+// -------------------------------
+// Entidades básicas de inversores
+// -------------------------------
+
+// InvestorRef: referencia mínima de un inversor (id + nombre).
+type InvestorRef struct {
+	InvestorID   *int64  `json:"investor_id,omitempty"`
+	InvestorName *string `json:"investor_name,omitempty"`
+}
+
+// InvestorHeader: chapita de cabecera (ej: "Agrolaits 50%").
+type InvestorHeader struct {
+	InvestorRef
+	SharePct Decimal3 `json:"share_pct"` // % global acordado
+}
+
+// InvestorShare: celda por inversor en una fila.
+type InvestorShare struct {
+	InvestorRef
+	AmountUsd Decimal3 `json:"amount_usd"` // Monto USD en la celda
+	SharePct  Decimal3 `json:"share_pct"`  // % de esa fila
+}
+
+// -------------------------------
+// Datos generales del proyecto
+// -------------------------------
+type GeneralProjectData struct {
+	SurfaceTotalHa Decimal3 `json:"surface_total_ha"` // Hectáreas totales
+	LeaseFixedUsd  Decimal3 `json:"lease_fixed_usd"`  // Arriendo fijo por ha
+	LeaseIsFixed   bool     `json:"lease_is_fixed"`   // true = arriendo fijo
+	AdminPerHaUsd  Decimal3 `json:"admin_per_ha_usd"` // Administración por ha
+	AdminTotalUsd  Decimal3 `json:"admin_total_usd"`  // Administración total
+}
+
+// -------------------------------
+// Aportes pre-cosecha (tabla sup.)
+// -------------------------------
+
+// Enum con tipos de categoría
 type ContributionCategoryType string
 
 const (
-	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"            // Supplies: Agrochemicals
-	ContributionSeeds                   ContributionCategoryType = "seeds"                    // Insumos: Semillas
-	ContributionGeneralLabors           ContributionCategoryType = "general_labors"           // Labors: Spraying, Others (not sowing/irrigation/harvest)
-	ContributionSowing                  ContributionCategoryType = "sowing"                   // Labor: Siembra
-	ContributionIrrigation              ContributionCategoryType = "irrigation"               // Labor: Riego
-	ContributionCapitalizableLease      ContributionCategoryType = "capitalizable_lease"      // Arriendo: solo la parte fija
-	ContributionAdministrationStructure ContributionCategoryType = "administration_structure" // Admin/Estructura: fijo * ha
+	ContributionAgrochemicals           ContributionCategoryType = "agrochemicals"
+	ContributionSeeds                   ContributionCategoryType = "seeds"
+	ContributionGeneralLabors           ContributionCategoryType = "general_labors"
+	ContributionSowing                  ContributionCategoryType = "sowing"
+	ContributionIrrigation              ContributionCategoryType = "irrigation"
+	ContributionCapitalizableLease      ContributionCategoryType = "capitalizable_lease"
+	ContributionAdministrationStructure ContributionCategoryType = "administration_structure"
 )
 
-/* =========================
-   RESPONSES — Sección 1: Datos Generales
-========================= */
-
-// GeneralProjectDataResponse summarizes base inputs for the report.
-type GeneralProjectDataResponse struct {
-	// Superficie total del proyecto (suma de lotes/campos)
-	SurfaceTotalHa decimal.Decimal `json:"surface_total_ha"`
-
-	// Arriendo considerado (solo la parte fija). Si no hay fijo, será 0.
-	LeaseFixedUsd decimal.Decimal `json:"lease_fixed_usd"`
-	LeaseIsFixed  bool            `json:"lease_is_fixed"`       // true si hay componente fijo considerado
-	LeaseNote     *string         `json:"lease_note,omitempty"` // p.ej. "Se toma solo componente fijo"
-
-	// Administración del proyecto por ha (valor base) y total calculado (valor * ha)
-	AdminPerHaUsd decimal.Decimal `json:"admin_per_ha_usd"`
-	AdminTotalUsd decimal.Decimal `json:"admin_total_usd"`
+// ContributionCategory: fila de la tabla de aportes pre-cosecha
+type ContributionCategory struct {
+	Key                       string                   `json:"key"` // clave estable en inglés (ej: "agrochemicals")
+	SortIndex                 int                      `json:"sort_index"`
+	Type                      ContributionCategoryType `json:"type"`
+	Label                     string                   `json:"label"` // etiqueta visible (ej: "Agroquímicos")
+	TotalUsd                  Decimal3                 `json:"total_usd"`
+	TotalUsdHa                Decimal3                 `json:"total_usd_ha"`
+	Investors                 []InvestorShare          `json:"investors"`
+	RequiresManualAttribution bool                     `json:"requires_manual_attribution"`
+	AttributionNote           *string                  `json:"attribution_note,omitempty"`
 }
 
-/* =========================
-   RESPONSES — Sección 2: Aportes por Inversor
-========================= */
-
-// InvestorShareResponse shows the contribution of a single investor in a category.
-type InvestorShareResponse struct {
-	InvestorID   *int64          `json:"investor_id,omitempty"`
-	InvestorName *string         `json:"investor_name,omitempty"`
-	AmountUsd    decimal.Decimal `json:"amount_usd"`
-	SharePct     decimal.Decimal `json:"share_pct"` // % respecto al total de la categoría
+// PreHarvestTotals: fila "Totales" en la tabla de aportes pre-cosecha
+type PreHarvestTotals struct {
+	TotalUsd   Decimal3        `json:"total_usd"`
+	TotalUsdHa Decimal3        `json:"total_us_ha"`
+	Investors  []InvestorShare `json:"investors"`
 }
 
-// ContributionCategoryResponse aggregates totals and investor breakdown for a category.
-type ContributionCategoryResponse struct {
-	Type  ContributionCategoryType `json:"type"`
-	Label string                   `json:"label"` // e.g., "Agrochemicals", "Seeds", etc.
-
-	// Totales de la categoría
-	TotalUsd   decimal.Decimal `json:"total_usd"`
-	TotalUsdHa decimal.Decimal `json:"total_usd_ha"` // Total / SurfaceTotalHa
-
-	// Desglose por inversor
-	Investors []InvestorShareResponse `json:"investors"`
-
-	// Para categorías que requieren imputación manual de aportantes (arriendo/admin)
-	RequiresManualAttribution bool    `json:"requires_manual_attribution"`
-	AttributionNote           *string `json:"attribution_note,omitempty"`
+// -------------------------------------------------
+// Aporte acordado / Ajuste de aporte (bloque medio)
+// -------------------------------------------------
+type InvestorContributionComparison struct {
+	InvestorRef
+	AgreedSharePct Decimal3 `json:"agreed_share_pct"`
+	AgreedUsd      Decimal3 `json:"agreed_usd"`
+	ActualUsd      Decimal3 `json:"actual_usd"`
+	AdjustmentUsd  Decimal3 `json:"adjustment_usd"`
 }
 
-/* =========================
-   RESPONSES — Sección 3: Comparación Teórico vs Real
-========================= */
+// -------------------------------
+// Pagos de cosecha (tabla inferior)
+// -------------------------------
 
-// InvestorContributionComparisonResponse compares agreed vs actual per investor.
-type InvestorContributionComparisonResponse struct {
-	InvestorID     *int64          `json:"investor_id,omitempty"`
-	InvestorName   *string         `json:"investor_name,omitempty"`
-	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"` // % pactado en Clientes y Sociedades
-	AgreedUsd      decimal.Decimal `json:"agreed_usd"`       // TOTAL_APORTES * %_ACORDADO
-	ActualUsd      decimal.Decimal `json:"actual_usd"`       // Suma de aportes reales (todas las categorías de aporte)
-	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`   // Actual - Acordado
+type HarvestRowType string
+
+const (
+	HarvestRowHarvest HarvestRowType = "harvest" // fila detalle "Cosecha"
+	HarvestRowTotals  HarvestRowType = "totals"  // fila "Totales"
+)
+
+// HarvestRow: representa una fila en pagos de cosecha
+type HarvestRow struct {
+	Key        string          `json:"key"`  // "harvest" o "totals"
+	Type       HarvestRowType  `json:"type"` // enum backend
+	TotalUsd   Decimal3        `json:"total_usd"`
+	TotalUsdHa Decimal3        `json:"total_us_ha"`
+	Investors  []InvestorShare `json:"investors"`
 }
 
-/* =========================
-   RESPONSES — Sección 4: Liquidación de Cosecha
-========================= */
-
-// HarvestInvestorSettlementResponse shows paid vs agreed and adjustment for a single investor.
-type HarvestInvestorSettlementResponse struct {
-	InvestorID    *int64          `json:"investor_id,omitempty"`
-	InvestorName  *string         `json:"investor_name,omitempty"`
-	PaidUsd       decimal.Decimal `json:"paid_usd"`       // lo que efectivamente pagó
-	AgreedUsd     decimal.Decimal `json:"agreed_usd"`     // total cosecha * % acordado
-	AdjustmentUsd decimal.Decimal `json:"adjustment_usd"` // (Agreed - Paid) o (Cosecha*% - Pagado)
+// HarvestSettlement: sección completa de pagos de cosecha
+type HarvestSettlement struct {
+	Rows                    []HarvestRow    `json:"rows"`                      // 2 filas: harvest y totals
+	FooterPaymentAgreed     []InvestorShare `json:"footer_payment_agreed"`     // fila "Pago acordado"
+	FooterPaymentAdjustment []InvestorShare `json:"footer_payment_adjustment"` // fila "Ajuste de pago"
 }
 
-// HarvestSettlementResponse aggregates harvest totals and per-investor settlements.
-type HarvestSettlementResponse struct {
-	TotalHarvestUsd   decimal.Decimal                     `json:"total_harvest_usd"`    // Suma "Total USD Neto" de cosecha
-	TotalHarvestUsdHa decimal.Decimal                     `json:"total_harvest_usd_ha"` // Total / SurfaceTotalHa
-	Investors         []HarvestInvestorSettlementResponse `json:"investors"`
+// -------------------------------
+// Informe raíz completo
+// -------------------------------
+type InvestorContributionReport struct {
+	ProjectID       int64                            `json:"project_id"`
+	ProjectName     string                           `json:"project_name"`
+	CustomerID      int64                            `json:"customer_id"`
+	CustomerName    string                           `json:"customer_name"`
+	CampaignID      int64                            `json:"campaign_id"`
+	CampaignName    string                           `json:"campaign_name"`
+	InvestorHeaders []InvestorHeader                 `json:"investor_headers"`
+	General         GeneralProjectData               `json:"general"`
+	Contributions   []ContributionCategory           `json:"contributions"`
+	PreHarvest      PreHarvestTotals                 `json:"pre_harvest"`
+	Comparison      []InvestorContributionComparison `json:"comparison"`
+	Harvest         HarvestSettlement                `json:"harvest"`
 }
 
-/* =========================
-   RESPUESTA GLOBAL DEL REPORTE
-========================= */
+// ===== MAPPERS =====
 
-type InvestorContributionReportResponse struct {
-	// Metadatos de proyecto
-	ProjectID    int64  `json:"project_id"`
-	ProjectName  string `json:"project_name"`
-	CustomerID   int64  `json:"customer_id"`
-	CustomerName string `json:"customer_name"`
-	CampaignID   int64  `json:"campaign_id"`
-	CampaignName string `json:"campaign_name"`
-
-	// 1) Datos Generales
-	General GeneralProjectDataResponse `json:"general"`
-
-	// 2) Aportes por Inversor (lista de categorías)
-	Contributions []ContributionCategoryResponse `json:"contributions"`
-
-	// 3) Comparación Aporte Teórico vs Real
-	Comparison []InvestorContributionComparisonResponse `json:"comparison"`
-
-	// 4) Liquidación de Cosecha
-	Harvest HarvestSettlementResponse `json:"harvest"`
-}
-
-/* =========================
-   MAPPERS (dominio → DTO)
-   Nota: define en dominio estructuras alineadas a estos mappers.
-========================= */
-
-// FromDomainInvestorReport maps the domain model to the DTO response.
-// Espera que el dominio ya traiga: SurfaceTotalHa, Lease/Admin, categorías con totales y %,
-// comparación acordado vs real, y liquidación de cosecha con pagos y ajustes.
-func FromDomainInvestorReport(d *domain.InvestorContributionReport) *InvestorContributionReportResponse {
-	if d == nil {
+// FromDomainInvestorReport mapea del domain al DTO
+func FromDomainInvestorReport(domainReport *domain.InvestorContributionReport) *InvestorContributionReport {
+	if domainReport == nil {
 		return nil
 	}
 
-	// General
-	gen := GeneralProjectDataResponse{
-		SurfaceTotalHa: d.General.SurfaceTotalHa,
-		LeaseFixedUsd:  d.General.LeaseFixedUsd,
-		LeaseIsFixed:   d.General.LeaseIsFixed,
-		LeaseNote:      d.General.LeaseNote,
-		AdminPerHaUsd:  d.General.AdminPerHaUsd,
-		AdminTotalUsd:  d.General.AdminTotalUsd,
+	return &InvestorContributionReport{
+		ProjectID:       domainReport.ProjectID,
+		ProjectName:     domainReport.ProjectName,
+		CustomerID:      domainReport.CustomerID,
+		CustomerName:    domainReport.CustomerName,
+		CampaignID:      domainReport.CampaignID,
+		CampaignName:    domainReport.CampaignName,
+		InvestorHeaders: fromDomainInvestorHeaders(domainReport.InvestorHeaders),
+		General:         fromDomainGeneralProjectData(domainReport.General),
+		Contributions:   fromDomainContributionCategories(domainReport.Contributions),
+		PreHarvest:      fromDomainPreHarvestTotals(domainReport.PreHarvest),
+		Comparison:      fromDomainInvestorContributionComparisons(domainReport.Comparison),
+		Harvest:         fromDomainHarvestSettlement(domainReport.Harvest),
 	}
+}
 
-	// Contributions
-	contribs := make([]ContributionCategoryResponse, 0, len(d.Contributions))
-	for _, c := range d.Contributions {
-		inv := make([]InvestorShareResponse, 0, len(c.Investors))
-		for _, is := range c.Investors {
-			inv = append(inv, InvestorShareResponse{
-				InvestorID:   is.InvestorID,
-				InvestorName: is.InvestorName,
-				AmountUsd:    is.AmountUsd,
-				SharePct:     is.SharePct,
-			})
+// fromDomainInvestorHeaders mapea headers de inversores
+func fromDomainInvestorHeaders(domainHeaders []domain.InvestorHeader) []InvestorHeader {
+	headers := make([]InvestorHeader, len(domainHeaders))
+	for i, h := range domainHeaders {
+		headers[i] = InvestorHeader{
+			InvestorRef: InvestorRef{
+				InvestorID:   h.InvestorID,
+				InvestorName: h.InvestorName,
+			},
+			SharePct: NewDecimal3(h.SharePct),
 		}
-		contribs = append(contribs, ContributionCategoryResponse{
+	}
+	return headers
+}
+
+// fromDomainGeneralProjectData mapea datos generales del proyecto
+func fromDomainGeneralProjectData(domainGeneral domain.GeneralProjectData) GeneralProjectData {
+	return GeneralProjectData{
+		SurfaceTotalHa: NewDecimal3(domainGeneral.SurfaceTotalHa),
+		LeaseFixedUsd:  NewDecimal3(domainGeneral.LeaseFixedUsd),
+		LeaseIsFixed:   domainGeneral.LeaseIsFixed,
+		AdminPerHaUsd:  NewDecimal3(domainGeneral.AdminPerHaUsd),
+		AdminTotalUsd:  NewDecimal3(domainGeneral.AdminTotalUsd),
+	}
+}
+
+// fromDomainContributionCategories mapea categorías de contribución
+func fromDomainContributionCategories(domainCategories []domain.ContributionCategory) []ContributionCategory {
+	categories := make([]ContributionCategory, len(domainCategories))
+	for i, c := range domainCategories {
+		categories[i] = ContributionCategory{
+			Key:                       c.Key,
+			SortIndex:                 c.SortIndex,
 			Type:                      ContributionCategoryType(c.Type),
 			Label:                     c.Label,
-			TotalUsd:                  c.TotalUsd,
-			TotalUsdHa:                c.TotalUsdHa,
-			Investors:                 inv,
+			TotalUsd:                  NewDecimal3(c.TotalUsd),
+			TotalUsdHa:                NewDecimal3(c.TotalUsdHa),
+			Investors:                 fromDomainInvestorShares(c.Investors),
 			RequiresManualAttribution: c.RequiresManualAttribution,
 			AttributionNote:           c.AttributionNote,
-		})
+		}
 	}
+	return categories
+}
 
-	// Comparison
-	comp := make([]InvestorContributionComparisonResponse, 0, len(d.Comparison))
-	for _, it := range d.Comparison {
-		comp = append(comp, InvestorContributionComparisonResponse{
-			InvestorID:     it.InvestorID,
-			InvestorName:   it.InvestorName,
-			AgreedSharePct: it.AgreedSharePct,
-			AgreedUsd:      it.AgreedUsd,
-			ActualUsd:      it.ActualUsd,
-			AdjustmentUsd:  it.AdjustmentUsd,
-		})
+// fromDomainPreHarvestTotals mapea totales pre-cosecha
+func fromDomainPreHarvestTotals(domainTotals domain.PreHarvestTotals) PreHarvestTotals {
+	return PreHarvestTotals{
+		TotalUsd:   NewDecimal3(domainTotals.TotalUsd),
+		TotalUsdHa: NewDecimal3(domainTotals.TotalUsdHa),
+		Investors:  fromDomainInvestorShares(domainTotals.Investors),
 	}
+}
 
-	// Harvest
-	harvestInvestors := make([]HarvestInvestorSettlementResponse, 0, len(d.Harvest.Investors))
-	for _, hi := range d.Harvest.Investors {
-		harvestInvestors = append(harvestInvestors, HarvestInvestorSettlementResponse{
-			InvestorID:    hi.InvestorID,
-			InvestorName:  hi.InvestorName,
-			PaidUsd:       hi.PaidUsd,
-			AgreedUsd:     hi.AgreedUsd,
-			AdjustmentUsd: hi.AdjustmentUsd,
-		})
+// fromDomainInvestorContributionComparisons mapea comparaciones de contribución
+func fromDomainInvestorContributionComparisons(domainComparisons []domain.InvestorContributionComparison) []InvestorContributionComparison {
+	comparisons := make([]InvestorContributionComparison, len(domainComparisons))
+	for i, c := range domainComparisons {
+		comparisons[i] = InvestorContributionComparison{
+			InvestorRef: InvestorRef{
+				InvestorID:   c.InvestorID,
+				InvestorName: c.InvestorName,
+			},
+			AgreedSharePct: NewDecimal3(c.AgreedSharePct),
+			AgreedUsd:      NewDecimal3(c.AgreedUsd),
+			ActualUsd:      NewDecimal3(c.ActualUsd),
+			AdjustmentUsd:  NewDecimal3(c.AdjustmentUsd),
+		}
 	}
-	har := HarvestSettlementResponse{
-		TotalHarvestUsd:   d.Harvest.TotalHarvestUsd,
-		TotalHarvestUsdHa: d.Harvest.TotalHarvestUsdHa,
-		Investors:         harvestInvestors,
-	}
+	return comparisons
+}
 
-	return &InvestorContributionReportResponse{
-		ProjectID:     d.ProjectID,
-		ProjectName:   d.ProjectName,
-		CustomerID:    d.CustomerID,
-		CustomerName:  d.CustomerName,
-		CampaignID:    d.CampaignID,
-		CampaignName:  d.CampaignName,
-		General:       gen,
-		Contributions: contribs,
-		Comparison:    comp,
-		Harvest:       har,
+// fromDomainHarvestSettlement mapea liquidación de cosecha
+func fromDomainHarvestSettlement(domainHarvest domain.HarvestSettlement) HarvestSettlement {
+	return HarvestSettlement{
+		Rows:                    fromDomainHarvestRows(domainHarvest.Rows),
+		FooterPaymentAgreed:     fromDomainInvestorShares(domainHarvest.FooterPaymentAgreed),
+		FooterPaymentAdjustment: fromDomainInvestorShares(domainHarvest.FooterPaymentAdjustment),
 	}
+}
+
+// fromDomainHarvestRows mapea filas de cosecha
+func fromDomainHarvestRows(domainRows []domain.HarvestRow) []HarvestRow {
+	rows := make([]HarvestRow, len(domainRows))
+	for i, r := range domainRows {
+		rows[i] = HarvestRow{
+			Key:        r.Key,
+			Type:       HarvestRowType(r.Type),
+			TotalUsd:   NewDecimal3(r.TotalUsd),
+			TotalUsdHa: NewDecimal3(r.TotalUsdHa),
+			Investors:  fromDomainInvestorShares(r.Investors),
+		}
+	}
+	return rows
+}
+
+// fromDomainInvestorShares mapea shares de inversores
+func fromDomainInvestorShares(domainShares []domain.InvestorShare) []InvestorShare {
+	shares := make([]InvestorShare, len(domainShares))
+	for i, s := range domainShares {
+		shares[i] = InvestorShare{
+			InvestorRef: InvestorRef{
+				InvestorID:   s.InvestorID,
+				InvestorName: s.InvestorName,
+			},
+			AmountUsd: NewDecimal3(s.AmountUsd),
+			SharePct:  NewDecimal3(s.SharePct),
+		}
+	}
+	return shares
 }

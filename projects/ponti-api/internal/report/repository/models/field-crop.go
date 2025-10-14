@@ -37,7 +37,9 @@ type FieldCropMetricModel struct {
 
 	// Costos directos
 	LaborCostsUsd       decimal.Decimal `gorm:"column:costos_labores_usd"`
+	LaborCostsUsdHa     decimal.Decimal `gorm:"column:costos_labores_usd_ha"` // TODO: Agregar a vista SQL v3
 	SupplyCostsUsd      decimal.Decimal `gorm:"column:costos_insumos_usd"`
+	SupplyCostsUsdHa    decimal.Decimal `gorm:"column:costos_insumos_usd_ha"` // TODO: Agregar a vista SQL v3
 	TotalDirectCostsUsd decimal.Decimal `gorm:"column:total_costos_directos_usd"`
 	DirectCostsUsdHa    decimal.Decimal `gorm:"column:costos_directos_usd_ha"`
 
@@ -67,9 +69,9 @@ type FieldCropMetricModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// ACTUALIZADO: Usar vista v3 (SSOT)
+// ACTUALIZADO: Usar vista v3 (SSOT) - Migración 000130
 func (FieldCropMetricModel) TableName() string {
-	return "v3_report_field_crop_metrics_view"
+	return "v3_report_field_crop_metrics"
 }
 
 // LaborMetricModel representa el modelo de base de datos para métricas de labores
@@ -105,6 +107,49 @@ type SupplyMetricModel struct {
 	WorkOrderCount int64           `gorm:"column:workorder_count"`
 }
 
+// FieldCropLaborDetailModel representa el modelo de la vista v3_report_field_crop_labores
+// Migración 000130
+type FieldCropLaborDetailModel struct {
+	ProjectID int64 `gorm:"column:project_id"`
+	FieldID   int64 `gorm:"column:field_id"`
+	CropID    int64 `gorm:"column:current_crop_id"`
+
+	// Desglose por categoría de labor (USD/ha)
+	SiembraUsdHa       decimal.Decimal `gorm:"column:siembra_usd_ha"`
+	PulverizacionUsdHa decimal.Decimal `gorm:"column:pulverizacion_usd_ha"`
+	RiegoUsdHa         decimal.Decimal `gorm:"column:riego_usd_ha"`
+	CosechaUsdHa       decimal.Decimal `gorm:"column:cosecha_usd_ha"`
+	OtrasLaboresUsdHa  decimal.Decimal `gorm:"column:otras_labores_usd_ha"`
+	TotalLaboresUsdHa  decimal.Decimal `gorm:"column:total_labores_usd_ha"`
+}
+
+// TableName especifica el nombre de la tabla para GORM
+func (FieldCropLaborDetailModel) TableName() string {
+	return "v3_report_field_crop_labores"
+}
+
+// FieldCropSupplyDetailModel representa el modelo de la vista v3_report_field_crop_insumos
+// Migración 000130
+type FieldCropSupplyDetailModel struct {
+	ProjectID int64 `gorm:"column:project_id"`
+	FieldID   int64 `gorm:"column:field_id"`
+	CropID    int64 `gorm:"column:current_crop_id"`
+
+	// Desglose por categoría de insumo (USD/ha)
+	SemillasUsdHa     decimal.Decimal `gorm:"column:semillas_usd_ha"`
+	CurasemillasUsdHa decimal.Decimal `gorm:"column:curasemillas_usd_ha"`
+	HerbicidasUsdHa   decimal.Decimal `gorm:"column:herbicidas_usd_ha"`
+	InsecticidasUsdHa decimal.Decimal `gorm:"column:insecticidas_usd_ha"`
+	FungicidasUsdHa   decimal.Decimal `gorm:"column:fungicidas_usd_ha"`
+	CoadyuvantesUsdHa decimal.Decimal `gorm:"column:coadyuvantes_usd_ha"`
+	TotalInsumosUsdHa decimal.Decimal `gorm:"column:total_insumos_usd_ha"`
+}
+
+// TableName especifica el nombre de la tabla para GORM
+func (FieldCropSupplyDetailModel) TableName() string {
+	return "v3_report_field_crop_insumos"
+}
+
 // ===== MAPPERS =====
 
 // ToDomainFieldCropMetric convierte de modelo a dominio
@@ -127,7 +172,9 @@ func (m *FieldCropMetricModel) ToDomainFieldCropMetric() *domain.FieldCropMetric
 		NetIncomeUsd:           m.NetIncomeUsd,
 		NetIncomeUsdHa:         m.NetIncomeUsdHa,
 		LaborCostsUsd:          m.LaborCostsUsd,
+		LaborCostsUsdHa:        m.LaborCostsUsdHa, // TODO: Ahora viene de la vista v3
 		SupplyCostsUsd:         m.SupplyCostsUsd,
+		SupplyCostsUsdHa:       m.SupplyCostsUsdHa, // TODO: Ahora viene de la vista v3
 		TotalDirectCostsUsd:    m.TotalDirectCostsUsd,
 		DirectCostsUsdHa:       m.DirectCostsUsdHa,
 		GrossMarginUsd:         m.GrossMarginUsd,
@@ -191,9 +238,10 @@ func GroupFieldCropMetricsByCrop(metrics []*domain.FieldCropMetric) map[string][
 	return grouped
 }
 
-// CalculateCropTotals calcula los totales por cultivo
+// CalculateCropTotals calcula los totales por cultivo usando helpers (DRY)
 func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.FieldCropMetric {
 	totals := make(map[string]domain.FieldCropMetric)
+	aggregator := NewMetricAggregator()
 
 	// Agrupar por cultivo
 	grouped := make(map[string][]*domain.FieldCropMetric)
@@ -205,83 +253,21 @@ func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.Fi
 		grouped[cropName] = append(grouped[cropName], metric)
 	}
 
-	// Calcular totales para cada cultivo
+	// Calcular totales para cada cultivo usando helpers
 	for cropName, cropMetrics := range grouped {
 		if len(cropMetrics) == 0 {
 			continue
 		}
 
-		total := domain.FieldCropMetric{
-			CropName: cropName,
-		}
+		// Sumar métricas usando helper
+		total := aggregator.SumMetrics(cropMetrics)
+		total.CropName = cropName
 
-		for _, metric := range cropMetrics {
-			// Sumar valores numéricos
-			total.SurfaceHa = total.SurfaceHa.Add(metric.SurfaceHa)
-			total.ProductionTn = total.ProductionTn.Add(metric.ProductionTn)
-			total.SownAreaHa = total.SownAreaHa.Add(metric.SownAreaHa)
-			total.HarvestedAreaHa = total.HarvestedAreaHa.Add(metric.HarvestedAreaHa)
-			total.NetIncomeUsd = total.NetIncomeUsd.Add(metric.NetIncomeUsd)
-			total.LaborCostsUsd = total.LaborCostsUsd.Add(metric.LaborCostsUsd)
-			total.SupplyCostsUsd = total.SupplyCostsUsd.Add(metric.SupplyCostsUsd)
-			total.TotalDirectCostsUsd = total.TotalDirectCostsUsd.Add(metric.TotalDirectCostsUsd)
-			total.GrossMarginUsd = total.GrossMarginUsd.Add(metric.GrossMarginUsd)
-			total.RentUsd = total.RentUsd.Add(metric.RentUsd)
-			total.AdministrationUsd = total.AdministrationUsd.Add(metric.AdministrationUsd)
-			total.OperatingResultUsd = total.OperatingResultUsd.Add(metric.OperatingResultUsd)
-			total.TotalInvestedUsd = total.TotalInvestedUsd.Add(metric.TotalInvestedUsd)
-		}
+		// Calcular ratios usando helper
+		aggregator.CalculateRatios(&total)
 
-		// Calcular promedios y ratios
-		if total.HarvestedAreaHa.GreaterThan(decimal.Zero) {
-			total.YieldTnHa = total.ProductionTn.Div(total.HarvestedAreaHa)
-		}
-
-		if total.SownAreaHa.GreaterThan(decimal.Zero) {
-			total.NetIncomeUsdHa = total.NetIncomeUsd.Div(total.SownAreaHa)
-			total.DirectCostsUsdHa = total.TotalDirectCostsUsd.Div(total.SownAreaHa)
-			total.GrossMarginUsdHa = total.GrossMarginUsd.Div(total.SownAreaHa)
-			total.RentUsdHa = total.RentUsd.Div(total.SownAreaHa)
-			total.AdministrationUsdHa = total.AdministrationUsd.Div(total.SownAreaHa)
-			total.OperatingResultUsdHa = total.OperatingResultUsd.Div(total.SownAreaHa)
-			total.TotalInvestedUsdHa = total.TotalInvestedUsd.Div(total.SownAreaHa)
-		}
-
-		// Calcular renta
-		if total.TotalInvestedUsd.GreaterThan(decimal.Zero) {
-			total.ReturnPct = total.OperatingResultUsd.Div(total.TotalInvestedUsd)
-		}
-
-		// Calcular rinde indiferencia
-		if total.YieldTnHa.GreaterThan(decimal.Zero) {
-			total.IndifferenceYieldUsdTn = total.TotalInvestedUsd.Div(total.YieldTnHa)
-		}
-
-		// Promedio de precios (usar el primer valor no cero)
-		for _, metric := range cropMetrics {
-			if metric.GrossPriceUsdTn.GreaterThan(decimal.Zero) {
-				total.GrossPriceUsdTn = metric.GrossPriceUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.FreightCostUsdTn.GreaterThan(decimal.Zero) {
-				total.FreightCostUsdTn = metric.FreightCostUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.CommercialCostUsdTn.GreaterThan(decimal.Zero) {
-				total.CommercialCostUsdTn = metric.CommercialCostUsdTn
-				break
-			}
-		}
-		for _, metric := range cropMetrics {
-			if metric.NetPriceUsdTn.GreaterThan(decimal.Zero) {
-				total.NetPriceUsdTn = metric.NetPriceUsdTn
-				break
-			}
-		}
+		// Copiar precios usando helper
+		aggregator.CopyFirstNonZeroPrice(cropMetrics, &total)
 
 		totals[cropName] = total
 	}
@@ -289,53 +275,16 @@ func CalculateCropTotals(metrics []*domain.FieldCropMetric) map[string]domain.Fi
 	return totals
 }
 
-// CalculateGrandTotal calcula el total general
+// CalculateGrandTotal calcula el total general usando helpers (DRY)
 func CalculateGrandTotal(metrics []*domain.FieldCropMetric) domain.FieldCropMetric {
-	total := domain.FieldCropMetric{
-		CropName: "TOTAL GENERAL",
-	}
+	aggregator := NewMetricAggregator()
 
-	for _, metric := range metrics {
-		// Sumar valores numéricos
-		total.SurfaceHa = total.SurfaceHa.Add(metric.SurfaceHa)
-		total.ProductionTn = total.ProductionTn.Add(metric.ProductionTn)
-		total.SownAreaHa = total.SownAreaHa.Add(metric.SownAreaHa)
-		total.HarvestedAreaHa = total.HarvestedAreaHa.Add(metric.HarvestedAreaHa)
-		total.NetIncomeUsd = total.NetIncomeUsd.Add(metric.NetIncomeUsd)
-		total.LaborCostsUsd = total.LaborCostsUsd.Add(metric.LaborCostsUsd)
-		total.SupplyCostsUsd = total.SupplyCostsUsd.Add(metric.SupplyCostsUsd)
-		total.TotalDirectCostsUsd = total.TotalDirectCostsUsd.Add(metric.TotalDirectCostsUsd)
-		total.GrossMarginUsd = total.GrossMarginUsd.Add(metric.GrossMarginUsd)
-		total.RentUsd = total.RentUsd.Add(metric.RentUsd)
-		total.AdministrationUsd = total.AdministrationUsd.Add(metric.AdministrationUsd)
-		total.OperatingResultUsd = total.OperatingResultUsd.Add(metric.OperatingResultUsd)
-		total.TotalInvestedUsd = total.TotalInvestedUsd.Add(metric.TotalInvestedUsd)
-	}
+	// Sumar todas las métricas usando helper
+	total := aggregator.SumMetrics(metrics)
+	total.CropName = "TOTAL GENERAL"
 
-	// Calcular promedios y ratios
-	if total.HarvestedAreaHa.GreaterThan(decimal.Zero) {
-		total.YieldTnHa = total.ProductionTn.Div(total.HarvestedAreaHa)
-	}
-
-	if total.SownAreaHa.GreaterThan(decimal.Zero) {
-		total.NetIncomeUsdHa = total.NetIncomeUsd.Div(total.SownAreaHa)
-		total.DirectCostsUsdHa = total.TotalDirectCostsUsd.Div(total.SownAreaHa)
-		total.GrossMarginUsdHa = total.GrossMarginUsd.Div(total.SownAreaHa)
-		total.RentUsdHa = total.RentUsd.Div(total.SownAreaHa)
-		total.AdministrationUsdHa = total.AdministrationUsd.Div(total.SownAreaHa)
-		total.OperatingResultUsdHa = total.OperatingResultUsd.Div(total.SownAreaHa)
-		total.TotalInvestedUsdHa = total.TotalInvestedUsd.Div(total.SownAreaHa)
-	}
-
-	// Calcular renta
-	if total.TotalInvestedUsd.GreaterThan(decimal.Zero) {
-		total.ReturnPct = total.OperatingResultUsd.Div(total.TotalInvestedUsd)
-	}
-
-	// Calcular rinde indiferencia
-	if total.YieldTnHa.GreaterThan(decimal.Zero) {
-		total.IndifferenceYieldUsdTn = total.TotalInvestedUsd.Div(total.YieldTnHa)
-	}
+	// Calcular ratios usando helper
+	aggregator.CalculateRatios(&total)
 
 	return total
 }
