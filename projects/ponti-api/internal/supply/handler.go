@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	supplyExcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/excel"
 	dto "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply/usecases/domain"
 )
@@ -27,6 +28,7 @@ type UseCasesPort interface {
 		mode string,
 	) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
+	ExportTableSupplies(ctx context.Context) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -78,6 +80,7 @@ func (h *Handler) Routes() {
 		public.POST("/bulk", h.CreateSuppliesBulk)
 		public.GET("", h.ListSupplies)
 		public.GET("/:id", h.GetSupply)
+		public.GET("/export/all", h.ExportTableSupplies)
 		public.PUT("/:id", h.UpdateSupply)
 		public.DELETE("/:id", h.DeleteSupply)
 		public.PUT("/bulk", h.UpdateSuppliesBulk)
@@ -207,4 +210,18 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supplies updated successfully"})
+}
+
+func (h *Handler) ExportTableSupplies(c *gin.Context) {
+	data, err := h.ucs.ExportTableSupplies(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	filename := supplyExcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

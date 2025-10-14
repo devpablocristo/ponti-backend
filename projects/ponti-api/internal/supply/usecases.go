@@ -16,15 +16,22 @@ type RepositoryPort interface {
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
 	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
+	ListAllSupplies(context.Context) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 }
 
-type UseCases struct {
-	repo RepositoryPort
+type ExporterAdapterPort interface {
+	Export(ctx context.Context, items []domain.Supply) ([]byte, error)
+	Close() error
 }
 
-func NewUseCases(repo RepositoryPort) *UseCases {
-	return &UseCases{repo: repo}
+type UseCases struct {
+	repo  RepositoryPort
+	excel ExporterAdapterPort
+}
+
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, excel: excel}
 }
 
 func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
@@ -125,4 +132,25 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 		seen[s.ID] = true
 	}
 	return u.repo.UpdateSuppliesBulk(ctx, supplies)
+}
+
+func (u *UseCases) ExportTableSupplies(ctx context.Context) ([]byte, error) {
+	if u.excel == nil {
+		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+	}
+
+	items, total, err := u.repo.ListAllSupplies(ctx)
+	if err != nil {
+		types.NewError(types.ErrInternal, "Internal error", err)
+	}
+
+	if total == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	if len(items) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+	}
+
+	return u.excel.Export(ctx, items)
 }
