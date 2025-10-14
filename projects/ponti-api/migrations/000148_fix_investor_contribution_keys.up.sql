@@ -1,20 +1,20 @@
 -- ========================================
--- MIGRACIÓN 000147: FIX v3_investor_contribution_data_view - Add investor_headers (UP)
+-- MIGRACIÓN 000148: FIX investor contribution keys to match frontend (UP)
 -- ========================================
 -- 
--- Propósito: Agregar columna investor_headers a v3_investor_contribution_data_view
--- Problema: La vista actual no incluye investor_headers, causando error en repository.go:551
--- Solución: Recrear la vista incluyendo la columna investor_headers con los datos de inversores
+-- Propósito: Corregir los keys de las categorías para que coincidan con el frontend
+-- Problema: Frontend espera 'capitalizable_lease' y 'administration_structure' 
+--           pero backend envía 'rent_capitalizable' y 'administration'
+-- Solución: Cambiar los keys en la vista v3_investor_contribution_data_view
 -- Fecha: 2025-10-14
 -- Autor: Sistema
 -- 
 -- Nota: Código en inglés, comentarios en español
--- Basado en migración 000146 con agregado de investor_headers
 
 BEGIN;
 
 -- ========================================
--- RECREAR v3_investor_contribution_data_view CON INVESTOR_HEADERS
+-- RECREAR v3_investor_contribution_data_view CON KEYS CORREGIDOS
 -- ========================================
 DROP VIEW IF EXISTS public.v3_investor_contribution_data_view CASCADE;
 
@@ -72,7 +72,7 @@ SELECT
   pb.campaign_name,
   
   -- =========================================================================
-  -- INVESTOR HEADERS: Array de inversores con % acordado (★ AGREGADO EN 000147)
+  -- INVESTOR HEADERS: Array de inversores con % acordado
   -- =========================================================================
   (
     SELECT jsonb_agg(
@@ -307,7 +307,7 @@ SELECT
       
       UNION ALL
       
-      -- Arriendo Capitalizable
+      -- Arriendo Capitalizable (KEY CORREGIDO: capitalizable_lease)
       SELECT 
         'capitalizable_lease'::text,
         6,
@@ -345,7 +345,7 @@ SELECT
       
       UNION ALL
       
-      -- Administración y Estructura
+      -- Administración y Estructura (KEY CORREGIDO: administration_structure)
       SELECT 
         'administration_structure'::text,
         7,
@@ -436,5 +436,5 @@ ORDER BY pb.project_id;
 COMMIT;
 
 COMMENT ON VIEW public.v3_investor_contribution_data_view IS 
-  'Vista FINAL para informe de Aportes por Inversor. Incluye investor_headers, datos generales, categorías de aportes, comparación acordado vs real, y liquidación de cosecha. Corregida en migración 147 para incluir columna investor_headers faltante.';
+  'Vista FINAL para informe de Aportes por Inversor. Keys corregidos en migración 148 para coincidir con frontend: capitalizable_lease y administration_structure.';
 
