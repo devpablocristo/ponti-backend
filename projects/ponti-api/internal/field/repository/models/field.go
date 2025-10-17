@@ -4,6 +4,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	fielddom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field/usecases/domain"
+	invdom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor/repository/models"
 	leasetypemod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/repository/models"
 	leasetypedom "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/leasetype/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
@@ -19,8 +20,18 @@ type Field struct {
 	LeaseTypePercent *decimal.Decimal `gorm:"column:lease_type_percent"`
 	LeaseTypeValue   *decimal.Decimal `gorm:"column:lease_type_value"`
 	sharedmodels.Base
-	Lots      []lotmod.Lot            `gorm:"foreignKey:FieldID"`
-	LeaseType *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
+	FieldInvestors []FieldInvestor         `gorm:"foreignKey:FieldID;references:ID"`
+	Lots           []lotmod.Lot            `gorm:"foreignKey:FieldID"`
+	LeaseType      *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
+}
+
+type FieldInvestor struct {
+	FieldID    int64 `gorm:"primaryKey;autoIncrement:false;column:field_id"`
+	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
+	Percentage int   `gorm:"not null;column:percentage"`
+	sharedmodels.Base
+
+	Investor invdom.Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
 // FROM DOMAIN (para INSERT: solo escalares)

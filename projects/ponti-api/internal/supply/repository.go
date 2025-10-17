@@ -194,8 +194,12 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 	})
 }
 
-func (r *Repository) ListAllSupplies(ctx context.Context) ([]domain.Supply, int64, error) {
+func (r *Repository) ListAllSupplies(ctx context.Context, projectID int64) ([]domain.Supply, int64, error) {
 	base := r.db.Client().WithContext(ctx).Model(&models.Supply{})
+
+	if projectID > 0 {
+		base = base.Where("project_id = ?", projectID)
+	}
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {

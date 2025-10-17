@@ -28,7 +28,7 @@ type UseCasesPort interface {
 		mode string,
 	) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
-	ExportTableSupplies(ctx context.Context) ([]byte, error)
+	ExportTableSupplies(ctx context.Context, projectID int64) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -213,7 +213,9 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 }
 
 func (h *Handler) ExportTableSupplies(c *gin.Context) {
-	data, err := h.ucs.ExportTableSupplies(c.Request.Context())
+	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+
+	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), projectID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return

@@ -11,14 +11,16 @@ import (
 )
 
 type Project struct {
-	ID        int64
-	Name      string
-	AdminCost decimal.Decimal
-	Customer  customerdom.Customer
-	Campaign  campdom.Campaign
-	Managers  []managerdom.Manager
-	Investors []investordom.Investor
-	Fields    []fieldom.Field
+	ID                 int64
+	Name               string
+	AdminCost          decimal.Decimal
+	PlannedCost        decimal.Decimal
+	Customer           customerdom.Customer
+	Campaign           campdom.Campaign
+	Managers           []managerdom.Manager
+	Investors          []investordom.Investor
+	AdminCostInvestors []investordom.Investor
+	Fields             []fieldom.Field
 
 	shareddomain.Base
 }
