@@ -133,22 +133,71 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 		return types.NewError(types.ErrValidation, fmt.Sprintf("La cantidad que desea mover es mayor al stock real: %s", stockOrigin.RealStockUnits.String()), nil)
 	}
 
-	if err := u.stockUseCases.UpdateUnitsConsumed(ctx, stockOrigin, movement.Quantity); err != nil {
-		return fmt.Errorf("error updating units consumed: %w", err)
+	// Asegurar que el provider existe antes de crear los registros
+	if movement.Provider.ID == 0 {
+		providerID, err := u.repo.CreateProvider(ctx, movement.Provider)
+		if err != nil {
+			return err
+		}
+		movement.Provider.ID = providerID
 	}
 
-	movementIn := *movement
+	// Crear registro de salida con cantidad NEGATIVA para el proyecto origen
+	// Esto representa la salida de inversión y aparecerá en la lista de insumos
+	movementOut := *movement
+	movementOut.Quantity = movement.Quantity.Neg() // ⚡ CANTIDAD NEGATIVA (dinero negativo se calcula automáticamente: price * cantidad_negativa)
+	movementOut.MovementType = domain.INTERNAL_MOVEMENT
+	movementOut.IsEntry = true           // ✅ IsEntry=true para que aparezca en el listado de insumos
+	movementOut.ProjectDestinationId = 0 // Limpiar destino, este es el registro del origen
+	movementOut.StockId = stockOrigin.ID // Asociar al stock del proyecto origen
 
+	// Guardar el registro de salida DIRECTAMENTE sin actualizar stock (ya se actualiza en CreateSupplyMovement principal)
+	_, err := u.repo.CreateSupplyMovement(ctx, &movementOut)
+	if err != nil {
+		return fmt.Errorf("error creating internal movement out record: %w", err)
+	}
+
+	// Crear registro de entrada con cantidad POSITIVA para el proyecto destino
+	movementIn := *movement
 	movementIn.ProjectId = movement.ProjectDestinationId
 	movementIn.MovementType = domain.INTERNAL_MOVEMENT_IN
 	movementIn.IsEntry = true
 	movementIn.ProjectDestinationId = 0
 
+	// Buscar o crear el stock en el proyecto destino
+	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectId(ctx, movementIn.ProjectId, movement.Supply.ID)
+	if err != nil {
+		return fmt.Errorf("error getting destination stock: %w", err)
+	}
+	if isFirstDest {
+		stockDest = createStockDomainFromSupplyMovement(&movementIn)
+		stockIdDest, err := u.stockUseCases.CreateStock(ctx, stockDest)
+		if err != nil {
+			return fmt.Errorf("error creating destination stock: %w", err)
+		}
+		stockDest.ID = stockIdDest
+	}
+
+	// Asignar el stock del proyecto destino
+	movementIn.StockId = stockDest.ID
+
+	// Actualizar el stock real del proyecto destino
+	stockDest.RealStockUnits = stockDest.RealStockUnits.Add(movementIn.Quantity)
+	err = u.stockUseCases.UpdateRealStockUnits(ctx, stockDest.ID, stockDest)
+	if err != nil {
+		return fmt.Errorf("error updating destination stock: %w", err)
+	}
+
+	// Crear el movimiento de entrada directamente (sin recursión)
+	_, err = u.repo.CreateSupplyMovement(ctx, &movementIn)
+	if err != nil {
+		return fmt.Errorf("error creating internal movement in record: %w", err)
+	}
+
+	// Marcar el movimiento original como salida (para el tracking del stock físico)
 	movement.IsEntry = false
 
-	_, err := u.CreateSupplyMovement(ctx, &movementIn)
-
-	return err
+	return nil
 }
 
 func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error) {
