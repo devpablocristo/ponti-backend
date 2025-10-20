@@ -66,13 +66,13 @@ func TestCreateStockDiference(t *testing.T) {
 // TestMoneyCalculation valida que cantidad × precio funcione correctamente con negativos
 func TestMoneyCalculation(t *testing.T) {
 	tests := []struct {
-		name           string
-		quantity       decimal.Decimal
-		price          decimal.Decimal
-		expectedMoney  decimal.Decimal
-		shouldBeNeg    bool
-		shouldBePos    bool
-		description    string
+		name          string
+		quantity      decimal.Decimal
+		price         decimal.Decimal
+		expectedMoney decimal.Decimal
+		shouldBeNeg   bool
+		shouldBePos   bool
+		description   string
 	}{
 		{
 			name:          "Cantidad positiva × precio = dinero positivo",
@@ -119,7 +119,7 @@ func TestMoneyCalculation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			money := tt.quantity.Mul(tt.price)
 			assert.Equal(t, tt.expectedMoney.String(), money.String(), tt.description)
-			
+
 			if tt.shouldBeNeg {
 				assert.True(t, money.IsNegative(), "El dinero debe ser negativo")
 			}
@@ -133,12 +133,12 @@ func TestMoneyCalculation(t *testing.T) {
 // TestBalanceCalculation valida que el balance entre salida y entrada sea correcto
 func TestBalanceCalculation(t *testing.T) {
 	tests := []struct {
-		name          string
-		outQuantity   decimal.Decimal
-		inQuantity    decimal.Decimal
-		price         decimal.Decimal
+		name            string
+		outQuantity     decimal.Decimal
+		inQuantity      decimal.Decimal
+		price           decimal.Decimal
 		expectedBalance decimal.Decimal
-		description   string
+		description     string
 	}{
 		{
 			name:            "🔥 Balance perfecto: -200 + 200 = 0",
@@ -171,9 +171,9 @@ func TestBalanceCalculation(t *testing.T) {
 			moneyOut := tt.outQuantity.Mul(tt.price)
 			moneyIn := tt.inQuantity.Mul(tt.price)
 			balance := moneyOut.Add(moneyIn)
-			
-			assert.True(t, balance.IsZero(), 
-				"%s\nMoneyOut: %s, MoneyIn: %s, Balance: %s (debe ser 0)", 
+
+			assert.True(t, balance.IsZero(),
+				"%s\nMoneyOut: %s, MoneyIn: %s, Balance: %s (debe ser 0)",
 				tt.description, moneyOut.String(), moneyIn.String(), balance.String())
 		})
 	}
@@ -221,7 +221,7 @@ func TestSQLQueryLogic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, expected := range tt.mustContain {
-				assert.Contains(t, tt.queryFragment, expected, 
+				assert.Contains(t, tt.queryFragment, expected,
 					"%s - Debe contener: '%s'", tt.description, expected)
 			}
 		})
@@ -239,9 +239,9 @@ func TestSumWithNegativeValues(t *testing.T) {
 		{
 			name: "🔥 Suma con movimiento interno negativo",
 			movements: []decimal.Decimal{
-				decimal.NewFromInt(1000),  // Entrada inicial: +$1,000
-				decimal.NewFromInt(-200),  // 🔥 Movimiento interno salida: -$200
-				decimal.NewFromInt(500),   // Remito oficial: +$500
+				decimal.NewFromInt(1000), // Entrada inicial: +$1,000
+				decimal.NewFromInt(-200), // 🔥 Movimiento interno salida: -$200
+				decimal.NewFromInt(500),  // Remito oficial: +$500
 			},
 			expectedTotal: decimal.NewFromInt(1300), // 1000 - 200 + 500 = 1300
 			description:   "🔥 CASO CRÍTICO: SUM debe incluir valores negativos correctamente",
@@ -249,10 +249,10 @@ func TestSumWithNegativeValues(t *testing.T) {
 		{
 			name: "Suma con múltiples movimientos internos",
 			movements: []decimal.Decimal{
-				decimal.NewFromInt(2000),  // Entrada inicial
-				decimal.NewFromInt(-300),  // Movimiento interno salida 1
-				decimal.NewFromInt(-150),  // Movimiento interno salida 2
-				decimal.NewFromInt(600),   // Remito oficial
+				decimal.NewFromInt(2000), // Entrada inicial
+				decimal.NewFromInt(-300), // Movimiento interno salida 1
+				decimal.NewFromInt(-150), // Movimiento interno salida 2
+				decimal.NewFromInt(600),  // Remito oficial
 			},
 			expectedTotal: decimal.NewFromInt(2150), // 2000 - 300 - 150 + 600
 			description:   "Múltiples movimientos internos",
@@ -331,15 +331,15 @@ func TestInternalMovementLogic(t *testing.T) {
 	t.Run("🔥 Movimiento interno debe crear 2 registros con is_entry=TRUE", func(t *testing.T) {
 		// Simular el concepto
 		type Movement struct {
-			ProjectID  int64
-			Quantity   decimal.Decimal
-			IsEntry    bool
+			ProjectID    int64
+			Quantity     decimal.Decimal
+			IsEntry      bool
 			MovementType string
 		}
 
 		// Movimiento original: transferir 20 unidades del Proyecto 1 al Proyecto 2
 		originalQuantity := decimal.NewFromInt(20)
-		
+
 		// Registro 1: SALIDA en proyecto origen
 		movementOut := Movement{
 			ProjectID:    1,
@@ -347,48 +347,48 @@ func TestInternalMovementLogic(t *testing.T) {
 			IsEntry:      true,                   // 🔥 IS_ENTRY = TRUE
 			MovementType: domain.INTERNAL_MOVEMENT,
 		}
-		
+
 		// Registro 2: ENTRADA en proyecto destino
 		movementIn := Movement{
 			ProjectID:    2,
-			Quantity:     originalQuantity,        // Cantidad positiva
-			IsEntry:      true,                    // IS_ENTRY = TRUE
+			Quantity:     originalQuantity, // Cantidad positiva
+			IsEntry:      true,             // IS_ENTRY = TRUE
 			MovementType: domain.INTERNAL_MOVEMENT_IN,
 		}
-		
+
 		// Validaciones críticas
-		assert.True(t, movementOut.IsEntry, 
+		assert.True(t, movementOut.IsEntry,
 			"❌ FALLO CRÍTICO: movementOut debe tener is_entry=TRUE")
-		assert.True(t, movementOut.Quantity.IsNegative(), 
+		assert.True(t, movementOut.Quantity.IsNegative(),
 			"❌ FALLO CRÍTICO: movementOut debe tener cantidad NEGATIVA")
-		
-		assert.True(t, movementIn.IsEntry, 
+
+		assert.True(t, movementIn.IsEntry,
 			"movementIn debe tener is_entry=TRUE")
-		assert.True(t, movementIn.Quantity.IsPositive(), 
+		assert.True(t, movementIn.Quantity.IsPositive(),
 			"movementIn debe tener cantidad POSITIVA")
-		
+
 		// Validar balance
 		balance := movementOut.Quantity.Add(movementIn.Quantity)
-		assert.True(t, balance.IsZero(), 
+		assert.True(t, balance.IsZero(),
 			"❌ FALLO CRÍTICO: Balance debe ser 0")
 	})
-	
+
 	t.Run("🔥 Cálculo de dinero con is_entry=TRUE y cantidad negativa", func(t *testing.T) {
 		// Movimiento interno: 20 unidades × $10 c/u
 		quantity := decimal.NewFromInt(-20) // Cantidad negativa (salida)
 		price := decimal.NewFromInt(10)
 		isEntry := true // 🔥 is_entry = TRUE
-		
+
 		// Cálculo de dinero
 		money := quantity.Mul(price) // -20 × 10 = -200
-		
+
 		// Validaciones
 		assert.True(t, isEntry, "is_entry debe ser TRUE para aparecer en reportes")
 		assert.True(t, quantity.IsNegative(), "Cantidad debe ser NEGATIVA")
-		assert.True(t, money.IsNegative(), 
+		assert.True(t, money.IsNegative(),
 			"❌ FALLO CRÍTICO: Dinero debe ser NEGATIVO (-200) para restar inversión")
 		assert.Equal(t, "-200", money.String())
-		
+
 		// Simular query SQL: SUM(quantity * price) WHERE is_entry = TRUE
 		// Este registro se incluiría en el SUM porque is_entry=TRUE
 		// Y restaría $200 del total porque money es negativo
@@ -400,48 +400,48 @@ func TestMigration159Behavior(t *testing.T) {
 	t.Run("🔥 Dashboard ANTES de migración 159: no incluye movimientos internos", func(t *testing.T) {
 		// Simular datos ANTES de la migración
 		movements := []struct {
-			IsEntry      bool
-			MovementType string
-			Money        decimal.Decimal
+			IsEntry        bool
+			MovementType   string
+			Money          decimal.Decimal
 			IncludedBefore bool
 		}{
 			{IsEntry: true, MovementType: "Stock", Money: decimal.NewFromInt(1000), IncludedBefore: true},
 			{IsEntry: true, MovementType: "Remito oficial", Money: decimal.NewFromInt(500), IncludedBefore: true},
 			{IsEntry: false, MovementType: "Movimiento interno", Money: decimal.NewFromInt(-200), IncludedBefore: false}, // ❌ No incluido
 		}
-		
+
 		totalBefore := decimal.Zero
 		for _, m := range movements {
 			if m.IncludedBefore {
 				totalBefore = totalBefore.Add(m.Money)
 			}
 		}
-		
-		assert.Equal(t, "1500", totalBefore.String(), 
+
+		assert.Equal(t, "1500", totalBefore.String(),
 			"ANTES: Solo suma Stock + Remito oficial = 1500 (sin movimientos internos)")
 	})
-	
+
 	t.Run("🔥 Dashboard DESPUÉS de migración 159: incluye movimientos internos", func(t *testing.T) {
 		// Simular datos DESPUÉS de la migración
 		movements := []struct {
-			IsEntry      bool
-			MovementType string
-			Money        decimal.Decimal
+			IsEntry       bool
+			MovementType  string
+			Money         decimal.Decimal
 			IncludedAfter bool
 		}{
 			{IsEntry: true, MovementType: "Stock", Money: decimal.NewFromInt(1000), IncludedAfter: true},
 			{IsEntry: true, MovementType: "Remito oficial", Money: decimal.NewFromInt(500), IncludedAfter: true},
 			{IsEntry: true, MovementType: "Movimiento interno", Money: decimal.NewFromInt(-200), IncludedAfter: true}, // ✅ INCLUIDO
 		}
-		
+
 		totalAfter := decimal.Zero
 		for _, m := range movements {
 			if m.IncludedAfter {
 				totalAfter = totalAfter.Add(m.Money)
 			}
 		}
-		
-		assert.Equal(t, "1300", totalAfter.String(), 
+
+		assert.Equal(t, "1300", totalAfter.String(),
 			"✅ DESPUÉS: Suma Stock + Remito oficial + Movimiento interno = 1000 + 500 - 200 = 1300")
 	})
 }

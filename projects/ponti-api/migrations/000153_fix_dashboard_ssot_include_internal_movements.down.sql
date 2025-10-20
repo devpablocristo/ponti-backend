@@ -1,5 +1,5 @@
 -- ========================================
--- MIGRACIÓN 000159: FIX Dashboard SSOT - Incluir Movimientos Internos (DOWN)
+-- MIGRACIÓN 000153: FIX Dashboard SSOT - Incluir Movimientos Internos (DOWN)
 -- ========================================
 
 BEGIN;
