@@ -54,4 +54,3 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 COMMIT;
-
