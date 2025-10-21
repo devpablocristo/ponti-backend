@@ -117,8 +117,8 @@ func (t LotListTotals) MarshalJSON() ([]byte, error) {
 		SumSowedArea string `json:"sum_sowed_area"`
 		SumCost      string `json:"sum_cost"`
 	}{
-		SumSowedArea: t.SumSowedArea.Round(2).String(), // Superficie: 2 decimales
-		SumCost:      t.SumCost.Round(0).String(),      // Sin decimales
+		SumSowedArea: t.SumSowedArea.StringFixed(2), // Superficie: 2 decimales
+		SumCost:      t.SumCost.Round(0).String(),   // Sin decimales
 	}
 	return json.Marshal(aux)
 }
