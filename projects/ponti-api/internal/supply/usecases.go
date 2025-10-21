@@ -16,7 +16,7 @@ type RepositoryPort interface {
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
 	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
-	ListAllSupplies(context.Context) ([]domain.Supply, int64, error)
+	ListAllSupplies(context.Context, int64) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 }
 
@@ -134,12 +134,12 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	return u.repo.UpdateSuppliesBulk(ctx, supplies)
 }
 
-func (u *UseCases) ExportTableSupplies(ctx context.Context) ([]byte, error) {
+func (u *UseCases) ExportTableSupplies(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	items, total, err := u.repo.ListAllSupplies(ctx)
+	items, total, err := u.repo.ListAllSupplies(ctx, projectID)
 	if err != nil {
 		types.NewError(types.ErrInternal, "Internal error", err)
 	}

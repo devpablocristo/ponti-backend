@@ -109,6 +109,22 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			p.Investors[i].ID = invID
 		}
 
+		for aci := range p.AdminCostInvestors {
+			AdminCostInv := &invmod.Investor{
+				ID:   p.AdminCostInvestors[aci].ID,
+				Name: p.AdminCostInvestors[aci].Name,
+				Base: base.Base{
+					CreatedBy: p.CreatedBy,
+					UpdatedBy: p.UpdatedBy,
+				},
+			}
+			aciID, err := ensureInvestor(tx, AdminCostInv)
+			if err != nil {
+				return err
+			}
+			p.AdminCostInvestors[aci].ID = aciID
+		}
+
 		for key := range p.Fields {
 			p.Fields[key].ID = 0
 			for key2, lot := range p.Fields[key].Lots {
@@ -130,6 +146,20 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				p.Fields[key].Lots[key2].PreviousCrop.ID = previousCropID
 				p.Fields[key].Lots[key2].ID = 0
 			}
+			for fi := range p.Fields[key].Investors {
+				id, err := ensureInvestor(tx, &invmod.Investor{
+					ID:   p.Fields[key].Investors[fi].ID,
+					Name: p.Fields[key].Investors[fi].Name,
+					Base: base.Base{
+						CreatedBy: p.CreatedBy,
+						UpdatedBy: p.UpdatedBy,
+					},
+				})
+				if err != nil {
+					return err
+				}
+				p.Fields[key].Investors[fi].ID = id
+			}
 		}
 
 		projectModel := models.FromDomain(p)
@@ -139,7 +169,6 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		projectID = projectModel.ID
 		return nil
 	})
-
 	if err != nil {
 		return 0, err
 	}
@@ -287,6 +316,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Campaign").
 		Preload("Managers").
 		Preload("Investors.Investor").
+		Preload("AdminCostInvestors.Investor").
 		Preload("Fields", func(db *gorm.DB) *gorm.DB {
 			return db.Order("id ASC")
 		}).
@@ -294,10 +324,10 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Fields.Lots", func(db *gorm.DB) *gorm.DB {
 			return db.Order("id ASC")
 		}).
+		Preload("Fields.FieldInvestors.Investor").
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
@@ -314,7 +344,6 @@ func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name str
 		Where("name = ?", name).
 		Where("campaign_id = ?", campaignID).
 		First(&m).Error
-
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -330,7 +359,6 @@ func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) 
 	err := r.db.Client().WithContext(ctx).
 		Where("project_id = ?", projectID).
 		Find(&fields).Error
-
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get fields for project %d", projectID), err)
 	}

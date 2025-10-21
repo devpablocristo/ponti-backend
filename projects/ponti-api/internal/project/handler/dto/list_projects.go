@@ -99,6 +99,12 @@ func NewProjectsResponse(
 				Investor{ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage},
 			)
 		}
+
+		for _, aci := range p.AdminCostInvestors {
+			out[i].AdminCostInvestors = append(out[i].AdminCostInvestors,
+				AdminCostInvestor{ID: aci.ID, Name: aci.Name, Percentage: aci.Percentage},
+			)
+		}
 	}
 
 	maxPage := int((total + int64(perPage) - 1) / int64(perPage))
