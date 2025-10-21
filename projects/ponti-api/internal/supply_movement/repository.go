@@ -12,6 +12,7 @@ import (
 	stockmodel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -160,6 +161,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 	var supplyModel models.SupplyMovement
 	client := r.db.Client().WithContext(ctx)
 
+	// Obtener el movimiento a eliminar
 	err := client.
 		Where("project_id = ?", projectId).
 		Where("id = ?", supplyId).
@@ -171,6 +173,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 		return err
 	}
 
+	// Verificar si hay stock cerrado
 	err = client.
 		Where("project_id = ?", projectId).
 		Where("supply_id = ?", supplyModel.SupplyID).
@@ -183,13 +186,119 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 		return err
 	}
 
+	// Verificar si es un movimiento interno
+	isInternalMovement := supplyModel.MovementType == "Movimiento interno" ||
+		supplyModel.MovementType == "Movimiento interno entrada"
+
 	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete stock", err)
+		if isInternalMovement {
+			// Buscar todos los registros relacionados del movimiento interno
+			// Los registros relacionados comparten: movement_date, reference_number, supply_id, investor_id, provider_id
+			var relatedMovements []models.SupplyMovement
+			err := tx.Where("movement_date = ? AND reference_number = ? AND supply_id = ? AND investor_id = ? AND provider_id = ?",
+				supplyModel.MovementDate,
+				supplyModel.ReferenceNumber,
+				supplyModel.SupplyID,
+				supplyModel.InvestorID,
+				supplyModel.ProviderID).
+				Find(&relatedMovements).Error
+			if err != nil {
+				return types.NewError(types.ErrInternal, "failed to find related movements", err)
+			}
+
+			// Recolectar todos los project_ids y stock_ids afectados
+			affectedProjects := make(map[int64]bool)
+			affectedStocks := make(map[int64]bool)
+
+			for _, mov := range relatedMovements {
+				affectedProjects[mov.ProjectId] = true
+				affectedStocks[mov.StockId] = true
+			}
+
+			// Eliminar todos los registros relacionados
+			if err := tx.Where("movement_date = ? AND reference_number = ? AND supply_id = ? AND investor_id = ? AND provider_id = ?",
+				supplyModel.MovementDate,
+				supplyModel.ReferenceNumber,
+				supplyModel.SupplyID,
+				supplyModel.InvestorID,
+				supplyModel.ProviderID).
+				Delete(&models.SupplyMovement{}).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to delete related supply movements", err)
+			}
+
+			// Eliminar stocks de todos los proyectos afectados solo si no tienen más movimientos
+			// O actualizar RealStockUnits si quedan movimientos
+			for projectIDAffected := range affectedProjects {
+				// Obtener movimientos restantes para recalcular el stock
+				var remainingMovements []models.SupplyMovement
+				if err := tx.Where("project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).
+					Find(&remainingMovements).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to get remaining movements", err)
+				}
+
+				if len(remainingMovements) == 0 {
+					// No quedan movimientos, eliminar el stock
+					if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).Error; err != nil {
+						return types.NewError(types.ErrInternal, "failed to delete stock", err)
+					}
+				} else {
+					// Recalcular RealStockUnits basándose en los movimientos restantes
+					realStockUnits := decimal.Zero
+					for _, mov := range remainingMovements {
+						if mov.IsEntry {
+							realStockUnits = realStockUnits.Add(mov.Quantity)
+						} else {
+							realStockUnits = realStockUnits.Sub(mov.Quantity)
+						}
+					}
+
+					// Actualizar el stock con el nuevo RealStockUnits
+					if err := tx.Model(&stockmodel.Stock{}).
+						Where("project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).
+						Update("real_stock_units", realStockUnits).Error; err != nil {
+						return types.NewError(types.ErrInternal, "failed to update stock real units", err)
+					}
+				}
+			}
+		} else {
+			// Movimiento normal (no interno)
+			// Primero eliminar el movimiento
+			if err := tx.Delete(&models.SupplyMovement{}, "project_id = ? AND id = ?", projectId, supplyId).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to delete supply movement", err)
+			}
+
+			// Obtener movimientos restantes para recalcular el stock
+			var remainingMovements []models.SupplyMovement
+			if err := tx.Where("project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).
+				Find(&remainingMovements).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to get remaining movements", err)
+			}
+
+			if len(remainingMovements) == 0 {
+				// No quedan movimientos, eliminar el stock
+				if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to delete stock", err)
+				}
+			} else {
+				// Recalcular RealStockUnits basándose en los movimientos restantes
+				realStockUnits := decimal.Zero
+				for _, mov := range remainingMovements {
+					if mov.IsEntry {
+						realStockUnits = realStockUnits.Add(mov.Quantity)
+					} else {
+						realStockUnits = realStockUnits.Sub(mov.Quantity)
+					}
+				}
+
+				// Actualizar el stock con el nuevo RealStockUnits
+				if err := tx.Model(&stockmodel.Stock{}).
+					Where("project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).
+					Update("real_stock_units", realStockUnits).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to update stock real units", err)
+				}
+			}
 		}
-		if err := tx.Delete(&models.SupplyMovement{}, "project_id = ? AND id = ?", projectId, supplyId).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete supply movement", err)
-		}
+
 		return nil
 	})
 	if err != nil {
