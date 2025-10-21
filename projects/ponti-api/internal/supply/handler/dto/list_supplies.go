@@ -36,7 +36,7 @@ func (s ListedSupply) MarshalJSON() ([]byte, error) {
 	}{
 		ID:           s.ID,
 		Name:         s.Name,
-		Price:        s.Price.Round(2).String(), // Precio: 2 decimales
+		Price:        s.Price.StringFixed(2), // Precio: 2 decimales
 		UnitID:       s.UnitID,
 		CategoryName: s.CategoryName,
 		CategoryID:   s.CategoryID,

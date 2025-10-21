@@ -33,7 +33,7 @@ func (l ListedLabor) MarshalJSON() ([]byte, error) {
 		ID:             l.ID,
 		Name:           l.Name,
 		CategoryId:     l.CategoryId,
-		Price:          l.Price.Round(2).String(), // Costo u$s/ha: 2 decimales
+		Price:          l.Price.StringFixed(2), // Costo u$s/ha: 2 decimales
 		ContractorName: l.ContractorName,
 		CategoryName:   l.CategoryName,
 		UpdatedAt:      l.UpdatedAt,

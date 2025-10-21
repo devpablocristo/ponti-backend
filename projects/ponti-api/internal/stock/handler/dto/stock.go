@@ -26,9 +26,9 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 		TotalKilograms string            `json:"total_kilograms"`
 	}{
 		Stocks:         r.Stocks,
-		NetTotalUSD:    r.NetTotalUSD.Round(2).String(),    // Total u$s: 2 decimales
-		TotalLiters:    r.TotalLiters.Round(2).String(),    // 2 decimales
-		TotalKilograms: r.TotalKilograms.Round(2).String(), // 2 decimales
+		NetTotalUSD:    r.NetTotalUSD.StringFixed(2),    // Total u$s: 2 decimales
+		TotalLiters:    r.TotalLiters.StringFixed(2),    // 2 decimales
+		TotalKilograms: r.TotalKilograms.StringFixed(2), // 2 decimales
 	}
 	return json.Marshal(aux)
 }
@@ -71,17 +71,17 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		ID:              s.ID,
 		SupplyName:      s.SupplyName,
 		InvestorName:    s.InvestorName,
-		StockUnits:      s.StockUnits.Round(2).String(),
-		RealStockUnits:  s.RealStockUnits.Round(2).String(),
-		StockDifference: s.StockDifference.Round(2).String(),
-		TotalUSD:        s.TotalUSD.Round(2).String(), // Total u$s: 2 decimales
+		StockUnits:      s.StockUnits.StringFixed(2),
+		RealStockUnits:  s.RealStockUnits.StringFixed(2),
+		StockDifference: s.StockDifference.StringFixed(2),
+		TotalUSD:        s.TotalUSD.StringFixed(2), // Total u$s: 2 decimales
 		ClassType:       s.ClassType,
 		CloseDate:       s.CloseDate,
 		SupplyUnitId:    s.SupplyUnitId,
-		SupplyUnitPrice: s.SupplyUnitPrice.Round(2).String(), // Precio u: 2 decimales
-		EntryStock:      s.EntryStock.Round(2).String(),
-		OutStock:        s.OutStock.Round(2).String(),
-		Consumed:        s.Consumed.Round(2).String(),
+		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2), // Precio u: 2 decimales
+		EntryStock:      s.EntryStock.StringFixed(2),
+		OutStock:        s.OutStock.StringFixed(2),
+		Consumed:        s.Consumed.StringFixed(2),
 	}
 	return json.Marshal(aux)
 }

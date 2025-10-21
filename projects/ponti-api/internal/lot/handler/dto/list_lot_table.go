@@ -88,17 +88,17 @@ func (e LotListElement) MarshalJSON() ([]byte, error) {
 		PreviousCrop:         e.PreviousCrop,
 		CurrentCrop:          e.CurrentCrop,
 		Variety:              e.Variety,
-		SowedArea:            e.SowedArea.Round(2).String(), // Superficie: 2 decimales
-		Hectares:             e.Hectares.Round(2).String(),  // Superficie: 2 decimales
+		SowedArea:            e.SowedArea.StringFixed(2), // Superficie: 2 decimales
+		Hectares:             e.Hectares.StringFixed(2),  // Superficie: 2 decimales
 		Season:               e.Season,
-		Tons:                 e.Tons.Round(2).String(), // Toneladas: 2 decimales
+		Tons:                 e.Tons.StringFixed(2), // Toneladas: 2 decimales
 		Dates:                e.Dates,
 		AdminCost:            e.AdminCost.Round(0).String(), // Sin decimales
 		UpdatedAt:            e.UpdatedAt,
-		HarvestedArea:        e.HarvestedArea.Round(2).String(), // Superficie: 2 decimales
+		HarvestedArea:        e.HarvestedArea.StringFixed(2), // Superficie: 2 decimales
 		HarvestDate:          e.HarvestDate,
 		CostUsdPerHa:         e.CostUsdPerHa.Round(0).String(),         // Sin decimales
-		YieldTnPerHa:         e.YieldTnPerHa.Round(2).String(),         // Rendimiento: 2 decimales
+		YieldTnPerHa:         e.YieldTnPerHa.StringFixed(2),            // Rendimiento: 2 decimales
 		IncomeNetPerHa:       e.IncomeNetPerHa.Round(0).String(),       // Sin decimales
 		RentPerHa:            e.RentPerHa.Round(0).String(),            // Sin decimales
 		ActiveTotalPerHa:     e.ActiveTotalPerHa.Round(0).String(),     // Sin decimales
