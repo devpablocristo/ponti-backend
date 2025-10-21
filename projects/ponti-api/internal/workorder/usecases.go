@@ -3,6 +3,8 @@ package workorder
 import (
 	"context"
 
+	"github.com/shopspring/decimal"
+
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
 )
@@ -15,6 +17,7 @@ type RepositoryPort interface {
 	DeleteWorkorderByID(context.Context, int64) error
 	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
 	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
+	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
 }
 
 type ExporterAdapterPort interface {
