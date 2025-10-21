@@ -22,10 +22,10 @@ func (m WorkorderMetrics) MarshalJSON() ([]byte, error) {
 		Kilograms  string `json:"kilograms"`
 		DirectCost string `json:"direct_cost"`
 	}{
-		SurfaceHa:  m.SurfaceHa.Round(3).String(),
-		Liters:     m.Liters.Round(3).String(),
-		Kilograms:  m.Kilograms.Round(3).String(),
-		DirectCost: m.DirectCost.Round(3).String(),
+		SurfaceHa:  m.SurfaceHa.Round(0).String(),  // Sin decimales
+		Liters:     m.Liters.Round(0).String(),     // Sin decimales
+		Kilograms:  m.Kilograms.Round(0).String(),  // Sin decimales
+		DirectCost: m.DirectCost.Round(0).String(), // Sin decimales
 	}
 	return json.Marshal(aux)
 }

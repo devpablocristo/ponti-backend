@@ -16,7 +16,7 @@ type LotMetrics struct {
 	SuperficieTotal decimal.Decimal `json:"superficie_total"`
 }
 
-// MarshalJSON redondea homogéneamente (3 decimales) como en workorders.
+// MarshalJSON aplica formato según especificación: Toneladas/ha 2 decimales, resto enteros
 func (m LotMetrics) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		SeededArea      string `json:"seeded_area"`
@@ -25,11 +25,11 @@ func (m LotMetrics) MarshalJSON() ([]byte, error) {
 		CostPerHectare  string `json:"cost_per_hectare"`
 		SuperficieTotal string `json:"superficie_total"`
 	}{
-		SeededArea:      m.SeededArea.StringFixed(2),        // Superficie sembrada: 2 decimales
-		HarvestedArea:   m.HarvestedArea.StringFixed(2),     // Superficie cosechada: 2 decimales
-		YieldTnPerHa:    m.YieldTnPerHa.StringFixed(2),      // Rendimiento: 2 decimales
-		CostPerHectare:  m.CostPerHectare.Round(0).String(), // Costo: sin decimales
-		SuperficieTotal: m.SuperficieTotal.StringFixed(2),   // Superficie total: 2 decimales
+		SeededArea:      m.SeededArea.Round(0).String(),      // Sin decimales
+		HarvestedArea:   m.HarvestedArea.Round(0).String(),   // Sin decimales
+		YieldTnPerHa:    m.YieldTnPerHa.StringFixed(2),       // Toneladas/ha: 2 decimales
+		CostPerHectare:  m.CostPerHectare.Round(0).String(),  // Sin decimales
+		SuperficieTotal: m.SuperficieTotal.Round(0).String(), // Sin decimales
 	}
 	return json.Marshal(aux)
 }
