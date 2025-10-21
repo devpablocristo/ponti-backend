@@ -20,9 +20,9 @@ func (m LaborMetrics) MarshalJSON() ([]byte, error) {
 		NetTotalCost string `json:"net_total_cost"`
 		AvgCostPerHa string `json:"avg_cost_per_ha"`
 	}{
-		SurfaceHa:    m.SurfaceHa.Round(3).String(),
-		NetTotalCost: m.NetTotalCost.Round(3).String(),
-		AvgCostPerHa: m.AvgCostPerHa.Round(3).String(),
+		SurfaceHa:    m.SurfaceHa.Round(0).String(),    // Sin decimales
+		NetTotalCost: m.NetTotalCost.Round(0).String(), // Sin decimales
+		AvgCostPerHa: m.AvgCostPerHa.StringFixed(2),    // Costo/ha: 2 decimales
 	}
 	return json.Marshal(aux)
 }
