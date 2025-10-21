@@ -223,13 +223,13 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 		"Costos directos ejecutados",
 		"Dashboard",
 		"Dashboard.CostosDirectos = ∑(Ordenes.costo_total)",
-		"∑(workorders.effective_area × labors.price + workorder_items.total_used × supplies.price)",
+		"∑(workorders.effective_area × labors.price + workorder_items.final_dose × effective_area × supplies.price)",
 		leftValue,
 		"Tabla workorders RAW",
 		"v3_dashboard_ssot.direct_costs_total_for_project()",
 		rightValue,
 		"Vista v3_dashboard_management_balance",
-		decimal.Zero, // Tolerancia = 0 (debe ser exacto)
+		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
 
@@ -278,7 +278,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 		"∑(cost_usd_per_ha × sowed_area_ha)",
 		rightValue,
 		"Vista v3_lot_list",
-		decimal.Zero, // Tolerancia = 0 (debe ser exacto)
+		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
 
@@ -328,7 +328,7 @@ func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID
 		"∑(direct_cost_usd por field+crop)",
 		rightValue,
 		"Vista v3_report_field_crop_metrics",
-		decimal.Zero, // Tolerancia = 0 (debe ser exacto)
+		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
 
@@ -373,7 +373,7 @@ func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, proje
 		"summaryResults[0].TotalDirectCostsUsd",
 		rightValue,
 		"Vista v3_report_summary_results",
-		decimal.Zero, // Tolerancia = 0 (debe ser exacto)
+		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
 

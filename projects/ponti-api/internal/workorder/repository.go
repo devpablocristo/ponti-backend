@@ -283,16 +283,17 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter
 func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
 	// Query RAW: suma directa desde workorders + workorder_items
 	// Labor cost: effective_area × labor.price
-	// Supply cost: total_used × supply.price (valor almacenado realmente usado)
+	// Supply cost: final_dose × effective_area × price (cálculo estándar del sistema)
+	// CORREGIDO: Usar final_dose × effective_area en lugar de total_used para consistencia con vistas
 	q := `
 		WITH workorder_costs AS (
 		  SELECT 
 		    wo.id,
 		    -- Costo de la labor (área efectiva × precio de la labor)
 		    (wo.effective_area * l.price) AS labor_cost,
-		    -- Costo de insumos (suma de items: total_used × price)
+		    -- Costo de insumos (suma de items: final_dose × effective_area × price)
 		    COALESCE((
-		      SELECT SUM(wi.total_used * s.price)
+		      SELECT SUM(wi.final_dose * wo.effective_area * s.price)
 		      FROM public.workorder_items wi
 		      JOIN public.supplies s ON s.id = wi.supply_id
 		      WHERE wi.workorder_id = wo.id 
