@@ -381,7 +381,9 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	err := r.db.Client().WithContext(ctx).
 		Preload("Managers").
 		Preload("Investors.Investor").
+		Preload("AdminCostInvestors.Investor").
 		Preload("Fields").
+		Preload("Fields.FieldInvestors.Investor").
 		Preload("Fields.Lots").
 		Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
 		First(&existing).Error
@@ -467,6 +469,16 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		}
 
 		err = relinkInvestors(tx, existing, d)
+		if err != nil {
+			return err
+		}
+
+		err = relinkAdminCostInvestors(tx, existing, d)
+		if err != nil {
+			return err
+		}
+
+		err = relinkFieldInvestors(tx, existing, d)
 		if err != nil {
 			return err
 		}
@@ -943,6 +955,122 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 		if _, exists := newLotIDs[l.ID]; !exists {
 			if err := tx.Exec("DELETE FROM lots WHERE id = ?", l.ID).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to remove lot", err)
+			}
+		}
+	}
+	return nil
+}
+
+func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	existingAdCostInvIDs := make(map[int64]struct{})
+	for _, aci := range existing.AdminCostInvestors {
+		existingAdCostInvIDs[aci.InvestorID] = struct{}{}
+	}
+
+	newAdCostInvIDs := make(map[int64]struct{})
+	for k, aci := range d.AdminCostInvestors {
+		if aci.ID != 0 {
+			newAdCostInvIDs[aci.ID] = struct{}{}
+		} else {
+			aciID, err := ensureInvestor(tx, &invmod.Investor{
+				Name: aci.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			newAdCostInvIDs[aciID] = struct{}{}
+			d.AdminCostInvestors[k].ID = aciID
+		}
+	}
+
+	for _, aci := range d.AdminCostInvestors {
+		if _, exists := existingAdCostInvIDs[aci.ID]; !exists {
+			if err := tx.Exec(
+				"INSERT INTO admin_cost_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
+				d.ID, aci.ID, aci.Percentage, d.UpdatedBy, d.UpdatedBy,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to add admin cost investor", err)
+			}
+		}
+	}
+
+	for _, aci := range existing.AdminCostInvestors {
+		if _, exists := newAdCostInvIDs[aci.InvestorID]; !exists {
+			if err := tx.Exec(
+				"DELETE FROM admin_cost_investors WHERE project_id = ? AND investor_id = ?",
+				d.ID, aci.InvestorID,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to remove investor", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	// helper para matchear el field del payload contra el field existente (por ID o por nombre si es nuevo)
+	findDomainField := func(fid int64, fname string) *domainField.Field {
+		for i := range d.Fields {
+			if d.Fields[i].ID > 0 && d.Fields[i].ID == fid {
+				return &d.Fields[i]
+			}
+			if d.Fields[i].ID == 0 && d.Fields[i].Name == fname {
+				return &d.Fields[i]
+			}
+		}
+		return nil
+	}
+
+	for _, ef := range existing.Fields {
+		df := findDomainField(ef.ID, ef.Name)
+		if df == nil {
+			continue
+		}
+
+		existingFieldInvIDs := make(map[int64]struct{}, len(ef.FieldInvestors))
+		for _, fi := range ef.FieldInvestors {
+			existingFieldInvIDs[fi.InvestorID] = struct{}{}
+		}
+
+		newIDs := make(map[int64]struct{}, len(df.Investors))
+		for i := range df.Investors {
+			inv := &df.Investors[i]
+			if inv.ID == 0 {
+				id, err := ensureInvestor(tx, &invmod.Investor{
+					Name: inv.Name,
+					Base: base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
+				})
+				if err != nil {
+					return err
+				}
+				inv.ID = id
+			}
+			newIDs[inv.ID] = struct{}{}
+
+			if _, existed := existingFieldInvIDs[inv.ID]; !existed {
+				if err := tx.Exec(
+					`INSERT INTO field_investors (field_id, investor_id, percentage, created_by, updated_by)
+					 VALUES (?, ?, ?, ?, ?)`,
+					ef.ID, inv.ID, inv.Percentage, d.UpdatedBy, d.UpdatedBy,
+				).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to add field investor", err)
+				}
+			}
+		}
+
+		for invID := range existingFieldInvIDs {
+			if _, exists := newIDs[invID]; !exists {
+				if err := tx.Exec(
+					`DELETE FROM field_investors WHERE field_id = ? AND investor_id = ?`,
+					ef.ID, invID,
+				).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to remove field investor", err)
+				}
 			}
 		}
 	}
