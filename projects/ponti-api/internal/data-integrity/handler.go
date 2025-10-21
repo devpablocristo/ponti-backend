@@ -1,4 +1,9 @@
 // Package data_integrity proporciona funcionalidades para validar la integridad de datos
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+//
+// ESTE MÓDULO CONTIENE CÁLCULOS CRÍTICOS DE INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 package data_integrity
 
 import (
@@ -100,4 +105,3 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	response := dto.ToIntegrityReportResponse(report)
 	c.JSON(http.StatusOK, response)
 }
-

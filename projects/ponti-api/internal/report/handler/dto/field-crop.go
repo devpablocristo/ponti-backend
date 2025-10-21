@@ -85,9 +85,19 @@ func FromDomainFieldCrop(table domain.FieldCrop) ReportTableResponse {
 	for _, row := range table.Rows {
 		values := make(map[string]NumberValue)
 		for fieldCropKey, value := range row.Values {
+			// Aplicar redondeo selectivo según la clave de la fila
+			var formattedNumber string
+			switch row.Key {
+			case "yield", "commercial_cost", "indifference_yield":
+				// Rendimiento, Gasto comercial, Rinde indiferencia: 2 decimales
+				formattedNumber = value.Number.Round(2).String()
+			default:
+				// Resto: sin decimales (redondeo al entero más cercano)
+				formattedNumber = value.Number.Round(0).String()
+			}
+
 			values[fieldCropKey] = NumberValue{
-				// Formatear con 3 decimales según regla del proyecto para dashboard
-				Number: value.Number.StringFixed(3),
+				Number: formattedNumber,
 			}
 		}
 

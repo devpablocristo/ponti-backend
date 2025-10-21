@@ -1,4 +1,18 @@
 // Package data_integrity implementa casos de uso para validar la coherencia de datos
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+//
+// ESTOS CÁLCULOS SON CRÍTICOS Y NO DEBEN ALTERARSE A MENOS QUE SE RECIBA
+// UNA ORDEN DIRECTA Y CLARA DEL USUARIO.
+//
+// REGLAS INVIOLABLES:
+// - NUNCA modificar los cálculos LEFT/RIGHT sin autorización explícita
+// - NUNCA cambiar las tolerancias sin autorización explícita
+// - NUNCA alterar la lógica de los 14 controles sin autorización explícita
+// - NUNCA usar ROUND() en cálculos internos (solo en DTOs de salida)
+// - SIEMPRE mantener precisión completa en cálculos SQL y Go
+//
+// Si necesitas modificar algo, DEBES pedir autorización explícita primero.
 package data_integrity
 
 import (
@@ -72,6 +86,10 @@ func NewUseCases(
 
 // CheckCostsCoherence valida la coherencia de costos con 14 controles individuales
 // Cada control calcula LEFT (origen/correcto) y RIGHT (destino/validar) de forma INDEPENDIENTE
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+// ESTA FUNCIÓN CONTIENE LOS 14 CONTROLES CRÍTICOS DE INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
 	checks := make([]domain.IntegrityCheck, 0, 14)
 
@@ -175,6 +193,10 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 // LEFT: ∑(Ordenes.costo_total) RAW
 // RIGHT: Dashboard.CostosDirectos (SSOT)
 // =====================================================
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+// ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {
@@ -216,6 +238,10 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 // LEFT: ∑(Ordenes.costo_total) RAW
 // RIGHT: ∑(Costo_directo_ha_lote × Superficie_lote)
 // =====================================================
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+// ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {

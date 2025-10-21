@@ -1,4 +1,9 @@
 // Package dto contiene los DTOs para el módulo de integridad de datos
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+//
+// ESTOS DTOs SON CRÍTICOS PARA LA INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 package dto
 
 import (
@@ -20,9 +25,9 @@ type IntegrityCheckDTO struct {
 	TargetModule  string `json:"target_module"`
 	ControlRule   string `json:"control_rule"`
 
-	LeftCalculation  string `json:"left_calculation"`
-	LeftValue        string `json:"left_value"`
-	LeftSource       string `json:"left_source,omitempty"`
+	LeftCalculation string `json:"left_calculation"`
+	LeftValue       string `json:"left_value"`
+	LeftSource      string `json:"left_source,omitempty"`
 
 	RightCalculation string `json:"right_calculation"`
 	RightValue       string `json:"right_value"`

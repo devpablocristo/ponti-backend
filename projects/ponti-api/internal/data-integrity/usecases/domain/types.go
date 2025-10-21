@@ -1,4 +1,9 @@
 // Package domain contiene los tipos de dominio para el módulo de integridad de datos
+//
+// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+//
+// ESTOS TIPOS SON CRÍTICOS PARA LA INTEGRIDAD DE DATOS.
+// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 package domain
 
 import "github.com/shopspring/decimal"
@@ -18,9 +23,9 @@ type IntegrityCheck struct {
 	ControlRule   string `json:"control_rule"`   // Regla de control del CSV
 
 	// LEFT SIDE (ORIGEN - Fuente de verdad)
-	LeftCalculation  string          `json:"left_calculation"`  // Descripción del cálculo LEFT
-	LeftValue        decimal.Decimal `json:"left_value"`        // Valor calculado desde origen
-	LeftSource       string          `json:"left_source"`       // Query/Vista/Tabla usada para LEFT
+	LeftCalculation string          `json:"left_calculation"` // Descripción del cálculo LEFT
+	LeftValue       decimal.Decimal `json:"left_value"`       // Valor calculado desde origen
+	LeftSource      string          `json:"left_source"`      // Query/Vista/Tabla usada para LEFT
 
 	// RIGHT SIDE (DESTINO - A validar)
 	RightCalculation string          `json:"right_calculation"` // Descripción del cálculo RIGHT
@@ -37,4 +42,3 @@ type IntegrityCheck struct {
 type CostsCheckFilter struct {
 	ProjectID *int64
 }
-

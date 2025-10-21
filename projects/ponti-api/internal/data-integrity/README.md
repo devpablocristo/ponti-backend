@@ -1,5 +1,20 @@
 # Data Integrity - Módulo de Control de Coherencia
 
+## ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
+
+**ESTOS CÁLCULOS SON CRÍTICOS Y NO DEBEN ALTERARSE A MENOS QUE SE RECIBA UNA ORDEN DIRECTA Y CLARA DEL USUARIO.**
+
+### REGLAS INVIOLABLES:
+- **NUNCA** modificar los cálculos LEFT/RIGHT sin autorización explícita
+- **NUNCA** cambiar las tolerancias sin autorización explícita  
+- **NUNCA** alterar la lógica de los 14 controles sin autorización explícita
+- **NUNCA** usar ROUND() en cálculos internos (solo en DTOs de salida)
+- **SIEMPRE** mantener precisión completa en cálculos SQL y Go
+
+**Si necesitas modificar algo, DEBES pedir autorización explícita primero.**
+
+---
+
 ## 📋 Descripción
 
 Módulo para validar la coherencia de datos entre diferentes módulos del sistema mediante **14 controles automatizados** que garantizan la integridad de la información en toda la aplicación.
