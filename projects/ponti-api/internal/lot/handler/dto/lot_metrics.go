@@ -25,11 +25,11 @@ func (m LotMetrics) MarshalJSON() ([]byte, error) {
 		CostPerHectare  string `json:"cost_per_hectare"`
 		SuperficieTotal string `json:"superficie_total"`
 	}{
-		SeededArea:      m.SeededArea.StringFixed(2), // Superficie sembrada: 2 decimales
-		HarvestedArea:   m.HarvestedArea.StringFixed(2), // Superficie cosechada: 2 decimales
-		YieldTnPerHa:    m.YieldTnPerHa.StringFixed(2), // Rendimiento: 2 decimales
+		SeededArea:      m.SeededArea.StringFixed(2),        // Superficie sembrada: 2 decimales
+		HarvestedArea:   m.HarvestedArea.StringFixed(2),     // Superficie cosechada: 2 decimales
+		YieldTnPerHa:    m.YieldTnPerHa.StringFixed(2),      // Rendimiento: 2 decimales
 		CostPerHectare:  m.CostPerHectare.Round(0).String(), // Costo: sin decimales
-		SuperficieTotal: m.SuperficieTotal.StringFixed(2), // Superficie total: 2 decimales
+		SuperficieTotal: m.SuperficieTotal.StringFixed(2),   // Superficie total: 2 decimales
 	}
 	return json.Marshal(aux)
 }
