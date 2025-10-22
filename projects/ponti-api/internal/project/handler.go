@@ -26,6 +26,7 @@ type UseCasesPort interface {
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
+	RestoreProject(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -80,6 +81,7 @@ func (h *Handler) Routes() {
 		public.GET("/customer/:id", h.ListProjectsByCustomerID)
 		public.GET("/:id", h.GetProject)
 		public.PUT("/:id", h.UpdateProject)
+		public.PUT("/:id/restore", h.RestoreProject)
 		public.DELETE("/:id", h.DeleteProject)
 		public.GET("/search", h.ListProjectsByName)
 	}
@@ -249,6 +251,30 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
+}
+
+// RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
+func (h *Handler) RestoreProject(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
+		return
+	}
+	if err := h.ucs.RestoreProject(c, id); err != nil {
+		switch {
+		case types.IsNotFound(err):
+			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+			return
+		case types.IsValidationError(err):
+			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "project restored successfully"})
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {
