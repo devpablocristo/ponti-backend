@@ -154,11 +154,14 @@ type ManagementBalanceSummary struct {
 	OperatingResultPct        decimal.Decimal `gorm:"column:operating_result_pct"`
 	SemillaCostUSD            decimal.Decimal `gorm:"column:semilla_cost"`
 	InsumosCostUSD            decimal.Decimal `gorm:"column:insumos_cost"`
+	FertilizantesCostUSD      decimal.Decimal `gorm:"column:fertilizantes_cost"`
 	LaboresCostUSD            decimal.Decimal `gorm:"column:labores_cost"`
 	SemillasInvertidosUSD     decimal.Decimal `gorm:"column:semillas_invertidos_usd"`
 	SemillasStockUSD          decimal.Decimal `gorm:"column:semillas_stock_usd"`
 	AgroquimicosInvertidosUSD decimal.Decimal `gorm:"column:agroquimicos_invertidos_usd"`
 	AgroquimicosStockUSD      decimal.Decimal `gorm:"column:agroquimicos_stock_usd"`
+	FertilizantesInvertidosUSD decimal.Decimal `gorm:"column:fertilizantes_invertidos_usd"`
+	FertilizantesStockUSD      decimal.Decimal `gorm:"column:fertilizantes_stock_usd"`
 	LaboresInvertidosUSD      decimal.Decimal `gorm:"column:labores_invertidos_usd"`
 }
 

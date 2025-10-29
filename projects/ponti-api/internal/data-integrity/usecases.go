@@ -392,11 +392,12 @@ func (u *UseCases) control5_LaboresInsumosVsDashboard(ctx context.Context, proje
 
 	summary := dashboardData.ManagementBalance.Summary
 
-	// LEFT: Suma de componentes (Labores + Semillas + Agroquímicos)
+	// LEFT: Suma de componentes (Labores + Semillas + Agroquímicos + Fertilizantes)
 	labores := summary.LaboresInvertidosUSD
 	semilla := summary.SemillasInvertidosUSD
 	agroquimicos := summary.AgroquimicosInvertidosUSD
-	leftValue := labores.Add(semilla).Add(agroquimicos)
+	fertilizantes := summary.FertilizantesInvertidosUSD
+	leftValue := labores.Add(semilla).Add(agroquimicos).Add(fertilizantes)
 
 	// RIGHT: Total invertidos desde dashboard
 	rightValue := dashboardData.ManagementBalance.TotalsRow.InvestedUSD
@@ -407,7 +408,7 @@ func (u *UseCases) control5_LaboresInsumosVsDashboard(ctx context.Context, proje
 		"Invertidos",
 		"Dashboard",
 		"Dashboard.Invertidos = ∑(Labores) + ∑(Insumos)",
-		"Labores + Semillas + Agroquímicos",
+		"Labores + Semillas + Agroquímicos + Fertilizantes",
 		leftValue,
 		"Dashboard Summary components",
 		"TotalsRow.InvestedUSD",
@@ -839,6 +840,7 @@ func (u *UseCases) control14_StockVsDashboard(ctx context.Context, projectID *in
 	// LEFT: Calcular stock esperado (Invertido - Ejecutado)
 	invertido := summary.SemillasInvertidosUSD.
 		Add(summary.AgroquimicosInvertidosUSD).
+		Add(summary.FertilizantesInvertidosUSD).
 		Add(summary.LaboresInvertidosUSD)
 	ejecutado := summary.DirectCostsExecutedUSD
 	leftValue := invertido.Sub(ejecutado)
@@ -852,7 +854,7 @@ func (u *UseCases) control14_StockVsDashboard(ctx context.Context, projectID *in
 		"Insumos en stock",
 		"Dashboard",
 		"Stock = Invertido - Ejecutado",
-		"(Semillas + Agroquímicos + Labores) - Ejecutado",
+		"(Semillas + Agroquímicos + Fertilizantes + Labores) - Ejecutado",
 		leftValue,
 		"Dashboard Summary calculation",
 		"Summary.StockUSD",
