@@ -117,24 +117,27 @@ type DashboardManagementBalance struct {
 
 // DashboardBalanceSummary representa el resumen del balance
 type DashboardBalanceSummary struct {
-	IncomeUSD                 decimal.Decimal
-	DirectCostsExecutedUSD    decimal.Decimal
-	DirectCostsInvestedUSD    decimal.Decimal
-	StockUSD                  decimal.Decimal
-	RentExecutedUSD           decimal.Decimal
-	RentUSD                   decimal.Decimal
-	StructureExecutedUSD      decimal.Decimal
-	StructureUSD              decimal.Decimal
-	OperatingResultUSD        decimal.Decimal
-	OperatingResultPct        decimal.Decimal
-	SemillaCostUSD            decimal.Decimal
-	InsumosCostUSD            decimal.Decimal
-	LaboresCostUSD            decimal.Decimal
-	SemillasInvertidosUSD     decimal.Decimal
-	SemillasStockUSD          decimal.Decimal
-	AgroquimicosInvertidosUSD decimal.Decimal
-	AgroquimicosStockUSD      decimal.Decimal
-	LaboresInvertidosUSD      decimal.Decimal
+	IncomeUSD                  decimal.Decimal
+	DirectCostsExecutedUSD     decimal.Decimal
+	DirectCostsInvestedUSD     decimal.Decimal
+	StockUSD                   decimal.Decimal
+	RentExecutedUSD            decimal.Decimal
+	RentUSD                    decimal.Decimal
+	StructureExecutedUSD       decimal.Decimal
+	StructureUSD               decimal.Decimal
+	OperatingResultUSD         decimal.Decimal
+	OperatingResultPct         decimal.Decimal
+	SemillaCostUSD             decimal.Decimal
+	InsumosCostUSD             decimal.Decimal
+	FertilizantesCostUSD       decimal.Decimal
+	LaboresCostUSD             decimal.Decimal
+	SemillasInvertidosUSD      decimal.Decimal
+	SemillasStockUSD           decimal.Decimal
+	AgroquimicosInvertidosUSD  decimal.Decimal
+	AgroquimicosStockUSD       decimal.Decimal
+	FertilizantesInvertidosUSD decimal.Decimal
+	FertilizantesStockUSD      decimal.Decimal
+	LaboresInvertidosUSD       decimal.Decimal
 }
 
 // DashboardBalanceBreakdown representa el desglose del balance por categoría

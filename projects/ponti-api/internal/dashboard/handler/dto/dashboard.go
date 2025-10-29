@@ -152,6 +152,7 @@ const (
 	BalanceCategoryDirectCosts BalanceCategory = "DIRECT_COSTS"
 	BalanceCategorySeed        BalanceCategory = "SEED"
 	BalanceCategorySupplies    BalanceCategory = "SUPPLIES"
+	BalanceCategoryFertilizers BalanceCategory = "FERTILIZERS"
 	BalanceCategoryLabors      BalanceCategory = "LABORS"
 	BalanceCategoryLease       BalanceCategory = "LEASE"
 	BalanceCategoryAdmin       BalanceCategory = "ADMIN"
@@ -162,6 +163,7 @@ var AllowedBalanceCategories = map[BalanceCategory]struct{}{
 	BalanceCategoryDirectCosts: {},
 	BalanceCategorySeed:        {},
 	BalanceCategorySupplies:    {},
+	BalanceCategoryFertilizers: {},
 	BalanceCategoryLabors:      {},
 	BalanceCategoryLease:       {},
 	BalanceCategoryAdmin:       {},
@@ -403,10 +405,17 @@ func createEmptyDashboardResponse() DashboardResponse {
 				},
 				{
 					Category:    BalanceCategorySupplies,
-					Label:       "Insumos",
+					Label:       "Agroquímicos",
 					ExecutedUSD: decimal.Zero,
 					InvestedUSD: decimal.Zero,
 					Order:       2,
+				},
+				{
+					Category:    BalanceCategoryFertilizers,
+					Label:       "Fertilizantes",
+					ExecutedUSD: decimal.Zero,
+					InvestedUSD: decimal.Zero,
+					Order:       3,
 				},
 				{
 					Category:    BalanceCategoryLabors,
@@ -414,21 +423,21 @@ func createEmptyDashboardResponse() DashboardResponse {
 					ExecutedUSD: decimal.Zero,
 					InvestedUSD: decimal.Zero,
 					StockUSD:    &decimal.Zero,
-					Order:       3,
+					Order:       4,
 				},
 				{
 					Category:    BalanceCategoryLease,
 					Label:       "Arriendo",
 					ExecutedUSD: decimal.Zero,
 					InvestedUSD: decimal.Zero,
-					Order:       4,
+					Order:       5,
 				},
 				{
 					Category:    BalanceCategoryAdmin,
 					Label:       "Estructura",
 					ExecutedUSD: decimal.Zero,
 					InvestedUSD: decimal.Zero,
-					Order:       5,
+					Order:       6,
 				},
 			},
 		},
@@ -689,26 +698,34 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Order:       2,
 		},
 		{
+			Category:    BalanceCategoryFertilizers,
+			Label:       "Fertilizantes",
+			ExecutedUSD: balance.Summary.FertilizantesCostUSD,
+			InvestedUSD: balance.Summary.FertilizantesInvertidosUSD,
+			StockUSD:    &balance.Summary.FertilizantesStockUSD,
+			Order:       3,
+		},
+		{
 			Category:    BalanceCategoryLabors,
 			Label:       "Labores",
 			ExecutedUSD: balance.Summary.LaboresCostUSD,
 			InvestedUSD: balance.Summary.LaboresInvertidosUSD,
 			StockUSD:    &decimal.Zero,
-			Order:       3,
+			Order:       4,
 		},
 		{
 			Category:    BalanceCategoryLease,
 			Label:       "Arriendo",
 			ExecutedUSD: balance.Summary.RentExecutedUSD,
 			InvestedUSD: balance.Summary.RentUSD,
-			Order:       4,
+			Order:       5,
 		},
 		{
 			Category:    BalanceCategoryAdmin,
 			Label:       "Estructura",
 			ExecutedUSD: balance.Summary.StructureExecutedUSD,
 			InvestedUSD: balance.Summary.StructureUSD,
-			Order:       5,
+			Order:       6,
 		},
 	}
 
