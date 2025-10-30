@@ -182,7 +182,7 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 		supplyMap[key] = detail
 	}
 
-	// Construir filas
+	// Construir filas (ACTUALIZADO: Fertilizantes y Otros Insumos ya están en la vista v3)
 	rows := []domain.FieldCropRow{
 		r.buildSupplyRow("supply_semilla", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),
 		r.buildSupplyRow("supply_coadyuvantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CoadyuvantesUsdHa }),
@@ -190,9 +190,8 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 		r.buildSupplyRow("supply_herbicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.HerbicidasUsdHa }),
 		r.buildSupplyRow("supply_insecticidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.InsecticidasUsdHa }),
 		r.buildSupplyRow("supply_fungicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FungicidasUsdHa }),
-		// Otros Insumos y Fertilizantes no están en la vista, dejarlos en 0
-		r.buildSupplyRow("supply_otros_insumos", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return decimal.Zero }),
-		r.buildSupplyRow("supply_fertilizantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return decimal.Zero }),
+		r.buildSupplyRow("supply_fertilizantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FertilizantesUsdHa }),
+		r.buildSupplyRow("supply_otros_insumos", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.OtrosInsumosUsdHa }),
 	}
 
 	return rows
@@ -305,7 +304,7 @@ func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.Fiel
 	// Cargar categorías de insumos desde la base de datos
 	supplyCategories, err := r.getSupplyCategories()
 	if err != nil {
-		// Fallback a categorías por defecto si hay error (usando solo categorías de 000013)
+		// Fallback a categorías por defecto si hay error (usando categorías de 000013 + migración 000131)
 		supplyCategories = map[string]string{
 			"supply_semilla":       "Semilla",
 			"supply_coadyuvantes":  "Coadyuvantes",
@@ -313,8 +312,8 @@ func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.Fiel
 			"supply_herbicidas":    "Herbicidas",
 			"supply_insecticidas":  "Insecticidas",
 			"supply_fungicidas":    "Fungicidas",
-			"supply_otros_insumos": "Otros Insumos",
 			"supply_fertilizantes": "Fertilizantes",
+			"supply_otros_insumos": "Otros Insumos",
 		}
 	}
 

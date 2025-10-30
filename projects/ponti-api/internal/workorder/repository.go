@@ -276,3 +276,42 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter
 		DirectCost: row.DirectCost,
 	}, nil
 }
+
+// GetRawDirectCost calcula el costo directo RAW desde las tablas workorders y workorder_items
+// Calcula ∑(Órdenes_de_trabajo.costo_total) como indica el CSV de controles
+// Este cálculo es INDEPENDIENTE de las vistas SSOT para validar coherencia
+func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	// Query RAW: suma directa desde workorders + workorder_items
+	// Labor cost: effective_area × labor.price
+	// Supply cost: final_dose × effective_area × price (cálculo estándar del sistema)
+	// CORREGIDO: Usar final_dose × effective_area en lugar de total_used para consistencia con vistas
+	q := `
+		WITH workorder_costs AS (
+		  SELECT 
+		    wo.id,
+		    -- Costo de la labor (área efectiva × precio de la labor)
+		    (wo.effective_area * l.price) AS labor_cost,
+		    -- Costo de insumos (suma de items: final_dose × effective_area × price)
+		    COALESCE((
+		      SELECT SUM(wi.final_dose * wo.effective_area * s.price)
+		      FROM public.workorder_items wi
+		      JOIN public.supplies s ON s.id = wi.supply_id
+		      WHERE wi.workorder_id = wo.id 
+		        AND wi.deleted_at IS NULL
+		    ), 0) AS supply_cost
+		  FROM public.workorders wo
+		  JOIN public.labors l ON l.id = wo.labor_id
+		  WHERE wo.deleted_at IS NULL
+		    AND wo.project_id = ?
+		)
+		SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
+		FROM workorder_costs
+	`
+
+	var totalCost decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, projectID).Scan(&totalCost).Error; err != nil {
+		return decimal.Zero, types.NewError(types.ErrInternal, "failed to get raw direct cost", err)
+	}
+
+	return totalCost, nil
+}

@@ -18,6 +18,7 @@ import (
 	crop "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/customer"
 	dashboard "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard"
+	data_integrity "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/data-integrity"
 	dollar "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/investor"
@@ -44,6 +45,7 @@ type Dependencies struct {
 	CustomerHandler          *customer.Handler
 	CampaignHandler          *campaign.Handler
 	DashboardHandler         *dashboard.Handler
+	DataIntegrityHandler     *data_integrity.Handler
 	InvestorHandler          *investor.Handler
 	CropHandler              *crop.Handler
 	LotHandler               *lot.Handler
@@ -75,6 +77,7 @@ func Initialize() (*Dependencies, error) {
 		CustomerSet,
 		CampaignSet,
 		DashboardSet,
+		DataIntegritySet,
 		InvestorSet,
 		CropSet,
 		CommercializationSet,

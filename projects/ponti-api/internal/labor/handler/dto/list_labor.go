@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -16,6 +17,28 @@ type ListedLabor struct {
 	ContractorName string          `json:"contractor_name"`
 	CategoryName   string          `json:"category_name"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+// MarshalJSON aplica redondeo de 2 decimales al precio (Costo u$s/ha)
+func (l ListedLabor) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		ID             int64     `json:"id"`
+		Name           string    `json:"name"`
+		CategoryId     int64     `json:"category_id"`
+		Price          string    `json:"price"`
+		ContractorName string    `json:"contractor_name"`
+		CategoryName   string    `json:"category_name"`
+		UpdatedAt      time.Time `json:"updated_at"`
+	}{
+		ID:             l.ID,
+		Name:           l.Name,
+		CategoryId:     l.CategoryId,
+		Price:          l.Price.StringFixed(2), // Costo u$s/ha: 2 decimales
+		ContractorName: l.ContractorName,
+		CategoryName:   l.CategoryName,
+		UpdatedAt:      l.UpdatedAt,
+	}
+	return json.Marshal(aux)
 }
 
 // PageInfo contiene metadata de paginación.

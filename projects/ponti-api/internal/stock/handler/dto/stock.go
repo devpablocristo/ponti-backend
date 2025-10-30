@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -14,6 +15,22 @@ type GetStocksResponse struct {
 	NetTotalUSD    decimal.Decimal   `json:"net_total_usd"`
 	TotalLiters    decimal.Decimal   `json:"total_liters"`
 	TotalKilograms decimal.Decimal   `json:"total_kilograms"`
+}
+
+// MarshalJSON aplica redondeo de 2 decimales
+func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		Stocks         []GetStockSummary `json:"items"`
+		NetTotalUSD    string            `json:"net_total_usd"`
+		TotalLiters    string            `json:"total_liters"`
+		TotalKilograms string            `json:"total_kilograms"`
+	}{
+		Stocks:         r.Stocks,
+		NetTotalUSD:    r.NetTotalUSD.StringFixed(2),    // Total u$s: 2 decimales
+		TotalLiters:    r.TotalLiters.StringFixed(2),    // 2 decimales
+		TotalKilograms: r.TotalKilograms.StringFixed(2), // 2 decimales
+	}
+	return json.Marshal(aux)
 }
 
 type GetStockSummary struct {
@@ -31,6 +48,42 @@ type GetStockSummary struct {
 	EntryStock      decimal.Decimal `json:"entry_stock"`
 	OutStock        decimal.Decimal `json:"out_stock"`
 	Consumed        decimal.Decimal `json:"consumed"`
+}
+
+// MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
+func (s GetStockSummary) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		ID              int64      `json:"id"`
+		SupplyName      string     `json:"supply_name"`
+		InvestorName    string     `json:"investor_name"`
+		StockUnits      string     `json:"stock_units"`
+		RealStockUnits  string     `json:"real_stock_units"`
+		StockDifference string     `json:"stock_difference"`
+		TotalUSD        string     `json:"total_usd"`
+		ClassType       string     `json:"class_type"`
+		CloseDate       *time.Time `json:"close_date"`
+		SupplyUnitId    int64      `json:"supply_unit_id"`
+		SupplyUnitPrice string     `json:"supply_unit_price"`
+		EntryStock      string     `json:"entry_stock"`
+		OutStock        string     `json:"out_stock"`
+		Consumed        string     `json:"consumed"`
+	}{
+		ID:              s.ID,
+		SupplyName:      s.SupplyName,
+		InvestorName:    s.InvestorName,
+		StockUnits:      s.StockUnits.StringFixed(2),
+		RealStockUnits:  s.RealStockUnits.StringFixed(2),
+		StockDifference: s.StockDifference.StringFixed(2),
+		TotalUSD:        s.TotalUSD.StringFixed(2), // Total u$s: 2 decimales
+		ClassType:       s.ClassType,
+		CloseDate:       s.CloseDate,
+		SupplyUnitId:    s.SupplyUnitId,
+		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2), // Precio u: 2 decimales
+		EntryStock:      s.EntryStock.StringFixed(2),
+		OutStock:        s.OutStock.StringFixed(2),
+		Consumed:        s.Consumed.StringFixed(2),
+	}
+	return json.Marshal(aux)
 }
 
 // FromDomain maps domain.Stock to GetStock DTO

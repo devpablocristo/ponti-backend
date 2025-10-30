@@ -544,6 +544,36 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 			}
 		}
 
+		// clear workorders
+		if err := tx.Exec("UPDATE workorders SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete workorders", err)
+		}
+
+		// clear supply_movements
+		if err := tx.Exec("UPDATE supply_movements SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete supply_movements", err)
+		}
+
+		// clear stocks
+		if err := tx.Exec("UPDATE stocks SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete stocks", err)
+		}
+
+		// clear crop_commercializations
+		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete commercializations", err)
+		}
+
+		// clear project_dollar_values
+		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete dollar values", err)
+		}
+
+		// clear admin_cost_investors
+		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to soft delete admin cost investors", err)
+		}
+
 		if err := tx.Model(&fieldmod.Field{}).
 			Where("id IN ?", fieldIDs).
 			Updates(map[string]any{
@@ -559,6 +589,99 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 			"deleted_by": deletedBy,
 		}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete project", err)
+		}
+
+		return nil
+	})
+}
+
+// --- RESTORE ---
+// RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
+func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verificar que el proyecto esté eliminado
+		var project models.Project
+		if err := tx.Unscoped().Where("id = ?", id).First(&project).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to check project", err)
+		}
+
+		if !project.DeletedAt.Valid {
+			return types.NewError(types.ErrValidation, "project is not deleted, cannot restore", nil)
+		}
+
+		// Restaurar project (usar Unscoped para actualizar registros eliminados)
+		if err := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": nil,
+			"updated_at": time.Now(),
+		}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore project", err)
+		}
+
+		// Restaurar managers
+		if err := tx.Exec("UPDATE project_managers SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore managers", err)
+		}
+
+		// Restaurar investors
+		if err := tx.Exec("UPDATE project_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore investors", err)
+		}
+
+		// Restaurar fields (obtener IDs primero)
+		var fieldIDs []int64
+		if err := tx.Unscoped().Model(&fieldmod.Field{}).
+			Where("project_id = ? AND deleted_at IS NOT NULL", id).
+			Pluck("id", &fieldIDs).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to get field ids", err)
+		}
+
+		// Restaurar fields
+		if err := tx.Exec("UPDATE fields SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore fields", err)
+		}
+
+		// Restaurar lots (solo los que pertenecen a los fields de este proyecto)
+		if len(fieldIDs) > 0 {
+			if err := tx.Exec("UPDATE lots SET deleted_at = NULL, updated_at = ? WHERE field_id IN ? AND deleted_at IS NOT NULL", time.Now(), fieldIDs).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to restore lots", err)
+			}
+		}
+
+		// Restaurar workorders
+		if err := tx.Exec("UPDATE workorders SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore workorders", err)
+		}
+
+		// Restaurar supply_movements
+		if err := tx.Exec("UPDATE supply_movements SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore supply_movements", err)
+		}
+
+		// Restaurar stocks
+		if err := tx.Exec("UPDATE stocks SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore stocks", err)
+		}
+
+		// Restaurar crop_commercializations
+		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore commercializations", err)
+		}
+
+		// Restaurar project_dollar_values
+		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore dollar values", err)
+		}
+
+		// Restaurar admin_cost_investors
+		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore admin cost investors", err)
 		}
 
 		return nil

@@ -129,20 +129,22 @@ func (FieldCropLaborDetailModel) TableName() string {
 }
 
 // FieldCropSupplyDetailModel representa el modelo de la vista v3_report_field_crop_insumos
-// Migración 000130
+// Migración 000131 (actualizada con Fertilizantes y Otros Insumos)
 type FieldCropSupplyDetailModel struct {
 	ProjectID int64 `gorm:"column:project_id"`
 	FieldID   int64 `gorm:"column:field_id"`
 	CropID    int64 `gorm:"column:current_crop_id"`
 
 	// Desglose por categoría de insumo (USD/ha)
-	SemillasUsdHa     decimal.Decimal `gorm:"column:semillas_usd_ha"`
-	CurasemillasUsdHa decimal.Decimal `gorm:"column:curasemillas_usd_ha"`
-	HerbicidasUsdHa   decimal.Decimal `gorm:"column:herbicidas_usd_ha"`
-	InsecticidasUsdHa decimal.Decimal `gorm:"column:insecticidas_usd_ha"`
-	FungicidasUsdHa   decimal.Decimal `gorm:"column:fungicidas_usd_ha"`
-	CoadyuvantesUsdHa decimal.Decimal `gorm:"column:coadyuvantes_usd_ha"`
-	TotalInsumosUsdHa decimal.Decimal `gorm:"column:total_insumos_usd_ha"`
+	SemillasUsdHa      decimal.Decimal `gorm:"column:semillas_usd_ha"`
+	CurasemillasUsdHa  decimal.Decimal `gorm:"column:curasemillas_usd_ha"`
+	HerbicidasUsdHa    decimal.Decimal `gorm:"column:herbicidas_usd_ha"`
+	InsecticidasUsdHa  decimal.Decimal `gorm:"column:insecticidas_usd_ha"`
+	FungicidasUsdHa    decimal.Decimal `gorm:"column:fungicidas_usd_ha"`
+	CoadyuvantesUsdHa  decimal.Decimal `gorm:"column:coadyuvantes_usd_ha"`
+	FertilizantesUsdHa decimal.Decimal `gorm:"column:fertilizantes_usd_ha"`
+	OtrosInsumosUsdHa  decimal.Decimal `gorm:"column:otros_insumos_usd_ha"`
+	TotalInsumosUsdHa  decimal.Decimal `gorm:"column:total_insumos_usd_ha"`
 }
 
 // TableName especifica el nombre de la tabla para GORM
