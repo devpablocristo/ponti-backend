@@ -1118,6 +1118,13 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 			).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to add admin cost investor", err)
 			}
+		} else {
+			if err := tx.Exec(
+				"UPDATE admin_cost_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
+				aci.Percentage, d.UpdatedBy, d.ID, aci.ID,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to update admin cost investor", err)
+			}
 		}
 	}
 
@@ -1182,6 +1189,13 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					ef.ID, inv.ID, inv.Percentage, d.UpdatedBy, d.UpdatedBy,
 				).Error; err != nil {
 					return types.NewError(types.ErrInternal, "failed to add field investor", err)
+				}
+			} else {
+				if err := tx.Exec(
+					"UPDATE field_investors SET percentage = ?, updated_by = ? WHERE field_id = ? AND investor_id = ?",
+					inv.Percentage, d.UpdatedBy, ef.ID, inv.ID,
+				).Error; err != nil {
+					return types.NewError(types.ErrInternal, "failed to update admin cost investor", err)
 				}
 			}
 		}
