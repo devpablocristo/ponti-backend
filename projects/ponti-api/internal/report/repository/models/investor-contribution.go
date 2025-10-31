@@ -76,9 +76,9 @@ type PreHarvestTotalsModel struct {
 type InvestorContributionComparisonModel struct {
 	InvestorID     *int64          `json:"investor_id,omitempty"`
 	InvestorName   *string         `json:"investor_name,omitempty"`
-	AgreedSharePct decimal.Decimal `json:"share_pct_agreed"`        // Corregido: coincide con vista SQL
-	AgreedUsd      decimal.Decimal `json:"agreed_contribution_usd"` // Corregido: coincide con vista SQL
-	ActualUsd      decimal.Decimal `json:"real_contribution_usd"`   // Corregido: coincide con vista SQL
+	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"` // FIX 000172: Corregido para coincidir con vista SQL
+	AgreedUsd      decimal.Decimal `json:"agreed_usd"`       // FIX 000172: Corregido para coincidir con vista SQL
+	ActualUsd      decimal.Decimal `json:"actual_usd"`       // FIX 000172: Corregido para coincidir con vista SQL
 	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`
 }
 
