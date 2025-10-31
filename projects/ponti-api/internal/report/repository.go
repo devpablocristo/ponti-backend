@@ -183,15 +183,16 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 	}
 
 	// Construir filas (ACTUALIZADO: Fertilizantes y Otros Insumos ya están en la vista v3)
+	// IMPORTANTE: Las keys deben coincidir con el frontend (ByFieldOrCropReport.tsx)
 	rows := []domain.FieldCropRow{
-		r.buildSupplyRow("supply_semilla", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),
-		r.buildSupplyRow("supply_coadyuvantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CoadyuvantesUsdHa }),
+		r.buildSupplyRow("supply_semillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),        // FIX: Cambiar "semilla" → "semillas" (plural)
 		r.buildSupplyRow("supply_curasemillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CurasemillasUsdHa }),
 		r.buildSupplyRow("supply_herbicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.HerbicidasUsdHa }),
 		r.buildSupplyRow("supply_insecticidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.InsecticidasUsdHa }),
-		r.buildSupplyRow("supply_fungicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FungicidasUsdHa }),
+		r.buildSupplyRow("supply_coadyuvantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CoadyuvantesUsdHa }),
 		r.buildSupplyRow("supply_fertilizantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FertilizantesUsdHa }),
-		r.buildSupplyRow("supply_otros_insumos", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.OtrosInsumosUsdHa }),
+		r.buildSupplyRow("supply_fungicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FungicidasUsdHa }),
+		r.buildSupplyRow("supply_otros", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.OtrosInsumosUsdHa }),           // FIX: Cambiar "supply_otros_insumos" → "supply_otros"
 	}
 
 	return rows
@@ -232,12 +233,13 @@ func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.Fiel
 	}
 
 	// Construir filas
+	// IMPORTANTE: Las keys deben coincidir con el frontend (ByFieldOrCropReport.tsx)
 	rows := []domain.FieldCropRow{
 		r.buildLaborRow("labor_siembra", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.SiembraUsdHa }),
 		r.buildLaborRow("labor_pulverizacion", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.PulverizacionUsdHa }),
 		r.buildLaborRow("labor_riego", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.RiegoUsdHa }),
 		r.buildLaborRow("labor_cosecha", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.CosechaUsdHa }),
-		r.buildLaborRow("labor_otras_labores", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.OtrasLaboresUsdHa }),
+		r.buildLaborRow("labor_otras", "usd/ha", columnMap, laborMap, func(d models.FieldCropLaborDetailModel) decimal.Decimal { return d.OtrasLaboresUsdHa }), // FIX: Cambiar "labor_otras_labores" → "labor_otras"
 	}
 
 	return rows

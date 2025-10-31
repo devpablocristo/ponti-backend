@@ -1,0 +1,112 @@
+{
+    "name": "proyecto alpha",
+    "customer": {
+      "id": 1,
+      "name": "Oscar Salomon"
+    },
+    "campaign": {
+      "id": 3,
+      "name": "2026-2027"
+    },
+    "admin_cost": 2340,
+    "planned_cost": 2111,
+    "managers": [
+      {
+        "id": 2,
+        "name": "Carla"
+      }
+    ],
+    "investors": [
+      {
+        "id": 1,
+        "name": "Oscar",
+        "percentage": 33
+      },
+      {
+        "id": 3,
+        "name": "Carla",
+        "percentage": 33
+      },
+      {
+        "id": 2,
+        "name": "Juli",
+        "percentage": 34
+      }
+    ],
+    "admin_cost_investors": [
+      {
+        "id": 1,
+        "name": "Oscar",
+        "percentage": 40
+      },
+      {
+        "id": 2,
+        "name": "Juli",
+        "percentage": 60
+      }
+    ],
+    "fields": [
+      {
+        "id": 0,
+        "name": "Campo listo 1",
+        "lease_type_id": 4,
+        "lease_type_percent": 21,
+        "lease_type_value": 200,
+        "investors": [
+          {
+            "id": 1,
+            "name": "Oscar",
+            "percentage": 33
+          },
+          {
+            "id": 2,
+            "name": "Juli",
+            "percentage": 66
+          },
+          {
+            "id": 3,
+            "name": "Carla",
+            "percentage": 1
+          }
+        ],
+        "lots": [
+          {
+            "id": 0,
+            "name": "1",
+            "hectares": 22323,
+            "previous_crop_id": 1,
+            "previous_crop_name": "Soja",
+            "current_crop_id": 3,
+            "current_crop_name": "Trigo",
+            "season": "1"
+          }
+        ]
+      },
+      {
+        "id": 0,
+        "name": "Campo 2",
+        "lease_type_id": 1,
+        "lease_type_percent": 33,
+        "lease_type_value": 0,
+        "investors": [
+          {
+            "id": 1,
+            "name": "Oscar",
+            "percentage": 100
+          }
+        ],
+        "lots": [
+          {
+            "id": 0,
+            "name": "2",
+            "hectares": 333,
+            "previous_crop_id": 8,
+            "previous_crop_name": "Maní",
+            "current_crop_id": 3,
+            "current_crop_name": "Trigo",
+            "season": "3"
+          }
+        ]
+      }
+    ]
+  }

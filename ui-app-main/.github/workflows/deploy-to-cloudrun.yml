@@ -1,0 +1,81 @@
+name: Build, Push to Artifact Registry, and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GCP_PROJECT_ID: ponti-474821
+  GCP_REGION: us-central1
+  REPOSITORY_NAME: ui-registry
+  SERVICE_NAME: ui
+  IMAGE_NAME: ui
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/1056876389857/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+  SERVICE_ACCOUNT: 'github-actions@ponti-474821.iam.gserviceaccount.com'
+
+# Permisos necesarios para OIDC
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Autenticación usando Workload Identity Federation (sin keys JSON)
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build, tag, and push image to Artifact Registry
+        id: build-image
+        run: |
+          IMAGE_TAG=${GITHUB_SHA::7}
+          
+          FULL_IMAGE_NAME=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY_NAME }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
+          
+          echo "🏗️ Building image: $FULL_IMAGE_NAME"
+          docker build -t $FULL_IMAGE_NAME .
+          
+          echo "📤 Pushing image to Artifact Registry..."
+          docker push $FULL_IMAGE_NAME
+          
+          echo "image=$FULL_IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "✅ Image pushed successfully"
+
+      - name: Deploy to Cloud Run
+        run: |
+          echo "🚀 Deploying to Cloud Run..."
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ steps.build-image.outputs.image }} \
+            --platform=managed \
+            --region=${{ env.GCP_REGION }} \
+            --allow-unauthenticated \
+            --quiet
+          
+          echo "✅ Deployment completed"
+
+      - name: Get Service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "🌐 Service URL: $SERVICE_URL"
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
