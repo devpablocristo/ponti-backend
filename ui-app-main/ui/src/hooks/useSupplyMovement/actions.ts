@@ -1,5 +1,0 @@
-export const SET_SUPPLY_MOVEMENTS = Symbol("SET_SUPPLY_MOVEMENTS");
-export const SET_SUMMARY = Symbol("SET_SUMMARY");
-export const SET_RESULT_CREATION = Symbol("RESULT_CREATION");
-export const SET_PAGE_INFO = Symbol("PAGE_INFO");
-export const SET_SELECTED_SUPPLY_MOVEMENT = Symbol("SELECTED_SUPPLY_MOVEMENT");
