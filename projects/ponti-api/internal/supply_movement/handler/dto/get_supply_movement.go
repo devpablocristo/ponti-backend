@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +20,20 @@ type summary struct {
 	TotalKg  decimal.Decimal `json:"total_kg"`
 	TotalLt  decimal.Decimal `json:"total_lt"`
 	TotalUSD decimal.Decimal `json:"total_usd"`
+}
+
+// MarshalJSON aplica redondeo al entero más cercano para todos los campos
+func (s summary) MarshalJSON() ([]byte, error) {
+	aux := struct {
+		TotalKg  string `json:"total_kg"`
+		TotalLt  string `json:"total_lt"`
+		TotalUSD string `json:"total_usd"`
+	}{
+		TotalKg:  s.TotalKg.Round(0).String(),  // Redondeo al entero más cercano
+		TotalLt:  s.TotalLt.Round(0).String(),  // Redondeo al entero más cercano
+		TotalUSD: s.TotalUSD.Round(0).String(), // Redondeo al entero más cercano
+	}
+	return json.Marshal(aux)
 }
 
 type entrySupplyMovementsResponse struct {
