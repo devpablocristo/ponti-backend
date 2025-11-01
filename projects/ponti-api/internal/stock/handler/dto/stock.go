@@ -17,7 +17,7 @@ type GetStocksResponse struct {
 	TotalKilograms decimal.Decimal   `json:"total_kilograms"`
 }
 
-// MarshalJSON aplica redondeo de 2 decimales
+// MarshalJSON aplica redondeo: Total U$/Neto, Total insumos (kg), Total insumos (lts) al entero más próximo
 func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		Stocks         []GetStockSummary `json:"items"`
@@ -26,9 +26,9 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 		TotalKilograms string            `json:"total_kilograms"`
 	}{
 		Stocks:         r.Stocks,
-		NetTotalUSD:    r.NetTotalUSD.StringFixed(2),    // Total u$s: 2 decimales
-		TotalLiters:    r.TotalLiters.StringFixed(2),    // 2 decimales
-		TotalKilograms: r.TotalKilograms.StringFixed(2), // 2 decimales
+		NetTotalUSD:    r.NetTotalUSD.StringFixed(0),    // Total u$s: entero más próximo
+		TotalLiters:    r.TotalLiters.StringFixed(0),    // Total insumos (lts): entero más próximo
+		TotalKilograms: r.TotalKilograms.StringFixed(0), // Total insumos (kg): entero más próximo
 	}
 	return json.Marshal(aux)
 }
