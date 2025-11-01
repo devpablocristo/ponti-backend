@@ -1,0 +1,17 @@
+{
+  "name": "sg-alphacoding",
+  "version": "1.0.0",
+  "description": "React UI and NodeJS middle end",
+  "author": "AlphaCoding",
+  "license": "MIT",
+  "scripts": {
+    "build": "yarn build:ui && yarn build:api && yarn move:frontend",
+    "build:ui": "cd ui && yarn build",
+    "build:api": "cd api && yarn build",
+    "move:frontend": "mkdir -p api/dist/public && cp -r ui/dist/* api/dist/public",
+    "start": "cd api && yarn start",
+    "dev": "yarn dev:api && yarn dev:ui",
+    "dev:ui": "cd ui && yarn dev",
+    "dev:api": "cd api && yarn dev"
+  }
+}
