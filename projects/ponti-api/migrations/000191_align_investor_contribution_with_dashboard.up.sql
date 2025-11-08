@@ -134,6 +134,20 @@ category_totals AS (
      administration_total_usd) AS total_contributions_usd
   FROM v3_report_investor_contribution_categories
 ),
+rent_real_by_investor AS (
+  SELECT
+    f.project_id,
+    LOWER(inv.name) AS investor_key,
+    SUM(
+      v3_lot_ssot.rent_fixed_only_for_lot(l.id) * l.hectares * COALESCE(fi.percentage, 0)::numeric / 100
+    )::numeric AS rent_real_usd
+  FROM public.field_investors fi
+  JOIN public.fields f ON f.id = fi.field_id AND f.deleted_at IS NULL
+  JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
+  JOIN public.investors inv ON inv.id = fi.investor_id AND inv.deleted_at IS NULL
+  WHERE fi.deleted_at IS NULL
+  GROUP BY f.project_id, LOWER(inv.name)
+),
 investor_real_contributions AS (
   -- Aportes REALES por inversor y categoría
   -- Basado en los montos realmente invertidos por cada inversor
@@ -167,8 +181,8 @@ investor_real_contributions AS (
     -- Riego: Distribuido según % acordado
     ROUND((ct.irrigation_total_usd * ib.share_pct_agreed / 100)::numeric, 2) AS irrigation_real_usd,
     
-    -- Arriendo Capitalizable: Requiere atribución manual (por ahora distribuido según %)
-    ROUND((ct.rent_capitalizable_total_usd * ib.share_pct_agreed / 100)::numeric, 2) AS rent_real_usd,
+    -- Arriendo Capitalizable: usar porcentajes reales de field_investors cuando existan
+    ROUND(COALESCE(rri.rent_real_usd, 0)::numeric, 2) AS rent_real_usd,
     
     -- Administración: Requiere atribución manual (por ahora distribuido según %)
     ROUND((ct.administration_total_usd * ib.share_pct_agreed / 100)::numeric, 2) AS administration_real_usd,
@@ -181,7 +195,7 @@ investor_real_contributions AS (
       (ct.general_labors_total_usd * ib.share_pct_agreed / 100) +
       (ct.sowing_total_usd * ib.share_pct_agreed / 100) +
       (ct.irrigation_total_usd * ib.share_pct_agreed / 100) +
-      (ct.rent_capitalizable_total_usd * ib.share_pct_agreed / 100) +
+      COALESCE(rri.rent_real_usd, 0) +
       (ct.administration_total_usd * ib.share_pct_agreed / 100)
     )::numeric, 2) AS total_real_contribution_usd,
     
@@ -190,6 +204,9 @@ investor_real_contributions AS (
     
   FROM investor_base ib
   JOIN category_totals ct ON ct.project_id = ib.project_id
+  LEFT JOIN rent_real_by_investor rri
+    ON rri.project_id = ib.project_id
+   AND rri.investor_key = LOWER(ib.investor_name)
 ),
 investor_agreed_vs_real AS (
   -- Comparación entre Aporte Acordado vs. Real
