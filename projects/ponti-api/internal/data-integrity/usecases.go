@@ -229,7 +229,7 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 		"v3_dashboard_ssot.direct_costs_total_for_project()",
 		rightValue,
 		"Vista v3_dashboard_management_balance",
-		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
+		decimal.NewFromInt(1),
 	), nil
 }
 
@@ -278,7 +278,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 		"∑(cost_usd_per_ha × sowed_area_ha)",
 		rightValue,
 		"Vista v3_lot_list",
-		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
+		decimal.NewFromInt(1),
 	), nil
 }
 
@@ -880,6 +880,16 @@ func buildCheck(
 ) domain.IntegrityCheck {
 	difference := leftValue.Sub(rightValue)
 	status := "OK"
+
+	// DEBUG: Log para control 2
+	if controlNumber == 2 {
+		println(fmt.Sprintf("[DEBUG Control 2] leftValue: %s", leftValue.String()))
+		println(fmt.Sprintf("[DEBUG Control 2] rightValue: %s", rightValue.String()))
+		println(fmt.Sprintf("[DEBUG Control 2] difference: %s", difference.String()))
+		println(fmt.Sprintf("[DEBUG Control 2] difference.Abs(): %s", difference.Abs().String()))
+		println(fmt.Sprintf("[DEBUG Control 2] tolerance: %s", tolerance.String()))
+		println(fmt.Sprintf("[DEBUG Control 2] GreaterThan result: %v", difference.Abs().GreaterThan(tolerance)))
+	}
 
 	if difference.Abs().GreaterThan(tolerance) {
 		status = "ERROR"

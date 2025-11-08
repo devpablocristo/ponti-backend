@@ -34,30 +34,30 @@ func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 	out := make([]ExcelDto, 0, len(items))
 
 	for _, it := range items {
-		// InvoiceDate ya es *time.Time, no necesita conversión
-		invDate := it.InvoiceDate
+			// InvoiceDate ya es *time.Time, no necesita conversión
+			invDate := it.InvoiceDate
 
-		out = append(out, ExcelDto{
-			WorkorderNumber: it.WorkorderNumber,
-			Date:            it.Date,
-			ProjectName:     it.ProjectName,
-			FieldName:       it.FieldName,
-			CropName:        it.CropName,
-			LaborName:       it.LaborName,
-			Contractor:      it.Contractor,
-			SurfaceHa:       decToFloat(it.SurfaceHa, 0),
-			CostHa:          decToFloat(it.CostHa, 2),
-			InvestorName:    it.InvestorName,
-			USDAvgValue:     decToFloat(it.USDAvgValue, 2),
-			NetTotal:        decToFloat(it.NetTotal, 2),
-			TotalIVA:        decToFloat(it.TotalIVA, 2),
-			USDCostHa:       decToFloat(it.USDCostHa, 2),
-			USDNetTotal:     decToFloat(it.USDNetTotal, 2),
-			InvoiceNumber:   it.InvoiceNumber,
-			InvoiceCompany:  it.InvoiceCompany,
-			InvoiceDate:     invDate,
-			InvoiceStatus:   it.InvoiceStatus,
-		})
+			out = append(out, ExcelDto{
+				WorkorderNumber: it.WorkorderNumber,
+				Date:            it.Date,
+				ProjectName:     it.ProjectName,
+				FieldName:       it.FieldName,
+				CropName:        it.CropName,
+				LaborName:       it.LaborName,
+				Contractor:      it.Contractor,
+				SurfaceHa:       decToFloat(it.SurfaceHa, 0),
+				CostHa:          decToFloat(it.CostHa, 2),
+				InvestorName:    it.InvestorName,
+				USDAvgValue:     decToFloat(it.USDAvgValue, 2),
+				NetTotal:        decToFloat(it.NetTotal, 2),
+				TotalIVA:        decToFloat(it.TotalIVA, 2),
+				USDCostHa:       decToFloat(it.USDCostHa, 2),
+				USDNetTotal:     decToFloat(it.USDNetTotal, 2),
+				InvoiceNumber:   it.InvoiceNumber,
+				InvoiceCompany:  it.InvoiceCompany,
+				InvoiceDate:     invDate,
+				InvoiceStatus:   it.InvoiceStatus,
+			})
 	}
 
 	return out
