@@ -44,12 +44,12 @@ func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExce
 			SurfaceHa:    decToFloat(it.SurfaceHa, 0),
 			SupplyName:   it.SupplyName,
 			Consumption:  decToFloat(it.Consumption, 0),
-		CategoryName: it.CategoryName,
-		Dose:         decToFloat(it.Dose, 2),
-		CostPerHa:    decToFloat(it.CostPerHa, 2),
-		UnitPrice:    decToFloat(it.UnitPrice, 2),
+			CategoryName: it.CategoryName,
+			Dose:         decToFloat(it.Dose, 2),
+			CostPerHa:    decToFloat(it.CostPerHa, 2),
+			UnitPrice:    decToFloat(it.UnitPrice, 2),
 		TotalCost:    decToFloat(it.TotalCost, 2),
-	})
+		})
 	}
 
 	return out
