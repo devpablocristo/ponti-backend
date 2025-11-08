@@ -415,7 +415,8 @@ SELECT
           'harvest_adjustment_usd', ROUND((
             (hd.total_harvest_usd * id.share_pct_agreed / 100) -
             (hd.total_harvest_usd * id.share_pct_agreed / 100)
-          )::numeric, 2)
+          )::numeric, 2),
+          'share_pct', ROUND(id.share_pct_agreed::numeric, 2)
         )
         ORDER BY id.investor_id
       )

@@ -14,45 +14,48 @@ DROP VIEW IF EXISTS public.v3_dashboard_contributions_progress;
 DROP VIEW IF EXISTS public.v3_investor_contribution_data_view;
 
 CREATE VIEW public.v3_investor_contribution_data_view AS
-WITH harvest_data AS (
-  -- =========================================================================
-  -- SECCIÓN 4: LIQUIDACIÓN DE COSECHA
-  -- =========================================================================
+WITH investor_base AS (
   SELECT
-    f.project_id,
-    COALESCE((
-      SELECT SUM(lab.price * w.effective_area)
-      FROM public.workorders w
-      JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-      JOIN public.categories cat ON lab.category_id = cat.id
-      JOIN public.lots l ON w.lot_id = l.id AND l.deleted_at IS NULL
-      JOIN public.fields fld ON l.field_id = fld.id AND fld.deleted_at IS NULL
-      WHERE fld.project_id = f.project_id
-        AND w.deleted_at IS NULL
-        AND cat.name = 'Cosecha'
-        AND cat.type_id = 4
-    ), 0)::numeric AS total_harvest_usd,
+    pi.project_id,
+    pi.investor_id,
+    i.name AS investor_name,
+    pi.percentage AS share_pct_agreed
+  FROM public.project_investors pi
+  JOIN public.investors i ON i.id = pi.investor_id AND i.deleted_at IS NULL
+  WHERE pi.deleted_at IS NULL
+),
+project_seed_data AS (
+  SELECT
+    project_id,
+    MAX(total_seeded_area_ha)::numeric AS total_seeded_area_ha
+  FROM v3_report_investor_contribution_categories
+  GROUP BY project_id
+),
+investor_harvest_real AS (
+  SELECT
+    w.project_id,
+    w.investor_id,
+    COALESCE(SUM(lab.price * w.effective_area), 0)::numeric AS harvest_real_usd
+  FROM public.workorders w
+  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
+  JOIN public.categories cat ON cat.id = lab.category_id
+  WHERE w.deleted_at IS NULL
+    AND cat.type_id = 4
+    AND cat.name = 'Cosecha'
+  GROUP BY w.project_id, w.investor_id
+),
+harvest_totals AS (
+  SELECT
+    psd.project_id,
+    COALESCE(SUM(hr.harvest_real_usd), 0)::numeric AS total_harvest_usd,
     CASE
-      WHEN cc.total_seeded_area_ha > 0
-      THEN COALESCE((
-        SELECT SUM(lab.price * w.effective_area)
-        FROM public.workorders w
-        JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-        JOIN public.categories cat ON lab.category_id = cat.id
-        JOIN public.lots l ON w.lot_id = l.id AND l.deleted_at IS NULL
-        JOIN public.fields fld ON l.field_id = fld.id AND fld.deleted_at IS NULL
-        WHERE fld.project_id = f.project_id
-          AND w.deleted_at IS NULL
-          AND cat.name = 'Cosecha'
-          AND cat.type_id = 4
-      ), 0) / cc.total_seeded_area_ha
+      WHEN COALESCE(psd.total_seeded_area_ha, 0) > 0
+      THEN COALESCE(SUM(hr.harvest_real_usd), 0) / psd.total_seeded_area_ha
       ELSE 0
     END::numeric AS total_harvest_usd_ha
-  FROM public.projects p
-  JOIN public.fields f ON f.project_id = p.id AND f.deleted_at IS NULL
-  JOIN v3_report_investor_contribution_categories cc ON cc.project_id = p.id
-  WHERE p.deleted_at IS NULL
-  GROUP BY f.project_id, cc.total_seeded_area_ha
+  FROM project_seed_data psd
+  LEFT JOIN investor_harvest_real hr ON hr.project_id = psd.project_id
+  GROUP BY psd.project_id, psd.total_seeded_area_ha
 )
 SELECT
   pb.project_id,
@@ -412,86 +415,93 @@ SELECT
       jsonb_build_object(
         'key', 'harvest',
         'type', 'harvest',
-        'total_usd', ROUND(COALESCE(hd.total_harvest_usd, 0)::numeric, 2),
-        'total_us_ha', ROUND(COALESCE(hd.total_harvest_usd_ha, 0)::numeric, 2),
+        'total_usd', ROUND(COALESCE(ht.total_harvest_usd, 0)::numeric, 2),
+        'total_us_ha', ROUND(COALESCE(ht.total_harvest_usd_ha, 0)::numeric, 2),
         'investors', COALESCE((
           SELECT jsonb_agg(
             jsonb_build_object(
-              'investor_id', id.investor_id,
-              'investor_name', id.investor_name,
-              'amount_usd', ROUND((COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100)::numeric, 2),
+              'investor_id', ib.investor_id,
+              'investor_name', ib.investor_name,
+              'amount_usd', ROUND(COALESCE(hr.harvest_real_usd, 0)::numeric, 2),
               'share_pct', ROUND(
-                CASE
-                  WHEN COALESCE(hd.total_harvest_usd, 0)::numeric > 0
-                  THEN ((COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100) / COALESCE(hd.total_harvest_usd, 0)::numeric * 100)::numeric
+                CASE 
+                  WHEN COALESCE(ht.total_harvest_usd, 0)::numeric > 0 
+                  THEN (COALESCE(hr.harvest_real_usd, 0)::numeric / COALESCE(ht.total_harvest_usd, 0)::numeric * 100)::numeric
                   ELSE 0::numeric
                 END, 2
               )
             )
-            ORDER BY id.investor_id
+            ORDER BY ib.investor_id
           )
-          FROM v3_report_investor_distributions id
-          WHERE id.project_id = pb.project_id
+          FROM investor_base ib
+          LEFT JOIN investor_harvest_real hr
+            ON hr.project_id = ib.project_id AND hr.investor_id = ib.investor_id
+          WHERE ib.project_id = pb.project_id
         ), '[]'::jsonb)
       ),
       jsonb_build_object(
         'key', 'totals',
         'type', 'totals',
-        'total_usd', ROUND(COALESCE(hd.total_harvest_usd, 0)::numeric, 2),
-        'total_us_ha', ROUND(COALESCE(hd.total_harvest_usd_ha, 0)::numeric, 2),
+        'total_usd', ROUND(COALESCE(ht.total_harvest_usd, 0)::numeric, 2),
+        'total_us_ha', ROUND(COALESCE(ht.total_harvest_usd_ha, 0)::numeric, 2),
         'investors', COALESCE((
           SELECT jsonb_agg(
             jsonb_build_object(
-              'investor_id', id.investor_id,
-              'investor_name', id.investor_name,
-              'amount_usd', ROUND((COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100)::numeric, 2),
+              'investor_id', ib.investor_id,
+              'investor_name', ib.investor_name,
+              'amount_usd', ROUND(COALESCE(hr.harvest_real_usd, 0)::numeric, 2),
               'share_pct', ROUND(
-                CASE
-                  WHEN COALESCE(hd.total_harvest_usd, 0)::numeric > 0
-                  THEN ((COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100) / COALESCE(hd.total_harvest_usd, 0)::numeric * 100)::numeric
+                CASE 
+                  WHEN COALESCE(ht.total_harvest_usd, 0)::numeric > 0 
+                  THEN (COALESCE(hr.harvest_real_usd, 0)::numeric / COALESCE(ht.total_harvest_usd, 0)::numeric * 100)::numeric
                   ELSE 0::numeric
                 END, 2
               )
             )
-            ORDER BY id.investor_id
+            ORDER BY ib.investor_id
           )
-          FROM v3_report_investor_distributions id
-          WHERE id.project_id = pb.project_id
+          FROM investor_base ib
+          LEFT JOIN investor_harvest_real hr
+            ON hr.project_id = ib.project_id AND hr.investor_id = ib.investor_id
+          WHERE ib.project_id = pb.project_id
         ), '[]'::jsonb)
       )
     ),
     'footer_payment_agreed', COALESCE((
       SELECT jsonb_agg(
         jsonb_build_object(
-          'investor_id', id.investor_id,
-          'investor_name', id.investor_name,
-          'amount_usd', ROUND((COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100)::numeric, 2),
-          'share_pct', ROUND(id.share_pct_agreed::numeric, 2)
+          'investor_id', ib.investor_id,
+          'investor_name', ib.investor_name,
+          'amount_usd', ROUND((COALESCE(ht.total_harvest_usd, 0)::numeric * ib.share_pct_agreed::numeric / 100)::numeric, 2),
+          'share_pct', ROUND(ib.share_pct_agreed::numeric, 2)
         )
-        ORDER BY id.investor_id
+        ORDER BY ib.investor_id
       )
-      FROM v3_report_investor_distributions id
-      WHERE id.project_id = pb.project_id
+      FROM investor_base ib
+      WHERE ib.project_id = pb.project_id
     ), '[]'::jsonb),
     'footer_payment_adjustment', COALESCE((
       SELECT jsonb_agg(
         jsonb_build_object(
-          'investor_id', id.investor_id,
-          'investor_name', id.investor_name,
+          'investor_id', ib.investor_id,
+          'investor_name', ib.investor_name,
           'amount_usd', ROUND((
-            (COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100) -
-            (COALESCE(hd.total_harvest_usd, 0)::numeric * id.share_pct_agreed::numeric / 100)
-          )::numeric, 2)
+            COALESCE(hr.harvest_real_usd, 0)::numeric -
+            (COALESCE(ht.total_harvest_usd, 0)::numeric * ib.share_pct_agreed::numeric / 100)
+          )::numeric, 2),
+          'share_pct', ROUND(ib.share_pct_agreed::numeric, 2)
         )
-        ORDER BY id.investor_id
+        ORDER BY ib.investor_id
       )
-      FROM v3_report_investor_distributions id
-      WHERE id.project_id = pb.project_id
+      FROM investor_base ib
+      LEFT JOIN investor_harvest_real hr
+        ON hr.project_id = ib.project_id AND hr.investor_id = ib.investor_id
+      WHERE ib.project_id = pb.project_id
     ), '[]'::jsonb)
   ) AS harvest_settlement
 FROM v3_report_investor_project_base pb
 JOIN v3_report_investor_contribution_categories cc ON cc.project_id = pb.project_id
-LEFT JOIN harvest_data hd ON hd.project_id = pb.project_id
+LEFT JOIN harvest_totals ht ON ht.project_id = pb.project_id
 ORDER BY pb.project_id;
 
 COMMENT ON VIEW public.v3_investor_contribution_data_view IS
