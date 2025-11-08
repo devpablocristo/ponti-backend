@@ -55,7 +55,7 @@ var (
 
 // Extractores de métricas adicionales
 var (
-	ExtractTotalInvested     MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsd }
+	ExtractTotalInvested     MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.TotalInvestedUsdHa }
 	ExtractReturnPct         MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.ReturnPct }
 	ExtractIndifferenceYield MetricExtractor = func(m domain.FieldCropMetric) decimal.Decimal { return m.IndifferenceYieldUsdTn }
 )
@@ -101,7 +101,7 @@ func GetMainRowConfigs() []RowConfig {
 		{Key: "operating_result", Unit: "usd/ha", ValueType: "number", Extractor: ExtractOperatingResult},
 
 		// Métricas adicionales
-		{Key: "total_invested", Unit: "usd", ValueType: "number", Extractor: ExtractTotalInvested},
+		{Key: "total_invested", Unit: "usd/ha", ValueType: "number", Extractor: ExtractTotalInvested},
 		{Key: "return_pct", Unit: "%", ValueType: "number", Extractor: ExtractReturnPct},
 		{Key: "indifference_yield", Unit: "tn/ha", ValueType: "number", Extractor: ExtractIndifferenceYield},
 		{Key: "indifference_price", Unit: "usd/tn", ValueType: "number", Extractor: ExtractIndifferencePrice},
