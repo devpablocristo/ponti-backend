@@ -262,6 +262,20 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 	var totalUsd decimal.Decimal
 	var totalUsdHa decimal.Decimal
 
+	// Mapa de porcentajes acordados desde los investor headers (clientes y sociedades)
+	headerPercentages := make(map[int64]decimal.Decimal)
+	var headerOrder []InvestorHeaderModel
+	if m.InvestorHeadersJSON != "" && m.InvestorHeadersJSON != "null" {
+		if err := json.Unmarshal([]byte(m.InvestorHeadersJSON), &headerOrder); err == nil {
+			for _, header := range headerOrder {
+				if header.InvestorID == nil {
+					continue
+				}
+				headerPercentages[*header.InvestorID] = header.SharePct
+			}
+		}
+	}
+
 	// Mapa para acumular montos por inversor
 	investorTotals := make(map[int64]*domain.InvestorShare)
 
@@ -291,12 +305,49 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 
 	// Convertir el mapa a slice y calcular porcentajes
 	investors := make([]domain.InvestorShare, 0, len(investorTotals))
-	for _, inv := range investorTotals {
-		// Calcular el porcentaje del total
-		if !totalUsd.IsZero() {
-			inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
+
+	if len(headerOrder) > 0 {
+		// Respetar el orden de los headers (clientes y sociedades)
+		used := make(map[int64]struct{})
+		for _, header := range headerOrder {
+			if header.InvestorID == nil {
+				continue
+			}
+
+			var amount decimal.Decimal
+			if inv, ok := investorTotals[*header.InvestorID]; ok {
+				amount = inv.AmountUsd
+				used[*header.InvestorID] = struct{}{}
+			}
+
+			investors = append(investors, domain.InvestorShare{
+				InvestorRef: domain.InvestorRef{
+					InvestorID:   header.InvestorID,
+					InvestorName: header.InvestorName,
+				},
+				AmountUsd: amount,
+				SharePct:  header.SharePct,
+			})
 		}
-		investors = append(investors, *inv)
+
+		// Agregar cualquier inversor adicional que no estuviera en los headers
+		for id, inv := range investorTotals {
+			if _, ok := used[id]; ok {
+				continue
+			}
+
+			if !totalUsd.IsZero() {
+				inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
+			}
+			investors = append(investors, *inv)
+		}
+	} else {
+		for _, inv := range investorTotals {
+			if !totalUsd.IsZero() {
+				inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
+			}
+			investors = append(investors, *inv)
+		}
 	}
 
 	return domain.PreHarvestTotals{
