@@ -378,7 +378,11 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 		}
 	}
 
-	input := types.NewInput(c.Request)
+	// Para exportación, usar un page_size muy grande para obtener todos los registros
+	input := types.Input{
+		Page:     1,
+		PageSize: 100000, // Límite suficientemente grande para exportar todos
+	}
 
 	usdMonth := strings.TrimSpace(c.Query("usd_month"))
 	if usdMonth == "" {
