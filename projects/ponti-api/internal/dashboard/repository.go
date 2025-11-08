@@ -83,11 +83,8 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 		OperatingResultPct:     metricsData.OperatingResultPct,
 	}
 
-	// Convertir contribuciones para el mapper
-	investorContributions := r.mapper.ContributionsProgressToInvestorContribution(contributionsData)
-
-	// Retornar datos mapeados a dominio
-	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, investorContributions, managementBalanceData, operationalIndicatorsData), nil
+	// Retornar datos mapeados a dominio (contributionsData ya contiene contributions_progress_pct)
+	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, contributionsData, managementBalanceData, operationalIndicatorsData), nil
 }
 
 // resolveProjectIDs determina los IDs de proyectos a consultar basándose en los filtros
@@ -148,7 +145,7 @@ func (r *Repository) createEmptyDashboardData() *domain.DashboardData {
 	return r.mapper.DashboardDataToDomain(
 		tempData,
 		[]models.CropIncidenceModel{},
-		[]models.InvestorContributionModel{},
+		[]models.ContributionsProgressModel{},
 		&models.ManagementBalanceModel{
 			Summary: &models.ManagementBalanceSummary{
 				IncomeUSD:                 zero,

@@ -17,13 +17,16 @@ func NewDashboardModelMapper() *DashboardModelMapper {
 func (m *DashboardModelMapper) DashboardDataToDomain(
 	data *DashboardDataModel,
 	crops []CropIncidenceModel,
-	investors []InvestorContributionModel,
+	investors []ContributionsProgressModel,
 	managementBalance *ManagementBalanceModel,
 	operationalIndicators *OperationalIndicatorModel,
 ) *domain.DashboardData {
 	if data == nil {
 		return &domain.DashboardData{}
 	}
+
+	// Mapear contribuciones de inversores con % reales
+	investorContributions := m.ContributionsProgressToDomain(investors)
 
 	return &domain.DashboardData{
 		Metrics: &domain.DashboardMetrics{
@@ -42,10 +45,7 @@ func (m *DashboardModelMapper) DashboardDataToDomain(
 				ExecutedUSD: data.CostsExecutedUSD,
 				BudgetUSD:   data.CostsBudgetUSD,
 			},
-			InvestorContributions: &domain.DashboardInvestorContributions{
-				ProgressPct: decimal.NewFromInt(100), // Siempre 100% por proyecto
-				Breakdown:   m.investorContributionsToDomain(investors),
-			},
+			InvestorContributions: investorContributions,
 			OperatingResult: &domain.DashboardOperatingResult{
 				ProgressPct:   data.OperatingResultPct,
 				ResultUSD:     data.OperatingResultUSD,
@@ -178,6 +178,7 @@ func (m *DashboardModelMapper) ContributionsProgressToDomain(models []Contributi
 		var investorID int64
 		var investorName string
 		var percentage decimal.Decimal
+		var progressPct decimal.Decimal
 
 		if model.InvestorID != nil {
 			investorID = *model.InvestorID
@@ -193,10 +194,17 @@ func (m *DashboardModelMapper) ContributionsProgressToDomain(models []Contributi
 			percentage = decimal.Zero
 		}
 
+		if model.ContributionsProgressPct != nil {
+			progressPct = *model.ContributionsProgressPct
+		} else {
+			progressPct = decimal.Zero
+		}
+
 		breakdown[i] = domain.DashboardInvestorBreakdown{
-			InvestorID:   investorID,
-			InvestorName: investorName,
-			PercentPct:   percentage,
+			InvestorID:               investorID,
+			InvestorName:             investorName,
+			PercentPct:               percentage,
+			ContributionsProgressPct: progressPct,
 		}
 	}
 

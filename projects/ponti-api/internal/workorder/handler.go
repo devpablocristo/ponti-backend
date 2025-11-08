@@ -255,7 +255,11 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 
 func (h *Handler) ExportWorkorders(c *gin.Context) {
 	filt := parseFilters(c)
-	input := types.NewInput(c.Request)
+	// Para exportación, usar un page_size muy grande para obtener todos los registros
+	input := types.Input{
+		Page:     1,
+		PageSize: 100000, // Límite suficientemente grande para exportar todos
+	}
 
 	data, err := h.ucs.ExportWorkorders(c, filt, input)
 	if err != nil {

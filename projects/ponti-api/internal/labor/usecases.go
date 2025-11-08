@@ -86,6 +86,7 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list group labor", err)
 	}
+	
 	if len(items) == 0 {
 		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
 	}
