@@ -226,9 +226,10 @@ type InvestorContributions struct {
 
 // InvestorItem representa un item de inversor
 type InvestorItem struct {
-	InvestorID   int64           `json:"investor_id"`
-	InvestorName string          `json:"investor_name"`
-	SharePct     decimal.Decimal `json:"share_pct"`
+	InvestorID               int64           `json:"investor_id"`
+	InvestorName             string          `json:"investor_name"`
+	SharePct                 decimal.Decimal `json:"share_pct"`                  // % teórico acordado (abajo)
+	ContributionsProgressPct decimal.Decimal `json:"contributions_progress_pct"` // % real de aportes (arriba)
 }
 
 // OperatingResultMetric representa la métrica de resultado operativo
@@ -506,6 +507,8 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	// Redondear contribuciones de inversores
 	for i := range response.Metrics.InvestorContributions.Items {
 		response.Metrics.InvestorContributions.Items[i].SharePct = roundToNearestInteger(response.Metrics.InvestorContributions.Items[i].SharePct)
+		// Redondear contributions_progress_pct a 2 decimales para mostrar como "75.74%"
+		response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct = response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct.Round(2)
 	}
 
 	response.Metrics.OperatingResult.MarginPct = roundToNearestInteger(response.Metrics.OperatingResult.MarginPct)
@@ -634,9 +637,10 @@ func convertInvestorContributions(contributions *domain.DashboardInvestorContrib
 	items := make([]InvestorItem, 0, len(contributions.Breakdown))
 	for _, inv := range contributions.Breakdown {
 		items = append(items, InvestorItem{
-			InvestorID:   inv.InvestorID,
-			InvestorName: inv.InvestorName,
-			SharePct:     inv.PercentPct,
+			InvestorID:               inv.InvestorID,
+			InvestorName:             inv.InvestorName,
+			SharePct:                 inv.PercentPct,
+			ContributionsProgressPct: inv.ContributionsProgressPct,
 		})
 	}
 

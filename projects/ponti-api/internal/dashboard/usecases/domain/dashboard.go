@@ -96,9 +96,10 @@ type DashboardInvestorContributions struct {
 
 // DashboardInvestorBreakdown representa el desglose de contribuciones por inversor
 type DashboardInvestorBreakdown struct {
-	InvestorID   int64
-	InvestorName string
-	PercentPct   decimal.Decimal
+	InvestorID               int64
+	InvestorName             string
+	PercentPct               decimal.Decimal // % teórico acordado (abajo)
+	ContributionsProgressPct decimal.Decimal // % real de aportes (arriba)
 }
 
 // DashboardOperatingResult representa la métrica de resultado operativo

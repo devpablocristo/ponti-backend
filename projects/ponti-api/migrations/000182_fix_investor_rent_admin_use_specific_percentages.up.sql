@@ -8,7 +8,7 @@
 --           - field_investors.percentage para arriendo REAL por cada campo
 --           - admin_cost_investors.percentage para administración REAL
 -- Solución: Crear CTEs que calculen dinámicamente desde las tablas específicas
--- Fecha: 2025-11-08
+-- Fecha: 2025-11-08m
 -- Autor: Sistema
 --
 -- Impacto: Control 8 y 9 pasarán correctamente
