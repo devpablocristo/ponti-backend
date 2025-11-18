@@ -142,27 +142,27 @@ type ManagementBalanceModel struct {
 
 // ManagementBalanceSummary representa el resumen del balance de gestión
 type ManagementBalanceSummary struct {
-	IncomeUSD                 decimal.Decimal `gorm:"column:income_usd"`
-	DirectCostsExecutedUSD    decimal.Decimal `gorm:"column:costos_directos_ejecutados_usd"`
-	DirectCostsInvestedUSD    decimal.Decimal `gorm:"column:costos_directos_invertidos_usd"`
-	StockUSD                  decimal.Decimal `gorm:"column:costos_directos_stock_usd"`
-	RentExecutedUSD           decimal.Decimal `gorm:"column:arriendo_ejecutados_usd"`
-	RentUSD                   decimal.Decimal `gorm:"column:arriendo_invertidos_usd"`
-	StructureExecutedUSD      decimal.Decimal `gorm:"column:estructura_ejecutados_usd"`
-	StructureUSD              decimal.Decimal `gorm:"column:estructura_invertidos_usd"`
-	OperatingResultUSD        decimal.Decimal `gorm:"column:operating_result_usd"`
-	OperatingResultPct        decimal.Decimal `gorm:"column:operating_result_pct"`
-	SemillaCostUSD            decimal.Decimal `gorm:"column:semilla_cost"`
-	InsumosCostUSD            decimal.Decimal `gorm:"column:insumos_cost"`
-	FertilizantesCostUSD      decimal.Decimal `gorm:"column:fertilizantes_cost"`
-	LaboresCostUSD            decimal.Decimal `gorm:"column:labores_cost"`
-	SemillasInvertidosUSD     decimal.Decimal `gorm:"column:semillas_invertidos_usd"`
-	SemillasStockUSD          decimal.Decimal `gorm:"column:semillas_stock_usd"`
-	AgroquimicosInvertidosUSD decimal.Decimal `gorm:"column:agroquimicos_invertidos_usd"`
-	AgroquimicosStockUSD      decimal.Decimal `gorm:"column:agroquimicos_stock_usd"`
+	IncomeUSD                  decimal.Decimal `gorm:"column:income_usd"`
+	DirectCostsExecutedUSD     decimal.Decimal `gorm:"column:costos_directos_ejecutados_usd"`
+	DirectCostsInvestedUSD     decimal.Decimal `gorm:"column:costos_directos_invertidos_usd"`
+	StockUSD                   decimal.Decimal `gorm:"column:costos_directos_stock_usd"`
+	RentExecutedUSD            decimal.Decimal `gorm:"column:arriendo_ejecutados_usd"`
+	RentUSD                    decimal.Decimal `gorm:"column:arriendo_invertidos_usd"`
+	StructureExecutedUSD       decimal.Decimal `gorm:"column:estructura_ejecutados_usd"`
+	StructureUSD               decimal.Decimal `gorm:"column:estructura_invertidos_usd"`
+	OperatingResultUSD         decimal.Decimal `gorm:"column:operating_result_usd"`
+	OperatingResultPct         decimal.Decimal `gorm:"column:operating_result_pct"`
+	SemillaCostUSD             decimal.Decimal `gorm:"column:semilla_cost"`
+	InsumosCostUSD             decimal.Decimal `gorm:"column:insumos_cost"`
+	FertilizantesCostUSD       decimal.Decimal `gorm:"column:fertilizantes_cost"`
+	LaboresCostUSD             decimal.Decimal `gorm:"column:labores_cost"`
+	SemillasInvertidosUSD      decimal.Decimal `gorm:"column:semillas_invertidos_usd"`
+	SemillasStockUSD           decimal.Decimal `gorm:"column:semillas_stock_usd"`
+	AgroquimicosInvertidosUSD  decimal.Decimal `gorm:"column:agroquimicos_invertidos_usd"`
+	AgroquimicosStockUSD       decimal.Decimal `gorm:"column:agroquimicos_stock_usd"`
 	FertilizantesInvertidosUSD decimal.Decimal `gorm:"column:fertilizantes_invertidos_usd"`
 	FertilizantesStockUSD      decimal.Decimal `gorm:"column:fertilizantes_stock_usd"`
-	LaboresInvertidosUSD      decimal.Decimal `gorm:"column:labores_invertidos_usd"`
+	LaboresInvertidosUSD       decimal.Decimal `gorm:"column:labores_invertidos_usd"`
 }
 
 // ManagementBalanceBreakdown representa el desglose del balance por categoría
@@ -199,9 +199,9 @@ type InvestorContributionModel struct {
 // OperationalIndicatorModel representa el modelo de indicadores operativos
 type OperationalIndicatorModel struct {
 	FirstWorkorderDate   *time.Time `gorm:"column:start_date"`
-	FirstWorkorderNumber *int64     `gorm:"column:first_workorder_id"`
+	FirstWorkorderNumber *string    `gorm:"column:first_workorder_id"`
 	LastWorkorderDate    *time.Time `gorm:"column:end_date"`
-	LastWorkorderNumber  *int64     `gorm:"column:last_workorder_id"`
+	LastWorkorderNumber  *string    `gorm:"column:last_workorder_id"`
 	LastStockCountDate   *time.Time `gorm:"column:last_stock_count_date"`
 	CampaignClosingDate  *time.Time `gorm:"column:campaign_closing_date"`
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/supply_movement/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 type SupplyMovementExcelDTO struct {
@@ -12,7 +13,7 @@ type SupplyMovementExcelDTO struct {
 	EntryDate       time.Time `excel:"FECHA"`
 	InvestorName    string    `excel:"INVERSOR"`
 	SupplyName      string    `excel:"INSUMO"`
-	Quantity        int64     `excel:"CANTIDAD"`
+	Quantity        string    `excel:"CANTIDAD"`
 	SupplyUnitName  string    `excel:"UNIDAD"`
 	Category        string    `excel:"RUBRO"`
 	Type            string    `excel:"TIPO/CLASE"`
@@ -35,7 +36,7 @@ func BuildSupplyMovementDTO(items []*domain.SupplyMovement) []SupplyMovementExce
 			EntryDate:       *it.MovementDate,
 			InvestorName:    it.Investor.Name,
 			SupplyName:      it.Supply.Name,
-			Quantity:        it.Quantity.IntPart(),
+			Quantity:        decToString(it.Quantity, 2),
 			SupplyUnitName:  it.Supply.UnitName,
 			Category:        it.Supply.CategoryName,
 			Type:            it.Supply.Type.Name,
@@ -46,4 +47,11 @@ func BuildSupplyMovementDTO(items []*domain.SupplyMovement) []SupplyMovementExce
 	}
 
 	return out
+}
+
+func decToString(d decimal.Decimal, scale int32) string {
+	if scale < 0 {
+		return d.String()
+	}
+	return d.Round(scale).StringFixed(scale)
 }
