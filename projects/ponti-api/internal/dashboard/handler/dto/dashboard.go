@@ -264,6 +264,7 @@ type BalanceItem struct {
 	ExecutedUSD decimal.Decimal  `json:"executed_usd"`
 	InvestedUSD decimal.Decimal  `json:"invested_usd"`
 	StockUSD    *decimal.Decimal `json:"stock_usd,omitempty"`
+	Difference  *decimal.Decimal `json:"difference_usd,omitempty"`
 	Order       int              `json:"order"`
 }
 
@@ -321,7 +322,7 @@ type OperationalItem struct {
 	Type        string  `json:"type"`
 	Title       string  `json:"title"`
 	Date        *string `json:"date"`
-	WorkorderID *int64  `json:"workorder_id,omitempty"`
+	WorkorderID *string `json:"workorder_id,omitempty"`
 }
 
 // OperationalCard representa una tarjeta de indicador operativo (mantenido para compatibilidad)
@@ -527,6 +528,9 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 		if response.ManagementBalance.Items[i].StockUSD != nil {
 			*response.ManagementBalance.Items[i].StockUSD = roundToNearestInteger(*response.ManagementBalance.Items[i].StockUSD)
 		}
+		if response.ManagementBalance.Items[i].Difference != nil {
+			*response.ManagementBalance.Items[i].Difference = roundToNearestInteger(*response.ManagementBalance.Items[i].Difference)
+		}
 	}
 
 	// Redondear incidencia por cultivo
@@ -668,6 +672,17 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		return ManagementBalance{}
 	}
 
+	decimalPtr := func(value decimal.Decimal) *decimal.Decimal {
+		v := value
+		return &v
+	}
+
+	leaseExecutedUSD := balance.Summary.RentExecutedUSD
+	leaseInvestedUSD := balance.Summary.RentUSD
+	if leaseInvestedUSD.GreaterThan(leaseExecutedUSD) {
+		leaseExecutedUSD, leaseInvestedUSD = leaseInvestedUSD, leaseExecutedUSD
+	}
+
 	// Crear totales usando SOLO datos de BD (sin hardcoding)
 	totals := BalanceTotals{
 		ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
@@ -683,6 +698,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			ExecutedUSD: balance.Summary.DirectCostsExecutedUSD,
 			InvestedUSD: balance.Summary.DirectCostsInvestedUSD,
 			StockUSD:    &balance.Summary.StockUSD,
+			Difference:  decimalPtr(balance.Summary.DirectCostsExecutedUSD.Sub(balance.Summary.DirectCostsInvestedUSD)),
 			Order:       0,
 		},
 		{
@@ -720,8 +736,9 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 		{
 			Category:    BalanceCategoryLease,
 			Label:       "Arriendo",
-			ExecutedUSD: balance.Summary.RentExecutedUSD,
-			InvestedUSD: balance.Summary.RentUSD,
+			ExecutedUSD: leaseExecutedUSD,
+			InvestedUSD: leaseInvestedUSD,
+			Difference:  decimalPtr(leaseExecutedUSD.Sub(leaseInvestedUSD)),
 			Order:       5,
 		},
 		{
@@ -803,7 +820,7 @@ func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicat
 		}
 
 		// Solo incluir workorder_id para tipos que lo requieren
-		var workorderID *int64
+		var workorderID *string
 		if card.WorkorderID != nil && (card.Key == "first_workorder" || card.Key == "last_workorder") {
 			workorderID = card.WorkorderID
 		}

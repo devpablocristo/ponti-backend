@@ -238,6 +238,30 @@ func (m *InvestorContributionDataModel) mapComparisonsToDomain(comparisons []Inv
 }
 
 // mapHarvestToDomain mapea harvest del modelo al domain usando helpers (DRY)
+func convertInvestorSharesWithTotal(shares []InvestorShareModel, total decimal.Decimal) []domain.InvestorShare {
+	result := make([]domain.InvestorShare, len(shares))
+
+	hasTotal := !total.IsZero()
+
+	for i, share := range shares {
+		percentage := share.SharePct
+		if hasTotal {
+			percentage = share.AmountUsd.Div(total).Mul(decimal.NewFromInt(100))
+		}
+
+		result[i] = domain.InvestorShare{
+			InvestorRef: domain.InvestorRef{
+				InvestorID:   share.InvestorID,
+				InvestorName: share.InvestorName,
+			},
+			AmountUsd: share.AmountUsd,
+			SharePct:  percentage,
+		}
+	}
+
+	return result
+}
+
 func (m *InvestorContributionDataModel) mapHarvestToDomain(harvest HarvestSettlementModel) domain.HarvestSettlement {
 	domainRows := make([]domain.HarvestRow, len(harvest.Rows))
 	for i, r := range harvest.Rows {
@@ -246,7 +270,7 @@ func (m *InvestorContributionDataModel) mapHarvestToDomain(harvest HarvestSettle
 			Type:       domain.HarvestRowType(r.Type),
 			TotalUsd:   r.TotalUsd,
 			TotalUsdHa: r.TotalUsdHa,
-			Investors:  ConvertInvestorSharesSlice(r.Investors),
+			Investors:  convertInvestorSharesWithTotal(r.Investors, r.TotalUsd),
 		}
 	}
 
@@ -262,8 +286,7 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 	var totalUsd decimal.Decimal
 	var totalUsdHa decimal.Decimal
 
-	// Mapa de porcentajes acordados desde los investor headers (clientes y sociedades)
-	headerPercentages := make(map[int64]decimal.Decimal)
+	// Headers determinan el orden de columnas en la UI
 	var headerOrder []InvestorHeaderModel
 	if m.InvestorHeadersJSON != "" && m.InvestorHeadersJSON != "null" {
 		if err := json.Unmarshal([]byte(m.InvestorHeadersJSON), &headerOrder); err == nil {
@@ -271,7 +294,6 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 				if header.InvestorID == nil {
 					continue
 				}
-				headerPercentages[*header.InvestorID] = header.SharePct
 			}
 		}
 	}
@@ -306,6 +328,13 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 	// Convertir el mapa a slice y calcular porcentajes
 	investors := make([]domain.InvestorShare, 0, len(investorTotals))
 
+	calcSharePct := func(amount decimal.Decimal) decimal.Decimal {
+		if totalUsd.IsZero() {
+			return decimal.Zero
+		}
+		return amount.Div(totalUsd).Mul(decimal.NewFromInt(100))
+	}
+
 	if len(headerOrder) > 0 {
 		// Respetar el orden de los headers (clientes y sociedades)
 		used := make(map[int64]struct{})
@@ -326,7 +355,7 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 					InvestorName: header.InvestorName,
 				},
 				AmountUsd: amount,
-				SharePct:  header.SharePct,
+				SharePct:  calcSharePct(amount),
 			})
 		}
 
@@ -336,16 +365,12 @@ func (m *InvestorContributionDataModel) calculatePreHarvestFromContributions(con
 				continue
 			}
 
-			if !totalUsd.IsZero() {
-				inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
-			}
+			inv.SharePct = calcSharePct(inv.AmountUsd)
 			investors = append(investors, *inv)
 		}
 	} else {
 		for _, inv := range investorTotals {
-			if !totalUsd.IsZero() {
-				inv.SharePct = inv.AmountUsd.Div(totalUsd).Mul(decimal.NewFromInt(100))
-			}
+			inv.SharePct = calcSharePct(inv.AmountUsd)
 			investors = append(investors, *inv)
 		}
 	}

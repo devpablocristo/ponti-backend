@@ -299,6 +299,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
 		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
 		SuperficieTotal decimal.Decimal `gorm:"column:project_total_hectares"`
+		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
 	}
 
 	// Construir query base
@@ -322,11 +323,17 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 		COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
 		COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS cost_per_ha,
-		COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares
+		COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
+		COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
 	`).Scan(&row).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to scan lot metrics", err)
+	}
+
+	superficieTotal := row.SuperficieTotal
+	if fieldID > 0 && row.FieldTotal.GreaterThan(decimal.Zero) {
+		superficieTotal = row.FieldTotal
 	}
 
 	return &domain.LotMetrics{
@@ -334,7 +341,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		HarvestedArea:   row.HarvestedArea,
 		YieldTnPerHa:    row.YieldTnPerHa,
 		CostPerHectare:  row.CostPerHa,
-		SuperficieTotal: row.SuperficieTotal,
+		SuperficieTotal: superficieTotal,
 	}, nil
 }
 

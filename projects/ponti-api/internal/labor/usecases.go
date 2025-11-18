@@ -14,9 +14,9 @@ type RepositoryPort interface {
 	GetWorkordersByLaborID(ctx context.Context, laborID int64) (int64, error)
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
-	ListByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
-	ListGroupLabor(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
-	ListAllGroupLabor(context.Context, string) ([]domain.LaborRawItem, error)
+	ListByWorkorder(context.Context, int64) ([]domain.LaborRawItem, error)
+	ListGroupLabor(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
@@ -61,12 +61,12 @@ func (u *UseCases) ListLaborCategoriesByTypeID(ctx context.Context, typeID int64
 	return u.repo.ListLaborCategoriesByTypeID(ctx, typeID)
 }
 
-func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
-	return u.repo.ListByWorkorder(ctx, workorderID, usdMonth)
+func (u *UseCases) ListLaborByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
+	return u.repo.ListByWorkorder(ctx, workorderID)
 }
 
-func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborListItem, types.PageInfo, error) {
-	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID, usdMonth)
+func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Input, projectID int64, fieldID int64) ([]domain.LaborListItem, types.PageInfo, error) {
+	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID)
 
 	// Mapear directamente - NO hacer cálculos manuales (ya vienen de la vista)
 	items := make([]domain.LaborListItem, len(rawItems))
@@ -77,16 +77,16 @@ func (u *UseCases) ListGroupLaborByWorkorder(ctx context.Context, inp types.Inpu
 	return items, pageInfo, err
 }
 
-func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64, usdMonth string) ([]byte, error) {
+func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	items, _, err := u.ListGroupLaborByWorkorder(ctx, in, pid, fid, usdMonth)
+	items, _, err := u.ListGroupLaborByWorkorder(ctx, in, pid, fid)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list group labor", err)
 	}
-	
+
 	if len(items) == 0 {
 		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
 	}
@@ -94,12 +94,12 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 	return u.excel.Export(ctx, items)
 }
 
-func (u *UseCases) ExportAllGroupLabors(ctx context.Context, usdMonth string) ([]byte, error) {
+func (u *UseCases) ExportAllGroupLabors(ctx context.Context) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	raw, err := u.repo.ListAllGroupLabor(ctx, usdMonth)
+	raw, err := u.repo.ListAllGroupLabor(ctx)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list group labor", err)
 	}

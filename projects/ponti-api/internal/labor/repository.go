@@ -146,7 +146,7 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 	return laborCategories, nil
 }
 
-func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usdMonth string) ([]domain.LaborRawItem, error) {
+func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
 	var v3Models []models.LaborListItem
 
 	// Usar la vista v3_labor_list como base y agregar campos adicionales
@@ -166,7 +166,8 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
             v3.cost_per_ha,
             COALESCE(v3.labor_category_name, '') AS category_name,
             COALESCE(v3.investor_name, '') AS investor_name,
-			pdv.average_value AS usd_avg_value,
+			v3.dollar_average_month,
+			v3.dollar_average_month AS usd_avg_value,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
@@ -174,7 +175,6 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64, usd
 			i.status AS invoice_status
         `).
 		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
-		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth).
 		Where("v3.workorder_id = ?", workorderID).
 		Scan(&v3Models).Error
 	if err != nil {
@@ -219,7 +219,6 @@ func (r *Repository) ListGroupLabor(
 	inp types.Input,
 	projectID int64,
 	fieldID int64,
-	usdMonth string,
 ) ([]domain.LaborListItem, types.PageInfo, error) {
 
 	// Base: vista v3_labor_list + joins de factura y dólar promedio del mes
@@ -248,9 +247,9 @@ func (r *Repository) ListGroupLabor(
 			v3.cost_per_ha,
 			v3.total_labor_cost,
 			v3.dollar_average_month,
+			v3.dollar_average_month AS usd_avg_value,
 			v3.usd_cost_ha,
 			v3.usd_net_total,
-			pdv.average_value AS usd_avg_value,
 			v3.investor_id,
 			COALESCE(v3.investor_name, '') AS investor_name,
 			i.id AS invoice_id,
@@ -259,8 +258,7 @@ func (r *Repository) ListGroupLabor(
 			i.date AS invoice_date,
 			i.status AS invoice_status
 		`).
-		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
-		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id")
 
 	if fieldID != 0 {
 		base = base.Where("v3.field_id = ?", fieldID)
@@ -568,7 +566,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	}, nil
 }
 
-func (r *Repository) ListAllGroupLabor(ctx context.Context, usdMonth string) ([]domain.LaborRawItem, error) {
+func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawItem, error) {
 	base := r.db.Client().
 		WithContext(ctx).
 		Table("v3_labor_list AS v3").
@@ -588,15 +586,15 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context, usdMonth string) ([]
 			v3.cost_per_ha,
 			v3.contractor_name,
 			COALESCE(v3.investor_name, '') AS investor_name,
-			pdv.average_value AS usd_avg_value,
+			v3.dollar_average_month,
+			v3.dollar_average_month AS usd_avg_value,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
 			i.date AS invoice_date,
 			i.status AS invoice_status
         `).
-		Joins(`LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id AND i.deleted_at IS NULL`).
-		Joins("LEFT JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
+		Joins(`LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id AND i.deleted_at IS NULL`)
 
 	var rows []models.LaborListItem
 

@@ -14,7 +14,6 @@ import (
 	labexcel "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/utils"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
@@ -25,10 +24,10 @@ type UseCasesPort interface {
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
-	ListLaborByWorkorder(context.Context, int64, string) ([]domain.LaborRawItem, error)
-	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64, string) ([]domain.LaborListItem, types.PageInfo, error)
-	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64, string) ([]byte, error)
-	ExportAllGroupLabors(context.Context, string) ([]byte, error)
+	ListLaborByWorkorder(context.Context, int64) ([]domain.LaborRawItem, error)
+	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
+	ExportAllGroupLabors(context.Context) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
@@ -287,17 +286,7 @@ func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
 		return
 	}
 
-	usdMonth := strings.TrimSpace(c.Query("usd_month"))
-	if usdMonth == "" {
-		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
-		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
-		return
-	}
-
-	// Mapear nombre de mes en inglés al formato MM si es necesario
-	usdMonth = utils.MonthNameToNumber(usdMonth)
-
-	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID, usdMonth)
+	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -334,17 +323,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	input := types.NewInput(c.Request)
 
-	usdMonth := strings.TrimSpace(c.Query("usd_month"))
-	if usdMonth == "" {
-		apiErr, _ := types.NewAPIError(fmt.Errorf("usd_month is required"))
-		c.Error(apiErr).SetMeta(map[string]any{"details": "usd_month requires a month"})
-		return
-	}
-
-	// Mapear nombre de mes en inglés al formato MM si es necesario
-	usdMonth = utils.MonthNameToNumber(usdMonth)
-
-	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID, usdMonth)
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -384,13 +363,7 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 		PageSize: 100000, // Límite suficientemente grande para exportar todos
 	}
 
-	usdMonth := strings.TrimSpace(c.Query("usd_month"))
-	if usdMonth == "" {
-		types.NewErrorResponseHelper().BadRequest(c, "usd_month requires a month", nil)
-		return
-	}
-
-	data, err := h.ucs.ExportGroupLaborXLSX(c.Request.Context(), input, projectID, fieldID, usdMonth)
+	data, err := h.ucs.ExportGroupLaborXLSX(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
 		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
@@ -435,13 +408,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
-	usdMonth := strings.TrimSpace(c.Query("usd_month"))
-	if usdMonth == "" {
-		types.NewErrorResponseHelper().BadRequest(c, "usd_month requires a month", nil)
-		return
-	}
-
-	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), usdMonth)
+	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context())
 	if err != nil {
 		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return

@@ -28,9 +28,19 @@ type WorkorderExcelDto struct {
 }
 
 func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExcelDto {
-	out := make([]WorkorderExcelDto, 0, len(items))
+	out := make([]WorkorderExcelDto, 0, len(items)+1) // +1 para la fila de totales
+
+	// Variables para acumular totales
+	var totalSurfaceHa decimal.Decimal
+	var totalConsumption decimal.Decimal
+	var totalCost decimal.Decimal
 
 	for _, it := range items {
+		// Acumular totales
+		totalSurfaceHa = totalSurfaceHa.Add(it.SurfaceHa)
+		totalConsumption = totalConsumption.Add(it.Consumption)
+		totalCost = totalCost.Add(it.TotalCost)
+
 		out = append(out, WorkorderExcelDto{
 			Number:       it.Number,
 			ProjectName:  it.ProjectName,
@@ -41,14 +51,37 @@ func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExce
 			LaborName:    it.LaborName,
 			TypeName:     it.TypeName,
 			Contractor:   it.Contractor,
-			SurfaceHa:    decToFloat(it.SurfaceHa, 0),
+			SurfaceHa:    decToFloat(it.SurfaceHa, 2),
 			SupplyName:   it.SupplyName,
 			Consumption:  decToFloat(it.Consumption, 0),
 			CategoryName: it.CategoryName,
 			Dose:         decToFloat(it.Dose, 2),
 			CostPerHa:    decToFloat(it.CostPerHa, 2),
 			UnitPrice:    decToFloat(it.UnitPrice, 2),
-		TotalCost:    decToFloat(it.TotalCost, 2),
+			TotalCost:    decToFloat(it.TotalCost, 2),
+		})
+	}
+
+	// Agregar fila de totales al final
+	if len(items) > 0 {
+		out = append(out, WorkorderExcelDto{
+			Number:       "TOTAL",
+			ProjectName:  "",
+			FieldName:    "",
+			LotName:      "",
+			Date:         time.Time{},
+			CropName:     "",
+			LaborName:    "",
+			TypeName:     "",
+			Contractor:   "",
+			SurfaceHa:    decToFloat(totalSurfaceHa, 2),
+			SupplyName:   "",
+			Consumption:  decToFloat(totalConsumption, 0),
+			CategoryName: "",
+			Dose:         0,
+			CostPerHa:    0,
+			UnitPrice:    0,
+			TotalCost:    decToFloat(totalCost, 2),
 		})
 	}
 
@@ -62,4 +95,12 @@ func decToFloat(d decimal.Decimal, scale int32) float64 {
 	}
 	f, _ := d.Float64()
 	return f
+}
+
+// helper para obtener string con decimales fijos
+func decToString(d decimal.Decimal, scale int32) string {
+	if scale < 0 {
+		return d.String()
+	}
+	return d.Round(scale).StringFixed(scale)
 }
