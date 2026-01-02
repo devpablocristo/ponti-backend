@@ -81,6 +81,14 @@ jobs:
           
           # Ejecutar migraciones
           cd projects/ponti-api
+          
+          # TEMPORAL: Limpiar estado dirty de migración 320 que falló
+          echo "🧹 Limpiando estado dirty..."
+          migrate -path migrations \
+            -database "postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/${{ secrets.DB_NAME }}?sslmode=disable" \
+            force 319
+          
+          # Ejecutar migraciones normalmente
           migrate -path migrations \
             -database "postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/${{ secrets.DB_NAME }}?sslmode=disable" \
             up
