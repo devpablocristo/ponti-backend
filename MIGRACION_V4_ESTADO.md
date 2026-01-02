@@ -4,8 +4,9 @@
 
 Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_report` usando el patrón **Strangler Fig**.
 
-**Estado actual:** 70% completado  
-**Fecha:** Enero 2025
+**Estado actual:** 75% completado  
+**Fecha:** Enero 2025  
+**Última actualización:** Bug arriendo corregido en summary_results
 
 ---
 
@@ -38,6 +39,8 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | Export labores | Decimales como string en vez de float64 | Código Go |
 | Summary duplica cálculos | Recalculaba en vez de agregar desde field_crop | 000322 |
 | Renta % incorrecta | Numerador/denominador usaban arriendo diferente | 000322 |
+| lot_list columnas faltantes | 000318 eliminó sowed_area_ha, harvested_area_ha, etc | 000323 |
+| **Summary arriendo fijo** | **Mostraba 119,770 en vez de 161,773 (total)** | **000324** |
 
 ---
 
@@ -233,12 +236,31 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 | 000320 | Recrear todas las vistas field_crop |
 | 000321 | Fix Total Activo usa arriendo configurado |
 | 000322 | summary_results agrega desde field_crop (SSOT) |
+| 000323 | Fix lot_list columnas faltantes (sowed_area_ha, etc) |
+| 000324 | **Fix summary_results arriendo** (usa rent_per_ha_for_lot en vez de rent_fixed_only) |
 
 ---
 
-## 9. Checklist de Calidad Final
+## 9. Deuda Técnica Conocida
 
-### Base de Datos Perfecta ✓
+### summary_results no usa arquitectura SSOT pura
+
+**Problema:** La vista `v4_report.summary_results` debería agregar desde `field_crop_metrics` (que ya tiene todos los valores calculados), pero eso causa **timeout** por la cadena de funciones SSOT.
+
+**Solución actual:** Copia la estructura de `v3_report_summary_results_view` pero cambia `rent_fixed_only_for_lot` → `rent_per_ha_for_lot` para corregir el bug del arriendo.
+
+**Solución ideal (futura):**
+1. Optimizar funciones SSOT (evitar llamadas anidadas)
+2. O usar vistas materializadas
+3. O precalcular en tablas con triggers
+
+**Impacto:** Funciona correctamente y rápido, pero viola el principio de no duplicar lógica.
+
+---
+
+## 10. Checklist de Calidad Final
+
+### Base de Datos ✓
 
 #### Cálculos (SSOT)
 - [ ] Cada cálculo tiene UNA sola función SSOT
@@ -270,7 +292,7 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 
 ---
 
-## 10. Scripts de Validación a Crear
+## 11. Scripts de Validación a Crear
 
 ```
 scripts/validation/
@@ -284,7 +306,7 @@ scripts/validation/
 
 ---
 
-## 11. Estado Final Esperado
+## 12. Estado Final Esperado
 
 ```
 📊 MÉTRICAS OBJETIVO
