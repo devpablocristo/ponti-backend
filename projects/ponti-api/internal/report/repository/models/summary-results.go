@@ -3,6 +3,7 @@ package models
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 	"github.com/shopspring/decimal"
 )
 
@@ -36,9 +37,9 @@ type SummaryResultsModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// Usar vista v3 (SSOT)
+// Usa v4_report.summary_results si REPORT_SCHEMA=v4_report, sino v3_report_summary_results_view
 func (SummaryResultsModel) TableName() string {
-	return "v3_report_summary_results_view"
+	return db.SummaryView()
 }
 
 // ===== MAPPERS =====
