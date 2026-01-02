@@ -14,12 +14,12 @@ type ExcelTableDto struct {
 	CropName        string    `excel:"CULTIVO"`
 	LaborName       string    `excel:"LABOR"`
 	Contractor      string    `excel:"CONTRATISTA"`
-	SurfaceHa       string    `excel:"SUPÉRFICIE"`
-	CostHa          string    `excel:"COSTO $/HECTÁREA"`
+	SurfaceHa       float64   `excel:"SUPÉRFICIE"`
+	CostHa          float64   `excel:"COSTO $/HECTÁREA"`
 	InvestorName    string    `excel:"INVERSOR"`
 	USDAvgValue     float64   `excel:"U$ PROM"`
-	NetTotal        string    `excel:"TOTAL $ / NETO"`
-	TotalIVA        string    `excel:"TOTAL $ / IVA"`
+	NetTotal        float64   `excel:"TOTAL $ / NETO"`
+	TotalIVA        float64   `excel:"TOTAL $ / IVA"`
 	USDCostHa       float64   `excel:"COSTO U$ /HA"`
 	USDNetTotal     float64   `excel:"TOTAL U$ NETO"`
 
@@ -40,12 +40,12 @@ func BuildExcelTableDTO(items []domain.LaborListItem) []ExcelDto {
 			CropName:        it.CropName,
 			LaborName:       it.LaborName,
 			Contractor:      it.Contractor,
-			SurfaceHa:       decToString(it.SurfaceHa, 2),
-			CostHa:          decToString(it.CostHa, 2),
+			SurfaceHa:       decToFloat(it.SurfaceHa, 2),
+			CostHa:          decToFloat(it.CostHa, 2),
 			InvestorName:    it.InvestorName,
 			USDAvgValue:     decToFloat(it.USDAvgValue, 2),
-			NetTotal:        decToString(it.NetTotal, 2),
-			TotalIVA:        decToString(it.TotalIVA, 2),
+			NetTotal:        decToFloat(it.NetTotal, 2),
+			TotalIVA:        decToFloat(it.TotalIVA, 2),
 			USDCostHa:       decToFloat(it.USDCostHa, 2),
 			USDNetTotal:     decToFloat(it.USDNetTotal, 2),
 			InvoiceNumber:   it.InvoiceNumber,
