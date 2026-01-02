@@ -1,10 +1,10 @@
 -- =============================================================================
--- Migration: 000326_rewrite_field_crop_metrics_fast
+-- Migration: 000324_rewrite_field_crop_metrics_fast
 -- Descripción: Reescribe field_crop_metrics como UNA sola vista sin anidamiento
 -- Problema: La versión anterior usaba 5 vistas anidadas con 46 llamadas SSOT
 -- Solución: Una sola vista con ~8 llamadas SSOT (igual que v3)
 -- 
--- PARA REVERTIR: Ejecutar 000326_rewrite_field_crop_metrics_fast.down.sql
+-- PARA REVERTIR: Ejecutar 000324_rewrite_field_crop_metrics_fast.down.sql
 -- =============================================================================
 
 -- Eliminar vistas dependientes
@@ -157,7 +157,7 @@ SELECT
 FROM aggregated a;
 
 COMMENT ON VIEW v4_report.field_crop_metrics IS 
-'OPTIMIZADO 000326: Una sola vista sin anidamiento. ~10x más rápido.';
+'OPTIMIZADO 000324: Una sola vista sin anidamiento. ~10x más rápido.';
 
 -- =============================================================================
 -- Recrear summary_results usando la nueva field_crop_metrics

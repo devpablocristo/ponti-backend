@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration: 000326_rewrite_field_crop_metrics_fast (DOWN)
+-- Migration: 000324_rewrite_field_crop_metrics_fast (DOWN)
 -- Restaura las vistas originales anidadas
 -- =============================================================================
 
@@ -14,7 +14,6 @@ DROP VIEW IF EXISTS v4_report.field_crop_metrics CASCADE;
 -- 000312_create_v4_report_field_crop_economicos.up.sql
 -- 000313_create_v4_report_field_crop_rentabilidad.up.sql
 -- 000314_create_v4_report_field_crop_metrics.up.sql
--- 000325_optimize_summary_results_ssot.up.sql
 
 -- Restaurar field_crop_metrics original (versión anidada)
 CREATE VIEW v4_report.field_crop_metrics AS
