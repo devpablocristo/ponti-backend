@@ -29,11 +29,14 @@ func FieldCropView(name string) string {
 
 // SummaryView retorna el nombre de vista para summary_results
 // v3: v3_report_summary_results_view → v4: v4_report.summary_results
+// TEMPORAL: Forzar v3 hasta verificar que migración 000322 se aplicó en GCP
 func SummaryView() string {
-	if reportSchema == "v4_report" {
-		return "v4_report.summary_results"
-	}
+	// TODO: Quitar este override cuando se confirme que v4_report.summary_results existe en GCP
 	return "v3_report_summary_results_view"
+	// if reportSchema == "v4_report" {
+	// 	return "v4_report.summary_results"
+	// }
+	// return "v3_report_summary_results_view"
 }
 
 // IsV4Enabled retorna true si está habilitado el schema v4
