@@ -8,6 +8,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/labor/usecases/domain"
+	shareddb "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 	workordermodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"gorm.io/gorm"
 
@@ -149,10 +150,10 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
 	var v3Models []models.LaborListItem
 
-	// Usar la vista v3_labor_list como base y agregar campos adicionales
+	// Usar la vista labor_list como base y agregar campos adicionales
 	err := r.db.Client().
 		WithContext(ctx).
-		Table("v3_labor_list AS v3").
+		Table(shareddb.ReportView("labor_list") + " AS v3").
 		Select(`
             v3.workorder_id,
             v3.workorder_number,
@@ -221,10 +222,10 @@ func (r *Repository) ListGroupLabor(
 	fieldID int64,
 ) ([]domain.LaborListItem, types.PageInfo, error) {
 
-	// Base: vista v3_labor_list + joins de factura y dólar promedio del mes
+	// Base: vista labor_list + joins de factura y dólar promedio del mes
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("v3_labor_list AS v3").
+		Table(shareddb.ReportView("labor_list") + " AS v3").
 		Select(`
 			v3.workorder_id,
 			v3.workorder_number,
@@ -366,10 +367,10 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 // ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA
 // Este método implementa la lógica original con cálculos en Go y join con project_dollar_values
 func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
-	// Usar la vista v3_labor_list como base y agregar campos adicionales
+	// Usar la vista labor_list como base y agregar campos adicionales
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("v3_labor_list AS v3").
+		Table(shareddb.ReportView("labor_list") + " AS v3").
 		Select(`
 				v3.workorder_id,
 				v3.workorder_number,
@@ -493,14 +494,14 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 
 	// Caso 1: project_id Y field_id → devolver métricas de un campo específico
 	if f.ProjectID != nil && f.FieldID != nil {
-		q := `
+		q := fmt.Sprintf(`
 			SELECT 
 				surface_ha,
 				total_labor_cost,
 				avg_labor_cost_per_ha
-			FROM v3_labor_metrics
+			FROM %s
 			WHERE project_id = ? AND field_id = ?
-		`
+		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID, *f.FieldID).Scan(&row).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 		}
@@ -514,7 +515,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 
 	// Caso 2: SOLO project_id (sin field_id) → sumar métricas de todos los campos del proyecto
 	if f.ProjectID != nil {
-		q := `
+		q := fmt.Sprintf(`
 			SELECT 
 				COALESCE(SUM(surface_ha), 0) as surface_ha,
 				COALESCE(SUM(total_labor_cost), 0) as total_labor_cost,
@@ -523,9 +524,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 					THEN COALESCE(SUM(total_labor_cost), 0) / COALESCE(SUM(surface_ha), 0)
 					ELSE 0 
 				END as avg_labor_cost_per_ha
-			FROM v3_labor_metrics
+			FROM %s
 			WHERE project_id = ?
-		`
+		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID).Scan(&row).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 		}
@@ -539,14 +540,14 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 
 	// Caso 3: SOLO field_id → devolver métricas de ese campo específico
 	if f.FieldID != nil {
-		q := `
+		q := fmt.Sprintf(`
 			SELECT 
 				surface_ha,
 				total_labor_cost,
 				avg_labor_cost_per_ha
-			FROM v3_labor_metrics
+			FROM %s
 			WHERE field_id = ?
-		`
+		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, *f.FieldID).Scan(&row).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 		}
@@ -569,7 +570,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawItem, error) {
 	base := r.db.Client().
 		WithContext(ctx).
-		Table("v3_labor_list AS v3").
+		Table(shareddb.ReportView("labor_list") + " AS v3").
 		Select(`
             v3.workorder_id,
 			v3.workorder_number,

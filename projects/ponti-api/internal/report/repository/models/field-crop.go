@@ -3,6 +3,7 @@ package models
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
+	shareddb "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 	"github.com/shopspring/decimal"
 )
 
@@ -69,9 +70,9 @@ type FieldCropMetricModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// ACTUALIZADO: Usar vista v3 (SSOT) - Migración 000130
+// ACTUALIZADO: Usar helper para switch v3/v4 - Migración 000316
 func (FieldCropMetricModel) TableName() string {
-	return "v3_report_field_crop_metrics"
+	return shareddb.FieldCropView("metrics")
 }
 
 // LaborMetricModel representa el modelo de base de datos para métricas de labores
@@ -125,7 +126,7 @@ type FieldCropLaborDetailModel struct {
 
 // TableName especifica el nombre de la tabla para GORM
 func (FieldCropLaborDetailModel) TableName() string {
-	return "v3_report_field_crop_labores"
+	return shareddb.FieldCropView("labores")
 }
 
 // FieldCropSupplyDetailModel representa el modelo de la vista v3_report_field_crop_insumos
@@ -149,7 +150,7 @@ type FieldCropSupplyDetailModel struct {
 
 // TableName especifica el nombre de la tabla para GORM
 func (FieldCropSupplyDetailModel) TableName() string {
-	return "v3_report_field_crop_insumos"
+	return shareddb.FieldCropView("insumos")
 }
 
 // ===== MAPPERS =====

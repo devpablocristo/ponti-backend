@@ -102,7 +102,7 @@ jobs:
             --cpu=1 \
             --max-instances=10 \
             --timeout=300s \
-            --set-env-vars="DEPLOY_PLATFORM=gcp,DEPLOY_ENV=prod,GO_ENVIRONMENT=beta,APP_NAME=ponti-api,APP_VERSION=1.0,APP_ENV=beta,HTTP_SERVER_PORT=8080,DB_TYPE=postgres,GIN_MODE=release,API_VERSION=v1,X_API_KEY=f9eac0c8d3dbc828c9d8730446d902483917c465fa07889d87dc66934cc9b9cb,DB_HOST=34.133.49.164,DB_PORT=5432,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SSL_MODE=disable" \
+            --set-env-vars="DEPLOY_PLATFORM=gcp,DEPLOY_ENV=prod,GO_ENVIRONMENT=beta,APP_NAME=ponti-api,APP_VERSION=1.0,APP_ENV=beta,HTTP_SERVER_PORT=8080,DB_TYPE=postgres,GIN_MODE=release,API_VERSION=v1,X_API_KEY=f9eac0c8d3dbc828c9d8730446d902483917c465fa07889d87dc66934cc9b9cb,DB_HOST=34.133.49.164,DB_PORT=5432,DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_SSL_MODE=disable,REPORT_SCHEMA=v4_report" \
             --quiet
           
           echo "✅ Deployment completed"

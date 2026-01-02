@@ -3,11 +3,13 @@ package workorder
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	shareddb "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/workorder/usecases/domain"
@@ -230,15 +232,15 @@ func (r *Repository) ListWorkorders(
 
 func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter) (*domain.WorkorderMetrics, error) {
 	// Construimos el WHERE dinámico según los filtros presentes
-	q := `
+	q := fmt.Sprintf(`
 		SELECT
 		  COALESCE(SUM(surface_ha), 0) AS surface_ha,
 		  COALESCE(SUM(liters), 0) AS liters,
 		  COALESCE(SUM(kilograms), 0) AS kilograms,
 		  COALESCE(SUM(direct_cost_usd), 0) AS direct_cost
-		FROM v3_workorder_metrics
+		FROM %s
 		WHERE 1=1
-	`
+	`, shareddb.ReportView("workorder_metrics"))
 	var args []any
 
 	if filt.ProjectID != nil {
