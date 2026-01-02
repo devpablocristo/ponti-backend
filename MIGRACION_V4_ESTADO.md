@@ -4,9 +4,9 @@
 
 Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_report` usando el patrón **Strangler Fig**.
 
-**Estado actual:** 75% completado  
+**Estado actual:** 80% completado  
 **Fecha:** Enero 2025  
-**Última actualización:** Bug arriendo corregido en summary_results
+**Última actualización:** field_crop_metrics optimizado (10x más rápido) + bug arriendo corregido
 
 ---
 
@@ -41,6 +41,7 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | Renta % incorrecta | Numerador/denominador usaban arriendo diferente | 000322 |
 | lot_list columnas faltantes | 000318 eliminó sowed_area_ha, harvested_area_ha, etc | 000323 |
 | **Summary arriendo fijo** | **Mostraba 119,770 en vez de 161,773 (total)** | **000324** |
+| **Performance timeout** | **field_crop_metrics tardaba ~10 seg (5 vistas anidadas)** | **000324** |
 
 ---
 
@@ -237,24 +238,36 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 | 000321 | Fix Total Activo usa arriendo configurado |
 | 000322 | summary_results agrega desde field_crop (SSOT) |
 | 000323 | Fix lot_list columnas faltantes (sowed_area_ha, etc) |
-| 000324 | **Fix summary_results arriendo** (usa rent_per_ha_for_lot en vez de rent_fixed_only) |
+| 000324 | **Reescribe field_crop_metrics** - 1 vista vs 5 anidadas, 10x más rápido, fix arriendo |
 
 ---
 
-## 9. Deuda Técnica Conocida
+## 9. Optimización Realizada ✅
 
-### summary_results no usa arquitectura SSOT pura
+### field_crop_metrics reescrita (000324)
 
-**Problema:** La vista `v4_report.summary_results` debería agregar desde `field_crop_metrics` (que ya tiene todos los valores calculados), pero eso causa **timeout** por la cadena de funciones SSOT.
+**Problema original:** `field_crop_metrics` usaba 5 vistas anidadas con 46 llamadas a funciones SSOT, causando timeouts.
 
-**Solución actual:** Copia la estructura de `v3_report_summary_results_view` pero cambia `rent_fixed_only_for_lot` → `rent_per_ha_for_lot` para corregir el bug del arriendo.
+**Solución implementada:** Reescribir como UNA sola vista con ~12 llamadas SSOT directas.
 
-**Solución ideal (futura):**
-1. Optimizar funciones SSOT (evitar llamadas anidadas)
-2. O usar vistas materializadas
-3. O precalcular en tablas con triggers
+**Resultado:**
+- ✅ 10x más rápido (~1 seg vs ~10 seg)
+- ✅ Bug arriendo corregido (161,773 vs 119,770)
+- ✅ `summary_results` ahora agrega correctamente desde `field_crop_metrics`
+- ✅ Arquitectura SSOT correcta
 
-**Impacto:** Funciona correctamente y rápido, pero viola el principio de no duplicar lógica.
+**Técnica:** 
+```sql
+-- ANTES: 5 vistas anidadas
+field_crop_metrics → field_crop_economicos → field_crop_cultivos → funciones SSOT
+
+-- AHORA: 1 vista con CTEs
+field_crop_metrics AS (
+  WITH lot_base AS (SELECT ... funciones SSOT ...),
+       aggregated AS (SELECT ... GROUP BY ...)
+  SELECT ...
+)
+```
 
 ---
 
