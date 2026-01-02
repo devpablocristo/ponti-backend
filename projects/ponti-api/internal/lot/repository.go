@@ -21,6 +21,7 @@ import (
 	// project
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/lot/usecases/domain"
+	shareddb "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/models"
 )
 
@@ -303,7 +304,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 	}
 
 	// Construir query base
-	query := r.db.Client().WithContext(ctx).Table("v3_lot_metrics")
+	query := r.db.Client().WithContext(ctx).Table(shareddb.ReportView("lot_metrics"))
 
 	// Aplicar filtros
 	if fieldID > 0 {
@@ -351,7 +352,7 @@ func (r *Repository) ListLots(
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 
-	base := r.db.Client().WithContext(ctx).Table("v3_lot_list")
+	base := r.db.Client().WithContext(ctx).Table(shareddb.ReportView("lot_list"))
 
 	// filtros
 	if fieldID > 0 {

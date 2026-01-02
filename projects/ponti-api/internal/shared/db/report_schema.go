@@ -1,0 +1,33 @@
+// Package db provee helpers para acceso a base de datos
+package db
+
+import "os"
+
+// reportSchema contiene el schema a usar para vistas de reportes
+// Si REPORT_SCHEMA="v4_report" → usa vistas v4_report.*
+// Si REPORT_SCHEMA está vacío o es "public" → usa vistas v3_* (default)
+var reportSchema = os.Getenv("REPORT_SCHEMA")
+
+// ReportView retorna el nombre completo de la vista según el schema configurado
+// Ejemplo: ReportView("lot_metrics") → "v4_report.lot_metrics" o "v3_lot_metrics"
+func ReportView(name string) string {
+	if reportSchema == "v4_report" {
+		return "v4_report." + name
+	}
+	return "v3_" + name
+}
+
+// FieldCropView retorna el nombre de vista para field_crop
+// v3: v3_report_field_crop_{name} → v4: v4_report.field_crop_{name}
+// Ejemplo: FieldCropView("metrics") → "v4_report.field_crop_metrics" o "v3_report_field_crop_metrics"
+func FieldCropView(name string) string {
+	if reportSchema == "v4_report" {
+		return "v4_report.field_crop_" + name
+	}
+	return "v3_report_field_crop_" + name
+}
+
+// IsV4Enabled retorna true si está habilitado el schema v4
+func IsV4Enabled() bool {
+	return reportSchema == "v4_report"
+}
