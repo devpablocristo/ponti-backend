@@ -11,6 +11,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/report/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 )
 
 // GormEnginePort define la interfaz para el motor GORM
@@ -615,6 +616,7 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 	}
 
 	// Construir query con filtros
+	// Usa v4_report.summary_results si REPORT_SCHEMA=v4_report
 	query := fmt.Sprintf(`
 		SELECT 
 			project_id,
@@ -636,10 +638,10 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 			total_invested_project_usd,
 			total_operating_result_usd,
 			project_return_pct
-		FROM v3_report_summary_results_view 
+		FROM %s 
 		WHERE project_id IN (%s)
 		ORDER BY project_id, current_crop_id
-	`, strings.Join(placeholders, ","))
+	`, db.SummaryView(), strings.Join(placeholders, ","))
 
 	// Convertir projectIDs a []interface{} para la query
 	args := make([]interface{}, len(projectIDs))

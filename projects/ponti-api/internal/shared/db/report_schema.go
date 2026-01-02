@@ -27,6 +27,15 @@ func FieldCropView(name string) string {
 	return "v3_report_field_crop_" + name
 }
 
+// SummaryView retorna el nombre de vista para summary_results
+// v3: v3_report_summary_results_view → v4: v4_report.summary_results
+func SummaryView() string {
+	if reportSchema == "v4_report" {
+		return "v4_report.summary_results"
+	}
+	return "v3_report_summary_results_view"
+}
+
 // IsV4Enabled retorna true si está habilitado el schema v4
 func IsV4Enabled() bool {
 	return reportSchema == "v4_report"
