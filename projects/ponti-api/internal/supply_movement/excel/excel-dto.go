@@ -13,7 +13,7 @@ type SupplyMovementExcelDTO struct {
 	EntryDate       time.Time `excel:"FECHA"`
 	InvestorName    string    `excel:"INVERSOR"`
 	SupplyName      string    `excel:"INSUMO"`
-	Quantity        string    `excel:"CANTIDAD"`
+	Quantity        float64   `excel:"CANTIDAD"`
 	SupplyUnitName  string    `excel:"UNIDAD"`
 	Category        string    `excel:"RUBRO"`
 	Type            string    `excel:"TIPO/CLASE"`
@@ -36,7 +36,7 @@ func BuildSupplyMovementDTO(items []*domain.SupplyMovement) []SupplyMovementExce
 			EntryDate:       *it.MovementDate,
 			InvestorName:    it.Investor.Name,
 			SupplyName:      it.Supply.Name,
-			Quantity:        decToString(it.Quantity, 2),
+			Quantity:        decToFloat(it.Quantity, 2),
 			SupplyUnitName:  it.Supply.UnitName,
 			Category:        it.Supply.CategoryName,
 			Type:            it.Supply.Type.Name,
@@ -49,9 +49,11 @@ func BuildSupplyMovementDTO(items []*domain.SupplyMovement) []SupplyMovementExce
 	return out
 }
 
-func decToString(d decimal.Decimal, scale int32) string {
-	if scale < 0 {
-		return d.String()
+// helper para convertir decimal en float64 con redondeo opcional
+func decToFloat(d decimal.Decimal, scale int32) float64 {
+	if scale >= 0 {
+		d = d.Round(scale)
 	}
-	return d.Round(scale).StringFixed(scale)
+	f, _ := d.Float64()
+	return f
 }
