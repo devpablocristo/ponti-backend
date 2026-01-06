@@ -34,16 +34,17 @@ func (r *Repository) GetStocks(ctx context.Context, projectId int64, closeDate t
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		Preload("SupplyMovements").
 		Joins("JOIN projects ON projects.id = stocks.project_id").
 		Where("projects.id = ?", projectId)
 
 	if closeDate != t {
-		query.Where("stocks.close_date = ?", closeDate)
+		query = query.Where("stocks.close_date = ?", closeDate)
 	} else {
 		// Si no se especifica fecha, obtener el stock activo (sin filtro de fecha)
-		query.Where("stocks.close_date IS NULL")
+		query = query.Where("stocks.close_date IS NULL")
 	}
 
 	var stockModels []models.Stock
@@ -181,6 +182,7 @@ func (r *Repository) GetStockById(ctx context.Context, stockId int64) (*domain.S
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		First(&stockModel, stockId).Error
 	if err != nil {
@@ -198,6 +200,7 @@ func (r *Repository) GetLastStockByProjectId(ctx context.Context, projectId int6
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		Where("project_id = ?", projectId).
 		Where("supply_id = ?", supplyId).
@@ -221,6 +224,7 @@ func (r *Repository) GetStockByPeriodAndProjectId(ctx context.Context, projectId
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		Where("project_id = ?", projectId).
 		Where("close_date IS NULL").
@@ -238,6 +242,7 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 	db := r.db.Client().WithContext(ctx).
 		Preload("Supply").
 		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		Preload("SupplyMovements")
 

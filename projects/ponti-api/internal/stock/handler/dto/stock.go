@@ -97,7 +97,7 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		TotalUSD:        s.GetTotalUSD(),
 		StockDifference: s.GetStockDifference(),
 		CloseDate:       s.CloseDate,
-		ClassType:       s.Supply.Type.Name,
+		ClassType:       s.Supply.CategoryName, // FIX: usar CategoryName (Herbicidas, Coadyuvantes) en lugar de Type.Name (Agroquímicos)
 		SupplyUnitId:    s.Supply.UnitID,
 		SupplyUnitPrice: s.Supply.Price,
 		EntryStock:      s.GetEntryStock(),

@@ -40,3 +40,13 @@ func SummaryView() string {
 func IsV4Enabled() bool {
 	return reportSchema == "v4_report"
 }
+
+// DashboardView retorna el nombre de vista para dashboard
+// v3: v3_dashboard_{name} → v4: v4_report.dashboard_{name}
+// Ejemplo: DashboardView("metrics") → "v4_report.dashboard_metrics" o "v3_dashboard_metrics"
+func DashboardView(name string) string {
+	if reportSchema == "v4_report" {
+		return "v4_report.dashboard_" + name
+	}
+	return "v3_dashboard_" + name
+}
