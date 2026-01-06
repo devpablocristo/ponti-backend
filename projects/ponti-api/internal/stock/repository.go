@@ -239,16 +239,60 @@ func (r *Repository) GetStockByPeriodAndProjectId(ctx context.Context, projectId
 func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error) {
 	var stockModel []models.Stock
 
-	db := r.db.Client().WithContext(ctx).
+	db := r.db.Client().WithContext(ctx)
+
+	query := db.
+		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
 		Preload("SupplyMovements")
 
-	if err := db.Find(&stockModel).Error; err != nil {
+	if err := query.Find(&stockModel).Error; err != nil {
 		return nil, err
 	}
+
+	// Calcular consumed para todos los stocks agrupando por project_id + supply_id
+	if len(stockModel) > 0 {
+		var consumedResults []struct {
+			ProjectID int64           `gorm:"column:project_id"`
+			SupplyID  int64           `gorm:"column:supply_id"`
+			Consumed  decimal.Decimal `gorm:"column:consumed"`
+		}
+
+		// Calcular consumed agrupado por project_id y supply_id
+		err := db.Model(&workordermodels.WorkorderItem{}).
+			Joins("JOIN workorders ON workorders.id = workorder_items.workorder_id").
+			Select("workorders.project_id, workorder_items.supply_id, COALESCE(SUM(workorder_items.total_used), 0) as consumed").
+			Group("workorders.project_id, workorder_items.supply_id").
+			Scan(&consumedResults).Error
+		if err != nil {
+			return nil, err
+		}
+
+		// Crear mapa de consumed por project_id:supply_id
+		type stockKey struct {
+			ProjectID int64
+			SupplyID  int64
+		}
+		consumedMap := make(map[stockKey]decimal.Decimal)
+		for _, result := range consumedResults {
+			key := stockKey{ProjectID: result.ProjectID, SupplyID: result.SupplyID}
+			consumedMap[key] = result.Consumed
+		}
+
+		// Asignar consumed a cada stock
+		for i := range stockModel {
+			key := stockKey{ProjectID: stockModel[i].ProjectID, SupplyID: stockModel[i].SupplyID}
+			if consumed, exists := consumedMap[key]; exists {
+				stockModel[i].Consumed = consumed
+			} else {
+				stockModel[i].Consumed = decimal.Zero
+			}
+		}
+	}
+
 	out := make([]*domain.Stock, 0, len(stockModel))
 	for i := range stockModel {
 		out = append(out, stockModel[i].ToDomain())

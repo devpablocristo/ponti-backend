@@ -4,9 +4,9 @@
 
 Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_report` usando el patrón **Strangler Fig**.
 
-**Estado actual:** 80% completado  
+**Estado actual:** 85% completado  
 **Fecha:** Enero 2025  
-**Última actualización:** field_crop_metrics optimizado (10x más rápido) + bug arriendo corregido
+**Última actualización:** Dashboard migrado a v4 + 3 bugs Stocks corregidos
 
 ---
 
@@ -26,7 +26,7 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 
 | Grupo | Vistas | Estado |
 |-------|--------|--------|
-| **Dashboard** | 5 vistas | ❌ Pendiente |
+| **Dashboard** | 5 vistas | ✅ Completado (000325) |
 | **Investor** | 5 vistas | ❌ Pendiente |
 
 ### Bugs Corregidos ✅
@@ -42,6 +42,9 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | lot_list columnas faltantes | 000318 eliminó sowed_area_ha, harvested_area_ha, etc | 000323 |
 | **Summary arriendo fijo** | **Mostraba 119,770 en vez de 161,773 (total)** | **000324** |
 | **Performance timeout** | **field_crop_metrics tardaba ~10 seg (5 vistas anidadas)** | **000324** |
+| **Stocks: filtro close_date** | query.Where() no se asignaba, mezclaba períodos | Código Go |
+| **Stocks: Rubro mostraba Tipo** | Usaba Type.Name en vez de CategoryName | Código Go |
+| **Stocks: Consumed = 0** | Faltaba Preload de Category + bug filtro | Código Go |
 
 ---
 
@@ -127,7 +130,7 @@ func (m Model) TableName() string {
 ### FASE 2: Refinar y Validar (EN PROGRESO)
 
 #### 2.1 Migrar Vistas Restantes
-- [ ] Migrar vistas Dashboard (5 vistas)
+- [x] Migrar vistas Dashboard (5 vistas) ✅ 000325
 - [ ] Migrar vistas Investor (5 vistas)
 
 #### 2.2 Auditoría de Cálculos Duplicados
@@ -200,9 +203,9 @@ SELECT v3_core_ssot.calculate_total(price, quantity) AS total
    - Usar la app con v4
    - Detectar bugs si hay
 
-2. **Migrar Dashboard** 
-   - Crear vistas v4_report.dashboard_*
-   - Switch en Go
+2. ~~**Migrar Dashboard**~~ ✅ Completado
+   - ~~Crear vistas v4_report.dashboard_*~~
+   - ~~Switch en Go~~
 
 3. **Migrar Investor**
    - Crear vistas v4_report.investor_*
@@ -214,7 +217,47 @@ SELECT v3_core_ssot.calculate_total(price, quantity) AS total
 
 ---
 
-## 7. Feature Flag Actual
+## 7. Backlog Futuro (Post-Migración)
+
+### Stocks como Vista SQL
+**Prioridad:** Baja  
+**Beneficio:** Consistencia arquitectónica con el resto del sistema
+
+**Situación actual:**
+```go
+// Go hace múltiples queries y merge en memoria
+1. SELECT * FROM stocks WHERE ...
+2. SELECT supply_id, SUM(total_used) FROM workorder_items ...
+3. Merge con map[supply_id]consumed
+```
+
+**Propuesta futura:**
+```sql
+CREATE VIEW v4_report.stock_summary AS
+SELECT 
+    s.*,
+    sup.name as supply_name,
+    sup.category_name,
+    COALESCE(SUM(wi.total_used), 0) as consumed
+FROM stocks s
+JOIN supplies sup ON sup.id = s.supply_id
+LEFT JOIN workorder_items wi ON ...
+GROUP BY s.id, sup.id;
+```
+
+**Ventajas:**
+- SSOT para cálculo de `consumed`
+- Menos código Go
+- Consistencia con Dashboard/Reports
+- 1 query vs 2 queries + merge
+
+**Consideraciones:**
+- Stocks tiene CRUD (la tabla sigue siendo necesaria para escrituras)
+- Patrón: `stocks` (tabla CRUD) + `stock_summary` (vista lectura)
+
+---
+
+## 8. Feature Flag Actual
 
 ```bash
 # En GCP Cloud Run
@@ -227,7 +270,7 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 
 ---
 
-## 8. Migraciones Aplicadas
+## 9. Migraciones Aplicadas
 
 | Número | Descripción |
 |--------|-------------|
@@ -239,10 +282,11 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 | 000322 | summary_results agrega desde field_crop (SSOT) |
 | 000323 | Fix lot_list columnas faltantes (sowed_area_ha, etc) |
 | 000324 | **Reescribe field_crop_metrics** - 1 vista vs 5 anidadas, 10x más rápido, fix arriendo |
+| 000325 | **Dashboard migrado a v4** - 5 vistas dashboard_* en v4_report |
 
 ---
 
-## 9. Optimización Realizada ✅
+## 10. Optimización Realizada ✅
 
 ### field_crop_metrics reescrita (000324)
 
@@ -271,7 +315,7 @@ field_crop_metrics AS (
 
 ---
 
-## 10. Checklist de Calidad Final
+## 11. Checklist de Calidad Final
 
 ### Base de Datos ✓
 
@@ -305,7 +349,7 @@ field_crop_metrics AS (
 
 ---
 
-## 11. Scripts de Validación a Crear
+## 12. Scripts de Validación a Crear
 
 ```
 scripts/validation/
@@ -319,7 +363,7 @@ scripts/validation/
 
 ---
 
-## 12. Estado Final Esperado
+## 13. Estado Final Esperado
 
 ```
 📊 MÉTRICAS OBJETIVO

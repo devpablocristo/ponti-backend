@@ -32,7 +32,7 @@ func BuildExcelDTO(items []*domain.Stock) []StockExcelDTO {
 
 		out = append(out, StockExcelDTO{
 			SupplyName:      it.Supply.Name,
-			ClassType:       it.Supply.Type.Name,
+			ClassType:       it.Supply.CategoryName, // FIX: usar CategoryName (Herbicidas) en vez de Type.Name (Agroquímicos)
 			InvestorName:    it.Investor.Name,
 			EntryStock:      decToFloat(entry, 2),
 			Consumed:        decToFloat(it.Consumed, 2),
