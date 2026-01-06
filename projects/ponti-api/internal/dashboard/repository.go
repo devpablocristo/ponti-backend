@@ -10,6 +10,7 @@ import (
 
 	models "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/dashboard/usecases/domain"
+	db "github.com/alphacodinggroup/ponti-backend/projects/ponti-api/internal/shared/db"
 )
 
 type GormEnginePort interface {
@@ -183,7 +184,7 @@ func (r *Repository) getMetrics(ctx context.Context, projectIDs []int64) (*model
 	var result models.DashboardMetricsModel
 
 	err := r.db.Client().WithContext(ctx).
-		Table("v3_dashboard_metrics").
+		Table(db.DashboardView("metrics")).
 		Select("*").
 		Where("project_id IN ?", projectIDs).
 		Scan(&result).Error
@@ -200,7 +201,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, projectIDs []
 	var results []models.ContributionsProgressModel
 
 	err := r.db.Client().WithContext(ctx).
-		Table("v3_dashboard_contributions_progress").
+		Table(db.DashboardView("contributions_progress")).
 		Select("*").
 		Where("project_id IN ?", projectIDs).
 		Order("investor_id").
@@ -218,7 +219,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int6
 	var summary models.ManagementBalanceSummary
 
 	err := r.db.Client().WithContext(ctx).
-		Table("v3_dashboard_management_balance").
+		Table(db.DashboardView("management_balance")).
 		Select("*").
 		Where("project_id IN ?", projectIDs).
 		Scan(&summary).Error
@@ -243,7 +244,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, projectIDs []int64) (
 	var results []models.CropIncidenceModel
 
 	err := r.db.Client().WithContext(ctx).
-		Table("v3_dashboard_crop_incidence").
+		Table(db.DashboardView("crop_incidence")).
 		Select("*").
 		Where("project_id IN ?", projectIDs).
 		Order("crop_name").
@@ -261,7 +262,7 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, projectIDs []
 	var result models.OperationalIndicatorModel
 
 	err := r.db.Client().WithContext(ctx).
-		Table("v3_dashboard_operational_indicators").
+		Table(db.DashboardView("operational_indicators")).
 		Select("*").
 		Where("project_id IN ?", projectIDs).
 		Limit(1).
