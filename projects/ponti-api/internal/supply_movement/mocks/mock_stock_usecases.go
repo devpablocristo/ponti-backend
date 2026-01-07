@@ -52,19 +52,19 @@ func (mr *MockUseCasesPortMockRecorder) CreateStock(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStock", reflect.TypeOf((*MockUseCasesPort)(nil).CreateStock), arg0, arg1)
 }
 
-// ExportAllStocks mocks base method.
-func (m *MockUseCasesPort) ExportAllStocks(arg0 context.Context) ([]byte, error) {
+// ExportStocksByProject mocks base method.
+func (m *MockUseCasesPort) ExportStocksByProject(arg0 context.Context, arg1 int64) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExportAllStocks", arg0)
+	ret := m.ctrl.Call(m, "ExportStocksByProject", arg0, arg1)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ExportAllStocks indicates an expected call of ExportAllStocks.
-func (mr *MockUseCasesPortMockRecorder) ExportAllStocks(arg0 interface{}) *gomock.Call {
+// ExportStocksByProject indicates an expected call of ExportStocksByProject.
+func (mr *MockUseCasesPortMockRecorder) ExportStocksByProject(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExportAllStocks", reflect.TypeOf((*MockUseCasesPort)(nil).ExportAllStocks), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExportStocksByProject", reflect.TypeOf((*MockUseCasesPort)(nil).ExportStocksByProject), arg0, arg1)
 }
 
 // GetLastStockByProjectId mocks base method.

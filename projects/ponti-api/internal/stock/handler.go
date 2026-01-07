@@ -81,7 +81,7 @@ func (h *Handler) Routes() {
 	{
 		public.GET("/summary", h.getStocksSummary)
 		public.GET("/periods", h.getStocksPeriods)
-		public.GET("/export", h.ExportStocksByProject) // Nuevo: export por proyecto
+		public.GET("/export", h.ExportStocksByProject)
 		public.PUT("/close-date", h.UpdateStocksCloseDate)
 		public.PUT("/real-stock/:stockId", h.UpdateRealStock)
 	}
@@ -285,6 +285,7 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 }
 
 // ExportStocksByProject exporta stocks filtrados por proyecto
+// Ruta nueva: /api/v1/projects/:id/stocks/export
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIdStr := c.Param("id")
@@ -300,7 +301,6 @@ func (h *Handler) ExportStocksByProject(c *gin.Context) {
 		return
 	}
 
-	// Obtener stocks del proyecto (reutiliza la misma lógica que summary)
 	data, err := h.ucs.ExportStocksByProject(ctx, projectId)
 	if handleError(err, c) {
 		return
