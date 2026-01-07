@@ -50,3 +50,25 @@ func DashboardView(name string) string {
 	}
 	return "v3_dashboard_" + name
 }
+
+// InvestorView retorna el nombre de vista para investor
+// v3: v3_investor_{name} o v3_report_investor_{name} → v4: v4_report.investor_{name}
+// Ejemplo: InvestorView("contribution_data") → "v4_report.investor_contribution_data" o "v3_investor_contribution_data_view"
+func InvestorView(name string) string {
+	if reportSchema == "v4_report" {
+		return "v4_report.investor_" + name
+	}
+	// Mapeo especial para v3 porque tienen nombres diferentes
+	switch name {
+	case "contribution_data":
+		return "v3_investor_contribution_data_view"
+	case "project_base":
+		return "v3_report_investor_project_base"
+	case "contribution_categories":
+		return "v3_report_investor_contribution_categories"
+	case "distributions":
+		return "v3_report_investor_distributions"
+	default:
+		return "v3_investor_" + name
+	}
+}
