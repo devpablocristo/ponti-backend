@@ -92,3 +92,4 @@ echo "   grep -E '^(CREATE|ALTER)' ${OUTPUT_FILE} | head -n 20"
 
 
 
+

@@ -121,12 +121,15 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 	return newMonthPeriod, newYearPeriod
 }
 
-func (u *UseCases) ExportAllStocks(ctx context.Context) ([]byte, error) {
+// ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
+func (u *UseCases) ExportStocksByProject(ctx context.Context, projectId int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	items, err := u.repo.ListAllStocks(ctx)
+	// Usar GetStocks con tiempo vacío para obtener stocks activos del proyecto
+	var emptyTime time.Time
+	items, err := u.repo.GetStocks(ctx, projectId, emptyTime)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list Stocks", err)
 	}
