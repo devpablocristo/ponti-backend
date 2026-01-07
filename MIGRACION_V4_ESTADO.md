@@ -4,9 +4,9 @@
 
 Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_report` usando el patrón **Strangler Fig**.
 
-**Estado actual:** 85% completado  
+**Estado actual:** 95% completado  
 **Fecha:** Enero 2025  
-**Última actualización:** Dashboard migrado a v4 + 3 bugs Stocks corregidos
+**Última actualización:** Investor migrado a v4 + bug aportes reales corregido
 
 ---
 
@@ -27,7 +27,9 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | Grupo | Vistas | Estado |
 |-------|--------|--------|
 | **Dashboard** | 5 vistas | ✅ Completado (000325) |
-| **Investor** | 5 vistas | ❌ Pendiente |
+| **Investor** | 4 vistas | ✅ Completado (000326) |
+
+**🎉 Todas las vistas migradas a v4_report**
 
 ### Bugs Corregidos ✅
 
@@ -45,6 +47,7 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | **Stocks: filtro close_date** | query.Where() no se asignaba, mezclaba períodos | Código Go |
 | **Stocks: Rubro mostraba Tipo** | Usaba Type.Name en vez de CategoryName | Código Go |
 | **Stocks: Consumed = 0** | Faltaba Preload de Category + bug filtro | Código Go |
+| **Investor: aportes % acordado** | Mostraba total×%acordado en vez de aportes reales | **000326** |
 
 ---
 
@@ -283,6 +286,7 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 | 000323 | Fix lot_list columnas faltantes (sowed_area_ha, etc) |
 | 000324 | **Reescribe field_crop_metrics** - 1 vista vs 5 anidadas, 10x más rápido, fix arriendo |
 | 000325 | **Dashboard migrado a v4** - 5 vistas dashboard_* en v4_report |
+| 000326 | **Investor migrado a v4** - 4 vistas investor_* con fix aportes reales |
 
 ---
 

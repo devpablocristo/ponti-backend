@@ -555,11 +555,9 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 			contribution_categories::text,
 			investor_contribution_comparison::text,
 			harvest_settlement::text
-		FROM v3_investor_contribution_data_view
+		FROM %s
 		WHERE project_id IN (%s)
-	`, strings.Join(placeholders, ","))
-
-	// Usar vista v3
+	`, db.InvestorView("contribution_data"), strings.Join(placeholders, ","))
 
 	args := make([]any, len(projectIDs))
 	for i, id := range projectIDs {
