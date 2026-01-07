@@ -77,15 +77,6 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	// TODO: DEPRECAR - Ruta legacy para compatibilidad con frontend actual
-	// Migrar frontend a usar /projects/:id/stocks/export y eliminar esta ruta
-	// Acepta: /stocks/export/all?project_id=12 o /stocks/export/:projectId
-	legacyExport := r.Group(baseURL + "/stocks/export")
-	{
-		legacyExport.GET("/all", h.ExportStocksLegacy)        // Ruta original: ?project_id=X
-		legacyExport.GET("/:projectId", h.ExportStocksLegacy) // Ruta alternativa: /12
-	}
-
 	public := r.Group(baseURL + "/projects/:id/stocks")
 	{
 		public.GET("/summary", h.getStocksSummary)
@@ -291,41 +282,6 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 		return 0, types.NewMissingFieldError("year_period")
 	}
 	return getYearPeriodOrDefault(c)
-}
-
-// ExportStocksLegacy - DEPRECATED: Usar ExportStocksByProject en su lugar
-// TODO: Migrar frontend a /projects/:id/stocks/export y eliminar este endpoint
-// Ruta legacy: /api/v1/stocks/export/all?project_id=X
-func (h *Handler) ExportStocksLegacy(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	// Leer project_id de query param (nuevo) o path param (fallback)
-	projectIdStr := c.Query("project_id")
-	if projectIdStr == "" {
-		projectIdStr = c.Param("projectId")
-	}
-
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	// Verificar que el proyecto existe
-	_, err = h.ucps.GetProject(ctx, projectId)
-	if handleError(err, c) {
-		return
-	}
-
-	data, err := h.ucs.ExportStocksByProject(ctx, projectId)
-	if handleError(err, c) {
-		return
-	}
-
-	filename := stockExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 // ExportStocksByProject exporta stocks filtrados por proyecto
