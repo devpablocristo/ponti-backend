@@ -26,7 +26,7 @@ type UseCasesPort interface {
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockById(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
-	ExportAllStocks(ctx context.Context) ([]byte, error)
+	ExportStocksByProject(ctx context.Context, projectId int64) ([]byte, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 }
 
@@ -77,15 +77,11 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	publicExcel := r.Group(baseURL + "/stocks/export")
-	{
-		publicExcel.GET("/all", h.ExportAllStocks)
-	}
-
 	public := r.Group(baseURL + "/projects/:id/stocks")
 	{
 		public.GET("/summary", h.getStocksSummary)
 		public.GET("/periods", h.getStocksPeriods)
+		public.GET("/export", h.ExportStocksByProject) // Nuevo: export por proyecto
 		public.PUT("/close-date", h.UpdateStocksCloseDate)
 		public.PUT("/real-stock/:stockId", h.UpdateRealStock)
 	}
@@ -288,8 +284,24 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 	return getYearPeriodOrDefault(c)
 }
 
-func (h *Handler) ExportAllStocks(c *gin.Context) {
-	data, err := h.ucs.ExportAllStocks(c)
+// ExportStocksByProject exporta stocks filtrados por proyecto
+func (h *Handler) ExportStocksByProject(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectIdStr := c.Param("id")
+
+	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	if handleError(err, c) {
+		return
+	}
+
+	// Verificar que el proyecto existe
+	_, err = h.ucps.GetProject(ctx, projectId)
+	if handleError(err, c) {
+		return
+	}
+
+	// Obtener stocks del proyecto (reutiliza la misma lógica que summary)
+	data, err := h.ucs.ExportStocksByProject(ctx, projectId)
 	if handleError(err, c) {
 		return
 	}
