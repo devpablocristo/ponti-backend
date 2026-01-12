@@ -450,6 +450,10 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			updates["admin_cost"] = d.AdminCost
 		}
 
+		if !existing.PlannedCost.Equal(d.PlannedCost) {
+			updates["planned_cost"] = d.PlannedCost
+		}
+
 		if len(updates) > 0 {
 			result := tx.Model(&models.Project{}).
 				Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
