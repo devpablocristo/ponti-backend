@@ -508,8 +508,8 @@ func RoundAllDecimals(response DashboardResponse) DashboardResponse {
 	// Redondear contribuciones de inversores
 	for i := range response.Metrics.InvestorContributions.Items {
 		response.Metrics.InvestorContributions.Items[i].SharePct = roundToNearestInteger(response.Metrics.InvestorContributions.Items[i].SharePct)
-		// Redondear contributions_progress_pct a 2 decimales para mostrar como "75.74%"
-		response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct = response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct.Round(2)
+		// Redondear contributions_progress_pct al entero más cercano para mostrar como "59%"
+		response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct = roundToNearestInteger(response.Metrics.InvestorContributions.Items[i].ContributionsProgressPct)
 	}
 
 	response.Metrics.OperatingResult.MarginPct = roundToNearestInteger(response.Metrics.OperatingResult.MarginPct)
