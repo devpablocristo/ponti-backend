@@ -323,7 +323,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
 		COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 		COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
-		COALESCE(SUM(direct_cost_per_ha_usd * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS cost_per_ha,
+		COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
 		COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
 		COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
 	`).Scan(&row).Error
@@ -377,10 +377,10 @@ func (r *Repository) ListLots(
 		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to sum sowed area", err)
 	}
 
-	// sumCost: promedio ponderado de cost_usd_per_ha por sowed_area (para la card "Costo por hectárea")
+	// sumCost: promedio ponderado de cost_usd_per_ha por superficie total
 	var sumCost decimal.Decimal
 	if err := base.Session(&gorm.Session{}).
-		Select("COALESCE(SUM(cost_usd_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha),0), 0)").
+		Select("COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares),0), 0)").
 		Scan(&sumCost).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to calculate cost per hectare", err)
 	}

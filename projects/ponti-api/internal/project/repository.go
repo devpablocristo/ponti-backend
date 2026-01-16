@@ -875,8 +875,10 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 
 func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) error {
 	existingInvestorIDs := make(map[int64]struct{})
+	existingInvestorPct := make(map[int64]int)
 	for _, i := range existing.Investors {
 		existingInvestorIDs[i.InvestorID] = struct{}{}
+		existingInvestorPct[i.InvestorID] = i.Percentage
 	}
 
 	newInvestorIDs := make(map[int64]struct{})
@@ -906,6 +908,14 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 				d.ID, i.ID, i.Percentage, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to add investor", err)
+			}
+		} else if pct, ok := existingInvestorPct[i.ID]; ok && pct != i.Percentage {
+			// Actualizar porcentaje si el inversor ya existe
+			if err := tx.Exec(
+				"UPDATE project_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
+				i.Percentage, d.UpdatedBy, d.ID, i.ID,
+			).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to update investor percentage", err)
 			}
 		}
 	}
