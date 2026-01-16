@@ -6,7 +6,7 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 
 **Estado actual:** 95% completado  
 **Fecha:** Enero 2025  
-**Última actualización:** Investor migrado a v4 + bug aportes reales corregido
+**Última actualización:** Correcciones per-ha por superficie total + siembra por órdenes (000330-000331)
 
 ---
 
@@ -48,6 +48,9 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | **Stocks: Rubro mostraba Tipo** | Usaba Type.Name en vez de CategoryName | Código Go |
 | **Stocks: Consumed = 0** | Faltaba Preload de Category + bug filtro | Código Go |
 | **Investor: aportes % acordado** | Mostraba total×%acordado en vez de aportes reales | **000326** |
+| **Workorders vs Export** | Costos directos no coincidían con Excel | **000328-000329** |
+| **Siembra sin órdenes** | Superficie sembrada no debía usar sowing_date | **000330** |
+| **Per-ha sin siembra** | /ha debía usar superficie total (lotes, cultivos, summary) | **000331** |
 
 ---
 
@@ -287,6 +290,10 @@ REPORT_SCHEMA="v4_report" → usa v4_report.* (actual)
 | 000324 | **Reescribe field_crop_metrics** - 1 vista vs 5 anidadas, 10x más rápido, fix arriendo |
 | 000325 | **Dashboard migrado a v4** - 5 vistas dashboard_* en v4_report |
 | 000326 | **Investor migrado a v4** - 4 vistas investor_* con fix aportes reales |
+| 000328 | **Workorders SSOT** - costos directos alineados a Excel (total_used) |
+| 000329 | **Costos por categoría** - total_used en balance/insumos |
+| 000330 | **Siembra = órdenes** - seeded_area_for_lot usa workorders |
+| 000331 | **Per-ha = superficie total** - lotes, field_crop, summary |
 
 ---
 
