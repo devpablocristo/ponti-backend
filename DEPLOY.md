@@ -64,7 +64,6 @@ Configurar en **Settings → Secrets and variables → Actions**:
 
 | Secret | Descripción |
 |--------|-------------|
-| `GCP_SA_KEY` | JSON de Service Account con permisos para Cloud Run y Artifact Registry |
 | `DB_HOST` | Host de la base de datos |
 | `DB_PORT` | Puerto de la base de datos |
 | `DB_USER` | Usuario de la base de datos |
@@ -72,6 +71,9 @@ Configurar en **Settings → Secrets and variables → Actions**:
 | `DB_NAME` | Nombre de la base de datos |
 | `SSL_MODE` | Modo SSL de la base de datos |
 | `X_API_KEY` | API Key para autenticación |
+
+> **Nota**: El workflow usa `environment` según el ambiente (`dev`, `stg`, `prod`).  
+> Si usas secrets por ambiente, deben estar definidos en ese environment.
 
 ### Variables requeridas (GitHub Actions)
 
@@ -85,6 +87,8 @@ Configurar en **Settings → Secrets and variables → Actions**:
 | `IMAGE_NAME` | Nombre de la imagen Docker |
 | `SERVICE_NAME` | Nombre del servicio en Cloud Run |
 | `CLOUD_RUN_SERVICE_ACCOUNT` | Service Account para Cloud Run |
+| `WIF_PROVIDER` | Workload Identity Provider |
+| `WIF_SERVICE_ACCOUNT` | Service Account para Workload Identity |
 | `GO_ENVIRONMENT` | Entorno de ejecución |
 | `DEPLOY_PLATFORM` | Plataforma de despliegue |
 | `APP_NAME` | Nombre de la aplicación |
@@ -124,9 +128,14 @@ Pasos:
 
 > **Nota**: El deploy manual usa siempre `DEPLOY_ENV_DEV`. En el futuro se puede habilitar `stg`.
 
+### Valores actuales (new-ponti-dev)
+
+- `WIF_PROVIDER`: `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
+- `WIF_SERVICE_ACCOUNT`: `github-actions@new-ponti-dev.iam.gserviceaccount.com`
+
 ### Flujo recomendado
 
-1. Deploy manual de la rama a `dev` o `stg`
+1. Deploy manual de la rama a `dev`
 2. Validación y aprobación
 3. Merge a `develop`
 4. Deploy automático por `develop`
