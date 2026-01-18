@@ -9,11 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: Rama a desplegar
-        required: true
-        type: string
-      deploy_env:
-        description: Ambiente de despliegue
+        description: Rama a desplegar (se despliega en dev)
         required: true
         type: string
 
@@ -33,29 +29,16 @@ jobs:
         id: deploy_vars
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
-          DEPLOY_ENV_INPUT: ${{ github.event.inputs.deploy_env }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           ref="${GITHUB_REF_NAME}"
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            if [ -z "$BRANCH_INPUT" ] || [ -z "$DEPLOY_ENV_INPUT" ]; then
+            if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
               exit 1
             fi
-
-            if [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_PROD }}" ]; then
-              echo "Manual deploy to prod is not allowed" >&2
-              exit 1
-            elif [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_DEV }}" ]; then
-              echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
-            elif [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_STG }}" ]; then
-              echo "image_tag=${{ vars.IMAGE_TAG_STG }}" >> "$GITHUB_OUTPUT"
-            else
-              echo "Unsupported deploy_env: $DEPLOY_ENV_INPUT" >&2
-              exit 1
-            fi
-
-            echo "deploy_env=$DEPLOY_ENV_INPUT" >> "$GITHUB_OUTPUT"
+            echo "deploy_env=${{ vars.DEPLOY_ENV_DEV }}" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
           else
             if [ "$ref" = "develop" ]; then
               echo "deploy_env=${{ vars.DEPLOY_ENV_DEV }}" >> "$GITHUB_OUTPUT"

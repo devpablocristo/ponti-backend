@@ -121,9 +121,8 @@ Pasos:
 2. **Run workflow**
 3. Completar:
    - `branch`: rama a desplegar (ej. `config/gpc`)
-   - `deploy_env`: ambiente permitido (`DEPLOY_ENV_DEV` o `DEPLOY_ENV_STG`)
 
-> **Nota**: El deploy manual bloquea `DEPLOY_ENV_PROD` para evitar despliegues accidentales a producción.
+> **Nota**: El deploy manual usa siempre `DEPLOY_ENV_DEV`. En el futuro se puede habilitar `stg`.
 
 ### Flujo recomendado
 
