@@ -15,9 +15,14 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   deploy:
+    env:
+      DEPLOY_ENV: ""
+      IMAGE_TAG: ""
+      IMAGE_URI: ""
     environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'staging' && vars.DEPLOY_ENV_STG || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
     runs-on: ubuntu-latest
     steps:
@@ -27,48 +32,45 @@ jobs:
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
       - name: Set deploy variables
-        id: deploy_vars
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           ref="${GITHUB_REF_NAME}"
+          deploy_env=""
+          image_tag=""
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
               exit 1
             fi
-            echo "deploy_env=${{ vars.DEPLOY_ENV_DEV }}" >> "$GITHUB_OUTPUT"
-            echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
+            deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
+            image_tag="${{ vars.IMAGE_TAG_DEV }}"
           else
             if [ "$ref" = "develop" ]; then
-              echo "deploy_env=${{ vars.DEPLOY_ENV_DEV }}" >> "$GITHUB_OUTPUT"
-              echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
+              deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
+              image_tag="${{ vars.IMAGE_TAG_DEV }}"
             elif [ "$ref" = "staging" ]; then
-              echo "deploy_env=${{ vars.DEPLOY_ENV_STG }}" >> "$GITHUB_OUTPUT"
-              echo "image_tag=${{ vars.IMAGE_TAG_STG }}" >> "$GITHUB_OUTPUT"
+              deploy_env="${{ vars.DEPLOY_ENV_STG }}"
+              image_tag="${{ vars.IMAGE_TAG_STG }}"
             elif [ "$ref" = "main" ]; then
-              echo "deploy_env=${{ vars.DEPLOY_ENV_PROD }}" >> "$GITHUB_OUTPUT"
-              echo "image_tag=${{ vars.IMAGE_TAG_PROD }}" >> "$GITHUB_OUTPUT"
+              deploy_env="${{ vars.DEPLOY_ENV_PROD }}"
+              image_tag="${{ vars.IMAGE_TAG_PROD }}"
             else
               echo "Unsupported branch: $ref" >&2
               exit 1
             fi
           fi
 
-          echo "image_uri=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ steps.deploy_vars.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate GCP credentials
-        run: |
-          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
-            echo "Missing GCP_SA_KEY secret. Configure it in Actions secrets or environment secrets." >&2
-            exit 1
-          fi
+          echo "DEPLOY_ENV=$deploy_env" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$image_tag" >> "$GITHUB_ENV"
+          echo "IMAGE_URI=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${image_tag}" >> "$GITHUB_ENV"
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -79,17 +81,17 @@ jobs:
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
       - name: Build image
-        run: docker build -t "${{ steps.deploy_vars.outputs.image_uri }}" .
+        run: docker build -t "${{ env.IMAGE_URI }}" .
 
       - name: Push image
-        run: docker push "${{ steps.deploy_vars.outputs.image_uri }}"
+        run: docker push "${{ env.IMAGE_URI }}"
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "${{ vars.SERVICE_NAME }}" \
             --project="${{ vars.GCP_PROJECT_ID }}" \
             --region="${{ vars.GCP_REGION }}" \
-            --image="${{ steps.deploy_vars.outputs.image_uri }}" \
+            --image="${{ env.IMAGE_URI }}" \
             --service-account="${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}" \
             --allow-unauthenticated \
-            --set-env-vars="GO_ENVIRONMENT=${{ vars.GO_ENVIRONMENT }},DEPLOY_ENV=${{ steps.deploy_vars.outputs.deploy_env }},DEPLOY_PLATFORM=${{ vars.DEPLOY_PLATFORM }},APP_NAME=${{ vars.APP_NAME }},APP_VERSION=${{ vars.APP_VERSION }},APP_MAX_RETRIES=${{ vars.APP_MAX_RETRIES }},X_API_KEY=${{ secrets.X_API_KEY }},API_VERSION=${{ vars.API_VERSION }},HTTP_SERVER_NAME=${{ vars.HTTP_SERVER_NAME }},HTTP_SERVER_HOST=${{ vars.HTTP_SERVER_HOST }},DB_TYPE=${{ vars.DB_TYPE }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASS }},DB_HOST=${{ secrets.DB_HOST }},DB_NAME=${{ secrets.DB_NAME }},DB_SSL_MODE=${{ secrets.SSL_MODE }},DB_PORT=${{ secrets.DB_PORT }},MIGRATIONS_DIR=${{ vars.MIGRATIONS_DIR }},WORDS_SUGGESTER_LIMIT=${{ vars.WORDS_SUGGESTER_LIMIT }},WORDS_SUGGESTER_THRESHOLD=${{ vars.WORDS_SUGGESTER_THRESHOLD }},REPORT_SCHEMA=${{ vars.REPORT_SCHEMA }}"
+            --set-env-vars="GO_ENVIRONMENT=${{ vars.GO_ENVIRONMENT }},DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=${{ vars.DEPLOY_PLATFORM }},APP_NAME=${{ vars.APP_NAME }},APP_VERSION=${{ vars.APP_VERSION }},APP_MAX_RETRIES=${{ vars.APP_MAX_RETRIES }},X_API_KEY=${{ secrets.X_API_KEY }},API_VERSION=${{ vars.API_VERSION }},HTTP_SERVER_NAME=${{ vars.HTTP_SERVER_NAME }},HTTP_SERVER_HOST=${{ vars.HTTP_SERVER_HOST }},DB_TYPE=${{ vars.DB_TYPE }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASS }},DB_HOST=${{ secrets.DB_HOST }},DB_NAME=${{ secrets.DB_NAME }},DB_SSL_MODE=${{ secrets.SSL_MODE }},DB_PORT=${{ secrets.DB_PORT }},MIGRATIONS_DIR=${{ vars.MIGRATIONS_DIR }},WORDS_SUGGESTER_LIMIT=${{ vars.WORDS_SUGGESTER_LIMIT }},WORDS_SUGGESTER_THRESHOLD=${{ vars.WORDS_SUGGESTER_THRESHOLD }},REPORT_SCHEMA=${{ vars.REPORT_SCHEMA }}"
