@@ -1,0 +1,104 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+      - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Rama a desplegar
+        required: true
+        type: string
+      deploy_env:
+        description: Ambiente de despliegue
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref_name }}
+
+      - name: Set deploy variables
+        id: deploy_vars
+        env:
+          BRANCH_INPUT: ${{ github.event.inputs.branch }}
+          DEPLOY_ENV_INPUT: ${{ github.event.inputs.deploy_env }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          ref="${GITHUB_REF_NAME}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -z "$BRANCH_INPUT" ] || [ -z "$DEPLOY_ENV_INPUT" ]; then
+              echo "Missing required inputs" >&2
+              exit 1
+            fi
+
+            if [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_PROD }}" ]; then
+              echo "Manual deploy to prod is not allowed" >&2
+              exit 1
+            elif [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_DEV }}" ]; then
+              echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
+            elif [ "$DEPLOY_ENV_INPUT" = "${{ vars.DEPLOY_ENV_STG }}" ]; then
+              echo "image_tag=${{ vars.IMAGE_TAG_STG }}" >> "$GITHUB_OUTPUT"
+            else
+              echo "Unsupported deploy_env: $DEPLOY_ENV_INPUT" >&2
+              exit 1
+            fi
+
+            echo "deploy_env=$DEPLOY_ENV_INPUT" >> "$GITHUB_OUTPUT"
+          else
+            if [ "$ref" = "develop" ]; then
+              echo "deploy_env=${{ vars.DEPLOY_ENV_DEV }}" >> "$GITHUB_OUTPUT"
+              echo "image_tag=${{ vars.IMAGE_TAG_DEV }}" >> "$GITHUB_OUTPUT"
+            elif [ "$ref" = "staging" ]; then
+              echo "deploy_env=${{ vars.DEPLOY_ENV_STG }}" >> "$GITHUB_OUTPUT"
+              echo "image_tag=${{ vars.IMAGE_TAG_STG }}" >> "$GITHUB_OUTPUT"
+            elif [ "$ref" = "main" ]; then
+              echo "deploy_env=${{ vars.DEPLOY_ENV_PROD }}" >> "$GITHUB_OUTPUT"
+              echo "image_tag=${{ vars.IMAGE_TAG_PROD }}" >> "$GITHUB_OUTPUT"
+            else
+              echo "Unsupported branch: $ref" >&2
+              exit 1
+            fi
+          fi
+
+          echo "image_uri=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ steps.deploy_vars.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: docker build -t "${{ steps.deploy_vars.outputs.image_uri }}" .
+
+      - name: Push image
+        run: docker push "${{ steps.deploy_vars.outputs.image_uri }}"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${{ vars.SERVICE_NAME }}" \
+            --project="${{ vars.GCP_PROJECT_ID }}" \
+            --region="${{ vars.GCP_REGION }}" \
+            --image="${{ steps.deploy_vars.outputs.image_uri }}" \
+            --service-account="${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+            --allow-unauthenticated \
+            --set-env-vars="GO_ENVIRONMENT=${{ vars.GO_ENVIRONMENT }},DEPLOY_ENV=${{ steps.deploy_vars.outputs.deploy_env }},DEPLOY_PLATFORM=${{ vars.DEPLOY_PLATFORM }},APP_NAME=${{ vars.APP_NAME }},APP_VERSION=${{ vars.APP_VERSION }},APP_MAX_RETRIES=${{ vars.APP_MAX_RETRIES }},X_API_KEY=${{ secrets.X_API_KEY }},API_VERSION=${{ vars.API_VERSION }},HTTP_SERVER_NAME=${{ vars.HTTP_SERVER_NAME }},HTTP_SERVER_HOST=${{ vars.HTTP_SERVER_HOST }},DB_TYPE=${{ vars.DB_TYPE }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASS }},DB_HOST=${{ secrets.DB_HOST }},DB_NAME=${{ secrets.DB_NAME }},DB_SSL_MODE=${{ secrets.SSL_MODE }},DB_PORT=${{ secrets.DB_PORT }},MIGRATIONS_DIR=${{ vars.MIGRATIONS_DIR }},WORDS_SUGGESTER_LIMIT=${{ vars.WORDS_SUGGESTER_LIMIT }},WORDS_SUGGESTER_THRESHOLD=${{ vars.WORDS_SUGGESTER_THRESHOLD }},REPORT_SCHEMA=${{ vars.REPORT_SCHEMA }}"
