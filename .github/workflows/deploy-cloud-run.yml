@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   deploy:
+    environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'staging' && vars.DEPLOY_ENV_STG || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,6 +57,13 @@ jobs:
           fi
 
           echo "image_uri=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ steps.deploy_vars.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate GCP credentials
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "Missing GCP_SA_KEY secret. Configure it in Actions secrets or environment secrets." >&2
+            exit 1
+          fi
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2

@@ -73,6 +73,9 @@ Configurar en **Settings → Secrets and variables → Actions**:
 | `SSL_MODE` | Modo SSL de la base de datos |
 | `X_API_KEY` | API Key para autenticación |
 
+> **Nota**: El workflow usa `environment` según el ambiente (`dev`, `stg`, `prod`).  
+> Si usas secrets por ambiente, deben estar definidos en ese environment.
+
 ### Variables requeridas (GitHub Actions)
 
 Configurar en **Settings → Secrets and variables → Actions**:
