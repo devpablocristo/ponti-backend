@@ -19,31 +19,34 @@ Configurar estos secrets en **Settings → Secrets and variables → Actions** d
 
 ```bash
 # Crear Service Account (si no existe)
-gcloud iam service-accounts create github-actions-sa \
-  --display-name="GitHub Actions Service Account" \
+gcloud iam service-accounts create github-actions \
+  --display-name="GitHub Actions Deployer" \
   --project=new-ponti-dev
 
 # Asignar roles necesarios
 gcloud projects add-iam-policy-binding new-ponti-dev \
-  --member="serviceAccount:github-actions-sa@new-ponti-dev.iam.gserviceaccount.com" \
+  --member="serviceAccount:github-actions@new-ponti-dev.iam.gserviceaccount.com" \
   --role="roles/run.admin"
 
 gcloud projects add-iam-policy-binding new-ponti-dev \
-  --member="serviceAccount:github-actions-sa@new-ponti-dev.iam.gserviceaccount.com" \
+  --member="serviceAccount:github-actions@new-ponti-dev.iam.gserviceaccount.com" \
   --role="roles/artifactregistry.writer"
 
 gcloud projects add-iam-policy-binding new-ponti-dev \
-  --member="serviceAccount:github-actions-sa@new-ponti-dev.iam.gserviceaccount.com" \
+  --member="serviceAccount:github-actions@new-ponti-dev.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
 
 # Generar key JSON
 gcloud iam service-accounts keys create github-actions-key.json \
-  --iam-account=github-actions-sa@new-ponti-dev.iam.gserviceaccount.com \
+  --iam-account=github-actions@new-ponti-dev.iam.gserviceaccount.com \
   --project=new-ponti-dev
 
 # El contenido de github-actions-key.json va en el secret GCP_SA_KEY
 cat github-actions-key.json
 ```
+
+> **Nota**: Si aparece el error `constraints/iam.disableServiceAccountKeyCreation`, la organización bloquea keys.  
+> En ese caso hay que usar **Workload Identity Federation** en el workflow en lugar de `GCP_SA_KEY`.
 
 ## Ramas y Ambientes
 
