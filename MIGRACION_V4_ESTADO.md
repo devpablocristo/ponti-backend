@@ -6,7 +6,7 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 
 **Estado actual:** 95% completado  
 **Fecha:** Enero 2025  
-**Última actualización:** Correcciones per-ha por superficie total + siembra por órdenes (000330-000331)
+**Última actualización:** Consolidación insumos dashboard (000348)
 
 ---
 
@@ -51,6 +51,8 @@ Migración de vistas de reportes desde schema `public` (v3_*) hacia schema `v4_r
 | **Workorders vs Export** | Costos directos no coincidían con Excel | **000328-000329** |
 | **Siembra sin órdenes** | Superficie sembrada no debía usar sowing_date | **000330** |
 | **Per-ha sin siembra** | /ha debía usar superficie total (lotes, cultivos, summary) | **000331** |
+| **Lotes costo/ha (card)** | Promedio ponderado usaba sowed_area_ha y quedaba 0 sin siembra | Código Go |
+| **Proyectos % inversor** | Edición no persistía porque no actualizaba percentage | Código Go |
 
 ---
 
@@ -140,10 +142,36 @@ func (m Model) TableName() string {
 - [ ] Migrar vistas Investor (5 vistas)
 
 #### 2.2 Auditoría de Cálculos Duplicados
-- [ ] Identificar cálculos repetidos en vistas
-- [ ] Verificar que toda fórmula use funciones SSOT
-- [ ] Eliminar cálculos inline que dupliquen SSOT
-- [ ] Crear matriz: cálculo → función SSOT única
+- [x] Consolidar funciones base duplicadas en v3_calc (000333)
+- [x] Consolidar funciones de dominio en v3_calc (000334)
+- [x] Consolidar funciones de lote en v3_calc (000335)
+- [x] Consolidar funciones de proyecto en v3_calc (000336)
+- [x] Consolidar funciones MB en v3_calc (000337)
+- [x] Consolidar funciones legacy de proyecto en v3_calc (000338)
+- [x] Consolidar direct_costs_total_for_project en v3_calc (000339)
+- [x] Consolidar lot_base de field_crop_* en v4_calc (000340)
+- [x] Consolidar lot_base de field_crop_metrics en v4_calc (000341)
+- [x] Consolidar aggregated de field_crop_* en v4_calc (000342)
+- [x] Consolidar costos de insumos en v4_calc (000343)
+- [x] Consolidar costos de labores en v4_calc (000344)
+- [x] Consolidar costos en field_crop_metrics (000345)
+- [x] Consolidar aggregated base field_crop_metrics en v4_calc (000346)
+- [x] Consolidar totales insumos/labores en v4_calc (000347)
+- [x] Consolidar insumos dashboard en v4_calc (000348)
+- [x] Identificar cálculos repetidos en vistas (completado)
+- [x] Verificar que toda fórmula use funciones SSOT
+- [x] Eliminar cálculos inline que dupliquen SSOT
+- [x] Crear matriz: cálculo → función SSOT única
+
+**Matriz SSOT (resumen):**
+| Cálculo | SSOT / Vista única |
+|---------|---------------------|
+| Costos insumos por categoría (cultivos) | `v4_calc.field_crop_supply_costs_by_lot` |
+| Costos labores por categoría (cultivos) | `v4_calc.field_crop_labor_costs_by_lot` |
+| Agregados económicos por cultivo | `v4_calc.field_crop_aggregated` |
+| Agregados métricas por cultivo | `v4_calc.field_crop_metrics_aggregated` |
+| Insumos ejecutados dashboard | `v4_calc.dashboard_supply_costs_by_project` |
+| Fertilizantes invertidos dashboard | `v4_calc.dashboard_fertilizers_invested_by_project` |
 
 **Ejemplo de problema:**
 ```sql

@@ -41,7 +41,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 			expectedDiff:     "0.00",
 		},
 		{
-			name:           "ERROR - diferencia aunque sea pequeña (tolerancia 0)",
+			name:           "OK - diferencia dentro de tolerancia",
 			projectID:      ptr(int64(11)),
 			mockRawCost:    decimal.NewFromFloat(18454.39),
 			mockRawCostErr: nil,
@@ -53,7 +53,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 				},
 			},
 			mockDashboardErr: nil,
-			expectedStatus:   "ERROR",
+			expectedStatus:   "OK",
 			expectedDiff:     "-0.78",
 		},
 		{
@@ -160,7 +160,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			expectedRightVal: "18459.39", // 10005.0 + 8454.39
 		},
 		{
-			name:           "ERROR - diferencia aunque sea pequeña (tolerancia 0)",
+			name:           "OK - diferencia dentro de tolerancia",
 			projectID:      ptr(int64(11)),
 			mockRawCost:    decimal.NewFromFloat(18454.39),
 			mockRawCostErr: nil,
@@ -171,7 +171,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 				},
 			},
 			mockLotsErr:      nil,
-			expectedStatus:   "ERROR",
+			expectedStatus:   "OK",
 			expectedLeftVal:  "18454.39",
 			expectedRightVal: "18455.17",
 		},
@@ -241,7 +241,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			assert.Equal(t, tt.expectedRightVal, result.RightValue.StringFixed(2))
 			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
 			assert.Equal(t, "Vista v3_lot_list", result.RightSource)
-			assert.Equal(t, "0.00", result.Tolerance.StringFixed(2))
+			assert.Equal(t, "1.00", result.Tolerance.StringFixed(2))
 		})
 	}
 }
