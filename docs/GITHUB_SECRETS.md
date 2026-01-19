@@ -23,6 +23,27 @@ Se requieren estas **variables** en GitHub:
 - `WIF_PROVIDER`: `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
 - `WIF_SERVICE_ACCOUNT`: `github-actions@new-ponti-dev.iam.gserviceaccount.com`
 
+## Variables mínimas para Actions
+
+Configurar en **Settings → Secrets and variables → Actions**:
+
+| Variable | Descripción |
+|----------|-------------|
+| `GCP_PROJECT_ID` | ID del proyecto GCP |
+| `GCP_REGION` | Región de Cloud Run |
+| `ARTIFACT_REGISTRY` | Repositorio de Artifact Registry |
+| `IMAGE_NAME` | Nombre de la imagen Docker |
+| `SERVICE_NAME` | Nombre del servicio en Cloud Run |
+| `CLOUD_RUN_SERVICE_ACCOUNT` | Service Account para Cloud Run |
+| `WIF_PROVIDER` | Workload Identity Provider |
+| `WIF_SERVICE_ACCOUNT` | Service Account para Workload Identity |
+| `DEPLOY_ENV_DEV` | Nombre del ambiente dev |
+| `DEPLOY_ENV_STG` | Nombre del ambiente stg |
+| `DEPLOY_ENV_PROD` | Nombre del ambiente prod |
+| `IMAGE_TAG_DEV` | Tag de imagen para dev |
+| `IMAGE_TAG_STG` | Tag de imagen para stg |
+| `IMAGE_TAG_PROD` | Tag de imagen para prod |
+
 ### Crear Workload Identity Pool y Provider
 
 ```bash
@@ -103,6 +124,21 @@ push to dev     → build → push :dev  → deploy (DEPLOY_ENV=dev)
 push to staging → build → push :stg  → deploy (DEPLOY_ENV=stg)
 push to main    → build → push :prod → deploy (DEPLOY_ENV=prod)
 ```
+
+## Estrategia recomendada: preview por rama (DB por rama)
+
+Para evitar conflictos de migraciones cuando se deployan ramas con diferentes versiones:
+
+- `rama x` → **DB rama x** (preview)
+- `develop` → **DB dev**
+- `main` → **DB prod**
+
+**Nombres sugeridos:**
+- Servicio: `ponti-backend-<branch_slug>`
+- DB: `ponti_api_db_<branch_slug>`
+
+**Limpieza:**
+- Eliminar servicio y DB al cerrar/mergear la rama.
 
 ## Variables de aplicación en Cloud Run
 

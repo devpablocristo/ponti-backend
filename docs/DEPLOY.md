@@ -127,6 +127,22 @@ Pasos:
 3. Merge a `develop`
 4. Deploy automático por `develop`
 
+### Estrategia recomendada: preview por rama (DB por rama)
+
+Para poder deployar una rama con más migraciones y luego volver a `develop` sin romper el esquema, se recomienda aislar la base de datos por rama:
+
+- `rama x` → **DB rama x** (preview)
+- `develop` → **DB dev**
+- `main` → **DB prod**
+
+**Nombre sugerido (ejemplo):**
+- Servicio: `ponti-backend-<branch_slug>`
+- DB: `ponti_api_db_<branch_slug>`
+
+**Limpieza:**
+- Eliminar la DB y el servicio de la rama al cerrar/mergear.
+- Opcional: TTL para previews sin actividad.
+
 ## Pasos de Despliegue
 
 ### 1. Construir la imagen Docker
@@ -157,9 +173,10 @@ gcloud run deploy ponti-backend \
   --region=us-central1 \
   --image=us-central1-docker.pkg.dev/new-ponti-dev/ponti-backend-registry/ponti-backend:dev \
   --service-account=cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com \
-  --allow-unauthenticated \
-  --set-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=abc123secreta,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=soalen-db-v3,DB_PASSWORD=Soalen*25.,DB_HOST=136.112.24.122,DB_NAME=ponti_api_db,DB_SSL_MODE=disable,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+  --allow-unauthenticated
 ```
+
+> **Nota**: Las variables de aplicación se gestionan en Cloud Run (ver sección anterior).
 
 ### 4. Verificar el despliegue
 
