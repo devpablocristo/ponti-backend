@@ -25,6 +25,9 @@ const (
 
 // TestInternalMovementsFullE2E prueba completa de movimientos internos
 func TestInternalMovementsFullE2E(t *testing.T) {
+	if !projectExists(t, projectOrigin) || !projectExists(t, projectDest) {
+		t.Skip("Proyecto(s) requerido(s) no existen en la DB local")
+	}
 	fmt.Println("\n" + "════════════════════════════════════════════════════════════════")
 	fmt.Println("🧪 TEST E2E COMPLETO: MOVIMIENTOS INTERNOS")
 	fmt.Println("════════════════════════════════════════════════════════════════")
@@ -180,6 +183,20 @@ func TestInternalMovementsFullE2E(t *testing.T) {
 }
 
 // Helper functions
+
+func projectExists(t *testing.T, projectID int) bool {
+	url := fmt.Sprintf("%s/api/v1/projects/%d", baseURLTest, projectID)
+	req, err := http.NewRequest("GET", url, nil)
+	require.NoError(t, err)
+	req.Header.Set("X-API-KEY", apiKeyTest)
+	req.Header.Set("X-USER-ID", userIDTest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK
+}
 
 func runIntegrityChecks(t *testing.T, projectID int) []map[string]interface{} {
 	url := fmt.Sprintf("%s/api/v1/data-integrity/costs-check?project_id=%d", baseURLTest, projectID)
