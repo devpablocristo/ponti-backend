@@ -35,10 +35,30 @@ jobs:
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
+          IMAGE_NAME: ${{ vars.IMAGE_NAME }}
         run: |
           ref="${GITHUB_REF_NAME}"
           deploy_env=""
           image_tag=""
+          if [ -z "$GCP_REGION" ]; then
+            echo "Missing GCP_REGION variable." >&2
+            exit 1
+          fi
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "Missing GCP_PROJECT_ID variable." >&2
+            exit 1
+          fi
+          if [ -z "$ARTIFACT_REGISTRY" ]; then
+            echo "Missing ARTIFACT_REGISTRY variable." >&2
+            exit 1
+          fi
+          if [ -z "$IMAGE_NAME" ]; then
+            echo "Missing IMAGE_NAME variable." >&2
+            exit 1
+          fi
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
@@ -62,9 +82,10 @@ jobs:
             fi
           fi
 
-          echo "DEPLOY_ENV=$deploy_env" >> "$GITHUB_ENV"
-          echo "IMAGE_TAG=$image_tag" >> "$GITHUB_ENV"
-          echo "IMAGE_URI=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${image_tag}" >> "$GITHUB_ENV"
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${image_tag}"
+          printf 'DEPLOY_ENV=%s\n' "$deploy_env" >> "$GITHUB_ENV"
+          printf 'IMAGE_TAG=%s\n' "$image_tag" >> "$GITHUB_ENV"
+          printf 'IMAGE_URI=%s\n' "$image_uri" >> "$GITHUB_ENV"
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
@@ -76,25 +97,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
-
-      - name: Validate required variables
-        run: |
-          if [ -z "${{ vars.GCP_REGION }}" ]; then
-            echo "Missing GCP_REGION variable." >&2
-            exit 1
-          fi
-          if [ -z "${{ vars.GCP_PROJECT_ID }}" ]; then
-            echo "Missing GCP_PROJECT_ID variable." >&2
-            exit 1
-          fi
-          if [ -z "${{ vars.ARTIFACT_REGISTRY }}" ]; then
-            echo "Missing ARTIFACT_REGISTRY variable." >&2
-            exit 1
-          fi
-          if [ -z "${{ vars.IMAGE_NAME }}" ]; then
-            echo "Missing IMAGE_NAME variable." >&2
-            exit 1
-          fi
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
