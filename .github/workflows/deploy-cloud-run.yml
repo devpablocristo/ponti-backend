@@ -39,6 +39,7 @@ jobs:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
           IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
         run: |
           ref="${GITHUB_REF_NAME}"
           deploy_env=""
@@ -57,6 +58,10 @@ jobs:
           fi
           if [ -z "$IMAGE_NAME" ]; then
             echo "Missing IMAGE_NAME variable." >&2
+            exit 1
+          fi
+          if [ -z "$SERVICE_NAME" ]; then
+            echo "Missing SERVICE_NAME variable." >&2
             exit 1
           fi
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
@@ -82,10 +87,8 @@ jobs:
             fi
           fi
 
-          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${image_tag}"
           printf 'DEPLOY_ENV=%s\n' "$deploy_env" >> "$GITHUB_ENV"
           printf 'IMAGE_TAG=%s\n' "$image_tag" >> "$GITHUB_ENV"
-          printf 'IMAGE_URI=%s\n' "$image_uri" >> "$GITHUB_ENV"
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
@@ -102,17 +105,21 @@ jobs:
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
       - name: Build image
-        run: docker build -t "${{ env.IMAGE_URI }}" .
+        run: |
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          docker build -t "$image_uri" .
 
       - name: Push image
-        run: docker push "${{ env.IMAGE_URI }}"
+        run: |
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          docker push "$image_uri"
 
       - name: Deploy to Cloud Run
         run: |
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           gcloud run deploy "${{ vars.SERVICE_NAME }}" \
             --project="${{ vars.GCP_PROJECT_ID }}" \
             --region="${{ vars.GCP_REGION }}" \
-            --image="${{ env.IMAGE_URI }}" \
+            --image="$image_uri" \
             --service-account="${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}" \
-            --allow-unauthenticated \
-            --set-env-vars="GO_ENVIRONMENT=${{ vars.GO_ENVIRONMENT }},DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=${{ vars.DEPLOY_PLATFORM }},APP_NAME=${{ vars.APP_NAME }},APP_VERSION=${{ vars.APP_VERSION }},APP_MAX_RETRIES=${{ vars.APP_MAX_RETRIES }},X_API_KEY=${{ secrets.X_API_KEY }},API_VERSION=${{ vars.API_VERSION }},HTTP_SERVER_NAME=${{ vars.HTTP_SERVER_NAME }},HTTP_SERVER_HOST=${{ vars.HTTP_SERVER_HOST }},DB_TYPE=${{ vars.DB_TYPE }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASS }},DB_HOST=${{ secrets.DB_HOST }},DB_NAME=${{ secrets.DB_NAME }},DB_SSL_MODE=${{ secrets.SSL_MODE }},DB_PORT=${{ secrets.DB_PORT }},MIGRATIONS_DIR=${{ vars.MIGRATIONS_DIR }},WORDS_SUGGESTER_LIMIT=${{ vars.WORDS_SUGGESTER_LIMIT }},WORDS_SUGGESTER_THRESHOLD=${{ vars.WORDS_SUGGESTER_THRESHOLD }},REPORT_SCHEMA=${{ vars.REPORT_SCHEMA }}"
+            --allow-unauthenticated

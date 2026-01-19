@@ -64,14 +64,7 @@ Configurar en **Settings → Secrets and variables → Actions**:
 
 | Secret | Descripción |
 |--------|-------------|
-| `GCP_SA_KEY` | JSON de Service Account con permisos para Cloud Run y Artifact Registry |
-| `DB_HOST` | Host de la base de datos |
-| `DB_PORT` | Puerto de la base de datos |
-| `DB_USER` | Usuario de la base de datos |
-| `DB_PASS` | Contraseña de la base de datos |
-| `DB_NAME` | Nombre de la base de datos |
-| `SSL_MODE` | Modo SSL de la base de datos |
-| `X_API_KEY` | API Key para autenticación |
+| *(ninguno)* | El deploy usa Workload Identity Federation |
 
 > **Nota**: El workflow usa `environment` según el ambiente (`dev`, `stg`, `prod`).  
 > Si usas secrets por ambiente, deben estar definidos en ese environment.
@@ -88,25 +81,25 @@ Configurar en **Settings → Secrets and variables → Actions**:
 | `IMAGE_NAME` | Nombre de la imagen Docker |
 | `SERVICE_NAME` | Nombre del servicio en Cloud Run |
 | `CLOUD_RUN_SERVICE_ACCOUNT` | Service Account para Cloud Run |
-| `GO_ENVIRONMENT` | Entorno de ejecución |
-| `DEPLOY_PLATFORM` | Plataforma de despliegue |
-| `APP_NAME` | Nombre de la aplicación |
-| `APP_VERSION` | Versión de la aplicación |
-| `APP_MAX_RETRIES` | Máximo de reintentos |
-| `API_VERSION` | Versión de la API |
-| `HTTP_SERVER_NAME` | Nombre del servidor HTTP |
-| `HTTP_SERVER_HOST` | Host del servidor |
-| `DB_TYPE` | Tipo de base de datos |
-| `MIGRATIONS_DIR` | Directorio de migraciones |
-| `WORDS_SUGGESTER_LIMIT` | Límite del sugeridor de palabras |
-| `WORDS_SUGGESTER_THRESHOLD` | Umbral del sugeridor |
-| `REPORT_SCHEMA` | Schema para reportes |
+| `WIF_PROVIDER` | Workload Identity Provider |
+| `WIF_SERVICE_ACCOUNT` | Service Account para Workload Identity |
 | `DEPLOY_ENV_DEV` | Nombre del ambiente dev |
 | `DEPLOY_ENV_STG` | Nombre del ambiente stg |
 | `DEPLOY_ENV_PROD` | Nombre del ambiente prod |
 | `IMAGE_TAG_DEV` | Tag de imagen para dev |
 | `IMAGE_TAG_STG` | Tag de imagen para stg |
 | `IMAGE_TAG_PROD` | Tag de imagen para prod |
+
+### Variables de aplicación en Cloud Run
+
+Las variables de la aplicación se configuran en el servicio de Cloud Run y **no** en GitHub Actions:
+
+```bash
+gcloud run services update <SERVICE_NAME> \
+  --project=<PROJECT_ID> \
+  --region=<REGION> \
+  --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=***,DB_NAME=***,DB_SSL_MODE=disable,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+```
 
 ### Deploy automático por rama
 
@@ -124,13 +117,12 @@ Pasos:
 2. **Run workflow**
 3. Completar:
    - `branch`: rama a desplegar (ej. `config/gpc`)
-   - `deploy_env`: ambiente permitido (`DEPLOY_ENV_DEV` o `DEPLOY_ENV_STG`)
 
-> **Nota**: El deploy manual bloquea `DEPLOY_ENV_PROD` para evitar despliegues accidentales a producción.
+> **Nota**: El deploy manual usa siempre `DEPLOY_ENV_DEV`. En el futuro se puede habilitar `stg`.
 
 ### Flujo recomendado
 
-1. Deploy manual de la rama a `dev` o `stg`
+1. Deploy manual de la rama a `dev`
 2. Validación y aprobación
 3. Merge a `develop`
 4. Deploy automático por `develop`
