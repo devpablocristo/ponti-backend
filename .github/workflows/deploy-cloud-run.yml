@@ -36,20 +36,30 @@ jobs:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
           GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
+          GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
           ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
           IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+          SERVICE_NAME_DEV: ${{ vars.SERVICE_NAME_DEV }}
+          SERVICE_NAME_PROD: ${{ vars.SERVICE_NAME_PROD }}
+          CLOUD_RUN_SERVICE_ACCOUNT_DEV: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV }}
+          CLOUD_RUN_SERVICE_ACCOUNT_PROD: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_PROD }}
+          WIF_PROVIDER_DEV: ${{ vars.WIF_PROVIDER_DEV }}
+          WIF_PROVIDER_PROD: ${{ vars.WIF_PROVIDER_PROD }}
+          WIF_SERVICE_ACCOUNT_DEV: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+          WIF_SERVICE_ACCOUNT_PROD: ${{ vars.WIF_SERVICE_ACCOUNT_PROD }}
         run: |
           ref="${GITHUB_REF_NAME}"
           deploy_env=""
           image_tag=""
+          gcp_project_id=""
+          service_name=""
+          cloud_run_sa=""
+          wif_provider=""
+          wif_sa=""
+          
           if [ -z "$GCP_REGION" ]; then
             echo "Missing GCP_REGION variable." >&2
-            exit 1
-          fi
-          if [ -z "$GCP_PROJECT_ID" ]; then
-            echo "Missing GCP_PROJECT_ID variable." >&2
             exit 1
           fi
           if [ -z "$ARTIFACT_REGISTRY" ]; then
@@ -60,10 +70,7 @@ jobs:
             echo "Missing IMAGE_NAME variable." >&2
             exit 1
           fi
-          if [ -z "$SERVICE_NAME" ]; then
-            echo "Missing SERVICE_NAME variable." >&2
-            exit 1
-          fi
+          
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
@@ -71,55 +78,112 @@ jobs:
             fi
             deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
             image_tag="${{ vars.IMAGE_TAG_DEV }}"
+            gcp_project_id="$GCP_PROJECT_ID_DEV"
+            service_name="$SERVICE_NAME_DEV"
+            cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
+            wif_provider="$WIF_PROVIDER_DEV"
+            wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
           else
             if [ "$ref" = "develop" ]; then
               deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
               image_tag="${{ vars.IMAGE_TAG_DEV }}"
+              gcp_project_id="$GCP_PROJECT_ID_DEV"
+              service_name="$SERVICE_NAME_DEV"
+              cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
+              wif_provider="$WIF_PROVIDER_DEV"
+              wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
             elif [ "$ref" = "staging" ]; then
               deploy_env="${{ vars.DEPLOY_ENV_STG }}"
               image_tag="${{ vars.IMAGE_TAG_STG }}"
+              # Staging usa dev por ahora (puede cambiarse después)
+              gcp_project_id="$GCP_PROJECT_ID_DEV"
+              service_name="$SERVICE_NAME_DEV"
+              cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
+              wif_provider="$WIF_PROVIDER_DEV"
+              wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
             elif [ "$ref" = "main" ]; then
               deploy_env="${{ vars.DEPLOY_ENV_PROD }}"
               image_tag="${{ vars.IMAGE_TAG_PROD }}"
+              gcp_project_id="$GCP_PROJECT_ID_PROD"
+              service_name="$SERVICE_NAME_PROD"
+              cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_PROD"
+              wif_provider="$WIF_PROVIDER_PROD"
+              wif_sa="$WIF_SERVICE_ACCOUNT_PROD"
             else
               echo "Unsupported branch: $ref" >&2
               exit 1
             fi
           fi
+          
+          if [ -z "$gcp_project_id" ]; then
+            echo "Missing GCP_PROJECT_ID for environment: $deploy_env" >&2
+            exit 1
+          fi
+          if [ -z "$service_name" ]; then
+            echo "Missing SERVICE_NAME for environment: $deploy_env" >&2
+            exit 1
+          fi
+          if [ -z "$cloud_run_sa" ]; then
+            echo "Missing CLOUD_RUN_SERVICE_ACCOUNT for environment: $deploy_env" >&2
+            exit 1
+          fi
+          if [ -z "$wif_provider" ]; then
+            echo "Missing WIF_PROVIDER for environment: $deploy_env" >&2
+            exit 1
+          fi
+          if [ -z "$wif_sa" ]; then
+            echo "Missing WIF_SERVICE_ACCOUNT for environment: $deploy_env" >&2
+            exit 1
+          fi
 
           printf 'DEPLOY_ENV=%s\n' "$deploy_env" >> "$GITHUB_ENV"
           printf 'IMAGE_TAG=%s\n' "$image_tag" >> "$GITHUB_ENV"
+          printf 'GCP_PROJECT_ID=%s\n' "$gcp_project_id" >> "$GITHUB_ENV"
+          printf 'SERVICE_NAME=%s\n' "$service_name" >> "$GITHUB_ENV"
+          printf 'CLOUD_RUN_SERVICE_ACCOUNT=%s\n' "$cloud_run_sa" >> "$GITHUB_ENV"
+          printf 'WIF_PROVIDER=%s\n' "$wif_provider" >> "$GITHUB_ENV"
+          printf 'WIF_SERVICE_ACCOUNT=%s\n' "$wif_sa" >> "$GITHUB_ENV"
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ vars.GCP_PROJECT_ID }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
       - name: Build image
         run: |
-          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           docker build -t "$image_uri" .
 
       - name: Push image
         run: |
-          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           docker push "$image_uri"
 
       - name: Deploy to Cloud Run
         run: |
-          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          gcloud run deploy "${{ vars.SERVICE_NAME }}" \
-            --project="${{ vars.GCP_PROJECT_ID }}" \
-            --region="${{ vars.GCP_REGION }}" \
-            --image="$image_uri" \
-            --service-account="${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}" \
-            --allow-unauthenticated
+          image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          # Prod no debe ser público, dev puede serlo
+          if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
+            gcloud run deploy "${{ env.SERVICE_NAME }}" \
+              --project="${{ env.GCP_PROJECT_ID }}" \
+              --region="${{ vars.GCP_REGION }}" \
+              --image="$image_uri" \
+              --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --no-allow-unauthenticated
+          else
+            gcloud run deploy "${{ env.SERVICE_NAME }}" \
+              --project="${{ env.GCP_PROJECT_ID }}" \
+              --region="${{ vars.GCP_REGION }}" \
+              --image="$image_uri" \
+              --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --allow-unauthenticated
+          fi
