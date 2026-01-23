@@ -6,6 +6,42 @@
 - `workflow_dispatch` → preview con **DB por rama** y **snapshot automatico**
 - Limpieza automatica al cerrar PR + cron semanal
 
+## Comportamiento actual
+
+### Resumen rapido
+- No hay schema por rama: la aislacion es por **DB**.
+- `develop` y `main` usan la DB fija del servicio.
+- Deploy manual crea `branch_<slug>` y clona datos desde dev (snapshot export+import).
+- Limpieza automatica al cerrar PR + cron semanal.
+
+### Por escenario
+**PRs (Pull Requests)**
+- Deploy automatico: no
+- DB: no toca DB dev
+- Cleanup: al cerrar PR se borran DB preview y snapshots
+
+**Deploy manual por rama (`workflow_dispatch`)**
+- Input: solo `branch`
+- DB: `branch_<slug>`
+- Datos: snapshot fresco desde `new-ponti-dev-db`
+- Resultado: servicio preview con DB aislada
+- Cleanup: al cerrar PR + cron semanal
+
+**Push a `develop`**
+- DB: la configurada en el servicio dev (`new-ponti-dev-db`)
+- Resultado: si altera la DB dev
+
+**Push a `main`**
+- DB: la configurada en el servicio prod
+- Resultado: si altera la DB prod
+
+### Limpieza automatica
+- PR cerrado (merge o close): borra DB `branch_<slug>` y snapshots `preview_seed_branch_<slug>_*`
+- Cron semanal: borra DBs `branch_*` y snapshots restantes
+- DBs principales: nunca se limpian
+
+---
+
 ## Workflows
 
 ### 1) Deploy principal

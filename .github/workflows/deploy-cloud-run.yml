@@ -253,8 +253,22 @@ jobs:
 
           echo "::notice::Using preview database: ${DB_NAME} (instance: ${INSTANCE_CONN})"
 
-          echo "::warning::Reset automático: DROPPING database ${DB_NAME}"
-          gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet || true
+          if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
+            echo "::warning::Reset automático: DROPPING database ${DB_NAME}"
+            gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet
+          else
+            echo "Database not found (ok): $DB_NAME"
+          fi
+
+          # Esperar a que la DB no exista antes de recrear
+          for i in 1 2 3 4 5; do
+            if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
+              echo "Waiting for DB deletion... ($i/5)"
+              sleep 5
+            else
+              break
+            fi
+          done
 
           echo "instance_project=${INSTANCE_PROJECT}" >> "$GITHUB_OUTPUT"
           echo "instance_name=${INSTANCE_NAME}" >> "$GITHUB_OUTPUT"
@@ -262,11 +276,11 @@ jobs:
 
           # Crear si no existe (idempotente)
           if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
-            echo "Database already exists: $DB_NAME"
-          else
-            echo "Creating database: $DB_NAME"
-            gcloud sql databases create "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME"
+            echo "::error::Database still exists after delete attempt: $DB_NAME"
+            exit 1
           fi
+          echo "Creating database: $DB_NAME"
+          gcloud sql databases create "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME"
 
       - name: Seed preview database from sanitized snapshot (workflow_dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
