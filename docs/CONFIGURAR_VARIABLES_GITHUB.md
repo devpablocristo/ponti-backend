@@ -165,4 +165,4 @@ Una vez configuradas todas las variables:
 1. Configurar **Environment Protection** en GitHub (Settings → Environments → `prod`)
 2. Hacer el **primer deploy** a producción
 
-Ver [PROXIMOS_PASOS.md](./PROXIMOS_PASOS.md) para más detalles.
+Ver [DEPLOY.md](./DEPLOY.md) para más detalles sobre el proceso de deploy.
