@@ -69,6 +69,11 @@ El despliegue automático y manual se gestiona desde GitHub Actions con el workf
 
 - `.github/workflows/deploy-cloud-run.yml`
 
+**Características del workflow:**
+- **Concurrency:** Evita runs solapados del mismo deploy (cancela automáticamente runs anteriores)
+- **Triggers:** Push a ramas principales, PRs automáticos, y deploys manuales
+- **Schema isolation:** Cada PR/rama usa su propio schema aislado
+
 ### Secrets requeridos (GitHub Actions)
 
 Configurar en **Settings → Secrets and variables → Actions**:

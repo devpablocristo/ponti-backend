@@ -22,7 +22,16 @@ on:
     inputs:
       branch: (required)
       schema_override: (opcional)
+
+concurrency:
+  group: deploy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 ```
+
+**Características de Concurrency:**
+- **Grupo único por evento/rama/PR:** Evita runs solapados del mismo deploy
+- **Cancelación automática:** Si llega un nuevo run, cancela el anterior en progreso
+- **Prevención de conflictos:** Evita deploys simultáneos que podrían causar inconsistencias
 
 **Comportamiento por Trigger:**
 
@@ -319,19 +328,146 @@ environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV
 - ❌ Schemas `branch_<slug>_<sha>` se creaban con SHA (múltiples schemas por rama)
 - ❌ Cleanup solo funcionaba para `pr_<number>` (que nunca se creaba)
 - ❌ Schemas `branch_*` nunca se limpiaban automáticamente
+- ❌ Estado dirty en migraciones causaba fallos en deploys automáticos de PRs
 
 ### Después:
 - ✅ PRs se deployan automáticamente (opened, synchronize, reopened)
 - ✅ Schemas `branch_<slug>` son estables (sin SHA, reutilizables)
 - ✅ Cleanup funciona correctamente para `pr_<number>` (ahora se crean)
 - ✅ Garbage collector limpia schemas `branch_*` antiguos automáticamente
+- ✅ Auto-recuperación de estado dirty: recrea schemas aislados desde cero
+
+---
+
+## 🔄 Manejo de Estado Dirty en Migraciones
+
+### Problema Original
+
+Cuando una migración falla o se interrumpe, `golang-migrate` marca el schema como "dirty". Esto bloquea futuras migraciones y causa fallos en deploys automáticos de PRs.
+
+**Error típico:**
+```
+Failed to run SQL migrations: error applying migrations: Dirty database version 79. Fix and force version.
+```
+
+### Solución Implementada
+
+El sistema ahora maneja automáticamente el estado dirty con una estrategia segura:
+
+#### 1. Schema `public` (Producción)
+- **Comportamiento:** Falla con error claro
+- **Razón:** Requiere intervención manual para investigar el problema
+- **Mensaje:** `"dirty migration state in public schema - manual intervention required"`
+
+#### 2. Schemas Aislados (`pr_*`, `branch_*`)
+- **Comportamiento:** Recreación automática desde cero
+- **Proceso:**
+  1. Detecta estado dirty durante ejecución de migraciones
+  2. Adquiere advisory lock (`pg_advisory_lock`) para prevenir concurrencia
+  3. Ejecuta `DROP SCHEMA <schema> CASCADE` (elimina todo el contenido)
+  4. Ejecuta `CREATE SCHEMA <schema>` (schema limpio)
+  5. Re-ejecuta todas las migraciones desde 0
+  6. Libera advisory lock
+
+#### 3. Advisory Lock para Concurrencia
+
+**Problema:** En Cloud Run, múltiples instancias pueden intentar migrar simultáneamente.
+
+**Solución:** Advisory lock mejorado con loop y timeout configurable:
+- **Lock ID:** `int64/bigint` compatible (hash determinístico del schema name)
+- **Estrategia:** Loop con `pg_try_advisory_lock` (no bloqueante) en lugar de `pg_advisory_lock` bloqueante
+- **Timeout configurable:** 5 minutos por defecto
+- **Backoff progresivo:** 100ms → 500ms → 1s (reduce carga en DB)
+- **Logs mejorados:** Incluyen schema name, lock_id, wait time
+- **Unlock garantizado:** Siempre se libera en `defer`
+
+**Implementación:**
+```go
+lockID := hashSchemaName(schema)  // Hash determinístico → int64
+// Loop con pg_try_advisory_lock hasta adquirir o timeout
+for {
+    acquired := pg_try_advisory_lock(lockID)
+    if acquired {
+        break
+    }
+    // Backoff progresivo y logs periódicos
+    time.Sleep(backoff)
+}
+// ... ejecutar migraciones o recrear schema ...
+defer pg_advisory_unlock(lockID)  // Garantizado
+```
+
+**Logs de ejemplo:**
+```
+Attempting to acquire migration lock for schema: pr_5 (lock_id: 1234567890)
+✅ Migration lock acquired immediately for schema: pr_5 (lock_id: 1234567890)
+...
+🔓 Migration lock released for schema: pr_5 (lock_id: 1234567890)
+```
+
+Si espera:
+```
+Attempting to acquire migration lock for schema: pr_5 (lock_id: 1234567890)
+⏳ Waiting for migration lock (schema: pr_5, lock_id: 1234567890, waited: 5s)...
+✅ Migration lock acquired for schema: pr_5 (lock_id: 1234567890, waited: 12.5s)
+```
+
+### Flujo Completo
+
+```
+1. Contenedor inicia → intenta ejecutar migraciones
+   ↓
+2. ¿Hay estado dirty?
+   ├─ NO → Ejecuta migraciones normalmente ✅
+   └─ SÍ → ¿Es schema public?
+       ├─ SÍ → ❌ Falla con error claro (requiere intervención manual)
+       └─ NO → Adquiere advisory lock
+                ↓
+                DROP SCHEMA CASCADE
+                ↓
+                CREATE SCHEMA
+                ↓
+                Re-ejecuta migraciones desde 0
+                ↓
+                Libera advisory lock
+                ↓
+                ✅ Éxito
+```
+
+### Beneficios
+
+1. **Deploys automáticos de PR funcionan sin intervención**
+   - Si un deploy anterior falló, el siguiente se recupera automáticamente
+
+2. **Garantía de consistencia**
+   - Recrear desde cero elimina cualquier inconsistencia
+   - No hay riesgo de dejar el schema en estado parcial
+
+3. **Prevención de concurrencia**
+   - Advisory lock previene que múltiples instancias migren simultáneamente
+   - Especialmente importante en Cloud Run con múltiples réplicas
+
+4. **Seguridad en producción**
+   - Schema `public` nunca se auto-limpia
+   - Requiere decisión consciente del equipo
+
+### Archivos Modificados
+
+- `projects/ponti-api/cmd/api/migrate_sql.go`:
+  - Función `recreateSchemaOnDirty()`: Implementa DROP/CREATE con advisory lock mejorado
+  - Función `acquireMigrationLock()`: Wrapper con timeout de 5 minutos
+  - Función `acquireMigrationLockWithTimeout()`: Loop con `pg_try_advisory_lock`, backoff progresivo, logs mejorados
+  - Manejo de errores dirty en `runMigrations()` y `runMigrationsWithInstance()`
+
+---
 
 ---
 
 ## 🔧 Archivos del Sistema
 
-1. **`.github/workflows/deploy-cloud-run.yml`** - Workflow principal de deploy (251 líneas)
+1. **`.github/workflows/deploy-cloud-run.yml`** - Workflow principal de deploy (~255 líneas)
    - Maneja todos los triggers (push, pull_request, workflow_dispatch)
+   - **Concurrency:** Evita runs solapados con cancelación automática
    - Determina DB_SCHEMA según el contexto
    - Deploya a Cloud Run con el schema correcto
 

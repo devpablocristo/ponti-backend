@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	_ "database/sql"
-
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -67,8 +65,37 @@ func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
 		return fmt.Errorf("error creating migrate instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("error applying migrations: %w", err)
+	// Intentar ejecutar migraciones
+	err = m.Up()
+	if err != nil && err != migrate.ErrNoChange {
+		// Verificar si es un error de dirty state
+		if strings.Contains(err.Error(), "Dirty database version") || strings.Contains(err.Error(), "dirty") {
+			// Para public: fallar con error claro (requiere intervención manual)
+			if schema == "public" {
+				return fmt.Errorf("dirty migration state in public schema - manual intervention required: %w", err)
+			}
+			
+			// Para schemas aislados: recrear schema desde cero
+			log.Printf("⚠️  Dirty migration state detected for schema %s, recreating schema from scratch...", schema)
+			
+			if err := recreateSchemaOnDirty(ctx, tempDB, schema); err != nil {
+				return fmt.Errorf("failed to recreate schema on dirty state: %w", err)
+			}
+			
+			// Recrear instancia de migrate después de recrear schema
+			m, err = migrate.New(migConfig.Dir, migrateDSN)
+			if err != nil {
+				return fmt.Errorf("error creating migrate instance after schema recreation: %w", err)
+			}
+			
+			// Re-ejecutar migraciones desde 0
+			log.Printf("Re-running migrations from scratch for schema %s...", schema)
+			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
+			}
+		} else {
+			return fmt.Errorf("error applying migrations: %w", err)
+		}
 	}
 
 	log.Printf("Migrations completed successfully for schema: %s", schema)
@@ -118,7 +145,47 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("running migrations: %w", err)
+		// Verificar si es un error de dirty state
+		if strings.Contains(err.Error(), "Dirty database version") || strings.Contains(err.Error(), "dirty") {
+			// Para public: fallar con error claro (requiere intervención manual)
+			if schema == "public" {
+				return fmt.Errorf("dirty migration state in public schema - manual intervention required: %w", err)
+			}
+			
+			// Para schemas aislados: recrear schema desde cero
+			log.Printf("⚠️  Dirty migration state detected for schema %s, recreating schema from scratch...", schema)
+			
+			if err := recreateSchemaOnDirty(ctx, sqlDB, schema); err != nil {
+				return fmt.Errorf("failed to recreate schema on dirty state: %w", err)
+			}
+			
+			// Recrear driver e instancia de migrate después de recrear schema
+			driver, err = postgres.WithInstance(sqlDB, &postgres.Config{
+				DatabaseName:    dbConfig.Name,
+				SchemaName:      schema,
+				MigrationsTable: fmt.Sprintf("%s.schema_migrations", quoteIdentifier(schema)),
+			})
+			if err != nil {
+				return fmt.Errorf("creating postgres driver after schema recreation: %w", err)
+			}
+			
+			m, err = migrate.NewWithDatabaseInstance(
+				migConfig.Dir,
+				dbConfig.Name,
+				driver,
+			)
+			if err != nil {
+				return fmt.Errorf("creating migrate instance after schema recreation: %w", err)
+			}
+			
+			// Re-ejecutar migraciones desde 0
+			log.Printf("Re-running migrations from scratch for schema %s...", schema)
+			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
+			}
+		} else {
+			return fmt.Errorf("running migrations: %w", err)
+		}
 	}
 
 	log.Printf("Migrations completed successfully for schema: %s", schema)
@@ -195,54 +262,81 @@ func initializeSchema(ctx context.Context, sqlDB *sql.DB, dbConfig config.DB) er
 // acquireMigrationLock adquiere un lock de migración usando pg_advisory_lock
 // El lock ID se deriva del schema name para que cada schema tenga su propio lock
 // Esto previene ejecuciones concurrentes de migraciones en el mismo schema
+// IMPORTANTE: También se usa para prevenir concurrencia en Cloud Run cuando múltiples instancias intentan migrar
+// 
+// Estrategia:
+// - Usa pg_try_advisory_lock con loop y timeout configurable (5 minutos por defecto)
+// - Lock ID es int64/bigint compatible (hash determinístico del schema name)
+// - Logs claros incluyen wait time, schema name y lock ID
+// - Unlock garantizado en defer
 func acquireMigrationLock(ctx context.Context, sqlDB *sql.DB, schema string) (func(), error) {
-	if schema == "" || schema == "public" {
-		// No necesitamos lock para public (asumimos que solo se migra una vez)
-		return func() {}, nil
-	}
+	return acquireMigrationLockWithTimeout(ctx, sqlDB, schema, 5*time.Minute)
+}
 
-	// Calcular hash del schema name para usar como lock ID
+// acquireMigrationLockWithTimeout adquiere un lock con timeout configurable
+func acquireMigrationLockWithTimeout(ctx context.Context, sqlDB *sql.DB, schema string, timeout time.Duration) (func(), error) {
+	// Calcular hash del schema name para usar como lock ID (int64/bigint compatible)
 	lockID := hashSchemaName(schema)
-
-	// Intentar adquirir el lock de forma no bloqueante primero
-	var acquired bool
-	err := sqlDB.QueryRowContext(ctx, 
-		"SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired)
-	if err != nil {
-		return nil, fmt.Errorf("failed to try acquire migration lock: %w", err)
-	}
-
-	if !acquired {
-		// Lock ya está tomado, esperar con timeout bloqueante
-		log.Printf("Migration lock for schema %s is held, waiting...", schema)
-		
-		// Usar un contexto con timeout para evitar esperar indefinidamente
-		lockCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-
-		// pg_advisory_lock bloquea hasta obtener el lock o timeout
-		var result interface{}
-		err := sqlDB.QueryRowContext(lockCtx,
-			"SELECT pg_advisory_lock($1)", lockID).Scan(&result)
-		if err != nil && err != sql.ErrNoRows {
-			if lockCtx.Err() == context.DeadlineExceeded {
-				return nil, fmt.Errorf("timeout waiting for migration lock (schema: %s)", schema)
-			}
-			return nil, fmt.Errorf("failed to acquire migration lock: %w", err)
+	
+	log.Printf("Attempting to acquire migration lock for schema: %s (lock_id: %d)", schema, lockID)
+	
+	startTime := time.Now()
+	deadline := startTime.Add(timeout)
+	
+	// Loop con pg_try_advisory_lock hasta adquirir el lock o timeout
+	for {
+		// Verificar timeout
+		if time.Now().After(deadline) {
+			waitTime := time.Since(startTime)
+			return nil, fmt.Errorf("timeout waiting for migration lock (schema: %s, lock_id: %d, waited: %v)", 
+				schema, lockID, waitTime)
 		}
 		
-		log.Printf("Migration lock acquired for schema %s after waiting", schema)
-	} else {
-		log.Printf("Migration lock acquired immediately for schema %s", schema)
+		// Intentar adquirir el lock de forma no bloqueante
+		var acquired bool
+		err := sqlDB.QueryRowContext(ctx, 
+			"SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired)
+		if err != nil {
+			return nil, fmt.Errorf("failed to try acquire migration lock (schema: %s, lock_id: %d): %w", 
+				schema, lockID, err)
+		}
+		
+		if acquired {
+			waitTime := time.Since(startTime)
+			if waitTime > 100*time.Millisecond {
+				log.Printf("✅ Migration lock acquired for schema: %s (lock_id: %d, waited: %v)", 
+					schema, lockID, waitTime)
+			} else {
+				log.Printf("✅ Migration lock acquired immediately for schema: %s (lock_id: %d)", 
+					schema, lockID)
+			}
+			
+			// Retornar función de unlock con defer garantizado
+			unlock := func() {
+				_, _ = sqlDB.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
+				log.Printf("🔓 Migration lock released for schema: %s (lock_id: %d)", schema, lockID)
+			}
+			
+			return unlock, nil
+		}
+		
+		// Lock no disponible, esperar un poco antes de reintentar
+		waitTime := time.Since(startTime)
+		if waitTime < 1*time.Second {
+			// Primer segundo: esperar 100ms
+			time.Sleep(100 * time.Millisecond)
+		} else if waitTime < 10*time.Second {
+			// Primeros 10 segundos: esperar 500ms
+			time.Sleep(500 * time.Millisecond)
+		} else {
+			// Después de 10 segundos: esperar 1s y log cada 5s
+			time.Sleep(1 * time.Second)
+			if int(waitTime.Seconds())%5 == 0 {
+				log.Printf("⏳ Waiting for migration lock (schema: %s, lock_id: %d, waited: %v)...", 
+					schema, lockID, waitTime)
+			}
+		}
 	}
-
-	// Retornar función de unlock
-	unlock := func() {
-		_, _ = sqlDB.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
-		log.Printf("Migration lock released for schema %s", schema)
-	}
-
-	return unlock, nil
 }
 
 // hashSchemaName convierte un schema name a un int64 para usar como lock ID en pg_advisory_lock
@@ -281,5 +375,48 @@ func validateSchemaName(schema string) error {
 		return fmt.Errorf("schema name cannot start with a number")
 	}
 
+	return nil
+}
+
+// recreateSchemaOnDirty recrea un schema desde cero cuando se detecta estado dirty
+// Estrategia: DROP SCHEMA CASCADE + CREATE SCHEMA para garantizar estado limpio
+// Solo se usa para schemas aislados (pr_*, branch_*), nunca para public
+// IMPORTANTE: Adquiere advisory lock antes de hacer DROP para prevenir concurrencia
+// Usa el mismo mecanismo de lock que acquireMigrationLock para consistencia
+func recreateSchemaOnDirty(ctx context.Context, sqlDB *sql.DB, schema string) error {
+	if schema == "public" {
+		return fmt.Errorf("cannot recreate public schema (requires manual intervention)")
+	}
+
+	// Validar nombre de schema (seguridad)
+	if err := validateSchemaName(schema); err != nil {
+		return fmt.Errorf("invalid schema name: %w", err)
+	}
+
+	log.Printf("Recreating schema %s from scratch due to dirty state...", schema)
+
+	// Adquirir advisory lock usando el mismo mecanismo que acquireMigrationLock
+	// Esto garantiza consistencia y previene concurrencia durante DROP/CREATE
+	unlock, err := acquireMigrationLockWithTimeout(ctx, sqlDB, schema, 5*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to acquire advisory lock for schema recreation: %w", err)
+	}
+	defer unlock() // Garantizar unlock en defer
+
+	// DROP SCHEMA CASCADE - elimina todo el contenido del schema incluyendo tablas, migraciones, etc.
+	dropSQL := fmt.Sprintf(`DROP SCHEMA IF EXISTS %s CASCADE`, quoteIdentifier(schema))
+	log.Printf("Dropping schema %s (CASCADE)...", schema)
+	if _, err := sqlDB.ExecContext(ctx, dropSQL); err != nil {
+		return fmt.Errorf("failed to drop schema %s: %w", schema, err)
+	}
+
+	// CREATE SCHEMA - crear schema limpio
+	createSQL := fmt.Sprintf(`CREATE SCHEMA %s`, quoteIdentifier(schema))
+	log.Printf("Creating fresh schema %s...", schema)
+	if _, err := sqlDB.ExecContext(ctx, createSQL); err != nil {
+		return fmt.Errorf("failed to create schema %s: %w", schema, err)
+	}
+
+	log.Printf("✅ Schema %s recreated successfully (ready for fresh migrations)", schema)
 	return nil
 }
