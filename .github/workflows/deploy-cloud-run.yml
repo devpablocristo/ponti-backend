@@ -11,15 +11,6 @@ on:
         description: Rama a desplegar (se despliega en dev)
         required: true
         type: string
-      reset_db:
-        description: 'Reset preview DB (solo workflow_dispatch). DROPS + recrea DB branch_<slug>.'
-        required: false
-        type: boolean
-        default: false
-      cloudsql_instance:
-        description: 'Cloud SQL instance connection (opcional, ej: new-ponti-dev:us-central1:ponti-dev-db).'
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -47,7 +38,6 @@ jobs:
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
-          RESET_DB: ${{ github.event.inputs.reset_db }}
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
           GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
@@ -198,8 +188,6 @@ jobs:
           REGION: ${{ vars.GCP_REGION }}
           BASE_SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV }}
           DB_NAME: ${{ env.DB_NAME }}
-          RESET_DB: ${{ github.event.inputs.reset_db }}
-          CLOUDSQL_INSTANCE_INPUT: ${{ github.event.inputs.cloudsql_instance }}
         run: |
           # 🔒 Guardrail: workflow_dispatch SOLO opera en DEV
           if [ "$PROJECT_ID" != "${{ vars.GCP_PROJECT_ID_DEV }}" ]; then
@@ -207,25 +195,21 @@ jobs:
             exit 1
           fi
 
-          if [ -n "$CLOUDSQL_INSTANCE_INPUT" ]; then
-            INSTANCE_CONN="$CLOUDSQL_INSTANCE_INPUT"
+          # Obtener instancia Cloud SQL desde la configuración del servicio (no depende de secrets)
+          # Esto se setea cuando el servicio tiene --add-cloudsql-instances.
+          CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
+          if [ -n "$CLOUDSQL_INSTANCES" ]; then
+            # Puede venir como lista separada por coma; tomamos la primera
+            INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
           else
-            # Obtener instancia Cloud SQL desde la configuración del servicio (no depende de secrets)
-            # Esto se setea cuando el servicio tiene --add-cloudsql-instances.
-            CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
-            if [ -n "$CLOUDSQL_INSTANCES" ]; then
-              # Puede venir como lista separada por coma; tomamos la primera
-              INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
-            else
-              echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
-              # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
-              DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
-              if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-                echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
-                exit 1
-              fi
-              INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+            echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
+            # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
+            DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
+            if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
+              echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
+              exit 1
             fi
+            INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
           fi
 
           if [ -z "$INSTANCE_CONN" ]; then
@@ -264,18 +248,13 @@ jobs:
           echo "instance_name=${INSTANCE_NAME}" >> "$GITHUB_OUTPUT"
           echo "instance_conn=${INSTANCE_CONN}" >> "$GITHUB_OUTPUT"
 
-          DB_EXISTED="false"
-
           # Crear si no existe (idempotente)
           if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
             echo "Database already exists: $DB_NAME"
-            DB_EXISTED="true"
           else
             echo "Creating database: $DB_NAME"
             gcloud sql databases create "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME"
           fi
-
-          echo "db_existed=${DB_EXISTED}" >> "$GITHUB_OUTPUT"
 
       - name: Seed preview database from sanitized snapshot (workflow_dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -283,8 +262,6 @@ jobs:
           PROJECT_ID: ${{ steps.ensure_preview_db.outputs.instance_project }}
           INSTANCE_NAME: ${{ steps.ensure_preview_db.outputs.instance_name }}
           DB_NAME: ${{ env.DB_NAME }}
-          RESET_DB: ${{ github.event.inputs.reset_db }}
-          DB_EXISTED: ${{ steps.ensure_preview_db.outputs.db_existed }}
         run: |
           # Buscar bucket de backups en el proyecto (sin hardcodear)
           BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python -c 'import sys; buckets=[line.strip() for line in sys.stdin if line.strip()]; name=next((b for b in buckets if "backup" in b and "dev" in b), buckets[0] if buckets else ""); print(name)')
@@ -306,7 +283,7 @@ jobs:
           fi
 
           TS=$(date +"%Y%m%d_%H%M%S")
-          SEED_URI="gs://${BUCKET_NAME}/preview-seeds/preview_seed_${SOURCE_DB_NAME}_${TS}.sql.gz"
+          SEED_URI="gs://${BUCKET_NAME}/preview-seeds/preview_seed_${DB_NAME}_${TS}.sql.gz"
           echo "::notice::Exportando snapshot desde ${SOURCE_DB_NAME} a ${SEED_URI}..."
           gcloud sql export sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$SOURCE_DB_NAME" --offload --quiet
 
