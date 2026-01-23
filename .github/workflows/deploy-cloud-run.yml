@@ -309,9 +309,9 @@ jobs:
             exit 1
           fi
 
-          SEED_URI="gs://${BUCKET_NAME}/${SEED_OBJECT}"
+          SEED_URI="gs://${BUCKET_NAME}/preview-seeds/${SEED_OBJECT}"
           echo "::notice::Importando snapshot ${SEED_URI} en ${DB_NAME}..."
-          gcloud sql import sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$DB_NAME"
+          gcloud sql import sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$DB_NAME" --quiet
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
