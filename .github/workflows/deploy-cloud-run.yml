@@ -192,6 +192,7 @@ jobs:
 
       - name: Ensure preview database exists (workflow_dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: ensure_preview_db
         env:
           PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
           REGION: ${{ vars.GCP_REGION }}
@@ -261,13 +262,87 @@ jobs:
             gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet || true
           fi
 
+          echo "instance_project=${INSTANCE_PROJECT}" >> "$GITHUB_OUTPUT"
+          echo "instance_name=${INSTANCE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "instance_conn=${INSTANCE_CONN}" >> "$GITHUB_OUTPUT"
+
+          DB_EXISTED="false"
+
           # Crear si no existe (idempotente)
           if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
             echo "Database already exists: $DB_NAME"
+            DB_EXISTED="true"
           else
             echo "Creating database: $DB_NAME"
             gcloud sql databases create "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME"
           fi
+
+          echo "db_existed=${DB_EXISTED}" >> "$GITHUB_OUTPUT"
+
+      - name: Seed preview database from sanitized snapshot (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          PROJECT_ID: ${{ steps.ensure_preview_db.outputs.instance_project }}
+          INSTANCE_NAME: ${{ steps.ensure_preview_db.outputs.instance_name }}
+          DB_NAME: ${{ env.DB_NAME }}
+          RESET_DB: ${{ github.event.inputs.reset_db }}
+          DB_EXISTED: ${{ steps.ensure_preview_db.outputs.db_existed }}
+        run: |
+          # Solo seedear cuando la DB se creó recién o cuando se pidió reset
+          if [ "$RESET_DB" != "true" ] && [ "$DB_EXISTED" = "true" ]; then
+            echo "::notice::Preview DB ya existe y no se pidió reset. Se omite seed."
+            exit 0
+          fi
+
+          # Buscar bucket de backups en el proyecto (sin hardcodear)
+          BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python - <<'PY'
+import sys
+
+buckets = [line.strip() for line in sys.stdin if line.strip()]
+for name in buckets:
+    if "backup" in name and "dev" in name:
+        print(name)
+        sys.exit(0)
+print(buckets[0] if buckets else "")
+PY
+          )
+
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "::error::No se encontró bucket de backups en el proyecto $PROJECT_ID."
+            exit 1
+          fi
+
+          SEED_OBJECT=$(gcloud storage objects list \
+            --bucket="$BUCKET_NAME" \
+            --prefix="preview-seeds/" \
+            --format='json(name,metadata.timeCreated)' | python - <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+
+items = json.load(sys.stdin)
+def parse_time(value):
+    if not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+if not items:
+    sys.exit(0)
+
+items.sort(key=lambda x: parse_time(x.get("metadata", {}).get("timeCreated")), reverse=True)
+name = items[0].get("name", "")
+print(name)
+PY
+          )
+
+          if [ -z "$SEED_OBJECT" ]; then
+            echo "::error::No hay snapshots en gs://${BUCKET_NAME}/preview-seeds/. Cargá uno y reintentá."
+            exit 1
+          fi
+
+          SEED_URI="gs://${BUCKET_NAME}/${SEED_OBJECT}"
+          echo "::notice::Importando snapshot ${SEED_URI} en ${DB_NAME}..."
+          gcloud sql import sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$DB_NAME"
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
