@@ -286,8 +286,12 @@ jobs:
           BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
           SOURCE_DB_NAME=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="${{ vars.GCP_REGION }}" --format='value(spec.template.spec.containers[0].env[?name="DB_NAME"].value)')
           if [ -z "$SOURCE_DB_NAME" ]; then
-            echo "::error::No se pudo inferir DB_NAME de origen desde el servicio base '$BASE_SERVICE_NAME'."
-            exit 1
+            # Fallback: si solo hay una DB en la instancia, usarla
+            SOURCE_DB_NAME=$(gcloud sql databases list --project="$PROJECT_ID" --instance="$INSTANCE_NAME" --format='value(name)' | python -c 'import sys; items=[line.strip() for line in sys.stdin if line.strip() and line.strip()!="postgres" and not line.strip().startswith("branch_")]; print(items[0] if len(items)==1 else "")')
+            if [ -z "$SOURCE_DB_NAME" ]; then
+              echo "::error::No se pudo inferir DB_NAME de origen desde el servicio base '$BASE_SERVICE_NAME' ni desde la instancia (hay multiples DBs)."
+              exit 1
+            fi
           fi
           if echo "$SOURCE_DB_NAME" | grep -q '^branch_'; then
             echo "::error::SECURITY: DB_NAME de origen no puede ser branch_*. Got: $SOURCE_DB_NAME"
