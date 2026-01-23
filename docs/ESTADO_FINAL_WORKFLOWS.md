@@ -1,8 +1,13 @@
-# Estado Final - GitHub Actions Workflows - Schema por Rama/PR
+# Estado Final - GitHub Actions Workflows - Deploy por Rama (DB por rama)
 
 ## 📋 Resumen Ejecutivo
 
-Sistema completo de deployment con aislamiento de schemas de PostgreSQL por rama/PR. Implementación final que resuelve todos los problemas identificados manteniendo compatibilidad backward.
+Sistema de deployment donde:
+- `main` → prod (DB fija)
+- `develop` → dev (DB fija)
+- `workflow_dispatch` (manual) → **DB por rama** (`DB_NAME=branch_<slug>`, schema `public`)
+
+> **Nota**: Esta estrategia evita choques de migraciones que modifican `public.*` (views, etc.) y mantiene el backend “agnóstico” al deploy.
 
 ---
 
@@ -18,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       branch: (required)
-      schema_override: (opcional)
+      reset_db: (opcional, default false)
 
 concurrency:
   group: deploy-${{ github.event_name }}-${{ github.event.inputs.branch || github.ref_name }}
@@ -37,6 +42,7 @@ concurrency:
 - **Environment:** `vars.DEPLOY_ENV_DEV`
 - **GCP Project:** `vars.GCP_PROJECT_ID_DEV`
 - **Service:** `vars.SERVICE_NAME_DEV`
+- **DB_NAME:** se lee desde el servicio Cloud Run existente (`DB_NAME` ya configurado en el servicio)
 - **DB_SCHEMA:** `public`
 - **Resultado:** Deploy a DEV usando schema `public` → **SÍ altera DB dev**
 
@@ -303,7 +309,7 @@ environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV
 - `CLOUD_RUN_SERVICE_ACCOUNT_DEV`, `CLOUD_RUN_SERVICE_ACCOUNT_PROD`
 - `WIF_PROVIDER_DEV`, `WIF_PROVIDER_PROD`
 - `WIF_SERVICE_ACCOUNT_DEV`, `WIF_SERVICE_ACCOUNT_PROD`
-- `DB_NAME_DEV`, `DB_PORT_DEV`, `DB_SSL_MODE_DEV`
+- `DB_NAME`, `DB_PORT`, `DB_SSL_MODE` (configurados directamente en Cloud Run)
 
 ### GitHub Actions Secrets:
 - `DB_HOST_DEV`, `DB_USER_DEV`, `DB_PASSWORD_DEV`

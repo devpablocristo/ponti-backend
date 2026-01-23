@@ -23,11 +23,10 @@ type Config struct {
 	dbname     string
 	port       int
 	sqlitePath string
-	schema     string // Schema de PostgreSQL
 }
 
 // newConfig crea una nueva instancia de Config
-func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath, sslMode string, schema string) *Config {
+func newConfig(dbType DBType, host, user, password, dbname string, port int, sqlitePath, sslMode string) *Config {
 	return &Config{
 		dbType:     dbType,
 		sslMode:    sslMode,
@@ -37,7 +36,6 @@ func newConfig(dbType DBType, host, user, password, dbname string, port int, sql
 		dbname:     dbname,
 		port:       port,
 		sqlitePath: sqlitePath,
-		schema:     schema,
 	}
 }
 
@@ -72,13 +70,6 @@ func (c *Config) GetPort() int {
 
 func (c *Config) GetSQLitePath() string {
 	return c.sqlitePath
-}
-
-func (c *Config) GetSchema() string {
-	if c.schema == "" {
-		return "public"
-	}
-	return c.schema
 }
 
 // Validate verifica si la Configuración es válida

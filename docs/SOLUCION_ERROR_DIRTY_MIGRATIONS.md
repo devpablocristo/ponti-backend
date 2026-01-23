@@ -1,5 +1,11 @@
 # Solución: Error de Estado Dirty en Migraciones - Auto-Recuperación
 
+> **⚠️ ACTUALIZACIÓN (2026)**: La estrategia de deploy manual por rama pasó a ser **DB por rama** (`DB_NAME=branch_<slug>`) y el backend ya no hace auto-recuperación por schema.
+>
+> **Cómo resolver un dirty state en preview hoy**: re-ejecutar el workflow manual con `reset_db=true` para borrar y recrear la DB de esa rama.
+>
+> Ver: `docs/DEPLOY.md` y `.github/workflows/deploy-cloud-run.yml`.
+
 ## 📋 Contexto del Problema
 
 ### ¿Qué estaba pasando?
@@ -18,8 +24,8 @@ on:
 **Estado actual:**
 - Los PRs ya NO disparan deploys automáticos (eliminado para evitar deploys innecesarios)
 - El workflow solo se ejecuta en `push` a `develop`/`main` (merges) o `workflow_dispatch` (deploy manual)
-- Los deploys manuales usan schemas aislados (`branch_<slug>`)
-- Los merges a `develop`/`main` usan schema `public` (modifican la DB)
+- Los deploys manuales usan DB aislada (`DB_NAME=branch_<slug>`, schema `public`)
+- Los merges a `develop`/`main` usan la DB fija configurada en cada servicio Cloud Run
 
 ### El Error Específico
 

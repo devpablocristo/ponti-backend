@@ -67,33 +67,25 @@ on:
 
 ### Corrección 2: Protección Explícita de la DB de DEV
 
-**Cambio realizado en la lógica de `DB_SCHEMA`:**
+**Cambio realizado en la lógica de DB para deploy manual:**
 
 ```bash
-# ⚠️ SEGURIDAD CRÍTICA: La DB de DEV solo se modifica cuando se hace merge a develop
-# Los deploys manuales SIEMPRE usan schemas aislados (branch_<slug>)
+# Política: el código es 1 (migraciones en public). La aislación de previews se hace por DB_NAME.
 
-# ✅ CRÍTICO: workflow_dispatch se verifica ANTES de ref_name
-# Esto es importante porque workflow_dispatch puede dispararse desde main/develop
-# pero DEBE usar schema aislado para proteger la DB
 if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-  DB_SCHEMA="branch_${BRANCH_SLUG}"
-  echo "✅ Using isolated schema: ${DB_SCHEMA} - DB dev is SAFE"
-# ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
-elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
-  DB_SCHEMA="public"
-  echo "⚠️  WARNING: Using public schema - this will modify the database!"
-else
-  # Fallback para otros casos
-  DB_SCHEMA="branch_${BRANCH_SLUG}"
-  echo "✅ Using isolated schema: ${DB_SCHEMA} - DB dev is SAFE"
+  DB_NAME="branch_${BRANCH_SLUG}"
+  echo "✅ PREVIEW: Using isolated DB: ${DB_NAME} (schema public)"
+elif [ "${{ github.ref_name }}" = "develop" ]; then
+  DB_NAME="<se lee desde el servicio Cloud Run dev>"
+elif [ "${{ github.ref_name }}" = "main" ]; then
+  DB_NAME="<se lee desde el servicio Cloud Run prod>"
 fi
 ```
 
 **Resultado:**
-- ✅ **Solo** cuando haces merge a `develop` → usa `public` → modifica DB de dev
-- ✅ **Solo** cuando haces merge a `main` → usa `public` → modifica DB de prod
-- ✅ **Deploy manual** → usa `branch_<slug>` → **NO modifica** DB de dev
+- ✅ **Solo** cuando haces merge a `develop` → usa el `DB_NAME` ya configurado en el servicio dev → modifica la DB principal de dev
+- ✅ **Solo** cuando haces merge a `main` → usa el `DB_NAME` ya configurado en el servicio prod → modifica la DB principal de prod
+- ✅ **Deploy manual** → usa `DB_NAME=branch_<slug>` → **NO modifica** la DB principal de dev
 - ✅ Comentarios claros en el código explicando la seguridad
 
 ### Corrección 3: Concurrency para Evitar Runs Solapados
@@ -116,22 +108,22 @@ concurrency:
 
 1. **Merge a `develop`** (push directo o merge de PR)
    - Trigger: `push` a `develop`
-   - Schema: `public`
-   - Acción: Modifica la DB de dev
+   - DB: la DB fija configurada en el servicio Cloud Run dev
+   - Acción: Modifica la DB principal de dev
    - ⚠️ **Este es el único caso donde se modifica la DB de dev**
 
 2. **Merge a `main`** (push directo o merge de PR)
    - Trigger: `push` a `main`
-   - Schema: `public`
-   - Acción: Modifica la DB de prod
+   - DB: la DB fija configurada en el servicio Cloud Run prod
+   - Acción: Modifica la DB principal de prod
    - ⚠️ **Este es el único caso donde se modifica la DB de prod**
 
 ### La DB de DEV NO se modifica cuando:
 
 1. **Deploy manual** (`workflow_dispatch`)
    - Trigger: Manual desde GitHub Actions
-   - Schema: `branch_<slug>` (ej: `branch_test-deploy-manual-dev`)
-   - Acción: **NO modifica** DB de dev (schema aislado)
+   - DB: `branch_<slug>` (ej: `branch_test_deploy_manual_dev`)
+   - Acción: **NO modifica** la DB principal de dev (DB aislada)
    - ✅ **Seguro**
 
 2. **Push a cualquier otra rama**
@@ -152,8 +144,8 @@ concurrency:
 | Merge a `develop` | ✅ Deploy automático (correcto) | ✅ Deploy automático (correcto) |
 | Merge a `main` | ✅ Deploy automático (correcto) | ✅ Deploy automático (correcto) |
 | Deploy manual | ✅ Disponible | ✅ Disponible |
-| Schema usado en deploy manual | `branch_<slug>` (aislado) | `branch_<slug>` (aislado) |
-| Schema usado en merge a develop | `public` (modifica DB) | `public` (modifica DB) |
+| DB usada en deploy manual | `branch_<slug>` (aislado) | `branch_<slug>` (aislado) |
+| DB usada en merge a develop | DB fija del servicio dev | DB fija del servicio dev |
 | Protección de DB de dev | ⚠️ Implícita | ✅ Explícita con comentarios |
 
 ## 🎯 Comportamiento Final
@@ -175,8 +167,8 @@ concurrency:
 3. **Hacer deploy manual si necesitas probar:**
    - GitHub Actions → Deploy to Cloud Run → Run workflow
    - Seleccionas tu rama: `feature/mi-feature`
-   - ✅ Se deploya con schema `branch_feature-mi-feature`
-   - ✅ **NO modifica** la DB de dev (schema aislado)
+   - ✅ Se deploya con DB `branch_feature_mi_feature` (schema `public`)
+   - ✅ **NO modifica** la DB principal de dev (DB aislada)
 
 4. **Mergear PR a `develop`:**
    - Haces merge del PR
@@ -197,19 +189,18 @@ concurrency:
    ```
    ✅ Solo se ejecuta en merge a `develop` o `main`
 
-2. **Revisar lógica de schema:**
+2. **Revisar lógica de DB_NAME:**
    ```bash
    if [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
-     DB_SCHEMA="public"  # Solo aquí se modifica la DB
+     DB_NAME="..."  # DB fija (dev/prod)
    else
-     DB_SCHEMA="branch_${BRANCH_SLUG}"  # Schema aislado, seguro
+     DB_NAME="branch_${BRANCH_SLUG}"  # DB aislada, seguro
    fi
    ```
-   ✅ Solo `develop` y `main` usan `public`
+   ✅ Solo `develop` y `main` usan DB fija
 
 3. **Logs del workflow:**
-   - Cuando usa `public`: `⚠️  WARNING: Using public schema - this will modify the database!`
-   - Cuando usa schema aislado: `✅ Using isolated schema: branch_xxx - DB dev is SAFE`
+   - Cuando es preview: `✅ PREVIEW: Using isolated DB: branch_xxx (schema public)`
 
 ## ✅ Resumen Final
 
@@ -219,7 +210,7 @@ concurrency:
 
 **Seguridad garantizada:**
 - ✅ La DB de DEV solo se modifica cuando se hace merge a `develop`
-- ✅ Los deploys manuales usan schemas aislados (no tocan la DB de dev)
+- ✅ Los deploys manuales usan DB aislada por rama (no tocan la DB principal de dev)
 - ✅ Comentarios explícitos en el código documentan la seguridad
 - ✅ Logs claros indican cuándo se modifica la DB
 

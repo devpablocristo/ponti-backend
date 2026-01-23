@@ -1,5 +1,11 @@
 # Schema por Rama - Documentación Técnica
 
+> **⚠️ DEPRECADO**: La estrategia recomendada y la implementada para deploy manual por rama ahora es **DB por rama** (`DB_NAME=branch_<slug>`) y **schema `public`**.
+>
+> Motivo: existen migraciones que modifican `public.*` (views, etc.). Con “schema por rama” dentro de la misma DB, `public` queda compartido y puede romper previews.
+>
+> Ver: `docs/DEPLOY.md` (sección “Deploy manual por rama”) y el workflow `.github/workflows/deploy-cloud-run.yml`.
+
 ## 📋 Resumen
 
 Sistema de aislamiento de datos y migraciones usando **schemas de PostgreSQL** por rama. Cada deploy manual de feature branch usa su propio schema, evitando conflictos con `develop`.

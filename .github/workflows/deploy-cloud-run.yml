@@ -11,10 +11,11 @@ on:
         description: Rama a desplegar (se despliega en dev)
         required: true
         type: string
-      schema_override:
-        description: 'Schema override (opcional, ej: custom_schema)'
+      reset_db:
+        description: 'Reset preview DB (solo workflow_dispatch). DROPS + recrea DB branch_<slug>.'
         required: false
-        type: string
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,6 +43,7 @@ jobs:
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
+          RESET_DB: ${{ github.event.inputs.reset_db }}
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
           GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
@@ -86,7 +88,10 @@ jobs:
             deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
             image_tag="${{ vars.IMAGE_TAG_DEV }}"
             gcp_project_id="$GCP_PROJECT_ID_DEV"
-            service_name="$SERVICE_NAME_DEV"
+            # Servicio preview separado para NO pisar el servicio dev
+            BRANCH_SLUG=$(echo "$BRANCH_INPUT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | cut -c1-40)
+            service_name="${SERVICE_NAME_DEV}-preview-${BRANCH_SLUG}"
+            echo "DB_NAME=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
             cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
             wif_provider="$WIF_PROVIDER_DEV"
             wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
@@ -142,60 +147,16 @@ jobs:
           printf 'WIF_PROVIDER=%s\n' "$wif_provider" >> "$GITHUB_ENV"
           printf 'WIF_SERVICE_ACCOUNT=%s\n' "$wif_sa" >> "$GITHUB_ENV"
 
-      - name: Set DB_SCHEMA for branch isolation
-        id: set_schema
+      - name: Set DB settings (no schema isolation)
+        id: set_db
         env:
-          SCHEMA_OVERRIDE: ${{ github.event.inputs.schema_override }}
           EVENT_NAME: ${{ github.event_name }}
+          DB_NAME: ${{ env.DB_NAME }}
         run: |
-          # ⚠️ SEGURIDAD CRÍTICA: La DB de DEV solo se modifica cuando se hace merge a develop
-          # Los deploys manuales SIEMPRE usan schemas aislados (branch_<slug>)
-          
-          # Si hay schema_override manual, usarlo directamente
-          if [ -n "$SCHEMA_OVERRIDE" ]; then
-            DB_SCHEMA="$SCHEMA_OVERRIDE"
-            echo "schema=${DB_SCHEMA}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=${DB_SCHEMA}" >> "$GITHUB_ENV"
-            echo "DB_SCHEMA set to override: $DB_SCHEMA"
-            
-            # 🔒 GUARDRAIL: workflow_dispatch nunca puede usar public
-            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DB_SCHEMA" = "public" ]; then
-              echo "::error::SECURITY: workflow_dispatch must never use public schema. Use a branch-specific schema instead."
-              exit 1
-            fi
-            exit 0
-          fi
-          
-          # ✅ workflow_dispatch SIEMPRE usa schema aislado (NO modifica DB de dev)
-          # Esto debe verificarse ANTES de verificar ref_name, porque workflow_dispatch
-          # puede dispararse desde main/develop pero debe usar schema aislado
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
-            DB_SCHEMA="branch_${BRANCH_SLUG}"
-            echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
-            echo "::notice::✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
-            echo "✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
-            echo "✅ This deployment will NOT modify the production database. All changes are isolated to schema: ${DB_SCHEMA}"
-          # ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
-          # Esto solo ocurre cuando se hace merge a estas ramas
-          elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
-            DB_SCHEMA="public"
-            echo "schema=public" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
-            echo "::warning::⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
-            echo "⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
-            echo "⚠️  This deployment will execute migrations on the production database schema."
-          else
-            # Fallback para cualquier otro caso (no debería ocurrir con los triggers actuales)
-            BRANCH_SLUG=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
-            DB_SCHEMA="branch_${BRANCH_SLUG}"
-            echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
-            echo "::notice::✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
-            echo "✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
-          fi
-          echo "DB_SCHEMA set to: $DB_SCHEMA"
+          # Política: el código es 1 (migraciones en public). La aislación para previews es por DB_NAME.
+          echo "db_name=${DB_NAME}" >> "$GITHUB_OUTPUT"
+          echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
+          echo "DB settings: DB_NAME=${DB_NAME}, DB_SCHEMA=public"
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
@@ -207,6 +168,84 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Read DB_NAME from target service (push only)
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
+        run: |
+          DB_NAME=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_NAME"].value)')
+          if [ -z "$DB_NAME" ]; then
+            echo "::error::DB_NAME env var not found in Cloud Run service '$SERVICE_NAME'. Refusing to deploy without explicit DB_NAME."
+            exit 1
+          fi
+          echo "DB_NAME=$DB_NAME" >> "$GITHUB_ENV"
+          echo "::notice::Using DB_NAME from existing service config: $DB_NAME"
+
+      - name: Ensure preview database exists (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          BASE_SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV }}
+          DB_NAME: ${{ env.DB_NAME }}
+          RESET_DB: ${{ github.event.inputs.reset_db }}
+        run: |
+          # 🔒 Guardrail: workflow_dispatch SOLO opera en DEV
+          if [ "$PROJECT_ID" != "${{ vars.GCP_PROJECT_ID_DEV }}" ]; then
+            echo "::error::SECURITY: workflow_dispatch must run only against DEV project. Got PROJECT_ID=$PROJECT_ID"
+            exit 1
+          fi
+
+          # Obtener DB_HOST desde el servicio (evita hardcodear instancia)
+          DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
+          if [ -z "$DB_HOST" ]; then
+            echo "::error::DB_HOST env var not found in Cloud Run service '$BASE_SERVICE_NAME'. Cannot infer Cloud SQL instance."
+            exit 1
+          fi
+          if ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
+            echo "::error::DB_HOST is not a Cloud SQL unix socket (/cloudsql/..). Cannot infer instance. DB_HOST='$DB_HOST'"
+            exit 1
+          fi
+          INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+          INSTANCE_PROJECT=$(echo "$INSTANCE_CONN" | cut -d: -f1)
+          INSTANCE_NAME=$(echo "$INSTANCE_CONN" | cut -d: -f3)
+          if [ -z "$INSTANCE_PROJECT" ] || [ -z "$INSTANCE_NAME" ]; then
+            echo "::error::Failed to parse Cloud SQL instance from DB_HOST='$DB_HOST'"
+            exit 1
+          fi
+
+          # 🔒 Guardrail: la instancia debe pertenecer al proyecto DEV (evita tocar prod por error de configuración)
+          if [ "$INSTANCE_PROJECT" != "${{ vars.GCP_PROJECT_ID_DEV }}" ]; then
+            echo "::error::SECURITY: Cloud SQL instance project mismatch. Expected DEV project '${{ vars.GCP_PROJECT_ID_DEV }}' but got '$INSTANCE_PROJECT' from DB_HOST='$DB_HOST'"
+            exit 1
+          fi
+
+          # Guardrails: solo permitimos DBs de preview con prefijo branch_
+          if ! echo "$DB_NAME" | grep -q '^branch_'; then
+            echo "::error::SECURITY: preview DB_NAME must start with 'branch_'. Got: $DB_NAME"
+            exit 1
+          fi
+
+          # 🔒 Guardrail: JAMÁS borrar/crear DBs principales por accidente
+          # (se controla por prefijo branch_ + proyecto dev)
+
+          echo "::notice::Using preview database: ${DB_NAME} (instance: ${INSTANCE_CONN})"
+
+          if [ "$RESET_DB" = "true" ]; then
+            echo "::warning::Reset requested: DROPPING database ${DB_NAME}"
+            gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet || true
+          fi
+
+          # Crear si no existe (idempotente)
+          if gcloud sql databases describe "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" >/dev/null 2>&1; then
+            echo "Database already exists: $DB_NAME"
+          else
+            echo "Creating database: $DB_NAME"
+            gcloud sql databases create "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME"
+          fi
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
@@ -223,30 +262,26 @@ jobs:
 
       - name: Deploy to Cloud Run
         env:
-          DB_SCHEMA: ${{ steps.set_schema.outputs.schema }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          DB_SCHEMA="${{ steps.set_schema.outputs.schema }}"
-          
-          # 🔒 GUARDRAIL FINAL: Verificar que workflow_dispatch nunca use public
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DB_SCHEMA" = "public" ]; then
-            echo "::error::SECURITY VIOLATION: workflow_dispatch must never use public schema. Deployment aborted."
-            echo "SECURITY VIOLATION: workflow_dispatch must never use public schema. Deployment aborted."
+          DB_NAME="${{ env.DB_NAME }}"
+
+          # 🔒 Guardrail: en deploys automáticos, no permitir DB_NAME de preview
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && echo "$DB_NAME" | grep -q '^branch_'; then
+            echo "::error::SECURITY: automatic deploy must not use preview DB_NAME (branch_*). Got: $DB_NAME"
             exit 1
           fi
           
-          # Logs de seguridad según el schema usado
-          if [ "$DB_SCHEMA" = "public" ]; then
-            echo "::warning::⚠️  DEPLOYING TO PRODUCTION DATABASE: Schema 'public' will be modified by migrations"
-            echo "⚠️  DEPLOYING TO PRODUCTION DATABASE: Schema 'public' will be modified by migrations"
+          # Logs: en workflow_dispatch aislamos por DB_NAME, no por schema
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "::notice::✅ PREVIEW DEPLOY: using isolated database DB_NAME=${DB_NAME} (schema public)"
           else
-            echo "::notice::✅ DEPLOYING TO ISOLATED SCHEMA: Database 'public' is protected. Using schema: ${DB_SCHEMA}"
-            echo "✅ DEPLOYING TO ISOLATED SCHEMA: Database 'public' is protected. Using schema: ${DB_SCHEMA}"
+            echo "::notice::Deploy: using fixed database DB_NAME=${DB_NAME} (schema public)"
           fi
           
           # --update-env-vars preserva las variables existentes y solo agrega/actualiza las especificadas
-          ENV_VARS="DB_SCHEMA=${DB_SCHEMA},HTTP_SERVER_PORT=8080"
+          ENV_VARS="DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080"
           
           if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
@@ -265,5 +300,5 @@ jobs:
               --update-env-vars="$ENV_VARS" \
               --allow-unauthenticated
           fi
-          echo "Deployed with DB_SCHEMA=${DB_SCHEMA}, HTTP_SERVER_PORT=8080"
+          echo "Deployed with DB_NAME=${DB_NAME}, DB_SCHEMA=public, HTTP_SERVER_PORT=8080"
           echo "Existing environment variables are preserved (--update-env-vars merges, not replaces)"

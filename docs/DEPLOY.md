@@ -48,7 +48,7 @@
 
 > **Nota sobre `DB_SCHEMA`**: Esta variable se configura automáticamente por el workflow según el contexto:
 > - `push` a `develop`/`main` (merge) → `public` (modifica la DB)
-> - `workflow_dispatch` (deploy manual) → `branch_<slug>` (schema aislado, NO modifica DB)
+> - `workflow_dispatch` (deploy manual) → servicio preview + `DB_NAME=branch_<slug>` (DB aislada, NO modifica DB dev)
 > - **Importante:** `workflow_dispatch` SIEMPRE usa schema aislado, incluso si se dispara desde `main`/`develop`
 > Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) y [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) para más detalles.
 
@@ -72,7 +72,7 @@ El despliegue automático y manual se gestiona desde GitHub Actions con el workf
 **Características del workflow:**
 - **Concurrency:** Evita runs solapados del mismo deploy (cancela automáticamente runs anteriores)
 - **Triggers:** Solo `push` a `develop`/`main` (merges) y `workflow_dispatch` (deploy manual)
-- **Schema isolation:** Los deploys manuales siempre usan schemas aislados (`branch_<slug>`)
+- **Aislamiento en preview:** Los deploys manuales usan **servicio preview** + **DB aislada por rama** (`DB_NAME=branch_<slug>`)
 - **Seguridad:** `workflow_dispatch` nunca puede usar `public` schema (verificado antes de `ref_name`)
 
 ### Secrets requeridos (GitHub Actions)
@@ -152,13 +152,12 @@ gcloud run services update ponti-backend-prod \
 
 > **Nota:** Los PRs ya NO disparan deploys automáticos. Solo se deploya cuando se hace merge a `develop` o `main`.
 - Push a `main` → deploy a proyecto **`new-ponti-prod`** con `DEPLOY_ENV_PROD`, `IMAGE_TAG_PROD` y `DB_SCHEMA=public`
-- PR hacia `develop`/`staging` → deploy automático a **`new-ponti-dev`** con `DB_SCHEMA=pr_<número>`
 
 > **Importante**: 
 > - Deploys a `main` requieren aprobación si hay environment protection configurado
 > - El servicio en prod **NO** es público (`--no-allow-unauthenticated`)
 > - Cada proyecto tiene su propia instancia de Cloud SQL y recursos aislados
-> - Los PRs y deploys manuales usan schemas aislados que NO alteran la DB dev (`public`)
+> - El deploy manual por rama usa **servicio preview + DB aislada** y no afecta la DB principal de dev
 
 ### Deploy manual por rama (sin merge)
 
@@ -170,13 +169,14 @@ Pasos:
 2. **Run workflow**
 3. Completar:
    - `branch`: rama a desplegar (ej. `feature/nueva-funcionalidad`)
-   - `schema_override`: (opcional) schema personalizado para casos especiales
+   - `reset_db`: (opcional) si es `true`, borra y recrea la DB de preview de esa rama
 
 > **Nota**: 
 > - El deploy manual usa siempre `DEPLOY_ENV_DEV`
-> - Se crea automáticamente un schema aislado `branch_<slug>` que NO altera la DB dev
-> - El schema se reutiliza en múltiples deploys de la misma rama
-> - El schema se limpia automáticamente después de 7 días sin uso (garbage collector)
+> - Se usa una **base de datos aislada por rama**: `DB_NAME=branch_<slug>` (schema `public`)
+> - La DB se crea automáticamente si no existe
+> - La DB se reutiliza en múltiples deploys de la misma rama
+> - Si algo se rompe por migraciones/dirty state, usar `reset_db=true` para resetear esa DB
 
 ### Flujo recomendado
 
@@ -201,32 +201,21 @@ El sistema usa **dos proyectos GCP separados** para aislamiento completo:
   - Cloud SQL con IP privada (recomendado)
   - SSL requerido (`DB_SSL_MODE=require`)
 
-### Schema por Rama/PR (Implementado)
+### Preview DB por Rama (Implementado)
 
-El sistema usa **schemas de PostgreSQL** para aislar datos y migraciones por rama/PR:
+El deploy manual por rama usa **una DB por rama** dentro de Cloud SQL dev.
+Esto evita conflictos de migraciones cuando hay `CREATE OR REPLACE VIEW public...` u otros objetos en `public`.
 
-- **PRs** → Schema `pr_<número>` (ej: `pr_123`)
-  - Se crea automáticamente al abrir/sincronizar PR
-  - Se limpia automáticamente al cerrar/mergear PR
-  - NO altera la DB dev (`public`)
-
-- **Deploy manual** → Schema `branch_<slug>` (ej: `branch_feature-nueva-funcionalidad`)
+- **Deploy manual** → `DB_NAME=branch_<slug>` (ej: `branch_feature_nueva_funcionalidad`)
   - Se crea automáticamente en el primer deploy
   - Se reutiliza en múltiples deploys de la misma rama
-  - Se limpia automáticamente después de 7 días sin uso (garbage collector)
-  - NO altera la DB dev (`public`)
+  - Se puede resetear con `reset_db=true`
+  - NO altera la DB principal de dev
 
-- **`develop`/`main`/`staging`** → Schema `public`
-  - Usa el schema compartido
-  - SÍ altera la DB dev/prod
+- **`develop`** → `DB_NAME` fijo (ya configurado en el servicio Cloud Run dev)
+- **`main`** → `DB_NAME` fijo (ya configurado en el servicio Cloud Run prod)
 
-**Ventajas:**
-- ✅ Aislamiento completo: cada rama/PR tiene su propio schema
-- ✅ No hay conflictos entre ramas
-- ✅ Puedes deployar migraciones experimentales sin afectar `develop`
-- ✅ Limpieza automática de schemas huérfanos
-
-Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) y [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) para más detalles.
+Ver [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) para más detalles.
 
 ## Pasos de Despliegue
 
