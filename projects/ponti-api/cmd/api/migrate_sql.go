@@ -93,6 +93,31 @@ func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
 			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
 			}
+		} else if strings.Contains(err.Error(), "cannot drop columns from view") {
+			// Error específico: PostgreSQL no permite CREATE OR REPLACE VIEW si eliminas columnas
+			// Esto ocurre cuando la vista en public tiene una estructura diferente
+			// Para schemas aislados: recrear schema desde cero (las vistas en public no deberían afectar)
+			if schema == "public" {
+				return fmt.Errorf("cannot modify view structure in public schema - manual intervention required: %w", err)
+			}
+			
+			log.Printf("⚠️  View structure conflict detected for schema %s (public views have different structure), recreating schema from scratch...", schema)
+			
+			if err := recreateSchemaOnDirty(ctx, tempDB, schema); err != nil {
+				return fmt.Errorf("failed to recreate schema on view conflict: %w", err)
+			}
+			
+			// Recrear instancia de migrate después de recrear schema
+			m, err = migrate.New(migConfig.Dir, migrateDSN)
+			if err != nil {
+				return fmt.Errorf("error creating migrate instance after schema recreation: %w", err)
+			}
+			
+			// Re-ejecutar migraciones desde 0
+			log.Printf("Re-running migrations from scratch for schema %s after view conflict resolution...", schema)
+			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
+			}
 		} else {
 			return fmt.Errorf("error applying migrations: %w", err)
 		}
@@ -180,6 +205,44 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 			
 			// Re-ejecutar migraciones desde 0
 			log.Printf("Re-running migrations from scratch for schema %s...", schema)
+			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
+			}
+		} else if strings.Contains(err.Error(), "cannot drop columns from view") {
+			// Error específico: PostgreSQL no permite CREATE OR REPLACE VIEW si eliminas columnas
+			// Esto ocurre cuando la vista en public tiene una estructura diferente
+			// Para schemas aislados: recrear schema desde cero (las vistas en public no deberían afectar)
+			if schema == "public" {
+				return fmt.Errorf("cannot modify view structure in public schema - manual intervention required: %w", err)
+			}
+			
+			log.Printf("⚠️  View structure conflict detected for schema %s (public views have different structure), recreating schema from scratch...", schema)
+			
+			if err := recreateSchemaOnDirty(ctx, sqlDB, schema); err != nil {
+				return fmt.Errorf("failed to recreate schema on view conflict: %w", err)
+			}
+			
+			// Recrear driver e instancia de migrate después de recrear schema
+			driver, err = postgres.WithInstance(sqlDB, &postgres.Config{
+				DatabaseName:    dbConfig.Name,
+				SchemaName:      schema,
+				MigrationsTable: fmt.Sprintf("%s.schema_migrations", quoteIdentifier(schema)),
+			})
+			if err != nil {
+				return fmt.Errorf("creating postgres driver after schema recreation: %w", err)
+			}
+			
+			m, err = migrate.NewWithDatabaseInstance(
+				migConfig.Dir,
+				dbConfig.Name,
+				driver,
+			)
+			if err != nil {
+				return fmt.Errorf("creating migrate instance after schema recreation: %w", err)
+			}
+			
+			// Re-ejecutar migraciones desde 0
+			log.Printf("Re-running migrations from scratch for schema %s after view conflict resolution...", schema)
 			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 				return fmt.Errorf("error applying migrations after schema recreation: %w", err)
 			}
