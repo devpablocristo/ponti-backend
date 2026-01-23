@@ -142,8 +142,8 @@ cat github-actions-key.json
 
 ```
 push to develop → build → push :dev  → deploy a new-ponti-dev (DEPLOY_ENV=dev)
-push to staging → build → push :stg  → deploy a new-ponti-dev (DEPLOY_ENV=stg)
 push to main    → build → push :prod → deploy a new-ponti-prod (DEPLOY_ENV=prod) [requiere aprobación]
+workflow_dispatch (manual) → preview en dev con DB por rama
 ```
 
 > **Importante**: 
@@ -173,12 +173,13 @@ Para evitar conflictos de migraciones cuando se deployan ramas con diferentes ve
 - `develop` → **DB dev** (proyecto dev)
 - `main` → **DB prod** (proyecto prod)
 
-**Nombres sugeridos:**
-- Servicio: `ponti-backend-<branch_slug>`
-- DB: `ponti_api_db_<branch_slug>`
+**Nombres actuales:**
+- Servicio preview: `ponti-backend-dev-preview-<branch-slug>`
+- DB preview: `branch_<branch_slug>`
 
 **Limpieza:**
-- Eliminar servicio y DB al cerrar/mergear la rama.
+- Automatica al cerrar PR (merge o close)
+- Cron semanal como respaldo
 
 ## Variables de aplicación en Cloud Run
 
