@@ -302,8 +302,44 @@ jobs:
             echo "::notice::Deploy: using fixed database DB_NAME=${DB_NAME} (schema public)"
           fi
           
-          # --update-env-vars preserva las variables existentes y solo agrega/actualiza las especificadas
-          ENV_VARS="DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Para previews, copiar envs base del servicio dev y pisar solo las claves necesarias
+            BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
+            BASE_ENV_JSON=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="${{ env.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" --format='json(spec.template.spec.containers[0].env)')
+            BASE_ENV_VARS=$(python - <<'PY'
+import json
+import sys
+
+payload = json.load(sys.stdin)
+envs = payload.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+override_keys = {
+    "DB_NAME",
+    "DB_SCHEMA",
+    "HTTP_SERVER_PORT",
+    "GO_ENVIRONMENT",
+    "DEPLOY_ENV",
+    "DEPLOY_PLATFORM",
+    "DEPLOY_PROJECT_ROOT",
+}
+parts = []
+for item in envs:
+    name = item.get("name")
+    value = item.get("value")
+    if not name or value is None:
+        continue
+    if name in override_keys:
+        continue
+    parts.append(f"{name}={value}")
+sys.stdout.write(",".join(parts))
+PY
+            <<<"$BASE_ENV_JSON")
+            ENV_VARS="${BASE_ENV_VARS},DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
+            ENV_FLAG="--set-env-vars=${ENV_VARS}"
+          else
+            # --update-env-vars preserva las variables existentes y solo agrega/actualiza las especificadas
+            ENV_VARS="DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
+            ENV_FLAG="--update-env-vars=${ENV_VARS}"
+          fi
           
           if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
@@ -311,7 +347,7 @@ jobs:
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
               --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
-              --update-env-vars="$ENV_VARS" \
+              ${ENV_FLAG} \
               --no-allow-unauthenticated
           else
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
@@ -319,7 +355,7 @@ jobs:
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
               --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
-              --update-env-vars="$ENV_VARS" \
+              ${ENV_FLAG} \
               --allow-unauthenticated
           fi
           echo "Deployed with DB_NAME=${DB_NAME}, DB_SCHEMA=public, HTTP_SERVER_PORT=8080"
