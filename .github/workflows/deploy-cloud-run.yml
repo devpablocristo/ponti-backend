@@ -205,11 +205,20 @@ jobs:
             echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
             # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
             DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
-            if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-              echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
+            if [ -z "$DB_HOST" ]; then
+              echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST not set."
               exit 1
             fi
-            INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+            if echo "$DB_HOST" | grep -q '^/cloudsql/'; then
+              INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+            else
+              # Fallback: inferir instancia por IP pública del DB_HOST
+              INSTANCE_CONN=$(gcloud sql instances list --project="$PROJECT_ID" --format='json(name,connectionName,ipAddresses)' | python -c 'import json,sys; host=sys.argv[1]; items=json.load(sys.stdin); match="";\nfor item in items:\n  for ip in item.get("ipAddresses", []):\n    if ip.get("ipAddress")==host:\n      match=item.get("connectionName","");\n      break\n  if match:\n    break\nprint(match)\n' "$DB_HOST")
+              if [ -z "$INSTANCE_CONN" ]; then
+                echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V3: DB_HOST '${DB_HOST}' no coincide con IP de ninguna instancia en el proyecto."
+                exit 1
+              fi
+            fi
           fi
 
           if [ -z "$INSTANCE_CONN" ]; then
