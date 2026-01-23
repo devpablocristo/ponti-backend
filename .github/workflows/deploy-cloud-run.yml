@@ -206,10 +206,11 @@ jobs:
             # Puede venir como lista separada por coma; tomamos la primera
             INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
           else
+            echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
             # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
             DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
             if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-              echo "::error::Cannot infer Cloud SQL instance. Missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
+              echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
               exit 1
             fi
             INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
