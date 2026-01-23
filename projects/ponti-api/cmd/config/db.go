@@ -8,4 +8,5 @@ type DB struct {
 	Name     string `envconfig:"DB_NAME" default:"ponti_api_db" validate:"required"`
 	SSLMode  string `envconfig:"DB_SSL_MODE" default:"disable" validate:"required"`
 	Port     int    `envconfig:"DB_PORT" default:"5432" validate:"gte=0"`
+	Schema   string `envconfig:"DB_SCHEMA" default:"public"` // Schema de PostgreSQL (default: public)
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 
 	"cloud.google.com/go/cloudsqlconn"
 	"github.com/jackc/pgx/v4"
@@ -27,6 +28,7 @@ type ConfigPort interface {
 	GetDBName() string
 	GetPort() int
 	GetSQLitePath() string
+	GetSchema() string // Schema de PostgreSQL
 	Validate() error
 }
 
@@ -77,9 +79,18 @@ func (r *Repository) Connect(config ConfigPort) error {
 			return fmt.Errorf("failed to ping database: %w", err)
 		}
 		r.sqlDB = sqlDB
+
+		// Inicializar schema para PostgreSQL
+		if config.GetDBType() == Postgres {
+			schema := config.GetSchema()
+			if err := r.initializeSchema(context.Background(), sqlDB, schema); err != nil {
+				return fmt.Errorf("failed to initialize schema: %w", err)
+			}
+			// search_path ya está configurado en el DSN, se aplica automáticamente a todas las conexiones
+		}
 	}
 
-	log.Printf("Gorm successfully connected to %s database: %s", config.GetDBType(), config.GetDBName())
+	log.Printf("Gorm successfully connected to %s database: %s (schema: %s)", config.GetDBType(), config.GetDBName(), config.GetSchema())
 	return nil
 }
 
@@ -91,8 +102,23 @@ func getDialector(config ConfigPort) (gorm.Dialector, error) {
 	var dialector gorm.Dialector
 	switch config.GetDBType() {
 	case Postgres:
+		schema := config.GetSchema()
 		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
 			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetDBName(), config.GetPort(), config.GetSSLMode())
+		
+		// Agregar search_path al DSN usando options=-c (se aplica a TODAS las conexiones del pool)
+		// PostgreSQL aplica estos parámetros automáticamente a cada conexión nueva
+		// Esto funciona con lib/pq y pgx, independientemente del driver usado por GORM
+		if schema != "" && schema != "public" {
+			// Validar schema name antes de agregarlo al DSN
+			if err := validateSchemaName(schema); err != nil {
+				return nil, fmt.Errorf("invalid schema name: %w", err)
+			}
+			// Escapar el schema name para el DSN (reemplazar comillas y espacios)
+			escapedSchema := strings.ReplaceAll(schema, "'", "''")
+			dsn += fmt.Sprintf(" options=-csearch_path='%s',public", escapedSchema)
+		}
+		
 		dialector = postgres.Open(dsn)
 
 	case MySQL:
@@ -244,4 +270,64 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 	}
 
 	return nil
+}
+
+// initializeSchema crea el schema si no existe
+// NO setea search_path aquí porque se configura en el DSN usando options=-c
+func (r *Repository) initializeSchema(ctx context.Context, sqlDB *sql.DB, schema string) error {
+	if schema == "" {
+		schema = "public"
+	}
+
+	// Validar nombre de schema (seguridad básica)
+	if err := validateSchemaName(schema); err != nil {
+		return fmt.Errorf("invalid schema name: %w", err)
+	}
+
+	log.Printf("Initializing schema: %s", schema)
+
+	// Crear schema si no existe
+	createSchemaSQL := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s`, quoteIdentifier(schema))
+	if _, err := sqlDB.ExecContext(ctx, createSchemaSQL); err != nil {
+		return fmt.Errorf("failed to create schema %s: %w", schema, err)
+	}
+
+	log.Printf("Schema %s created (search_path configured via DSN)", schema)
+	return nil
+}
+
+// validateSchemaName valida que el nombre del schema sea seguro
+func validateSchemaName(schema string) error {
+	if schema == "" {
+		return fmt.Errorf("schema name cannot be empty")
+	}
+
+	// Nombres reservados de PostgreSQL
+	reserved := []string{"pg_catalog", "pg_toast", "information_schema", "pg_temp", "pg_toast_temp"}
+	for _, r := range reserved {
+		if strings.EqualFold(schema, r) {
+			return fmt.Errorf("schema name '%s' is reserved", schema)
+		}
+	}
+
+	// Validar caracteres (solo alfanuméricos, guiones bajos y guiones)
+	for _, r := range schema {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return fmt.Errorf("schema name contains invalid character: %c", r)
+		}
+	}
+
+	// No puede empezar con número
+	if len(schema) > 0 && schema[0] >= '0' && schema[0] <= '9' {
+		return fmt.Errorf("schema name cannot start with a number")
+	}
+
+	return nil
+}
+
+// quoteIdentifier escapa un identificador de PostgreSQL de forma segura
+func quoteIdentifier(name string) string {
+	// Reemplazar comillas dobles escapándolas
+	escaped := strings.ReplaceAll(name, `"`, `""`)
+	return fmt.Sprintf(`"%s"`, escaped)
 }

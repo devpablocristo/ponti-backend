@@ -33,6 +33,7 @@ func ProvideGormRepository(cfg *config.DB) (*pgorm.Repository, error) {
 		cfg.Name,
 		cfg.SSLMode,
 		cfg.Port,
+		cfg.Schema,
 	)
 }
 
