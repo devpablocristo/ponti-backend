@@ -16,6 +16,10 @@ on:
         required: false
         type: boolean
         default: false
+      cloudsql_instance:
+        description: 'Cloud SQL instance connection (opcional, ej: new-ponti-dev:us-central1:ponti-dev-db).'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -192,6 +196,7 @@ jobs:
           BASE_SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV }}
           DB_NAME: ${{ env.DB_NAME }}
           RESET_DB: ${{ github.event.inputs.reset_db }}
+          CLOUDSQL_INSTANCE_INPUT: ${{ github.event.inputs.cloudsql_instance }}
         run: |
           # 🔒 Guardrail: workflow_dispatch SOLO opera en DEV
           if [ "$PROJECT_ID" != "${{ vars.GCP_PROJECT_ID_DEV }}" ]; then
@@ -199,21 +204,25 @@ jobs:
             exit 1
           fi
 
-          # Obtener instancia Cloud SQL desde la configuración del servicio (no depende de secrets)
-          # Esto se setea cuando el servicio tiene --add-cloudsql-instances.
-          CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
-          if [ -n "$CLOUDSQL_INSTANCES" ]; then
-            # Puede venir como lista separada por coma; tomamos la primera
-            INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
+          if [ -n "$CLOUDSQL_INSTANCE_INPUT" ]; then
+            INSTANCE_CONN="$CLOUDSQL_INSTANCE_INPUT"
           else
-            echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
-            # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
-            DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
-            if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-              echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
-              exit 1
+            # Obtener instancia Cloud SQL desde la configuración del servicio (no depende de secrets)
+            # Esto se setea cuando el servicio tiene --add-cloudsql-instances.
+            CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
+            if [ -n "$CLOUDSQL_INSTANCES" ]; then
+              # Puede venir como lista separada por coma; tomamos la primera
+              INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
+            else
+              echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances (not connected to Cloud SQL?)"
+              # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
+              DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
+              if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
+                echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
+                exit 1
+              fi
+              INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
             fi
-            INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
           fi
 
           if [ -z "$INSTANCE_CONN" ]; then
