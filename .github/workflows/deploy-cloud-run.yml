@@ -295,17 +295,7 @@ jobs:
           fi
 
           # Buscar bucket de backups en el proyecto (sin hardcodear)
-          BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python - <<'PY'
-          import sys
-
-          buckets = [line.strip() for line in sys.stdin if line.strip()]
-          for name in buckets:
-              if "backup" in name and "dev" in name:
-                  print(name)
-                  sys.exit(0)
-          print(buckets[0] if buckets else "")
-PY
-          )
+          BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python -c 'import sys; buckets=[line.strip() for line in sys.stdin if line.strip()]; name=next((b for b in buckets if "backup" in b and "dev" in b), buckets[0] if buckets else ""); print(name)')
 
           if [ -z "$BUCKET_NAME" ]; then
             echo "::error::No se encontró bucket de backups en el proyecto $PROJECT_ID."
@@ -315,25 +305,7 @@ PY
           SEED_OBJECT=$(gcloud storage objects list \
             --bucket="$BUCKET_NAME" \
             --prefix="preview-seeds/" \
-            --format='json(name,metadata.timeCreated)' | python - <<'PY'
-          import json
-          import sys
-          from datetime import datetime, timezone
-
-          items = json.load(sys.stdin)
-          def parse_time(value):
-              if not value:
-                  return datetime.min.replace(tzinfo=timezone.utc)
-              return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-          if not items:
-              sys.exit(0)
-
-          items.sort(key=lambda x: parse_time(x.get("metadata", {}).get("timeCreated")), reverse=True)
-          name = items[0].get("name", "")
-          print(name)
-PY
-          )
+            --format='json(name,metadata.timeCreated)' | python -c 'import json,sys; from datetime import datetime,timezone; items=json.load(sys.stdin); parse=lambda v: datetime.min.replace(tzinfo=timezone.utc) if not v else datetime.fromisoformat(v.replace("Z","+00:00")); items.sort(key=lambda x: parse(x.get("metadata",{}).get("timeCreated")), reverse=True); print(items[0].get("name","") if items else "")')
 
           if [ -z "$SEED_OBJECT" ]; then
             echo "::error::No hay snapshots en gs://${BUCKET_NAME}/preview-seeds/. Cargá uno y reintentá."
@@ -381,33 +353,7 @@ PY
             # Para previews, copiar envs base del servicio dev y pisar solo las claves necesarias
             BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
             BASE_ENV_JSON=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="${{ env.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" --format='json(spec.template.spec.containers[0].env)')
-            BASE_ENV_VARS=$(python - <<'PY'
-            import json
-            import sys
-
-            payload = json.load(sys.stdin)
-            envs = payload.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
-            override_keys = {
-                "DB_NAME",
-                "DB_SCHEMA",
-                "HTTP_SERVER_PORT",
-                "GO_ENVIRONMENT",
-                "DEPLOY_ENV",
-                "DEPLOY_PLATFORM",
-                "DEPLOY_PROJECT_ROOT",
-            }
-            parts = []
-            for item in envs:
-                name = item.get("name")
-                value = item.get("value")
-                if not name or value is None:
-                    continue
-                if name in override_keys:
-                    continue
-                parts.append(f"{name}={value}")
-            sys.stdout.write(",".join(parts))
-PY
-            <<<"$BASE_ENV_JSON")
+            BASE_ENV_VARS=$(python -c 'import json,sys; payload=json.load(sys.stdin); envs=payload.get("spec",{}).get("template",{}).get("spec",{}).get("containers",[{}])[0].get("env",[]); override={"DB_NAME","DB_SCHEMA","HTTP_SERVER_PORT","GO_ENVIRONMENT","DEPLOY_ENV","DEPLOY_PLATFORM","DEPLOY_PROJECT_ROOT"}; parts=[f"{item.get(\"name\")}={item.get(\"value\")}" for item in envs if item.get("name") and item.get("value") is not None and item.get("name") not in override]; print(",".join(parts), end="")' <<<"$BASE_ENV_JSON")
             ENV_VARS="${BASE_ENV_VARS},DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
             ENV_FLAG="--set-env-vars=${ENV_VARS}"
           else
