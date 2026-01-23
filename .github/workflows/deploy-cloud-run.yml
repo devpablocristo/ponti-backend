@@ -166,17 +166,10 @@ jobs:
             exit 0
           fi
           
-          # ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
-          # Esto solo ocurre cuando se hace merge a estas ramas
-          if [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
-            DB_SCHEMA="public"
-            echo "schema=public" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
-            echo "::warning::⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
-            echo "⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
-            echo "⚠️  This deployment will execute migrations on the production database schema."
           # ✅ workflow_dispatch SIEMPRE usa schema aislado (NO modifica DB de dev)
-          else
+          # Esto debe verificarse ANTES de verificar ref_name, porque workflow_dispatch
+          # puede dispararse desde main/develop pero debe usar schema aislado
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
             DB_SCHEMA="branch_${BRANCH_SLUG}"
             echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
@@ -184,6 +177,23 @@ jobs:
             echo "::notice::✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
             echo "✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
             echo "✅ This deployment will NOT modify the production database. All changes are isolated to schema: ${DB_SCHEMA}"
+          # ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
+          # Esto solo ocurre cuando se hace merge a estas ramas
+          elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            DB_SCHEMA="public"
+            echo "schema=public" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
+            echo "::warning::⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
+            echo "⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
+            echo "⚠️  This deployment will execute migrations on the production database schema."
+          else
+            # Fallback para cualquier otro caso (no debería ocurrir con los triggers actuales)
+            BRANCH_SLUG=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
+            DB_SCHEMA="branch_${BRANCH_SLUG}"
+            echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
+            echo "::notice::✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
+            echo "✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
           fi
           echo "DB_SCHEMA set to: $DB_SCHEMA"
 
