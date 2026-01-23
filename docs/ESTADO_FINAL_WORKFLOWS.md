@@ -14,17 +14,14 @@ Sistema completo de deployment con aislamiento de schemas de PostgreSQL por rama
 ```yaml
 on:
   push:
-    branches: [develop, staging, main]
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [develop, staging]
+    branches: [develop, main]
   workflow_dispatch:
     inputs:
       branch: (required)
       schema_override: (opcional)
 
 concurrency:
-  group: deploy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref_name }}
+  group: deploy-${{ github.event_name }}-${{ github.event.inputs.branch || github.ref_name }}
   cancel-in-progress: true
 ```
 
@@ -35,17 +32,7 @@ concurrency:
 
 **Comportamiento por Trigger:**
 
-#### A. `pull_request` (opened, synchronize, reopened)
-- **Evento:** PR abierto, sincronizado o reabierto hacia `develop` o `staging`
-- **Environment:** `vars.DEPLOY_ENV_DEV` (sin protección)
-- **GCP Project:** `vars.GCP_PROJECT_ID_DEV`
-- **Service:** `vars.SERVICE_NAME_DEV`
-- **DB_SCHEMA:** `pr_<number>` (ej: `pr_123`)
-- **Checkout:** Rama del PR (`github.event.pull_request.head.ref`)
-- **Validación:** Solo permite PRs hacia `develop` o `staging`
-- **Resultado:** Deploy automático a DEV usando schema aislado `pr_<number>`
-
-#### B. `push` a `develop`
+#### A. `push` a `develop`
 - **Evento:** Push directo a `develop`
 - **Environment:** `vars.DEPLOY_ENV_DEV`
 - **GCP Project:** `vars.GCP_PROJECT_ID_DEV`
@@ -53,15 +40,7 @@ concurrency:
 - **DB_SCHEMA:** `public`
 - **Resultado:** Deploy a DEV usando schema `public` → **SÍ altera DB dev**
 
-#### C. `push` a `staging`
-- **Evento:** Push directo a `staging`
-- **Environment:** `vars.DEPLOY_ENV_STG`
-- **GCP Project:** `vars.GCP_PROJECT_ID_DEV` (staging usa proyecto dev)
-- **Service:** `vars.SERVICE_NAME_DEV`
-- **DB_SCHEMA:** `public`
-- **Resultado:** Deploy a DEV usando schema `public` → **SÍ altera DB dev**
-
-#### D. `push` a `main`
+#### B. `push` a `main`
 - **Evento:** Push directo a `main`
 - **Environment:** `vars.DEPLOY_ENV_PROD` (con protección si está configurada)
 - **GCP Project:** `vars.GCP_PROJECT_ID_PROD`
@@ -69,7 +48,7 @@ concurrency:
 - **DB_SCHEMA:** `public`
 - **Resultado:** Deploy a PROD usando schema `public` → **SÍ altera DB prod**
 
-#### E. `workflow_dispatch` (deploy manual)
+#### C. `workflow_dispatch` (deploy manual)
 - **Evento:** Ejecución manual con input `branch`
 - **Environment:** `vars.DEPLOY_ENV_DEV` (siempre dev)
 - **GCP Project:** `vars.GCP_PROJECT_ID_DEV` (siempre dev)
@@ -80,32 +59,40 @@ concurrency:
 - **Checkout:** Rama especificada en input `branch`
 - **Resultado:** Deploy a DEV usando schema aislado `branch_<slug>` → **NO altera DB dev**
 
-**Lógica de DB_SCHEMA (líneas 171-203):**
+**Lógica de DB_SCHEMA (líneas 154-196):**
 ```bash
-# 1. Si hay schema_override manual → usarlo directamente
+# 1. Si hay schema_override manual → usarlo directamente (con guardrail)
 if [ -n "$SCHEMA_OVERRIDE" ]; then
     DB_SCHEMA="$SCHEMA_OVERRIDE"
+    # 🔒 GUARDRAIL: workflow_dispatch nunca puede usar public
+    if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DB_SCHEMA" = "public" ]; then
+        exit 1  # Falla si intenta usar public
+    fi
     
-# 2. Si es evento pull_request → pr_<number>
-elif [ "${{ github.event_name }}" = "pull_request" ]; then
-    DB_SCHEMA="pr_${PR_NUMBER}"
+# 2. ✅ CRÍTICO: workflow_dispatch SIEMPRE usa schema aislado (verificado ANTES de ref_name)
+# Esto es importante porque workflow_dispatch puede dispararse desde main/develop
+# pero DEBE usar schema aislado para proteger la DB
+elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+    BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | ...)
+    DB_SCHEMA="branch_${BRANCH_SLUG}"
     
-# 3. Si es develop/main/staging → public
-elif [ "${{ github.ref_name }}" = "develop" ] || ...; then
+# 3. Si es push a develop/main → public (modifica la DB)
+elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
     DB_SCHEMA="public"
     
-# 4. Si es workflow_dispatch (feature branch) → branch_<slug> (sin SHA)
+# 4. Fallback para otros casos → branch_<slug>
 else
-    BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | ...)
+    BRANCH_SLUG=$(echo "${{ github.ref_name }}" | ...)
     DB_SCHEMA="branch_${BRANCH_SLUG}"
 fi
 ```
 
 **Características clave:**
-- ✅ PRs se deployan automáticamente cuando se abren/sincronizan/reabren
+- ✅ **NO hay deploy automático de PRs** (eliminado para evitar molestias)
+- ✅ Solo merge a `develop`/`main` dispara deploy automático
 - ✅ Schemas `branch_*` son estables (sin SHA, reutilizables)
-- ✅ Schemas `pr_*` se crean automáticamente y pueden ser limpiados
-- ✅ `develop`/`main`/`staging` siguen usando `public`
+- ✅ `workflow_dispatch` **SIEMPRE** usa schema aislado (incluso si se dispara desde `main`/`develop`)
+- ✅ `develop`/`main` usan `public` solo cuando es `push` (merge)
 
 ---
 
@@ -170,13 +157,12 @@ on:
 
 | Escenario | Trigger | DB_SCHEMA | Deploy a | ¿Altera DB dev? | ¿Altera DB prod? | Cleanup automático |
 |-----------|---------|-----------|----------|-----------------|------------------|-------------------|
-| **PR abierto/sincronizado** | `pull_request` | `pr_<number>` | DEV | ❌ No | ❌ No | ✅ Sí (al cerrar PR) |
 | **Deploy manual rama x** | `workflow_dispatch` | `branch_<slug>` | DEV | ❌ No | ❌ No | ⚠️ Manual o cron |
-| **Push a develop** | `push` | `public` | DEV | ✅ Sí | ❌ No | ❌ No |
-| **Push a staging** | `push` | `public` | DEV | ✅ Sí | ❌ No | ❌ No |
-| **Push a main** | `push` | `public` | PROD | ❌ No | ✅ Sí | ❌ No |
-| **Cerrar PR** | `pull_request: closed` | N/A | N/A | N/A | N/A | ✅ Sí (`pr_<number>`) |
+| **Push a develop** (merge) | `push` | `public` | DEV | ✅ Sí | ❌ No | ❌ No |
+| **Push a main** (merge) | `push` | `public` | PROD | ❌ No | ✅ Sí | ❌ No |
 | **Cron semanal** | `schedule` | N/A | N/A | N/A | N/A | ✅ Sí (`branch_*` antiguos) |
+
+> **Nota:** Los PRs ya NO disparan deploys automáticos. Solo se deploya cuando se hace merge a `develop` o `main`.
 
 ---
 
@@ -184,20 +170,23 @@ on:
 
 ### Determinación de DB_SCHEMA
 
-**Orden de evaluación:**
+**Orden de evaluación (CRÍTICO - orden importa):**
 
 1. **Schema Override** (solo `workflow_dispatch`)
    - Si `schema_override` está presente → usar ese valor directamente
+   - **Guardrail:** Si es `workflow_dispatch` y el override es `public`, falla inmediatamente
    - Útil para casos especiales de testing
 
-2. **Pull Request**
-   - Si `github.event_name == "pull_request"` → `pr_<number>`
-   - El número viene de `github.event.pull_request.number`
+2. **✅ CRÍTICO: workflow_dispatch se verifica ANTES de ref_name**
+   - Si `github.event_name == "workflow_dispatch"` → `branch_<slug>`
+   - **Razón:** `workflow_dispatch` puede dispararse desde `main`/`develop`, pero DEBE usar schema aislado
+   - Usa `github.event.inputs.branch` para generar el slug
 
-3. **Branches principales**
-   - Si `github.ref_name` es `develop`, `main` o `staging` → `public`
+3. **Branches principales** (solo si NO es `workflow_dispatch`)
+   - Si `github.ref_name` es `develop` o `main` → `public`
+   - Solo ocurre en eventos `push` (merge a estas ramas)
 
-4. **Feature branches** (`workflow_dispatch`)
+4. **Fallback** (no debería ocurrir con los triggers actuales)
    - Rama sanitizada: lowercase, solo alfanuméricos y guiones, máximo 30 caracteres
    - Formato: `branch_<slug>` (sin SHA)
    - Ejemplo: `feature/nueva-funcionalidad` → `branch_feature-nueva-funcionalidad`

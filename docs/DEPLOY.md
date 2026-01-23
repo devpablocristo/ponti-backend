@@ -47,10 +47,10 @@
 | `DB_SCHEMA` | Schema de PostgreSQL (automático por workflow) | `public`, `pr_123`, `branch_feature-x` |
 
 > **Nota sobre `DB_SCHEMA`**: Esta variable se configura automáticamente por el workflow según el contexto:
-> - `develop`/`main`/`staging` → `public`
-> - PRs → `pr_<número>`
-> - Deploy manual de feature branch → `branch_<slug>`
-> Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) para más detalles.
+> - `push` a `develop`/`main` (merge) → `public` (modifica la DB)
+> - `workflow_dispatch` (deploy manual) → `branch_<slug>` (schema aislado, NO modifica DB)
+> - **Importante:** `workflow_dispatch` SIEMPRE usa schema aislado, incluso si se dispara desde `main`/`develop`
+> Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) y [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) para más detalles.
 
 ### Variables Adicionales
 
@@ -71,8 +71,9 @@ El despliegue automático y manual se gestiona desde GitHub Actions con el workf
 
 **Características del workflow:**
 - **Concurrency:** Evita runs solapados del mismo deploy (cancela automáticamente runs anteriores)
-- **Triggers:** Push a ramas principales, PRs automáticos, y deploys manuales
-- **Schema isolation:** Cada PR/rama usa su propio schema aislado
+- **Triggers:** Solo `push` a `develop`/`main` (merges) y `workflow_dispatch` (deploy manual)
+- **Schema isolation:** Los deploys manuales siempre usan schemas aislados (`branch_<slug>`)
+- **Seguridad:** `workflow_dispatch` nunca puede usar `public` schema (verificado antes de `ref_name`)
 
 ### Secrets requeridos (GitHub Actions)
 
@@ -146,8 +147,10 @@ gcloud run services update ponti-backend-prod \
 
 ### Deploy automático por rama
 
-- Push a `develop` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_DEV`, `IMAGE_TAG_DEV` y `DB_SCHEMA=public`
-- Push a `staging` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_STG`, `IMAGE_TAG_STG` y `DB_SCHEMA=public` (usa dev por ahora)
+- Push a `develop` (merge) → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_DEV`, `IMAGE_TAG_DEV` y `DB_SCHEMA=public` (modifica DB de dev)
+- Push a `main` (merge) → deploy a proyecto **`new-ponti-prod`** con `DEPLOY_ENV_PROD`, `IMAGE_TAG_PROD` y `DB_SCHEMA=public` (modifica DB de prod)
+
+> **Nota:** Los PRs ya NO disparan deploys automáticos. Solo se deploya cuando se hace merge a `develop` o `main`.
 - Push a `main` → deploy a proyecto **`new-ponti-prod`** con `DEPLOY_ENV_PROD`, `IMAGE_TAG_PROD` y `DB_SCHEMA=public`
 - PR hacia `develop`/`staging` → deploy automático a **`new-ponti-dev`** con `DB_SCHEMA=pr_<número>`
 

@@ -2,7 +2,9 @@
 
 ## 📋 Resumen
 
-Sistema de aislamiento de datos y migraciones usando **schemas de PostgreSQL** por rama/PR. Cada deploy de feature branch usa su propio schema, evitando conflictos con `develop`.
+Sistema de aislamiento de datos y migraciones usando **schemas de PostgreSQL** por rama. Cada deploy manual de feature branch usa su propio schema, evitando conflictos con `develop`.
+
+> **Nota:** Los PRs ya NO disparan deploys automáticos. Solo se deploya cuando se hace merge a `develop` o `main`, o mediante `workflow_dispatch` (deploy manual).
 
 ---
 
@@ -139,10 +141,9 @@ DB_SCHEMA="branch_${BRANCH_SLUG}_${SHORT_SHA}"
 
 ---
 
-#### Opción C: Híbrido (Recomendado)
+**Para deploys manuales (`workflow_dispatch`):** `branch_<slug>` (sin SHA, schema estable por rama)
 
-**Para PRs:** `pr_<number>`  
-**Para branches sin PR:** `branch_<slug>_<short_sha>`
+> **Nota:** El workflow actual solo usa `branch_<slug>` para deploys manuales. Los schemas `pr_*` ya no se crean automáticamente, pero el workflow `cleanup-schema.yml` puede limpiar schemas `pr_*` antiguos si existen.
 
 **Implementación sugerida en GitHub Actions:**
 ```yaml

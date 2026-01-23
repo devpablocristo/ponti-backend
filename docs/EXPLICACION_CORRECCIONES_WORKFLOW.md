@@ -73,12 +73,18 @@ on:
 # ⚠️ SEGURIDAD CRÍTICA: La DB de DEV solo se modifica cuando se hace merge a develop
 # Los deploys manuales SIEMPRE usan schemas aislados (branch_<slug>)
 
+# ✅ CRÍTICO: workflow_dispatch se verifica ANTES de ref_name
+# Esto es importante porque workflow_dispatch puede dispararse desde main/develop
+# pero DEBE usar schema aislado para proteger la DB
+if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+  DB_SCHEMA="branch_${BRANCH_SLUG}"
+  echo "✅ Using isolated schema: ${DB_SCHEMA} - DB dev is SAFE"
 # ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
-if [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
+elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
   DB_SCHEMA="public"
   echo "⚠️  WARNING: Using public schema - this will modify the database!"
-# ✅ workflow_dispatch SIEMPRE usa schema aislado (NO modifica DB de dev)
 else
+  # Fallback para otros casos
   DB_SCHEMA="branch_${BRANCH_SLUG}"
   echo "✅ Using isolated schema: ${DB_SCHEMA} - DB dev is SAFE"
 fi
@@ -95,7 +101,7 @@ fi
 **Cambio realizado:**
 ```yaml
 concurrency:
-  group: deploy-${{ github.event_name }}-${{ github.ref_name }}
+  group: deploy-${{ github.event_name }}-${{ github.event.inputs.branch || github.ref_name }}
   cancel-in-progress: true
 ```
 

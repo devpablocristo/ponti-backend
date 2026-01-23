@@ -15,14 +15,15 @@ on:
       - staging
 ```
 
-**Esto significa que:**
-- Cada vez que se abre un PR hacia `develop` o `staging`, el workflow se ejecuta automáticamente
-- El workflow despliega la aplicación a un ambiente de preview (DEV) con un schema aislado (`pr_<número>`)
-- Esto es útil para probar cambios antes de hacer merge
+**Estado actual:**
+- Los PRs ya NO disparan deploys automáticos (eliminado para evitar deploys innecesarios)
+- El workflow solo se ejecuta en `push` a `develop`/`main` (merges) o `workflow_dispatch` (deploy manual)
+- Los deploys manuales usan schemas aislados (`branch_<slug>`)
+- Los merges a `develop`/`main` usan schema `public` (modifican la DB)
 
 ### El Error Específico
 
-Cuando el workflow se ejecutaba automáticamente por un PR, el contenedor de Cloud Run fallaba al iniciar con el siguiente error:
+Cuando el workflow se ejecutaba (o se ejecuta en deploy manual), el contenedor de Cloud Run puede fallar al iniciar con el siguiente error:
 
 ```
 ERROR: (gcloud.run.deploy) The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable within the allocated timeout.
@@ -52,17 +53,17 @@ Cuando una migración queda en estado "dirty":
 ### ¿Por qué ocurría en nuestro caso?
 
 **Escenario típico:**
-1. Un PR se abre → workflow se ejecuta automáticamente
-2. El workflow despliega a Cloud Run con schema `pr_5` (por ejemplo)
+1. Un deploy se ejecuta (manual o automático por merge)
+2. El workflow despliega a Cloud Run con schema aislado (ej: `branch_feature-x` o `pr_5` si es antiguo)
 3. El contenedor intenta ejecutar migraciones al iniciar
 4. Si una migración anterior falló o el contenedor se reinició durante una migración, queda estado dirty
 5. El nuevo deploy intenta ejecutar migraciones → detecta estado dirty → **falla**
 6. El contenedor no puede iniciar → Cloud Run reporta error de timeout
 
 **Problema adicional:**
-- Los schemas de PR (`pr_*`) son temporales y aislados
+- Los schemas aislados (`branch_*`, `pr_*`) son temporales y aislados
 - Si un deploy falla, el schema queda con estado dirty
-- El siguiente deploy automático (por ejemplo, cuando se hace push al PR) también falla
+- El siguiente deploy (manual o automático) también falla
 - Esto crea un ciclo de fallos hasta que alguien limpie manualmente el estado dirty
 
 ## ✅ Solución Implementada
@@ -275,14 +276,14 @@ Por lo tanto:
 
 ### Escenarios Cubiertos
 
-#### Escenario 1: PR Normal (sin estado dirty)
+#### Escenario 1: Deploy Normal (sin estado dirty)
 ```
-PR abierto → Deploy automático → Migraciones ejecutan → ✅ Éxito
+Deploy ejecutado → Migraciones ejecutan → ✅ Éxito
 ```
 
-#### Escenario 2: PR con Estado Dirty Previo
+#### Escenario 2: Deploy con Estado Dirty Previo
 ```
-PR abierto → Deploy automático → Detecta dirty → Adquiere lock → DROP SCHEMA CASCADE → CREATE SCHEMA → Re-ejecuta migraciones desde 0 → ✅ Éxito
+Deploy ejecutado → Detecta dirty → Adquiere lock → DROP SCHEMA CASCADE → CREATE SCHEMA → Re-ejecuta migraciones desde 0 → ✅ Éxito
 ```
 
 #### Escenario 3: Deploy Manual de Rama
@@ -335,8 +336,10 @@ Push a main → Deploy → Schema public → Si hay dirty → ❌ Falla con mens
 
 ## 🎯 Conclusión
 
-La solución implementa **recreación automática de schemas** cuando se detecta estado dirty, permitiendo que los deploys automáticos de PR funcionen sin intervención manual, mientras mantiene la seguridad al requerir intervención manual para el schema `public` de producción.
+La solución implementa **recreación automática de schemas** cuando se detecta estado dirty, permitiendo que los deploys funcionen sin intervención manual, mientras mantiene la seguridad al requerir intervención manual para el schema `public` de producción.
 
 **Estrategia clave:** En lugar de limpiar el estado dirty (que puede dejar inconsistencias), el sistema recrea completamente el schema desde cero, garantizando un estado limpio y consistente.
+
+**Importante:** La lógica de `DB_SCHEMA` ahora verifica `workflow_dispatch` ANTES de `ref_name` para garantizar que los deploys manuales siempre usen schemas aislados, incluso si se disparan desde `main`/`develop`.
 
 **Concurrencia:** El uso de advisory locks previene que múltiples instancias de Cloud Run migren simultáneamente, tanto en el camino normal como durante la recreación de schemas.
