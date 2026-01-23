@@ -199,27 +199,37 @@ jobs:
             exit 1
           fi
 
-          # Obtener DB_HOST desde el servicio (evita hardcodear instancia)
-          DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
-          if [ -z "$DB_HOST" ]; then
-            echo "::error::DB_HOST env var not found in Cloud Run service '$BASE_SERVICE_NAME'. Cannot infer Cloud SQL instance."
+          # Obtener instancia Cloud SQL desde la configuración del servicio (no depende de secrets)
+          # Esto se setea cuando el servicio tiene --add-cloudsql-instances.
+          CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
+          if [ -n "$CLOUDSQL_INSTANCES" ]; then
+            # Puede venir como lista separada por coma; tomamos la primera
+            INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
+          else
+            # Fallback: intentar inferir desde DB_HOST si estuviera seteado como valor plano
+            DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
+            if [ -z "$DB_HOST" ] || ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
+              echo "::error::Cannot infer Cloud SQL instance. Missing service annotation 'run.googleapis.com/cloudsql-instances' and DB_HOST is not a /cloudsql/ unix socket value."
+              exit 1
+            fi
+            INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+          fi
+
+          if [ -z "$INSTANCE_CONN" ]; then
+            echo "::error::Failed to infer Cloud SQL instance connection name from service '$BASE_SERVICE_NAME'."
             exit 1
           fi
-          if ! echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-            echo "::error::DB_HOST is not a Cloud SQL unix socket (/cloudsql/..). Cannot infer instance. DB_HOST='$DB_HOST'"
-            exit 1
-          fi
-          INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
+
           INSTANCE_PROJECT=$(echo "$INSTANCE_CONN" | cut -d: -f1)
           INSTANCE_NAME=$(echo "$INSTANCE_CONN" | cut -d: -f3)
           if [ -z "$INSTANCE_PROJECT" ] || [ -z "$INSTANCE_NAME" ]; then
-            echo "::error::Failed to parse Cloud SQL instance from DB_HOST='$DB_HOST'"
+            echo "::error::Failed to parse Cloud SQL instance from INSTANCE_CONN='$INSTANCE_CONN'"
             exit 1
           fi
 
           # 🔒 Guardrail: la instancia debe pertenecer al proyecto DEV (evita tocar prod por error de configuración)
           if [ "$INSTANCE_PROJECT" != "${{ vars.GCP_PROJECT_ID_DEV }}" ]; then
-            echo "::error::SECURITY: Cloud SQL instance project mismatch. Expected DEV project '${{ vars.GCP_PROJECT_ID_DEV }}' but got '$INSTANCE_PROJECT' from DB_HOST='$DB_HOST'"
+            echo "::error::SECURITY: Cloud SQL instance project mismatch. Expected DEV project '${{ vars.GCP_PROJECT_ID_DEV }}' but got '$INSTANCE_PROJECT' from INSTANCE_CONN='$INSTANCE_CONN'"
             exit 1
           fi
 
