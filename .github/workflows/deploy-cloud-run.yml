@@ -93,9 +93,11 @@ jobs:
             image_tag="${{ vars.IMAGE_TAG_DEV }}"
             gcp_project_id="$GCP_PROJECT_ID_DEV"
             # Servicio preview separado para NO pisar el servicio dev
-            BRANCH_SLUG=$(echo "$BRANCH_INPUT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | cut -c1-40)
-            service_name="${SERVICE_NAME_DEV}-preview-${BRANCH_SLUG}"
-            echo "DB_NAME=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
+            # Slug para DB (permite underscore); slug para servicio (solo guiones)
+            BRANCH_SLUG_DB=$(echo "$BRANCH_INPUT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | cut -c1-40)
+            BRANCH_SLUG_SERVICE=$(echo "$BRANCH_INPUT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-40 | sed 's/^-//; s/-$//')
+            service_name="${SERVICE_NAME_DEV}-preview-${BRANCH_SLUG_SERVICE}"
+            echo "DB_NAME=branch_${BRANCH_SLUG_DB}" >> "$GITHUB_ENV"
             cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
             wif_provider="$WIF_PROVIDER_DEV"
             wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
