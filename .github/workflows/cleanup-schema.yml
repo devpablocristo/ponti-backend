@@ -1,0 +1,49 @@
+name: Cleanup Schema on PR Close
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Set variables and validate
+        id: validate
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          SCHEMA="pr_${PR_NUMBER}"
+          # Anti-public: nunca borrar public ni schemas reservados
+          for reserved in public pg_catalog pg_toast information_schema; do
+            if [ "$SCHEMA" = "$reserved" ]; then
+              echo "ERROR: Cannot drop reserved schema: $SCHEMA"
+              exit 1
+            fi
+          done
+          echo "schema=${SCHEMA}" >> "$GITHUB_OUTPUT"
+          echo "SCHEMA=${SCHEMA}" >> "$GITHUB_ENV"
+
+      - name: Run cleanup script
+        env:
+          DB_HOST: ${{ secrets.DB_HOST_DEV }}
+          DB_NAME: ${{ vars.DB_NAME_DEV }}
+          DB_USER: ${{ secrets.DB_USER_DEV }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+          DB_PORT: ${{ vars.DB_PORT_DEV }}
+          DB_SSL_MODE: ${{ vars.DB_SSL_MODE_DEV }}
+        run: |
+          SCHEMA="${{ steps.validate.outputs.schema }}"
+          [ -z "$SCHEMA" ] || [ "$SCHEMA" = "public" ] && { echo "Invalid schema"; exit 1; }
+          chmod +x ./scripts/cleanup_schema.sh
+          ./scripts/cleanup_schema.sh "$SCHEMA"
+          echo "Schema $SCHEMA cleaned up"

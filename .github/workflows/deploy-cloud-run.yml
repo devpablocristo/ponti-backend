@@ -144,6 +144,29 @@ jobs:
           printf 'WIF_PROVIDER=%s\n' "$wif_provider" >> "$GITHUB_ENV"
           printf 'WIF_SERVICE_ACCOUNT=%s\n' "$wif_sa" >> "$GITHUB_ENV"
 
+      - name: Set DB_SCHEMA for branch isolation
+        id: set_schema
+        run: |
+          # Para PRs: usar pr_<number>
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            DB_SCHEMA="pr_${{ github.event.pull_request.number }}"
+            echo "schema=pr_${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=pr_${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+          # Para develop/main/staging: usar public (comportamiento legacy)
+          elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "staging" ]; then
+            DB_SCHEMA="public"
+            echo "schema=public" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
+          # Para feature branches sin PR: usar branch_<slug>_<sha>
+          else
+            BRANCH_SLUG=$(echo "${{ github.head_ref || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            DB_SCHEMA="branch_${BRANCH_SLUG}_${SHORT_SHA}"
+            echo "schema=branch_${BRANCH_SLUG}_${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=branch_${BRANCH_SLUG}_${SHORT_SHA}" >> "$GITHUB_ENV"
+          fi
+          echo "DB_SCHEMA set to: $DB_SCHEMA"
+
       - name: Auth GCP
         uses: google-github-actions/auth@v2
         with:
@@ -171,13 +194,15 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          # Prod no debe ser público, dev puede serlo
+          DB_SCHEMA="${{ steps.set_schema.outputs.schema }}"
+          ENV_VARS="DB_SCHEMA=${DB_SCHEMA}"
           if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
               --project="${{ env.GCP_PROJECT_ID }}" \
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
               --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --update-env-vars="$ENV_VARS" \
               --no-allow-unauthenticated
           else
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
@@ -185,5 +210,7 @@ jobs:
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
               --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --update-env-vars="$ENV_VARS" \
               --allow-unauthenticated
           fi
+          echo "Deployed with DB_SCHEMA=${DB_SCHEMA}"

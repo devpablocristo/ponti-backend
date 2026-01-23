@@ -8,7 +8,7 @@ import (
 )
 
 // Bootstrap inicializa la base de datos sin aplicar migraciones automáticamente.
-func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) (*Repository, error) {
+func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int, schema string) (*Repository, error) {
 	if dbTypeStr == "" {
 		dbTypeStr = strings.ToLower(os.Getenv("DB_TYPE"))
 	}
@@ -46,6 +46,12 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 		if port == 0 {
 			port, _ = strconv.Atoi(os.Getenv("DB_PORT"))
 		}
+		if schema == "" {
+			schema = os.Getenv("DB_SCHEMA")
+			if schema == "" {
+				schema = "public"
+			}
+		}
 
 		config = newConfig(
 			dbType,
@@ -56,6 +62,7 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 			port,
 			"",
 			sslMode,
+			schema,
 		)
 	case SQLite:
 		config = newConfig(
@@ -66,6 +73,7 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 			"",
 			0,
 			os.Getenv("SQLITE_PATH"),
+			"",
 			"",
 		)
 	}
