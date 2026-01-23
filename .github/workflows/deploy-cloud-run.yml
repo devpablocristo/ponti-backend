@@ -4,13 +4,7 @@ on:
   push:
     branches:
       - develop
-      - staging
       - main
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - develop
-      - staging
   workflow_dispatch:
     inputs:
       branch:
@@ -27,7 +21,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deploy-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref_name }}
+  group: deploy-${{ github.event_name }}-${{ github.event.inputs.branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -36,19 +30,18 @@ jobs:
       DEPLOY_ENV: ""
       IMAGE_TAG: ""
       IMAGE_URI: ""
-    environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.event_name == 'pull_request' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'staging' && vars.DEPLOY_ENV_STG || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}
+          ref: ${{ github.event.inputs.branch || github.ref_name }}
 
       - name: Set deploy variables
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
           GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
@@ -85,21 +78,7 @@ jobs:
             exit 1
           fi
           
-          # Pull Request: siempre deployar a DEV
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            # Validar que el PR apunta a develop o staging
-            if [ "$PR_BASE_REF" != "develop" ] && [ "$PR_BASE_REF" != "staging" ]; then
-              echo "PRs can only target develop or staging branches" >&2
-              exit 1
-            fi
-            deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
-            image_tag="${{ vars.IMAGE_TAG_DEV }}"
-            gcp_project_id="$GCP_PROJECT_ID_DEV"
-            service_name="$SERVICE_NAME_DEV"
-            cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
-            wif_provider="$WIF_PROVIDER_DEV"
-            wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
-          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
               exit 1
@@ -120,15 +99,6 @@ jobs:
               cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
               wif_provider="$WIF_PROVIDER_DEV"
               wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
-            elif [ "$ref" = "staging" ]; then
-              deploy_env="${{ vars.DEPLOY_ENV_STG }}"
-              image_tag="${{ vars.IMAGE_TAG_STG }}"
-              # Staging usa dev por ahora (puede cambiarse después)
-              gcp_project_id="$GCP_PROJECT_ID_DEV"
-              service_name="$SERVICE_NAME_DEV"
-              cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
-              wif_provider="$WIF_PROVIDER_DEV"
-              wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
             elif [ "$ref" = "main" ]; then
               deploy_env="${{ vars.DEPLOY_ENV_PROD }}"
               image_tag="${{ vars.IMAGE_TAG_PROD }}"
@@ -138,7 +108,7 @@ jobs:
               wif_provider="$WIF_PROVIDER_PROD"
               wif_sa="$WIF_SERVICE_ACCOUNT_PROD"
             else
-              echo "Unsupported branch: $ref" >&2
+              echo "Unsupported branch: $ref (only develop and main are supported for automatic deployment)" >&2
               exit 1
             fi
           fi
@@ -176,33 +146,44 @@ jobs:
         id: set_schema
         env:
           SCHEMA_OVERRIDE: ${{ github.event.inputs.schema_override }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          # ⚠️ SEGURIDAD CRÍTICA: La DB de DEV solo se modifica cuando se hace merge a develop
+          # Los deploys manuales SIEMPRE usan schemas aislados (branch_<slug>)
+          
           # Si hay schema_override manual, usarlo directamente
           if [ -n "$SCHEMA_OVERRIDE" ]; then
             DB_SCHEMA="$SCHEMA_OVERRIDE"
             echo "schema=${DB_SCHEMA}" >> "$GITHUB_OUTPUT"
             echo "DB_SCHEMA=${DB_SCHEMA}" >> "$GITHUB_ENV"
             echo "DB_SCHEMA set to override: $DB_SCHEMA"
+            
+            # 🔒 GUARDRAIL: workflow_dispatch nunca puede usar public
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DB_SCHEMA" = "public" ]; then
+              echo "::error::SECURITY: workflow_dispatch must never use public schema. Use a branch-specific schema instead."
+              exit 1
+            fi
             exit 0
           fi
           
-          # Para PRs: usar pr_<number>
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            DB_SCHEMA="pr_${PR_NUMBER}"
-            echo "schema=pr_${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=pr_${PR_NUMBER}" >> "$GITHUB_ENV"
-          # Para develop/main/staging: usar public (comportamiento legacy)
-          elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "staging" ]; then
+          # ⚠️ SOLO push a develop/main usa schema public (modifica la DB)
+          # Esto solo ocurre cuando se hace merge a estas ramas
+          if [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ]; then
             DB_SCHEMA="public"
             echo "schema=public" >> "$GITHUB_OUTPUT"
             echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
-          # Para workflow_dispatch (feature branches): usar branch_<slug> (sin SHA)
+            echo "::warning::⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
+            echo "⚠️  SECURITY WARNING: Using public schema - this will MODIFY the production database!"
+            echo "⚠️  This deployment will execute migrations on the production database schema."
+          # ✅ workflow_dispatch SIEMPRE usa schema aislado (NO modifica DB de dev)
           else
             BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
             DB_SCHEMA="branch_${BRANCH_SLUG}"
             echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
             echo "DB_SCHEMA=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
+            echo "::notice::✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
+            echo "✅ SECURITY: Using isolated schema: ${DB_SCHEMA} - Production database is PROTECTED"
+            echo "✅ This deployment will NOT modify the production database. All changes are isolated to schema: ${DB_SCHEMA}"
           fi
           echo "DB_SCHEMA set to: $DB_SCHEMA"
 
@@ -231,9 +212,28 @@ jobs:
           docker push "$image_uri"
 
       - name: Deploy to Cloud Run
+        env:
+          DB_SCHEMA: ${{ steps.set_schema.outputs.schema }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           DB_SCHEMA="${{ steps.set_schema.outputs.schema }}"
+          
+          # 🔒 GUARDRAIL FINAL: Verificar que workflow_dispatch nunca use public
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DB_SCHEMA" = "public" ]; then
+            echo "::error::SECURITY VIOLATION: workflow_dispatch must never use public schema. Deployment aborted."
+            echo "SECURITY VIOLATION: workflow_dispatch must never use public schema. Deployment aborted."
+            exit 1
+          fi
+          
+          # Logs de seguridad según el schema usado
+          if [ "$DB_SCHEMA" = "public" ]; then
+            echo "::warning::⚠️  DEPLOYING TO PRODUCTION DATABASE: Schema 'public' will be modified by migrations"
+            echo "⚠️  DEPLOYING TO PRODUCTION DATABASE: Schema 'public' will be modified by migrations"
+          else
+            echo "::notice::✅ DEPLOYING TO ISOLATED SCHEMA: Database 'public' is protected. Using schema: ${DB_SCHEMA}"
+            echo "✅ DEPLOYING TO ISOLATED SCHEMA: Database 'public' is protected. Using schema: ${DB_SCHEMA}"
+          fi
           
           # --update-env-vars preserva las variables existentes y solo agrega/actualiza las especificadas
           ENV_VARS="DB_SCHEMA=${DB_SCHEMA},HTTP_SERVER_PORT=8080"
