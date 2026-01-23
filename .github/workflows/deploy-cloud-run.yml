@@ -6,11 +6,20 @@ on:
       - develop
       - staging
       - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - develop
+      - staging
   workflow_dispatch:
     inputs:
       branch:
         description: Rama a desplegar (se despliega en dev)
         required: true
+        type: string
+      schema_override:
+        description: 'Schema override (opcional, ej: custom_schema)'
+        required: false
         type: string
 
 permissions:
@@ -23,18 +32,19 @@ jobs:
       DEPLOY_ENV: ""
       IMAGE_TAG: ""
       IMAGE_URI: ""
-    environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'staging' && vars.DEPLOY_ENV_STG || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && vars.DEPLOY_ENV_DEV || github.event_name == 'pull_request' && vars.DEPLOY_ENV_DEV || github.ref_name == 'develop' && vars.DEPLOY_ENV_DEV || github.ref_name == 'staging' && vars.DEPLOY_ENV_STG || github.ref_name == 'main' && vars.DEPLOY_ENV_PROD }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch || github.ref_name }}
+          ref: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Set deploy variables
         env:
           BRANCH_INPUT: ${{ github.event.inputs.branch }}
           EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
           GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
@@ -71,7 +81,21 @@ jobs:
             exit 1
           fi
           
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          # Pull Request: siempre deployar a DEV
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Validar que el PR apunta a develop o staging
+            if [ "$PR_BASE_REF" != "develop" ] && [ "$PR_BASE_REF" != "staging" ]; then
+              echo "PRs can only target develop or staging branches" >&2
+              exit 1
+            fi
+            deploy_env="${{ vars.DEPLOY_ENV_DEV }}"
+            image_tag="${{ vars.IMAGE_TAG_DEV }}"
+            gcp_project_id="$GCP_PROJECT_ID_DEV"
+            service_name="$SERVICE_NAME_DEV"
+            cloud_run_sa="$CLOUD_RUN_SERVICE_ACCOUNT_DEV"
+            wif_provider="$WIF_PROVIDER_DEV"
+            wif_sa="$WIF_SERVICE_ACCOUNT_DEV"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$BRANCH_INPUT" ]; then
               echo "Missing required inputs" >&2
               exit 1
@@ -146,24 +170,35 @@ jobs:
 
       - name: Set DB_SCHEMA for branch isolation
         id: set_schema
+        env:
+          SCHEMA_OVERRIDE: ${{ github.event.inputs.schema_override }}
         run: |
+          # Si hay schema_override manual, usarlo directamente
+          if [ -n "$SCHEMA_OVERRIDE" ]; then
+            DB_SCHEMA="$SCHEMA_OVERRIDE"
+            echo "schema=${DB_SCHEMA}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=${DB_SCHEMA}" >> "$GITHUB_ENV"
+            echo "DB_SCHEMA set to override: $DB_SCHEMA"
+            exit 0
+          fi
+          
           # Para PRs: usar pr_<number>
-          if [ -n "${{ github.event.pull_request.number }}" ]; then
-            DB_SCHEMA="pr_${{ github.event.pull_request.number }}"
-            echo "schema=pr_${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=pr_${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            DB_SCHEMA="pr_${PR_NUMBER}"
+            echo "schema=pr_${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=pr_${PR_NUMBER}" >> "$GITHUB_ENV"
           # Para develop/main/staging: usar public (comportamiento legacy)
           elif [ "${{ github.ref_name }}" = "develop" ] || [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "staging" ]; then
             DB_SCHEMA="public"
             echo "schema=public" >> "$GITHUB_OUTPUT"
             echo "DB_SCHEMA=public" >> "$GITHUB_ENV"
-          # Para feature branches sin PR: usar branch_<slug>_<sha>
+          # Para workflow_dispatch (feature branches): usar branch_<slug> (sin SHA)
           else
-            BRANCH_SLUG=$(echo "${{ github.head_ref || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
-            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            DB_SCHEMA="branch_${BRANCH_SLUG}_${SHORT_SHA}"
-            echo "schema=branch_${BRANCH_SLUG}_${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-            echo "DB_SCHEMA=branch_${BRANCH_SLUG}_${SHORT_SHA}" >> "$GITHUB_ENV"
+            BRANCH_SLUG=$(echo "${{ github.event.inputs.branch || github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-30)
+            DB_SCHEMA="branch_${BRANCH_SLUG}"
+            echo "schema=branch_${BRANCH_SLUG}" >> "$GITHUB_OUTPUT"
+            echo "DB_SCHEMA=branch_${BRANCH_SLUG}" >> "$GITHUB_ENV"
           fi
           echo "DB_SCHEMA set to: $DB_SCHEMA"
 
