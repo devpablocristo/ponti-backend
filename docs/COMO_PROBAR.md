@@ -111,8 +111,12 @@ Después de hacer el deploy, verifica:
 - [ ] Deploy a Cloud Run exitoso
 - [ ] Servicio responde al `/ping`
 - [ ] Logs sin errores críticos
-- [ ] Variables de entorno correctas en Cloud Run
+- [ ] Variables de entorno correctas en Cloud Run (incluyendo `DB_SCHEMA`)
 - [ ] Conexión a Cloud SQL funcionando (si aplica)
+- [ ] Schema correcto creado/usado según el tipo de deploy:
+  - PR → `pr_<número>`
+  - Deploy manual → `branch_<slug>`
+  - Push a develop/main → `public`
 
 ---
 
@@ -132,3 +136,32 @@ Después de hacer el deploy, verifica:
 1. Verificar que Cloud SQL esté conectado al servicio
 2. Verificar variables de entorno (DB_HOST, DB_USER, etc.)
 3. Verificar que el service account tenga permisos
+
+### Si quieres verificar el schema usado:
+```bash
+# Ver variables de entorno del servicio
+gcloud run services describe <SERVICE_NAME> \
+  --project=<PROJECT_ID> \
+  --region=us-central1 \
+  --format="value(spec.template.spec.containers[0].env)" | grep DB_SCHEMA
+
+# Conectarte a la DB y listar schemas
+psql -h <DB_HOST> -U <DB_USER> -d <DB_NAME> -c "\dn"
+```
+
+### Si quieres limpiar un schema manualmente:
+```bash
+# Ver schemas existentes
+psql -h <DB_HOST> -U <DB_USER> -d <DB_NAME> -c "\dn"
+
+# Limpiar schema específico
+./scripts/cleanup_schema.sh pr_123  # o branch_feature-x
+```
+
+---
+
+## 📚 Documentación Relacionada
+
+- [DEPLOY.md](./DEPLOY.md) - Guía completa de despliegue
+- [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) - Documentación técnica del sistema de schema por rama
+- [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) - Estado actual de los workflows

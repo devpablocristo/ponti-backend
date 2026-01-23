@@ -44,6 +44,13 @@
 | `DB_PASSWORD` | Contraseña de la base de datos | `****` |
 | `DB_NAME` | Nombre de la base de datos | `ponti_api_db` |
 | `DB_SSL_MODE` | Modo SSL | `disable` |
+| `DB_SCHEMA` | Schema de PostgreSQL (automático por workflow) | `public`, `pr_123`, `branch_feature-x` |
+
+> **Nota sobre `DB_SCHEMA`**: Esta variable se configura automáticamente por el workflow según el contexto:
+> - `develop`/`main`/`staging` → `public`
+> - PRs → `pr_<número>`
+> - Deploy manual de feature branch → `branch_<slug>`
+> Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) para más detalles.
 
 ### Variables Adicionales
 
@@ -134,14 +141,16 @@ gcloud run services update ponti-backend-prod \
 
 ### Deploy automático por rama
 
-- Push a `develop` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_DEV` y `IMAGE_TAG_DEV`
-- Push a `staging` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_STG` y `IMAGE_TAG_STG` (usa dev por ahora)
-- Push a `main` → deploy a proyecto **`new-ponti-prod`** con `DEPLOY_ENV_PROD` y `IMAGE_TAG_PROD`
+- Push a `develop` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_DEV`, `IMAGE_TAG_DEV` y `DB_SCHEMA=public`
+- Push a `staging` → deploy a proyecto **`new-ponti-dev`** con `DEPLOY_ENV_STG`, `IMAGE_TAG_STG` y `DB_SCHEMA=public` (usa dev por ahora)
+- Push a `main` → deploy a proyecto **`new-ponti-prod`** con `DEPLOY_ENV_PROD`, `IMAGE_TAG_PROD` y `DB_SCHEMA=public`
+- PR hacia `develop`/`staging` → deploy automático a **`new-ponti-dev`** con `DB_SCHEMA=pr_<número>`
 
 > **Importante**: 
 > - Deploys a `main` requieren aprobación si hay environment protection configurado
 > - El servicio en prod **NO** es público (`--no-allow-unauthenticated`)
 > - Cada proyecto tiene su propia instancia de Cloud SQL y recursos aislados
+> - Los PRs y deploys manuales usan schemas aislados que NO alteran la DB dev (`public`)
 
 ### Deploy manual por rama (sin merge)
 
@@ -152,9 +161,14 @@ Pasos:
 1. GitHub → **Actions** → **Deploy to Cloud Run**
 2. **Run workflow**
 3. Completar:
-   - `branch`: rama a desplegar (ej. `config/gpc`)
+   - `branch`: rama a desplegar (ej. `feature/nueva-funcionalidad`)
+   - `schema_override`: (opcional) schema personalizado para casos especiales
 
-> **Nota**: El deploy manual usa siempre `DEPLOY_ENV_DEV`. En el futuro se puede habilitar `stg`.
+> **Nota**: 
+> - El deploy manual usa siempre `DEPLOY_ENV_DEV`
+> - Se crea automáticamente un schema aislado `branch_<slug>` que NO altera la DB dev
+> - El schema se reutiliza en múltiples deploys de la misma rama
+> - El schema se limpia automáticamente después de 7 días sin uso (garbage collector)
 
 ### Flujo recomendado
 
@@ -179,21 +193,32 @@ El sistema usa **dos proyectos GCP separados** para aislamiento completo:
   - Cloud SQL con IP privada (recomendado)
   - SSL requerido (`DB_SSL_MODE=require`)
 
-### Estrategia recomendada: preview por rama (DB por rama)
+### Schema por Rama/PR (Implementado)
 
-Para poder deployar una rama con más migraciones y luego volver a `develop` sin romper el esquema, se recomienda aislar la base de datos por rama:
+El sistema usa **schemas de PostgreSQL** para aislar datos y migraciones por rama/PR:
 
-- `rama x` → **DB rama x** (preview en proyecto dev)
-- `develop` → **DB dev** (proyecto dev)
-- `main` → **DB prod** (proyecto prod)
+- **PRs** → Schema `pr_<número>` (ej: `pr_123`)
+  - Se crea automáticamente al abrir/sincronizar PR
+  - Se limpia automáticamente al cerrar/mergear PR
+  - NO altera la DB dev (`public`)
 
-**Nombre sugerido (ejemplo):**
-- Servicio: `ponti-backend-<branch_slug>`
-- DB: `ponti_api_db_<branch_slug>`
+- **Deploy manual** → Schema `branch_<slug>` (ej: `branch_feature-nueva-funcionalidad`)
+  - Se crea automáticamente en el primer deploy
+  - Se reutiliza en múltiples deploys de la misma rama
+  - Se limpia automáticamente después de 7 días sin uso (garbage collector)
+  - NO altera la DB dev (`public`)
 
-**Limpieza:**
-- Eliminar la DB y el servicio de la rama al cerrar/mergear.
-- Opcional: TTL para previews sin actividad.
+- **`develop`/`main`/`staging`** → Schema `public`
+  - Usa el schema compartido
+  - SÍ altera la DB dev/prod
+
+**Ventajas:**
+- ✅ Aislamiento completo: cada rama/PR tiene su propio schema
+- ✅ No hay conflictos entre ramas
+- ✅ Puedes deployar migraciones experimentales sin afectar `develop`
+- ✅ Limpieza automática de schemas huérfanos
+
+Ver [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) y [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) para más detalles.
 
 ## Pasos de Despliegue
 
@@ -303,3 +328,6 @@ gcloud run services update ponti-backend \
 
 - [SETUP_PROD.md](./SETUP_PROD.md) - Guía completa para crear y configurar el proyecto de producción
 - [GITHUB_SECRETS.md](./GITHUB_SECRETS.md) - Configuración de variables y secrets en GitHub Actions
+- [SCHEMA_POR_RAMA.md](./SCHEMA_POR_RAMA.md) - Documentación técnica del sistema de schema por rama/PR
+- [ESTADO_FINAL_WORKFLOWS.md](./ESTADO_FINAL_WORKFLOWS.md) - Estado actual de los workflows de GitHub Actions
+- [CAMBIOS_SCHEMA_POR_RAMA.md](./CAMBIOS_SCHEMA_POR_RAMA.md) - Cambios implementados para schema por rama
