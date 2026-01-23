@@ -1,0 +1,123 @@
+name: Garbage Collect Old Branch Schemas
+
+on:
+  schedule:
+    # Ejecutar cada domingo a las 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Máximo de días de antigüedad para schemas (default: 7)'
+        required: false
+        type: number
+        default: 7
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Set variables
+        id: vars
+        run: |
+          MAX_AGE_DAYS="${{ github.event.inputs.max_age_days || 7 }}"
+          echo "max_age_days=${MAX_AGE_DAYS}" >> "$GITHUB_OUTPUT"
+          echo "MAX_AGE_DAYS=${MAX_AGE_DAYS}" >> "$GITHUB_ENV"
+
+      - name: List and cleanup old branch schemas
+        env:
+          DB_HOST: ${{ secrets.DB_HOST_DEV }}
+          DB_NAME: ${{ vars.DB_NAME_DEV }}
+          DB_USER: ${{ secrets.DB_USER_DEV }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+          DB_PORT: ${{ vars.DB_PORT_DEV }}
+          DB_SSL_MODE: ${{ vars.DB_SSL_MODE_DEV }}
+        run: |
+          MAX_AGE_DAYS="${{ steps.vars.outputs.max_age_days }}"
+          
+          # Construir DSN
+          export PGPASSWORD="${DB_PASSWORD}"
+          
+          # Listar todos los schemas que empiezan con 'branch_'
+          # Excluir schemas reservados y public
+          SCHEMAS=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -c "
+            SELECT schema_name 
+            FROM information_schema.schemata 
+            WHERE schema_name LIKE 'branch_%'
+              AND schema_name NOT IN ('public', 'pg_catalog', 'pg_toast', 'information_schema')
+            ORDER BY schema_name;
+          " | tr -d ' ' | grep -v '^$')
+          
+          if [ -z "$SCHEMAS" ]; then
+            echo "No branch schemas found to clean up"
+            exit 0
+          fi
+          
+          echo "Found branch schemas:"
+          echo "$SCHEMAS"
+          echo ""
+          
+          CLEANED_COUNT=0
+          SKIPPED_COUNT=0
+          
+          for SCHEMA in $SCHEMAS; do
+            echo "Checking schema: $SCHEMA"
+            
+            # Obtener la fecha de la última migración desde schema_migrations
+            # Si no existe la tabla, usar la fecha de creación del schema (aproximación)
+            LAST_MIGRATION_QUERY="
+              SELECT COALESCE(
+                (SELECT installed_on::date FROM ${SCHEMA}.schema_migrations ORDER BY installed_on DESC LIMIT 1),
+                (SELECT current_date - interval '1 day')
+              )::date;
+            "
+            
+            LAST_DATE=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -c "$LAST_MIGRATION_QUERY" 2>/dev/null | tr -d ' ' | head -1)
+            
+            if [ -z "$LAST_DATE" ]; then
+              echo "  Warning: Could not determine age for $SCHEMA, skipping"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              continue
+            fi
+            
+            # Calcular diferencia en días usando PostgreSQL directamente
+            DAYS_OLD=$(psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -t -c "
+              SELECT current_date - '${LAST_DATE}'::date;
+            " 2>/dev/null | tr -d ' ' | head -1)
+            
+            if [ -z "$DAYS_OLD" ] || [ "$DAYS_OLD" = "" ]; then
+              echo "  Warning: Could not calculate age for $SCHEMA, skipping"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              continue
+            fi
+            
+            echo "  Schema age: $DAYS_OLD days (last migration: $LAST_DATE)"
+            
+            if [ "$DAYS_OLD" -ge "$MAX_AGE_DAYS" ]; then
+              echo "  Cleaning up schema: $SCHEMA (older than $MAX_AGE_DAYS days)"
+              chmod +x ./scripts/cleanup_schema.sh
+              if ./scripts/cleanup_schema.sh "$SCHEMA"; then
+                CLEANED_COUNT=$((CLEANED_COUNT + 1))
+                echo "  ✓ Schema $SCHEMA cleaned up successfully"
+              else
+                echo "  ✗ Failed to clean up schema $SCHEMA"
+              fi
+            else
+              echo "  Skipping schema: $SCHEMA (only $DAYS_OLD days old, threshold: $MAX_AGE_DAYS)"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+            fi
+            echo ""
+          done
+          
+          echo "Summary:"
+          echo "  Cleaned: $CLEANED_COUNT schemas"
+          echo "  Skipped: $SKIPPED_COUNT schemas"

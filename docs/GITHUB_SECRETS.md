@@ -11,38 +11,59 @@ Configurar estos secrets en **Settings → Secrets and variables → Actions** d
 ## Workload Identity Federation (recomendado)
 
 Se usa OIDC desde GitHub Actions, no se generan keys JSON.  
-Se requieren estas **variables** en GitHub:
+Cada proyecto (dev y prod) tiene su propio Workload Identity Pool y Provider.
 
-| Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `WIF_PROVIDER` | Provider de Workload Identity | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/<POOL_ID>/providers/<PROVIDER_ID>` |
-| `WIF_SERVICE_ACCOUNT` | Service Account para deploy | `<SERVICE_ACCOUNT_EMAIL>` |
+### Valores en new-ponti-dev
 
-### Valores actuales en new-ponti-dev
+- `WIF_PROVIDER_DEV`: `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
+- `WIF_SERVICE_ACCOUNT_DEV`: `github-actions@new-ponti-dev.iam.gserviceaccount.com`
 
-- `WIF_PROVIDER`: `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
-- `WIF_SERVICE_ACCOUNT`: `github-actions@new-ponti-dev.iam.gserviceaccount.com`
+### Valores en new-ponti-prod
 
-## Variables mínimas para Actions
+- `WIF_PROVIDER_PROD`: `projects/<PROJECT_NUMBER_PROD>/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
+- `WIF_SERVICE_ACCOUNT_PROD`: `github-actions@new-ponti-prod.iam.gserviceaccount.com`
+
+> **Nota**: Para crear el WIF en prod, seguir los pasos en [SETUP_PROD.md](./SETUP_PROD.md)
+
+## Variables para Actions
 
 Configurar en **Settings → Secrets and variables → Actions**:
 
-| Variable | Descripción |
-|----------|-------------|
-| `GCP_PROJECT_ID` | ID del proyecto GCP |
-| `GCP_REGION` | Región de Cloud Run |
-| `ARTIFACT_REGISTRY` | Repositorio de Artifact Registry |
-| `IMAGE_NAME` | Nombre de la imagen Docker |
-| `SERVICE_NAME` | Nombre del servicio en Cloud Run |
-| `CLOUD_RUN_SERVICE_ACCOUNT` | Service Account para Cloud Run |
-| `WIF_PROVIDER` | Workload Identity Provider |
-| `WIF_SERVICE_ACCOUNT` | Service Account para Workload Identity |
-| `DEPLOY_ENV_DEV` | Nombre del ambiente dev |
-| `DEPLOY_ENV_STG` | Nombre del ambiente stg |
-| `DEPLOY_ENV_PROD` | Nombre del ambiente prod |
-| `IMAGE_TAG_DEV` | Tag de imagen para dev |
-| `IMAGE_TAG_STG` | Tag de imagen para stg |
-| `IMAGE_TAG_PROD` | Tag de imagen para prod |
+### Variables Generales (compartidas entre ambientes)
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `GCP_REGION` | Región de Cloud Run | `us-central1` |
+| `ARTIFACT_REGISTRY` | Repositorio de Artifact Registry | `ponti-backend-registry` |
+| `IMAGE_NAME` | Nombre de la imagen Docker | `ponti-backend` |
+| `DEPLOY_ENV_DEV` | Nombre del ambiente dev | `dev` |
+| `DEPLOY_ENV_STG` | Nombre del ambiente stg | `stg` |
+| `DEPLOY_ENV_PROD` | Nombre del ambiente prod | `prod` |
+| `IMAGE_TAG_DEV` | Tag de imagen para dev | `dev` |
+| `IMAGE_TAG_STG` | Tag de imagen para stg | `stg` |
+| `IMAGE_TAG_PROD` | Tag de imagen para prod | `prod` |
+
+### Variables Específicas de DEV
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `GCP_PROJECT_ID_DEV` | ID del proyecto GCP de desarrollo | `new-ponti-dev` |
+| `SERVICE_NAME_DEV` | Nombre del servicio en Cloud Run dev | `ponti-backend` |
+| `CLOUD_RUN_SERVICE_ACCOUNT_DEV` | Service Account para Cloud Run dev | `cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com` |
+| `WIF_PROVIDER_DEV` | Workload Identity Provider para dev | `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
+| `WIF_SERVICE_ACCOUNT_DEV` | Service Account para Workload Identity dev | `github-actions@new-ponti-dev.iam.gserviceaccount.com` |
+
+### Variables Específicas de PROD
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `GCP_PROJECT_ID_PROD` | ID del proyecto GCP de producción | `new-ponti-prod` |
+| `SERVICE_NAME_PROD` | Nombre del servicio en Cloud Run prod | `ponti-backend-prod` |
+| `CLOUD_RUN_SERVICE_ACCOUNT_PROD` | Service Account para Cloud Run prod | `cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com` |
+| `WIF_PROVIDER_PROD` | Workload Identity Provider para prod | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
+| `WIF_SERVICE_ACCOUNT_PROD` | Service Account para Workload Identity prod | `github-actions@new-ponti-prod.iam.gserviceaccount.com` |
+
+> **Nota**: El workflow selecciona automáticamente las variables correctas según la rama desplegada (`develop` → dev, `main` → prod).
 
 ### Crear Workload Identity Pool y Provider
 
@@ -111,42 +132,78 @@ cat github-actions-key.json
 
 ## Ramas y Ambientes
 
-| Rama | Tag de imagen | DEPLOY_ENV |
-|------|---------------|------------|
-| `dev` | `dev` | `dev` |
-| `staging` | `stg` | `stg` |
-| `main` | `prod` | `prod` |
+| Rama | Proyecto GCP | Tag de imagen | DEPLOY_ENV | Servicio Cloud Run |
+|------|--------------|---------------|------------|-------------------|
+| `develop` | `new-ponti-dev` | `dev` | `dev` | `ponti-backend` |
+| `staging` | `new-ponti-dev` | `stg` | `stg` | `ponti-backend` |
+| `main` | `new-ponti-prod` | `prod` | `prod` | `ponti-backend-prod` |
 
 ## Flujo de Deploy
 
 ```
-push to dev     → build → push :dev  → deploy (DEPLOY_ENV=dev)
-push to staging → build → push :stg  → deploy (DEPLOY_ENV=stg)
-push to main    → build → push :prod → deploy (DEPLOY_ENV=prod)
+push to develop → build → push :dev  → deploy a new-ponti-dev (DEPLOY_ENV=dev)
+push to main    → build → push :prod → deploy a new-ponti-prod (DEPLOY_ENV=prod) [requiere aprobación]
+workflow_dispatch (manual) → preview en dev con DB por rama
 ```
+
+> **Importante**: 
+> - Deploys a `main` van al proyecto **`new-ponti-prod`** (aislado de dev)
+> - Deploys a `main` requieren aprobación si hay environment protection configurado
+> - El servicio en prod es privado (`--no-allow-unauthenticated`)
+
+## Arquitectura de Proyectos
+
+El sistema usa **dos proyectos GCP separados** para aislamiento completo:
+
+- **`new-ponti-dev`**: Desarrollo y staging
+  - Cloud SQL con IP pública o privada
+  - Servicio público
+  - Sin aprobaciones requeridas
+
+- **`new-ponti-prod`**: Producción
+  - Cloud SQL con IP privada (recomendado)
+  - Servicio privado
+  - Requiere aprobación para deploy
 
 ## Estrategia recomendada: preview por rama (DB por rama)
 
 Para evitar conflictos de migraciones cuando se deployan ramas con diferentes versiones:
 
-- `rama x` → **DB rama x** (preview)
-- `develop` → **DB dev**
-- `main` → **DB prod**
+- `rama x` → **DB rama x** (preview en proyecto dev)
+- `develop` → **DB dev** (proyecto dev)
+- `main` → **DB prod** (proyecto prod)
 
-**Nombres sugeridos:**
-- Servicio: `ponti-backend-<branch_slug>`
-- DB: `ponti_api_db_<branch_slug>`
+**Nombres actuales:**
+- Servicio preview: `ponti-backend-dev-preview-<branch-slug>`
+- DB preview: `branch_<branch_slug>`
 
 **Limpieza:**
-- Eliminar servicio y DB al cerrar/mergear la rama.
+- Automatica al cerrar PR (merge o close)
+- Cron semanal como respaldo
 
 ## Variables de aplicación en Cloud Run
 
-Las variables de la aplicación se configuran en el servicio de Cloud Run y **no** en GitHub Actions:
+Las variables de la aplicación se configuran en el servicio de Cloud Run y **no** en GitHub Actions.
 
+### Para DEV:
 ```bash
-gcloud run services update <SERVICE_NAME> \
-  --project=<PROJECT_ID> \
-  --region=<REGION> \
+gcloud run services update ponti-backend \
+  --project=new-ponti-dev \
+  --region=us-central1 \
   --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=***,DB_NAME=***,DB_SSL_MODE=disable,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
 ```
+
+### Para PROD:
+```bash
+gcloud run services update ponti-backend-prod \
+  --project=new-ponti-prod \
+  --region=us-central1 \
+  --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=prod,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME,DB_NAME=***,DB_SSL_MODE=require,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+```
+
+> **Nota**: En prod, `DB_HOST` debe usar el formato Unix socket para Cloud SQL y `DB_SSL_MODE=require`.
+
+## Documentación Relacionada
+
+- [DEPLOY.md](./DEPLOY.md) - Guía general de despliegue
+- [SETUP_PROD.md](./SETUP_PROD.md) - Guía completa para crear y configurar el proyecto de producción
