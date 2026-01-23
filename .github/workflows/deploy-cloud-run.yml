@@ -257,10 +257,8 @@ jobs:
 
           echo "::notice::Using preview database: ${DB_NAME} (instance: ${INSTANCE_CONN})"
 
-          if [ "$RESET_DB" = "true" ]; then
-            echo "::warning::Reset requested: DROPPING database ${DB_NAME}"
-            gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet || true
-          fi
+          echo "::warning::Reset automático: DROPPING database ${DB_NAME}"
+          gcloud sql databases delete "$DB_NAME" --project="$INSTANCE_PROJECT" --instance="$INSTANCE_NAME" --quiet || true
 
           echo "instance_project=${INSTANCE_PROJECT}" >> "$GITHUB_OUTPUT"
           echo "instance_name=${INSTANCE_NAME}" >> "$GITHUB_OUTPUT"
@@ -288,12 +286,6 @@ jobs:
           RESET_DB: ${{ github.event.inputs.reset_db }}
           DB_EXISTED: ${{ steps.ensure_preview_db.outputs.db_existed }}
         run: |
-          # Solo seedear cuando la DB se creó recién o cuando se pidió reset
-          if [ "$RESET_DB" != "true" ] && [ "$DB_EXISTED" = "true" ]; then
-            echo "::notice::Preview DB ya existe y no se pidió reset. Se omite seed."
-            exit 0
-          fi
-
           # Buscar bucket de backups en el proyecto (sin hardcodear)
           BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python -c 'import sys; buckets=[line.strip() for line in sys.stdin if line.strip()]; name=next((b for b in buckets if "backup" in b and "dev" in b), buckets[0] if buckets else ""); print(name)')
 
@@ -302,14 +294,22 @@ jobs:
             exit 1
           fi
 
-          SEED_OBJECT=$(gcloud storage ls "gs://${BUCKET_NAME}/preview-seeds/" --format=gsutil | python -c 'import sys; items=[line.strip() for line in sys.stdin if line.strip()]; print(items[-1].rsplit("/",1)[-1] if items else "")')
-
-          if [ -z "$SEED_OBJECT" ]; then
-            echo "::error::No hay snapshots en gs://${BUCKET_NAME}/preview-seeds/. Cargá uno y reintentá."
+          BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
+          SOURCE_DB_NAME=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="${{ vars.GCP_REGION }}" --format='value(spec.template.spec.containers[0].env[?name="DB_NAME"].value)')
+          if [ -z "$SOURCE_DB_NAME" ]; then
+            echo "::error::No se pudo inferir DB_NAME de origen desde el servicio base '$BASE_SERVICE_NAME'."
+            exit 1
+          fi
+          if echo "$SOURCE_DB_NAME" | grep -q '^branch_'; then
+            echo "::error::SECURITY: DB_NAME de origen no puede ser branch_*. Got: $SOURCE_DB_NAME"
             exit 1
           fi
 
-          SEED_URI="gs://${BUCKET_NAME}/preview-seeds/${SEED_OBJECT}"
+          TS=$(date +"%Y%m%d_%H%M%S")
+          SEED_URI="gs://${BUCKET_NAME}/preview-seeds/preview_seed_${SOURCE_DB_NAME}_${TS}.sql.gz"
+          echo "::notice::Exportando snapshot desde ${SOURCE_DB_NAME} a ${SEED_URI}..."
+          gcloud sql export sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$SOURCE_DB_NAME" --offload --quiet
+
           echo "::notice::Importando snapshot ${SEED_URI} en ${DB_NAME}..."
           gcloud sql import sql "$INSTANCE_NAME" "$SEED_URI" --project="$PROJECT_ID" --database="$DB_NAME" --quiet
 
