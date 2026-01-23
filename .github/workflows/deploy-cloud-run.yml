@@ -296,14 +296,14 @@ jobs:
 
           # Buscar bucket de backups en el proyecto (sin hardcodear)
           BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python - <<'PY'
-import sys
+          import sys
 
-buckets = [line.strip() for line in sys.stdin if line.strip()]
-for name in buckets:
-    if "backup" in name and "dev" in name:
-        print(name)
-        sys.exit(0)
-print(buckets[0] if buckets else "")
+          buckets = [line.strip() for line in sys.stdin if line.strip()]
+          for name in buckets:
+              if "backup" in name and "dev" in name:
+                  print(name)
+                  sys.exit(0)
+          print(buckets[0] if buckets else "")
 PY
           )
 
@@ -316,22 +316,22 @@ PY
             --bucket="$BUCKET_NAME" \
             --prefix="preview-seeds/" \
             --format='json(name,metadata.timeCreated)' | python - <<'PY'
-import json
-import sys
-from datetime import datetime, timezone
+          import json
+          import sys
+          from datetime import datetime, timezone
 
-items = json.load(sys.stdin)
-def parse_time(value):
-    if not value:
-        return datetime.min.replace(tzinfo=timezone.utc)
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+          items = json.load(sys.stdin)
+          def parse_time(value):
+              if not value:
+                  return datetime.min.replace(tzinfo=timezone.utc)
+              return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
-if not items:
-    sys.exit(0)
+          if not items:
+              sys.exit(0)
 
-items.sort(key=lambda x: parse_time(x.get("metadata", {}).get("timeCreated")), reverse=True)
-name = items[0].get("name", "")
-print(name)
+          items.sort(key=lambda x: parse_time(x.get("metadata", {}).get("timeCreated")), reverse=True)
+          name = items[0].get("name", "")
+          print(name)
 PY
           )
 
@@ -382,30 +382,30 @@ PY
             BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
             BASE_ENV_JSON=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="${{ env.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" --format='json(spec.template.spec.containers[0].env)')
             BASE_ENV_VARS=$(python - <<'PY'
-import json
-import sys
+            import json
+            import sys
 
-payload = json.load(sys.stdin)
-envs = payload.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
-override_keys = {
-    "DB_NAME",
-    "DB_SCHEMA",
-    "HTTP_SERVER_PORT",
-    "GO_ENVIRONMENT",
-    "DEPLOY_ENV",
-    "DEPLOY_PLATFORM",
-    "DEPLOY_PROJECT_ROOT",
-}
-parts = []
-for item in envs:
-    name = item.get("name")
-    value = item.get("value")
-    if not name or value is None:
-        continue
-    if name in override_keys:
-        continue
-    parts.append(f"{name}={value}")
-sys.stdout.write(",".join(parts))
+            payload = json.load(sys.stdin)
+            envs = payload.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+            override_keys = {
+                "DB_NAME",
+                "DB_SCHEMA",
+                "HTTP_SERVER_PORT",
+                "GO_ENVIRONMENT",
+                "DEPLOY_ENV",
+                "DEPLOY_PLATFORM",
+                "DEPLOY_PROJECT_ROOT",
+            }
+            parts = []
+            for item in envs:
+                name = item.get("name")
+                value = item.get("value")
+                if not name or value is None:
+                    continue
+                if name in override_keys:
+                    continue
+                parts.append(f"{name}={value}")
+            sys.stdout.write(",".join(parts))
 PY
             <<<"$BASE_ENV_JSON")
             ENV_VARS="${BASE_ENV_VARS},DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
