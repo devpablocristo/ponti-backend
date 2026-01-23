@@ -303,7 +303,7 @@ jobs:
           fi
           
           # --update-env-vars preserva las variables existentes y solo agrega/actualiza las especificadas
-          ENV_VARS="DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080"
+          ENV_VARS="DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun"
           
           if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
             gcloud run deploy "${{ env.SERVICE_NAME }}" \
