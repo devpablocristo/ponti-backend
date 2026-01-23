@@ -350,7 +350,7 @@ jobs:
             # Para previews, copiar envs base del servicio dev y pisar solo las claves necesarias
             BASE_SERVICE_NAME="${{ vars.SERVICE_NAME_DEV }}"
             BASE_ENV_JSON=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="${{ env.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" --format='json(spec.template.spec.containers[0].env)')
-            BASE_ENV_VARS=$(python -c 'import json,sys; payload=json.load(sys.stdin); envs=payload.get("spec",{}).get("template",{}).get("spec",{}).get("containers",[{}])[0].get("env",[]); override={"DB_NAME","DB_SCHEMA","HTTP_SERVER_PORT","GO_ENVIRONMENT","DEPLOY_ENV","DEPLOY_PLATFORM","DEPLOY_PROJECT_ROOT"}; parts=[f"{item.get(\"name\")}={item.get(\"value\")}" for item in envs if item.get("name") and item.get("value") is not None and item.get("name") not in override]; print(",".join(parts), end="")' <<<"$BASE_ENV_JSON")
+            BASE_ENV_VARS=$(python -c 'import json,sys; payload=json.load(sys.stdin); envs=payload.get("spec",{}).get("template",{}).get("spec",{}).get("containers",[{}])[0].get("env",[]); override={"DB_NAME","DB_SCHEMA","HTTP_SERVER_PORT","GO_ENVIRONMENT","DEPLOY_ENV","DEPLOY_PLATFORM","DEPLOY_PROJECT_ROOT"}; parts=[item.get("name") + "=" + str(item.get("value")) for item in envs if item.get("name") and item.get("value") is not None and item.get("name") not in override]; sys.stdout.write(",".join(parts))' <<<"$BASE_ENV_JSON")
             ENV_VARS="${BASE_ENV_VARS},DB_NAME=${DB_NAME},DB_SCHEMA=public,HTTP_SERVER_PORT=8080,GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=${{ env.DEPLOY_ENV }},DEPLOY_PLATFORM=gcp,DEPLOY_PROJECT_ROOT=/app"
             ENV_FLAG="--set-env-vars=${ENV_VARS}"
           else
