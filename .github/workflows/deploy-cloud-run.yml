@@ -344,6 +344,8 @@ jobs:
         run: |
           image_uri="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY }}/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
           DB_NAME="${{ env.DB_NAME }}"
+          SERVICE_NAME="${{ env.SERVICE_NAME }}"
+          SERVICE_NAME=$(echo "$SERVICE_NAME" | tr -d '\r' | tr -d '\n')
 
           # 🔒 Guardrail: en deploys automáticos, no permitir DB_NAME de preview
           if [ "$EVENT_NAME" != "workflow_dispatch" ] && echo "$DB_NAME" | grep -q '^branch_'; then
@@ -372,7 +374,7 @@ jobs:
           fi
           
           if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
-            gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            gcloud run deploy "$SERVICE_NAME" \
               --project="${{ env.GCP_PROJECT_ID }}" \
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
@@ -380,7 +382,7 @@ jobs:
               ${ENV_FLAG} \
               --no-allow-unauthenticated
           else
-            gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            gcloud run deploy "$SERVICE_NAME" \
               --project="${{ env.GCP_PROJECT_ID }}" \
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
