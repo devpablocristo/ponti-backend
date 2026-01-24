@@ -347,6 +347,13 @@ jobs:
           DB_NAME="${{ env.DB_NAME }}"
           SERVICE_NAME="${{ env.SERVICE_NAME }}"
           SERVICE_NAME=$(echo "$SERVICE_NAME" | tr -d '\r' | tr -d '\n')
+          SERVICE_ACCOUNT="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}"
+          if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            CURRENT_SA=$(gcloud run services describe "$SERVICE_NAME" --project="${{ env.GCP_PROJECT_ID }}" --region="${{ vars.GCP_REGION }}" --format='value(spec.template.spec.serviceAccountName)')
+            if [ -n "$CURRENT_SA" ]; then
+              SERVICE_ACCOUNT="$CURRENT_SA"
+            fi
+          fi
 
           # 🔒 Guardrail: en deploys automáticos, no permitir DB_NAME de preview
           if [ "$EVENT_NAME" != "workflow_dispatch" ] && echo "$DB_NAME" | grep -q '^branch_'; then
@@ -379,7 +386,7 @@ jobs:
               --project="${{ env.GCP_PROJECT_ID }}" \
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
-              --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --service-account="$SERVICE_ACCOUNT" \
               ${ENV_FLAG} \
               --no-allow-unauthenticated
           else
@@ -387,7 +394,7 @@ jobs:
               --project="${{ env.GCP_PROJECT_ID }}" \
               --region="${{ vars.GCP_REGION }}" \
               --image="$image_uri" \
-              --service-account="${{ env.CLOUD_RUN_SERVICE_ACCOUNT }}" \
+              --service-account="$SERVICE_ACCOUNT" \
               ${ENV_FLAG} \
               --allow-unauthenticated
           fi
