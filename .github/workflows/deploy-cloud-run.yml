@@ -173,7 +173,8 @@ jobs:
           SERVICE_NAME: ${{ env.SERVICE_NAME }}
         run: |
           SERVICE_NAME=$(echo "$SERVICE_NAME" | tr -d '\r' | tr -d '\n')
-          DB_NAME=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_NAME"].value)')
+          SERVICE_JSON=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format=json)
+          DB_NAME=$(python -c 'import json,sys; data=json.loads(sys.argv[1]); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); value="";\nfor item in env:\n  if item.get("name")=="DB_NAME":\n    value=item.get("value","");\n    break\nprint(value)\n' "$SERVICE_JSON")
           if [ -z "$DB_NAME" ]; then
             echo "::warning::DB_NAME env var not found in Cloud Run service '$SERVICE_NAME'."
             echo "::notice::Env vars configuradas en el servicio:"
