@@ -122,6 +122,7 @@ jobs:
             echo "Missing SERVICE_NAME for environment: $deploy_env" >&2
             exit 1
           fi
+          service_name=$(echo "$service_name" | tr -d '\r' | tr -d '\n')
           if [ -z "$cloud_run_sa" ]; then
             echo "Missing CLOUD_RUN_SERVICE_ACCOUNT for environment: $deploy_env" >&2
             exit 1
