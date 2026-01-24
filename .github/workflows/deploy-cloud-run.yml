@@ -172,6 +172,7 @@ jobs:
           REGION: ${{ vars.GCP_REGION }}
           SERVICE_NAME: ${{ env.SERVICE_NAME }}
         run: |
+          SERVICE_NAME=$(echo "$SERVICE_NAME" | tr -d '\r' | tr -d '\n')
           DB_NAME=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_NAME"].value)')
           if [ -z "$DB_NAME" ]; then
             echo "::warning::DB_NAME env var not found in Cloud Run service '$SERVICE_NAME'. Intentando inferir desde la instancia."
