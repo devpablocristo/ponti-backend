@@ -26,7 +26,7 @@ echo "📁 Directorio de salida: ${OUTPUT_DIR}"
 
 # 1. Schema completo (solo estructura, sin datos)
 echo "📋 1. Exportando schema completo..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U ${DB_USER} -d ${DB_NAME} \
     --schema-only \
     --no-owner \
@@ -35,7 +35,7 @@ docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
 
 # 2. Solo schemas SSOT
 echo "📋 2. Exportando schemas SSOT..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U ${DB_USER} -d ${DB_NAME} \
     --schema=v3_calc \
     --schema=v3_core_ssot \
@@ -50,7 +50,7 @@ docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
 
 # 3. Solo vistas v3_*
 echo "📋 3. Exportando vistas v3_*..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} -t -c "
     SELECT 'CREATE OR REPLACE VIEW ' || schemaname || '.' || viewname || ' AS ' || 
            pg_get_viewdef(schemaname || '.' || viewname, true) || ';'
@@ -61,7 +61,7 @@ docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
 
 # 4. Lista de funciones SSOT
 echo "📋 4. Exportando definiciones de funciones SSOT..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} -t -c "
     SELECT pg_get_functiondef(p.oid) || ';'
     FROM pg_proc p
@@ -72,7 +72,7 @@ docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
 
 # 5. Inventario de objetos
 echo "📋 5. Creando inventario de objetos..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} << 'EOF' > "${OUTPUT_DIR}/05_inventario_objetos.txt"
 -- Esquemas
 SELECT 'SCHEMA: ' || nspname FROM pg_namespace WHERE nspname LIKE 'v3_%' ORDER BY nspname;
@@ -93,7 +93,7 @@ EOF
 
 # 6. Metadata adicional
 echo "📋 6. Exportando metadata..."
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} << 'EOF' > "${OUTPUT_DIR}/06_metadata.txt"
 -- Versión de PostgreSQL
 SELECT version();

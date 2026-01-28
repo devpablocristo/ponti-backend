@@ -62,7 +62,7 @@ Scripts para crear backups del schema de la base de datos antes de hacer cambios
 
 ```bash
 # Restaurar
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U admin -d ponti_api_db < snapshots/snapshot_YYYYMMDD_HHMMSS.sql
 ```
 
@@ -70,11 +70,11 @@ docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
 
 ```bash
 # Restaurar solo schemas SSOT
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U admin -d ponti_api_db < snapshots/antes_fase_1/02_schemas_ssot.sql
 
 # O restaurar todo
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U admin -d ponti_api_db < snapshots/antes_fase_1/01_schema_completo.sql
 ```
 

@@ -12,15 +12,10 @@ LOCAL_DB_HOST="${DB_HOST:-}"
 LOCAL_DB_NAME="${DB_NAME:-}"
 LOCAL_DB_PORT="${DB_PORT:-}"
 
-### ===== Cargar defaults desde .env.gcp.dev (si existe) =====
-DEV_ENV_FILE="${DEV_ENV_FILE:-./projects/ponti-api/.env.gcp.dev}"
-if [[ -f "$DEV_ENV_FILE" ]]; then
-  # shellcheck disable=SC1090
-  set -a && source "$DEV_ENV_FILE" && set +a
-fi
+### ===== No cargar archivos .env por ambiente =====
 
 ### ===== Origen (GCP DEV) =====
-# Defaults apuntan a la DB de dev (.env.gcp.dev)
+# Defaults apuntan a la DB de dev (override por variables de entorno)
 SRC_USER="${SRC_USER:-${DB_USER:-soalen-db-v3}}"
 SRC_PASS="${SRC_PASS:-${DB_PASSWORD:-Soalen*25.}}"
 SRC_HOST="${SRC_HOST:-${DB_HOST:-34.176.31.249}}"

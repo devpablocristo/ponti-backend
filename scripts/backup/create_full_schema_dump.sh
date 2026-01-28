@@ -20,7 +20,7 @@ echo "📸 Generando dump completo del schema: ${SNAPSHOT_NAME}"
 echo "📁 Archivo de salida: ${OUTPUT_FILE}"
 
 # Crear dump completo del schema (sin datos)
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U admin -d ponti_api_db \
     --schema-only \
     --no-owner \

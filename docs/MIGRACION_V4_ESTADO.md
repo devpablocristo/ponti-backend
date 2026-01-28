@@ -1,7 +1,7 @@
 # Migración V4 - Estado Final
 
 ## TLDR
-- Estado final v4 definido en `projects/ponti-api/migrations`.
+- Estado final v4 definido en `migrations`.
 - Schemas v4: `v4_core`, `v4_ssot`, `v4_calc`, `v4_report`.
 - Vistas v4_report finales listadas por dominio.
 - Config vigente: `REPORT_SCHEMA=v4_report`.

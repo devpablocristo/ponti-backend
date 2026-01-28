@@ -15,7 +15,7 @@ mkdir -p snapshots
 echo "📸 Creando snapshot rápido: ${SNAPSHOT_NAME}"
 
 # Exportar solo schemas SSOT y vistas v3_*
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U admin -d ponti_api_db \
     --schema=v3_calc \
     --schema=v3_core_ssot \
@@ -34,7 +34,7 @@ echo "-- ========================================" >> "${OUTPUT_FILE}"
 echo "-- VISTAS v3_*" >> "${OUTPUT_FILE}"
 echo "-- ========================================" >> "${OUTPUT_FILE}"
 
-docker compose -f projects/ponti-api/docker-compose.yml exec -T ponti-db \
+docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U admin -d ponti_api_db -t -c "
     SELECT 'CREATE OR REPLACE VIEW ' || schemaname || '.' || viewname || ' AS ' || 
            pg_get_viewdef(schemaname || '.' || viewname, true) || ';'

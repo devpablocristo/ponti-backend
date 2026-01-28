@@ -6,7 +6,7 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/projects/ponti-api/cmd/api/",
+      "program": "${workspaceFolder}/cmd/api/",
       "cwd": "${workspaceFolder}"
     },
     {
@@ -14,9 +14,9 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/projects/ponti-api/cmd/api/",
+      "program": "${workspaceFolder}/cmd/api/",
       "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/projects/ponti-api/.env",
+      "envFile": "${workspaceFolder}/.env",
       "env": {
         "DEPLOY_PROJECT_ROOT": ".",
         "DB_HOST": "localhost",

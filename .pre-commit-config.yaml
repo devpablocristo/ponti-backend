@@ -1,7 +1,0 @@
-- repo: local
-  hooks:
-    - id: no-op
-      name: No-op
-      entry: "true"
-      language: system
-      pass_filenames: false

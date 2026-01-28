@@ -132,17 +132,17 @@ cat github-actions-key.json
 
 ## Ramas y Ambientes
 
-| Rama | Proyecto GCP | Tag de imagen | DEPLOY_ENV | Servicio Cloud Run |
-|------|--------------|---------------|------------|-------------------|
-| `develop` | `new-ponti-dev` | `dev` | `dev` | `ponti-backend` |
-| `staging` | `new-ponti-dev` | `stg` | `stg` | `ponti-backend` |
-| `main` | `new-ponti-prod` | `prod` | `prod` | `ponti-backend-prod` |
+| Rama | Proyecto GCP | Tag de imagen | Servicio Cloud Run |
+|------|--------------|---------------|-------------------|
+| `develop` | `new-ponti-dev` | `dev` | `ponti-backend` |
+| `staging` | `new-ponti-dev` | `stg` | `ponti-backend` |
+| `main` | `new-ponti-prod` | `prod` | `ponti-backend-prod` |
 
 ## Flujo de Deploy
 
 ```
-push to develop → build → push :dev  → deploy a new-ponti-dev (DEPLOY_ENV=dev)
-push to main    → build → push :prod → deploy a new-ponti-prod (DEPLOY_ENV=prod) [requiere aprobación]
+push to develop → build → push :dev  → deploy a new-ponti-dev
+push to main    → build → push :prod → deploy a new-ponti-prod [requiere aprobación]
 workflow_dispatch (manual) → preview en dev con DB por rama
 ```
 
@@ -190,7 +190,7 @@ Las variables de la aplicación se configuran en el servicio de Cloud Run y **no
 gcloud run services update ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
-  --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=***,DB_NAME=***,DB_SSL_MODE=disable,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+  --update-env-vars="APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=***,DB_NAME=***,DB_SSL_MODE=disable,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
 ```
 
 ### Para PROD:
@@ -198,7 +198,7 @@ gcloud run services update ponti-backend \
 gcloud run services update ponti-backend-prod \
   --project=new-ponti-prod \
   --region=us-central1 \
-  --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=prod,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME,DB_NAME=***,DB_SSL_MODE=require,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+  --update-env-vars="APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=***,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=***,DB_PASSWORD=***,DB_HOST=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME,DB_NAME=***,DB_SSL_MODE=require,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
 ```
 
 > **Nota**: En prod, `DB_HOST` debe usar el formato Unix socket para Cloud SQL y `DB_SSL_MODE=require`.

@@ -19,9 +19,6 @@ Estas variables se configuran en el servicio, no en Actions.
 ### Minimas
 | Variable | Descripcion | Ejemplo |
 |----------|-------------|---------|
-| `GO_ENVIRONMENT` | Debe estar en `production` para evitar `.env` | `production` |
-| `DEPLOY_ENV` | `dev` o `prod` | `dev` |
-| `DEPLOY_PLATFORM` | `gcp` | `gcp` |
 | `DB_TYPE` | `postgres` | `postgres` |
 | `DB_HOST` | Host/IP de Postgres | `136.112.24.122` |
 | `DB_PORT` | Puerto | `5432` |
@@ -60,10 +57,6 @@ Workflow: `.github/workflows/cleanup-preview.yml`
 - **Cron semanal**: limpia DBs `branch_*` y snapshots restantes.
 
 ## Troubleshooting rapido
-### Error: "no se pudo cargar el archivo .env base"
-**Causa**: `GO_ENVIRONMENT` no esta seteado en Cloud Run.  
-**Solucion**: setear `GO_ENVIRONMENT=production`.
-
 ### Error: "container failed to start" + errores de DB
 **Causa**: variables de DB faltantes o DB preview sin datos.  
 **Solucion**: correr `workflow_dispatch` (se resetea y se importan datos siempre).
