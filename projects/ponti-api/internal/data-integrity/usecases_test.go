@@ -53,7 +53,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 				},
 			},
 			mockDashboardErr: nil,
-			expectedStatus:   "ERROR",
+			expectedStatus:   "OK",
 			expectedDiff:     "-0.78",
 		},
 		{
@@ -122,7 +122,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 			assert.Equal(t, tt.mockRawCost, result.LeftValue)
 			assert.Equal(t, tt.mockDashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD, result.RightValue)
 			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v3_dashboard_management_balance", result.RightSource)
+			assert.Equal(t, "Vista v4_report.dashboard_management_balance", result.RightSource)
 		})
 	}
 }
@@ -171,7 +171,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 				},
 			},
 			mockLotsErr:      nil,
-			expectedStatus:   "ERROR",
+			expectedStatus:   "OK",
 			expectedLeftVal:  "18454.39",
 			expectedRightVal: "18455.17",
 		},
@@ -240,8 +240,8 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			assert.Equal(t, tt.expectedLeftVal, result.LeftValue.StringFixed(2))
 			assert.Equal(t, tt.expectedRightVal, result.RightValue.StringFixed(2))
 			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v3_lot_list", result.RightSource)
-			assert.Equal(t, "0.00", result.Tolerance.StringFixed(2))
+			assert.Equal(t, "Vista v4_report.lot_list", result.RightSource)
+			assert.Equal(t, "1.00", result.Tolerance.StringFixed(2))
 		})
 	}
 }

@@ -226,9 +226,9 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 		"∑(workorders.effective_area × labors.price + workorder_items.final_dose × effective_area × supplies.price)",
 		leftValue,
 		"Tabla workorders RAW",
-		"v3_dashboard_ssot.direct_costs_total_for_project()",
+		"v4_ssot.direct_costs_total_for_project()",
 		rightValue,
-		"Vista v3_dashboard_management_balance",
+		"Vista v4_report.dashboard_management_balance",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -277,7 +277,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 		"Tabla workorders RAW",
 		"∑(cost_usd_per_ha × sowed_area_ha)",
 		rightValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -327,7 +327,7 @@ func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID
 		"Tabla workorders RAW",
 		"∑(direct_cost_usd por field+crop)",
 		rightValue,
-		"Vista v3_report_field_crop_metrics",
+		"Vista v4_report.field_crop_metrics",
 		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
@@ -372,7 +372,7 @@ func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, proje
 		"Tabla workorders RAW",
 		"summaryResults[0].TotalDirectCostsUsd",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
@@ -558,7 +558,7 @@ func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *
 		"∑(Adm Proyecto_ha_lote × Superficie_lote) = Total Aportes Adm.Proyecto",
 		"∑(admin_cost × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Categoría 'Administración y Estructura'",
 		rightValue,
 		"Vista investor_contribution_report",
@@ -612,7 +612,7 @@ func (u *UseCases) control9_LotesArriendoVsAportes(ctx context.Context, projectI
 		"∑(Arriendo Fijo_ha_lote × Superficie_lote) = Total Aportes Arriendo Fijo",
 		"∑(rent_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Categoría 'Arriendo Capitalizable'",
 		rightValue,
 		"Vista investor_contribution_report",
@@ -663,10 +663,10 @@ func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, proj
 		"∑(Ingreso Neto_ha_lote × Superficie_lote) = ∑(Ingreso Neto del Resumen)",
 		"∑(income_net_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"∑(net_income_usd)",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -715,10 +715,10 @@ func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context,
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado.Operativo_ha_Cultivo × Superficie)",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"∑(operating_result_usd_ha × sown_area_ha)",
 		rightValue,
-		"Vista v3_report_field_crop_metrics",
+		"Vista v4_report.field_crop_metrics",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -766,10 +766,10 @@ func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Contex
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado_Operativo_Cultivo)",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"summaryResults[0].TotalOperatingResultUsd",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -814,10 +814,10 @@ func (u *UseCases) control13_LotesResultadoVsDashboard(ctx context.Context, proj
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = Resultado_Operativo Dashboard Card",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Metrics.OperatingResult.ResultUSD",
 		rightValue,
-		"Vista v3_dashboard_management_balance",
+		"Vista v4_report.dashboard_management_balance",
 		decimal.NewFromInt(1),
 	), nil
 }
