@@ -1,4 +1,4 @@
-package app_parameters
+package business_parameters
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/app-parameters/handler/dto"
+	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters/handler/dto"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -35,17 +35,17 @@ func (h *Handler) Routes() {
 }
 
 // GetParameter obtiene un parámetro por su clave
-// @Summary Get app parameter by key
-// @Description Get an app parameter by its key
-// @Tags app-parameters
+// @Summary Get business parameter by key
+// @Description Get a business parameter by its key
+// @Tags business-parameters
 // @Accept json
 // @Produce json
 // @Param key path string true "Parameter key"
-// @Success 200 {object} dto.AppParameterResponse
+// @Success 200 {object} dto.BusinessParameterResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters/{key} [get]
+// @Router /business-parameters/{key} [get]
 func (h *Handler) GetParameter(c *gin.Context) {
 	key := c.Param("key")
 	if key == "" {
@@ -57,14 +57,14 @@ func (h *Handler) GetParameter(c *gin.Context) {
 
 	param, err := h.useCases.GetParameter(c.Request.Context(), key)
 	if err != nil {
-		if err.Error() == "app parameter not found" {
+		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "app parameter not found",
+				Error: "business parameter not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get app parameter",
+			Error: "failed to get business parameter",
 		})
 		return
 	}
@@ -73,16 +73,16 @@ func (h *Handler) GetParameter(c *gin.Context) {
 }
 
 // GetParametersByCategory obtiene parámetros por categoría
-// @Summary Get app parameters by category
-// @Description Get all app parameters filtered by category
-// @Tags app-parameters
+// @Summary Get business parameters by category
+// @Description Get all business parameters filtered by category
+// @Tags business-parameters
 // @Accept json
 // @Produce json
 // @Param category path string true "Parameter category"
-// @Success 200 {array} dto.AppParameterResponse
+// @Success 200 {array} dto.BusinessParameterResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters/category/{category} [get]
+// @Router /business-parameters/category/{category} [get]
 func (h *Handler) GetParametersByCategory(c *gin.Context) {
 	category := c.Param("category")
 	if category == "" {
@@ -95,12 +95,12 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 	params, err := h.useCases.GetParametersByCategory(c.Request.Context(), category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get app parameters by category",
+			Error: "failed to get business parameters by category",
 		})
 		return
 	}
 
-	response := make([]dto.AppParameterResponse, len(params))
+	response := make([]dto.BusinessParameterResponse, len(params))
 	for i, param := range params {
 		response[i] = dto.FromDomain(&param)
 	}
@@ -109,24 +109,24 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 }
 
 // GetAllParameters obtiene todos los parámetros
-// @Summary Get all app parameters
-// @Description Get all app parameters
-// @Tags app-parameters
+// @Summary Get all business parameters
+// @Description Get all business parameters
+// @Tags business-parameters
 // @Accept json
 // @Produce json
-// @Success 200 {array} dto.AppParameterResponse
+// @Success 200 {array} dto.BusinessParameterResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters [get]
+// @Router /business-parameters [get]
 func (h *Handler) GetAllParameters(c *gin.Context) {
 	params, err := h.useCases.GetAllParameters(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get all app parameters",
+			Error: "failed to get all business parameters",
 		})
 		return
 	}
 
-	response := make([]dto.AppParameterResponse, len(params))
+	response := make([]dto.BusinessParameterResponse, len(params))
 	for i, param := range params {
 		response[i] = dto.FromDomain(&param)
 	}
@@ -135,18 +135,18 @@ func (h *Handler) GetAllParameters(c *gin.Context) {
 }
 
 // CreateParameter crea un nuevo parámetro
-// @Summary Create app parameter
-// @Description Create a new app parameter
-// @Tags app-parameters
+// @Summary Create business parameter
+// @Description Create a new business parameter
+// @Tags business-parameters
 // @Accept json
 // @Produce json
-// @Param request body dto.CreateAppParameterRequest true "Create parameter request"
-// @Success 201 {object} dto.AppParameterResponse
+// @Param request body dto.CreateBusinessParameterRequest true "Create business parameter request"
+// @Success 201 {object} dto.BusinessParameterResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters [post]
+// @Router /business-parameters [post]
 func (h *Handler) CreateParameter(c *gin.Context) {
-	var req dto.CreateAppParameterRequest
+	var req dto.CreateBusinessParameterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{
 			Error: "invalid request body",
@@ -164,7 +164,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 	id, err := h.useCases.CreateParameter(c.Request.Context(), param)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to create app parameter",
+			Error: "failed to create business parameter",
 		})
 		return
 	}
@@ -174,18 +174,18 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 }
 
 // UpdateParameter actualiza un parámetro existente
-// @Summary Update app parameter
-// @Description Update an existing app parameter
-// @Tags app-parameters
+// @Summary Update business parameter
+// @Description Update an existing business parameter
+// @Tags business-parameters
 // @Accept json
 // @Produce json
 // @Param id path int true "Parameter ID"
-// @Param request body dto.UpdateAppParameterRequest true "Update parameter request"
-// @Success 200 {object} dto.AppParameterResponse
+// @Param request body dto.UpdateBusinessParameterRequest true "Update business parameter request"
+// @Success 200 {object} dto.BusinessParameterResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters/{id} [put]
+// @Router /business-parameters/{id} [put]
 func (h *Handler) UpdateParameter(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -196,7 +196,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 		return
 	}
 
-	var req dto.UpdateAppParameterRequest
+	var req dto.UpdateBusinessParameterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{
 			Error: "invalid request body",
@@ -212,14 +212,14 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 
 	err = h.useCases.UpdateParameter(c.Request.Context(), param)
 	if err != nil {
-		if err.Error() == "app parameter not found" {
+		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "app parameter not found",
+				Error: "business parameter not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to update app parameter",
+			Error: "failed to update business parameter",
 		})
 		return
 	}
@@ -228,9 +228,9 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 }
 
 // DeleteParameter elimina un parámetro
-// @Summary Delete app parameter
-// @Description Delete an app parameter
-// @Tags app-parameters
+// @Summary Delete business parameter
+// @Description Delete a business parameter
+// @Tags business-parameters
 // @Accept json
 // @Produce json
 // @Param id path int true "Parameter ID"
@@ -238,7 +238,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /app-parameters/{id} [delete]
+// @Router /business-parameters/{id} [delete]
 func (h *Handler) DeleteParameter(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -251,14 +251,14 @@ func (h *Handler) DeleteParameter(c *gin.Context) {
 
 	err = h.useCases.DeleteParameter(c.Request.Context(), id)
 	if err != nil {
-		if err.Error() == "app parameter not found" {
+		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "app parameter not found",
+				Error: "business parameter not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to delete app parameter",
+			Error: "failed to delete business parameter",
 		})
 		return
 	}

@@ -10,7 +10,7 @@ import (
 
 	gormRepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 
-	appparametermodels "github.com/alphacodinggroup/ponti-backend/internal/app-parameters/repository/models"
+	businessparametermodels "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/repository/models"
 	campaignmodels "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
 	categorymodels "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
 	classtypemodels "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
@@ -27,7 +27,6 @@ import (
 	projectmodels "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
 	stockmodels "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	supplyMovementmodels "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	workordermodels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 )
 
@@ -57,7 +56,7 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&fieldmodels.FieldInvestor{},
 		&lotmodels.Lot{},
 		&categorymodels.Category{},
-		&appparametermodels.AppParameter{},
+		&businessparametermodels.BusinessParameter{},
 		&classtypemodels.ClassType{},
 		&supplymodels.Supply{},
 		&dollarmodels.ProjectDollarValue{},
@@ -67,7 +66,7 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&projectmodels.AdminCostInvestor{},
 		&invoicemodels.Invoice{},
 		&projectmodels.Project{},
-		&supplyMovementmodels.SupplyMovement{},
+		&supplymodels.SupplyMovement{},
 		&stockmodels.Stock{},
 	}
 

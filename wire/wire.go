@@ -10,7 +10,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 
 	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	app_parameters "github.com/alphacodinggroup/ponti-backend/internal/app-parameters"
+	business_parameters "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	campaign "github.com/alphacodinggroup/ponti-backend/internal/campaign"
 	category "github.com/alphacodinggroup/ponti-backend/internal/category"
 	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type"
@@ -36,33 +36,33 @@ import (
 )
 
 type Dependencies struct {
-	Config                   *config.Config
-	GinEngine                *gin.Server
-	GormRepo                 *gorm.Repository
-	Middlewares              *mwr.Middlewares
-	WordsSuggester           *sug.WordsSuggester
-	CustomerHandler          *customer.Handler
-	CampaignHandler          *campaign.Handler
-	DashboardHandler         *dashboard.Handler
-	DataIntegrityHandler     *data_integrity.Handler
-	InvestorHandler          *investor.Handler
-	CropHandler              *crop.Handler
-	LotHandler               *lot.Handler
-	FieldHandler             *field.Handler
-	ManagerHandler           *manager.Handler
-	ProjectHandler           *project.Handler
-	ReportHandler            *report.ReportHandler
-	LeaseTypeHandler         *leasetype.Handler
-	SupplyHandler            *supply.Handler
-	CategoryHandler          *category.Handler
-	AppParametersHandler     *app_parameters.Handler
-	ClassTypeHandler         *classtype.Handler
-	DollarHandler            *dollar.Handler
-	WorkorderHandler         *workorder.Handler
-	LaborHandler             *labor.Handler
-	InvoiceHandler           *invoice.Handler
-	CommercializationHandler *commercialization.Handler
-	StockHandler             *stock.Handler
+	Config                    *config.Config
+	GinEngine                 *gin.Server
+	GormRepo                  *gorm.Repository
+	Middlewares               *mwr.Middlewares
+	WordsSuggester            *sug.WordsSuggester
+	CustomerHandler           *customer.Handler
+	CampaignHandler           *campaign.Handler
+	DashboardHandler          *dashboard.Handler
+	DataIntegrityHandler      *data_integrity.Handler
+	InvestorHandler           *investor.Handler
+	CropHandler               *crop.Handler
+	LotHandler                *lot.Handler
+	FieldHandler              *field.Handler
+	ManagerHandler            *manager.Handler
+	ProjectHandler            *project.Handler
+	ReportHandler             *report.ReportHandler
+	LeaseTypeHandler          *leasetype.Handler
+	SupplyHandler             *supply.Handler
+	CategoryHandler           *category.Handler
+	BusinessParametersHandler *business_parameters.Handler
+	ClassTypeHandler          *classtype.Handler
+	DollarHandler             *dollar.Handler
+	WorkorderHandler          *workorder.Handler
+	LaborHandler              *labor.Handler
+	InvoiceHandler            *invoice.Handler
+	CommercializationHandler  *commercialization.Handler
+	StockHandler              *stock.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -87,7 +87,7 @@ func Initialize() (*Dependencies, error) {
 		LeaseTypeSet,
 		SupplySet,
 		CategorySet,
-		AppParametersSet,
+		BusinessParametersSet,
 		ClassTypeSet,
 		DollarSet,
 		WorkorderSet,

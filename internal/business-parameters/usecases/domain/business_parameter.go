@@ -9,7 +9,7 @@ import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
 
-type AppParameter struct {
+type BusinessParameter struct {
 	ID          int64
 	Key         string
 	Value       string
@@ -21,7 +21,7 @@ type AppParameter struct {
 }
 
 // GetValueAsDecimal convierte el valor a decimal.Decimal
-func (ap *AppParameter) GetValueAsDecimal() (decimal.Decimal, error) {
+func (ap *BusinessParameter) GetValueAsDecimal() (decimal.Decimal, error) {
 	if ap.Type != "decimal" {
 		return decimal.Zero, fmt.Errorf("parameter %s is not of type decimal", ap.Key)
 	}
@@ -33,7 +33,7 @@ func (ap *AppParameter) GetValueAsDecimal() (decimal.Decimal, error) {
 }
 
 // GetValueAsInteger convierte el valor a int64
-func (ap *AppParameter) GetValueAsInteger() (int64, error) {
+func (ap *BusinessParameter) GetValueAsInteger() (int64, error) {
 	if ap.Type != "integer" {
 		return 0, fmt.Errorf("parameter %s is not of type integer", ap.Key)
 	}
@@ -41,7 +41,7 @@ func (ap *AppParameter) GetValueAsInteger() (int64, error) {
 }
 
 // GetValueAsBoolean convierte el valor a bool
-func (ap *AppParameter) GetValueAsBoolean() (bool, error) {
+func (ap *BusinessParameter) GetValueAsBoolean() (bool, error) {
 	if ap.Type != "boolean" {
 		return false, fmt.Errorf("parameter %s is not of type boolean", ap.Key)
 	}

@@ -1,10 +1,10 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/app-parameters/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
 )
 
-type AppParameterResponse struct {
+type BusinessParameterResponse struct {
 	ID          int64  `json:"id"`
 	Key         string `json:"key"`
 	Value       string `json:"value"`
@@ -15,7 +15,7 @@ type AppParameterResponse struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
-type CreateAppParameterRequest struct {
+type CreateBusinessParameterRequest struct {
 	Key         string `json:"key" binding:"required"`
 	Value       string `json:"value" binding:"required"`
 	Type        string `json:"type" binding:"required,oneof=decimal integer string boolean"`
@@ -23,7 +23,7 @@ type CreateAppParameterRequest struct {
 	Description string `json:"description"`
 }
 
-type UpdateAppParameterRequest struct {
+type UpdateBusinessParameterRequest struct {
 	Key         string `json:"key" binding:"required"`
 	Value       string `json:"value" binding:"required"`
 	Type        string `json:"type" binding:"required,oneof=decimal integer string boolean"`
@@ -31,8 +31,8 @@ type UpdateAppParameterRequest struct {
 	Description string `json:"description"`
 }
 
-func FromDomain(param *domain.AppParameter) AppParameterResponse {
-	return AppParameterResponse{
+func FromDomain(param *domain.BusinessParameter) BusinessParameterResponse {
+	return BusinessParameterResponse{
 		ID:          param.ID,
 		Key:         param.Key,
 		Value:       param.Value,
@@ -44,8 +44,8 @@ func FromDomain(param *domain.AppParameter) AppParameterResponse {
 	}
 }
 
-func (req *CreateAppParameterRequest) ToDomain() *domain.AppParameter {
-	return &domain.AppParameter{
+func (req *CreateBusinessParameterRequest) ToDomain() *domain.BusinessParameter {
+	return &domain.BusinessParameter{
 		Key:         req.Key,
 		Value:       req.Value,
 		Type:        req.Type,
@@ -54,8 +54,8 @@ func (req *CreateAppParameterRequest) ToDomain() *domain.AppParameter {
 	}
 }
 
-func (req *UpdateAppParameterRequest) ToDomain(id int64) *domain.AppParameter {
-	return &domain.AppParameter{
+func (req *UpdateBusinessParameterRequest) ToDomain(id int64) *domain.BusinessParameter {
+	return &domain.BusinessParameter{
 		ID:          id,
 		Key:         req.Key,
 		Value:       req.Value,

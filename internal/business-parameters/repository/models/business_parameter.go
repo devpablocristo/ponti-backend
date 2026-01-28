@@ -1,12 +1,12 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/app-parameters/usecases/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
-type AppParameter struct {
+type BusinessParameter struct {
 	ID          int64  `gorm:"primaryKey;autoIncrement;column:id"`
 	Key         string `gorm:"uniqueIndex;size:100;not null"`
 	Value       string `gorm:"size:255;not null"`
@@ -17,8 +17,8 @@ type AppParameter struct {
 	sharedmodels.Base
 }
 
-func (m *AppParameter) ToDomain() *domain.AppParameter {
-	return &domain.AppParameter{
+func (m *BusinessParameter) ToDomain() *domain.BusinessParameter {
+	return &domain.BusinessParameter{
 		ID:          m.ID,
 		Key:         m.Key,
 		Value:       m.Value,
@@ -34,8 +34,8 @@ func (m *AppParameter) ToDomain() *domain.AppParameter {
 	}
 }
 
-func FromDomain(d *domain.AppParameter) *AppParameter {
-	return &AppParameter{
+func FromDomain(d *domain.BusinessParameter) *BusinessParameter {
+	return &BusinessParameter{
 		ID:          d.ID,
 		Key:         d.Key,
 		Value:       d.Value,

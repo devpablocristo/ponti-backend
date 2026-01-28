@@ -99,6 +99,13 @@ PY
 }
 # trap removido para permitir que el script continúe con errores menores
 
+### ===== Validaciones de credenciales origen =====
+if [[ -z "${SRC_USER}" || -z "${SRC_PASS}" ]]; then
+  err "Faltan credenciales de origen. Definí SRC_USER y SRC_PASS."
+  err "Ejemplo: SRC_USER=... SRC_PASS=... ./download-gcp-db.sh"
+  exit 1
+fi
+
 ### ===== Chequeo binarios =====
 need psql; need pg_dump; need pg_restore; need pg_isready
 
@@ -222,6 +229,11 @@ else
       exit 1
     fi
   done
+fi
+
+if [[ ! -s "$DUMP_FILE" ]]; then
+  err "El dump generado está vacío o incompleto: ${DUMP_FILE}"
+  exit 1
 fi
 
 log "Contenido del dump (primeras 20 líneas):"

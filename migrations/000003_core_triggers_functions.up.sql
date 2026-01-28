@@ -5,46 +5,46 @@
 
 BEGIN;
 
--- Funciones de parámetros de aplicación
-CREATE OR REPLACE FUNCTION public.get_app_parameter(p_key varchar)
+-- Funciones de parámetros de negocio
+CREATE OR REPLACE FUNCTION public.get_business_parameter(p_key varchar)
 RETURNS varchar AS $$
 BEGIN
-  RETURN (SELECT value FROM public.app_parameters WHERE key = p_key);
+  RETURN (SELECT value FROM public.business_parameters WHERE key = p_key);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION public.get_app_parameter_decimal(p_key varchar)
+CREATE OR REPLACE FUNCTION public.get_business_parameter_decimal(p_key varchar)
 RETURNS decimal AS $$
 BEGIN
-  RETURN (SELECT value::decimal FROM public.app_parameters WHERE key = p_key);
+  RETURN (SELECT value::decimal FROM public.business_parameters WHERE key = p_key);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION public.get_app_parameter_integer(p_key varchar)
+CREATE OR REPLACE FUNCTION public.get_business_parameter_integer(p_key varchar)
 RETURNS integer AS $$
 BEGIN
-  RETURN (SELECT value::integer FROM public.app_parameters WHERE key = p_key);
+  RETURN (SELECT value::integer FROM public.business_parameters WHERE key = p_key);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION public.get_iva_percentage()
 RETURNS decimal AS $$
 BEGIN
-  RETURN public.get_app_parameter_decimal('iva_percentage');
+  RETURN public.get_business_parameter_decimal('iva_percentage');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION public.get_campaign_closure_days()
 RETURNS integer AS $$
 BEGIN
-  RETURN public.get_app_parameter_integer('campaign_closure_days');
+  RETURN public.get_business_parameter_integer('campaign_closure_days');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION public.get_default_fx_rate()
 RETURNS decimal AS $$
 BEGIN
-  RETURN public.get_app_parameter_decimal('default_fx_rate');
+  RETURN public.get_business_parameter_decimal('default_fx_rate');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 

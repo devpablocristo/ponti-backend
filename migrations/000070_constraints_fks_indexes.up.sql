@@ -14,11 +14,11 @@ ALTER TABLE ONLY public.users
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_username_key UNIQUE (username);
 
-ALTER TABLE ONLY public.app_parameters
-    ADD CONSTRAINT app_parameters_key_key UNIQUE (key);
+ALTER TABLE ONLY public.business_parameters
+    ADD CONSTRAINT business_parameters_key_key UNIQUE (key);
 
-ALTER TABLE ONLY public.app_parameters
-    ADD CONSTRAINT app_parameters_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.business_parameters
+    ADD CONSTRAINT business_parameters_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.fx_rates
     ADD CONSTRAINT fx_rates_pkey PRIMARY KEY (id);
@@ -352,9 +352,9 @@ ALTER TABLE ONLY public.invoices
 
 CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at);
 
-CREATE INDEX idx_app_parameters_category ON public.app_parameters USING btree (category);
+CREATE INDEX idx_business_parameters_category ON public.business_parameters USING btree (category);
 
-CREATE INDEX idx_app_parameters_key ON public.app_parameters USING btree (key);
+CREATE INDEX idx_business_parameters_key ON public.business_parameters USING btree (key);
 
 CREATE INDEX idx_fx_rates_effective_date ON public.fx_rates USING btree (effective_date);
 

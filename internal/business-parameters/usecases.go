@@ -1,18 +1,18 @@
-package app_parameters
+package business_parameters
 
 import (
 	"context"
 
+	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/app-parameters/usecases/domain"
 )
 
 type RepositoryPort interface {
-	GetByKey(ctx context.Context, key string) (*domain.AppParameter, error)
-	ListByCategory(ctx context.Context, category string) ([]domain.AppParameter, error)
-	ListAll(ctx context.Context) ([]domain.AppParameter, error)
-	Create(ctx context.Context, item *domain.AppParameter) (int64, error)
-	Update(ctx context.Context, item *domain.AppParameter) error
+	GetByKey(ctx context.Context, key string) (*domain.BusinessParameter, error)
+	ListByCategory(ctx context.Context, category string) ([]domain.BusinessParameter, error)
+	ListAll(ctx context.Context) ([]domain.BusinessParameter, error)
+	Create(ctx context.Context, item *domain.BusinessParameter) (int64, error)
+	Update(ctx context.Context, item *domain.BusinessParameter) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -26,7 +26,7 @@ func NewUseCases(repository RepositoryPort) *UseCases {
 	}
 }
 
-func (u *UseCases) GetParameter(ctx context.Context, key string) (*domain.AppParameter, error) {
+func (u *UseCases) GetParameter(ctx context.Context, key string) (*domain.BusinessParameter, error) {
 	if key == "" {
 		return nil, types.NewError(types.ErrInvalidInput, "key is required", nil)
 	}
@@ -34,7 +34,7 @@ func (u *UseCases) GetParameter(ctx context.Context, key string) (*domain.AppPar
 	return u.repository.GetByKey(ctx, key)
 }
 
-func (u *UseCases) GetParametersByCategory(ctx context.Context, category string) ([]domain.AppParameter, error) {
+func (u *UseCases) GetParametersByCategory(ctx context.Context, category string) ([]domain.BusinessParameter, error) {
 	if category == "" {
 		return nil, types.NewError(types.ErrInvalidInput, "category is required", nil)
 	}
@@ -42,11 +42,11 @@ func (u *UseCases) GetParametersByCategory(ctx context.Context, category string)
 	return u.repository.ListByCategory(ctx, category)
 }
 
-func (u *UseCases) GetAllParameters(ctx context.Context) ([]domain.AppParameter, error) {
+func (u *UseCases) GetAllParameters(ctx context.Context) ([]domain.BusinessParameter, error) {
 	return u.repository.ListAll(ctx)
 }
 
-func (u *UseCases) CreateParameter(ctx context.Context, param *domain.AppParameter) (int64, error) {
+func (u *UseCases) CreateParameter(ctx context.Context, param *domain.BusinessParameter) (int64, error) {
 	if param.Key == "" || param.Value == "" || param.Type == "" || param.Category == "" {
 		return 0, types.NewError(types.ErrInvalidInput, "missing required fields", nil)
 	}
@@ -54,7 +54,7 @@ func (u *UseCases) CreateParameter(ctx context.Context, param *domain.AppParamet
 	return u.repository.Create(ctx, param)
 }
 
-func (u *UseCases) UpdateParameter(ctx context.Context, param *domain.AppParameter) error {
+func (u *UseCases) UpdateParameter(ctx context.Context, param *domain.BusinessParameter) error {
 	if param.ID == 0 {
 		return types.NewError(types.ErrInvalidID, "invalid id", nil)
 	}

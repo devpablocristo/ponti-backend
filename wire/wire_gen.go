@@ -8,7 +8,7 @@ package wire
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/cmd/config"
-	"github.com/alphacodinggroup/ponti-backend/internal/app-parameters"
+	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	"github.com/alphacodinggroup/ponti-backend/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/internal/category"
 	"github.com/alphacodinggroup/ponti-backend/internal/class-type"
@@ -214,15 +214,15 @@ func Initialize() (*Dependencies, error) {
 	categoryConfigAPIPort := ProvideCategoryConfigAPI(config)
 	categoryMiddlewaresEnginePort := ProvideCategoryMiddlewaresEnginePort(middlewares)
 	categoryHandler := ProvideCategoryHandler(categoryGinEnginePort, categoryUseCasesPort, categoryConfigAPIPort, categoryMiddlewaresEnginePort)
-	app_parametersGinEnginePort := ProvideAppParametersGinEnginePort(server)
-	app_parametersGormEnginePort := ProvideAppParametersGormEnginePort(repository)
-	app_parametersRepository := ProvideAppParametersRepository(app_parametersGormEnginePort)
-	app_parametersRepositoryPort := ProvideAppParametersRepositoryPort(app_parametersRepository)
-	app_parametersUseCases := ProvideAppParametersUseCases(app_parametersRepositoryPort)
-	app_parametersUseCasesPort := ProvideAppParametersUseCasesPort(app_parametersUseCases)
-	app_parametersConfigAPIPort := ProvideAppParametersConfigAPI(config)
-	app_parametersMiddlewaresEnginePort := ProvideAppParametersMiddlewaresEnginePort(middlewares)
-	app_parametersHandler := ProvideAppParametersHandler(app_parametersGinEnginePort, app_parametersUseCasesPort, app_parametersConfigAPIPort, app_parametersMiddlewaresEnginePort)
+	business_parametersGinEnginePort := ProvideBusinessParametersGinEnginePort(server)
+	business_parametersGormEnginePort := ProvideBusinessParametersGormEnginePort(repository)
+	business_parametersRepository := ProvideBusinessParametersRepository(business_parametersGormEnginePort)
+	business_parametersRepositoryPort := ProvideBusinessParametersRepositoryPort(business_parametersRepository)
+	business_parametersUseCases := ProvideBusinessParametersUseCases(business_parametersRepositoryPort)
+	business_parametersUseCasesPort := ProvideBusinessParametersUseCasesPort(business_parametersUseCases)
+	business_parametersConfigAPIPort := ProvideBusinessParametersConfigAPI(config)
+	business_parametersMiddlewaresEnginePort := ProvideBusinessParametersMiddlewaresEnginePort(middlewares)
+	business_parametersHandler := ProvideBusinessParametersHandler(business_parametersGinEnginePort, business_parametersUseCasesPort, business_parametersConfigAPIPort, business_parametersMiddlewaresEnginePort)
 	classtypeGinEnginePort := ProvideClassTypeGinEnginePort(server)
 	classtypeGormEnginePort := ProvideClassTypeGormEnginePort(repository)
 	classtypeRepository := ProvideClassTypeRepository(classtypeGormEnginePort)
@@ -292,33 +292,33 @@ func Initialize() (*Dependencies, error) {
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, useCasesPort2, stockConfigAPIPort, stockMiddlewaresEnginePort, projectUseCasesPort)
 	dependencies := &Dependencies{
-		Config:                   config,
-		GinEngine:                server,
-		GormRepo:                 repository,
-		Middlewares:              middlewares,
-		WordsSuggester:           pkgsuggesterWordsSuggester,
-		CustomerHandler:          handler,
-		CampaignHandler:          campaignHandler,
-		DashboardHandler:         dashboardHandler,
-		DataIntegrityHandler:     data_integrityHandler,
-		InvestorHandler:          investorHandler,
-		CropHandler:              cropHandler,
-		LotHandler:               lotHandler,
-		FieldHandler:             fieldHandler,
-		ManagerHandler:           managerHandler,
-		ProjectHandler:           projectHandler,
-		ReportHandler:            reportHandler,
-		LeaseTypeHandler:         leasetypeHandler,
-		SupplyHandler:            supplyHandler,
-		CategoryHandler:          categoryHandler,
-		AppParametersHandler:     app_parametersHandler,
-		ClassTypeHandler:         classtypeHandler,
-		DollarHandler:            dollarHandler,
-		WorkorderHandler:         workorderHandler,
-		LaborHandler:             laborHandler,
-		InvoiceHandler:           invoiceHandler,
-		CommercializationHandler: commercializationHandler,
-		StockHandler:             stockHandler,
+		Config:                    config,
+		GinEngine:                 server,
+		GormRepo:                  repository,
+		Middlewares:               middlewares,
+		WordsSuggester:            pkgsuggesterWordsSuggester,
+		CustomerHandler:           handler,
+		CampaignHandler:           campaignHandler,
+		DashboardHandler:          dashboardHandler,
+		DataIntegrityHandler:      data_integrityHandler,
+		InvestorHandler:           investorHandler,
+		CropHandler:               cropHandler,
+		LotHandler:                lotHandler,
+		FieldHandler:              fieldHandler,
+		ManagerHandler:            managerHandler,
+		ProjectHandler:            projectHandler,
+		ReportHandler:             reportHandler,
+		LeaseTypeHandler:          leasetypeHandler,
+		SupplyHandler:             supplyHandler,
+		CategoryHandler:           categoryHandler,
+		BusinessParametersHandler: business_parametersHandler,
+		ClassTypeHandler:          classtypeHandler,
+		DollarHandler:             dollarHandler,
+		WorkorderHandler:          workorderHandler,
+		LaborHandler:              laborHandler,
+		InvoiceHandler:            invoiceHandler,
+		CommercializationHandler:  commercializationHandler,
+		StockHandler:              stockHandler,
 	}
 	return dependencies, nil
 }
@@ -326,31 +326,31 @@ func Initialize() (*Dependencies, error) {
 // wire.go:
 
 type Dependencies struct {
-	Config                   *config.Config
-	GinEngine                *pkggin.Server
-	GormRepo                 *pkggorm.Repository
-	Middlewares              *pkgmwr.Middlewares
-	WordsSuggester           *pkgsuggester.WordsSuggester
-	CustomerHandler          *customer.Handler
-	CampaignHandler          *campaign.Handler
-	DashboardHandler         *dashboard.Handler
-	DataIntegrityHandler     *data_integrity.Handler
-	InvestorHandler          *investor.Handler
-	CropHandler              *crop.Handler
-	LotHandler               *lot.Handler
-	FieldHandler             *field.Handler
-	ManagerHandler           *manager.Handler
-	ProjectHandler           *project.Handler
-	ReportHandler            *report.ReportHandler
-	LeaseTypeHandler         *leasetype.Handler
-	SupplyHandler            *supply.Handler
-	CategoryHandler          *category.Handler
-	AppParametersHandler     *app_parameters.Handler
-	ClassTypeHandler         *classtype.Handler
-	DollarHandler            *dollar.Handler
-	WorkorderHandler         *workorder.Handler
-	LaborHandler             *labor.Handler
-	InvoiceHandler           *invoice.Handler
-	CommercializationHandler *commercialization.Handler
-	StockHandler             *stock.Handler
+	Config                    *config.Config
+	GinEngine                 *pkggin.Server
+	GormRepo                  *pkggorm.Repository
+	Middlewares               *pkgmwr.Middlewares
+	WordsSuggester            *pkgsuggester.WordsSuggester
+	CustomerHandler           *customer.Handler
+	CampaignHandler           *campaign.Handler
+	DashboardHandler          *dashboard.Handler
+	DataIntegrityHandler      *data_integrity.Handler
+	InvestorHandler           *investor.Handler
+	CropHandler               *crop.Handler
+	LotHandler                *lot.Handler
+	FieldHandler              *field.Handler
+	ManagerHandler            *manager.Handler
+	ProjectHandler            *project.Handler
+	ReportHandler             *report.ReportHandler
+	LeaseTypeHandler          *leasetype.Handler
+	SupplyHandler             *supply.Handler
+	CategoryHandler           *category.Handler
+	BusinessParametersHandler *business_parameters.Handler
+	ClassTypeHandler          *classtype.Handler
+	DollarHandler             *dollar.Handler
+	WorkorderHandler          *workorder.Handler
+	LaborHandler              *labor.Handler
+	InvoiceHandler            *invoice.Handler
+	CommercializationHandler  *commercialization.Handler
+	StockHandler              *stock.Handler
 }

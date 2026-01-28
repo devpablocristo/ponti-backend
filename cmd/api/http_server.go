@@ -10,8 +10,8 @@ import (
 	wire "github.com/alphacodinggroup/ponti-backend/wire"
 )
 
-// runHttpServer registers routes in the Gin router and starts the HTTP server.
-func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
+// runHTTPServer registers routes in the Gin router and starts the HTTP server.
+func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
@@ -22,7 +22,7 @@ func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Register all application routes.
 	// Each handler will apply its own validation middlewares as needed
-	registerHttpRoutes(deps)
+	registerHTTPRoutes(deps)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
 	log.Println("Version: ", deps.Config.App.Version)
@@ -34,8 +34,8 @@ func runHttpServer(ctx context.Context, deps *wire.Dependencies) error {
 	return deps.GinEngine.RunServer(ctx)
 }
 
-// registerHttpRoutes registers all application routes in the Gin router.
-func registerHttpRoutes(deps *wire.Dependencies) {
+// registerHTTPRoutes registers all application routes in the Gin router.
+func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
@@ -52,7 +52,7 @@ func registerHttpRoutes(deps *wire.Dependencies) {
 	deps.SupplyHandler.Routes()
 	deps.CategoryHandler.Routes()
 	deps.ClassTypeHandler.Routes()
-	deps.AppParametersHandler.Routes()
+	deps.BusinessParametersHandler.Routes()
 	deps.WorkorderHandler.Routes()
 	deps.DollarHandler.Routes()
 	deps.LaborHandler.Routes()

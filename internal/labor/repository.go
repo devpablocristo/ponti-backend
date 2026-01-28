@@ -354,11 +354,11 @@ func (r *Repository) ListGroupLabor(
 	return list, pageInfo, nil
 }
 
-// getIVAPercentage obtiene el porcentaje de IVA desde app_parameters
+// getIVAPercentage obtiene el porcentaje de IVA desde business_parameters
 func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
 	var value string
 	err := r.db.Client().WithContext(ctx).
-		Table("app_parameters").
+		Table("business_parameters").
 		Select("value").
 		Where("key = ?", "iva_percentage").
 		Scan(&value).Error
@@ -456,7 +456,7 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		// Calcular valores de USD dinámicamente
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
-		// Obtener porcentaje de IVA dinámicamente desde app_parameters
+		// Obtener porcentaje de IVA dinámicamente desde business_parameters
 		ivaPercentage, err := r.getIVAPercentage(ctx)
 		if err != nil {
 			// Si hay error, usar valor por defecto y logear el error
@@ -636,7 +636,7 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
 		// Usar porcentaje de IVA por defecto (10.5%)
-		// TODO: Implementar obtención dinámica desde app_parameters
+		// TODO: Implementar obtención dinámica desde business_parameters
 		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
 		totalIVA := netTotal.Mul(ivaPercentage)
 
