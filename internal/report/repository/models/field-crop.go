@@ -38,9 +38,9 @@ type FieldCropMetricModel struct {
 
 	// Costos directos
 	LaborCostsUsd       decimal.Decimal `gorm:"column:costos_labores_usd"`
-	LaborCostsUsdHa     decimal.Decimal `gorm:"column:costos_labores_usd_ha"` // TODO: Agregar a vista SQL v3
+	LaborCostsUsdHa     decimal.Decimal `gorm:"column:costos_labores_usd_ha"` // TODO: Confirmar en vista v4
 	SupplyCostsUsd      decimal.Decimal `gorm:"column:costos_insumos_usd"`
-	SupplyCostsUsdHa    decimal.Decimal `gorm:"column:costos_insumos_usd_ha"` // TODO: Agregar a vista SQL v3
+	SupplyCostsUsdHa    decimal.Decimal `gorm:"column:costos_insumos_usd_ha"` // TODO: Confirmar en vista v4
 	TotalDirectCostsUsd decimal.Decimal `gorm:"column:total_costos_directos_usd"`
 	DirectCostsUsdHa    decimal.Decimal `gorm:"column:costos_directos_usd_ha"`
 
@@ -70,7 +70,6 @@ type FieldCropMetricModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// ACTUALIZADO: Usar helper para switch v3/v4 - Migración 000316
 func (FieldCropMetricModel) TableName() string {
 	return shareddb.FieldCropView("metrics")
 }
@@ -108,8 +107,7 @@ type SupplyMetricModel struct {
 	WorkOrderCount int64           `gorm:"column:workorder_count"`
 }
 
-// FieldCropLaborDetailModel representa el modelo de la vista v3_report_field_crop_labores
-// Migración 000130
+// FieldCropLaborDetailModel representa el modelo de la vista v4_report.field_crop_labores
 type FieldCropLaborDetailModel struct {
 	ProjectID int64 `gorm:"column:project_id"`
 	FieldID   int64 `gorm:"column:field_id"`
@@ -129,8 +127,7 @@ func (FieldCropLaborDetailModel) TableName() string {
 	return shareddb.FieldCropView("labores")
 }
 
-// FieldCropSupplyDetailModel representa el modelo de la vista v3_report_field_crop_insumos
-// Migración 000131 (actualizada con Fertilizantes y Otros Insumos)
+// FieldCropSupplyDetailModel representa el modelo de la vista v4_report.field_crop_insumos
 type FieldCropSupplyDetailModel struct {
 	ProjectID int64 `gorm:"column:project_id"`
 	FieldID   int64 `gorm:"column:field_id"`
@@ -175,9 +172,9 @@ func (m *FieldCropMetricModel) ToDomainFieldCropMetric() *domain.FieldCropMetric
 		NetIncomeUsd:           m.NetIncomeUsd,
 		NetIncomeUsdHa:         m.NetIncomeUsdHa,
 		LaborCostsUsd:          m.LaborCostsUsd,
-		LaborCostsUsdHa:        m.LaborCostsUsdHa, // TODO: Ahora viene de la vista v3
+		LaborCostsUsdHa:        m.LaborCostsUsdHa,
 		SupplyCostsUsd:         m.SupplyCostsUsd,
-		SupplyCostsUsdHa:       m.SupplyCostsUsdHa, // TODO: Ahora viene de la vista v3
+		SupplyCostsUsdHa:       m.SupplyCostsUsdHa,
 		TotalDirectCostsUsd:    m.TotalDirectCostsUsd,
 		DirectCostsUsdHa:       m.DirectCostsUsdHa,
 		GrossMarginUsd:         m.GrossMarginUsd,

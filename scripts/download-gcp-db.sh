@@ -16,8 +16,8 @@ LOCAL_DB_PORT="${DB_PORT:-}"
 
 ### ===== Origen (GCP DEV) =====
 # Defaults apuntan a la DB de dev (override por variables de entorno)
-SRC_USER="${SRC_USER:-${DB_USER:-soalen-db-v3}}"
-SRC_PASS="${SRC_PASS:-${DB_PASSWORD:-Soalen*25.}}"
+SRC_USER="${SRC_USER:-${DB_USER:-}}"
+SRC_PASS="${SRC_PASS:-${DB_PASSWORD:-}}"
 SRC_HOST="${SRC_HOST:-${DB_HOST:-34.176.31.249}}"
 SRC_DB="${SRC_DB:-${DB_NAME:-ponti_api_db}}"
 SRC_PORT="${SRC_PORT:-${DB_PORT:-5432}}"

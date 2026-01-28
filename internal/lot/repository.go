@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	// third-party
@@ -303,32 +304,34 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
 	}
 
-	// Construir query base
-	query := r.db.Client().WithContext(ctx).Table(shareddb.ReportView("lot_metrics"))
-
-	// Aplicar filtros
+	where := []string{"1=1"}
+	args := []any{}
 	if fieldID > 0 {
-		query = query.Where("lot_id IN (SELECT id FROM lots WHERE field_id = ? AND deleted_at IS NULL)", fieldID)
+		where = append(where, "lot_id IN (SELECT id FROM lots WHERE field_id = ? AND deleted_at IS NULL)")
+		args = append(args, fieldID)
 	} else if projectID > 0 {
-		query = query.Where("project_id = ?", projectID)
+		where = append(where, "project_id = ?")
+		args = append(args, projectID)
 	}
-
 	if cropID > 0 {
-		query = query.Where("lot_id IN (SELECT id FROM lots WHERE (current_crop_id = ? OR previous_crop_id = ?) AND deleted_at IS NULL)", cropID, cropID)
+		where = append(where, "lot_id IN (SELECT id FROM lots WHERE (current_crop_id = ? OR previous_crop_id = ?) AND deleted_at IS NULL)")
+		args = append(args, cropID, cropID)
 	}
 
-	// Ejecutar query con agregaciones
-	var row rowAgg
-	err := query.Select(`
-		COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
-		COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-		COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
-		COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
-		COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
-		COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
-	`).Scan(&row).Error
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+			COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
+			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
+			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
+			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
+		FROM %s
+		WHERE %s
+	`, shareddb.ReportView("lot_metrics"), strings.Join(where, " AND "))
 
-	if err != nil {
+	var row rowAgg
+	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to scan lot metrics", err)
 	}
 
@@ -351,37 +354,39 @@ func (r *Repository) ListLots(
 	projectID, fieldID, cropID int64,
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
-
-	base := r.db.Client().WithContext(ctx).Table(shareddb.ReportView("lot_list"))
-
-	// filtros
+	where := []string{"1=1"}
+	args := []any{}
 	if fieldID > 0 {
-		base = base.Where("field_id = ?", fieldID)
+		where = append(where, "field_id = ?")
+		args = append(args, fieldID)
 	} else if projectID > 0 {
-		base = base.Where("project_id = ?", projectID)
+		where = append(where, "project_id = ?")
+		args = append(args, projectID)
 	}
-	// Si no se proporcionan filtros, se retornan todos los lotes
-
 	if cropID > 0 {
-		base = base.Where("(current_crop_id = ? OR previous_crop_id = ?)", cropID, cropID)
+		where = append(where, "(current_crop_id = ? OR previous_crop_id = ?)")
+		args = append(args, cropID, cropID)
 	}
+	whereSQL := strings.Join(where, " AND ")
+	view := shareddb.ReportView("lot_list")
 
 	// totales
 	var total int64
-	if err := base.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", view, whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to count lots", err)
 	}
 
 	var sumSowedArea decimal.Decimal
-	if err := base.Session(&gorm.Session{}).Select("COALESCE(SUM(sowed_area_ha),0)").Scan(&sumSowedArea).Error; err != nil {
+	sumSowedQuery := fmt.Sprintf("SELECT COALESCE(SUM(sowed_area_ha),0) FROM %s WHERE %s", view, whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(sumSowedQuery, args...).Scan(&sumSowedArea).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to sum sowed area", err)
 	}
 
 	// sumCost: promedio ponderado de cost_usd_per_ha por superficie total
 	var sumCost decimal.Decimal
-	if err := base.Session(&gorm.Session{}).
-		Select("COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares),0), 0)").
-		Scan(&sumCost).Error; err != nil {
+	sumCostQuery := fmt.Sprintf("SELECT COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares),0), 0) FROM %s WHERE %s", view, whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(sumCostQuery, args...).Scan(&sumCost).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to calculate cost per hectare", err)
 	}
 
@@ -389,20 +394,24 @@ func (r *Repository) ListLots(
 	offset := (page - 1) * pageSize
 
 	var rows []models.LotTable
-	if err := base.Session(&gorm.Session{}).
-		Select(`
-	             project_id, field_id, project_name, field_name,
-	             id, lot_name, variety, sowed_area_ha, hectares, season, updated_at, tons,
-	             previous_crop_id, previous_crop,
-	             current_crop_id, current_crop,
-	             admin_cost_per_ha_usd AS admin_cost_per_ha,
-	             harvested_area_ha AS harvested_area, lot_harvest_date AS harvest_date,
-	             cost_usd_per_ha, yield_tn_per_ha,
-	             income_net_per_ha_usd AS income_net_per_ha, rent_per_ha_usd AS rent_per_ha,
-	             active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha
-	         `).
-		Order("id DESC").Limit(pageSize).Offset(offset).
-		Scan(&rows).Error; err != nil {
+	rowsQuery := fmt.Sprintf(`
+		SELECT
+			project_id, field_id, project_name, field_name,
+			id, lot_name, variety, sowed_area_ha, hectares, season, updated_at, tons,
+			previous_crop_id, previous_crop,
+			current_crop_id, current_crop,
+			admin_cost_per_ha_usd AS admin_cost_per_ha,
+			harvested_area_ha AS harvested_area, lot_harvest_date AS harvest_date,
+			cost_usd_per_ha, yield_tn_per_ha,
+			income_net_per_ha_usd AS income_net_per_ha, rent_per_ha_usd AS rent_per_ha,
+			active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha
+		FROM %s
+		WHERE %s
+		ORDER BY id DESC
+		LIMIT ? OFFSET ?
+	`, view, whereSQL)
+	rowsArgs := append(append([]any{}, args...), pageSize, offset)
+	if err := r.db.Client().WithContext(ctx).Raw(rowsQuery, rowsArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
 	}
 
@@ -414,10 +423,8 @@ func (r *Repository) ListLots(
 			lotIDs[i] = rows[i].ID
 		}
 		var allDates []models.LotDates
-		if err := r.db.Client().WithContext(ctx).Table("lot_dates").
-			Where("lot_id IN ? AND deleted_at IS NULL", lotIDs).
-			Order("lot_id, sequence"). // orden consistente
-			Scan(&allDates).Error; err != nil {
+		datesQuery := "SELECT * FROM lot_dates WHERE lot_id IN ? AND deleted_at IS NULL ORDER BY lot_id, sequence"
+		if err := r.db.Client().WithContext(ctx).Raw(datesQuery, lotIDs).Scan(&allDates).Error; err != nil {
 			return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to get lot dates", err)
 		}
 		datesByLot := make(map[int64][]models.LotDates)

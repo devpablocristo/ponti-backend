@@ -51,7 +51,7 @@ GET /api/v1/data-integrity/costs-check?project_id=123
 
 #### **Control 2**: Órdenes de trabajo → Lotes
 - **LEFT (Origen)**: `∑(workorders RAW)` - Suma directa de tablas
-- **RIGHT (Destino)**: `∑(cost_usd_per_ha × sowed_area_ha)` - Vista v3_lot_list
+- **RIGHT (Destino)**: `∑(cost_usd_per_ha × sowed_area_ha)` - Vista v4_report.lot_list
 - **Tolerancia**: 0 (debe ser exacto)
 
 #### **Control 3**: Órdenes de trabajo → Informe de Resultado por campo
@@ -88,12 +88,12 @@ GET /api/v1/data-integrity/costs-check?project_id=123
 ### GRUPO 3: Aportes desde Lotes
 
 #### **Control 8**: Lotes → Informe de Aportes (Adm. Proyecto)
-- **LEFT (Origen)**: `∑(admin_cost × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(admin_cost × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: Categoría "Administración y Estructura" - Informe aportes
 - **Tolerancia**: ±1
 
 #### **Control 9**: Lotes → Informe de Aportes (Arriendo Fijo)
-- **LEFT (Origen)**: `∑(rent_per_ha × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(rent_per_ha × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: Categoría "Arriendo Capitalizable" - Informe aportes
 - **Tolerancia**: ±1
 
@@ -102,7 +102,7 @@ GET /api/v1/data-integrity/costs-check?project_id=123
 ### GRUPO 4: Ingreso Neto
 
 #### **Control 10**: Lotes → Resumen de resultados
-- **LEFT (Origen)**: `∑(income_net_per_ha × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(income_net_per_ha × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: `∑(net_income_usd)` - Resumen de resultados
 - **Tolerancia**: ±1
 
@@ -111,17 +111,17 @@ GET /api/v1/data-integrity/costs-check?project_id=123
 ### GRUPO 5: Resultado Operativo
 
 #### **Control 11**: Lotes → Informe por cultivo
-- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: `∑(operating_result_usd_ha × sown_area_ha)` - Por cultivo
 - **Tolerancia**: ±1
 
 #### **Control 12**: Lotes → Informe de Resultado Generales
-- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: Total general (primera fila)
 - **Tolerancia**: ±1
 
 #### **Control 13**: Lotes → Dashboard
-- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v3_lot_list
+- **LEFT (Origen)**: `∑(operating_result_per_ha × sowed_area)` - Vista v4_report.lot_list
 - **RIGHT (Destino)**: `Metrics.OperatingResult.ResultUSD` - Dashboard card
 - **Tolerancia**: ±1
 
@@ -150,9 +150,9 @@ GET /api/v1/data-integrity/costs-check?project_id=123
       "left_calculation": "∑(workorders.effective_area × labors.price + workorder_items.total_used × supplies.price)",
       "left_value": "18454.39",
       "left_source": "Tabla workorders RAW",
-      "right_calculation": "v3_dashboard_ssot.direct_costs_total_for_project()",
+      "right_calculation": "v4_ssot.direct_costs_total_for_project()",
       "right_value": "18455.17",
-      "right_source": "Vista v3_dashboard_management_balance",
+      "right_source": "Vista v4_report.dashboard_management_balance",
       "difference": "-0.78",
       "status": "OK",
       "tolerance": "1.00"
@@ -273,7 +273,7 @@ GET /api/v1/data-integrity/costs-check?project_id=11
       "left_source": "Tabla workorders RAW",
       "right_calculation": "∑(cost_usd_per_ha × sowed_area_ha)",
       "right_value": "18454.39",
-      "right_source": "Vista v3_lot_list",
+      "right_source": "Vista v4_report.lot_list",
       "difference": "0.00",
       "status": "OK",
       "tolerance": "0.00"

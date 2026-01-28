@@ -468,7 +468,7 @@ func TestContributionCategory_OtherCategoriesUseRealPct(t *testing.T) {
 // TestInvestorContributionComparisonModel_JSONMapping verifica que los tags JSON
 // coincidan con los nombres de campos en la vista SQL (FIX Problema 4)
 func TestInvestorContributionComparisonModel_JSONMapping(t *testing.T) {
-	// JSON que viene de la vista SQL v3_investor_contribution_data_view
+	// JSON que viene de la vista SQL v4_report.investor_contribution_data
 	comparisonJSON := `{
 		"investor_id": 5,
 		"investor_name": "COTY",

@@ -41,11 +41,11 @@ HEADER=$(cat << 'EOF'
 -- ========================================
 -- 
 -- Este archivo contiene TODO el schema de la base de datos:
---   - Schemas (v3_calc, v3_core_ssot, etc.)
+--   - Schemas (v4_core, v4_ssot, v4_calc, v4_report)
 --   - Tablas (con columnas, tipos, defaults)
 --   - Constraints (PK, FK, UNIQUE, CHECK)
 --   - Índices
---   - Vistas (v3_*)
+--   - Vistas (v4_report.*)
 --   - Funciones SSOT (157 funciones)
 --   - Tipos (enums, tipos custom)
 --   - Secuencias

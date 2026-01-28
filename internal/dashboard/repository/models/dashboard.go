@@ -14,7 +14,7 @@ type DashboardModel struct {
 	sharedmodels.Base
 }
 
-// DashboardMetricsModel representa las métricas principales del dashboard desde v3_dashboard_metrics
+// DashboardMetricsModel representa las métricas principales del dashboard desde v4_report.dashboard_metrics
 type DashboardMetricsModel struct {
 	CustomerID int64 `gorm:"column:customer_id"`
 	ProjectID  int64 `gorm:"column:project_id"`

@@ -47,20 +47,21 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 		return []domain.FieldCropMetric{}, nil
 	}
 
-	// Usar GORM para mapear automáticamente desde la vista v3_report_field_crop_metrics
+	// Usar SQL directo para mapear desde la vista v4_report.field_crop_metrics
 	var modelResults []models.FieldCropMetricModel
 
-	// Construir query base con GORM
-	query := r.db.Client().Model(&models.FieldCropMetricModel{}).
-		Where("project_id IN ?", projectIDs)
+	viewName := db.FieldCropView("metrics")
+	query := fmt.Sprintf("SELECT * FROM %s WHERE project_id IN ?", viewName)
+	args := []any{projectIDs}
 
 	// Aplicar filtros adicionales
 	if filters.FieldID != nil {
-		query = query.Where("field_id = ?", *filters.FieldID)
+		query += " AND field_id = ?"
+		args = append(args, *filters.FieldID)
 	}
 
 	// Ejecutar query
-	if err := query.Find(&modelResults).Error; err != nil {
+	if err := r.db.Client().Raw(query, args...).Scan(&modelResults).Error; err != nil {
 		return nil, fmt.Errorf("error al obtener métricas: %w", err)
 	}
 
@@ -149,9 +150,9 @@ func (r *ReportRepository) buildMainRows(
 	return rows
 }
 
-// buildSupplyDetailRows construye las filas detalladas de supplies desde v3_report_field_crop_insumos
+// buildSupplyDetailRows construye las filas detalladas de supplies desde v4_report.field_crop_insumos
 func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
-	// Consultar vista v3_report_field_crop_insumos (migración 000130)
+	// Consultar vista v4_report.field_crop_insumos
 	var supplyDetails []models.FieldCropSupplyDetailModel
 
 	// Extraer project_ids de las columnas
@@ -183,7 +184,7 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 		supplyMap[key] = detail
 	}
 
-	// Construir filas (ACTUALIZADO: Fertilizantes y Otros Insumos ya están en la vista v3)
+	// Construir filas (Fertilizantes y Otros Insumos ya están en la vista v4)
 	// IMPORTANTE: Las keys deben coincidir con el frontend (ByFieldOrCropReport.tsx)
 	rows := []domain.FieldCropRow{
 		r.buildSupplyRow("supply_semillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),        // FIX: Cambiar "semilla" → "semillas" (plural)
@@ -199,9 +200,9 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 	return rows
 }
 
-// buildLaborDetailRows construye las filas detalladas de labores desde v3_report_field_crop_labores
+// buildLaborDetailRows construye las filas detalladas de labores desde v4_report.field_crop_labores
 func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
-	// Consultar vista v3_report_field_crop_labores (migración 000130)
+	// Consultar vista v4_report.field_crop_labores
 	var laborDetails []models.FieldCropLaborDetailModel
 
 	// Extraer field_ids de las columnas

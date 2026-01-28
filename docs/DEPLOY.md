@@ -22,7 +22,7 @@ Estas variables se configuran en el servicio, no en Actions.
 | `DB_TYPE` | `postgres` | `postgres` |
 | `DB_HOST` | Host/IP de Postgres | `136.112.24.122` |
 | `DB_PORT` | Puerto | `5432` |
-| `DB_USER` | Usuario | `soalen-db-v3` |
+| `DB_USER` | Usuario | `soalen-db` |
 | `DB_PASSWORD` | Password | `****` |
 | `DB_NAME` | DB base del servicio | `ponti_api_db` |
 | `DB_SSL_MODE` | Modo SSL | `disable` |

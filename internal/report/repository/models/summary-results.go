@@ -37,7 +37,6 @@ type SummaryResultsModel struct {
 }
 
 // TableName especifica el nombre de la tabla para GORM
-// Usa v4_report.summary_results si REPORT_SCHEMA=v4_report, sino v3_report_summary_results_view
 func (SummaryResultsModel) TableName() string {
 	return db.SummaryView()
 }

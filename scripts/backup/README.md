@@ -29,9 +29,9 @@ Scripts para crear backups del schema de la base de datos antes de hacer cambios
 
 **Salida:** `snapshots/antes_fase_1/` con múltiples archivos:
 - `01_schema_completo.sql` - Schema completo
-- `02_schemas_ssot.sql` - Solo schemas SSOT
-- `03_vistas_v3.sql` - Solo vistas v3_*
-- `04_funciones_ssot.sql` - Funciones SSOT
+- `02_schemas_ssot.sql` - Solo schemas v4
+- `03_vistas_v4.sql` - Solo vistas v4_report
+- `04_funciones_ssot.sql` - Funciones v4
 - `05_inventario_objetos.txt` - Lista de objetos
 - `06_metadata.txt` - Metadata
 
@@ -40,16 +40,16 @@ Scripts para crear backups del schema de la base de datos antes de hacer cambios
 ## 📋 Qué incluye cada snapshot
 
 ### Snapshot Simple
-- ✅ Schemas SSOT (v3_calc, v3_core_ssot, etc.)
-- ✅ Vistas v3_*
+- ✅ Schemas v4 (v4_core, v4_ssot, v4_calc, v4_report)
+- ✅ Vistas v4_report
 - ❌ Datos (solo estructura)
 - ❌ Otros schemas
 
 ### Snapshot Completo
 - ✅ Schema completo de la BD
-- ✅ Schemas SSOT separados
-- ✅ Vistas v3_* separadas
-- ✅ Funciones SSOT separadas
+- ✅ Schemas v4 separados
+- ✅ Vistas v4_report separadas
+- ✅ Funciones v4 separadas
 - ✅ Inventario de objetos
 - ✅ Metadata (versión, tamaño, etc.)
 - ❌ Datos (solo estructura)
@@ -93,7 +93,7 @@ docker compose -f docker-compose.yml exec -T ponti-db \
 
 - ✅ Antes de Fase 1 (crear wrappers)
 - ✅ Antes de Fase 2 (actualizar vistas)
-- ✅ Antes de Fase 4 (eliminar v3_calc)
+- ✅ Antes de cualquier cambio importante en v4
 - ✅ Antes de cualquier cambio importante
 
 ---
@@ -106,7 +106,7 @@ snapshots/
 ├── antes_fase_1/                          # Snapshot completo
 │   ├── 01_schema_completo.sql
 │   ├── 02_schemas_ssot.sql
-│   ├── 03_vistas_v3.sql
+│   ├── 03_vistas_v4.sql
 │   ├── 04_funciones_ssot.sql
 │   ├── 05_inventario_objetos.txt
 │   ├── 06_metadata.txt

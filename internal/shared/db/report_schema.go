@@ -1,40 +1,26 @@
 // Package db provee helpers para acceso a base de datos
 package db
 
-import "os"
-
 // reportSchema retorna el schema a usar para vistas de reportes.
-// Se evalúa dinámicamente para respetar .env cargado en runtime.
-// Si REPORT_SCHEMA="v4_report" → usa vistas v4_report.*
+// En v4 usamos siempre v4_report.
 func reportSchema() string {
-	return os.Getenv("REPORT_SCHEMA")
+	return "v4_report"
 }
 
 // ReportView retorna el nombre completo de la vista según el schema configurado
-// Ejemplo: ReportView("lot_metrics") → "v4_report.lot_metrics" o "v3_lot_metrics"
+// Ejemplo: ReportView("lot_metrics") → "v4_report.lot_metrics"
 func ReportView(name string) string {
-	if reportSchema() == "v4_report" {
-		return "v4_report." + name
-	}
 	return "v4_report." + name
 }
 
 // FieldCropView retorna el nombre de vista para field_crop
-// v3: v3_report_field_crop_{name} → v4: v4_report.field_crop_{name}
-// Ejemplo: FieldCropView("metrics") → "v4_report.field_crop_metrics" o "v3_report_field_crop_metrics"
+// Ejemplo: FieldCropView("metrics") → "v4_report.field_crop_metrics"
 func FieldCropView(name string) string {
-	if reportSchema() == "v4_report" {
-		return "v4_report.field_crop_" + name
-	}
 	return "v4_report.field_crop_" + name
 }
 
 // SummaryView retorna el nombre de vista para summary_results
-// v3: v3_report_summary_results_view → v4: v4_report.summary_results
 func SummaryView() string {
-	if reportSchema() == "v4_report" {
-		return "v4_report.summary_results"
-	}
 	return "v4_report.summary_results"
 }
 
@@ -44,21 +30,13 @@ func IsV4Enabled() bool {
 }
 
 // DashboardView retorna el nombre de vista para dashboard
-// v3: v3_dashboard_{name} → v4: v4_report.dashboard_{name}
-// Ejemplo: DashboardView("metrics") → "v4_report.dashboard_metrics" o "v3_dashboard_metrics"
+// Ejemplo: DashboardView("metrics") → "v4_report.dashboard_metrics"
 func DashboardView(name string) string {
-	if reportSchema() == "v4_report" {
-		return "v4_report.dashboard_" + name
-	}
 	return "v4_report.dashboard_" + name
 }
 
 // InvestorView retorna el nombre de vista para investor
-// v3: v3_investor_{name} o v3_report_investor_{name} → v4: v4_report.investor_{name}
-// Ejemplo: InvestorView("contribution_data") → "v4_report.investor_contribution_data" o "v3_investor_contribution_data_view"
+// Ejemplo: InvestorView("contribution_data") → "v4_report.investor_contribution_data"
 func InvestorView(name string) string {
-	if reportSchema() == "v4_report" {
-		return "v4_report.investor_" + name
-	}
 	return "v4_report.investor_" + name
 }

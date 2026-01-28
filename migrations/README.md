@@ -1,9 +1,8 @@
-# Migrations baseline (Strategy B: dual-support)
+# Migrations baseline (v4 only)
 
 ## Strategy
-- This baseline keeps **v4_report** as the primary schema when `REPORT_SCHEMA=v4_report`.
-- It also provides a **minimal v3 fallback** set of views in `public`.
-- Required v3 function schemas (`v3_calc`, `v3_core_ssot`, `v3_lot_ssot`, `v3_workorder_ssot`, `v3_dashboard_ssot`, `v3_report_ssot`) are included only to support those fallback views.
+- This baseline keeps **v4_report** as the primary schema.
+- Only v4 schemas and views are included.
 
 ## Order of migrations
 1. Extensions
@@ -16,7 +15,7 @@
 8. v4 ssot functions
 9. v4 calc views
 10. v4 report views
-11. v3 minimal fallback views
+11. v4 report views extensions
 
 ## Notes
 - SQL is in English; comments in Spanish when needed.

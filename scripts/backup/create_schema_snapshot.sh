@@ -33,40 +33,38 @@ docker compose -f docker-compose.yml exec -T ponti-db \
     --no-privileges \
     > "${OUTPUT_DIR}/01_schema_completo.sql"
 
-# 2. Solo schemas SSOT
-echo "📋 2. Exportando schemas SSOT..."
+# 2. Solo schemas v4
+echo "📋 2. Exportando schemas v4..."
 docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U ${DB_USER} -d ${DB_NAME} \
-    --schema=v3_calc \
-    --schema=v3_core_ssot \
-    --schema=v3_lot_ssot \
-    --schema=v3_dashboard_ssot \
-    --schema=v3_report_ssot \
-    --schema=v3_workorder_ssot \
+    --schema=v4_core \
+    --schema=v4_ssot \
+    --schema=v4_calc \
+    --schema=v4_report \
     --schema-only \
     --no-owner \
     --no-privileges \
     > "${OUTPUT_DIR}/02_schemas_ssot.sql"
 
-# 3. Solo vistas v3_*
-echo "📋 3. Exportando vistas v3_*..."
+# 3. Solo vistas v4_report
+echo "📋 3. Exportando vistas v4_report..."
 docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} -t -c "
     SELECT 'CREATE OR REPLACE VIEW ' || schemaname || '.' || viewname || ' AS ' || 
            pg_get_viewdef(schemaname || '.' || viewname, true) || ';'
     FROM pg_views
-    WHERE schemaname = 'public' AND viewname LIKE 'v3_%'
+    WHERE schemaname = 'v4_report'
     ORDER BY viewname;
-    " > "${OUTPUT_DIR}/03_vistas_v3.sql"
+    " > "${OUTPUT_DIR}/03_vistas_v4.sql"
 
-# 4. Lista de funciones SSOT
-echo "📋 4. Exportando definiciones de funciones SSOT..."
+# 4. Lista de funciones v4
+echo "📋 4. Exportando definiciones de funciones v4..."
 docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} -t -c "
     SELECT pg_get_functiondef(p.oid) || ';'
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname IN ('v3_calc', 'v3_core_ssot', 'v3_lot_ssot', 'v3_dashboard_ssot', 'v3_report_ssot', 'v3_workorder_ssot')
+    WHERE n.nspname IN ('v4_core', 'v4_ssot', 'v4_calc', 'v4_report')
     ORDER BY n.nspname, p.proname;
     " > "${OUTPUT_DIR}/04_funciones_ssot.sql"
 
@@ -75,19 +73,19 @@ echo "📋 5. Creando inventario de objetos..."
 docker compose -f docker-compose.yml exec -T ponti-db \
     psql -U ${DB_USER} -d ${DB_NAME} << 'EOF' > "${OUTPUT_DIR}/05_inventario_objetos.txt"
 -- Esquemas
-SELECT 'SCHEMA: ' || nspname FROM pg_namespace WHERE nspname LIKE 'v3_%' ORDER BY nspname;
+SELECT 'SCHEMA: ' || nspname FROM pg_namespace WHERE nspname LIKE 'v4_%' ORDER BY nspname;
 
 -- Funciones por esquema
 SELECT 'FUNCTION: ' || n.nspname || '.' || p.proname || '(' || pg_get_function_arguments(p.oid) || ')'
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname LIKE 'v3_%'
+WHERE n.nspname LIKE 'v4_%'
 ORDER BY n.nspname, p.proname;
 
 -- Vistas
 SELECT 'VIEW: ' || schemaname || '.' || viewname
 FROM pg_views
-WHERE schemaname = 'public' AND viewname LIKE 'v3_%'
+WHERE schemaname = 'v4_report'
 ORDER BY viewname;
 EOF
 
@@ -106,22 +104,22 @@ SELECT pg_size_pretty(pg_database_size('ponti_api_db')) AS database_size;
 
 -- Número de objetos por tipo
 SELECT 
-    'Schemas SSOT' AS tipo,
+    'Schemas v4' AS tipo,
     COUNT(*) AS cantidad
-FROM pg_namespace WHERE nspname LIKE 'v3_%'
+FROM pg_namespace WHERE nspname LIKE 'v4_%'
 UNION ALL
 SELECT 
-    'Funciones SSOT',
+    'Funciones v4',
     COUNT(*)
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname LIKE 'v3_%'
+WHERE n.nspname LIKE 'v4_%'
 UNION ALL
 SELECT 
-    'Vistas v3_*',
+    'Vistas v4_report',
     COUNT(*)
 FROM pg_views
-WHERE schemaname = 'public' AND viewname LIKE 'v3_%';
+WHERE schemaname = 'v4_report';
 EOF
 
 # 7. Crear README del snapshot
@@ -135,9 +133,9 @@ cat > "${OUTPUT_DIR}/README.md" << EOF
 ## 📁 Archivos incluidos
 
 1. **01_schema_completo.sql** - Schema completo de la BD (solo estructura)
-2. **02_schemas_ssot.sql** - Solo schemas SSOT (v3_calc, v3_core_ssot, etc.)
-3. **03_vistas_v3.sql** - Solo vistas v3_*
-4. **04_funciones_ssot.sql** - Definiciones completas de funciones SSOT
+2. **02_schemas_ssot.sql** - Solo schemas v4 (v4_core, v4_ssot, v4_calc, v4_report)
+3. **03_vistas_v4.sql** - Solo vistas v4_report
+4. **04_funciones_ssot.sql** - Definiciones completas de funciones v4
 5. **05_inventario_objetos.txt** - Lista de todos los objetos
 6. **06_metadata.txt** - Información de versión y estadísticas
 7. **README.md** - Este archivo

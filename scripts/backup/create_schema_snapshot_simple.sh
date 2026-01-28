@@ -14,24 +14,22 @@ mkdir -p snapshots
 
 echo "📸 Creando snapshot rápido: ${SNAPSHOT_NAME}"
 
-# Exportar solo schemas SSOT y vistas v3_*
+# Exportar solo schemas v4 y vistas v4_report
 docker compose -f docker-compose.yml exec -T ponti-db \
     pg_dump -U admin -d ponti_api_db \
-    --schema=v3_calc \
-    --schema=v3_core_ssot \
-    --schema=v3_lot_ssot \
-    --schema=v3_dashboard_ssot \
-    --schema=v3_report_ssot \
-    --schema=v3_workorder_ssot \
+    --schema=v4_core \
+    --schema=v4_ssot \
+    --schema=v4_calc \
+    --schema=v4_report \
     --schema-only \
     --no-owner \
     --no-privileges \
     > "${OUTPUT_FILE}"
 
-# Agregar vistas v3_* al final
+# Agregar vistas v4_report al final
 echo "" >> "${OUTPUT_FILE}"
 echo "-- ========================================" >> "${OUTPUT_FILE}"
-echo "-- VISTAS v3_*" >> "${OUTPUT_FILE}"
+echo "-- VISTAS v4_report" >> "${OUTPUT_FILE}"
 echo "-- ========================================" >> "${OUTPUT_FILE}"
 
 docker compose -f docker-compose.yml exec -T ponti-db \
@@ -39,7 +37,7 @@ docker compose -f docker-compose.yml exec -T ponti-db \
     SELECT 'CREATE OR REPLACE VIEW ' || schemaname || '.' || viewname || ' AS ' || 
            pg_get_viewdef(schemaname || '.' || viewname, true) || ';'
     FROM pg_views
-    WHERE schemaname = 'public' AND viewname LIKE 'v3_%'
+    WHERE schemaname = 'v4_report'
     ORDER BY viewname;
     " >> "${OUTPUT_FILE}"
 

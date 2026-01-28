@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
@@ -148,43 +149,42 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 }
 
 func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
-	var v3Models []models.LaborListItem
+	var v4Models []models.LaborListItem
 
-	// Usar la vista labor_list como base y agregar campos adicionales
-	err := r.db.Client().
-		WithContext(ctx).
-		Table(shareddb.ReportView("labor_list") + " AS v3").
-		Select(`
-            v3.workorder_id,
-            v3.workorder_number,
-            v3.date,
-            v3.project_name,
-            v3.field_name,
-            COALESCE(v3.crop_name, '') AS crop_name,
-            v3.labor_name,
-            v3.contractor,
-            v3.surface_ha,
-            v3.cost_per_ha,
-            COALESCE(v3.labor_category_name, '') AS category_name,
-            COALESCE(v3.investor_name, '') AS investor_name,
-			v3.dollar_average_month,
-			v3.dollar_average_month AS usd_avg_value,
+	query := fmt.Sprintf(`
+		SELECT
+            v4.workorder_id,
+            v4.workorder_number,
+            v4.date,
+            v4.project_name,
+            v4.field_name,
+            COALESCE(v4.crop_name, '') AS crop_name,
+            v4.labor_name,
+            v4.contractor,
+            v4.surface_ha,
+            v4.cost_per_ha,
+            COALESCE(v4.labor_category_name, '') AS category_name,
+            COALESCE(v4.investor_name, '') AS investor_name,
+			v4.dollar_average_month,
+			v4.dollar_average_month AS usd_avg_value,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
 			i.date AS invoice_date,
 			i.status AS invoice_status
-        `).
-		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
-		Where("v3.workorder_id = ?", workorderID).
-		Scan(&v3Models).Error
+		FROM %s AS v4
+		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		WHERE v4.workorder_id = ?
+	`, shareddb.ReportView("labor_list"))
+
+	err := r.db.Client().WithContext(ctx).Raw(query, workorderID).Scan(&v4Models).Error
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
 	}
 
 	// Convertir a LaborRawItem para mantener compatibilidad
-	raws := make([]domain.LaborRawItem, len(v3Models))
-	for i, m := range v3Models {
+	raws := make([]domain.LaborRawItem, len(v4Models))
+	for i, m := range v4Models {
 		// Manejar InvoiceID de forma segura
 		var invoiceID int64
 		if m.InvoiceID != nil {
@@ -221,57 +221,63 @@ func (r *Repository) ListGroupLabor(
 	projectID int64,
 	fieldID int64,
 ) ([]domain.LaborListItem, types.PageInfo, error) {
+	where := []string{}
+	args := []any{}
+	if fieldID != 0 {
+		where = append(where, "v4.field_id = ?")
+		args = append(args, fieldID)
+	} else if projectID != 0 {
+		where = append(where, "v4.project_id = ?")
+		args = append(args, projectID)
+	} else {
+		return nil, types.PageInfo{}, types.NewError(types.ErrValidation, "fieldID or projectID is required", nil)
+	}
+	whereSQL := strings.Join(where, " AND ")
+	view := shareddb.ReportView("labor_list")
 
-	// Base: vista labor_list + joins de factura y dólar promedio del mes
-	base := r.db.Client().
-		WithContext(ctx).
-		Table(shareddb.ReportView("labor_list") + " AS v3").
-		Select(`
-			v3.workorder_id,
-			v3.workorder_number,
-			v3.date,
-			v3.project_id,
-			v3.field_id,
-			v3.project_name,
-			v3.field_name,
-			v3.lot_id,
-			v3.lot_name,
-			v3.crop_id,
-			COALESCE(v3.crop_name, '') AS crop_name,
-			v3.labor_id,
-			v3.labor_name,
-			v3.labor_category_id,
-			COALESCE(v3.labor_category_name, '') AS labor_category_name,
-			v3.contractor,
-			v3.contractor_name,
-			v3.surface_ha,
-			v3.cost_per_ha,
-			v3.total_labor_cost,
-			v3.dollar_average_month,
-			v3.dollar_average_month AS usd_avg_value,
-			v3.usd_cost_ha,
-			v3.usd_net_total,
-			v3.investor_id,
-			COALESCE(v3.investor_name, '') AS investor_name,
+	selectCols := `
+			v4.workorder_id,
+			v4.workorder_number,
+			v4.date,
+			v4.project_id,
+			v4.field_id,
+			v4.project_name,
+			v4.field_name,
+			v4.lot_id,
+			v4.lot_name,
+			v4.crop_id,
+			COALESCE(v4.crop_name, '') AS crop_name,
+			v4.labor_id,
+			v4.labor_name,
+			v4.labor_category_id,
+			COALESCE(v4.labor_category_name, '') AS labor_category_name,
+			v4.contractor,
+			v4.contractor_name,
+			v4.surface_ha,
+			v4.cost_per_ha,
+			v4.total_labor_cost,
+			v4.dollar_average_month,
+			v4.dollar_average_month AS usd_avg_value,
+			v4.usd_cost_ha,
+			v4.usd_net_total,
+			v4.investor_id,
+			COALESCE(v4.investor_name, '') AS investor_name,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
 			i.date AS invoice_date,
 			i.status AS invoice_status
-		`).
-		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id")
-
-	if fieldID != 0 {
-		base = base.Where("v3.field_id = ?", fieldID)
-	} else if projectID != 0 {
-		base = base.Where("v3.project_id = ?", projectID)
-	} else {
-		return nil, types.PageInfo{}, types.NewError(types.ErrValidation, "fieldID or projectID is required", nil)
-	}
+	`
 
 	// Conteo para paginación
 	var total int64
-	if err := base.Session(&gorm.Session{}).Select("COUNT(*)").Count(&total).Error; err != nil {
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM %s AS v4
+		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		WHERE %s
+	`, view, whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count labors for workorder", err)
 	}
 
@@ -279,10 +285,16 @@ func (r *Repository) ListGroupLabor(
 
 	// Datos
 	var rows []models.LaborListItem
-	if err := base.Order("v3.workorder_number DESC").
-		Limit(int(inp.PageSize)).
-		Offset(offset).
-		Scan(&rows).Error; err != nil {
+	dataQuery := fmt.Sprintf(`
+		SELECT %s
+		FROM %s AS v4
+		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		WHERE %s
+		ORDER BY v4.workorder_number DESC
+		LIMIT ? OFFSET ?
+	`, selectCols, view, whereSQL)
+	dataArgs := append(append([]any{}, args...), int(inp.PageSize), offset)
+	if err := r.db.Client().WithContext(ctx).Raw(dataQuery, dataArgs...).Scan(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list grouped labors", err)
 	}
 
@@ -367,48 +379,55 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 // ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA
 // Este método implementa la lógica original con cálculos en Go y join con project_dollar_values
 func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
-	// Usar la vista labor_list como base y agregar campos adicionales
-	base := r.db.Client().
-		WithContext(ctx).
-		Table(shareddb.ReportView("labor_list") + " AS v3").
-		Select(`
-				v3.workorder_id,
-				v3.workorder_number,
-				v3.date,
-				v3.project_id,
-				v3.field_id,
-				v3.project_name,
-				v3.field_name,
-				COALESCE(v3.crop_name, '') AS crop_name,
-				v3.labor_name,
-				COALESCE(v3.labor_category_name, '') AS category_name,
-				v3.contractor,
-				v3.surface_ha,
-				v3.cost_per_ha,
-				v3.contractor_name,
-				COALESCE(v3.investor_name, '') AS investor_name,
+	where := []string{}
+	args := []any{usdMonth}
+	if fieldID != 0 {
+		where = append(where, "v4.field_id = ?")
+		args = append(args, fieldID)
+	} else if projectID != 0 {
+		where = append(where, "v4.project_id = ?")
+		args = append(args, projectID)
+	} else {
+		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
+			"fieldID or projectID is required", nil)
+	}
+	whereSQL := strings.Join(where, " AND ")
+	view := shareddb.ReportView("labor_list")
+
+	selectCols := `
+				v4.workorder_id,
+				v4.workorder_number,
+				v4.date,
+				v4.project_id,
+				v4.field_id,
+				v4.project_name,
+				v4.field_name,
+				COALESCE(v4.crop_name, '') AS crop_name,
+				v4.labor_name,
+				COALESCE(v4.labor_category_name, '') AS category_name,
+				v4.contractor,
+				v4.surface_ha,
+				v4.cost_per_ha,
+				v4.contractor_name,
+				COALESCE(v4.investor_name, '') AS investor_name,
 				pdv.average_value AS usd_avg_value,
 				i.id AS invoice_id,
 				i.number AS invoice_number,
 				i.company AS invoice_company,
 				i.date AS invoice_date,
 				i.status AS invoice_status
-			`).
-		Joins("LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id").
-		Joins("INNER JOIN project_dollar_values pdv ON pdv.project_id = v3.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL", usdMonth)
-
-	if fieldID != 0 {
-		base = base.Where("v3.field_id = ?", fieldID)
-	} else if projectID != 0 {
-		base = base.Where("v3.project_id = ?", projectID)
-	} else {
-		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
-			"fieldID or projectID is required", nil)
-	}
+			`
 
 	var total int64
-	countQuery := base.Session(&gorm.Session{})
-	if err := countQuery.Select("COUNT(*)").Count(&total).Error; err != nil {
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM %s AS v4
+		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		INNER JOIN project_dollar_values pdv
+			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
+		WHERE %s
+	`, view, whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to count labors for workorder", err)
 	}
@@ -416,10 +435,18 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.LaborListItem
-	if err := base.Order("v3.workorder_number DESC").
-		Limit(int(inp.PageSize)).
-		Offset(offset).
-		Scan(&rows).Error; err != nil {
+	dataQuery := fmt.Sprintf(`
+		SELECT %s
+		FROM %s AS v4
+		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		INNER JOIN project_dollar_values pdv
+			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
+		WHERE %s
+		ORDER BY v4.workorder_number DESC
+		LIMIT ? OFFSET ?
+	`, selectCols, view, whereSQL)
+	dataArgs := append(append([]any{}, args...), int(inp.PageSize), offset)
+	if err := r.db.Client().WithContext(ctx).Raw(dataQuery, dataArgs...).Scan(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
 			"failed to list grouped labors", err)
 	}
@@ -570,36 +597,36 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawItem, error) {
 	base := r.db.Client().
 		WithContext(ctx).
-		Table(shareddb.ReportView("labor_list") + " AS v3").
+		Table(shareddb.ReportView("labor_list") + " AS v4").
 		Select(`
-            v3.workorder_id,
-			v3.workorder_number,
-			v3.date,
-			v3.project_id,
-			v3.field_id,
-			v3.project_name,
-			v3.field_name,
-			COALESCE(v3.crop_name, '') AS crop_name,
-			v3.labor_name,
-			COALESCE(v3.labor_category_name, '') AS category_name,
-			v3.contractor,
-			v3.surface_ha,
-			v3.cost_per_ha,
-			v3.contractor_name,
-			COALESCE(v3.investor_name, '') AS investor_name,
-			v3.dollar_average_month,
-			v3.dollar_average_month AS usd_avg_value,
+            v4.workorder_id,
+			v4.workorder_number,
+			v4.date,
+			v4.project_id,
+			v4.field_id,
+			v4.project_name,
+			v4.field_name,
+			COALESCE(v4.crop_name, '') AS crop_name,
+			v4.labor_name,
+			COALESCE(v4.labor_category_name, '') AS category_name,
+			v4.contractor,
+			v4.surface_ha,
+			v4.cost_per_ha,
+			v4.contractor_name,
+			COALESCE(v4.investor_name, '') AS investor_name,
+			v4.dollar_average_month,
+			v4.dollar_average_month AS usd_avg_value,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
 			i.date AS invoice_date,
 			i.status AS invoice_status
         `).
-		Joins(`LEFT JOIN invoices i ON i.work_order_id = v3.workorder_id AND i.deleted_at IS NULL`)
+		Joins(`LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id AND i.deleted_at IS NULL`)
 
 	var rows []models.LaborListItem
 
-	if err := base.Order("v3.workorder_number DESC").Scan(&rows).Error; err != nil {
+	if err := base.Order("v4.workorder_number DESC").Scan(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list grouped labors", err)
 	}
 

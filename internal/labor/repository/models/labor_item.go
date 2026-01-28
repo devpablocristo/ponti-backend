@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// LaborListItem - Modelo que incluye campos calculados de la vista v3_labor_list
+// LaborListItem - Modelo que incluye campos calculados de la vista v4_report.labor_list
 type LaborListItem struct {
 	WorkorderID        int64           `gorm:"column:workorder_id"`
 	WorkorderNumber    string          `gorm:"column:workorder_number"`

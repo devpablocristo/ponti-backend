@@ -11,7 +11,7 @@ import (
 // ===== MODELOS PARA APORTES DE INVERSORES =====
 
 // InvestorContributionDataModel modelo para los datos de aportes de inversores desde la vista
-// La vista v3_investor_contribution_data_view devuelve datos en formato JSONB
+// La vista v4_report.investor_contribution_data devuelve datos en formato JSONB
 type InvestorContributionDataModel struct {
 	ProjectID    int64  `gorm:"column:project_id"`
 	ProjectName  string `gorm:"column:project_name"`
@@ -117,7 +117,7 @@ type InvestorContributionReportModel struct {
 // ===== MAPPERS =====
 
 // ToDomainInvestorContributionReport convierte el modelo al domain
-// Deserializa los datos JSONB de la vista v3_investor_contribution_data_view
+// Deserializa los datos JSONB de la vista v4_report.investor_contribution_data
 func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*domain.InvestorContributionReport, error) {
 	report := &domain.InvestorContributionReport{
 		ProjectID:    m.ProjectID,
