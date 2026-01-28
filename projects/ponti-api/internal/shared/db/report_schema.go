@@ -15,10 +15,6 @@ func reportSchema() string {
 // Ejemplo: ReportView("lot_metrics") → "v4_report.lot_metrics" o "v3_lot_metrics"
 func ReportView(name string) string {
 	if reportSchema() == "v4_report" {
-		// Excepción temporal: lot_list sigue apuntando a v3 para igualdad con remoto
-		if name == "lot_list" {
-			return "v3_lot_list"
-		}
 		return "v4_report." + name
 	}
 	return "v3_" + name
