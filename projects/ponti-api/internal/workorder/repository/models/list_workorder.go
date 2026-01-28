@@ -31,5 +31,5 @@ type WorkorderListElement struct {
 
 // TableName apunta a la vista
 func (WorkorderListElement) TableName() string {
-	return "v3_workorder_list"
+	return "v4_report.workorder_list"
 }

@@ -6,7 +6,6 @@ import "os"
 // reportSchema retorna el schema a usar para vistas de reportes.
 // Se evalúa dinámicamente para respetar .env cargado en runtime.
 // Si REPORT_SCHEMA="v4_report" → usa vistas v4_report.*
-// Si REPORT_SCHEMA está vacío o es "public" → usa vistas v3_* (default)
 func reportSchema() string {
 	return os.Getenv("REPORT_SCHEMA")
 }
@@ -17,7 +16,7 @@ func ReportView(name string) string {
 	if reportSchema() == "v4_report" {
 		return "v4_report." + name
 	}
-	return "v3_" + name
+	return "v4_report." + name
 }
 
 // FieldCropView retorna el nombre de vista para field_crop
@@ -27,7 +26,7 @@ func FieldCropView(name string) string {
 	if reportSchema() == "v4_report" {
 		return "v4_report.field_crop_" + name
 	}
-	return "v3_report_field_crop_" + name
+	return "v4_report.field_crop_" + name
 }
 
 // SummaryView retorna el nombre de vista para summary_results
@@ -36,12 +35,12 @@ func SummaryView() string {
 	if reportSchema() == "v4_report" {
 		return "v4_report.summary_results"
 	}
-	return "v3_report_summary_results_view"
+	return "v4_report.summary_results"
 }
 
 // IsV4Enabled retorna true si está habilitado el schema v4
 func IsV4Enabled() bool {
-	return reportSchema() == "v4_report"
+	return true
 }
 
 // DashboardView retorna el nombre de vista para dashboard
@@ -51,7 +50,7 @@ func DashboardView(name string) string {
 	if reportSchema() == "v4_report" {
 		return "v4_report.dashboard_" + name
 	}
-	return "v3_dashboard_" + name
+	return "v4_report.dashboard_" + name
 }
 
 // InvestorView retorna el nombre de vista para investor
@@ -61,17 +60,5 @@ func InvestorView(name string) string {
 	if reportSchema() == "v4_report" {
 		return "v4_report.investor_" + name
 	}
-	// Mapeo especial para v3 porque tienen nombres diferentes
-	switch name {
-	case "contribution_data":
-		return "v3_investor_contribution_data_view"
-	case "project_base":
-		return "v3_report_investor_project_base"
-	case "contribution_categories":
-		return "v3_report_investor_contribution_categories"
-	case "distributions":
-		return "v3_report_investor_distributions"
-	default:
-		return "v3_investor_" + name
-	}
+	return "v4_report.investor_" + name
 }
