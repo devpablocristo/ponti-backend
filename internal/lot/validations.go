@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
+	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/pkg/validations"
-	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
 
 // ValidationError representa un error de validación específico
@@ -311,9 +311,9 @@ func ValidateLotRequest() gin.HandlerFunc {
 		var req dto.Lot
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{
-				Error: fmt.Sprintf("Error in request format: %v", err),
-			})
+			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			c.Abort()
 			return
 		}
@@ -326,7 +326,7 @@ func ValidateLotRequest() gin.HandlerFunc {
 		}
 
 		// Establecer ID de usuario desde el contexto
-		userID := c.Value(pkgmwr.ContextUserID)
+		userID := c.Value(pkgmwr.ContextUserIDKey)
 		if userID != nil {
 			if s, ok := userID.(string); ok {
 				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
@@ -366,9 +366,9 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		var req dto.LotUpdate
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{
-				Error: fmt.Sprintf("Error in request format: %v", err),
-			})
+			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			c.Abort()
 			return
 		}
@@ -409,7 +409,7 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		// }
 
 		// Set user ID from context
-		userID := c.Value(pkgmwr.ContextUserID)
+		userID := c.Value(pkgmwr.ContextUserIDKey)
 		if userID != nil {
 			if s, ok := userID.(string); ok {
 				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
@@ -442,9 +442,9 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{
-				Error: fmt.Sprintf("Error in request format: %v", err),
-			})
+			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			c.Abort()
 			return
 		}
@@ -452,18 +452,18 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		// Validar formato de toneladas
 		tons, err := decimal.NewFromString(req.Tons)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{
-				Error: "Invalid tons format. Must be a valid decimal number.",
-			})
+			domErr := types.NewError(types.ErrBadRequest, "invalid tons format", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			c.Abort()
 			return
 		}
 
 		// Validar valor de toneladas
 		if err := ValidateTons(tons, "tons"); err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{
-				Error: err.Error(),
-			})
+			domErr := types.NewError(types.ErrBadRequest, err.Error(), err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			c.Abort()
 			return
 		}

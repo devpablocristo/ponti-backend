@@ -2,7 +2,6 @@ package labor
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,21 +70,21 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL + "/projects/:id/labors")
+	public := r.Group(baseURL + "/projects/:project_id/labors")
 	{
 		public.POST("", h.CreateLabor)
 		public.GET("", h.ListLabor)
-		public.DELETE("/:idLabor", h.DeleteLabor)
-		public.PUT("/:idLabor", h.UpdateLabor)
-		public.GET("/labor-categories/:typeId", h.ListLaborCategories)
+		public.DELETE("/:labor_id", h.DeleteLabor)
+		public.PUT("/:labor_id", h.UpdateLabor)
+		public.GET("/labor-categories/:type_id", h.ListLaborCategories)
 	}
 
 	workOrderGroup := r.Group(baseURL + "/labors")
 	{
-		workOrderGroup.DELETE("/:idLabor", h.DeleteLaborByID)
-		workOrderGroup.GET("/:workorderID", h.ListLaborByWorkOrder)
-		workOrderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
-		workOrderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
+		workOrderGroup.DELETE("/:labor_id", h.DeleteLaborByID)
+		workOrderGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
+		workOrderGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
+		workOrderGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
 		workOrderGroup.GET("/export/all", h.ExportAllGroupLabors)
 		workOrderGroup.GET("/metrics", h.GetMetrics)
 	}
@@ -93,7 +92,7 @@ func (h *Handler) Routes() {
 
 func (h *Handler) CreateLabor(c *gin.Context) {
 	var req dto.LaborList
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -151,7 +150,7 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -172,7 +171,7 @@ func (h *Handler) ListLabor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -188,52 +187,61 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Labor
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain(projectID, userID)); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor updated successfully"})
 }
 
 func (h *Handler) DeleteLabor(c *gin.Context) {
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	_, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("idLabor"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
@@ -245,25 +253,28 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborCategories(c *gin.Context) {
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	_, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("typeId"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid labor type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid labor type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	laborCategories, err := h.ucs.ListLaborCategoriesByTypeID(c, id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -272,15 +283,15 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
-	workOrderID, ok := parseParamID(c, "workorderID")
+	workOrderID, ok := parseParamID(c, "work_order_id")
 	if !ok {
 		return
 	}
 
 	items, err := h.ucs.ListLaborByWorkOrder(c.Request.Context(), workOrderID)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -289,15 +300,16 @@ func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
 }
 
 func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
-	projectID, ok := parseParamID(c, "projectID")
+	projectID, ok := parseParamID(c, "project_id")
 	if !ok {
 		return
 	}
 
-	fieldIDParam := c.Query("fieldID")
+	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID or projectID is required"))
-		c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID or projectID requires a value"})
+		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -306,8 +318,9 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 		var err error
 		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
 		if err != nil {
-			apiErr, _ := types.NewAPIError(fmt.Errorf("fieldID is not a valid integer"))
-			c.Error(apiErr).SetMeta(map[string]any{"details": "fieldID is not a valid integer"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 	}
@@ -327,12 +340,12 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
-	projectID, ok := parseParamID(c, "projectID")
+	projectID, ok := parseParamID(c, "project_id")
 	if !ok {
 		return
 	}
 
-	fieldIDParam := c.Query("fieldID")
+	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
 		types.NewErrorResponseHelper().BadRequest(c, "fieldID or projectID requires a value", nil)
 		return
@@ -372,7 +385,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("project_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filt.ProjectID = &id
@@ -381,7 +396,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("field_id"); v != "" && v != "null" && v != "undefined" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		// Solo setear field_id si es > 0 (field_id=0 = todos los campos)
@@ -391,8 +408,8 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))

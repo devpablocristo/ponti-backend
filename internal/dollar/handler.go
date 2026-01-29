@@ -51,7 +51,7 @@ func NewHandler(u UseCasePort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEn
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.cfg.APIBaseURL() + "/projects/:id/dollar-values"
+	baseURL := h.cfg.APIBaseURL() + "/projects/:project_id/dollar-values"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -65,25 +65,19 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	projectID, err := strconv.ParseInt(c.Param("project_id"), 10, 64)
 	if err != nil || projectID == 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrInvalidID, "projectId is required", err).Error(),
-		})
+		domErr := types.NewError(types.ErrInvalidID, "project_id is required", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	// Llamo al caso de uso
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
-		switch {
-		case types.IsNotFound(err):
-			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
-		case types.IsValidationError(err):
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		}
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -97,34 +91,28 @@ func (h *Handler) ListByProject(c *gin.Context) {
 }
 
 func (h *Handler) CreateorUpdateBulk(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	projectID, err := strconv.ParseInt(c.Param("project_id"), 10, 64)
 	if err != nil || projectID == 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrInvalidID, "projectId is required", err).Error(),
-		})
+		domErr := types.NewError(types.ErrInvalidID, "project_id is required", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	// Parseo el body JSON a DTO
 	var in dto.BulkDollarAverageRequest
 	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrValidation, "invalid request body", err).Error(),
-		})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	// Convierto el DTO a Slice de domain
 	items := in.ToDomainSlice(projectID)
 	if err := h.ucs.CreateOrUpdateBulk(c.Request.Context(), items); err != nil {
-		switch {
-		case types.IsValidationError(err):
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-		case types.IsConflict(err):
-			c.JSON(http.StatusConflict, types.ErrorResponse{Error: err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-		}
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 

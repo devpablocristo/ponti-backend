@@ -13,9 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // UseCasesPort define la interfaz para los casos de uso
@@ -88,7 +88,9 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
 		projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filter.ProjectID = &projectID
@@ -97,7 +99,8 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Ejecutar caso de uso
 	report, err := h.ucs.CheckCostsCoherence(c.Request.Context(), filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 

@@ -449,7 +449,7 @@ func mapLotsToDomain(lots []models.Lot) []domain.Lot {
 }
 
 func convertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserID)
+	userID := ctx.Value(pkgmwr.ContextUserIDKey)
 	if i, ok := userID.(int64); ok {
 		return i, nil
 	}

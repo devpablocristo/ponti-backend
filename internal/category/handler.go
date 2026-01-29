@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/internal/category/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -66,15 +66,16 @@ func (h *Handler) Routes() {
 	{
 		group.GET("", h.ListCategories)
 		group.POST("", h.CreateCategory)
-		group.PUT("/:id", h.UpdateCategory)
-		group.DELETE("/:id", h.DeleteCategory)
+		group.PUT("/:category_id", h.UpdateCategory)
+		group.DELETE("/:category_id", h.DeleteCategory)
 	}
 }
 
 func (h *Handler) ListCategories(c *gin.Context) {
 	categories, err := h.categoryUC.ListCategories(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	out := make([]dto.Category, len(categories))
@@ -87,45 +88,56 @@ func (h *Handler) ListCategories(c *gin.Context) {
 func (h *Handler) CreateCategory(c *gin.Context) {
 	var req dto.Category
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	newID, err := h.categoryUC.CreateCategory(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "Category created successfully", "id": newID})
 }
 
 func (h *Handler) UpdateCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("category_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid category id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid category id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Category
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	dom := req.ToDomain()
 	dom.ID = id
 	if err := h.categoryUC.UpdateCategory(c.Request.Context(), dom); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category updated successfully"})
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("category_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid category id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid category id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.categoryUC.DeleteCategory(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category deleted successfully"})

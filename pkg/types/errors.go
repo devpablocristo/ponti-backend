@@ -1,5 +1,5 @@
-// Package pkgtypes provides common types and utilities used across the ponti-backend project,
-// including domain error types, API error handling, and common data structures.
+// Package pkgtypes proporciona tipos y utilidades comunes del proyecto ponti-backend,
+// incluyendo errores de dominio, manejo de errores de API y estructuras compartidas.
 package pkgtypes
 
 import (
@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// ErrorType defines the main domain error types.
+// ErrorType define los tipos principales de error de dominio.
 type ErrorType string
 
 const (
@@ -28,11 +28,11 @@ const (
 	ErrBadRequest      ErrorType = "BAD_REQUEST"
 )
 
-// Error is a domain-level error with type, message, details and optional context.
+// Error es un error de dominio con tipo, mensaje, detalles y contexto opcional.
 type Error struct {
 	Type    ErrorType      `json:"type"`
 	Message string         `json:"message"`
-	Details error          `json:"-"` // Not marshaled to JSON
+	Details error          `json:"-"` // No se serializa a JSON
 	Context map[string]any `json:"context,omitempty"`
 }
 
@@ -58,7 +58,7 @@ func (e *Error) ToJSON() map[string]any {
 	return response
 }
 
-// NewError creates a new domain error with the specified type, message, and details.
+// NewError crea un error de dominio con tipo, mensaje y detalles.
 func NewError(errType ErrorType, message string, details error) *Error {
 	return &Error{
 		Type:    errType,
@@ -110,7 +110,7 @@ func NewMissingFieldError(field string) *Error {
 	)
 }
 
-// IsNotFound checks if the error is a "not found" domain error.
+// IsNotFound verifica si el error es de tipo "not found".
 func IsNotFound(err error) bool {
 	var e *Error
 	return errors.As(err, &e) && e.Type == ErrNotFound
@@ -141,7 +141,7 @@ func IsTokenNotFoundError(err error) bool {
 	return errors.As(err, &e) && e.Type == ErrTokenNotFound
 }
 
-// GetErrorType extracts the error type from a domain error, returning the type and whether it was found.
+// GetErrorType extrae el tipo de error de dominio y si fue encontrado.
 func GetErrorType(err error) (ErrorType, bool) {
 	var e *Error
 	if errors.As(err, &e) {

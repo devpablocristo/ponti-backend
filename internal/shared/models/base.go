@@ -22,7 +22,7 @@ type Base struct {
 
 // ConvertStringToID convierte el user_id del contexto a int64.
 func ConvertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserID)
+	userID := ctx.Value(pkgmwr.ContextUserIDKey)
 	if s, ok := userID.(string); ok {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 			return i, nil

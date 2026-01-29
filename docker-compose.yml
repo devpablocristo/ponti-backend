@@ -46,29 +46,6 @@ services:
     networks:
       - app-network
 
-  pgadmin:
-    image: dpage/pgadmin4:8.12
-    ports:
-      - "${PGADMIN_PORT}:${PGADMIN_TARGET_PORT}"
-    env_file:
-      - .env
-    environment:
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-      GUNICORN_ACCESS_LOGFILE: "/dev/null"
-      PGADMIN_CONFIG_CONSOLE_LOG_LEVEL: 30
-    logging:
-      driver: "json-file"
-    depends_on:
-      - ponti-db
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - app-network
-    restart: unless-stopped
-
 networks:
   app-network:
     driver: bridge

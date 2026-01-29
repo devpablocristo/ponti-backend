@@ -809,7 +809,7 @@ func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
 }
 
 func convertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserID)
+	userID := ctx.Value(pkgmwr.ContextUserIDKey)
 	if s, ok := userID.(string); ok {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 			return i, nil

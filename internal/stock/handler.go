@@ -74,19 +74,19 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL + "/projects/:id/stocks")
+	public := r.Group(baseURL + "/projects/:project_id/stocks")
 	{
 		public.GET("/summary", h.getStocksSummary)
 		public.GET("/periods", h.getStocksPeriods)
 		public.GET("/export", h.ExportStocksByProject)
 		public.PUT("/close-date", h.UpdateStocksCloseDate)
-		public.PUT("/real-stock/:stockId", h.UpdateRealStock)
+		public.PUT("/real-stock/:stock_id", h.UpdateRealStock)
 	}
 }
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
@@ -113,7 +113,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 
 func (h *Handler) getStocksPeriods(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
@@ -131,7 +131,7 @@ func (h *Handler) getStocksPeriods(c *gin.Context) {
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	monthPeriod, err := getMonthPeriod(c)
 	if handleError(err, c) {
@@ -145,7 +145,9 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 	var req dto.UpdateCloseDateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	userID, err := sharedmodels.ConvertStringToID(ctx)
@@ -179,11 +181,13 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 func (h *Handler) UpdateRealStock(c *gin.Context) {
 	ctx := c.Request.Context()
-	stockIDStr := c.Param("stockId")
+	stockIDStr := c.Param("stock_id")
 
 	var req dto.UpdateRealStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -272,10 +276,10 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 }
 
 // ExportStocksByProject exporta stocks filtrados por proyecto
-// Ruta nueva: /api/v1/projects/:id/stocks/export
+// Ruta nueva: /api/v1/projects/:project_id/stocks/export
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("id")
+	projectIDStr := c.Param("project_id")
 
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {

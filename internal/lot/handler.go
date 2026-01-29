@@ -83,10 +83,10 @@ func (h *Handler) Routes() {
 		public.POST("", ValidateLotRequest(), h.CreateLot)
 		public.GET("", h.ListLots)
 		public.GET("/metrics", h.GetMetrics)
-		public.PUT("/:id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
-		public.GET("/:id", h.GetLot)
-		public.PUT("/:id", ValidateLotUpdate(), h.UpdateLot)
-		public.DELETE("/:id", h.DeleteLot)
+		public.PUT("/:lot_id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
+		public.GET("/:lot_id", h.GetLot)
+		public.PUT("/:lot_id", ValidateLotUpdate(), h.UpdateLot)
+		public.DELETE("/:lot_id", h.DeleteLot)
 		public.GET("/export", h.ExportLots)
 	}
 }
@@ -180,7 +180,7 @@ func (h *Handler) ListLots(c *gin.Context) {
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
 	if err != nil {
 		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
@@ -194,7 +194,7 @@ func (h *Handler) GetLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
 	if err != nil {
 		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
@@ -220,7 +220,10 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		if cur, getErr := h.ucs.GetLot(c.Request.Context(), id); getErr == nil {
 			dom.FieldID = cur.FieldID
 		} else {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "field_id is required"})
+			types.NewErrorResponseHelper().InvalidPayload(
+				c,
+				types.NewError(types.ErrInvalidID, "field_id is required", nil),
+			)
 			return
 		}
 	}
@@ -232,7 +235,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
 	if err != nil {
 		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return
@@ -249,7 +252,7 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
 	if err != nil {
 		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
 		return

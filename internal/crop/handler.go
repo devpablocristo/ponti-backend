@@ -68,9 +68,9 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateCrop)
 		public.GET("", h.ListCrops)
-		public.GET("/:id", h.GetCrop)
-		public.PUT("/:id", h.UpdateCrop)
-		public.DELETE("/:id", h.DeleteCrop)
+		public.GET("/:crop_id", h.GetCrop)
+		public.PUT("/:crop_id", h.UpdateCrop)
+		public.DELETE("/:crop_id", h.DeleteCrop)
 	}
 }
 
@@ -111,16 +111,18 @@ func (h *Handler) ListCrops(c *gin.Context) {
 
 // GetCrop retrieves a crop by its ID.
 func (h *Handler) GetCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid crop id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	crop, err := h.ucs.GetCrop(c.Request.Context(), id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -129,20 +131,24 @@ func (h *Handler) GetCrop(c *gin.Context) {
 
 // UpdateCrop updates an existing crop.
 func (h *Handler) UpdateCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid crop id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Crop
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateCrop(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Crop updated successfully"})
@@ -150,14 +156,16 @@ func (h *Handler) UpdateCrop(c *gin.Context) {
 
 // DeleteCrop deletes a crop by its ID.
 func (h *Handler) DeleteCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid crop id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteCrop(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Crop deleted successfully"})

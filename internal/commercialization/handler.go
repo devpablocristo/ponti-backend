@@ -52,7 +52,7 @@ func NewHandler(u UseCasePort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEn
 
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	baseURL := h.cfg.APIBaseURL() + "/projects/:id/commercializations"
+	baseURL := h.cfg.APIBaseURL() + "/projects/:project_id/commercializations"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -67,7 +67,7 @@ func (h *Handler) Routes() {
 
 // Listar por proyecto
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, ok := parseParamID(c, "id")
+	projectID, ok := parseParamID(c, "project_id")
 	if !ok {
 		return
 	}
@@ -88,7 +88,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 
 // Crear proyecto
 func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
-	projectID, ok := parseParamID(c, "id")
+	projectID, ok := parseParamID(c, "project_id")
 	if !ok {
 		return
 	}
@@ -99,9 +99,9 @@ func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
 
 	var body dto.BulkCommercializationRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrValidation, "invalid request body", err).Error(),
-		})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -120,9 +120,9 @@ func parseParamID(c *gin.Context, param string) (int64, bool) {
 	raw := c.Param(param)
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: types.NewError(types.ErrInvalidID, param+" is required", err).Error(),
-		})
+		domErr := types.NewError(types.ErrInvalidID, param+" is required", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return 0, false
 	}
 	return id, true
@@ -132,9 +132,9 @@ func parseParamID(c *gin.Context, param string) (int64, bool) {
 func parseUserID(c *gin.Context) (int64, bool) {
 	UserID, err := sharedmodels.ConvertStringToID(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse{
-			Error: types.NewError(types.ErrAuthorization, "invalid userID", err).Error(),
-		})
+		domErr := types.NewError(types.ErrAuthorization, "invalid user_id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return 0, false
 	}
 	return UserID, true
@@ -142,14 +142,6 @@ func parseUserID(c *gin.Context) (int64, bool) {
 
 // unifica el switch de errores
 func respondError(c *gin.Context, err error) {
-	switch {
-	case types.IsNotFound(err):
-		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
-	case types.IsValidationError(err):
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
-	case types.IsConflict(err):
-		c.JSON(http.StatusConflict, types.ErrorResponse{Error: err.Error()})
-	default:
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
-	}
+	apiErr, status := types.NewAPIError(err)
+	c.JSON(status, apiErr.ToResponse())
 }

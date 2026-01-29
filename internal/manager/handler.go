@@ -67,11 +67,11 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateManager)       // Crear un manager
-		public.GET("", h.ListManagers)         // Listar managers
-		public.GET("/:id", h.GetManager)       // Obtener un manager por ID
-		public.PUT("/:id", h.UpdateManager)    // Actualizar un manager
-		public.DELETE("/:id", h.DeleteManager) // Eliminar un manager
+		public.POST("", h.CreateManager)               // Crear un manager
+		public.GET("", h.ListManagers)                 // Listar managers
+		public.GET("/:manager_id", h.GetManager)       // Obtener un manager por ID
+		public.PUT("/:manager_id", h.UpdateManager)    // Actualizar un manager
+		public.DELETE("/:manager_id", h.DeleteManager) // Eliminar un manager
 	}
 }
 
@@ -112,16 +112,18 @@ func (h *Handler) ListManagers(c *gin.Context) {
 }
 
 func (h *Handler) GetManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid manager id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	manager, err := h.ucs.GetManager(c.Request.Context(), id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -130,21 +132,24 @@ func (h *Handler) GetManager(c *gin.Context) {
 
 // UpdateManager actualiza un manager existente.
 func (h *Handler) UpdateManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid manager id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Manager
 	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateManager(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Manager updated successfully"})
@@ -152,14 +157,16 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 
 // DeleteManager elimina un manager por su ID.
 func (h *Handler) DeleteManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid manager id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteManager(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Manager deleted successfully"})

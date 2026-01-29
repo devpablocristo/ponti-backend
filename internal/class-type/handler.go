@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/internal/class-type/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -63,14 +63,15 @@ func (h *Handler) Routes() {
 	{
 		group.GET("", h.ListClassTypes)
 		group.POST("", h.CreateClassType)
-		group.PUT("/:id", h.UpdateClassType)
-		group.DELETE("/:id", h.DeleteClassType)
+		group.PUT("/:class_type_id", h.UpdateClassType)
+		group.DELETE("/:class_type_id", h.DeleteClassType)
 	}
 }
 func (h *Handler) ListClassTypes(c *gin.Context) {
 	classTypes, err := h.classTypeUC.ListClassTypes(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	out := make([]dto.ClassType, len(classTypes))
@@ -82,43 +83,54 @@ func (h *Handler) ListClassTypes(c *gin.Context) {
 func (h *Handler) CreateClassType(c *gin.Context) {
 	var req dto.ClassType
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	newID, err := h.classTypeUC.CreateClassType(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "Class type created successfully", "id": newID})
 }
 func (h *Handler) UpdateClassType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("class_type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid class type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid class type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.ClassType
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	dom := req.ToDomain()
 	dom.ID = id
 	if err := h.classTypeUC.UpdateClassType(c.Request.Context(), dom); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Class type updated successfully"})
 }
 func (h *Handler) DeleteClassType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("class_type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid class type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid class type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.classTypeUC.DeleteClassType(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Class type deleted successfully"})

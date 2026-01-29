@@ -66,22 +66,25 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateLeaseType)
 		public.GET("", h.ListLeaseTypes)
-		public.GET("/:id", h.GetLeaseType)
-		public.PUT("/:id", h.UpdateLeaseType)
-		public.DELETE("/:id", h.DeleteLeaseType)
+		public.GET("/:lease_type_id", h.GetLeaseType)
+		public.PUT("/:lease_type_id", h.UpdateLeaseType)
+		public.DELETE("/:lease_type_id", h.DeleteLeaseType)
 	}
 }
 
 func (h *Handler) CreateLeaseType(c *gin.Context) {
 	var req dto.LeaseType
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	dom := &domain.LeaseType{Name: req.Name}
 	id, err := h.ucs.CreateLeaseType(c.Request.Context(), dom)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusCreated, dto.CreateLeaseTypeResponse{Message: "Lease type created", ID: id})
@@ -90,7 +93,8 @@ func (h *Handler) CreateLeaseType(c *gin.Context) {
 func (h *Handler) ListLeaseTypes(c *gin.Context) {
 	list, err := h.ucs.ListLeaseTypes(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	resp := make([]dto.LeaseType, len(list))
@@ -101,46 +105,57 @@ func (h *Handler) ListLeaseTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	lt, err := h.ucs.GetLeaseType(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomain(*lt))
 }
 
 func (h *Handler) UpdateLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.LeaseType
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateLeaseType(c.Request.Context(), req.ToDomain()); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lease type updated"})
 }
 
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lease type deleted"})

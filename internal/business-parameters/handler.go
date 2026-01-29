@@ -69,10 +69,10 @@ func (h *Handler) Routes() {
 	{
 		group.GET("", h.GetAllParameters)
 		group.GET("/category/:category", h.GetParametersByCategory)
-		group.GET("/:key", h.GetParameter)
+		group.GET("/:parameter_key", h.GetParameter)
 		group.POST("", h.CreateParameter)
-		group.PUT("/:id", h.UpdateParameter)
-		group.DELETE("/:id", h.DeleteParameter)
+		group.PUT("/:parameter_id", h.UpdateParameter)
+		group.DELETE("/:parameter_id", h.DeleteParameter)
 	}
 }
 
@@ -82,32 +82,25 @@ func (h *Handler) Routes() {
 // @Tags business-parameters
 // @Accept json
 // @Produce json
-// @Param key path string true "Parameter key"
+// @Param parameter_key path string true "Parameter key"
 // @Success 200 {object} dto.BusinessParameterResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters/{key} [get]
 func (h *Handler) GetParameter(c *gin.Context) {
-	key := c.Param("key")
+	key := c.Param("parameter_key")
 	if key == "" {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "key parameter is required",
-		})
+		domErr := types.NewError(types.ErrBadRequest, "parameter_key is required", nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	param, err := h.ucs.GetParameter(c.Request.Context(), key)
 	if err != nil {
-		if err.Error() == "business parameter not found" {
-			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "business parameter not found",
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get business parameter",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -128,17 +121,16 @@ func (h *Handler) GetParameter(c *gin.Context) {
 func (h *Handler) GetParametersByCategory(c *gin.Context) {
 	category := c.Param("category")
 	if category == "" {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "category parameter is required",
-		})
+		domErr := types.NewError(types.ErrBadRequest, "category is required", nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	params, err := h.ucs.GetParametersByCategory(c.Request.Context(), category)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get business parameters by category",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -162,9 +154,8 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 func (h *Handler) GetAllParameters(c *gin.Context) {
 	params, err := h.ucs.GetAllParameters(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to get all business parameters",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -190,9 +181,9 @@ func (h *Handler) GetAllParameters(c *gin.Context) {
 func (h *Handler) CreateParameter(c *gin.Context) {
 	var req dto.CreateBusinessParameterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "invalid request body",
-		})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -205,9 +196,8 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 
 	id, err := h.ucs.CreateParameter(c.Request.Context(), param)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to create business parameter",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -229,20 +219,20 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters/{id} [put]
 func (h *Handler) UpdateParameter(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("parameter_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "invalid id parameter",
-		})
+		domErr := types.NewError(types.ErrInvalidID, "invalid parameter_id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	var req dto.UpdateBusinessParameterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "invalid request body",
-		})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -254,15 +244,8 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 
 	err = h.ucs.UpdateParameter(c.Request.Context(), param)
 	if err != nil {
-		if err.Error() == "business parameter not found" {
-			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "business parameter not found",
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to update business parameter",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -282,26 +265,19 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters/{id} [delete]
 func (h *Handler) DeleteParameter(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("parameter_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{
-			Error: "invalid id parameter",
-		})
+		domErr := types.NewError(types.ErrInvalidID, "invalid parameter_id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	err = h.ucs.DeleteParameter(c.Request.Context(), id)
 	if err != nil {
-		if err.Error() == "business parameter not found" {
-			c.JSON(http.StatusNotFound, types.ErrorResponse{
-				Error: "business parameter not found",
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
-			Error: "failed to delete business parameter",
-		})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 

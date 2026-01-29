@@ -1,30 +1,29 @@
 package pkgmwr
 
 import (
-	"net/http"
 	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-// RequireAPIKey ensures the request contains a valid API key in the header.
+// RequireAPIKey asegura que el request tenga un API key válido en el header.
 func RequireAPIKey() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := strings.TrimSpace(c.GetHeader(HeaderAPIKey))
 		expectedKey := os.Getenv(EnvAPIKey)
 		if apiKey == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":   "MISSING_API_KEY",
-				"message": "API key is required in '" + HeaderAPIKey + "' header.",
-			})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "api key is required", nil)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		if expectedKey == "" || apiKey != expectedKey {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":   "INVALID_API_KEY",
-				"message": "API key is invalid.",
-			})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "api key is invalid", nil)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		c.Set(ContextAPIKey, apiKey)

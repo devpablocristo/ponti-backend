@@ -66,11 +66,11 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateCustomer)       // Crear un customer
-		public.GET("", h.ListCustomers)         // Listar todos los customers
-		public.GET("/:id", h.GetCustomer)       // Obtener un customer por ID
-		public.PUT("/:id", h.UpdateCustomer)    // Actualizar un customer
-		public.DELETE("/:id", h.DeleteCustomer) // Eliminar un customer
+		public.POST("", h.CreateCustomer)                // Crear un customer
+		public.GET("", h.ListCustomers)                  // Listar todos los customers
+		public.GET("/:customer_id", h.GetCustomer)       // Obtener un customer por ID
+		public.PUT("/:customer_id", h.UpdateCustomer)    // Actualizar un customer
+		public.DELETE("/:customer_id", h.DeleteCustomer) // Eliminar un customer
 	}
 }
 
@@ -104,8 +104,8 @@ func (h *Handler) ListCustomers(c *gin.Context) {
 
 	items, total, err := h.ucs.ListCustomers(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -115,16 +115,18 @@ func (h *Handler) ListCustomers(c *gin.Context) {
 
 // GetCustomer recupera un customer por su ID.
 func (h *Handler) GetCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	customer, err := h.ucs.GetCustomer(c.Request.Context(), id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -133,20 +135,24 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 
 // UpdateCustomer actualiza un customer existente.
 func (h *Handler) UpdateCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Customer
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateCustomer(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer updated successfully"})
@@ -154,14 +160,16 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 
 // DeleteCustomer elimina un customer por su ID.
 func (h *Handler) DeleteCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteCustomer(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer deleted successfully"})

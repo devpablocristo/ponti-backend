@@ -57,7 +57,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 // Routes registra las rutas del módulo work orders.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
-	base := h.acf.APIBaseURL() + "/workorders"
+	base := h.acf.APIBaseURL() + "/work-orders"
 
 	for _, mw := range h.mws.GetValidation() {
 		r.Use(mw)
@@ -67,10 +67,10 @@ func (h *Handler) Routes() {
 	{
 
 		grp.POST("", h.CreateWorkOrder)
-		grp.GET("/:id", h.GetWorkOrderByID)
-		grp.PUT("/:id", h.UpdateWorkOrderByID)
-		grp.DELETE("/:id", h.DeleteWorkOrderByID)
-		grp.POST("/:number/duplicate", h.DuplicateWorkOrder)
+		grp.GET("/:work_order_id", h.GetWorkOrderByID)
+		grp.PUT("/:work_order_id", h.UpdateWorkOrderByID)
+		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
+		grp.POST("/:work_order_number/duplicate", h.DuplicateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
@@ -102,7 +102,7 @@ func (h *Handler) CreateWorkOrder(c *gin.Context) {
 
 // GetWorkOrderByID obtiene una orden por ID.
 func (h *Handler) GetWorkOrderByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("work_order_id"), 10, 64)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -120,7 +120,7 @@ func (h *Handler) GetWorkOrderByID(c *gin.Context) {
 
 // DuplicateWorkOrder duplica una orden de trabajo.
 func (h *Handler) DuplicateWorkOrder(c *gin.Context) {
-	// orig := c.Param("number")
+	// orig := c.Param("work_order_number")
 	// newNum, err := h.ucs.DuplicateWorkOrder(c.Request.Context(), orig)
 	// if err != nil {
 	// 	apiErr, status := types.NewAPIError(err)
@@ -142,7 +142,7 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("work_order_id"), 10, 64)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -159,7 +159,7 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 
 // DeleteWorkOrderByID elimina una orden de trabajo.
 func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	idParam := c.Param("id")
+	idParam := c.Param("work_order_id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		apiErr, status := types.NewAPIError(types.NewError(types.ErrInvalidID, "invalid work_order id", err))
@@ -226,7 +226,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("project_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filt.ProjectID = &id
@@ -234,7 +236,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("field_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filt.FieldID = &id
@@ -242,7 +246,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("customer_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid customer_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid customer_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filt.CustomerID = &id
@@ -250,7 +256,9 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if v := c.Query("campaign_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid campaign_id"})
+			domErr := types.NewError(types.ErrInvalidID, "invalid campaign_id", err)
+			apiErr, status := types.NewAPIError(domErr)
+			c.JSON(status, apiErr.ToResponse())
 			return
 		}
 		filt.CampaignID = &id

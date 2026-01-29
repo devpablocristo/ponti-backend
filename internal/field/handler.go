@@ -64,21 +64,24 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateField)
 		public.GET("", h.ListFields)
-		public.GET("/:idField", h.GetField)
-		public.PUT("/:idField", h.UpdateField)
-		public.DELETE("/:idField", h.DeleteField)
+		public.GET("/:field_id", h.GetField)
+		public.PUT("/:field_id", h.UpdateField)
+		public.DELETE("/:field_id", h.DeleteField)
 	}
 }
 
 func (h *Handler) CreateField(c *gin.Context) {
 	var req dto.Field
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	id, err := h.ucs.CreateField(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusCreated, dto.CreateFieldResponse{Message: "Field created", ID: id})
@@ -87,7 +90,8 @@ func (h *Handler) CreateField(c *gin.Context) {
 func (h *Handler) ListFields(c *gin.Context) {
 	fields, err := h.ucs.ListFields(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	dtos := make([]dto.Field, len(fields))
@@ -98,47 +102,58 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	f, err := h.ucs.GetField(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomain(*f))
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.UpdateField
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	dom := req.ToDomain()
 	dom.ID = id
 	if err := h.ucs.UpdateField(c.Request.Context(), dom); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field updated"})
 }
 
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Field deleted"})

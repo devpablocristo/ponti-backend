@@ -32,18 +32,6 @@ migrate-create:
 	@echo "Creating migration $(MIGRATIONS_NAME)..."
 	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
 
-# Recargar la última migración (bajar y subir en un acto, sin borrar volúmenes)
-migrate-reload:
-	@echo "Reloading last migration (down + up without losing data)..."
-	@docker compose run --rm migrate \
-		-path /migrations \
-		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
-		down 1
-	@docker compose run --rm migrate \
-		-path /migrations \
-		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
-		up 1
-	@echo "Migration reloaded successfully!"
 migrate-force:
 	@echo "Forcing migration to -1..."
 	@$(MIGRATE) force -1
@@ -51,41 +39,6 @@ migrate-force:
 migrate-version:
 	@echo "Current migration version:"
 	@$(MIGRATE) version
-
-# Forzar migración en docker-compose pasando el número como argumento
-migrate-force-dc:
-	@if [ -z "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		echo "Error: You must pass the version number. Example: make migrate-force-dc 31"; \
-		exit 1; \
-	fi
-	@echo "Forcing migration to version $(filter-out $@,$(MAKECMDGOALS))..."
-	@docker compose run --rm migrate \
-		-path /migrations \
-		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
-		force $(filter-out $@,$(MAKECMDGOALS))
-
-%:
-	@:
-
-# Baja todo, borra volúmenes, recompila, levanta, limpia esquema y corre migraciones desde cero
-migrate-reset-dc:
-	@echo "Resetting everything: down -v, build, up -d, drop schema and run migrations from scratch..."
-	@docker compose down -v --remove-orphans
-	@docker compose build
-	@docker compose up -d
-	@echo "Waiting for DB (ponti-db) to be ready..."
-	@until docker compose exec -T ponti-db pg_isready -U admin -d ponti_api_db >/dev/null 2>&1; do sleep 1; done
-	@echo "Dropping schema with migrate drop -f..."
-	@docker compose run --rm migrate \
-		-path /migrations \
-		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
-		drop -f
-	@echo "Running migrations from scratch..."
-	@docker compose run --rm migrate \
-		-path /migrations \
-		-database "postgres://admin:admin@ponti-db:5432/ponti_api_db?sslmode=disable" \
-		up
-	@echo "Reset completed."
 
 # --------------------------------------------------
 # Compilación y ejecución

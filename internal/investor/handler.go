@@ -66,11 +66,11 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateInvestor)       // Create an investor
-		public.GET("", h.ListInvestors)         // List all investors
-		public.GET("/:id", h.GetInvestor)       // Get an investor by ID
-		public.PUT("/:id", h.UpdateInvestor)    // Update an investor
-		public.DELETE("/:id", h.DeleteInvestor) // Delete an investor
+		public.POST("", h.CreateInvestor)                // Create an investor
+		public.GET("", h.ListInvestors)                  // List all investors
+		public.GET("/:investor_id", h.GetInvestor)       // Get an investor by ID
+		public.PUT("/:investor_id", h.UpdateInvestor)    // Update an investor
+		public.DELETE("/:investor_id", h.DeleteInvestor) // Delete an investor
 	}
 }
 
@@ -111,16 +111,18 @@ func (h *Handler) ListInvestors(c *gin.Context) {
 
 // GetInvestor retrieves an investor by its ID.
 func (h *Handler) GetInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid investor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
 	investor, err := h.ucs.GetInvestor(c.Request.Context(), id)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
@@ -129,20 +131,24 @@ func (h *Handler) GetInvestor(c *gin.Context) {
 
 // UpdateInvestor updates an existing investor.
 func (h *Handler) UpdateInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid investor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	var req dto.Investor
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	req.ID = id
 	if err := h.ucs.UpdateInvestor(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Investor updated successfully"})
@@ -150,14 +156,16 @@ func (h *Handler) UpdateInvestor(c *gin.Context) {
 
 // DeleteInvestor deletes an investor by its ID.
 func (h *Handler) DeleteInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid investor id"})
+		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	if err := h.ucs.DeleteInvestor(c.Request.Context(), id); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Investor deleted successfully"})
