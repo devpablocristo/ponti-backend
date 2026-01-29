@@ -4,60 +4,60 @@ import (
 	"github.com/google/wire"
 
 	cfg "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	business_parameters "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
+	bparams "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 )
 
 // ProvideBusinessParametersGormEnginePort ...
-func ProvideBusinessParametersGormEnginePort(r *gormpkg.Repository) business_parameters.GormEnginePort {
+func ProvideBusinessParametersGormEnginePort(r *gormpkg.Repository) bparams.GormEnginePort {
 	return r
 }
 
 // ProvideBusinessParametersRepository ...
-func ProvideBusinessParametersRepository(r business_parameters.GormEnginePort) *business_parameters.Repository {
-	return business_parameters.NewRepository(r)
+func ProvideBusinessParametersRepository(r bparams.GormEnginePort) *bparams.Repository {
+	return bparams.NewRepository(r)
 }
 
 // ProvideBusinessParametersRepositoryPort ...
-func ProvideBusinessParametersRepositoryPort(repo *business_parameters.Repository) business_parameters.RepositoryPort {
+func ProvideBusinessParametersRepositoryPort(repo *bparams.Repository) bparams.RepositoryPort {
 	return repo
 }
 
 // ProvideBusinessParametersConfigAPI ...
-func ProvideBusinessParametersConfigAPI(c *cfg.Config) business_parameters.ConfigAPIPort {
+func ProvideBusinessParametersConfigAPI(c *cfg.Config) bparams.ConfigAPIPort {
 	return &c.API
 }
 
 // ProvideBusinessParametersGinEnginePort ...
-func ProvideBusinessParametersGinEnginePort(s *pgin.Server) business_parameters.GinEnginePort {
+func ProvideBusinessParametersGinEnginePort(s *pgin.Server) bparams.GinEnginePort {
 	return s
 }
 
 // ProvideBusinessParametersMiddlewaresEnginePort ...
-func ProvideBusinessParametersMiddlewaresEnginePort(m *mwr.Middlewares) business_parameters.MiddlewaresEnginePort {
+func ProvideBusinessParametersMiddlewaresEnginePort(m *mwr.Middlewares) bparams.MiddlewaresEnginePort {
 	return m
 }
 
 // ProvideBusinessParametersUseCases ...
-func ProvideBusinessParametersUseCases(rep business_parameters.RepositoryPort) *business_parameters.UseCases {
-	return business_parameters.NewUseCases(rep)
+func ProvideBusinessParametersUseCases(rep bparams.RepositoryPort) *bparams.UseCases {
+	return bparams.NewUseCases(rep)
 }
 
 // ProvideBusinessParametersUseCasesPort ...
-func ProvideBusinessParametersUseCasesPort(u *business_parameters.UseCases) business_parameters.UseCasesPort {
+func ProvideBusinessParametersUseCasesPort(u *bparams.UseCases) bparams.UseCasesPort {
 	return u
 }
 
 // ProvideBusinessParametersHandler ...
 func ProvideBusinessParametersHandler(
-	server business_parameters.GinEnginePort,
-	ucs business_parameters.UseCasesPort,
-	cfg business_parameters.ConfigAPIPort,
-	mws business_parameters.MiddlewaresEnginePort,
-) *business_parameters.Handler {
-	return business_parameters.NewHandler(ucs, server, cfg, mws)
+	server bparams.GinEnginePort,
+	ucs bparams.UseCasesPort,
+	cfg bparams.ConfigAPIPort,
+	mws bparams.MiddlewaresEnginePort,
+) *bparams.Handler {
+	return bparams.NewHandler(ucs, server, cfg, mws)
 }
 
 // BusinessParametersSet ...

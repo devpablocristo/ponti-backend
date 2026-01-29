@@ -1,4 +1,4 @@
-// Package domain contiene las entidades de dominio para los reportes
+// Package domain contiene las entidades de dominio para los reportes.
 package domain
 
 import (

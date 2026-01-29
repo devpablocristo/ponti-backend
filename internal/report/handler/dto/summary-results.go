@@ -1,4 +1,4 @@
-// Package dto holds the Data Transfer Objects for reports.
+// Package dto define los DTOs HTTP para reportes.
 package dto
 
 import (
@@ -9,48 +9,48 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
-// Decimal0 es un wrapper de decimal.Decimal que serializa sin decimales (redondeo al entero más cercano)
+// Decimal0 es un wrapper de decimal.Decimal que serializa sin decimales (redondeo al entero más cercano).
 type Decimal0 struct {
 	decimal.Decimal
 }
 
-// MarshalJSON implementa json.Marshaler para formatear sin decimales
+// MarshalJSON implementa json.Marshaler para formatear sin decimales.
 func (d Decimal0) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Decimal.Round(0).String())
 }
 
-// NewDecimal0 crea un Decimal0 desde un decimal.Decimal
+// NewDecimal0 crea un Decimal0 desde un decimal.Decimal.
 func NewDecimal0(d decimal.Decimal) Decimal0 {
 	return Decimal0{Decimal: d}
 }
 
-// Decimal2 es un wrapper de decimal.Decimal que serializa con 2 decimales
+// Decimal2 es un wrapper de decimal.Decimal que serializa con 2 decimales.
 type Decimal2 struct {
 	decimal.Decimal
 }
 
-// MarshalJSON implementa json.Marshaler para formatear con 2 decimales
+// MarshalJSON implementa json.Marshaler para formatear con 2 decimales.
 func (d Decimal2) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Decimal.Round(2).String())
 }
 
-// NewDecimal2 crea un Decimal2 desde un decimal.Decimal
+// NewDecimal2 crea un Decimal2 desde un decimal.Decimal.
 func NewDecimal2(d decimal.Decimal) Decimal2 {
 	return Decimal2{Decimal: d}
 }
 
-// Decimal3 es un wrapper de decimal.Decimal que serializa con 3 decimales
+// Decimal3 es un wrapper de decimal.Decimal que serializa con 3 decimales.
 // NOTA: Se mantiene para compatibilidad con código existente que ya tiene Round(3) configurado
 type Decimal3 struct {
 	decimal.Decimal
 }
 
-// MarshalJSON implementa json.Marshaler para formatear con 3 decimales
+// MarshalJSON implementa json.Marshaler para formatear con 3 decimales.
 func (d Decimal3) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Decimal.Round(3).String())
 }
 
-// NewDecimal3 crea un Decimal3 desde un decimal.Decimal
+// NewDecimal3 crea un Decimal3 desde un decimal.Decimal.
 func NewDecimal3(d decimal.Decimal) Decimal3 {
 	return Decimal3{Decimal: d}
 }
@@ -59,7 +59,7 @@ func NewDecimal3(d decimal.Decimal) Decimal3 {
    REQUEST DTOs
 ========================= */
 
-// SummaryResultsRequest represents the request for summary results report.
+// SummaryResultsRequest representa el request del reporte summary-results.
 type SummaryResultsRequest struct {
 	ProjectID  *int64 `form:"project_id" binding:"omitempty"`
 	CustomerID *int64 `form:"customer_id" binding:"omitempty"`
@@ -71,7 +71,7 @@ type SummaryResultsRequest struct {
    RESPONSE DTOs
 ========================= */
 
-// SummaryResultsResponse represents the summary results report response.
+// SummaryResultsResponse representa la respuesta del reporte summary-results.
 type SummaryResultsResponse struct {
 	ProjectID    int64  `json:"project_id"`
 	ProjectName  string `json:"project_name"`
@@ -90,7 +90,7 @@ type SummaryResultsResponse struct {
 	GeneralCrops GeneralCropsResponse `json:"general_crops"`
 }
 
-// CropSummaryResponse represents a crop summary in the report.
+// CropSummaryResponse representa el resumen de un cultivo.
 type CropSummaryResponse struct {
 	CropID   int64  `json:"crop_id"`
 	CropName string `json:"crop_name"`
@@ -106,7 +106,7 @@ type CropSummaryResponse struct {
 	CropReturnPct      Decimal0 `json:"crop_return_pct"`
 }
 
-// ProjectTotalsResponse represents the project totals in the report (GRAL CAMPOS).
+// ProjectTotalsResponse representa los totales del proyecto (GRAL CAMPOS).
 type ProjectTotalsResponse struct {
 	TotalSurfaceHa          Decimal0 `json:"total_surface_ha"`
 	TotalNetIncomeUsd       Decimal0 `json:"total_net_income_usd"`
@@ -118,7 +118,7 @@ type ProjectTotalsResponse struct {
 	ProjectReturnPct        Decimal0 `json:"project_return_pct"`
 }
 
-// GeneralCropsResponse represents the general crops summary (GRAL CULTIVOS).
+// GeneralCropsResponse representa el resumen general de cultivos (GRAL CULTIVOS).
 type GeneralCropsResponse struct {
 	TotalSurfaceHa          Decimal0 `json:"total_surface_ha"`
 	TotalNetIncomeUsd       Decimal0 `json:"total_net_income_usd"`
@@ -134,7 +134,7 @@ type GeneralCropsResponse struct {
    MAPPING FUNCTIONS
 ========================= */
 
-// ToDomainSummaryResultsFilter maps DTO to domain filters.
+// ToDomainSummaryResultsFilter mapea DTO a filtros de dominio.
 func ToDomainSummaryResultsFilter(in SummaryResultsRequest) domain.SummaryResultsFilter {
 	return domain.SummaryResultsFilter{
 		ProjectID:  in.ProjectID,
@@ -144,7 +144,7 @@ func ToDomainSummaryResultsFilter(in SummaryResultsRequest) domain.SummaryResult
 	}
 }
 
-// FromDomainSummaryResults maps domain to DTO response.
+// FromDomainSummaryResults mapea dominio a respuesta DTO.
 func FromDomainSummaryResults(d *domain.SummaryResultsResponse) *SummaryResultsResponse {
 	// Mapear cultivos (sin decimales según reglas de formato)
 	crops := make([]CropSummaryResponse, len(d.Crops))

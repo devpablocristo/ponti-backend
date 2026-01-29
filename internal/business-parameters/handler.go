@@ -1,6 +1,8 @@
-package business_parameters
+// Package bparams expone endpoints para parametros de negocio.
+package bparams
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -9,29 +11,69 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters/handler/dto"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
-type Handler struct {
-	useCases *UseCases
+type UseCasesPort interface {
+	GetParameter(context.Context, string) (*domain.BusinessParameter, error)
+	GetParametersByCategory(context.Context, string) ([]domain.BusinessParameter, error)
+	GetAllParameters(context.Context) ([]domain.BusinessParameter, error)
+	CreateParameter(context.Context, *domain.BusinessParameter) (int64, error)
+	UpdateParameter(context.Context, *domain.BusinessParameter) error
+	DeleteParameter(context.Context, int64) error
 }
 
-// Interfaces para wire
-type GinEnginePort interface{}
-type ConfigAPIPort interface{}
-type MiddlewaresEnginePort interface{}
-type UseCasesPort interface{}
+type GinEnginePort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
 
-func NewHandler(useCases UseCasesPort, server GinEnginePort, cfg ConfigAPIPort, mws MiddlewaresEnginePort) *Handler {
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+type MiddlewaresEnginePort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
+}
+
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
-		useCases: useCases.(*UseCases),
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
 // Routes configura las rutas del handler
 func (h *Handler) Routes() {
-	// Por ahora no implementamos rutas específicas
-	// Las rutas se pueden agregar aquí cuando sea necesario
+	r := h.gsv.GetRouter()
+	baseURL := h.acf.APIBaseURL() + "/business-parameters"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
+	group := r.Group(baseURL)
+	{
+		group.GET("", h.GetAllParameters)
+		group.GET("/category/:category", h.GetParametersByCategory)
+		group.GET("/:key", h.GetParameter)
+		group.POST("", h.CreateParameter)
+		group.PUT("/:id", h.UpdateParameter)
+		group.DELETE("/:id", h.DeleteParameter)
+	}
 }
 
 // GetParameter obtiene un parámetro por su clave
@@ -55,7 +97,7 @@ func (h *Handler) GetParameter(c *gin.Context) {
 		return
 	}
 
-	param, err := h.useCases.GetParameter(c.Request.Context(), key)
+	param, err := h.ucs.GetParameter(c.Request.Context(), key)
 	if err != nil {
 		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{
@@ -92,7 +134,7 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 		return
 	}
 
-	params, err := h.useCases.GetParametersByCategory(c.Request.Context(), category)
+	params, err := h.ucs.GetParametersByCategory(c.Request.Context(), category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
 			Error: "failed to get business parameters by category",
@@ -118,7 +160,7 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters [get]
 func (h *Handler) GetAllParameters(c *gin.Context) {
-	params, err := h.useCases.GetAllParameters(c.Request.Context())
+	params, err := h.ucs.GetAllParameters(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
 			Error: "failed to get all business parameters",
@@ -161,7 +203,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 		param.UpdatedBy = &userID
 	}
 
-	id, err := h.useCases.CreateParameter(c.Request.Context(), param)
+	id, err := h.ucs.CreateParameter(c.Request.Context(), param)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{
 			Error: "failed to create business parameter",
@@ -210,7 +252,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 		param.UpdatedBy = &userID
 	}
 
-	err = h.useCases.UpdateParameter(c.Request.Context(), param)
+	err = h.ucs.UpdateParameter(c.Request.Context(), param)
 	if err != nil {
 		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{
@@ -249,7 +291,7 @@ func (h *Handler) DeleteParameter(c *gin.Context) {
 		return
 	}
 
-	err = h.useCases.DeleteParameter(c.Request.Context(), id)
+	err = h.ucs.DeleteParameter(c.Request.Context(), id)
 	if err != nil {
 		if err.Error() == "business parameter not found" {
 			c.JSON(http.StatusNotFound, types.ErrorResponse{

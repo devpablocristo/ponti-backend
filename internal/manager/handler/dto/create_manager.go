@@ -1,3 +1,4 @@
+// Package dto define los DTOs HTTP para managers.
 package dto
 
 // CreateManager es el DTO para la creación de un manager.
@@ -8,5 +9,5 @@ type CreateManager struct {
 
 type CreateManagerResponse struct {
 	Message   string `json:"message"`
-	ManagerID int64  `json:"customer_id"`
+	ManagerID int64  `json:"manager_id"`
 }

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
 
@@ -23,15 +23,15 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetByWorkOrderID(ctx context.Context, WorkOrderId int64) (*domain.Invoice, error) {
-	if WorkOrderId == 0 {
+func (r *Repository) GetByWorkOrderID(ctx context.Context, workOrderID int64) (*domain.Invoice, error) {
+	if workOrderID == 0 {
 		return nil, types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
 	}
 
 	var row models.Invoice
-	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", WorkOrderId).First(&row).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			types.NewError(types.ErrNotFound, "There is no invoice for this workorder", err)
+			types.NewError(types.ErrNotFound, "There is no invoice for this work order", err)
 		}
 		return nil, types.NewError(types.ErrInternal, "Failed to find invoice", err)
 
@@ -77,12 +77,12 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, WorkOrderId int64) error {
-	if WorkOrderId == 0 {
+func (r *Repository) Delete(ctx context.Context, workOrderID int64) error {
+	if workOrderID == 0 {
 		return types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
 	}
 
-	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", WorkOrderId).Delete(&models.Invoice{}).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).Delete(&models.Invoice{}).Error; err != nil {
 		return types.NewError(types.ErrInternal, "failed to delete invoice", err)
 	}
 	return nil

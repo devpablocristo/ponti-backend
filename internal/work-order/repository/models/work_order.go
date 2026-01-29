@@ -1,3 +1,4 @@
+// Package models contiene modelos de persistencia para work orders.
 package models
 
 import (
@@ -17,8 +18,8 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 )
 
-// Workorder GORM model con todas las relaciones
-type Workorder struct {
+// WorkOrder GORM model con todas las relaciones.
+type WorkOrder struct {
 	ID            int64              `gorm:"primaryKey;column:id"`
 	Number        string             `gorm:"column:number;uniqueIndex"`
 	ProjectID     int64              `gorm:"not null"`
@@ -37,23 +38,23 @@ type Workorder struct {
 	InvestorID    int64              `gorm:"not null"`
 	EffectiveArea decimal.Decimal    `gorm:"not null"`
 	DeletedAt     gorm.DeletedAt     `gorm:"index"`
-	Items         []WorkorderItem    `gorm:"foreignKey:WorkorderID;references:ID;constraint:OnDelete:CASCADE"`
+	Items         []WorkOrderItem    `gorm:"foreignKey:WorkOrderID;references:ID;constraint:OnDelete:CASCADE"`
 
 	sharedmodels.Base
 }
 
-// WorkorderItem GORM model
-type WorkorderItem struct {
+// WorkOrderItem GORM model.
+type WorkOrderItem struct {
 	ID          int64            `gorm:"primaryKey;autoIncrement"`
-	WorkorderID int64            `gorm:"column:workorder_id;index"`
+	WorkOrderID int64            `gorm:"column:workorder_id;index"`
 	SupplyID    int64            `gorm:"not null"`
 	Supply      supplymod.Supply `gorm:"foreignKey:SupplyID"`
 	TotalUsed   decimal.Decimal  `gorm:"not null"`
 	FinalDose   decimal.Decimal  `gorm:"not null"`
 }
 
-func FromDomain(o *domain.Workorder) *Workorder {
-	w := &Workorder{
+func FromDomain(o *domain.WorkOrder) *WorkOrder {
+	w := &WorkOrder{
 		Number:        o.Number,
 		ProjectID:     o.ProjectID,
 		FieldID:       o.FieldID,
@@ -73,9 +74,9 @@ func FromDomain(o *domain.Workorder) *Workorder {
 	}
 
 	if len(o.Items) > 0 {
-		items := make([]WorkorderItem, len(o.Items))
+		items := make([]WorkOrderItem, len(o.Items))
 		for i, it := range o.Items {
-			items[i] = WorkorderItem{
+			items[i] = WorkOrderItem{
 				SupplyID:  it.SupplyID,
 				TotalUsed: it.TotalUsed,
 				FinalDose: it.FinalDose,
@@ -86,20 +87,20 @@ func FromDomain(o *domain.Workorder) *Workorder {
 	return w
 }
 
-// ToDomain convierte GORM → domain
-func (m *Workorder) ToDomain() *domain.Workorder {
-	var items []domain.WorkorderItem
+// ToDomain convierte GORM → domain.
+func (m *WorkOrder) ToDomain() *domain.WorkOrder {
+	var items []domain.WorkOrderItem
 	if len(m.Items) > 0 {
-		items = make([]domain.WorkorderItem, len(m.Items))
+		items = make([]domain.WorkOrderItem, len(m.Items))
 		for i, it := range m.Items {
-			items[i] = domain.WorkorderItem{
+			items[i] = domain.WorkOrderItem{
 				SupplyID:  it.SupplyID,
 				TotalUsed: it.TotalUsed,
 				FinalDose: it.FinalDose,
 			}
 		}
 	}
-	return &domain.Workorder{
+	return &domain.WorkOrder{
 		ID:            m.ID,
 		Number:        m.Number,
 		ProjectID:     m.ProjectID,

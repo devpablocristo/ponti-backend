@@ -1,3 +1,4 @@
+// Package domain contiene modelos de dominio para work orders.
 package domain
 
 import (
@@ -6,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// WorkorderListElement para la lista
-type WorkorderListElement struct {
+// WorkOrderListElement para la lista.
+type WorkOrderListElement struct {
 	ID                int64
 	Number            string
 	ProjectName       string
@@ -30,5 +31,5 @@ type WorkorderListElement struct {
 }
 
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.
-
+//
 // - Configurar Columnas: Esto debería mostrar una lista de los titulos de columnas disponibles con un checkbox para ir chequeando las que queremos ver activas. Por default, todas deben estar activadas.

@@ -8,7 +8,7 @@ import (
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	workordermodels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
@@ -101,17 +101,17 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 // --- DELETE ---
-func (r *Repository) GetWorkordersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
+func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	var count int64
 	if err := r.db.Client().WithContext(ctx).
-		Model(&workordermodels.Workorder{}).
+		Model(&workOrderModels.WorkOrder{}).
 		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
 		Where("workorder_items.supply_id = ?", supplyID).
 		Count(&count).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, types.NewError(types.ErrInternal, "failed to get workorder", err)
+		return 0, types.NewError(types.ErrInternal, "failed to get work order", err)
 	}
 	return count, nil
 }

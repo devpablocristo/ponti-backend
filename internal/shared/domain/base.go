@@ -1,3 +1,4 @@
+// Package shareddomain contiene tipos de dominio compartidos.
 package shareddomain
 
 import (

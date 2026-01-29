@@ -28,7 +28,7 @@ type LaborExcelService struct {
 	*pkgexcel.Service
 }
 
-// Crea el engine de Excel ya configurado
+// ProvideLaborPkgExcelService crea el engine de Excel ya configurado.
 func ProvideLaborPkgExcelService() (*LaborExcelService, error) {
 	fp := filepath.Join(os.TempDir(), labexcel.DefaultFilename)
 	write := true
@@ -44,19 +44,19 @@ func ProvideLaborPkgExcelService() (*LaborExcelService, error) {
 	return &LaborExcelService{s}, nil
 }
 
-// bindea el engine como la interfaz XLSXEnginePort
+// ProvideLaborXLSXEnginePort bindea el engine como interfaz XLSXEnginePort.
 func ProvideLaborXLSXEnginePort(s *LaborExcelService) labor.XLSXEnginePort {
 	return s
 }
 
-// Crea el adaptador de exportación que usa el engine
+// ProvideLaborExporterPort crea el adaptador de exportación que usa el engine.
 func ProvideLaborExporterPort(eng labor.XLSXEnginePort) labor.ExporterAdapterPort {
 	return labor.NewExcelExporter(eng)
 }
 
 // ProvideLaborUseCases agrupa repositorio y servicio
-func ProvideLaborUseCases(rep labor.RepositoryPort, exp labor.ExporterAdapterPort) *labor.UseCases {
-	return labor.NewUseCases(rep, exp)
+func ProvideLaborUseCases(rep labor.RepositoryPort, exp labor.ExporterAdapterPort, projectUC project.UseCasesPort) *labor.UseCases {
+	return labor.NewUseCases(rep, exp, projectUC)
 }
 
 func ProvideLaborUseCasesPort(uc *labor.UseCases) labor.UseCasesPort {
@@ -67,9 +67,8 @@ func ProvideLaborHandler(
 	server labor.GinEnginePort,
 	useCases labor.UseCasesPort,
 	cfg labor.ConfigAPIPort,
-	middlewares labor.MiddlewaresEnginePort,
-	useCaseProject project.UseCasesPort) *labor.Handler {
-	return labor.NewHandler(useCases, server, cfg, middlewares, useCaseProject)
+	middlewares labor.MiddlewaresEnginePort) *labor.Handler {
+	return labor.NewHandler(useCases, server, cfg, middlewares)
 }
 
 func ProvideLaborConfigAPI(cfg *config.Config) labor.ConfigAPIPort {

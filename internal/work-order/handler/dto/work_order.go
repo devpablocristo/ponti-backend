@@ -1,3 +1,4 @@
+// Package dto define los DTOs HTTP para work orders.
 package dto
 
 import (
@@ -9,14 +10,14 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 )
 
-type WorkorderItem struct {
+type WorkOrderItem struct {
 	SupplyID  int64           `json:"supply_id" binding:"required"`
 	TotalUsed decimal.Decimal `json:"total_used" binding:"required"`
 	FinalDose decimal.Decimal `json:"final_dose" binding:"required"`
 }
 
-// MarshalJSON asegura 2 decimales en los campos decimal de salida
-func (w WorkorderItem) MarshalJSON() ([]byte, error) {
+// MarshalJSON asegura 2 decimales en los campos decimal de salida.
+func (w WorkOrderItem) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		SupplyID  int64           `json:"supply_id"`
 		TotalUsed decimal.Decimal `json:"total_used"`
@@ -29,7 +30,7 @@ func (w WorkorderItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-type Workorder struct {
+type WorkOrder struct {
 	ID            int64           `json:"id"`
 	Number        string          `json:"number" binding:"required"`
 	ProjectID     int64           `json:"project_id" binding:"required"`
@@ -42,11 +43,11 @@ type Workorder struct {
 	Date          time.Time       `json:"date" binding:"required"`
 	InvestorID    int64           `json:"investor_id" binding:"required"`
 	EffectiveArea decimal.Decimal `json:"effective_area" binding:"required"`
-	Items         []WorkorderItem `json:"items"`
+	Items         []WorkOrderItem `json:"items"`
 }
 
-// MarshalJSON asegura 2 decimales en EffectiveArea (y deja que Items manejen su propio redondeo)
-func (r Workorder) MarshalJSON() ([]byte, error) {
+// MarshalJSON asegura 2 decimales en EffectiveArea (y deja que Items manejen su propio redondeo).
+func (r WorkOrder) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		ID            int64           `json:"id"`
 		Number        string          `json:"number"`
@@ -60,7 +61,7 @@ func (r Workorder) MarshalJSON() ([]byte, error) {
 		Date          time.Time       `json:"date"`
 		InvestorID    int64           `json:"investor_id"`
 		EffectiveArea decimal.Decimal `json:"effective_area"`
-		Items         []WorkorderItem `json:"items"`
+		Items         []WorkOrderItem `json:"items"`
 	}{
 		ID:            r.ID,
 		Number:        r.Number,
@@ -79,8 +80,8 @@ func (r Workorder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-func (r *Workorder) ToDomain() *domain.Workorder {
-	return &domain.Workorder{
+func (r *WorkOrder) ToDomain() *domain.WorkOrder {
+	return &domain.WorkOrder{
 		ID:            r.ID,
 		Number:        r.Number,
 		ProjectID:     r.ProjectID,
@@ -97,10 +98,10 @@ func (r *Workorder) ToDomain() *domain.Workorder {
 	}
 }
 
-func toDomainItems(items []WorkorderItem) []domain.WorkorderItem {
-	out := make([]domain.WorkorderItem, len(items))
+func toDomainItems(items []WorkOrderItem) []domain.WorkOrderItem {
+	out := make([]domain.WorkOrderItem, len(items))
 	for i, it := range items {
-		out[i] = domain.WorkorderItem{
+		out[i] = domain.WorkOrderItem{
 			SupplyID:  it.SupplyID,
 			TotalUsed: it.TotalUsed,
 			FinalDose: it.FinalDose,
@@ -109,16 +110,16 @@ func toDomainItems(items []WorkorderItem) []domain.WorkorderItem {
 	return out
 }
 
-func FromDomain(o *domain.Workorder) *Workorder {
-	items := make([]WorkorderItem, len(o.Items))
+func FromDomain(o *domain.WorkOrder) *WorkOrder {
+	items := make([]WorkOrderItem, len(o.Items))
 	for i, it := range o.Items {
-		items[i] = WorkorderItem{
+		items[i] = WorkOrderItem{
 			SupplyID:  it.SupplyID,
 			TotalUsed: it.TotalUsed,
 			FinalDose: it.FinalDose,
 		}
 	}
-	return &Workorder{
+	return &WorkOrder{
 		ID:            o.ID,
 		Number:        o.Number,
 		ProjectID:     o.ProjectID,
@@ -135,7 +136,7 @@ func FromDomain(o *domain.Workorder) *Workorder {
 	}
 }
 
-type WorkorderResponse struct {
+type WorkOrderResponse struct {
 	Message string `json:"message"`
 	Number  int64  `json:"id"`
 }

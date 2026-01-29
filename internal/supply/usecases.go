@@ -1,10 +1,11 @@
+// Package supply contiene casos de uso para insumos y movimientos.
 package supply
 
 import (
 	"context"
 	"fmt"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -14,7 +15,7 @@ type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
 	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
-	GetWorkordersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
+	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
 	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
@@ -36,9 +37,9 @@ type ExporterAdapterPort interface {
 }
 
 type StockUseCasesPort interface {
-	GetLastStockByProjectId(ctx context.Context, projectId int64, supplyId int64) (*stockdomain.Stock, bool, error)
+	GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*stockdomain.Stock, bool, error)
 	CreateStock(ctx context.Context, s *stockdomain.Stock) (int64, error)
-	UpdateRealStockUnits(ctx context.Context, stockId int64, stock *stockdomain.Stock) error
+	UpdateRealStockUnits(ctx context.Context, stockID int64, stock *stockdomain.Stock) error
 }
 
 type UseCases struct {
@@ -112,12 +113,12 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
-	count, err := u.repo.GetWorkordersBySupplyID(ctx, id)
+	count, err := u.repo.GetWorkOrdersBySupplyID(ctx, id)
 	if err != nil {
 		return err
 	}
 	if count > 0 {
-		return types.NewError(types.ErrConflict, "supply is being used in a workorder", nil)
+		return types.NewError(types.ErrConflict, "supply is being used in a work order", nil)
 	}
 
 	return u.repo.DeleteSupply(ctx, id)

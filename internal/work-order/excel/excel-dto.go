@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type WorkorderExcelDto struct {
+type WorkOrderExcelDTO struct {
 	Number       string    `excel:"NUMERO DE ORDEN"`
 	ProjectName  string    `excel:"PROYECTO"`
 	FieldName    string    `excel:"CAMPO"`
@@ -27,8 +27,8 @@ type WorkorderExcelDto struct {
 	TotalCost    float64   `excel:"TOTAL COSTO"`
 }
 
-func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExcelDto {
-	out := make([]WorkorderExcelDto, 0, len(items)+1) // +1 para la fila de totales
+func BuildWorkOrderExcelDTO(items []domain.WorkOrderListElement) []WorkOrderExcelDTO {
+	out := make([]WorkOrderExcelDTO, 0, len(items)+1) // +1 para la fila de totales
 
 	// Variables para acumular totales
 	var totalSurfaceHa decimal.Decimal
@@ -41,7 +41,7 @@ func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExce
 		totalConsumption = totalConsumption.Add(it.Consumption)
 		totalCost = totalCost.Add(it.TotalCost)
 
-		out = append(out, WorkorderExcelDto{
+		out = append(out, WorkOrderExcelDTO{
 			Number:       it.Number,
 			ProjectName:  it.ProjectName,
 			FieldName:    it.FieldName,
@@ -64,7 +64,7 @@ func BuildWorkorderExcelDTO(items []domain.WorkorderListElement) []WorkorderExce
 
 	// Agregar fila de totales al final
 	if len(items) > 0 {
-		out = append(out, WorkorderExcelDto{
+		out = append(out, WorkOrderExcelDTO{
 			Number:       "TOTAL",
 			ProjectName:  "",
 			FieldName:    "",

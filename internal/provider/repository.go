@@ -1,17 +1,15 @@
-// File: ./repository.go
-
 package provider
 
 import (
 	"context"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
 
-// GormEnginePort exposes the required DB interface.
+// GormEnginePort expone el cliente de base de datos requerido.
 type GormEnginePort interface {
 	Client() *gorm.DB
 }

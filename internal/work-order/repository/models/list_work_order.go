@@ -1,3 +1,4 @@
+// Package models contiene modelos de persistencia para work orders.
 package models
 
 import (
@@ -6,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// WorkorderListElement mapea directamente la vista SQL
-type WorkorderListElement struct {
+// WorkOrderListElement mapea directamente la vista SQL.
+type WorkOrderListElement struct {
 	ID                int64           `gorm:"column:id;primaryKey"`
 	Number            string          `gorm:"column:number;primaryKey"`
 	ProjectName       string          `gorm:"column:project_name"`
@@ -29,7 +30,7 @@ type WorkorderListElement struct {
 	TotalCost         decimal.Decimal `gorm:"column:supply_total_cost"`
 }
 
-// TableName apunta a la vista
-func (WorkorderListElement) TableName() string {
+// TableName apunta a la vista.
+func (WorkOrderListElement) TableName() string {
 	return "v4_report.workorder_list"
 }

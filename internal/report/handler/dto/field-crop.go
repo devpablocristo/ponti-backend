@@ -1,4 +1,4 @@
-// Package dto holds the Data Transfer Objects for reports.
+// Package dto define los DTOs HTTP para reportes.
 package dto
 
 import (
@@ -9,7 +9,7 @@ import (
    REQUEST DTOs
 ========================= */
 
-// ReportFilterRequest represents the request filter for reports.
+// ReportFilterRequest representa el filtro de request para reportes.
 type ReportFilterRequest struct {
 	CustomerID *int64 `json:"customer_id" binding:"omitempty"`
 	ProjectID  *int64 `json:"project_id" binding:"omitempty"`
@@ -18,7 +18,7 @@ type ReportFilterRequest struct {
 }
 
 /* =========================
-   RESPONSE DTOs — Table Format (Simplificado)
+   RESPONSE DTOs — Formato tabla
 ========================= */
 
 // ReportTableResponse representa el reporte field/crop en formato tabla.
@@ -59,14 +59,14 @@ type ReportTableRow struct {
    MAPPING FUNCTIONS
 ========================= */
 
-// BuildFieldCropResponse construye la respuesta completa del reporte field-crop de forma optimizada
+// BuildFieldCropResponse construye la respuesta completa del reporte field-crop.
 func BuildFieldCropResponse(fieldCrop *domain.FieldCrop) *ReportTableResponse {
 	// Usar la función existente pero optimizada
 	response := FromDomainFieldCrop(*fieldCrop)
 	return &response
 }
 
-// FromDomainFieldCrop convierte el dominio a DTO simple
+// FromDomainFieldCrop convierte el dominio a DTO.
 func FromDomainFieldCrop(table domain.FieldCrop) ReportTableResponse {
 	// Convertir columnas
 	columns := make([]ReportTableColumn, 0, len(table.Columns))
@@ -121,7 +121,7 @@ func FromDomainFieldCrop(table domain.FieldCrop) ReportTableResponse {
 	}
 }
 
-// ToDomainReportFilter maps DTO to domain filters.
+// ToDomainReportFilter mapea DTO a filtros de dominio.
 func ToDomainReportFilter(in ReportFilterRequest) domain.ReportFilter {
 	return domain.ReportFilter{
 		CustomerID: in.CustomerID,

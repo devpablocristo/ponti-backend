@@ -12,8 +12,8 @@ import (
 )
 
 type LaborListItem struct {
-	WorkorderID     int64           `json:"workorder_id"`
-	WorkorderNumber string          `json:"workorder_number"`
+	WorkOrderID     int64           `json:"workorder_id"`
+	WorkOrderNumber string          `json:"workorder_number"`
 	Date            time.Time       `json:"date"`
 	ProjectName     string          `json:"project_name"`
 	FieldName       string          `json:"field_name"`
@@ -25,8 +25,8 @@ type LaborListItem struct {
 	CategoryName    string          `json:"category_name"`
 	InvestorName    string          `json:"investor_name"`
 	USDAvgValue     decimal.Decimal `json:"usd_avg_value"`
-	NetTotal        decimal.Decimal `json:"net_total"`        // Total $ Neto
-	TotalIVA        decimal.Decimal `json:"total_iva"`        // Total $ IVA
+	NetTotal        decimal.Decimal `json:"net_total"` // Total $ Neto
+	TotalIVA        decimal.Decimal `json:"total_iva"` // Total $ IVA
 	USDCostHa       decimal.Decimal `json:"usd_cost_ha"`
 	USDNetTotal     decimal.Decimal `json:"usd_net_total"`
 	InvoiceID       int64           `json:"invoice_id"`
@@ -39,8 +39,8 @@ type LaborListItem struct {
 // MarshalJSON aplica redondeo: Total $ Neto y Total $ IVA al entero más próximo
 func (l LaborListItem) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		WorkorderID     int64      `json:"workorder_id"`
-		WorkorderNumber string     `json:"workorder_number"`
+		WorkOrderID     int64      `json:"workorder_id"`
+		WorkOrderNumber string     `json:"workorder_number"`
 		Date            time.Time  `json:"date"`
 		ProjectName     string     `json:"project_name"`
 		FieldName       string     `json:"field_name"`
@@ -62,8 +62,8 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		InvoiceDate     *time.Time `json:"invoice_date"`
 		InvoiceStatus   string     `json:"invoice_status"`
 	}{
-		WorkorderID:     l.WorkorderID,
-		WorkorderNumber: l.WorkorderNumber,
+		WorkOrderID:     l.WorkOrderID,
+		WorkOrderNumber: l.WorkOrderNumber,
 		Date:            l.Date,
 		ProjectName:     l.ProjectName,
 		FieldName:       l.FieldName,
@@ -75,8 +75,8 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		CategoryName:    l.CategoryName,
 		InvestorName:    l.InvestorName,
 		USDAvgValue:     l.USDAvgValue.StringFixed(3),
-		NetTotal:        l.NetTotal.StringFixed(0),    // Total $ Neto: entero más próximo
-		TotalIVA:        l.TotalIVA.StringFixed(0),    // Total $ IVA: entero más próximo
+		NetTotal:        l.NetTotal.StringFixed(0), // Total $ Neto: entero más próximo
+		TotalIVA:        l.TotalIVA.StringFixed(0), // Total $ IVA: entero más próximo
 		USDCostHa:       l.USDCostHa.StringFixed(3),
 		USDNetTotal:     l.USDNetTotal.StringFixed(3),
 		InvoiceID:       l.InvoiceID,
@@ -95,8 +95,8 @@ type ListLaborGroupResponse struct {
 
 func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 	return &LaborListItem{
-		WorkorderID:     d.WorkorderID,
-		WorkorderNumber: d.WorkorderNumber,
+		WorkOrderID:     d.WorkOrderID,
+		WorkOrderNumber: d.WorkOrderNumber,
 		Date:            d.Date,
 		ProjectName:     d.ProjectName,
 		FieldName:       d.FieldName,

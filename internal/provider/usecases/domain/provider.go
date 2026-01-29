@@ -1,3 +1,4 @@
+// Package domain define modelos de dominio para proveedores.
 package domain
 
 import (
@@ -5,7 +6,7 @@ import (
 )
 
 type Provider struct {
-	ID   int64
-	Name string
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 	shareddomain.Base
 }

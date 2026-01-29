@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	providermodel "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"

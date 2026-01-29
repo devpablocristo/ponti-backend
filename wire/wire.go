@@ -10,7 +10,7 @@ import (
 	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 
 	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	business_parameters "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
+	bparams "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	campaign "github.com/alphacodinggroup/ponti-backend/internal/campaign"
 	category "github.com/alphacodinggroup/ponti-backend/internal/category"
 	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type"
@@ -55,10 +55,10 @@ type Dependencies struct {
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler
-	BusinessParametersHandler *business_parameters.Handler
+	BusinessParametersHandler *bparams.Handler
 	ClassTypeHandler          *classtype.Handler
 	DollarHandler             *dollar.Handler
-	WorkorderHandler          *workorder.Handler
+	WorkOrderHandler          *workorder.Handler
 	LaborHandler              *labor.Handler
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
@@ -90,7 +90,7 @@ func Initialize() (*Dependencies, error) {
 		BusinessParametersSet,
 		ClassTypeSet,
 		DollarSet,
-		WorkorderSet,
+		WorkOrderSet,
 		LaborSet,
 		StockSet,
 		InvoiceSet,

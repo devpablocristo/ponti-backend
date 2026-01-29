@@ -16,7 +16,7 @@ import (
 	"github.com/google/wire"
 )
 
-// ProvideStockRepository creates the concrete implementation of stock.Repository.
+// ProvideStockRepository crea la implementación concreta de stock.Repository.
 func ProvideStockRepository(repo stock.GormEnginePort) *stock.Repository {
 	return stock.NewRepository(repo)
 }
@@ -29,7 +29,7 @@ type StockExcelService struct {
 	*pkgexcel.Service
 }
 
-// Crea el engine de Excel ya configurado
+// ProvideStockPkgExcelService crea el engine de Excel ya configurado.
 func ProvideStockPkgExcelService() (*StockExcelService, error) {
 	fp := filepath.Join(os.TempDir(), stockExcel.DefaultFilename)
 	write := true
@@ -45,19 +45,19 @@ func ProvideStockPkgExcelService() (*StockExcelService, error) {
 	return &StockExcelService{s}, nil
 }
 
-// bindea el engine como la interfaz XLSXEnginePort
+// ProvideStockXLSXEnginePort bindea el engine como interfaz XLSXEnginePort.
 func ProvideStockXLSXEnginePort(s *StockExcelService) stock.XLSXEnginePort {
 	return s
 }
 
-// Crea el adaptador de exportación que usa el engine
+// ProvideStockExporterPort crea el adaptador de exportación que usa el engine.
 func ProvideStockExporterPort(eng stock.XLSXEnginePort) stock.ExporterAdapterPort {
 	return stock.NewExcelExporter(eng)
 }
 
-// ProvideStockUseCases groups repository into stock.UseCases.
-func ProvideStockUseCases(rep stock.RepositoryPort, excel stock.ExporterAdapterPort) *stock.UseCases {
-	return stock.NewUseCases(rep, excel)
+// ProvideStockUseCases agrupa repositorio y servicio.
+func ProvideStockUseCases(rep stock.RepositoryPort, excel stock.ExporterAdapterPort, projectUC project.UseCasesPort) *stock.UseCases {
+	return stock.NewUseCases(rep, excel, projectUC)
 }
 
 func ProvideStockUseCasesPort(uc *stock.UseCases) stock.UseCasesPort {
@@ -69,9 +69,8 @@ func ProvideStockHandler(
 	useCases stock.UseCasesPort,
 	cfg stock.ConfigAPIPort,
 	middlewares stock.MiddlewaresEnginePort,
-	ucps project.UseCasesPort,
 ) *stock.Handler {
-	return stock.NewHandler(useCases, server, cfg, middlewares, ucps)
+	return stock.NewHandler(useCases, server, cfg, middlewares)
 }
 
 func ProvideStockConfigAPI(cfg *config.Config) stock.ConfigAPIPort {

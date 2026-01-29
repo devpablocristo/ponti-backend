@@ -30,7 +30,7 @@ type Supply struct {
 
 // De persistencia (models.Supply) → dominio (domain.Supply)
 func (m *Supply) ToDomain() *domain.Supply {
-	// Obtener nombre de unidad desde business_parameters
+	// Obtener nombre de unidad desde bparams
 	unitName := m.getUnitName()
 
 	return &domain.Supply{
@@ -71,10 +71,10 @@ func FromDomain(d *domain.Supply) *Supply {
 	}
 }
 
-// getUnitName obtiene el nombre de la unidad desde business_parameters
+// getUnitName obtiene el nombre de la unidad desde bparams
 func (m *Supply) getUnitName() string {
-	// Mapeo temporal hasta que se implemente la consulta a business_parameters
-	// TODO: Implementar consulta real a business_parameters
+	// Mapeo temporal hasta que se implemente la consulta a bparams
+	// TODO: Implementar consulta real a bparams
 	switch m.UnitID {
 	case 1:
 		return "Lt" // unit_liters

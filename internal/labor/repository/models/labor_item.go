@@ -9,8 +9,8 @@ import (
 
 // LaborListItem - Modelo que incluye campos calculados de la vista v4_report.labor_list
 type LaborListItem struct {
-	WorkorderID        int64           `gorm:"column:workorder_id"`
-	WorkorderNumber    string          `gorm:"column:workorder_number"`
+	WorkOrderID        int64           `gorm:"column:workorder_id"`
+	WorkOrderNumber    string          `gorm:"column:workorder_number"`
 	Date               time.Time       `gorm:"column:date"`
 	ProjectID          int64           `gorm:"column:project_id"`
 	ProjectName        string          `gorm:"column:project_name"`

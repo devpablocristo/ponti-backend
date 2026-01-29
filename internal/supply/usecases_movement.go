@@ -6,7 +6,7 @@ import (
 	"time"
 
 	projdom "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -14,17 +14,17 @@ import (
 )
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectId(ctx, movement.ProjectId, movement.Supply.ID)
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err
 	}
 	if isFirst {
 		stock = createStockDomainFromSupplyMovement(movement)
-		stockId, err := u.stockUseCases.CreateStock(ctx, stock)
+		stockID, err := u.stockUseCases.CreateStock(ctx, stock)
 		if err != nil {
 			return 0, err
 		}
-		stock.ID = stockId
+		stock.ID = stockID
 	}
 
 	if movement.MovementType == domain.INTERNAL_MOVEMENT {
@@ -58,8 +58,8 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	return u.repo.CreateSupplyMovement(ctx, movement)
 }
 
-func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectId int64) ([]*domain.SupplyMovement, error) {
-	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectId)
+func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
+	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
 }
 
 func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
@@ -70,8 +70,8 @@ func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain
 	return u.repo.GetSupplyMovementByID(ctx, id)
 }
 
-func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
-	return u.repo.DeleteSupplyMovement(ctx, projectId, supplyId)
+func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectID, supplyID int64) error {
+	return u.repo.DeleteSupplyMovement(ctx, projectID, supplyID)
 }
 
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
@@ -145,17 +145,17 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 	movementIn.ProjectDestinationId = 0
 
 	// Buscar o crear el stock en el proyecto destino
-	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectId(ctx, movementIn.ProjectId, movement.Supply.ID)
+	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectID(ctx, movementIn.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return fmt.Errorf("error getting destination stock: %w", err)
 	}
 	if isFirstDest {
 		stockDest = createStockDomainFromSupplyMovement(&movementIn)
-		stockIdDest, err := u.stockUseCases.CreateStock(ctx, stockDest)
+		stockIDDest, err := u.stockUseCases.CreateStock(ctx, stockDest)
 		if err != nil {
 			return fmt.Errorf("error creating destination stock: %w", err)
 		}
-		stockDest.ID = stockIdDest
+		stockDest.ID = stockIDDest
 	}
 
 	// Asignar el stock del proyecto destino

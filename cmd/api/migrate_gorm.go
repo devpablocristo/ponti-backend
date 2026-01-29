@@ -27,7 +27,7 @@ import (
 	projectmodels "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
 	stockmodels "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	supplymodels "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	workordermodels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 )
 
 // runGormMigrations runs GORM AutoMigrate on all models and ensures
@@ -60,8 +60,8 @@ func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 		&classtypemodels.ClassType{},
 		&supplymodels.Supply{},
 		&dollarmodels.ProjectDollarValue{},
-		&workordermodels.Workorder{},
-		&workordermodels.WorkorderItem{},
+		&workOrderModels.WorkOrder{},
+		&workOrderModels.WorkOrderItem{},
 		&projectmodels.ProjectInvestor{},
 		&projectmodels.AdminCostInvestor{},
 		&invoicemodels.Invoice{},

@@ -1,3 +1,4 @@
+// Package sharedmodels contiene modelos compartidos de infraestructura.
 package sharedmodels
 
 import (
@@ -19,6 +20,7 @@ type Base struct {
 	DeletedBy *int64         `gorm:"column:deleted_by"`
 }
 
+// ConvertStringToID convierte el user_id del contexto a int64.
 func ConvertStringToID(ctx context.Context) (int64, error) {
 	userID := ctx.Value(pkgmwr.ContextUserID)
 	if s, ok := userID.(string); ok {
@@ -30,13 +32,3 @@ func ConvertStringToID(ctx context.Context) (int64, error) {
 	}
 	return 0, fmt.Errorf("user ID is not a string")
 }
-
-// IncrementVersion incrementa la versión del modelo
-// func (b *Base) IncrementVersion() {
-// 	b.Version++
-// }
-
-// // GetVersion retorna la versión actual
-// func (b *Base) GetVersion() int64 {
-// 	return b.Version
-// }

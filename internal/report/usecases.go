@@ -1,4 +1,4 @@
-// Package report proporciona funcionalidades para generar reportes financieros y operativos
+// Package report proporciona funcionalidades para generar reportes financieros y operativos.
 package report
 
 import (
@@ -13,7 +13,7 @@ import (
 
 // ===== PORTS (Hexagonal Architecture) =====
 
-// ReportRepositoryPort define la interfaz del repositorio (Puerto de salida)
+// ReportRepositoryPort define la interfaz del repositorio (Puerto de salida).
 type ReportRepositoryPort interface {
 	GetFieldCropMetrics(domain.ReportFilter) ([]domain.FieldCropMetric, error)
 	GetProjectInfo(int64) (*domain.ProjectInfo, error)
@@ -22,7 +22,7 @@ type ReportRepositoryPort interface {
 	GetSummaryResults(domain.SummaryResultsFilter) ([]domain.SummaryResults, error)
 }
 
-// ReportUseCasePort define la interfaz del caso de uso (Puerto de entrada)
+// ReportUseCasePort define la interfaz del caso de uso (Puerto de entrada).
 type ReportUseCasePort interface {
 	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
@@ -31,14 +31,14 @@ type ReportUseCasePort interface {
 
 // ===== USE CASE IMPLEMENTATION =====
 
-// ReportUseCase implementa la lógica de negocio para reportes
+// ReportUseCase implementa la lógica de negocio para reportes.
 type ReportUseCase struct {
 	repository    ReportRepositoryPort
 	validator     *usecases.ReportFilterValidator
 	summaryMapper *mappers.SummaryResponseMapper
 }
 
-// NewReportUseCase crea una nueva instancia del caso de uso
+// NewReportUseCase crea una nueva instancia del caso de uso.
 func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 	return &ReportUseCase{
 		repository:    repository,
@@ -49,7 +49,7 @@ func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 
 // ===== REPORTE POR CAMPO/CULTIVO =====
 
-// GetFieldCropReport obtiene el reporte por campo/cultivo
+// GetFieldCropReport obtiene el reporte por campo/cultivo.
 func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error) {
 
 	// Obtener reporte del repositorio
@@ -61,7 +61,7 @@ func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domai
 	return report, nil
 }
 
-// GetInvestorContributionReport obtiene el reporte de aportes de inversores
+// GetInvestorContributionReport obtiene el reporte de aportes de inversores.
 func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {
 	// Todos los filtros son opcionales - no hay validaciones requeridas
 
@@ -76,7 +76,7 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 
 // ===== REPORTE DE RESUMEN DE RESULTADOS =====
 
-// GetSummaryResultsReport obtiene el reporte de resumen de resultados
+// GetSummaryResultsReport obtiene el reporte de resumen de resultados.
 func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
 	// Validar que al menos un filtro esté presente
 	if err := uc.validator.ValidateAtLeastOneFilter(filters); err != nil {
@@ -100,12 +100,12 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 
 // ===== FUNCIONES PRIVADAS (DRY) =====
 
-// buildEmptySummaryResponse construye una respuesta vacía usando el mapper
+// buildEmptySummaryResponse construye una respuesta vacía usando el mapper.
 func (uc *ReportUseCase) buildEmptySummaryResponse() *domain.SummaryResultsResponse {
 	return uc.summaryMapper.BuildEmptyResponse()
 }
 
-// buildSummaryResponse construye la respuesta completa con datos usando el mapper
+// buildSummaryResponse construye la respuesta completa con datos usando el mapper.
 func (uc *ReportUseCase) buildSummaryResponse(results []domain.SummaryResults) (*domain.SummaryResultsResponse, error) {
 	// Obtener información del proyecto del primer resultado
 	projectInfo, err := uc.repository.GetProjectInfo(results[0].ProjectID)
@@ -120,7 +120,7 @@ func (uc *ReportUseCase) buildSummaryResponse(results []domain.SummaryResults) (
 	return uc.summaryMapper.BuildResponse(projectInfo, results, totales), nil
 }
 
-// calculateProjectTotals calcula los totales del proyecto
+// calculateProjectTotals calcula los totales del proyecto.
 func (uc *ReportUseCase) calculateProjectTotals(results []domain.SummaryResults) *domain.ProjectTotals {
 	// Usar el mapper para convertir a punteros
 	resultsPtr := uc.summaryMapper.ConvertToPointers(results)

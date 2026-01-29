@@ -110,11 +110,51 @@ func (h *Handler) CreateLot(c *gin.Context) {
 }
 
 func (h *Handler) ListLots(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "1000"))
+	projectID := int64(0)
+	if raw := c.Query("project_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
+			return
+		}
+		projectID = parsed
+	}
+	fieldID := int64(0)
+	if raw := c.Query("field_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
+			return
+		}
+		fieldID = parsed
+	}
+	cropID := int64(0)
+	if raw := c.Query("crop_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			return
+		}
+		cropID = parsed
+	}
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page", err))
+			return
+		}
+		page = parsed
+	}
+	pageSize := 1000
+	if raw := c.Query("page_size"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page_size", err))
+			return
+		}
+		pageSize = parsed
+	}
 	if page <= 0 {
 		page = 1
 	}
@@ -222,9 +262,33 @@ func (h *Handler) DeleteLot(c *gin.Context) {
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
+	projectID := int64(0)
+	if raw := c.Query("project_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
+			return
+		}
+		projectID = parsed
+	}
+	fieldID := int64(0)
+	if raw := c.Query("field_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
+			return
+		}
+		fieldID = parsed
+	}
+	cropID := int64(0)
+	if raw := c.Query("crop_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			return
+		}
+		cropID = parsed
+	}
 
 	// Los filtros por ID son opcionales para permitir búsquedas globales
 	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
@@ -238,11 +302,51 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 }
 
 func (h *Handler) ExportLots(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	fieldID, _ := strconv.ParseInt(c.Query("field_id"), 10, 64)
-	cropID, _ := strconv.ParseInt(c.Query("crop_id"), 10, 64)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "1000"))
+	projectID := int64(0)
+	if raw := c.Query("project_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
+			return
+		}
+		projectID = parsed
+	}
+	fieldID := int64(0)
+	if raw := c.Query("field_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
+			return
+		}
+		fieldID = parsed
+	}
+	cropID := int64(0)
+	if raw := c.Query("crop_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			return
+		}
+		cropID = parsed
+	}
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page", err))
+			return
+		}
+		page = parsed
+	}
+	pageSize := 1000
+	if raw := c.Query("page_size"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page_size", err))
+			return
+		}
+		pageSize = parsed
+	}
 	if page <= 0 {
 		page = 1
 	}

@@ -1,4 +1,4 @@
-// Package domain: modelos de dominio para el informe de aportes de inversores.
+// Package domain contiene modelos de dominio para el informe de aportes de inversores.
 package domain
 
 import "github.com/shopspring/decimal"

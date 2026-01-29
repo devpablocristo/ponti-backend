@@ -1,3 +1,4 @@
+// Package domain define modelos de dominio para managers.
 package domain
 
 import shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
@@ -5,7 +6,6 @@ import shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/d
 type Manager struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
-	Type string // Sin tag, pero si querés lo podés poner json:"type"
+	Type string `json:"type"`
 	shareddomain.Base
 }
-	

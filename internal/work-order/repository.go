@@ -1,3 +1,4 @@
+// Package workorder implementa repositorios para work orders.
 package workorder
 
 import (
@@ -8,11 +9,11 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type GormEngine interface {
@@ -23,12 +24,13 @@ type Repository struct {
 	db GormEngine
 }
 
+// NewRepository crea una instancia de repositorio de work orders.
 func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (int64, error) {
-	// 1) convertir a modelo GORM (cabecera + items sin WorkorderID)
+func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
+	// 1) convertir a modelo GORM (cabecera + items sin WorkOrderID)
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
@@ -41,7 +43,7 @@ func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) insertar la cabecera para obtener model.ID
 		if err := tx.Create(&model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to create workorder header", err)
+			return types.NewError(types.ErrInternal, "failed to create work order header", err)
 		}
 
 		return nil
@@ -53,23 +55,23 @@ func (r *Repository) CreateWorkorder(ctx context.Context, o *domain.Workorder) (
 	return model.ID, nil
 }
 
-func (r *Repository) GetWorkorderByID(ctx context.Context, id int64) (*domain.Workorder, error) {
-	var m models.Workorder
+func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.WorkOrder, error) {
+	var m models.WorkOrder
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Items").
 		Where("id = ?", id).
 		First(&m).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "workorder not found", err)
+			return nil, types.NewError(types.ErrNotFound, "work order not found", err)
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
+		return nil, types.NewError(types.ErrInternal, "failed to get work order", err)
 	}
 	return m.ToDomain(), nil
 }
 
-func (r *Repository) GetWorkorderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.Workorder, error) {
-	var m models.Workorder
+func (r *Repository) GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error) {
+	var m models.WorkOrder
 	if err := r.db.Client().WithContext(ctx).
 		Where("number = ?", number).
 		Where("project_id = ?", projectID).
@@ -77,12 +79,12 @@ func (r *Repository) GetWorkorderByNumberAndProjectID(ctx context.Context, numbe
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get workorder", err)
+		return nil, types.NewError(types.ErrInternal, "failed to get work order", err)
 	}
 	return m.ToDomain(), nil
 }
 
-func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorder) error {
+func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
 	// 1) Convertimos dominio → GORM y fijamos el ID
 	model := models.FromDomain(o)
 	model.ID = o.ID
@@ -94,18 +96,18 @@ func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorde
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
-		var orig models.Workorder
+		var orig models.WorkOrder
 		if err := tx.Preload("Items").First(&orig, model.ID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "workorder not found", err)
+				return types.NewError(types.ErrNotFound, "work order not found", err)
 			}
-			return types.NewError(types.ErrInternal, "failed to find workorder before update", err)
+			return types.NewError(types.ErrInternal, "failed to find work order before update", err)
 		}
 
 		// 3.2) Eliminar todos los items antiguos
 		if err := tx.
 			Where("workorder_id = ?", model.ID).
-			Delete(&models.WorkorderItem{}).Error; err != nil {
+			Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to delete old items", err)
 		}
 
@@ -113,12 +115,12 @@ func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorde
 		if err := tx.Model(&orig).
 			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items").
 			Updates(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update workorder header", err)
+			return types.NewError(types.ErrInternal, "failed to update work order header", err)
 		}
 
-		// 3.4) Insertar los items nuevos, asignando WorkorderID
+		// 3.4) Insertar los items nuevos, asignando WorkOrderID
 		for i := range model.Items {
-			model.Items[i].WorkorderID = model.ID
+			model.Items[i].WorkOrderID = model.ID
 		}
 		if len(model.Items) > 0 {
 			if err := tx.Create(&model.Items).Error; err != nil {
@@ -130,18 +132,18 @@ func (r *Repository) UpdateWorkorderByID(ctx context.Context, o *domain.Workorde
 	})
 }
 
-func (r *Repository) DeleteWorkorderByID(ctx context.Context, id int64) error {
-	var m models.Workorder
+func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+	var m models.WorkOrder
 
-	// 1) Buscamos la workorder por su ID
+	// 1) Buscamos la work order por su ID
 	if err := r.db.Client().
 		WithContext(ctx).
 		First(&m, id).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return types.NewError(types.ErrNotFound, "workorder not found", err)
+			return types.NewError(types.ErrNotFound, "work order not found", err)
 		}
-		return types.NewError(types.ErrInternal, "failed to find workorder", err)
+		return types.NewError(types.ErrInternal, "failed to find work order", err)
 	}
 
 	// 2) Soft-delete dentro de una transacción
@@ -149,7 +151,7 @@ func (r *Repository) DeleteWorkorderByID(ctx context.Context, id int64) error {
 		WithContext(ctx).
 		Transaction(func(tx *gorm.DB) error {
 			if err := tx.Delete(&m).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to soft delete workorder", err)
+				return types.NewError(types.ErrInternal, "failed to soft delete work order", err)
 			}
 			return nil
 		}); err != nil {
@@ -159,15 +161,15 @@ func (r *Repository) DeleteWorkorderByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *Repository) ListWorkorders(
+func (r *Repository) ListWorkOrders(
 	ctx context.Context,
-	filt domain.WorkorderFilter,
+	filt domain.WorkOrderFilter,
 	inp types.Input,
-) ([]domain.WorkorderListElement, types.PageInfo, error) {
+) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	// 1) Base del query: vinculada a la vista
 	base := r.db.Client().
 		WithContext(ctx).
-		Model(&models.WorkorderListElement{})
+		Model(&models.WorkOrderListElement{})
 
 	// 2) Aplicar filtros
 	if filt.ProjectID != nil {
@@ -182,27 +184,27 @@ func (r *Repository) ListWorkorders(
 	if err := base.
 		Count(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to count workorders", err)
+			"failed to count work orders", err)
 	}
 
 	// 4) Paginación
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	// 5) Recuperar filas paginadas (reutiliza 'base' con filtros)
-	var rows []models.WorkorderListElement
+	var rows []models.WorkOrderListElement
 	if err := base.
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Order("number desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to list workorders", err)
+			"failed to list work orders", err)
 	}
 
 	// 6) Mapear a dominio
-	list := make([]domain.WorkorderListElement, len(rows))
+	list := make([]domain.WorkOrderListElement, len(rows))
 	for i, m := range rows {
-		list[i] = domain.WorkorderListElement{
+		list[i] = domain.WorkOrderListElement{
 			ID:                m.ID,
 			Number:            m.Number,
 			ProjectName:       m.ProjectName,
@@ -230,7 +232,7 @@ func (r *Repository) ListWorkorders(
 	return list, pageInfo, nil
 }
 
-func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter) (*domain.WorkorderMetrics, error) {
+func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
 	// Construimos el WHERE dinámico según los filtros presentes
 	q := fmt.Sprintf(`
 		SELECT
@@ -271,7 +273,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkorderFilter
 		return nil, types.NewError(types.ErrInternal, "failed to get metrics", err)
 	}
 
-	return &domain.WorkorderMetrics{
+	return &domain.WorkOrderMetrics{
 		SurfaceHa:  row.SurfaceHa,
 		Liters:     row.Liters,
 		Kilograms:  row.Kilograms,

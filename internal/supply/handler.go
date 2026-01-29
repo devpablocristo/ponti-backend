@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	supplyExcel "github.com/alphacodinggroup/ponti-backend/internal/supply/excel"
 	createDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/create"

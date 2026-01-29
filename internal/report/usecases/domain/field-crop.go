@@ -1,4 +1,4 @@
-// Package domain contiene los modelos de dominio para los reportes
+// Package domain contiene los modelos de dominio para los reportes.
 package domain
 
 import (

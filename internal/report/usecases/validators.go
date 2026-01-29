@@ -1,4 +1,4 @@
-// Package usecases proporciona validadores para los casos de uso de reportes
+// Package usecases proporciona validadores para los casos de uso de reportes.
 package usecases
 
 import (
@@ -7,15 +7,15 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
-// ReportFilterValidator valida filtros de reportes
+// ReportFilterValidator valida filtros de reportes.
 type ReportFilterValidator struct{}
 
-// NewReportFilterValidator crea una nueva instancia del validador
+// NewReportFilterValidator crea una nueva instancia del validador.
 func NewReportFilterValidator() *ReportFilterValidator {
 	return &ReportFilterValidator{}
 }
 
-// ValidateAtLeastOneFilter valida que al menos un filtro esté presente
+// ValidateAtLeastOneFilter valida que al menos un filtro esté presente.
 func (v *ReportFilterValidator) ValidateAtLeastOneFilter(filter domain.SummaryResultsFilter) error {
 	if filter.ProjectID == nil &&
 		filter.CustomerID == nil &&
@@ -26,11 +26,10 @@ func (v *ReportFilterValidator) ValidateAtLeastOneFilter(filter domain.SummaryRe
 	return nil
 }
 
-// HasAnyFilter verifica si hay al menos un filtro presente
+// HasAnyFilter verifica si hay al menos un filtro presente.
 func (v *ReportFilterValidator) HasAnyFilter(filter domain.SummaryResultsFilter) bool {
 	return filter.ProjectID != nil ||
 		filter.CustomerID != nil ||
 		filter.CampaignID != nil ||
 		filter.FieldID != nil
 }
-

@@ -175,7 +175,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 	return projectID, nil
 }
 
-// --- LIST ---
+// ListProjects lista proyectos con paginación ligera.
 func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]domain.ListedProject, int64, error) {
 	if page < 1 {
 		page = 1
@@ -292,7 +292,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	}
 
 	if err := base.
-		Select("name").
+		Select("MIN(id) as id, name").
 		Group("name").
 		Order("name ASC").
 		Limit(perPage).
@@ -304,7 +304,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	return projects, total, nil
 }
 
-// --- GET ---
+// GetProject obtiene un proyecto por ID.
 func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
 	if id <= 0 {
 		return nil, types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
@@ -371,7 +371,7 @@ func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) 
 	return fieldList, nil
 }
 
-// --- UPDATE ---
+// UpdateProject actualiza un proyecto completo.
 func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
 	if d.ID <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", d.ID), nil)
@@ -495,7 +495,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	})
 }
 
-// --- DELETE ---
+// DeleteProject elimina un proyecto por ID.
 func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
@@ -599,8 +599,7 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	})
 }
 
-// --- RESTORE ---
-// RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
+// RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas.
 func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)

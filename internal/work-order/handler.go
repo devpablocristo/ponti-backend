@@ -1,3 +1,4 @@
+// Package workorder expone endpoints HTTP para work orders.
 package workorder
 
 import (
@@ -9,20 +10,20 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
-	workorderexcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
+	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type UseCasesPort interface {
-	CreateWorkorder(context.Context, *domain.Workorder) (int64, error)
-	GetWorkorderByID(context.Context, int64) (*domain.Workorder, error)
-	DuplicateWorkorder(context.Context, string) (string, error)
-	UpdateWorkorderByID(context.Context, *domain.Workorder) error
-	DeleteWorkorderByID(context.Context, int64) error
-	ListWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]domain.WorkorderListElement, types.PageInfo, error)
-	GetMetrics(context.Context, domain.WorkorderFilter) (*domain.WorkorderMetrics, error)
-	ExportWorkorders(context.Context, domain.WorkorderFilter, types.Input) ([]byte, error)
+	CreateWorkOrder(context.Context, *domain.WorkOrder) (int64, error)
+	GetWorkOrderByID(context.Context, int64) (*domain.WorkOrder, error)
+	DuplicateWorkOrder(context.Context, string) (string, error)
+	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
+	DeleteWorkOrderByID(context.Context, int64) error
+	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
+	ExportWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -48,10 +49,12 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
+// NewHandler crea un handler de work orders.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
 }
 
+// Routes registra las rutas del módulo work orders.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/workorders"
@@ -63,19 +66,20 @@ func (h *Handler) Routes() {
 	grp := r.Group(base)
 	{
 
-		grp.POST("", h.CreateWorkorder)
-		grp.GET("/:id", h.GetWorkorderByID)
-		grp.PUT("/:id", h.UpdateWorkorderByID)
-		grp.DELETE("/:id", h.DeleteWorkorderByID)
-		grp.POST("/:number/duplicate", h.DuplicateWorkorder)
-		grp.GET("", h.ListWorkorders)
+		grp.POST("", h.CreateWorkOrder)
+		grp.GET("/:id", h.GetWorkOrderByID)
+		grp.PUT("/:id", h.UpdateWorkOrderByID)
+		grp.DELETE("/:id", h.DeleteWorkOrderByID)
+		grp.POST("/:number/duplicate", h.DuplicateWorkOrder)
+		grp.GET("", h.ListWorkOrders)
 		grp.GET("/metrics", h.GetMetrics)
-		grp.GET("/export", h.ExportWorkorders)
+		grp.GET("/export", h.ExportWorkOrders)
 	}
 }
 
-func (h *Handler) CreateWorkorder(c *gin.Context) {
-	var req dto.Workorder
+// CreateWorkOrder crea una orden de trabajo.
+func (h *Handler) CreateWorkOrder(c *gin.Context) {
+	var req dto.WorkOrder
 	if err := c.ShouldBindJSON(&req); err != nil {
 		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
 		apiErr, status := types.NewAPIError(domErr)
@@ -83,19 +87,21 @@ func (h *Handler) CreateWorkorder(c *gin.Context) {
 		return
 	}
 
-	id, err := h.ucs.CreateWorkorder(c, req.ToDomain())
+	ctx := c.Request.Context()
+	id, err := h.ucs.CreateWorkOrder(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusCreated, dto.WorkorderResponse{
-		Message: "Workorder created",
+	c.JSON(http.StatusCreated, dto.WorkOrderResponse{
+		Message: "Work order created",
 		Number:  id,
 	})
 }
 
-func (h *Handler) GetWorkorderByID(c *gin.Context) {
+// GetWorkOrderByID obtiene una orden por ID.
+func (h *Handler) GetWorkOrderByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
@@ -103,7 +109,7 @@ func (h *Handler) GetWorkorderByID(c *gin.Context) {
 		return
 	}
 
-	wo, err := h.ucs.GetWorkorderByID(c, id)
+	wo, err := h.ucs.GetWorkOrderByID(c.Request.Context(), id)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -112,22 +118,24 @@ func (h *Handler) GetWorkorderByID(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDomain(wo))
 }
 
-func (h *Handler) DuplicateWorkorder(c *gin.Context) {
+// DuplicateWorkOrder duplica una orden de trabajo.
+func (h *Handler) DuplicateWorkOrder(c *gin.Context) {
 	// orig := c.Param("number")
-	// newNum, err := h.ucs.DuplicateWorkorder(c.Request.Context(), orig)
+	// newNum, err := h.ucs.DuplicateWorkOrder(c.Request.Context(), orig)
 	// if err != nil {
 	// 	apiErr, status := types.NewAPIError(err)
 	// 	c.JSON(status, apiErr.ToResponse())
 	// 	return
 	// }
-	c.JSON(http.StatusCreated, dto.WorkorderResponse{
-		Message: "Workorder duplicated",
+	c.JSON(http.StatusCreated, dto.WorkOrderResponse{
+		Message: "Work order duplicated",
 		Number:  0,
 	})
 }
 
-func (h *Handler) UpdateWorkorderByID(c *gin.Context) {
-	var req dto.Workorder
+// UpdateWorkOrderByID actualiza una orden de trabajo.
+func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
+	var req dto.WorkOrder
 	if err := c.ShouldBindJSON(&req); err != nil {
 		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
 		apiErr, status := types.NewAPIError(domErr)
@@ -141,7 +149,7 @@ func (h *Handler) UpdateWorkorderByID(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	if err := h.ucs.UpdateWorkorderByID(c, req.ToDomain()); err != nil {
+	if err := h.ucs.UpdateWorkOrderByID(c.Request.Context(), req.ToDomain()); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
@@ -149,15 +157,17 @@ func (h *Handler) UpdateWorkorderByID(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) DeleteWorkorderByID(c *gin.Context) {
+// DeleteWorkOrderByID elimina una orden de trabajo.
+func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workorder ID"})
+		apiErr, status := types.NewAPIError(types.NewError(types.ErrInvalidID, "invalid work_order id", err))
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
-	if err := h.ucs.DeleteWorkorderByID(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteWorkOrderByID(c.Request.Context(), id); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
@@ -166,12 +176,13 @@ func (h *Handler) DeleteWorkorderByID(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) ListWorkorders(c *gin.Context) {
+// ListWorkOrders lista órdenes de trabajo con filtros.
+func (h *Handler) ListWorkOrders(c *gin.Context) {
 	filt := parseFilters(c)
 	input := types.NewInput(c.Request)
 
-	// Devuelve ([]domain.WorkorderListElement, types.PageInfo, error)
-	list, pageInfo, err := h.ucs.ListWorkorders(c.Request.Context(), filt, input)
+	// Devuelve ([]domain.WorkOrderListElement, types.PageInfo, error)
+	list, pageInfo, err := h.ucs.ListWorkOrders(c.Request.Context(), filt, input)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -184,9 +195,9 @@ func (h *Handler) ListWorkorders(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// ParseFilters extrae project_id, field_id, customer_id y campaign_id
-func parseFilters(c *gin.Context) domain.WorkorderFilter {
-	var f domain.WorkorderFilter
+// parseFilters extrae project_id, field_id, customer_id y campaign_id.
+func parseFilters(c *gin.Context) domain.WorkOrderFilter {
+	var f domain.WorkOrderFilter
 	if v := c.Query("project_id"); v != "" {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
 			f.ProjectID = &id
@@ -211,7 +222,7 @@ func parseFilters(c *gin.Context) domain.WorkorderFilter {
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
-	var filt domain.WorkorderFilter
+	var filt domain.WorkOrderFilter
 	if v := c.Query("project_id"); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
@@ -253,7 +264,8 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
 }
 
-func (h *Handler) ExportWorkorders(c *gin.Context) {
+// ExportWorkOrders exporta órdenes de trabajo.
+func (h *Handler) ExportWorkOrders(c *gin.Context) {
 	filt := parseFilters(c)
 	// Para exportación, usar un page_size muy grande para obtener todos los registros
 	input := types.Input{
@@ -261,14 +273,14 @@ func (h *Handler) ExportWorkorders(c *gin.Context) {
 		PageSize: 100000, // Límite suficientemente grande para exportar todos
 	}
 
-	data, err := h.ucs.ExportWorkorders(c, filt, input)
+	data, err := h.ucs.ExportWorkOrders(c.Request.Context(), filt, input)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 
-	filename := workorderexcel.DefaultFilename
+	filename := workOrderExcel.DefaultFilename
 
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)

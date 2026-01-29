@@ -42,7 +42,7 @@ func (r *Repository) CreateManager(ctx context.Context, c *domain.Manager) (int6
 func (r *Repository) ListManagers(ctx context.Context) ([]domain.Manager, error) {
 	var list []models.Manager
 	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list customers", err)
+		return nil, types.NewError(types.ErrInternal, "failed to list managers", err)
 	}
 	result := make([]domain.Manager, 0, len(list))
 	for _, c := range list {

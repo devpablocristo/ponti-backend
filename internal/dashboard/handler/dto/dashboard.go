@@ -136,8 +136,8 @@ type OperationalCardRequest struct {
 	Key           string  `json:"key"`
 	Title         string  `json:"title"`
 	Date          *string `json:"date"`
-	WorkorderID   any     `json:"workorder_id"`
-	WorkorderCode any     `json:"workorder_code"`
+	WorkOrderID   any     `json:"workorder_id"`
+	WorkOrderCode any     `json:"workorder_code"`
 	AuditID       any     `json:"audit_id"`
 	AuditCode     any     `json:"audit_code"`
 	Status        any     `json:"status"`
@@ -322,7 +322,7 @@ type OperationalItem struct {
 	Type        string  `json:"type"`
 	Title       string  `json:"title"`
 	Date        *string `json:"date"`
-	WorkorderID *string `json:"workorder_id,omitempty"`
+	WorkOrderID *string `json:"workorder_id,omitempty"`
 }
 
 // OperationalCard representa una tarjeta de indicador operativo (mantenido para compatibilidad)
@@ -330,7 +330,7 @@ type OperationalCard struct {
 	Key         string     `json:"key"`
 	Title       string     `json:"title"`
 	Date        *time.Time `json:"date"`
-	WorkorderID *int64     `json:"workorder_id"`
+	WorkOrderID *int64     `json:"workorder_id"`
 }
 
 // FromDashboardPayloadResponse convierte directamente la respuesta de la función SQL a DTO
@@ -820,16 +820,16 @@ func convertOperationalIndicators(indicators *domain.DashboardOperationalIndicat
 		}
 
 		// Solo incluir workorder_id para tipos que lo requieren
-		var workorderID *string
-		if card.WorkorderID != nil && (card.Key == "first_workorder" || card.Key == "last_workorder") {
-			workorderID = card.WorkorderID
+		var workOrderID *string
+		if card.WorkOrderID != nil && (card.Key == "first_workorder" || card.Key == "last_workorder") {
+			workOrderID = card.WorkOrderID
 		}
 
 		items = append(items, OperationalItem{
 			Type:        card.Key, // Usar Key como Type
 			Title:       card.Title,
 			Date:        dateStr,
-			WorkorderID: workorderID,
+			WorkOrderID: workOrderID,
 		})
 	}
 

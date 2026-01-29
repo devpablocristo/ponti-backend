@@ -1,28 +1,29 @@
+// Package dto define los DTOs HTTP para reportes.
 package dto
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
-// Nota: Decimal3 está definido en summary-results.go para evitar duplicación
+// Nota: Decimal3 está definido en summary-results.go para evitar duplicación.
 
 // -------------------------------
 // Entidades básicas de inversores
 // -------------------------------
 
-// InvestorRef: referencia mínima de un inversor (id + nombre).
+// InvestorRef referencia mínima de un inversor (id + nombre).
 type InvestorRef struct {
 	InvestorID   *int64  `json:"investor_id,omitempty"`
 	InvestorName *string `json:"investor_name,omitempty"`
 }
 
-// InvestorHeader: chapita de cabecera (ej: "Agrolaits 50%").
+// InvestorHeader es la chapita de cabecera (ej: "Agrolaits 50%").
 type InvestorHeader struct {
 	InvestorRef
 	SharePct Decimal0 `json:"share_pct"` // % global acordado - sin decimales
 }
 
-// InvestorShare: celda por inversor en una fila.
+// InvestorShare representa una celda por inversor en una fila.
 type InvestorShare struct {
 	InvestorRef
 	AmountUsd Decimal0 `json:"amount_usd"` // Monto USD en la celda - sin decimales
@@ -57,7 +58,7 @@ const (
 	ContributionAdministrationStructure ContributionCategoryType = "administration_structure"
 )
 
-// ContributionCategory: fila de la tabla de aportes pre-cosecha
+// ContributionCategory representa una fila de la tabla de aportes pre-cosecha.
 type ContributionCategory struct {
 	Key                       string                   `json:"key"` // clave estable en inglés (ej: "agrochemicals")
 	SortIndex                 int                      `json:"sort_index"`
@@ -70,7 +71,7 @@ type ContributionCategory struct {
 	AttributionNote           *string                  `json:"attribution_note,omitempty"`
 }
 
-// PreHarvestTotals: fila "Totales" en la tabla de aportes pre-cosecha
+// PreHarvestTotals representa la fila "Totales" en la tabla de aportes pre-cosecha.
 type PreHarvestTotals struct {
 	TotalUsd   Decimal0        `json:"total_usd"`   // Sin decimales
 	TotalUsdHa Decimal2        `json:"total_us_ha"` // Total u$/ha: 2 decimales
@@ -99,7 +100,7 @@ const (
 	HarvestRowTotals  HarvestRowType = "totals"  // fila "Totales"
 )
 
-// HarvestRow: representa una fila en pagos de cosecha
+// HarvestRow representa una fila en pagos de cosecha.
 type HarvestRow struct {
 	Key        string          `json:"key"`         // "harvest" o "totals"
 	Type       HarvestRowType  `json:"type"`        // enum backend
@@ -108,7 +109,7 @@ type HarvestRow struct {
 	Investors  []InvestorShare `json:"investors"`
 }
 
-// HarvestSettlement: sección completa de pagos de cosecha
+// HarvestSettlement representa la sección completa de pagos de cosecha.
 type HarvestSettlement struct {
 	Rows                    []HarvestRow    `json:"rows"`                      // 2 filas: harvest y totals
 	FooterPaymentAgreed     []InvestorShare `json:"footer_payment_agreed"`     // fila "Pago acordado"
@@ -135,7 +136,7 @@ type InvestorContributionReport struct {
 
 // ===== MAPPERS =====
 
-// FromDomainInvestorReport mapea del domain al DTO
+// FromDomainInvestorReport mapea del domain al DTO.
 func FromDomainInvestorReport(domainReport *domain.InvestorContributionReport) *InvestorContributionReport {
 	if domainReport == nil {
 		return nil
@@ -157,7 +158,7 @@ func FromDomainInvestorReport(domainReport *domain.InvestorContributionReport) *
 	}
 }
 
-// fromDomainInvestorHeaders mapea headers de inversores
+// fromDomainInvestorHeaders mapea headers de inversores.
 func fromDomainInvestorHeaders(domainHeaders []domain.InvestorHeader) []InvestorHeader {
 	headers := make([]InvestorHeader, len(domainHeaders))
 	for i, h := range domainHeaders {
@@ -172,7 +173,7 @@ func fromDomainInvestorHeaders(domainHeaders []domain.InvestorHeader) []Investor
 	return headers
 }
 
-// fromDomainGeneralProjectData mapea datos generales del proyecto
+// fromDomainGeneralProjectData mapea datos generales del proyecto.
 func fromDomainGeneralProjectData(domainGeneral domain.GeneralProjectData) GeneralProjectData {
 	return GeneralProjectData{
 		SurfaceTotalHa: NewDecimal0(domainGeneral.SurfaceTotalHa), // Sin decimales
@@ -183,7 +184,7 @@ func fromDomainGeneralProjectData(domainGeneral domain.GeneralProjectData) Gener
 	}
 }
 
-// fromDomainContributionCategories mapea categorías de contribución
+// fromDomainContributionCategories mapea categorías de contribución.
 func fromDomainContributionCategories(domainCategories []domain.ContributionCategory) []ContributionCategory {
 	categories := make([]ContributionCategory, len(domainCategories))
 	for i, c := range domainCategories {

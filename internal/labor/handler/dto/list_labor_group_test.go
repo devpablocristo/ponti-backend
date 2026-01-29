@@ -13,8 +13,8 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 	now := time.Now()
 	// Crear labor con valores decimales
 	labor := LaborListItem{
-		WorkorderID:     1,
-		WorkorderNumber: "WO-001",
+		WorkOrderID:     1,
+		WorkOrderNumber: "WO-001",
 		Date:            now,
 		ProjectName:     "Test Project",
 		FieldName:       "Test Field",
@@ -26,8 +26,8 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 		CategoryName:    "Test Category",
 		InvestorName:    "Test Investor",
 		USDAvgValue:     decimal.NewFromFloat(50.5),
-		NetTotal:        decimal.NewFromFloat(1234.56),  // Debería redondearse a 1235 (entero)
-		TotalIVA:        decimal.NewFromFloat(259.26),   // Debería redondearse a 259 (entero)
+		NetTotal:        decimal.NewFromFloat(1234.56), // Debería redondearse a 1235 (entero)
+		TotalIVA:        decimal.NewFromFloat(259.26),  // Debería redondearse a 259 (entero)
 		USDCostHa:       decimal.NewFromFloat(75.5),
 		USDNetTotal:     decimal.NewFromFloat(500.5),
 		InvoiceID:       1,
@@ -100,8 +100,8 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			labor := LaborListItem{
-				WorkorderID:     1,
-				WorkorderNumber: "WO-001",
+				WorkOrderID:     1,
+				WorkOrderNumber: "WO-001",
 				Date:            now,
 				ProjectName:     "Test",
 				FieldName:       "Test",
@@ -140,8 +140,8 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	now := time.Now()
 	labor := LaborListItem{
-		WorkorderID:     1,
-		WorkorderNumber: "WO-001",
+		WorkOrderID:     1,
+		WorkOrderNumber: "WO-001",
 		Date:            now,
 		ProjectName:     "Test Project",
 		FieldName:       "Test Field",
@@ -182,4 +182,3 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	assert.Equal(t, "1235", result["net_total"])
 	assert.Equal(t, "259", result["total_iva"])
 }
-

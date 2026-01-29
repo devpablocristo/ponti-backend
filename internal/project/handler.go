@@ -1,3 +1,4 @@
+// Package project expone endpoints HTTP para proyectos.
 package project
 
 import (
@@ -45,7 +46,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
+// Handler encapsula dependencias del handler HTTP de Project.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -53,7 +54,7 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
+// NewHandler crea un handler de Project.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -63,7 +64,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
+// Routes registra las rutas del módulo Project.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/projects"
@@ -87,7 +88,7 @@ func (h *Handler) Routes() {
 	}
 }
 
-// CreateProject handles project creation.
+// CreateProject crea un proyecto.
 func (h *Handler) CreateProject(c *gin.Context) {
 	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -95,7 +96,8 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		return
 	}
 
-	pID, err := h.ucs.CreateProject(c, req.ToDomain())
+	ctx := c.Request.Context()
+	pID, err := h.ucs.CreateProject(ctx, req.ToDomain())
 	if err != nil {
 		switch {
 		case types.IsConflict(err):
@@ -117,7 +119,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
 
 	// Obtener los proyectos ligeros y total
-	items, totalHectares, total, err := h.ucs.GetProjects(c, name, customerID, campaignID, page, perPage)
+	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerID, campaignID, page, perPage)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
@@ -147,7 +149,7 @@ func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
 	c.JSON(http.StatusOK, dtos)
 }
 
-// ListProjects maneja el endpoint GET /projects con paginación ligera
+// ListProjectsDropdown maneja el endpoint GET /projects con paginación ligera.
 func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
@@ -184,7 +186,7 @@ func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetProject returns a single project by ID.
+// GetProject devuelve un proyecto por ID.
 func (h *Handler) GetProject(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -200,7 +202,7 @@ func (h *Handler) GetProject(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDomain(proj))
 }
 
-// UpdateProject handles a full project update.
+// UpdateProject actualiza un proyecto.
 func (h *Handler) UpdateProject(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -208,10 +210,13 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-	//var req dto.UpdateProject
 	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if req.UpdatedAt == nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "updated_at is required"})
 		return
 	}
 	dom := req.ToDomain()
@@ -219,7 +224,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 	dom.Base = shareddomain.Base{
 		UpdatedAt: *req.UpdatedAt,
 	}
-	if err := h.ucs.UpdateProject(c, dom); err != nil {
+	if err := h.ucs.UpdateProject(c.Request.Context(), dom); err != nil {
 		switch {
 		case types.IsNotFound(err):
 			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -232,7 +237,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "updated"})
 }
 
-// DeleteProject removes a project by ID.
+// DeleteProject elimina un proyecto por ID.
 func (h *Handler) DeleteProject(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -240,7 +245,7 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-	if err := h.ucs.DeleteProject(c, id); err != nil {
+	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
 		switch {
 		case types.IsNotFound(err):
 			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -261,7 +266,7 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid project id"})
 		return
 	}
-	if err := h.ucs.RestoreProject(c, id); err != nil {
+	if err := h.ucs.RestoreProject(c.Request.Context(), id); err != nil {
 		switch {
 		case types.IsNotFound(err):
 			c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -287,8 +292,8 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 		err   error
 	)
 	if name != "" {
-		// Delegate to use case ListProjectsByName
-		list, t, errName := h.ucs.ListProjectsByName(c, name, page, perPage)
+		// Delegar al caso de uso ListProjectsByName
+		list, t, errName := h.ucs.ListProjectsByName(c.Request.Context(), name, page, perPage)
 		if errName != nil {
 			err = errName
 		} else {
@@ -299,8 +304,8 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 			}
 		}
 	} else {
-		// existing ListProjects
-		list, t, errList := h.ucs.ListProjects(c, page, perPage)
+		// Usar ListProjects como fallback
+		list, t, errList := h.ucs.ListProjects(c.Request.Context(), page, perPage)
 		if errList != nil {
 			err = errList
 		} else {

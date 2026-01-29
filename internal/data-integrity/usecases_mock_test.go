@@ -18,46 +18,46 @@ import (
 	decimal "github.com/shopspring/decimal"
 )
 
-// MockWorkorderRepositoryPort is a mock of WorkorderRepositoryPort interface.
-type MockWorkorderRepositoryPort struct {
+// MockWorkOrderRepositoryPort is a mock of WorkOrderRepositoryPort interface.
+type MockWorkOrderRepositoryPort struct {
 	ctrl     *gomock.Controller
-	recorder *MockWorkorderRepositoryPortMockRecorder
+	recorder *MockWorkOrderRepositoryPortMockRecorder
 }
 
-// MockWorkorderRepositoryPortMockRecorder is the mock recorder for MockWorkorderRepositoryPort.
-type MockWorkorderRepositoryPortMockRecorder struct {
-	mock *MockWorkorderRepositoryPort
+// MockWorkOrderRepositoryPortMockRecorder is the mock recorder for MockWorkOrderRepositoryPort.
+type MockWorkOrderRepositoryPortMockRecorder struct {
+	mock *MockWorkOrderRepositoryPort
 }
 
-// NewMockWorkorderRepositoryPort creates a new mock instance.
-func NewMockWorkorderRepositoryPort(ctrl *gomock.Controller) *MockWorkorderRepositoryPort {
-	mock := &MockWorkorderRepositoryPort{ctrl: ctrl}
-	mock.recorder = &MockWorkorderRepositoryPortMockRecorder{mock}
+// NewMockWorkOrderRepositoryPort creates a new mock instance.
+func NewMockWorkOrderRepositoryPort(ctrl *gomock.Controller) *MockWorkOrderRepositoryPort {
+	mock := &MockWorkOrderRepositoryPort{ctrl: ctrl}
+	mock.recorder = &MockWorkOrderRepositoryPortMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockWorkorderRepositoryPort) EXPECT() *MockWorkorderRepositoryPortMockRecorder {
+func (m *MockWorkOrderRepositoryPort) EXPECT() *MockWorkOrderRepositoryPortMockRecorder {
 	return m.recorder
 }
 
 // GetMetrics mocks base method.
-func (m *MockWorkorderRepositoryPort) GetMetrics(ctx context.Context, filt domain3.WorkorderFilter) (*domain3.WorkorderMetrics, error) {
+func (m *MockWorkOrderRepositoryPort) GetMetrics(ctx context.Context, filt domain3.WorkOrderFilter) (*domain3.WorkOrderMetrics, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetrics", ctx, filt)
-	ret0, _ := ret[0].(*domain3.WorkorderMetrics)
+	ret0, _ := ret[0].(*domain3.WorkOrderMetrics)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMetrics indicates an expected call of GetMetrics.
-func (mr *MockWorkorderRepositoryPortMockRecorder) GetMetrics(ctx, filt interface{}) *gomock.Call {
+func (mr *MockWorkOrderRepositoryPortMockRecorder) GetMetrics(ctx, filt interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetrics", reflect.TypeOf((*MockWorkorderRepositoryPort)(nil).GetMetrics), ctx, filt)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetrics", reflect.TypeOf((*MockWorkOrderRepositoryPort)(nil).GetMetrics), ctx, filt)
 }
 
 // GetRawDirectCost mocks base method.
-func (m *MockWorkorderRepositoryPort) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+func (m *MockWorkOrderRepositoryPort) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRawDirectCost", ctx, projectID)
 	ret0, _ := ret[0].(decimal.Decimal)
@@ -66,9 +66,9 @@ func (m *MockWorkorderRepositoryPort) GetRawDirectCost(ctx context.Context, proj
 }
 
 // GetRawDirectCost indicates an expected call of GetRawDirectCost.
-func (mr *MockWorkorderRepositoryPortMockRecorder) GetRawDirectCost(ctx, projectID interface{}) *gomock.Call {
+func (mr *MockWorkOrderRepositoryPortMockRecorder) GetRawDirectCost(ctx, projectID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawDirectCost", reflect.TypeOf((*MockWorkorderRepositoryPort)(nil).GetRawDirectCost), ctx, projectID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawDirectCost", reflect.TypeOf((*MockWorkOrderRepositoryPort)(nil).GetRawDirectCost), ctx, projectID)
 }
 
 // MockDashboardRepositoryPort is a mock of DashboardRepositoryPort interface.

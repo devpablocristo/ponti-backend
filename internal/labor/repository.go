@@ -10,7 +10,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	workordermodels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -41,17 +41,17 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	return model.ID, nil
 }
 
-func (r *Repository) GetWorkordersByLaborID(ctx context.Context, laborID int64) (int64, error) {
+func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
 	var count int64
 	if err := r.db.Client().WithContext(ctx).
-		Model(&workordermodels.Workorder{}).
+		Model(&workOrderModels.WorkOrder{}).
 		Joins("JOIN labors ON labors.id = workorders.labor_id").
 		Where("labors.id = ?", laborID).
 		Count(&count).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, types.NewError(types.ErrInternal, "failed to get workorder", err)
+		return 0, types.NewError(types.ErrInternal, "failed to get work order", err)
 	}
 	return count, nil
 }
@@ -148,7 +148,7 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 	return laborCategories, nil
 }
 
-func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]domain.LaborRawItem, error) {
+func (r *Repository) ListByWorkOrder(ctx context.Context, workOrderID int64) ([]domain.LaborRawItem, error) {
 	var v4Models []models.LaborListItem
 
 	query := fmt.Sprintf(`
@@ -177,9 +177,9 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]
 		WHERE v4.workorder_id = ?
 	`, shareddb.ReportView("labor_list"))
 
-	err := r.db.Client().WithContext(ctx).Raw(query, workorderID).Scan(&v4Models).Error
+	err := r.db.Client().WithContext(ctx).Raw(query, workOrderID).Scan(&v4Models).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list labors by workorder", err)
+		return nil, types.NewError(types.ErrInternal, "failed to list labors by work order", err)
 	}
 
 	// Convertir a LaborRawItem para mantener compatibilidad
@@ -192,8 +192,8 @@ func (r *Repository) ListByWorkorder(ctx context.Context, workorderID int64) ([]
 		}
 
 		raws[i] = domain.LaborRawItem{
-			WorkorderID:     m.WorkorderID,
-			WorkorderNumber: m.WorkorderNumber,
+			WorkOrderID:     m.WorkOrderID,
+			WorkOrderNumber: m.WorkOrderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
@@ -278,7 +278,7 @@ func (r *Repository) ListGroupLabor(
 		WHERE %s
 	`, view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count labors for workorder", err)
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count labors for work order", err)
 	}
 
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
@@ -325,8 +325,8 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		list[i] = domain.LaborListItem{
-			WorkorderID:     m.WorkorderID,
-			WorkorderNumber: m.WorkorderNumber,
+			WorkOrderID:     m.WorkOrderID,
+			WorkOrderNumber: m.WorkOrderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
@@ -354,11 +354,11 @@ func (r *Repository) ListGroupLabor(
 	return list, pageInfo, nil
 }
 
-// getIVAPercentage obtiene el porcentaje de IVA desde business_parameters
+// getIVAPercentage obtiene el porcentaje de IVA desde bparams
 func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
 	var value string
 	err := r.db.Client().WithContext(ctx).
-		Table("business_parameters").
+		Table("bparams").
 		Select("value").
 		Where("key = ?", "iva_percentage").
 		Scan(&value).Error
@@ -429,7 +429,7 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 	`, view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to count labors for workorder", err)
+			"failed to count labors for work order", err)
 	}
 
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
@@ -456,7 +456,7 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		// Calcular valores de USD dinámicamente
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
-		// Obtener porcentaje de IVA dinámicamente desde business_parameters
+		// Obtener porcentaje de IVA dinámicamente desde bparams
 		ivaPercentage, err := r.getIVAPercentage(ctx)
 		if err != nil {
 			// Si hay error, usar valor por defecto y logear el error
@@ -475,8 +475,8 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		}
 
 		list[i] = domain.LaborRawItem{
-			WorkorderID:     m.WorkorderID,
-			WorkorderNumber: m.WorkorderNumber,
+			WorkOrderID:     m.WorkOrderID,
+			WorkOrderNumber: m.WorkOrderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,
@@ -636,7 +636,7 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
 		// Usar porcentaje de IVA por defecto (10.5%)
-		// TODO: Implementar obtención dinámica desde business_parameters
+		// TODO: Implementar obtención dinámica desde bparams
 		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
 		totalIVA := netTotal.Mul(ivaPercentage)
 
@@ -678,8 +678,8 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		}
 
 		list[i] = domain.LaborRawItem{
-			WorkorderID:     m.WorkorderID,
-			WorkorderNumber: m.WorkorderNumber,
+			WorkOrderID:     m.WorkOrderID,
+			WorkOrderNumber: m.WorkOrderNumber,
 			Date:            m.Date,
 			ProjectName:     m.ProjectName,
 			FieldName:       m.FieldName,

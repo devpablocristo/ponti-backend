@@ -7,8 +7,8 @@ import (
 )
 
 type LaborListItem struct {
-	WorkorderID     int64           // id de la orden
-	WorkorderNumber string          //numero de orden
+	WorkOrderID     int64           // id de la orden
+	WorkOrderNumber string          //numero de orden
 	Date            time.Time       // fecha de la orden
 	ProjectName     string          // nombre del proyecto
 	FieldName       string          // nombre del campo
@@ -33,8 +33,8 @@ type LaborListItem struct {
 }
 
 type LaborRawItem struct {
-	WorkorderID     int64
-	WorkorderNumber string
+	WorkOrderID     int64
+	WorkOrderNumber string
 	Date            time.Time
 	ProjectName     string
 	FieldName       string

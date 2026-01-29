@@ -1,7 +1,7 @@
 package get
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 )
 
 type Provider struct {

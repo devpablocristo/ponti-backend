@@ -1,4 +1,4 @@
-// Package report proporciona funcionalidades para generar reportes financieros y operativos
+// Package report proporciona funcionalidades para generar reportes financieros y operativos.
 package report
 
 import (
@@ -8,37 +8,39 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	"github.com/alphacodinggroup/ponti-backend/internal/report/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
-// UseCasesPort define la interfaz para los casos de uso
+// UseCasesPort define la interfaz para los casos de uso.
 type UseCasesPort interface {
 	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
 	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
-// GinEnginePort define la interfaz para el motor Gin
+// GinEnginePort define la interfaz para el motor Gin.
 type GinEnginePort interface {
 	GetRouter() *gin.Engine
 	RunServer(context.Context) error
 }
 
-// ConfigAPIPort define la interfaz para la configuración de API
+// ConfigAPIPort define la interfaz para la configuración de API.
 type ConfigAPIPort interface {
 	APIVersion() string
 	APIBaseURL() string
 }
 
-// MiddlewaresEnginePort define la interfaz para los middlewares
+// MiddlewaresEnginePort define la interfaz para los middlewares.
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
 }
 
-// ReportHandler maneja las peticiones HTTP para reportes
+// ReportHandler maneja las peticiones HTTP para reportes.
 type ReportHandler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -46,7 +48,7 @@ type ReportHandler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewReportHandler crea una nueva instancia del handler
+// NewReportHandler crea una nueva instancia del handler.
 func NewReportHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *ReportHandler {
 	return &ReportHandler{
 		ucs: u,
@@ -56,9 +58,7 @@ func NewReportHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m Middle
 	}
 }
 
-// ===== RUTAS =====
-
-// Routes registra todas las rutas del handler
+// Routes registra todas las rutas del handler.
 func (h *ReportHandler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/reports"
@@ -74,38 +74,42 @@ func (h *ReportHandler) Routes() {
 	}
 }
 
-// ===== HANDLER GENÉRICO =====
-
-// GetReport maneja todas las peticiones de reportes de forma unificada
+// GetReport maneja todas las peticiones de reportes de forma unificada.
 func (h *ReportHandler) GetReport(c *gin.Context) {
 	reportType := c.Param("type")
 
 	// Validar tipo de reporte
 	if !h.isValidReportType(reportType) {
-		h.sendErrorResponse(c, http.StatusBadRequest, "Invalid report type", "Valid types: field-crop, investor-contribution, summary-results")
+		h.reportError(c, types.NewError(types.ErrInvalidInput, "invalid report type", nil))
 		return
 	}
 
 	// Parsear filtros según el tipo de reporte
 	filters, err := h.parseFiltersByType(c, reportType)
 	if err != nil {
-		h.sendErrorResponse(c, http.StatusBadRequest, "Invalid filters", err.Error())
+		h.reportError(c, err)
 		return
+	}
+
+	if reportType == "field-crop" {
+		reportFilters := filters.(domain.ReportFilter)
+		if reportFilters.ProjectID == nil {
+			h.reportError(c, types.NewError(types.ErrInvalidInput, "project_id is required", nil))
+			return
+		}
 	}
 
 	// Obtener reporte según el tipo
 	report, err := h.buildReportByType(c, reportType, filters)
 	if err != nil {
-		h.sendErrorResponse(c, http.StatusInternalServerError, "Internal server error", err.Error())
+		h.reportError(c, err)
 		return
 	}
 
 	h.sendSuccessResponse(c, report)
 }
 
-// ===== FUNCIONES AUXILIARES =====
-
-// isValidReportType valida si el tipo de reporte es válido
+// isValidReportType valida si el tipo de reporte es válido.
 func (h *ReportHandler) isValidReportType(reportType string) bool {
 	validTypes := map[string]bool{
 		"field-crop":            true,
@@ -115,7 +119,7 @@ func (h *ReportHandler) isValidReportType(reportType string) bool {
 	return validTypes[reportType]
 }
 
-// parseFiltersByType parsea los filtros según el tipo de reporte
+// parseFiltersByType parsea los filtros según el tipo de reporte.
 func (h *ReportHandler) parseFiltersByType(c *gin.Context, reportType string) (interface{}, error) {
 	switch reportType {
 	case "field-crop", "investor-contribution":
@@ -127,7 +131,7 @@ func (h *ReportHandler) parseFiltersByType(c *gin.Context, reportType string) (i
 	}
 }
 
-// parseReportFilters parsea filtros para reportes estándar
+// parseReportFilters parsea filtros para reportes estándar.
 func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter, error) {
 	filters := domain.ReportFilter{}
 
@@ -135,7 +139,7 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	if customerIDStr := c.Query("customer_id"); customerIDStr != "" {
 		customerID, err := strconv.ParseInt(customerIDStr, 10, 64)
 		if err != nil {
-			return filters, err
+			return filters, types.NewError(types.ErrInvalidInput, "invalid customer_id", err)
 		}
 		filters.CustomerID = &customerID
 	}
@@ -144,7 +148,7 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
 		projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 		if err != nil {
-			return filters, err
+			return filters, types.NewError(types.ErrInvalidInput, "invalid project_id", err)
 		}
 		filters.ProjectID = &projectID
 	}
@@ -153,7 +157,7 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	if campaignIDStr := c.Query("campaign_id"); campaignIDStr != "" {
 		campaignID, err := strconv.ParseInt(campaignIDStr, 10, 64)
 		if err != nil {
-			return filters, err
+			return filters, types.NewError(types.ErrInvalidInput, "invalid campaign_id", err)
 		}
 		filters.CampaignID = &campaignID
 	}
@@ -162,7 +166,7 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	if fieldIDStr := c.Query("field_id"); fieldIDStr != "" {
 		fieldID, err := strconv.ParseInt(fieldIDStr, 10, 64)
 		if err != nil {
-			return filters, err
+			return filters, types.NewError(types.ErrInvalidInput, "invalid field_id", err)
 		}
 		filters.FieldID = &fieldID
 	}
@@ -170,16 +174,16 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	return filters, nil
 }
 
-// parseSummaryFilters parsea filtros para reporte de resumen
+// parseSummaryFilters parsea filtros para reporte de resumen.
 func (h *ReportHandler) parseSummaryFilters(c *gin.Context) (domain.SummaryResultsFilter, error) {
 	var request dto.SummaryResultsRequest
 	if err := c.ShouldBindQuery(&request); err != nil {
-		return domain.SummaryResultsFilter{}, err
+		return domain.SummaryResultsFilter{}, types.NewError(types.ErrInvalidInput, "invalid summary filters", err)
 	}
 	return dto.ToDomainSummaryResultsFilter(request), nil
 }
 
-// buildReportByType construye el reporte según el tipo
+// buildReportByType construye el reporte según el tipo.
 func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, filters interface{}) (interface{}, error) {
 	switch reportType {
 	case "field-crop":
@@ -204,19 +208,20 @@ func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, fil
 		return dto.FromDomainSummaryResults(report), nil
 
 	default:
-		return nil, nil
+		return nil, types.NewError(types.ErrInvalidInput, "invalid report type", nil)
 	}
 }
 
-// sendErrorResponse envía una respuesta de error estandarizada
-func (h *ReportHandler) sendErrorResponse(c *gin.Context, statusCode int, message string, details string) {
-	c.JSON(statusCode, gin.H{
-		"error":   message,
-		"details": details,
-	})
-}
-
-// sendSuccessResponse envía una respuesta exitosa
+// sendSuccessResponse envía una respuesta exitosa.
 func (h *ReportHandler) sendSuccessResponse(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, data)
+}
+
+// reportError normaliza errores del handler.
+func (h *ReportHandler) reportError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+	apiErr, _ := types.NewAPIError(err)
+	c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 }

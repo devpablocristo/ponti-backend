@@ -1,3 +1,4 @@
+// Package leasetype expone endpoints HTTP para tipos de arrendamiento.
 package leasetype
 
 import (
@@ -7,9 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/internal/lease-type/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {
@@ -61,10 +62,6 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateLeaseType)
@@ -104,7 +101,11 @@ func (h *Handler) ListLeaseTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetLeaseType(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		return
+	}
 	lt, err := h.ucs.GetLeaseType(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -114,7 +115,11 @@ func (h *Handler) GetLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLeaseType(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		return
+	}
 	var req dto.LeaseType
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
@@ -129,7 +134,11 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid lease type id"})
+		return
+	}
 	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return

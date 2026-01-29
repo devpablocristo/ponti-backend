@@ -27,12 +27,12 @@ import (
 	lotDomain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
 	reportDomain "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 	stockDomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	workorderDomain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	workOrderDomain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 )
 
-// WorkorderRepositoryPort define la interfaz para el repositorio de workorders
-type WorkorderRepositoryPort interface {
-	GetMetrics(ctx context.Context, filt workorderDomain.WorkorderFilter) (*workorderDomain.WorkorderMetrics, error)
+// WorkOrderRepositoryPort define la interfaz para el repositorio de work orders.
+type WorkOrderRepositoryPort interface {
+	GetMetrics(ctx context.Context, filt workOrderDomain.WorkOrderFilter) (*workOrderDomain.WorkOrderMetrics, error)
 	GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error)
 }
 
@@ -60,7 +60,7 @@ type StockRepositoryPort interface {
 
 // UseCases contiene los casos de uso del módulo data_integrity
 type UseCases struct {
-	workorderRepo WorkorderRepositoryPort
+	workOrderRepo WorkOrderRepositoryPort
 	dashboardRepo DashboardRepositoryPort
 	lotRepo       LotRepositoryPort
 	reportRepo    ReportRepositoryPort
@@ -69,14 +69,14 @@ type UseCases struct {
 
 // NewUseCases crea una nueva instancia de UseCases
 func NewUseCases(
-	workorderRepo WorkorderRepositoryPort,
+	workOrderRepo WorkOrderRepositoryPort,
 	dashboardRepo DashboardRepositoryPort,
 	lotRepo LotRepositoryPort,
 	reportRepo ReportRepositoryPort,
 	stockRepo StockRepositoryPort,
 ) *UseCases {
 	return &UseCases{
-		workorderRepo: workorderRepo,
+		workOrderRepo: workOrderRepo,
 		dashboardRepo: dashboardRepo,
 		lotRepo:       lotRepo,
 		reportRepo:    reportRepo,
@@ -204,7 +204,7 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 	}
 
 	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workorderRepo.GetRawDirectCost(ctx, pID)
+	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -249,7 +249,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 	}
 
 	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workorderRepo.GetRawDirectCost(ctx, pID)
+	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -294,7 +294,7 @@ func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID
 	}
 
 	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workorderRepo.GetRawDirectCost(ctx, pID)
+	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -344,7 +344,7 @@ func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, proje
 	}
 
 	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workorderRepo.GetRawDirectCost(ctx, pID)
+	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}

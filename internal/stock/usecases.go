@@ -1,12 +1,14 @@
+// Package stock contiene casos de uso para stock.
 package stock
 
 import (
 	"context"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	projectdomain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 
@@ -15,9 +17,9 @@ type RepositoryPort interface {
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
-	GetStockById(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
-	GetStockByPeriodAndProjectId(context.Context, int64) (*domain.Stock, error)
+	GetStockByID(context.Context, int64) (*domain.Stock, error)
+	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
@@ -28,34 +30,49 @@ type ExporterAdapterPort interface {
 	Close() error
 }
 
+type ProjectUseCasesPort interface {
+	GetProject(ctx context.Context, id int64) (*projectdomain.Project, error)
+}
+
 type UseCases struct {
-	repo  RepositoryPort
-	excel ExporterAdapterPort
+	repo      RepositoryPort
+	excel     ExporterAdapterPort
+	projectUC ProjectUseCasesPort
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel}
+// NewUseCases crea una instancia de casos de uso para stock.
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
+	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
 }
 
-func (u *UseCases) GetStocksSummary(ctx context.Context, projectId int64, closeDate time.Time) ([]*domain.Stock, error) {
-	return u.repo.GetStocks(ctx, projectId, closeDate)
+func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
+	if err := u.validateProject(ctx, projectID); err != nil {
+		return nil, err
+	}
+	return u.repo.GetStocks(ctx, projectID, closeDate)
 }
 
-func (u *UseCases) GetStocksPeriods(ctx context.Context, projectId int64) ([]string, error) {
-	return u.repo.GetStocksPeriods(ctx, projectId)
+func (u *UseCases) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
+	if err := u.validateProject(ctx, projectID); err != nil {
+		return nil, err
+	}
+	return u.repo.GetStocksPeriods(ctx, projectID)
 }
 
 func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, error) {
 	return u.repo.CreateStock(ctx, s)
 }
 
-func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
-	stockFromDb, err := u.repo.GetStockByPeriodAndProjectId(ctx, projectId)
+func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
+	if err := u.validateProject(ctx, projectID); err != nil {
+		return err
+	}
+	stockFromDb, err := u.repo.GetStockByPeriodAndProjectID(ctx, projectID)
 	if err != nil {
 		return err
 	}
 
-	err = u.repo.UpdateCloseDateByProject(ctx, projectId, stock)
+	err = u.repo.UpdateCloseDateByProject(ctx, projectID, stock)
 	if err != nil {
 		return err
 	}
@@ -68,26 +85,26 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectId int64
 	return nil
 }
 
-func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockId int64, stock *domain.Stock) error {
-	return u.repo.UpdateRealStockUnits(ctx, stockId, stock)
+func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
+	return u.repo.UpdateRealStockUnits(ctx, stockID, stock)
 }
 
-func (u *UseCases) GetStockById(ctx context.Context, stockId int64) (*domain.Stock, error) {
-	if stockId <= 0 {
-		return nil, types.NewError(types.ErrInvalidInput, "stock id must be greater than 0", nil)
+func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
+	if stockID <= 0 {
+		return nil, types.NewError(types.ErrInvalidInput, "stock_id must be greater than 0", nil)
 	}
-	return u.repo.GetStockById(ctx, stockId)
+	return u.repo.GetStockByID(ctx, stockID)
 }
 
-func (u *UseCases) GetLastStockByProjectId(ctx context.Context, projectId int64, supplyId int64) (*domain.Stock, bool, error) {
-	return u.repo.GetLastStockByProjectId(ctx, projectId, supplyId)
+func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastStockByProjectID(ctx, projectID, supplyID)
 }
 
 func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
 	return u.repo.UpdateUnitsConsumed(ctx, stockDomain, quantity)
 }
 
-func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
+func createNewStockPeriod(userID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
 	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
 	newStock := domain.Stock{
 		Project:        stock.Project,
@@ -100,8 +117,8 @@ func createNewStockPeriod(userId int64, monthPeriod int64, yearPeriod int64, sto
 		Base: shareddomain.Base{
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-			CreatedBy: &userId,
-			UpdatedBy: &userId,
+			CreatedBy: &userID,
+			UpdatedBy: &userID,
 		},
 	}
 	return newStock
@@ -122,14 +139,17 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 }
 
 // ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
-func (u *UseCases) ExportStocksByProject(ctx context.Context, projectId int64) ([]byte, error) {
+func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
 	// Usar GetStocks con tiempo vacío para obtener stocks activos del proyecto
 	var emptyTime time.Time
-	items, err := u.repo.GetStocks(ctx, projectId, emptyTime)
+	if err := u.validateProject(ctx, projectID); err != nil {
+		return nil, err
+	}
+	items, err := u.repo.GetStocks(ctx, projectID, emptyTime)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list Stocks", err)
 	}
@@ -139,4 +159,15 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectId int64) (
 	}
 
 	return u.excel.Export(ctx, items)
+}
+
+func (u *UseCases) validateProject(ctx context.Context, projectID int64) error {
+	if projectID <= 0 {
+		return types.NewError(types.ErrInvalidInput, "project_id must be greater than 0", nil)
+	}
+	if u.projectUC == nil {
+		return types.NewError(types.ErrInternal, "project usecases not configured", nil)
+	}
+	_, err := u.projectUC.GetProject(ctx, projectID)
+	return err
 }

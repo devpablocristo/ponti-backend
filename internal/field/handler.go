@@ -1,3 +1,4 @@
+// Package field expone endpoints HTTP para campos.
 package field
 
 import (
@@ -5,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	dto "github.com/alphacodinggroup/ponti-backend/internal/field/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -97,7 +98,11 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("idField"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		return
+	}
 	f, err := h.ucs.GetField(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, types.ErrorResponse{Error: err.Error()})
@@ -107,7 +112,11 @@ func (h *Handler) GetField(c *gin.Context) {
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("idField"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("idField"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
+		return
+	}
 	var req dto.UpdateField
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
@@ -128,7 +137,7 @@ func (h *Handler) DeleteField(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid field id"})
 		return
 	}
-	if err := h.ucs.DeleteField(c, id); err != nil {
+	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: err.Error()})
 		return
 	}

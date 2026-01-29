@@ -1,3 +1,4 @@
+// Package stock expone endpoints HTTP para stock.
 package stock
 
 import (
@@ -11,7 +12,6 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	stockExcel "github.com/alphacodinggroup/ponti-backend/internal/stock/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock/handler/dto"
@@ -24,9 +24,9 @@ type UseCasesPort interface {
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
-	GetStockById(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectId(context.Context, int64, int64) (*domain.Stock, bool, error)
-	ExportStocksByProject(ctx context.Context, projectId int64) ([]byte, error)
+	GetStockByID(context.Context, int64) (*domain.Stock, error)
+	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
+	ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 }
 
@@ -46,11 +46,10 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 type Handler struct {
-	ucs  UseCasesPort
-	gsv  GinEnginePort
-	acf  ConfigAPIPort
-	mws  MiddlewaresEnginePort
-	ucps project.UseCasesPort
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
 func NewHandler(
@@ -58,14 +57,12 @@ func NewHandler(
 	s GinEnginePort,
 	c ConfigAPIPort,
 	m MiddlewaresEnginePort,
-	ucps project.UseCasesPort,
 ) *Handler {
 	return &Handler{
-		ucs:  u,
-		gsv:  s,
-		acf:  c,
-		mws:  m,
-		ucps: ucps,
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
@@ -89,14 +86,9 @@ func (h *Handler) Routes() {
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	_, err = h.ucps.GetProject(ctx, projectId)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
@@ -110,7 +102,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 		}
 	}
 
-	stocks, err := h.ucs.GetStocksSummary(ctx, projectId, cutoffDate)
+	stocks, err := h.ucs.GetStocksSummary(ctx, projectID, cutoffDate)
 	if handleError(err, c) {
 		return
 	}
@@ -121,14 +113,14 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 
 func (h *Handler) getStocksPeriods(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
 
-	periods, err := h.ucs.GetStocksPeriods(ctx, projectId)
+	periods, err := h.ucs.GetStocksPeriods(ctx, projectID)
 	if handleError(err, c) {
 		return
 	}
@@ -139,7 +131,7 @@ func (h *Handler) getStocksPeriods(c *gin.Context) {
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
 	monthPeriod, err := getMonthPeriod(c)
 	if handleError(err, c) {
@@ -156,17 +148,12 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
 		return
 	}
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedmodels.ConvertStringToID(ctx)
 	if handleError(err, c) {
 		return
 	}
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
-	if handleError(err, c) {
-		return
-	}
-
-	_, err = h.ucps.GetProject(ctx, projectId)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
@@ -177,7 +164,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 	err = h.ucs.UpdateCloseDateByProject(
 		ctx,
-		projectId,
+		projectID,
 		monthPeriod,
 		yearPeriod,
 		req.ToDomain(&userID),
@@ -192,7 +179,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 func (h *Handler) UpdateRealStock(c *gin.Context) {
 	ctx := c.Request.Context()
-	stockIdStr := c.Param("stockId")
+	stockIDStr := c.Param("stockId")
 
 	var req dto.UpdateRealStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -200,16 +187,16 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedmodels.ConvertStringToID(ctx)
 	if handleError(err, c) {
 		return
 	}
 
-	stockId, err := strconv.ParseInt(stockIdStr, 10, 64)
+	stockID, err := strconv.ParseInt(stockIDStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
-	stockDomain, err := h.ucs.GetStockById(ctx, stockId)
+	stockDomain, err := h.ucs.GetStockByID(ctx, stockID)
 	if handleError(err, c) {
 		return
 	}
@@ -217,7 +204,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	stockDomain.RealStockUnits = req.RealStockUnits
 	stockDomain.UpdatedBy = &userID
 
-	err = h.ucs.UpdateRealStockUnits(ctx, stockId, stockDomain)
+	err = h.ucs.UpdateRealStockUnits(ctx, stockID, stockDomain)
 	if handleError(err, c) {
 		return
 	}
@@ -288,20 +275,14 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 // Ruta nueva: /api/v1/projects/:id/stocks/export
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIdStr := c.Param("id")
+	projectIDStr := c.Param("id")
 
-	projectId, err := strconv.ParseInt(projectIdStr, 10, 64)
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if handleError(err, c) {
 		return
 	}
 
-	// Verificar que el proyecto existe
-	_, err = h.ucps.GetProject(ctx, projectId)
-	if handleError(err, c) {
-		return
-	}
-
-	data, err := h.ucs.ExportStocksByProject(ctx, projectId)
+	data, err := h.ucs.ExportStocksByProject(ctx, projectID)
 	if handleError(err, c) {
 		return
 	}

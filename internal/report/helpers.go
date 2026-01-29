@@ -1,4 +1,4 @@
-// Package report proporciona funcionalidades para generar reportes financieros y operativos
+// Package report proporciona funcionalidades para generar reportes financieros y operativos.
 package report
 
 import (

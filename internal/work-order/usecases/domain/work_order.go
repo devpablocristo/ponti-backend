@@ -1,3 +1,4 @@
+// Package domain contiene modelos de dominio para work orders.
 package domain
 
 import (
@@ -8,8 +9,8 @@ import (
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
 
-// Workorder
-type Workorder struct {
+// WorkOrder representa una orden de trabajo.
+type WorkOrder struct {
 	ID            int64
 	Number        string
 	ProjectID     int64
@@ -22,20 +23,20 @@ type Workorder struct {
 	Date          time.Time
 	InvestorID    int64
 	EffectiveArea decimal.Decimal
-	Items         []WorkorderItem
+	Items         []WorkOrderItem
 
 	Base shareddomain.Base
 }
 
-// WorkorderItem ...
-type WorkorderItem struct {
+// WorkOrderItem representa un item de la orden de trabajo.
+type WorkOrderItem struct {
 	SupplyID  int64
 	TotalUsed decimal.Decimal
 	FinalDose decimal.Decimal
 }
 
-// Filtro
-type WorkorderFilter struct {
+// WorkOrderFilter representa filtros para listar órdenes de trabajo.
+type WorkOrderFilter struct {
 	ProjectID  *int64
 	FieldID    *int64
 	CustomerID *int64

@@ -1,4 +1,4 @@
-// Package report proporciona funcionalidades para generar reportes financieros y operativos
+// Package report proporciona funcionalidades para generar reportes financieros y operativos.
 package report
 
 import (
@@ -14,17 +14,17 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 )
 
-// GormEnginePort define la interfaz para el motor GORM
+// GormEnginePort define la interfaz para el motor GORM.
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
 
-// ReportRepository implementa la interfaz de repositorio para reportes
+// ReportRepository implementa la interfaz de repositorio para reportes.
 type ReportRepository struct {
 	db GormEnginePort
 }
 
-// NewReportRepository crea una nueva instancia del repositorio
+// NewReportRepository crea una nueva instancia del repositorio.
 func NewReportRepository(db GormEnginePort) *ReportRepository {
 	return &ReportRepository{
 		db: db,
@@ -35,7 +35,7 @@ func NewReportRepository(db GormEnginePort) *ReportRepository {
 
 // ===== REPORTE POR CAMPO/CULTIVO =====
 
-// GetFieldCropMetrics obtiene las métricas por campo y cultivo
+// GetFieldCropMetrics obtiene las métricas por campo y cultivo.
 func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]domain.FieldCropMetric, error) {
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(filters)
@@ -74,7 +74,7 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 	return metrics, nil
 }
 
-// getFieldCropColumns obtiene las columnas (field-crop combinations)
+// getFieldCropColumns obtiene las columnas (field-crop combinations).
 func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]domain.FieldCropColumn, error) {
 	var columns []domain.FieldCropColumn
 
@@ -100,7 +100,7 @@ func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]d
 	return columns, nil
 }
 
-// buildReportRows construye las filas del reporte
+// buildReportRows construye las filas del reporte.
 func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, columns []domain.FieldCropColumn) []domain.FieldCropRow {
 	// Crear mapas de métricas y columnas
 	metricMap := r.createMetricMap(metrics)
@@ -116,7 +116,7 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 	return rows
 }
 
-// createMetricMap crea un mapa de métricas indexado por field_crop_key
+// createMetricMap crea un mapa de métricas indexado por field_crop_key.
 func (r *ReportRepository) createMetricMap(metrics []domain.FieldCropMetric) map[string]domain.FieldCropMetric {
 	metricMap := make(map[string]domain.FieldCropMetric, len(metrics))
 	for _, metric := range metrics {
@@ -126,7 +126,7 @@ func (r *ReportRepository) createMetricMap(metrics []domain.FieldCropMetric) map
 	return metricMap
 }
 
-// createColumnMap crea un mapa de columnas indexado por ID
+// createColumnMap crea un mapa de columnas indexado por ID.
 func (r *ReportRepository) createColumnMap(columns []domain.FieldCropColumn) map[string]domain.FieldCropColumn {
 	columnMap := make(map[string]domain.FieldCropColumn, len(columns))
 	for _, col := range columns {
@@ -135,7 +135,7 @@ func (r *ReportRepository) createColumnMap(columns []domain.FieldCropColumn) map
 	return columnMap
 }
 
-// buildMainRows construye las filas principales usando configuraciones predefinidas (DRY)
+// buildMainRows construye las filas principales usando configuraciones predefinidas (DRY).
 func (r *ReportRepository) buildMainRows(
 	metricMap map[string]domain.FieldCropMetric,
 	columnMap map[string]domain.FieldCropColumn,
@@ -150,25 +150,25 @@ func (r *ReportRepository) buildMainRows(
 	return rows
 }
 
-// buildSupplyDetailRows construye las filas detalladas de supplies desde v4_report.field_crop_insumos
+// buildSupplyDetailRows construye las filas detalladas de insumos desde v4_report.field_crop_insumos.
 func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Consultar vista v4_report.field_crop_insumos
 	var supplyDetails []models.FieldCropSupplyDetailModel
 
-	// Extraer project_ids de las columnas
-	projectIDs := make(map[int64]bool)
+	// Extraer field_id de las columnas
+	fieldIDs := make(map[int64]bool)
 	for _, col := range columnMap {
-		projectIDs[col.FieldID] = true
+		fieldIDs[col.FieldID] = true
 	}
 
 	// Construir query
 	query := r.db.Client().Model(&models.FieldCropSupplyDetailModel{})
-	if len(projectIDs) > 0 {
-		fieldIDs := make([]int64, 0, len(projectIDs))
-		for fid := range projectIDs {
-			fieldIDs = append(fieldIDs, fid)
+	if len(fieldIDs) > 0 {
+		fieldIDList := make([]int64, 0, len(fieldIDs))
+		for fid := range fieldIDs {
+			fieldIDList = append(fieldIDList, fid)
 		}
-		query = query.Where("field_id IN ?", fieldIDs)
+		query = query.Where("field_id IN ?", fieldIDList)
 	}
 
 	// Ejecutar query
@@ -187,20 +187,20 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 	// Construir filas (Fertilizantes y Otros Insumos ya están en la vista v4)
 	// IMPORTANTE: Las keys deben coincidir con el frontend (ByFieldOrCropReport.tsx)
 	rows := []domain.FieldCropRow{
-		r.buildSupplyRow("supply_semillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }),        // FIX: Cambiar "semilla" → "semillas" (plural)
+		r.buildSupplyRow("supply_semillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.SemillasUsdHa }), // FIX: Cambiar "semilla" → "semillas" (plural)
 		r.buildSupplyRow("supply_curasemillas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CurasemillasUsdHa }),
 		r.buildSupplyRow("supply_herbicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.HerbicidasUsdHa }),
 		r.buildSupplyRow("supply_insecticidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.InsecticidasUsdHa }),
 		r.buildSupplyRow("supply_coadyuvantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.CoadyuvantesUsdHa }),
 		r.buildSupplyRow("supply_fertilizantes", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FertilizantesUsdHa }),
 		r.buildSupplyRow("supply_fungicidas", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.FungicidasUsdHa }),
-		r.buildSupplyRow("supply_otros", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.OtrosInsumosUsdHa }),           // FIX: Cambiar "supply_otros_insumos" → "supply_otros"
+		r.buildSupplyRow("supply_otros", "usd/ha", columnMap, supplyMap, func(d models.FieldCropSupplyDetailModel) decimal.Decimal { return d.OtrosInsumosUsdHa }), // FIX: Cambiar "supply_otros_insumos" → "supply_otros"
 	}
 
 	return rows
 }
 
-// buildLaborDetailRows construye las filas detalladas de labores desde v4_report.field_crop_labores
+// buildLaborDetailRows construye las filas detalladas de labores desde v4_report.field_crop_labores.
 func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Consultar vista v4_report.field_crop_labores
 	var laborDetails []models.FieldCropLaborDetailModel
@@ -247,7 +247,7 @@ func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.Fiel
 	return rows
 }
 
-// buildSupplyRow construye una fila de insumo desde el mapa de detalles
+// buildSupplyRow construye una fila de insumo desde el mapa de detalles.
 func (r *ReportRepository) buildSupplyRow(
 	key string,
 	unit string,
@@ -275,7 +275,7 @@ func (r *ReportRepository) buildSupplyRow(
 	}
 }
 
-// buildLaborRow construye una fila de labor desde el mapa de detalles
+// buildLaborRow construye una fila de labor desde el mapa de detalles.
 func (r *ReportRepository) buildLaborRow(
 	key string,
 	unit string,
@@ -303,21 +303,21 @@ func (r *ReportRepository) buildLaborRow(
 	}
 }
 
-// buildEmptySupplyRows construye filas vacías de supplies
+// buildEmptySupplyRows construye filas vacías de insumos.
 func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Cargar categorías de insumos desde la base de datos
 	supplyCategories, err := r.getSupplyCategories()
 	if err != nil {
 		// Fallback a categorías por defecto si hay error (usando categorías de 000013 + migración 000131)
 		supplyCategories = map[string]string{
-			"supply_semilla":       "Semilla",
+			"supply_semillas":      "Semilla",
 			"supply_coadyuvantes":  "Coadyuvantes",
 			"supply_curasemillas":  "Curasemillas",
 			"supply_herbicidas":    "Herbicidas",
 			"supply_insecticidas":  "Insecticidas",
 			"supply_fungicidas":    "Fungicidas",
 			"supply_fertilizantes": "Fertilizantes",
-			"supply_otros_insumos": "Otros Insumos",
+			"supply_otros":         "Otros Insumos",
 		}
 	}
 
@@ -339,7 +339,7 @@ func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.Fiel
 	return rows
 }
 
-// buildEmptyLaborRows construye filas vacías de labores
+// buildEmptyLaborRows construye filas vacías de labores.
 func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Cargar categorías de labores desde la base de datos
 	laborCategories, err := r.getLaborCategories()
@@ -348,7 +348,7 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 		laborCategories = map[string]string{
 			"labor_siembra":       "Siembra",
 			"labor_pulverizacion": "Pulverización",
-			"labor_otras_labores": "Otras Labores",
+			"labor_otras":         "Otras Labores",
 			"labor_riego":         "Riego",
 			"labor_cosecha":       "Cosecha",
 		}
@@ -372,7 +372,7 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 	return rows
 }
 
-// getSupplyCategories obtiene las categorías de insumos desde la base de datos
+// getSupplyCategories obtiene las categorías de insumos desde la base de datos.
 func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 	query := `
 		SELECT c.id, c.name, c.type_id
@@ -401,7 +401,7 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 		var key string
 		switch typeID {
 		case 1: // Semilla
-			key = "supply_semilla"
+			key = "supply_semillas"
 		case 2: // Agroquímicos
 			switch name {
 			case "Coadyuvantes":
@@ -415,7 +415,7 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 			case "Fungicidas":
 				key = "supply_fungicidas"
 			case "Otros Insumos":
-				key = "supply_otros_insumos"
+				key = "supply_otros"
 			default:
 				key = fmt.Sprintf("supply_%d", id) // Fallback usando ID
 			}
@@ -431,7 +431,7 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 	return categories, nil
 }
 
-// getLaborCategories obtiene las categorías de labores desde la base de datos
+// getLaborCategories obtiene las categorías de labores desde la base de datos.
 func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 	query := `
 		SELECT c.id, c.name, c.type_id
@@ -464,7 +464,7 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 		case "Pulverización":
 			key = "labor_pulverizacion"
 		case "Otras Labores":
-			key = "labor_otras_labores"
+			key = "labor_otras"
 		case "Riego":
 			key = "labor_riego"
 		case "Cosecha":
@@ -481,7 +481,7 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 
 // ===== FUNCIONES AUXILIARES =====
 
-// BuildFieldCrop construye la tabla completa del reporte field-crop
+// BuildFieldCrop construye la tabla completa del reporte field-crop.
 func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.FieldCrop, error) {
 	// Obtener información del proyecto
 	projectInfo, err := r.getProjectInfo(filters)
@@ -517,7 +517,7 @@ func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.
 	}, nil
 }
 
-// GetProjectInfo obtiene información del proyecto por ID
+// GetProjectInfo obtiene información del proyecto por ID.
 func (r *ReportRepository) GetProjectInfo(projectID int64) (*domain.ProjectInfo, error) {
 	filters := domain.ReportFilter{
 		ProjectID: &projectID,
@@ -525,7 +525,7 @@ func (r *ReportRepository) GetProjectInfo(projectID int64) (*domain.ProjectInfo,
 	return r.getProjectInfo(filters)
 }
 
-// GetInvestorContributionReport obtiene el reporte de aportes de inversores
+// GetInvestorContributionReport obtiene el reporte de aportes de inversores.
 func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(filter)
@@ -591,7 +591,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 
 // ===== REPORTE DE RESUMEN DE RESULTADOS =====
 
-// GetSummaryResults obtiene el resumen de resultados por cultivo
+// GetSummaryResults obtiene el resumen de resultados por cultivo.
 func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter) ([]domain.SummaryResults, error) {
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(domain.ReportFilter{
@@ -665,7 +665,7 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 
 // ===== FUNCIONES AUXILIARES =====
 
-// getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
+// getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros.
 func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
 	// Si tenemos ProjectID directamente, usarlo sin buscar
 	if filter.ProjectID != nil {
@@ -715,7 +715,7 @@ func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]i
 	return projectIDs, nil
 }
 
-// getProjectInfo obtiene la información básica del proyecto
+// getProjectInfo obtiene la información básica del proyecto.
 func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.ProjectInfo, error) {
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(filters)

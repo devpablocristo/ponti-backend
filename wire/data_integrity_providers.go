@@ -17,14 +17,14 @@ import (
 
 // ProvideDataIntegrityUseCases construye los casos de uso de data_integrity
 func ProvideDataIntegrityUseCases(
-	workorderRepo data_integrity.WorkorderRepositoryPort,
+	workOrderRepo data_integrity.WorkOrderRepositoryPort,
 	dashboardRepo data_integrity.DashboardRepositoryPort,
 	lotRepo data_integrity.LotRepositoryPort,
 	reportRepo data_integrity.ReportRepositoryPort,
 	stockRepo data_integrity.StockRepositoryPort,
 ) *data_integrity.UseCases {
 	return data_integrity.NewUseCases(
-		workorderRepo,
+		workOrderRepo,
 		dashboardRepo,
 		lotRepo,
 		reportRepo,
@@ -62,8 +62,8 @@ func ProvideDataIntegrityMiddlewaresEnginePort(m *mwr.Middlewares) data_integrit
 	return m
 }
 
-// ProvideDataIntegrityWorkorderRepositoryPort adapta workorder.RepositoryPort a data_integrity.WorkorderRepositoryPort
-func ProvideDataIntegrityWorkorderRepositoryPort(r workorder.RepositoryPort) data_integrity.WorkorderRepositoryPort {
+// ProvideDataIntegrityWorkOrderRepositoryPort adapta workorder.RepositoryPort a data_integrity.WorkOrderRepositoryPort.
+func ProvideDataIntegrityWorkOrderRepositoryPort(r workorder.RepositoryPort) data_integrity.WorkOrderRepositoryPort {
 	return r
 }
 
@@ -95,7 +95,7 @@ var DataIntegritySet = wire.NewSet(
 	ProvideDataIntegrityConfigAPI,
 	ProvideDataIntegrityGinEnginePort,
 	ProvideDataIntegrityMiddlewaresEnginePort,
-	ProvideDataIntegrityWorkorderRepositoryPort,
+	ProvideDataIntegrityWorkOrderRepositoryPort,
 	ProvideDataIntegrityDashboardRepositoryPort,
 	ProvideDataIntegrityLotRepositoryPort,
 	ProvideDataIntegrityReportRepositoryPort,

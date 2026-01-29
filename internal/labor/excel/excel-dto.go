@@ -8,7 +8,7 @@ import (
 )
 
 type ExcelDto struct {
-	WorkorderNumber string    `excel:"OT N°"`
+	WorkOrderNumber string    `excel:"OT N°"`
 	Date            time.Time `excel:"FECHA"`
 	ProjectName     string    `excel:"PROYECTO"`
 	FieldName       string    `excel:"CAMPO"`
@@ -38,7 +38,7 @@ func BuildExcelDTO(items []domain.LaborListItem) []ExcelDto {
 		invDate := it.InvoiceDate
 
 		out = append(out, ExcelDto{
-			WorkorderNumber: it.WorkorderNumber,
+			WorkOrderNumber: it.WorkOrderNumber,
 			Date:            it.Date,
 			ProjectName:     it.ProjectName,
 			FieldName:       it.FieldName,
@@ -71,4 +71,3 @@ func decToFloat(d decimal.Decimal, scale int32) float64 {
 	f, _ := d.Float64()
 	return f
 }
-

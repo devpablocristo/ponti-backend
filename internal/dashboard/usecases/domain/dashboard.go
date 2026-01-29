@@ -189,5 +189,5 @@ type DashboardOperationalCard struct {
 	Key         string
 	Title       string
 	Date        *time.Time
-	WorkorderID *string
+	WorkOrderID *string
 }

@@ -80,14 +80,14 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockWorkorderRepo := NewMockWorkorderRepositoryPort(ctrl)
+			mockWorkOrderRepo := NewMockWorkOrderRepositoryPort(ctrl)
 			mockDashboardRepo := NewMockDashboardRepositoryPort(ctrl)
 			mockLotRepo := NewMockLotRepositoryPort(ctrl)
 			mockReportRepo := NewMockReportRepositoryPort(ctrl)
 			mockStockRepo := NewMockStockRepositoryPort(ctrl)
 
 			useCases := NewUseCases(
-				mockWorkorderRepo,
+				mockWorkOrderRepo,
 				mockDashboardRepo,
 				mockLotRepo,
 				mockReportRepo,
@@ -101,7 +101,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 			}
 
 			// Mock expectations
-			mockWorkorderRepo.EXPECT().
+			mockWorkOrderRepo.EXPECT().
 				GetRawDirectCost(ctx, pID).
 				Return(tt.mockRawCost, tt.mockRawCostErr).
 				Times(1)
@@ -199,14 +199,14 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockWorkorderRepo := NewMockWorkorderRepositoryPort(ctrl)
+			mockWorkOrderRepo := NewMockWorkOrderRepositoryPort(ctrl)
 			mockDashboardRepo := NewMockDashboardRepositoryPort(ctrl)
 			mockLotRepo := NewMockLotRepositoryPort(ctrl)
 			mockReportRepo := NewMockReportRepositoryPort(ctrl)
 			mockStockRepo := NewMockStockRepositoryPort(ctrl)
 
 			useCases := NewUseCases(
-				mockWorkorderRepo,
+				mockWorkOrderRepo,
 				mockDashboardRepo,
 				mockLotRepo,
 				mockReportRepo,
@@ -220,7 +220,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			}
 
 			// Mock expectations
-			mockWorkorderRepo.EXPECT().
+			mockWorkOrderRepo.EXPECT().
 				GetRawDirectCost(ctx, pID).
 				Return(tt.mockRawCost, tt.mockRawCostErr).
 				Times(1)

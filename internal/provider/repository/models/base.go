@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )

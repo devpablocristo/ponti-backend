@@ -13,29 +13,29 @@ import (
 
 	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
 	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
-	workorderexcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
+	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
 )
 
-// ProvideWorkorderRepository crea la implementación concreta de workorder.Repository.
-func ProvideWorkorderRepository(repo workorder.GormEngine) *workorder.Repository {
+// ProvideWorkOrderRepository crea la implementación concreta de workorder.Repository.
+func ProvideWorkOrderRepository(repo workorder.GormEngine) *workorder.Repository {
 	return workorder.NewRepository(repo)
 }
 
-// ProvideWorkorderRepositoryPort adapta *workorder.Repository a la interfaz workorder.RepositoryPort.
-func ProvideWorkorderRepositoryPort(r *workorder.Repository) workorder.RepositoryPort {
+// ProvideWorkOrderRepositoryPort adapta *workorder.Repository a la interfaz workorder.RepositoryPort.
+func ProvideWorkOrderRepositoryPort(r *workorder.Repository) workorder.RepositoryPort {
 	return r
 }
 
 // Crea el engine de Excel ya configurado
 func ProvidePkgExcelService() (*pkgexcel.Service, error) {
-	fp := filepath.Join(os.TempDir(), workorderexcel.DefaultFilename)
+	fp := filepath.Join(os.TempDir(), workOrderExcel.DefaultFilename)
 	write := true
 	return pkgexcel.Bootstrap(
 		fp,
-		workorderexcel.SheetName,
-		workorderexcel.DateFormat,
+		workOrderExcel.SheetName,
+		workOrderExcel.DateFormat,
 		&write,
-		workorderexcel.ColumnWidths,
+		workOrderExcel.ColumnWidths,
 	)
 }
 
@@ -49,18 +49,18 @@ func ProvideExporterPort(eng workorder.XLSXEnginePort) workorder.ExporterAdapter
 	return workorder.NewExcelExporter(eng)
 }
 
-// ProvideWorkorderUseCases agrupa repositorios en workorder.UseCases.
-func ProvideWorkorderUseCases(repo workorder.RepositoryPort, exp workorder.ExporterAdapterPort) *workorder.UseCases {
+// ProvideWorkOrderUseCases agrupa repositorios en workorder.UseCases.
+func ProvideWorkOrderUseCases(repo workorder.RepositoryPort, exp workorder.ExporterAdapterPort) *workorder.UseCases {
 	return workorder.NewUseCases(repo, exp)
 }
 
-// ProvideWorkorderUseCasesPort adapta *workorder.UseCases a la interfaz workorder.UseCasesPort.
-func ProvideWorkorderUseCasesPort(uc *workorder.UseCases) workorder.UseCasesPort {
+// ProvideWorkOrderUseCasesPort adapta *workorder.UseCases a la interfaz workorder.UseCasesPort.
+func ProvideWorkOrderUseCasesPort(uc *workorder.UseCases) workorder.UseCasesPort {
 	return uc
 }
 
-// ProvideWorkorderHandler construye el handler HTTP para Workorder.
-func ProvideWorkorderHandler(
+// ProvideWorkOrderHandler construye el handler HTTP para WorkOrder.
+func ProvideWorkOrderHandler(
 	server workorder.GinEnginePort,
 	useCases workorder.UseCasesPort,
 	cfg workorder.ConfigAPIPort,
@@ -69,37 +69,37 @@ func ProvideWorkorderHandler(
 	return workorder.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideWorkorderConfigAPI extrae la configuración específica de API para Workorder.
-func ProvideWorkorderConfigAPI(cfg *config.Config) workorder.ConfigAPIPort {
+// ProvideWorkOrderConfigAPI extrae la configuración específica de API para WorkOrder.
+func ProvideWorkOrderConfigAPI(cfg *config.Config) workorder.ConfigAPIPort {
 	return &cfg.API
 }
 
-// ProvideWorkorderGormEnginePort adapta *pgorm.Repository a workorder.GormEngine.
-func ProvideWorkorderGormEnginePort(r *pgorm.Repository) workorder.GormEngine {
+// ProvideWorkOrderGormEnginePort adapta *pgorm.Repository a workorder.GormEngine.
+func ProvideWorkOrderGormEnginePort(r *pgorm.Repository) workorder.GormEngine {
 	return r
 }
 
-// ProvideWorkorderGinEnginePort adapta *pgin.Server a workorder.GinEnginePort.
-func ProvideWorkorderGinEnginePort(s *pgin.Server) workorder.GinEnginePort {
+// ProvideWorkOrderGinEnginePort adapta *pgin.Server a workorder.GinEnginePort.
+func ProvideWorkOrderGinEnginePort(s *pgin.Server) workorder.GinEnginePort {
 	return s
 }
 
-// ProvideWorkorderMiddlewaresEnginePort adapta *mwr.Middlewares a workorder.MiddlewaresEnginePort.
-func ProvideWorkorderMiddlewaresEnginePort(m *mwr.Middlewares) workorder.MiddlewaresEnginePort {
+// ProvideWorkOrderMiddlewaresEnginePort adapta *mwr.Middlewares a workorder.MiddlewaresEnginePort.
+func ProvideWorkOrderMiddlewaresEnginePort(m *mwr.Middlewares) workorder.MiddlewaresEnginePort {
 	return m
 }
 
-// WorkorderSet expone todos los providers necesarios para Workorder.
-var WorkorderSet = wire.NewSet(
-	ProvideWorkorderRepository,
-	ProvideWorkorderRepositoryPort,
-	ProvideWorkorderUseCases,
-	ProvideWorkorderUseCasesPort,
-	ProvideWorkorderHandler,
-	ProvideWorkorderConfigAPI,
-	ProvideWorkorderGormEnginePort,
-	ProvideWorkorderGinEnginePort,
-	ProvideWorkorderMiddlewaresEnginePort,
+// WorkOrderSet expone todos los providers necesarios para WorkOrder.
+var WorkOrderSet = wire.NewSet(
+	ProvideWorkOrderRepository,
+	ProvideWorkOrderRepositoryPort,
+	ProvideWorkOrderUseCases,
+	ProvideWorkOrderUseCasesPort,
+	ProvideWorkOrderHandler,
+	ProvideWorkOrderConfigAPI,
+	ProvideWorkOrderGormEnginePort,
+	ProvideWorkOrderGinEnginePort,
+	ProvideWorkOrderMiddlewaresEnginePort,
 	ProvidePkgExcelService,
 	ProvideExporterPort,
 	ProvideXLSXEnginePort,

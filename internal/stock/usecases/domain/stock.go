@@ -1,3 +1,4 @@
+// Package domain contiene modelos de dominio para stock.
 package domain
 
 import (

@@ -1,3 +1,4 @@
+// Package manager expone endpoints HTTP para managers.
 package manager
 
 import (
@@ -37,7 +38,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
+// Handler encapsula dependencias del handler HTTP de Manager.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -45,7 +46,7 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
+// NewHandler crea un handler de Manager.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -55,7 +56,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
+// Routes registra las rutas del módulo Manager.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/managers"
@@ -67,7 +68,7 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL)
 	{
 		public.POST("", h.CreateManager)       // Crear un manager
-		public.GET("", h.ListManagers)         // Listar todos los customers
+		public.GET("", h.ListManagers)         // Listar managers
 		public.GET("/:id", h.GetManager)       // Obtener un manager por ID
 		public.PUT("/:id", h.UpdateManager)    // Actualizar un manager
 		public.DELETE("/:id", h.DeleteManager) // Eliminar un manager
@@ -97,13 +98,17 @@ func (h *Handler) CreateManager(c *gin.Context) {
 }
 
 func (h *Handler) ListManagers(c *gin.Context) {
-	customers, err := h.ucs.ListManagers(c.Request.Context())
+	items, err := h.ucs.ListManagers(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, customers)
+	resp := make([]dto.Manager, len(items))
+	for i := range items {
+		resp[i] = *dto.FromDomain(items[i])
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) GetManager(c *gin.Context) {
@@ -120,7 +125,7 @@ func (h *Handler) GetManager(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, manager)
+	c.JSON(http.StatusOK, dto.FromDomain(*manager))
 }
 
 // UpdateManager actualiza un manager existente.
@@ -132,7 +137,8 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 	}
 	var req dto.Manager
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "invalid payload"})
+		apiErr, _ := types.NewAPIError(err)
+		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 	req.ID = id

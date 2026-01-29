@@ -1,3 +1,4 @@
+// Package models contiene modelos de persistencia para stock.
 package models
 
 import (

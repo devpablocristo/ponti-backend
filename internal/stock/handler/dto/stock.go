@@ -1,3 +1,4 @@
+// Package dto define los DTOs HTTP para stock.
 package dto
 
 import (
@@ -43,7 +44,7 @@ type GetStockSummary struct {
 	TotalUSD        decimal.Decimal `json:"total_usd"`
 	ClassType       string          `json:"class_type"`
 	CloseDate       *time.Time      `json:"close_date"`
-	SupplyUnitId    int64           `json:"supply_unit_id"`
+	SupplyUnitID    int64           `json:"supply_unit_id"`
 	SupplyUnitPrice decimal.Decimal `json:"supply_unit_price"`
 	EntryStock      decimal.Decimal `json:"entry_stock"`
 	OutStock        decimal.Decimal `json:"out_stock"`
@@ -62,7 +63,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		TotalUSD        string     `json:"total_usd"`
 		ClassType       string     `json:"class_type"`
 		CloseDate       *time.Time `json:"close_date"`
-		SupplyUnitId    int64      `json:"supply_unit_id"`
+		SupplyUnitID    int64      `json:"supply_unit_id"`
 		SupplyUnitPrice string     `json:"supply_unit_price"`
 		EntryStock      string     `json:"entry_stock"`
 		OutStock        string     `json:"out_stock"`
@@ -77,7 +78,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		TotalUSD:        s.TotalUSD.StringFixed(2), // Total u$s: 2 decimales
 		ClassType:       s.ClassType,
 		CloseDate:       s.CloseDate,
-		SupplyUnitId:    s.SupplyUnitId,
+		SupplyUnitID:    s.SupplyUnitID,
 		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2), // Precio u: 2 decimales
 		EntryStock:      s.EntryStock.StringFixed(2),
 		OutStock:        s.OutStock.StringFixed(2),
@@ -98,7 +99,7 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		StockDifference: s.GetStockDifference(),
 		CloseDate:       s.CloseDate,
 		ClassType:       s.Supply.CategoryName, // FIX: usar CategoryName (Herbicidas, Coadyuvantes) en lugar de Type.Name (Agroquímicos)
-		SupplyUnitId:    s.Supply.UnitID,
+		SupplyUnitID:    s.Supply.UnitID,
 		SupplyUnitPrice: s.Supply.Price,
 		EntryStock:      s.GetEntryStock(),
 		OutStock:        s.GetOutStock(),

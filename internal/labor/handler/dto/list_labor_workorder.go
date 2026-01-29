@@ -9,7 +9,7 @@ import (
 )
 
 type LaborRawItem struct {
-	WorkorderNumber string          `json:"workorder_number"`
+	WorkOrderNumber string          `json:"workorder_number"`
 	Date            time.Time       `json:"date"`
 	ProjectName     string          `json:"project_name"`
 	FieldName       string          `json:"field_name"`
@@ -27,15 +27,15 @@ type LaborRawItem struct {
 	InvoiceStatus   string          `json:"invoice_status"`
 }
 
-type LaborByWorkorderListResponse struct {
+type LaborByWorkOrderListResponse struct {
 	Data []LaborRawItem `json:"data"`
 }
 
-func ToLaborListResponse(items []domain.LaborRawItem) LaborByWorkorderListResponse {
+func ToLaborListResponse(items []domain.LaborRawItem) LaborByWorkOrderListResponse {
 	dtos := make([]LaborRawItem, len(items))
 	for i, d := range items {
 		dtos[i] = LaborRawItem{
-			WorkorderNumber: d.WorkorderNumber,
+			WorkOrderNumber: d.WorkOrderNumber,
 			Date:            d.Date,
 			ProjectName:     d.ProjectName,
 			FieldName:       d.FieldName,
@@ -53,5 +53,5 @@ func ToLaborListResponse(items []domain.LaborRawItem) LaborByWorkorderListRespon
 			InvoiceStatus:   d.InvoiceStatus,
 		}
 	}
-	return LaborByWorkorderListResponse{Data: dtos}
+	return LaborByWorkOrderListResponse{Data: dtos}
 }

@@ -1,4 +1,4 @@
-package business_parameters
+package bparams
 
 import (
 	"context"

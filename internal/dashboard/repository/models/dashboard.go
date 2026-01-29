@@ -198,10 +198,10 @@ type InvestorContributionModel struct {
 
 // OperationalIndicatorModel representa el modelo de indicadores operativos
 type OperationalIndicatorModel struct {
-	FirstWorkorderDate   *time.Time `gorm:"column:start_date"`
-	FirstWorkorderNumber *string    `gorm:"column:first_workorder_id"`
-	LastWorkorderDate    *time.Time `gorm:"column:end_date"`
-	LastWorkorderNumber  *string    `gorm:"column:last_workorder_id"`
+	FirstWorkOrderDate   *time.Time `gorm:"column:start_date"`
+	FirstWorkOrderNumber *string    `gorm:"column:first_workorder_id"`
+	LastWorkOrderDate    *time.Time `gorm:"column:end_date"`
+	LastWorkOrderNumber  *string    `gorm:"column:last_workorder_id"`
 	LastStockCountDate   *time.Time `gorm:"column:last_stock_count_date"`
 	CampaignClosingDate  *time.Time `gorm:"column:campaign_closing_date"`
 }

@@ -1,3 +1,4 @@
+// Package provider expone endpoints HTTP para proveedores.
 package provider
 
 import (
@@ -9,11 +10,11 @@ import (
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/provider/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 )
 
-type RepositoryPort interface {
-	GetProviders(context.Context) ([]*domain.Provider, error)
+type UseCasesPort interface {
+	GetProviders(context.Context) ([]domain.Provider, error)
 }
 
 type GinEnginePort interface {
@@ -32,6 +33,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
+// Routes registra las rutas del módulo Provider.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
@@ -47,30 +49,30 @@ func (h *Handler) Routes() {
 }
 
 type Handler struct {
-	repo RepositoryPort
-	gsv  GinEnginePort
-	acf  ConfigAPIPort
-	mws  MiddlewaresEnginePort
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
 func NewHandler(
-	repo RepositoryPort,
+	ucs UseCasesPort,
 	s GinEnginePort,
 	c ConfigAPIPort,
 	m MiddlewaresEnginePort,
 ) *Handler {
 	return &Handler{
-		repo: repo,
-		gsv:  s,
-		acf:  c,
-		mws:  m,
+		ucs: ucs,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
 func (h *Handler) GetProviders(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	providers, err := h.repo.GetProviders(ctx)
+	providers, err := h.ucs.GetProviders(ctx)
 	if handleError(err, c) {
 		return
 	}

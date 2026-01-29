@@ -371,29 +371,29 @@ func (m *DashboardModelMapper) operationalIndicatorsToDomain(model *OperationalI
 		{
 			Key:         "first_workorder",
 			Title:       "Primera orden de trabajo",
-			Date:        model.FirstWorkorderDate,
-			WorkorderID: model.FirstWorkorderNumber,
+			Date:        model.FirstWorkOrderDate,
+			WorkOrderID: model.FirstWorkOrderNumber,
 		},
 		// Card 2: Última orden de trabajo
 		{
 			Key:         "last_workorder",
 			Title:       "Última orden de trabajo",
-			Date:        model.LastWorkorderDate,
-			WorkorderID: model.LastWorkorderNumber,
+			Date:        model.LastWorkOrderDate,
+			WorkOrderID: model.LastWorkOrderNumber,
 		},
 		// Card 3: Arqueo de stock
 		{
 			Key:         "last_stock_count",
 			Title:       "Arqueo de stock",
 			Date:        model.LastStockCountDate,
-			WorkorderID: nil,
+			WorkOrderID: nil,
 		},
 		// Card 4: Cierre de campaña
 		{
 			Key:         "campaign_closing",
 			Title:       "Cierre de campaña",
 			Date:        model.CampaignClosingDate,
-			WorkorderID: nil,
+			WorkOrderID: nil,
 		},
 	}
 

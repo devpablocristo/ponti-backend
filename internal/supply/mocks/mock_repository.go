@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	domain0 "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	domain1 "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
@@ -184,19 +184,19 @@ func (mr *MockRepositoryPortMockRecorder) GetSupplyMovementByID(arg0, arg1 inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSupplyMovementByID", reflect.TypeOf((*MockRepositoryPort)(nil).GetSupplyMovementByID), arg0, arg1)
 }
 
-// GetWorkordersBySupplyID mocks base method.
-func (m *MockRepositoryPort) GetWorkordersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
+// GetWorkOrdersBySupplyID mocks base method.
+func (m *MockRepositoryPort) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetWorkordersBySupplyID", ctx, supplyID)
+	ret := m.ctrl.Call(m, "GetWorkOrdersBySupplyID", ctx, supplyID)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetWorkordersBySupplyID indicates an expected call of GetWorkordersBySupplyID.
-func (mr *MockRepositoryPortMockRecorder) GetWorkordersBySupplyID(ctx, supplyID interface{}) *gomock.Call {
+// GetWorkOrdersBySupplyID indicates an expected call of GetWorkOrdersBySupplyID.
+func (mr *MockRepositoryPortMockRecorder) GetWorkOrdersBySupplyID(ctx, supplyID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkordersBySupplyID", reflect.TypeOf((*MockRepositoryPort)(nil).GetWorkordersBySupplyID), ctx, supplyID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkOrdersBySupplyID", reflect.TypeOf((*MockRepositoryPort)(nil).GetWorkOrdersBySupplyID), ctx, supplyID)
 }
 
 // ListAllSupplies mocks base method.
@@ -378,20 +378,20 @@ func (mr *MockStockUseCasesPortMockRecorder) CreateStock(ctx, s interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStock", reflect.TypeOf((*MockStockUseCasesPort)(nil).CreateStock), ctx, s)
 }
 
-// GetLastStockByProjectId mocks base method.
-func (m *MockStockUseCasesPort) GetLastStockByProjectId(ctx context.Context, projectId, supplyId int64) (*domain0.Stock, bool, error) {
+// GetLastStockByProjectID mocks base method.
+func (m *MockStockUseCasesPort) GetLastStockByProjectID(ctx context.Context, projectId, supplyId int64) (*domain0.Stock, bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLastStockByProjectId", ctx, projectId, supplyId)
+	ret := m.ctrl.Call(m, "GetLastStockByProjectID", ctx, projectId, supplyId)
 	ret0, _ := ret[0].(*domain0.Stock)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// GetLastStockByProjectId indicates an expected call of GetLastStockByProjectId.
-func (mr *MockStockUseCasesPortMockRecorder) GetLastStockByProjectId(ctx, projectId, supplyId interface{}) *gomock.Call {
+// GetLastStockByProjectID indicates an expected call of GetLastStockByProjectID.
+func (mr *MockStockUseCasesPortMockRecorder) GetLastStockByProjectID(ctx, projectId, supplyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectId", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastStockByProjectId), ctx, projectId, supplyId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastStockByProjectID), ctx, projectId, supplyId)
 }
 
 // UpdateRealStockUnits mocks base method.

@@ -14,7 +14,6 @@ import (
 	labexcel "github.com/alphacodinggroup/ponti-backend/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/project"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -24,8 +23,8 @@ type UseCasesPort interface {
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
-	ListLaborByWorkorder(context.Context, int64) ([]domain.LaborRawItem, error)
-	ListGroupLaborByWorkorder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
+	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
 	ExportAllGroupLabors(context.Context) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
@@ -49,20 +48,18 @@ type MiddlewaresEnginePort interface {
 
 // Handler encapsulates all dependencies for the LeaseType HTTP handler.
 type Handler struct {
-	ucs  UseCasesPort
-	gsv  GinEnginePort
-	acf  ConfigAPIPort
-	mws  MiddlewaresEnginePort
-	ucps project.UseCasesPort
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
-func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort, up project.UseCasesPort) *Handler {
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
-		ucs:  u,
-		gsv:  s,
-		acf:  c,
-		mws:  m,
-		ucps: up,
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
@@ -83,14 +80,14 @@ func (h *Handler) Routes() {
 		public.GET("/labor-categories/:typeId", h.ListLaborCategories)
 	}
 
-	workorderGroup := r.Group(baseURL + "/labors")
+	workOrderGroup := r.Group(baseURL + "/labors")
 	{
-		workorderGroup.DELETE("/:idLabor", h.DeleteLaborByID)
-		workorderGroup.GET("/:workorderID", h.ListLaborByWorkorder)
-		workorderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
-		workorderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
-		workorderGroup.GET("/export/all", h.ExportAllGroupLabors)
-		workorderGroup.GET("/metrics", h.GetMetrics)
+		workOrderGroup.DELETE("/:idLabor", h.DeleteLaborByID)
+		workOrderGroup.GET("/:workorderID", h.ListLaborByWorkOrder)
+		workOrderGroup.GET("/group/:projectID", h.ListGroupLaborByProject)
+		workOrderGroup.GET("/export/:projectID", h.ExportGroupLaborXLSX)
+		workOrderGroup.GET("/export/all", h.ExportAllGroupLabors)
+		workOrderGroup.GET("/metrics", h.GetMetrics)
 	}
 }
 
@@ -113,12 +110,6 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	_, err = h.ucps.GetProject(ctx, projectID)
-	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-		return
-	}
 
 	if err = c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
@@ -280,13 +271,13 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (h *Handler) ListLaborByWorkorder(c *gin.Context) {
-	workorderID, ok := parseParamID(c, "workorderID")
+func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
+	workOrderID, ok := parseParamID(c, "workorderID")
 	if !ok {
 		return
 	}
 
-	items, err := h.ucs.ListLaborByWorkorder(c.Request.Context(), workorderID)
+	items, err := h.ucs.ListLaborByWorkOrder(c.Request.Context(), workOrderID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -323,7 +314,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	input := types.NewInput(c.Request)
 
-	list, pageInfo, err := h.ucs.ListGroupLaborByWorkorder(c.Request.Context(), input, projectID, fieldID)
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})

@@ -7,7 +7,7 @@ import (
 )
 
 type ExcelTableDto struct {
-	WorkorderNumber string    `excel:"OT N°"`
+	WorkOrderNumber string    `excel:"OT N°"`
 	Date            time.Time `excel:"FECHA"`
 	ProjectName     string    `excel:"PROYECTO"`
 	FieldName       string    `excel:"CAMPO"`
@@ -33,7 +33,7 @@ func BuildExcelTableDTO(items []domain.LaborListItem) []ExcelDto {
 	out := make([]ExcelDto, 0, len(items))
 	for _, it := range items {
 		out = append(out, ExcelDto{
-			WorkorderNumber: it.WorkorderNumber,
+			WorkOrderNumber: it.WorkOrderNumber,
 			Date:            it.Date,
 			ProjectName:     it.ProjectName,
 			FieldName:       it.FieldName,

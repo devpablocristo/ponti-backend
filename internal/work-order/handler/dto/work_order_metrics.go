@@ -1,3 +1,4 @@
+// Package dto define los DTOs HTTP para work orders.
 package dto
 
 import (
@@ -8,14 +9,14 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 )
 
-type WorkorderMetrics struct {
+type WorkOrderMetrics struct {
 	SurfaceHa  decimal.Decimal `json:"surface_ha"`  // Superficie ejecutada total
 	Liters     decimal.Decimal `json:"liters"`      // Consumo en litros total
 	Kilograms  decimal.Decimal `json:"kilograms"`   // Consumo en kilos total
 	DirectCost decimal.Decimal `json:"direct_cost"` // Costo directo total (labor + insumos)
 }
 
-func (m WorkorderMetrics) MarshalJSON() ([]byte, error) {
+func (m WorkOrderMetrics) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		SurfaceHa  string `json:"surface_ha"`
 		Liters     string `json:"liters"`
@@ -30,8 +31,8 @@ func (m WorkorderMetrics) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-func FromDomainMetrics(d *domain.WorkorderMetrics) WorkorderMetrics {
-	return WorkorderMetrics{
+func FromDomainMetrics(d *domain.WorkOrderMetrics) WorkOrderMetrics {
+	return WorkOrderMetrics{
 		SurfaceHa:  d.SurfaceHa,
 		Liters:     d.Liters,
 		Kilograms:  d.Kilograms,

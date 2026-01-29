@@ -4,7 +4,7 @@ import (
 	"time"
 
 	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecase/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )

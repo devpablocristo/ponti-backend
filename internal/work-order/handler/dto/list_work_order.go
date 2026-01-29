@@ -1,3 +1,4 @@
+// Package dto define los DTOs HTTP para work orders.
 package dto
 
 import (
@@ -6,11 +7,11 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-type WorkorderListElement struct {
+type WorkOrderListElement struct {
 	ID                int64           `json:"id"`
 	Number            string          `json:"number"`
 	ProjectName       string          `json:"project_name"`
@@ -32,8 +33,8 @@ type WorkorderListElement struct {
 	TotalCost         decimal.Decimal `json:"total_cost"`
 }
 
-// MarshalJSON asegura 2 decimales en todos los campos decimal de salida
-func (w WorkorderListElement) MarshalJSON() ([]byte, error) {
+// MarshalJSON asegura 2 decimales en todos los campos decimal de salida.
+func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		ID                int64     `json:"id"`
 		Number            string    `json:"number"`
@@ -78,13 +79,13 @@ func (w WorkorderListElement) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-type WorkorderListResponse struct {
+type WorkOrderListResponse struct {
 	PageInfo types.PageInfo         `json:"page_info"`
-	Items    []WorkorderListElement `json:"items"`
+	Items    []WorkOrderListElement `json:"items"`
 }
 
-func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement {
-	return &WorkorderListElement{
+func FromDomainListElement(d *domain.WorkOrderListElement) *WorkOrderListElement {
+	return &WorkOrderListElement{
 		ID:                d.ID,
 		Number:            d.Number,
 		ProjectName:       d.ProjectName,
@@ -107,10 +108,10 @@ func FromDomainListElement(d *domain.WorkorderListElement) *WorkorderListElement
 	}
 }
 
-func FromDomainList(pageInfo types.PageInfo, list []domain.WorkorderListElement) WorkorderListResponse {
-	items := make([]WorkorderListElement, len(list))
+func FromDomainList(pageInfo types.PageInfo, list []domain.WorkOrderListElement) WorkOrderListResponse {
+	items := make([]WorkOrderListElement, len(list))
 	for i, d := range list {
 		items[i] = *FromDomainListElement(&d)
 	}
-	return WorkorderListResponse{PageInfo: pageInfo, Items: items}
+	return WorkOrderListResponse{PageInfo: pageInfo, Items: items}
 }
