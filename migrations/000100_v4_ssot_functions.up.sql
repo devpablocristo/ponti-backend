@@ -182,6 +182,31 @@ LANGUAGE sql STABLE AS $$
          )
 $$;
 
+CREATE OR REPLACE FUNCTION v4_ssot.total_hectares_for_project(p_project_id bigint) 
+RETURNS double precision
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(SUM(l.hectares), 0)::double precision
+  FROM public.fields f
+  LEFT JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
+  WHERE f.project_id = p_project_id AND f.deleted_at IS NULL
+$$;
+
+CREATE OR REPLACE FUNCTION v4_ssot.admin_cost_prorated_per_ha_for_lot(p_lot_id bigint)
+RETURNS numeric
+LANGUAGE sql STABLE AS $$
+  SELECT CASE
+           WHEN t.total_hectares > 0 THEN COALESCE(p.admin_cost, 0)::numeric / t.total_hectares
+           ELSE 0::numeric
+         END
+  FROM public.lots l
+  JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+  JOIN public.projects p ON p.id = f.project_id AND p.deleted_at IS NULL
+  CROSS JOIN LATERAL (
+    SELECT v4_ssot.total_hectares_for_project(f.project_id)::numeric AS total_hectares
+  ) t
+  WHERE l.id = p_lot_id AND l.deleted_at IS NULL
+$$;
+
 CREATE OR REPLACE FUNCTION v4_ssot.admin_cost_per_ha_for_lot(p_lot_id bigint) 
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
@@ -290,15 +315,6 @@ CREATE OR REPLACE FUNCTION v4_ssot.direct_cost_usd(
 ) RETURNS numeric
 LANGUAGE sql IMMUTABLE AS $$
   SELECT COALESCE(p_labor_cost_usd, 0) + COALESCE(p_supply_cost_usd, 0)
-$$;
-
-CREATE OR REPLACE FUNCTION v4_ssot.total_hectares_for_project(p_project_id bigint) 
-RETURNS double precision
-LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(SUM(l.hectares), 0)::double precision
-  FROM public.fields f
-  LEFT JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
-  WHERE f.project_id = p_project_id AND f.deleted_at IS NULL
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.direct_costs_total_for_project(p_project_id bigint) 

@@ -26,56 +26,18 @@ func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
 	}
 	defer sqlDB.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
-	// Adquirir lock de migración para evitar ejecuciones concurrentes
-	unlock, err := acquireMigrationLock(ctx, sqlDB, dbConfig.Name)
-	if err != nil {
-		return fmt.Errorf("failed to acquire migration lock: %w", err)
-	}
-	defer unlock()
-
-	log.Printf("Migration lock acquired for database: %s", dbConfig.Name)
-
-	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{
-		DatabaseName: dbConfig.Name,
-	})
-	if err != nil {
-		return fmt.Errorf("creating postgres driver: %w", err)
-	}
-
-	m, err := migrate.NewWithDatabaseInstance(
-		migConfig.Dir,
-		dbConfig.Name,
-		driver,
-	)
-	if err != nil {
-		return fmt.Errorf("error creating migrate instance: %w", err)
-	}
-
-	// Intentar ejecutar migraciones
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		// Dirty state o conflictos de views (ej: cannot drop columns from view) requieren intervención externa:
-		// la estrategia recomendada es resetear la DB (lo maneja el workflow de deploy manual).
-		if strings.Contains(err.Error(), "Dirty database version") || strings.Contains(err.Error(), "dirty") {
-			return fmt.Errorf("dirty migration state - reset the database or fix and force version manually: %w", err)
-		}
-		if strings.Contains(err.Error(), "cannot drop columns from view") {
-			return fmt.Errorf("migration failed due to incompatible view shape (cannot drop columns from view) - reset the database or adjust migrations: %w", err)
-		}
-		return fmt.Errorf("error applying migrations: %w", err)
-	}
-
-	log.Printf("Migrations completed successfully for database: %s", dbConfig.Name)
-	return nil
+	return runMigrationsWithInstance(sqlDB, dbConfig, migConfig)
 }
 
 func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	// Adquirir lock de migración para evitar ejecuciones concurrentes
+	return runMigrationsWithContext(ctx, sqlDB, dbConfig, migConfig)
+}
+
+func runMigrationsWithContext(ctx context.Context, sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
+	// Adquirir lock de migración para evitar ejecuciones concurrentes.
 	unlock, err := acquireMigrationLock(ctx, sqlDB, dbConfig.Name)
 	if err != nil {
 		return fmt.Errorf("failed to acquire migration lock: %w", err)
@@ -106,9 +68,8 @@ func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig conf
 		}
 		if strings.Contains(err.Error(), "cannot drop columns from view") {
 			return fmt.Errorf("migration failed due to incompatible view shape (cannot drop columns from view) - reset the database or adjust migrations: %w", err)
-		} else {
-			return fmt.Errorf("running migrations: %w", err)
 		}
+		return fmt.Errorf("running migrations: %w", err)
 	}
 
 	log.Printf("Migrations completed successfully for database: %s", dbConfig.Name)

@@ -30,7 +30,7 @@ import (
 	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 )
 
-// runGormMigrations runs GORM AutoMigrate on all models and ensures
+// runGormMigrations corre AutoMigrate de GORM sobre todos los modelos.
 func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
 	log.Println("Starting GORM migrations...")
 

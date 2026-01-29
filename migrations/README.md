@@ -15,7 +15,6 @@
 8. v4 ssot functions
 9. v4 calc views
 10. v4 report views
-11. v4 report views extensions
 
 ## Notes
 - SQL is in English; comments in Spanish when needed.

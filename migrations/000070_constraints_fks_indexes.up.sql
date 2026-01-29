@@ -59,6 +59,9 @@ ALTER TABLE ONLY public.fields
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT lots_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.lot_dates
+    ADD CONSTRAINT lot_dates_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY public.crops
     ADD CONSTRAINT crops_name_key UNIQUE (name);
 
@@ -221,20 +224,32 @@ ALTER TABLE ONLY public.fields
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_created_by FOREIGN KEY (created_by) REFERENCES public.users(id);
 
+ALTER TABLE ONLY public.lot_dates
+    ADD CONSTRAINT fk_lot_dates_created_by FOREIGN KEY (created_by) REFERENCES public.users(id);
+
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_current_crop FOREIGN KEY (current_crop_id) REFERENCES public.crops(id);
 
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_deleted_by FOREIGN KEY (deleted_by) REFERENCES public.users(id);
 
+ALTER TABLE ONLY public.lot_dates
+    ADD CONSTRAINT fk_lot_dates_deleted_by FOREIGN KEY (deleted_by) REFERENCES public.users(id);
+
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_field FOREIGN KEY (field_id) REFERENCES public.fields(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.lot_dates
+    ADD CONSTRAINT fk_lot_dates_lot FOREIGN KEY (lot_id) REFERENCES public.lots(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_previous_crop FOREIGN KEY (previous_crop_id) REFERENCES public.crops(id);
 
 ALTER TABLE ONLY public.lots
     ADD CONSTRAINT fk_lots_updated_by FOREIGN KEY (updated_by) REFERENCES public.users(id);
+
+ALTER TABLE ONLY public.lot_dates
+    ADD CONSTRAINT fk_lot_dates_updated_by FOREIGN KEY (updated_by) REFERENCES public.users(id);
 
 ALTER TABLE ONLY public.crops
     ADD CONSTRAINT fk_crops_created_by FOREIGN KEY (created_by) REFERENCES public.users(id);

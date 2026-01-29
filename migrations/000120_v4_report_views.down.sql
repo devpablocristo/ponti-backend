@@ -23,6 +23,8 @@ DROP VIEW IF EXISTS v4_report.field_crop_economicos;
 DROP VIEW IF EXISTS v4_report.field_crop_cultivos;
 DROP VIEW IF EXISTS v4_report.labor_metrics;
 DROP VIEW IF EXISTS v4_report.labor_list;
+DROP VIEW IF EXISTS v4_report.workorder_metrics;
+DROP VIEW IF EXISTS v4_report.workorder_list;
 DROP VIEW IF EXISTS v4_report.lot_list;
 DROP VIEW IF EXISTS v4_report.lot_metrics;
 

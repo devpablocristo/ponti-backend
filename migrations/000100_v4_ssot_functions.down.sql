@@ -59,6 +59,7 @@ DROP FUNCTION IF EXISTS v4_ssot.operating_result_per_ha_for_lot(p_lot_id bigint)
 DROP FUNCTION IF EXISTS v4_ssot.active_total_per_ha_for_lot(p_lot_id bigint);
 DROP FUNCTION IF EXISTS v4_ssot.rent_per_ha_for_lot_fixed(p_lot_id BIGINT);
 DROP FUNCTION IF EXISTS v4_ssot.rent_per_ha_for_lot(p_lot_id bigint);
+DROP FUNCTION IF EXISTS v4_ssot.admin_cost_prorated_per_ha_for_lot(p_lot_id bigint);
 DROP FUNCTION IF EXISTS v4_ssot.admin_cost_per_ha_for_lot(p_lot_id bigint);
 DROP FUNCTION IF EXISTS v4_ssot.cost_per_ha_for_lot(p_lot_id bigint);
 DROP FUNCTION IF EXISTS v4_ssot.direct_cost_for_lot(p_lot_id bigint);

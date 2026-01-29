@@ -13,13 +13,13 @@ import (
 
 // Config agrupa todas las configuraciones de la aplicación.
 type Config struct {
-	App            App            // General variables
-	API            API            // API configuration
-	HTTPServer     HTTPServer     // HTTP server configuration
-	Debugger       Debugger       // debugger configuration
-	DB             DB             // database configuration
-	WordsSuggester WordsSuggester // suggester configuration
-	Migrations     Migrations     // migrations configuration
+	App            App            // Variables generales
+	API            API            // Configuración de API
+	HTTPServer     HTTPServer     // Configuración del servidor HTTP
+	Debugger       Debugger       // Configuración del debugger
+	DB             DB             // Configuración de base de datos
+	WordsSuggester WordsSuggester // Configuración del suggester
+	Migrations     Migrations     // Configuración de migraciones
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

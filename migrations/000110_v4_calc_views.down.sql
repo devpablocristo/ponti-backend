@@ -18,5 +18,6 @@ DROP VIEW IF EXISTS v4_calc.field_crop_lot_base;
 DROP VIEW IF EXISTS v4_calc.lot_base_income;
 DROP VIEW IF EXISTS v4_calc.lot_base_costs;
 DROP VIEW IF EXISTS v4_calc.workorder_metrics;
+DROP VIEW IF EXISTS v4_calc.workorder_metrics_raw;
 
 COMMIT;

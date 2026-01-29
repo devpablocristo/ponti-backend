@@ -72,6 +72,20 @@ CREATE TABLE public.lots (
     tons numeric
 );
 
+CREATE TABLE public.lot_dates (
+    id bigint NOT NULL,
+    lot_id bigint NOT NULL,
+    sowing_date date,
+    harvest_date date,
+    sequence integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    created_by bigint,
+    updated_by bigint,
+    deleted_by bigint
+);
+
 
 CREATE SEQUENCE public.lots_id_seq
     START WITH 1
@@ -83,6 +97,17 @@ CREATE SEQUENCE public.lots_id_seq
 ALTER SEQUENCE public.lots_id_seq OWNED BY public.lots.id;
 
 ALTER TABLE ONLY public.lots ALTER COLUMN id SET DEFAULT nextval('public.lots_id_seq'::regclass);
+
+CREATE SEQUENCE public.lot_dates_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.lot_dates_id_seq OWNED BY public.lot_dates.id;
+
+ALTER TABLE ONLY public.lot_dates ALTER COLUMN id SET DEFAULT nextval('public.lot_dates_id_seq'::regclass);
 
 
 COMMIT;

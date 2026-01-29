@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	wire "github.com/alphacodinggroup/ponti-backend/wire"
@@ -29,18 +28,10 @@ func main() {
 		log.Fatalf("Error initializing dependencies: %s", err)
 	}
 
-	// Run the HTTP server
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		if err := runHTTPServer(ctx, deps); err != nil {
-			log.Fatalf("Error running HTTP server: %v", err)
-		}
-	}()
-
-	wg.Wait()
+	// Ejecutar el servidor HTTP.
+	if err := runHTTPServer(ctx, deps); err != nil {
+		log.Fatalf("Error running HTTP server: %v", err)
+	}
 
 	log.Println("Application terminated successfully.")
 }

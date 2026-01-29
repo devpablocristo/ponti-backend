@@ -13,7 +13,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean \
-        run-api seed \
+        run-api seed seed-dashboard download-gcp-db \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create
 
 # --------------------------------------------------
@@ -80,6 +80,13 @@ seed:
 seed-dashboard:
 	@echo "Seeding dashboard test data..."
 	@go run ./cmd/api/main.go seed
+
+# --------------------------------------------------
+# Base de datos (descarga GCP DEV)
+# --------------------------------------------------
+new-download-gcp-db:
+	@echo "Downloading GCP DB and applying business_parameters rename..."
+	@set -a && source docs/GCP_DB_CREDS.md && set +a && ./scripts/new-download-gcp-db.sh
 
 # --------------------------------------------------
 # Docker Compose

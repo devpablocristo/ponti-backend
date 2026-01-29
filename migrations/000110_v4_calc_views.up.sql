@@ -6,39 +6,130 @@
 BEGIN;
 
 CREATE OR REPLACE VIEW v4_calc.workorder_metrics AS
-WITH lot_ids AS (
-  SELECT DISTINCT
+WITH base AS (
+  SELECT
+    w.id AS workorder_id,
     w.project_id,
     w.field_id,
-    w.lot_id
+    w.lot_id,
+    w.effective_area,
+    lb.price AS labor_price
   FROM public.workorders w
+  JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
+    AND w.effective_area IS NOT NULL
+    AND w.effective_area > 0
+),
+surface AS (
+  SELECT project_id, field_id, lot_id, SUM(effective_area)::numeric AS surface_ha
+  FROM base
+  GROUP BY project_id, field_id, lot_id
+),
+labor_costs AS (
+  SELECT
+    project_id, field_id, lot_id,
+    SUM((labor_price * effective_area))::numeric AS labor_cost_usd
+  FROM base
+  GROUP BY project_id, field_id, lot_id
+),
+supply_metrics AS (
+  SELECT
+    b.project_id, b.field_id, b.lot_id,
+    SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS liters,
+    SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS kilograms,
+    SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0))::numeric AS supplies_cost_usd
+  FROM base b
+  LEFT JOIN public.workorder_items wi
+    ON wi.workorder_id = b.workorder_id AND wi.deleted_at IS NULL
+  LEFT JOIN public.supplies s
+    ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  GROUP BY b.project_id, b.field_id, b.lot_id
 )
 SELECT
-  li.project_id,
-  li.field_id,
-  li.lot_id,
-  v4_ssot.surface_for_lot(li.lot_id) AS surface_ha,
-  v4_ssot.liters_for_lot(li.lot_id) AS liters,
-  v4_ssot.kilograms_for_lot(li.lot_id) AS kilograms,
-  v4_ssot.labor_cost_for_lot(li.lot_id) AS labor_cost_usd,
-  v4_ssot.supply_cost_for_lot(li.lot_id) AS supplies_cost_usd,
-  (v4_ssot.labor_cost_for_lot(li.lot_id) +
-   v4_ssot.supply_cost_for_lot(li.lot_id)) AS direct_cost_usd,
-  v4_core.per_ha(
-    v4_ssot.labor_cost_for_lot(li.lot_id) +
-    v4_ssot.supply_cost_for_lot(li.lot_id),
-    v4_ssot.surface_for_lot(li.lot_id)
+  COALESCE(sur.project_id, lc.project_id, sm.project_id) AS project_id,
+  COALESCE(sur.field_id, lc.field_id, sm.field_id) AS field_id,
+  COALESCE(sur.lot_id, lc.lot_id, sm.lot_id) AS lot_id,
+  COALESCE(sur.surface_ha, 0)::numeric AS surface_ha,
+  COALESCE(sm.liters, 0)::numeric AS liters,
+  COALESCE(sm.kilograms, 0)::numeric AS kilograms,
+  COALESCE(lc.labor_cost_usd, 0)::numeric AS labor_cost_usd,
+  COALESCE(sm.supplies_cost_usd, 0)::numeric AS supplies_cost_usd,
+  (COALESCE(lc.labor_cost_usd, 0)::numeric +
+   COALESCE(sm.supplies_cost_usd, 0)::numeric) AS direct_cost_usd,
+  v4_core.cost_per_ha(
+    COALESCE(lc.labor_cost_usd, 0)::numeric + COALESCE(sm.supplies_cost_usd, 0)::numeric,
+    COALESCE(sur.surface_ha, 0)::numeric
   ) AS avg_cost_per_ha_usd,
-  v4_core.per_ha(
-    v4_ssot.liters_for_lot(li.lot_id),
-    v4_ssot.surface_for_lot(li.lot_id)
-  ) AS liters_per_ha,
-  v4_core.per_ha(
-    v4_ssot.kilograms_for_lot(li.lot_id),
-    v4_ssot.surface_for_lot(li.lot_id)
-  ) AS kilograms_per_ha
-FROM lot_ids li;
+  v4_core.per_ha(COALESCE(sm.liters, 0)::numeric, COALESCE(sur.surface_ha, 0)::numeric) AS liters_per_ha,
+  v4_core.per_ha(COALESCE(sm.kilograms, 0)::numeric, COALESCE(sur.surface_ha, 0)::numeric) AS kilograms_per_ha
+FROM surface sur
+FULL JOIN labor_costs lc USING (project_id, field_id, lot_id)
+FULL JOIN supply_metrics sm USING (project_id, field_id, lot_id);
+
+CREATE OR REPLACE VIEW v4_calc.workorder_metrics_raw AS
+WITH base AS (
+  SELECT
+    w.id AS workorder_id,
+    w.project_id,
+    w.field_id,
+    w.lot_id,
+    w.effective_area,
+    lb.price AS labor_price
+  FROM public.workorders w
+  JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
+  WHERE w.deleted_at IS NULL
+    AND w.effective_area IS NOT NULL
+    AND w.effective_area > 0
+),
+surface AS (
+  SELECT project_id, field_id, lot_id, SUM(effective_area)::numeric AS surface_ha
+  FROM base
+  GROUP BY project_id, field_id, lot_id
+),
+labor_costs AS (
+  SELECT
+    project_id, field_id, lot_id,
+    SUM((labor_price * effective_area))::numeric AS labor_cost_usd
+  FROM base
+  GROUP BY project_id, field_id, lot_id
+),
+supply_metrics AS (
+  SELECT
+    b.project_id, b.field_id, b.lot_id,
+    SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS liters,
+    SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS kilograms,
+    SUM(v4_core.supply_cost(
+      wi.final_dose::double precision,
+      s.price::numeric,
+      b.effective_area::numeric
+    ))::numeric AS supplies_cost_usd
+  FROM base b
+  LEFT JOIN public.workorder_items wi
+    ON wi.workorder_id = b.workorder_id AND wi.deleted_at IS NULL
+  LEFT JOIN public.supplies s
+    ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  GROUP BY b.project_id, b.field_id, b.lot_id
+)
+SELECT
+  COALESCE(sur.project_id, lc.project_id, sm.project_id) AS project_id,
+  COALESCE(sur.field_id, lc.field_id, sm.field_id) AS field_id,
+  COALESCE(sur.lot_id, lc.lot_id, sm.lot_id) AS lot_id,
+  COALESCE(sur.surface_ha, 0)::numeric AS surface_ha,
+  COALESCE(sm.liters, 0)::numeric AS liters,
+  COALESCE(sm.kilograms, 0)::numeric AS kilograms,
+  COALESCE(lc.labor_cost_usd, 0)::numeric AS labor_cost_usd,
+  COALESCE(sm.supplies_cost_usd, 0)::numeric AS supplies_cost_usd,
+  (COALESCE(lc.labor_cost_usd, 0)::numeric +
+   COALESCE(sm.supplies_cost_usd, 0)::numeric) AS direct_cost_usd,
+  v4_core.cost_per_ha(
+    COALESCE(lc.labor_cost_usd, 0)::numeric + COALESCE(sm.supplies_cost_usd, 0)::numeric,
+    COALESCE(sur.surface_ha, 0)::numeric
+  ) AS avg_cost_per_ha_usd,
+  v4_core.per_ha(COALESCE(sm.liters, 0)::numeric, COALESCE(sur.surface_ha, 0)::numeric) AS liters_per_ha,
+  v4_core.per_ha(COALESCE(sm.kilograms, 0)::numeric, COALESCE(sur.surface_ha, 0)::numeric) AS kilograms_per_ha
+FROM surface sur
+FULL JOIN labor_costs lc USING (project_id, field_id, lot_id)
+FULL JOIN supply_metrics sm USING (project_id, field_id, lot_id);
 
 CREATE OR REPLACE VIEW v4_calc.lot_base_costs AS
 WITH
@@ -69,7 +160,7 @@ costs AS (
     MAX(COALESCE(labor_cost_usd, 0))::numeric AS labor_cost_usd,
     MAX(COALESCE(supplies_cost_usd, 0))::numeric AS supplies_cost_usd,
     MAX(COALESCE(direct_cost_usd, 0))::numeric AS direct_cost_usd
-  FROM v4_calc.workorder_metrics
+  FROM v4_calc.workorder_metrics_raw
   GROUP BY lot_id
 ),
 ssot_values AS (
@@ -118,7 +209,6 @@ SELECT
   direct_cost_usd,
   income_net_total_usd,
   v4_core.per_ha(income_net_total_usd, hectares::numeric) AS income_net_per_ha_usd,
-  
   v4_core.per_ha(direct_cost_usd, hectares::numeric) AS direct_cost_per_ha_usd,
   rent_per_ha_usd,
   rent_fixed_per_ha_usd,
@@ -335,7 +425,7 @@ SELECT
   SUM(v4_ssot.rent_fixed_only_for_lot(lot_id) * surface_ha)::numeric AS rent_fixed_usd,
   
   SUM(v4_ssot.rent_per_ha_for_lot(lot_id) * surface_ha)::numeric AS rent_total_usd,
-  SUM(v4_ssot.admin_cost_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd
+  SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd
 FROM v4_calc.field_crop_supply_costs_by_lot
 GROUP BY project_id, field_id, crop_id;
 
@@ -356,7 +446,7 @@ SELECT
   COALESCE(v4_ssot.supply_cost_for_lot_base(l.id), 0)::numeric AS supply_cost_usd,
   COALESCE(v4_ssot.net_price_usd_for_lot(l.id), 0)::numeric AS net_price_usd,
   COALESCE(v4_ssot.rent_per_ha_for_lot(l.id), 0)::numeric AS rent_per_ha,
-  COALESCE(v4_ssot.admin_cost_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
+  COALESCE(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
   COALESCE(v4_ssot.board_price_for_lot(l.id), 0)::numeric AS board_price,
   COALESCE(v4_ssot.freight_cost_for_lot(l.id), 0)::numeric AS freight_cost,
   COALESCE(v4_ssot.commercial_cost_for_lot(l.id), 0)::numeric AS commercial_cost
@@ -462,7 +552,7 @@ seed_area AS (
     lb.project_id,
     COALESCE(SUM(lb.seeded_area_ha), 0)::numeric AS total_seeded_area_ha,
     COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS rent_capitalizable_total_usd,
-    COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS administration_total_usd
+    COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS administration_total_usd
   FROM lot_base lb
   GROUP BY lb.project_id
 ),

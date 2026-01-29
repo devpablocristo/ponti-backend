@@ -10,18 +10,18 @@ import (
 	wire "github.com/alphacodinggroup/ponti-backend/wire"
 )
 
-// runHTTPServer registers routes in the Gin router and starts the HTTP server.
+// runHTTPServer registra rutas en Gin y levanta el servidor HTTP.
 func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
 
-	// Set up the Gin router with global middlewares only
-	// Global middlewares: ErrorHandling, RequestAndResponseLogger
+	// Configurar Gin con middlewares globales.
+	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
 
-	// Register all application routes.
-	// Each handler will apply its own validation middlewares as needed
+	// Registrar todas las rutas de la aplicación.
+	// Cada handler aplica sus middlewares de validación específicos.
 	registerHTTPRoutes(deps)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
@@ -30,11 +30,11 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	log.Println("Database: ", deps.Config.DB.Name)
 	log.Println("--------------------------------")
 
-	// Start the HTTP server (e.g., on port 8080).
+	// Iniciar el servidor HTTP (ej: puerto 8080).
 	return deps.GinEngine.RunServer(ctx)
 }
 
-// registerHTTPRoutes registers all application routes in the Gin router.
+// registerHTTPRoutes registra todas las rutas en el router Gin.
 func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
