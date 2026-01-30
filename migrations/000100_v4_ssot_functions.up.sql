@@ -6,7 +6,7 @@
 BEGIN;
 
 CREATE OR REPLACE FUNCTION v4_ssot.lot_hectares(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(l.hectares, 0)
   FROM public.lots l
@@ -14,7 +14,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.lot_tons(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(l.tons, 0)
   FROM public.lots l
@@ -109,7 +109,7 @@ CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_lot(p_lot_id bigint)
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::numeric
+    (SELECT COALESCE(SUM((wi.final_dose)::numeric * s.price * (w.effective_area)::numeric), 0)::numeric
      FROM public.workorders w
      JOIN public.workorder_items wi ON wi.workorder_id = w.id
      JOIN public.supplies s ON s.id = wi.supply_id
@@ -167,25 +167,25 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.direct_cost_for_lot(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(v4_ssot.labor_cost_for_lot(p_lot_id), 0)::double precision
+  SELECT COALESCE(v4_ssot.labor_cost_for_lot(p_lot_id), 0)::numeric
        + COALESCE(v4_ssot.supply_cost_for_lot(p_lot_id), 0)
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.cost_per_ha_for_lot(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT v4_core.safe_div_dp(
-           COALESCE(v4_ssot.direct_cost_for_lot(p_lot_id), 0)::double precision,
+  SELECT v4_core.safe_div(
+           COALESCE(v4_ssot.direct_cost_for_lot(p_lot_id), 0)::numeric,
            v4_ssot.lot_hectares(p_lot_id)
          )
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.total_hectares_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(SUM(l.hectares), 0)::double precision
+  SELECT COALESCE(SUM(l.hectares), 0)::numeric
   FROM public.fields f
   LEFT JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
   WHERE f.project_id = p_project_id AND f.deleted_at IS NULL
@@ -234,9 +234,9 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.rent_per_ha_for_lot_fixed(p_lot_id BIGINT)
-RETURNS DOUBLE PRECISION AS $$
+RETURNS numeric AS $$
 DECLARE
-  calculated_rent DOUBLE PRECISION;
+  calculated_rent numeric;
 BEGIN
   calculated_rent := v4_ssot.rent_per_ha_for_lot(p_lot_id);
   
@@ -249,7 +249,7 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 CREATE OR REPLACE FUNCTION v4_ssot.active_total_per_ha_for_lot(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT v4_core.active_total_per_ha(
            v4_ssot.cost_per_ha_for_lot(p_lot_id),
@@ -259,7 +259,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.operating_result_per_ha_for_lot(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT v4_core.operating_result_per_ha(
            v4_ssot.income_net_per_ha_for_lot(p_lot_id),
@@ -268,9 +268,9 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.yield_tn_per_ha_for_lot(p_lot_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT v4_core.per_ha_dp(
+  SELECT v4_core.per_ha(
            v4_ssot.lot_tons(p_lot_id),
            v4_ssot.lot_hectares(p_lot_id)
          )
@@ -300,9 +300,9 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.renta_pct(
-  operating_result_total_usd double precision, 
-  total_costs_usd double precision
-) RETURNS double precision
+  operating_result_total_usd numeric, 
+  total_costs_usd numeric
+) RETURNS numeric
 LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE WHEN COALESCE(total_costs_usd,0) > 0
               THEN (COALESCE(operating_result_total_usd,0) / total_costs_usd) * 100
@@ -318,25 +318,25 @@ LANGUAGE sql IMMUTABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.direct_costs_total_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id
        AND l.deleted_at IS NULL)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.operating_result_total_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   WITH project_totals AS (
     SELECT
       p.id,
       p.admin_cost,
-      COALESCE(SUM(l.hectares), 0)::double precision AS total_hectares
+      COALESCE(SUM(l.hectares), 0)::numeric AS total_hectares
     FROM public.projects p
     LEFT JOIN public.fields f ON f.project_id = p.id AND f.deleted_at IS NULL
     LEFT JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
@@ -348,13 +348,13 @@ LANGUAGE sql STABLE AS $$
       COALESCE(
         SUM(v4_ssot.rent_per_ha_for_lot(l.id) * l.hectares),
         0
-      )::double precision AS total_lease
+      )::numeric AS total_lease
     FROM public.lots l
     JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
     WHERE f.project_id = p_project_id AND l.deleted_at IS NULL
   )
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(v4_ssot.income_net_total_for_lot(l.id)), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.income_net_total_for_lot(l.id)), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
@@ -363,36 +363,36 @@ LANGUAGE sql STABLE AS $$
     -
     (SELECT total_lease FROM lease_cost)
     -
-    (SELECT COALESCE(admin_cost * total_hectares, 0)::double precision FROM project_totals)
-  , 0)::double precision
+    (SELECT COALESCE(admin_cost * total_hectares, 0)::numeric FROM project_totals)
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.total_invested_cost_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
     +
-    (SELECT COALESCE(SUM(v4_ssot.rent_per_ha_for_lot(l.id) * l.hectares), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.rent_per_ha_for_lot(l.id) * l.hectares), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
     +
-    (SELECT COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM((wi.final_dose)::double precision * s.price * (w.effective_area)::double precision), 0)::double precision
+    (SELECT COALESCE(SUM((wi.final_dose)::numeric * s.price * (w.effective_area)::numeric), 0)::numeric
      FROM public.workorders w
      JOIN public.workorder_items wi ON wi.workorder_id = w.id
      JOIN public.supplies s ON s.id = wi.supply_id
@@ -402,7 +402,7 @@ LANGUAGE sql STABLE AS $$
        AND s.price IS NOT NULL
        AND w.project_id = p_project_id)
     +
-    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::double precision
+    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::numeric
      FROM public.supply_movements sm
      JOIN public.supplies s ON s.id = sm.supply_id
      WHERE sm.deleted_at IS NULL
@@ -412,14 +412,14 @@ LANGUAGE sql STABLE AS $$
        AND sm.project_id = p_project_id
        AND s.price IS NOT NULL
        AND sm.quantity > 0)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_received_for_project(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::double precision
+    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::numeric
      FROM public.supply_movements sm
      JOIN public.supplies s ON s.id = sm.supply_id
      WHERE sm.deleted_at IS NULL
@@ -429,28 +429,28 @@ LANGUAGE sql STABLE AS $$
        AND sm.project_id = p_project_id
        AND s.price IS NOT NULL
        AND sm.quantity > 0)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.total_costs_for_crop(p_project_id bigint, p_crop_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::double precision
+    (SELECT COALESCE(SUM(v4_ssot.direct_cost_for_lot(l.id)), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id
        AND l.current_crop_id = p_crop_id
        AND l.deleted_at IS NULL)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.cost_per_ha_for_crop(p_project_id bigint, p_crop_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT v4_core.per_ha_dp(
+  SELECT v4_core.per_ha(
     v4_ssot.total_costs_for_crop(p_project_id, p_crop_id),
-    (SELECT COALESCE(SUM(l.hectares), 0)::double precision
+    (SELECT COALESCE(SUM(l.hectares), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      WHERE f.project_id = p_project_id 
@@ -460,13 +460,13 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.cost_per_ha_for_crop_ssot(p_project_id bigint, p_crop_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT v4_ssot.cost_per_ha_for_crop(p_project_id, p_crop_id)
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.seeds_invested_for_project_mb(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT SUM(sm.quantity * s.price)
@@ -479,11 +479,11 @@ LANGUAGE sql STABLE AS $$
        AND c.type_id = 1
        AND sm.is_entry = TRUE
        AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada'))
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.agrochemicals_invested_for_project_mb(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT SUM(sm.quantity * s.price)
@@ -496,11 +496,11 @@ LANGUAGE sql STABLE AS $$
        AND c.type_id = 2
        AND sm.is_entry = TRUE
        AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada'))
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.direct_costs_invested_for_project_mb(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT SUM(sm.quantity * s.price)
@@ -510,11 +510,11 @@ LANGUAGE sql STABLE AS $$
        AND sm.deleted_at IS NULL
        AND s.deleted_at IS NULL
        AND sm.movement_type IN ('Stock', 'Remito oficial'))
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.stock_value_for_project_mb(p_project_id bigint) 
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT SUM(sm.quantity * s.price)
@@ -524,7 +524,7 @@ LANGUAGE sql STABLE AS $$
        AND sm.deleted_at IS NULL
        AND s.deleted_at IS NULL
        AND sm.movement_type IN ('Stock', 'Remito oficial'))
-  , 0)::double precision - v4_ssot.direct_costs_total_for_project(p_project_id)
+  , 0)::numeric - v4_ssot.direct_costs_total_for_project(p_project_id)
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.first_workorder_date_for_project(p_project_id bigint)
@@ -589,7 +589,7 @@ LANGUAGE sql IMMUTABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.supply_movements_invested_total_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT SUM(sm.quantity * s.price)
@@ -600,50 +600,50 @@ LANGUAGE sql STABLE AS $$
        AND s.deleted_at IS NULL
        AND sm.is_entry = TRUE
        AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada'))
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.lease_executed_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM(
     CASE
       WHEN f.lease_type_id IN (3, 4) THEN f.lease_type_value * l.hectares
       ELSE 0
     END
-  ), 0)::double precision
+  ), 0)::numeric
   FROM public.lots l
   JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
   WHERE f.project_id = p_project_id AND l.deleted_at IS NULL
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.lease_invested_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(SUM(v4_ssot.rent_per_ha_for_lot(l.id) * l.hectares), 0)::double precision
+  SELECT COALESCE(SUM(v4_ssot.rent_per_ha_for_lot(l.id) * l.hectares), 0)::numeric
   FROM public.lots l
   JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
   WHERE f.project_id = p_project_id AND l.deleted_at IS NULL
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.admin_cost_total_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     (SELECT p.admin_cost * v4_ssot.total_hectares_for_project(p_project_id)
      FROM public.projects p
      WHERE p.id = p_project_id AND p.deleted_at IS NULL)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.total_costs_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     v4_ssot.direct_costs_total_for_project(p_project_id) + 
     v4_ssot.lease_invested_for_project(p_project_id) + 
     v4_ssot.admin_cost_total_for_project(p_project_id)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.crop_incidence_for_project(p_project_id bigint)
@@ -826,42 +826,42 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.direct_costs_invested_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(lb.price * l.hectares), 0)::double precision
+    (SELECT COALESCE(SUM(lb.price * l.hectares), 0)::numeric
      FROM public.lots l
      JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
      JOIN public.labors lb ON lb.project_id = f.project_id AND lb.deleted_at IS NULL
      WHERE f.project_id = p_project_id AND l.deleted_at IS NULL)
     +
-    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::double precision
+    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::numeric
      FROM public.supplies s
      JOIN public.stocks st ON st.supply_id = s.id AND st.deleted_at IS NULL
      WHERE s.project_id = p_project_id AND s.deleted_at IS NULL
        AND st.initial_units IS NOT NULL)
     +
     v4_ssot.supply_cost_received_for_project(p_project_id)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.stock_value_for_project(p_project_id bigint)
-RETURNS double precision
+RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::double precision
+    (SELECT COALESCE(SUM(s.price * st.initial_units), 0)::numeric
      FROM public.supplies s
      JOIN public.stocks st ON st.supply_id = s.id AND st.deleted_at IS NULL
      WHERE s.project_id = p_project_id 
        AND s.deleted_at IS NULL
        AND st.initial_units IS NOT NULL)
     -
-    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::double precision
+    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::numeric
      FROM public.workorders w
      JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
      JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
      WHERE w.project_id = p_project_id AND w.deleted_at IS NULL)
-  , 0)::double precision
+  , 0)::numeric
 $$;
 
 COMMIT;

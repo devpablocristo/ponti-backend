@@ -6,39 +6,39 @@
 BEGIN;
 
 DROP FUNCTION IF EXISTS v4_core.indifference_price_usd_tn(
-  total_invested_per_ha double precision, 
-  yield_tn_per_ha double precision
+  total_invested_per_ha numeric, 
+  yield_tn_per_ha numeric
 );
 DROP FUNCTION IF EXISTS v4_core.operating_result_per_ha(
-  income_net_per_ha double precision,
-  active_total_per_ha double precision
+  income_net_per_ha numeric,
+  active_total_per_ha numeric
 );
 DROP FUNCTION IF EXISTS v4_core.active_total_per_ha(
-  direct_cost_per_ha double precision,
-  rent_per_ha double precision,
-  admin_cost_per_ha double precision
+  direct_cost_per_ha numeric,
+  rent_per_ha numeric,
+  admin_cost_per_ha numeric
 );
-DROP FUNCTION IF EXISTS v4_core.calculate_rent_per_ha(lease_value DOUBLE PRECISION);
+DROP FUNCTION IF EXISTS v4_core.calculate_rent_per_ha(lease_value numeric);
 DROP FUNCTION IF EXISTS v4_core.rent_per_ha(
   lease_type_id bigint,
-  lease_type_percent double precision,
-  lease_type_value double precision,
-  income_net_per_ha double precision,
-  cost_per_ha double precision,
-  admin_cost_per_ha double precision
+  lease_type_percent numeric,
+  lease_type_value numeric,
+  income_net_per_ha numeric,
+  cost_per_ha numeric,
+  admin_cost_per_ha numeric
 );
 DROP FUNCTION IF EXISTS v4_core.rent_per_ha(
   lease_type_id integer,
-  lease_type_percent double precision,
-  lease_type_value double precision,
-  income_net_per_ha double precision,
-  cost_per_ha double precision,
-  admin_cost_per_ha double precision
+  lease_type_percent numeric,
+  lease_type_value numeric,
+  income_net_per_ha numeric,
+  cost_per_ha numeric,
+  admin_cost_per_ha numeric
 );
 DROP FUNCTION IF EXISTS v4_core.income_net_per_ha(income_net_total numeric, hectares numeric);
 DROP FUNCTION IF EXISTS v4_core.income_net_total(tons numeric, net_price_usd numeric);
 DROP FUNCTION IF EXISTS v4_core.cost_per_ha(total_cost numeric, hectares numeric);
-DROP FUNCTION IF EXISTS v4_core.supply_cost(final_dose double precision, supply_price numeric, effective_area numeric);
+DROP FUNCTION IF EXISTS v4_core.supply_cost(final_dose numeric, supply_price numeric, effective_area numeric);
 DROP FUNCTION IF EXISTS v4_core.labor_cost(labor_price numeric, effective_area numeric);
 DROP FUNCTION IF EXISTS v4_core.yield_tn_per_ha_over_harvested(tons numeric, harvested_area numeric);
 DROP FUNCTION IF EXISTS v4_core.yield_tn_per_ha_over_hectares(tons numeric, hectares numeric);

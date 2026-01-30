@@ -25,7 +25,7 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	registerHTTPRoutes(deps)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
-	log.Println("Version: ", deps.Config.App.Version)
+	log.Println("Version: ", deps.Config.Service.Version)
 	log.Println("--------------------------------")
 	log.Println("Database: ", deps.Config.DB.Name)
 	log.Println("--------------------------------")

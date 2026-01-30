@@ -45,7 +45,7 @@ CREATE TABLE public.crop_commercializations (
     crop_id bigint NOT NULL,
     board_price numeric(12,2) NOT NULL,
     freight_cost numeric(12,2) NOT NULL,
-    commercial_cost double precision NOT NULL,
+    commercial_cost numeric(18,6) NOT NULL,
     net_price numeric(12,2) NOT NULL,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),

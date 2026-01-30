@@ -385,7 +385,7 @@ CREATE INDEX idx_fields_project_id ON public.fields USING btree (project_id);
 
 CREATE INDEX idx_lot_table_fields_notdel ON public.fields USING btree (id, project_id, lease_type_id, lease_type_value, lease_type_percent) WHERE (deleted_at IS NULL);
 
-CREATE INDEX idx_lot_table_lots_composite ON public.lots USING btree (field_id, current_crop_id, previous_crop_id, tons, hectares) WHERE ((deleted_at IS NULL) AND (hectares > (0)::double precision));
+CREATE INDEX idx_lot_table_lots_composite ON public.lots USING btree (field_id, current_crop_id, previous_crop_id, tons, hectares) WHERE ((deleted_at IS NULL) AND (hectares > (0)::numeric));
 
 CREATE INDEX idx_lot_table_lots_notdel ON public.lots USING btree (id, field_id, current_crop_id, previous_crop_id, tons, hectares) WHERE (deleted_at IS NULL);
 

@@ -1,4 +1,5 @@
 -- Crea vista para consumos de insumos por proyecto
+BEGIN;
 CREATE OR REPLACE VIEW v4_report.stock_consumed_by_supply AS
 SELECT
   wo.project_id,
@@ -10,3 +11,4 @@ WHERE wo.deleted_at IS NULL
   AND woi.deleted_at IS NULL
   AND woi.supply_id IS NOT NULL
 GROUP BY wo.project_id, woi.supply_id;
+COMMIT;

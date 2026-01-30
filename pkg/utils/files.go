@@ -82,8 +82,8 @@ func FilesFinder(fileNames ...string) ([]string, error) {
 // getProjectRootDir encuentra el directorio raíz del proyecto buscando primero '.git' y luego 'go.mod'.
 // Prioriza la detección del directorio raíz basado en el control de versiones (Git).
 func getProjectRootDir() (string, error) {
-	// Si se define APP_ROOT, úsala
-	if pr := os.Getenv("APP_ROOT"); pr != "" {
+	// Si se define SERVICE_ROOT, úsala
+	if pr := os.Getenv("SERVICE_ROOT"); pr != "" {
 		return pr, nil
 	}
 

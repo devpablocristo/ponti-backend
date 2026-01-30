@@ -99,7 +99,7 @@ supply_metrics AS (
     SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS liters,
     SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS kilograms,
     SUM(v4_core.supply_cost(
-      wi.final_dose::double precision,
+      wi.final_dose::numeric,
       s.price::numeric,
       b.effective_area::numeric
     ))::numeric AS supplies_cost_usd

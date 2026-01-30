@@ -54,7 +54,7 @@ CREATE TABLE public.supplies (
     id bigint NOT NULL,
     project_id bigint NOT NULL,
     name character varying(100) NOT NULL,
-    price double precision NOT NULL,
+    price numeric(18,6) NOT NULL,
     unit_id integer,
     category_id integer,
     type_id integer,

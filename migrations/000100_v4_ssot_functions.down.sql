@@ -49,8 +49,8 @@ DROP FUNCTION IF EXISTS v4_ssot.direct_cost_usd(
   p_supply_cost_usd numeric
 );
 DROP FUNCTION IF EXISTS v4_ssot.renta_pct(
-  operating_result_total_usd double precision, 
-  total_costs_usd double precision
+  operating_result_total_usd numeric, 
+  total_costs_usd numeric
 );
 DROP FUNCTION IF EXISTS v4_ssot.harvested_area_for_lot(p_lot_id bigint);
 DROP FUNCTION IF EXISTS v4_ssot.seeded_area_for_lot(p_lot_id bigint);

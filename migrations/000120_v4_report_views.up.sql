@@ -397,7 +397,7 @@ SELECT
   ) AS total_invertido_usd_ha,
   CASE WHEN (c.labor_costs_usd + c.supply_costs_usd + c.arriendo_total_usd + c.admin_total_usd) > 0
     THEN ((a.ingreso_neto_total - c.labor_costs_usd - c.supply_costs_usd - c.arriendo_total_usd - c.admin_total_usd) /
-          (c.labor_costs_usd + c.supply_costs_usd + c.arriendo_total_usd + c.admin_total_usd) * 100)::double precision
+          (c.labor_costs_usd + c.supply_costs_usd + c.arriendo_total_usd + c.admin_total_usd) * 100)::numeric
     ELSE 0
   END AS renta_pct,
   CASE WHEN a.precio_neto_usd_tn > 0 AND a.superficie_total > 0
@@ -560,7 +560,7 @@ project_hectares AS (
 rent_fixed_ssot AS (
   SELECT
     f.project_id,
-    SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares)::double precision AS rent_fixed_total_usd
+    SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares)::numeric AS rent_fixed_total_usd
   FROM public.fields f
   JOIN public.lots l ON l.field_id = f.id AND l.deleted_at IS NULL
   WHERE f.deleted_at IS NULL
@@ -572,16 +572,16 @@ SELECT
   p.campaign_id,
   
   
-  COALESCE(SUM(ld.sowed_area_ha), 0)::double precision AS sowing_hectares,
-  COALESCE(SUM(ld.hectares), 0)::double precision AS sowing_total_hectares,
+  COALESCE(SUM(ld.sowed_area_ha), 0)::numeric AS sowing_hectares,
+  COALESCE(SUM(ld.hectares), 0)::numeric AS sowing_total_hectares,
   v4_core.percentage(
     COALESCE(SUM(ld.sowed_area_ha), 0)::numeric,
     COALESCE(SUM(ld.hectares), 0)::numeric
   ) AS sowing_progress_pct,
   
   
-  COALESCE(SUM(ld.harvested_area_ha), 0)::double precision AS harvest_hectares,
-  COALESCE(SUM(ld.hectares), 0)::double precision AS harvest_total_hectares,
+  COALESCE(SUM(ld.harvested_area_ha), 0)::numeric AS harvest_hectares,
+  COALESCE(SUM(ld.hectares), 0)::numeric AS harvest_total_hectares,
   v4_core.percentage(
     COALESCE(SUM(ld.harvested_area_ha), 0)::numeric,
     COALESCE(SUM(ld.hectares), 0)::numeric
@@ -591,8 +591,8 @@ SELECT
   COALESCE(
     SUM(ld.direct_cost_per_ha_usd * ld.sowed_area_ha) / NULLIF(SUM(ld.sowed_area_ha), 0),
     0
-  )::double precision AS executed_costs_usd,
-  COALESCE(p.planned_cost, 0)::double precision AS budget_cost_usd,
+  )::numeric AS executed_costs_usd,
+  COALESCE(p.planned_cost, 0)::numeric AS budget_cost_usd,
   v4_core.percentage(
     COALESCE(
       SUM(ld.direct_cost_per_ha_usd * ld.sowed_area_ha) / NULLIF(SUM(ld.sowed_area_ha), 0),
@@ -608,14 +608,14 @@ SELECT
     COALESCE(v4_ssot.direct_costs_total_for_project(p.id), 0) +
     COALESCE(p.admin_cost * ph.total_hectares, 0) +
     COALESCE(rfs.rent_fixed_total_usd, 0)
-  )::double precision AS operating_result_total_costs_usd,
+  )::numeric AS operating_result_total_costs_usd,
   v4_ssot.renta_pct(
     v4_ssot.operating_result_total_for_project(p.id),
     (
       COALESCE(v4_ssot.direct_costs_total_for_project(p.id), 0) +
       COALESCE(p.admin_cost * ph.total_hectares, 0) +
       COALESCE(rfs.rent_fixed_total_usd, 0)
-    )::double precision
+    )::numeric
   ) AS operating_result_pct,
   
   COALESCE(ph.total_hectares, 0)::numeric AS project_total_hectares
@@ -662,22 +662,22 @@ SELECT
   c.name AS customer_name,
   p.campaign_id,
   cam.name AS campaign_name,
-  COALESCE(SUM(l.hectares), 0::double precision)::numeric AS surface_total_ha,
-  COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::double precision)::numeric AS lease_fixed_total_usd,
+  COALESCE(SUM(l.hectares), 0::numeric)::numeric AS surface_total_ha,
+  COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::numeric)::numeric AS lease_fixed_total_usd,
   CASE
-    WHEN COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::double precision) > 0::double precision THEN TRUE
+    WHEN COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::numeric) > 0::numeric THEN TRUE
     ELSE FALSE
   END AS lease_is_fixed,
   CASE
-    WHEN COALESCE(SUM(l.hectares), 0::double precision) > 0::double precision THEN
-      COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::double precision) / SUM(l.hectares)
-    ELSE 0::double precision
+    WHEN COALESCE(SUM(l.hectares), 0::numeric) > 0::numeric THEN
+      COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::numeric) / SUM(l.hectares)
+    ELSE 0::numeric
   END::numeric AS lease_per_ha_usd,
-  COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::double precision)::numeric AS admin_total_usd,
+  COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::numeric)::numeric AS admin_total_usd,
   CASE
-    WHEN COALESCE(SUM(l.hectares), 0::double precision) > 0::double precision THEN
-      COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::double precision) / SUM(l.hectares)
-    ELSE 0::double precision
+    WHEN COALESCE(SUM(l.hectares), 0::numeric) > 0::numeric THEN
+      COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::numeric) / SUM(l.hectares)
+    ELSE 0::numeric
   END::numeric AS admin_per_ha_usd
 FROM public.projects p
 JOIN public.customers c ON p.customer_id = c.id AND c.deleted_at IS NULL
@@ -1252,13 +1252,13 @@ SELECT
   CASE 
     WHEN wi.final_dose IS NOT NULL AND s.price IS NOT NULL
     THEN v4_core.cost_per_ha(
-      (wi.final_dose::double precision * s.price)::numeric,
+      (wi.final_dose::numeric * s.price)::numeric,
       1::numeric
     )
     ELSE 0
   END AS supply_cost_per_ha,
   v4_core.supply_cost(
-    wi.final_dose::double precision,
+    wi.final_dose::numeric,
     s.price::numeric,
     w.effective_area::numeric
   ) AS supply_total_cost

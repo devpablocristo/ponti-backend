@@ -13,7 +13,7 @@ import (
 
 // Config agrupa todas las configuraciones de la aplicación.
 type Config struct {
-	App            App            // Variables generales
+	Service        Service        // Variables generales
 	API            API            // Configuración de API
 	HTTPServer     HTTPServer     // Configuración del servidor HTTP
 	Debugger       Debugger       // Configuración del debugger
@@ -38,7 +38,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// 4) Valores derivados
-	cfg.API.BaseURL = fmt.Sprintf("api/%s", cfg.API.APIVersion())
+	cfg.API.BaseURL = fmt.Sprintf("/api/%s", cfg.API.APIVersion())
 
 	// 5) Validación final
 	validate := validator.New()

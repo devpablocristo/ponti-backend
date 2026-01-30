@@ -48,7 +48,7 @@ all: build run
 bin-build:
 	@echo "Building the project..."
 	@mkdir -p $(BUILD_DIR)
-	APP_NAME=ponti-api go build -gcflags "all=-N -l" \
+	SERVICE_NAME=ponti-api go build -gcflags "all=-N -l" \
 		-o $(BUILD_DIR)/ponti-api \
 		-ldflags "-X main.Version=$(VERSION)" \
 		$(ROOT_DIR)/cmd/
