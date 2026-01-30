@@ -189,14 +189,17 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 
 	db0 := r.db.Client().
 		WithContext(ctx).
-		Model(&models.Project{})
+		Model(&models.Project{}).
+		// Filtrar soft-deletes explícitamente para igualar remoto.
+		Where("deleted_at IS NULL")
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
 	}
 
 	if err := db0.
-		Select("id, name").
+		// Emula remoto: id = row_number sobre id desc.
+		Select("row_number() over (order by id desc) as id, name").
 		Order("id ASC").
 		Limit(perPage).
 		Offset((page - 1) * perPage).

@@ -14,13 +14,20 @@ LOCAL_DB_PORT="${DB_PORT:-}"
 ### ===== No cargar archivos .env por ambiente =====
 
 ### ===== Origen (GCP DEV) =====
-# Defaults apuntan a la DB de dev (override por variables de entorno)
+# Defaults apuntan a la DB del servicio Cloud Run (override por variables de entorno)
 SRC_USER="${SRC_USER:-${DB_USER:-}}"
 SRC_PASS="${SRC_PASS:-${DB_PASSWORD:-}}"
-SRC_HOST="${SRC_HOST:-${DB_HOST:-34.176.31.249}}"
-SRC_DB="${SRC_DB:-${DB_NAME:-ponti_api_db}}"
-SRC_PORT="${SRC_PORT:-${DB_PORT:-5432}}"
-SRC_SSL="${SRC_SSL:-${DB_SSL_MODE:-disable}}"    # disable | require | verify-full
+SRC_HOST="${SRC_HOST:-${DB_HOST:-}}"
+SRC_DB="${SRC_DB:-${DB_NAME:-}}"
+SRC_PORT="${SRC_PORT:-${DB_PORT:-}}"
+SRC_SSL="${SRC_SSL:-${DB_SSL_MODE:-}}"    # disable | require | verify-full
+
+# Opcional: tomar datos desde un servicio Cloud Run (usa gcloud si está disponible)
+SRC_FROM_CLOUD_RUN="${SRC_FROM_CLOUD_RUN:-1}" # 1=leer servicio; 0=no
+SRC_FORCE_CLOUD_RUN="${SRC_FORCE_CLOUD_RUN:-1}" # 1=sobrescribe con Cloud Run
+SRC_SERVICE_NAME="${SRC_SERVICE_NAME:-ponti-backend}"
+SRC_PROJECT_ID="${SRC_PROJECT_ID:-new-ponti-dev}"
+SRC_REGION="${SRC_REGION:-us-central1}"
 
 # Cloud SQL Proxy (fallback si no hay acceso directo)
 USE_CLOUDSQL_PROXY="${USE_CLOUDSQL_PROXY:-auto}" # auto | 1 | 0
@@ -100,12 +107,41 @@ PY
 }
 # trap removido para permitir que el script continúe con errores menores
 
+### ===== Completar origen desde Cloud Run si falta info =====
+if [[ "${SRC_FROM_CLOUD_RUN}" == "1" && -x "$(command -v gcloud)" ]]; then
+  log "Leyendo configuración desde Cloud Run: ${SRC_SERVICE_NAME} (${SRC_PROJECT_ID}/${SRC_REGION})..."
+  service_json="$(gcloud run services describe "${SRC_SERVICE_NAME}" --project="${SRC_PROJECT_ID}" --region="${SRC_REGION}" --format=json 2>/dev/null || true)"
+  if [[ -n "${service_json}" ]]; then
+    if [[ "${SRC_FORCE_CLOUD_RUN}" == "1" ]]; then
+      SRC_HOST="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_HOST"), ""))' <<<"${service_json}")"
+      SRC_USER="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_USER"), ""))' <<<"${service_json}")"
+      SRC_PASS="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_PASSWORD"), ""))' <<<"${service_json}")"
+      SRC_DB="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_NAME"), ""))' <<<"${service_json}")"
+      SRC_PORT="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_PORT"), ""))' <<<"${service_json}")"
+      SRC_SSL="$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_SSL_MODE"), ""))' <<<"${service_json}")"
+    else
+      SRC_HOST="${SRC_HOST:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_HOST"), ""))' <<<"${service_json}")}"
+      SRC_USER="${SRC_USER:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_USER"), ""))' <<<"${service_json}")}"
+      SRC_PASS="${SRC_PASS:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_PASSWORD"), ""))' <<<"${service_json}")}"
+      SRC_DB="${SRC_DB:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_NAME"), ""))' <<<"${service_json}")}"
+      SRC_PORT="${SRC_PORT:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_PORT"), ""))' <<<"${service_json}")}"
+      SRC_SSL="${SRC_SSL:-$(python -c 'import json,sys; data=json.load(sys.stdin); env=data["spec"]["template"]["spec"]["containers"][0].get("env", []); print(next((item.get("value","") for item in env if item.get("name")=="DB_SSL_MODE"), ""))' <<<"${service_json}")}"
+    fi
+  fi
+fi
+
 ### ===== Validaciones de credenciales origen =====
-if [[ -z "${SRC_USER}" || -z "${SRC_PASS}" ]]; then
-  err "Faltan credenciales de origen. Definí SRC_USER y SRC_PASS."
-  err "Ejemplo: SRC_USER=... SRC_PASS=... ./new-download-gcp-db.sh"
+if [[ -z "${SRC_USER}" || -z "${SRC_PASS}" || -z "${SRC_HOST}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
+  err "Faltan credenciales de origen. Definí SRC_USER, SRC_PASS, SRC_HOST, SRC_DB, SRC_PORT."
+  err "Ejemplo: SRC_USER=... SRC_PASS=... SRC_HOST=... SRC_DB=... SRC_PORT=... ./new-download-gcp-db.sh"
   exit 1
 fi
+
+if [[ -z "${SRC_SSL}" ]]; then
+  SRC_SSL="disable"
+fi
+
+log "Origen efectivo: ${SRC_USER}@${SRC_HOST}:${SRC_PORT}/${SRC_DB} (sslmode=${SRC_SSL})"
 
 ### ===== Chequeo binarios =====
 need psql; need pg_dump; need pg_restore; need pg_isready

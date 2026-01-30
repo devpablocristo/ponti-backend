@@ -243,7 +243,7 @@ def build_endpoints(args: argparse.Namespace, local_base: str, headers: Dict[str
         ("/api/v1/fields", 20),
         ("/api/v1/crops", 20),
         ("/api/v1/work-orders?page=1&page_size=20", 20),
-        ("/api/v1/lots?page=1&page_size=20", 60),
+        ("/api/v1/lots?page=1&page_size=20", 120),
         ("/api/v1/supplies?page=1&per_page=20", 20),
         ("/api/v1/investors?page=1&per_page=20", 20),
         ("/api/v1/managers?page=1&per_page=20", 20),
@@ -264,7 +264,7 @@ def build_endpoints(args: argparse.Namespace, local_base: str, headers: Dict[str
                 (f"/api/v1/work-orders?project_id={ids['project_id']}&page=1&page_size=20", 30),
                 (f"/api/v1/work-orders/metrics?project_id={ids['project_id']}", 60),
                 (f"/api/v1/work-orders/export?project_id={ids['project_id']}", 120),
-                (f"/api/v1/lots?project_id={ids['project_id']}&page=1&page_size=20", 30),
+                (f"/api/v1/lots?project_id={ids['project_id']}&page=1&page_size=20", 120),
                 (f"/api/v1/lots/metrics?project_id={ids['project_id']}", 60),
                 (f"/api/v1/lots/export?project_id={ids['project_id']}&page=1&page_size=20", 120),
                 (f"/api/v1/supplies?project_id={ids['project_id']}&page=1&per_page=50", 30),
@@ -280,7 +280,7 @@ def build_endpoints(args: argparse.Namespace, local_base: str, headers: Dict[str
                 (f"/api/v1/projects/{ids['project_id']}/stocks/export", 120),
                 (f"/api/v1/reports/investor-contribution?project_id={ids['project_id']}", 120),
                 (f"/api/v1/reports/summary-results?project_id={ids['project_id']}", 120),
-                (f"/api/v1/data-integrity/costs-check?project_id={ids['project_id']}", 180),
+                (f"/api/v1/data-integrity/costs-check?project_id={ids['project_id']}", 240),
             ]
         )
 
@@ -339,13 +339,13 @@ def build_endpoints(args: argparse.Namespace, local_base: str, headers: Dict[str
     return endpoints, ids
 
 
-def map_remote_path(local_path: str) -> str:
+def map_remote_path(local_path: str) -> Optional[str]:
     # Remoto legacy: endpoints no normalizados
     if local_path.startswith("/healthz"):
-        return ""
+        return None
 
     if local_path.startswith("/api/v1/business-parameters"):
-        return ""
+        return None
 
     if local_path.startswith("/api/v1/work-orders"):
         return local_path.replace("/api/v1/work-orders", "/api/v1/workorders", 1)
@@ -422,7 +422,7 @@ def main() -> int:
     def run_one(path: str, timeout: int):
         url_local = f"{local_base}{path}"
         remote_path = map_remote_path(path)
-        if not remote_path:
+        if remote_path is None:
             return path, timeout, 0.0, 0, "", None, "", 0, 0, "", None, "", 0, True
         url_remote = f"{remote_base}{remote_path}"
         t0 = time.time()

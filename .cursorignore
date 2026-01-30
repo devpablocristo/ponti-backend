@@ -1,0 +1,53 @@
+# Database dumps - archivos grandes que no necesitan indexación
+*.dump
+*.sql.gz
+*.sql.bz2
+
+# Archivos temporales y generados
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+bin/
+dist/
+build/
+*.exe
+*.so
+*.dylib
+
+# Dependencies
+vendor/
+node_modules/
+
+# Cache directories
+.cache/
+.sass-cache/
+tmp/
+temp/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test coverage
+*.out
+coverage/
+*.lcov
+
+# Archivos grandes de datos
+*.csv
+*.xlsx
+*.xls
+
+# Archivos de backup de base de datos en la raíz
+ponti_api_db_*.dump
