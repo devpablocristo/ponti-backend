@@ -70,23 +70,25 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL + "/projects/:project_id/labors")
+	// Endpoints de labores asociados a un proyecto específico
+	projectLaborsGroup := r.Group(baseURL + "/projects/:project_id/labors")
 	{
-		public.POST("", h.CreateLabor)
-		public.GET("", h.ListLabor)
-		public.DELETE("/:labor_id", h.DeleteLabor)
-		public.PUT("/:labor_id", h.UpdateLabor)
-		public.GET("/labor-categories/:type_id", h.ListLaborCategories)
+		projectLaborsGroup.POST("", h.CreateLabor)
+		projectLaborsGroup.GET("", h.ListLabor)
+		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
+		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
+		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
 	}
 
-	workOrderGroup := r.Group(baseURL + "/labors")
+	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
+	workOrderLaborsGroup := r.Group(baseURL + "/labors")
 	{
-		workOrderGroup.DELETE("/:labor_id", h.DeleteLaborByID)
-		workOrderGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
-		workOrderGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
-		workOrderGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
-		workOrderGroup.GET("/export/all", h.ExportAllGroupLabors)
-		workOrderGroup.GET("/metrics", h.GetMetrics)
+		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
+		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
+		workOrderLaborsGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
+		workOrderLaborsGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
+		workOrderLaborsGroup.GET("/export/all", h.ExportAllGroupLabors)
+		workOrderLaborsGroup.GET("/metrics", h.GetMetrics)
 	}
 }
 
