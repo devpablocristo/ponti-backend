@@ -85,6 +85,9 @@ else
   (cd "$AUTH_DIR" && GO_ENVIRONMENT=production PORT=8081 go run ./cmd/api) &
 fi
 
+# Evitar que el PORT del auth contamine frontend (conflicto 8081)
+unset PORT
+
 if [[ ! -f "$FRONTEND_DIR/ui/package.json" ]]; then
   echo "ERROR: falta $FRONTEND_DIR/ui/package.json" >&2
   exit 1
@@ -97,6 +100,8 @@ fi
 frontend_cmd() {
   local dir="$1"
   local label="$2"
+  local script="${3:-dev}"
+  local env_vars="${4:-}"
   local pm="yarn"
   if ! command -v yarn >/dev/null 2>&1; then
     pm="npm"
@@ -106,14 +111,18 @@ frontend_cmd() {
     (cd "$dir" && $pm install)
   fi
   echo "Levantando $label con $pm..."
-  (cd "$dir" && $pm run dev) &
+  if [[ -n "$env_vars" ]]; then
+    (cd "$dir" && env $env_vars $pm run "$script") &
+  else
+    (cd "$dir" && $pm run "$script") &
+  fi
 }
 
 echo "Levantando frontend UI..."
-frontend_cmd "$FRONTEND_DIR/ui" "frontend UI"
+frontend_cmd "$FRONTEND_DIR/ui" "frontend UI" "dev"
 
 echo "Levantando frontend API..."
-frontend_cmd "$FRONTEND_DIR/api" "frontend API"
+frontend_cmd "$FRONTEND_DIR/api" "frontend API" "local"
 
 echo "Todos los servicios fueron lanzados. Logs en esta terminal."
 wait
