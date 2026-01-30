@@ -4,7 +4,6 @@ package bparams
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -219,12 +219,9 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters/{id} [put]
 func (h *Handler) UpdateParameter(c *gin.Context) {
-	idStr := c.Param("parameter_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid parameter_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -265,12 +262,9 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 // @Failure 500 {object} types.ErrorResponse
 // @Router /business-parameters/{id} [delete]
 func (h *Handler) DeleteParameter(c *gin.Context) {
-	idStr := c.Param("parameter_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid parameter_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

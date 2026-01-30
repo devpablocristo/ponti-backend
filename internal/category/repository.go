@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
@@ -52,6 +53,9 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 }
 
 func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) error {
+	if err := sharedrepo.ValidateID(c.ID, "category"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Category{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
@@ -61,19 +65,32 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", c.ID), nil)
 		}
 		// Solo actualiza el nombre (puedes extender para UpdatedBy, etc. si lo necesitas)
-		if err := tx.Model(&models.Category{}).
-			Where("id = ?", c.ID).
-			Updates(map[string]any{
-				"name":       c.Name,
-				"updated_by": c.UpdatedBy,
-			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update category", err)
+		updateTx := tx.Model(&models.Category{}).
+			Where("id = ?", c.ID)
+		if !c.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+		}
+		result := updateTx.Updates(map[string]any{
+			"name":       c.Name,
+			"updated_by": c.UpdatedBy,
+		})
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update category", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !c.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "category not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", c.ID), nil)
 		}
 		return nil
 	})
 }
 
 func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "category"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Category{}).Where("id = ?", id).Count(&count).Error; err != nil {
@@ -82,8 +99,12 @@ func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", id), nil)
 		}
-		if err := tx.Delete(&models.Category{}, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete category", err)
+		result := tx.Delete(&models.Category{}, id)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to delete category", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", id), nil)
 		}
 		return nil
 	})

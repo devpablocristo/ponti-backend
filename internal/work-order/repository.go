@@ -7,10 +7,12 @@ import (
 	"fmt"
 
 	"github.com/shopspring/decimal"
+	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -43,7 +45,24 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) insertar la cabecera para obtener model.ID
 		if err := tx.Create(&model).Error; err != nil {
+			if isUniqueViolation(err) {
+				return types.NewError(
+					types.ErrConflict,
+					fmt.Sprintf("work order already exists for number %s and project %d", o.Number, o.ProjectID),
+					err,
+				)
+			}
 			return types.NewError(types.ErrInternal, "failed to create work order header", err)
+		}
+
+		// 3.2) insertar los items explícitamente asignando WorkOrderID
+		if len(model.Items) > 0 {
+			for i := range model.Items {
+				model.Items[i].WorkOrderID = model.ID
+			}
+			if err := tx.Create(&model.Items).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to create work order items", err)
+			}
 		}
 
 		return nil
@@ -85,6 +104,12 @@ func (r *Repository) GetWorkOrderByNumberAndProjectID(ctx context.Context, numbe
 }
 
 func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
+	if err := sharedrepo.ValidateEntity(o, "work order"); err != nil {
+		return err
+	}
+	if err := sharedrepo.ValidateID(o.ID, "work order"); err != nil {
+		return err
+	}
 	// 1) Convertimos dominio → GORM y fijamos el ID
 	model := models.FromDomain(o)
 	model.ID = o.ID
@@ -97,8 +122,15 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
-		if err := tx.Preload("Items").First(&orig, model.ID).Error; err != nil {
+		query := tx.Preload("Items").Where("id = ?", model.ID)
+		if !o.Base.UpdatedAt.IsZero() {
+			query = query.Where("updated_at = ?", o.Base.UpdatedAt)
+		}
+		if err := query.First(&orig).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if !o.Base.UpdatedAt.IsZero() {
+					return types.NewError(types.ErrConflict, "work order not found or outdated", err)
+				}
 				return types.NewError(types.ErrNotFound, "work order not found", err)
 			}
 			return types.NewError(types.ErrInternal, "failed to find work order before update", err)
@@ -112,10 +144,17 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		}
 
 		// 3.3) Actualizar sólo la cabecera, omitiendo campos de auditoría y la asociación Items
-		if err := tx.Model(&orig).
-			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items").
-			Updates(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update work order header", err)
+		updateTx := tx.Model(&orig).
+			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items")
+		if !o.Base.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", o.Base.UpdatedAt)
+		}
+		updateTx = updateTx.Updates(model)
+		if updateTx.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update work order header", updateTx.Error)
+		}
+		if updateTx.RowsAffected == 0 {
+			return types.NewError(types.ErrConflict, "work order not found or outdated", nil)
 		}
 
 		// 3.4) Insertar los items nuevos, asignando WorkOrderID
@@ -133,6 +172,9 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 }
 
 func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1) Verificar existencia dentro de la transacción
 		var m models.WorkOrder
@@ -150,6 +192,11 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 
 		return nil
 	})
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func (r *Repository) ListWorkOrders(

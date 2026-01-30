@@ -3,7 +3,6 @@ package investor
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +10,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/investor/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -111,11 +111,9 @@ func (h *Handler) ListInvestors(c *gin.Context) {
 
 // GetInvestor retrieves an investor by its ID.
 func (h *Handler) GetInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -131,11 +129,9 @@ func (h *Handler) GetInvestor(c *gin.Context) {
 
 // UpdateInvestor updates an existing investor.
 func (h *Handler) UpdateInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Investor
@@ -156,11 +152,9 @@ func (h *Handler) UpdateInvestor(c *gin.Context) {
 
 // DeleteInvestor deletes an investor by its ID.
 func (h *Handler) DeleteInvestor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("investor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid investor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteInvestor(c.Request.Context(), id); err != nil {

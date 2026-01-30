@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
@@ -64,16 +65,16 @@ func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, e
 		Preload("Category").
 		Preload("Type").
 		First(&m, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get supply", err)
+		return nil, sharedrepo.HandleGormError(err, "supply", id)
 	}
 	return m.ToDomain(), nil
 }
 
 // --- UPDATE ---
 func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
+	if err := sharedrepo.ValidateID(s.ID, "supply"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
@@ -91,10 +92,20 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"project_id":  s.ProjectID,
 			"updated_by":  s.UpdatedBy,
 		}
-		if err := tx.Model(&models.Supply{}).
-			Where("id = ?", s.ID).
-			Updates(updates).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update supply", err)
+		updateTx := tx.Model(&models.Supply{}).
+			Where("id = ?", s.ID)
+		if !s.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", s.UpdatedAt)
+		}
+		result := updateTx.Updates(updates)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update supply", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !s.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "supply not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
 		}
 		return nil
 	})
@@ -117,6 +128,9 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 }
 
 func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
@@ -125,8 +139,12 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
 		}
-		if err := tx.Delete(&models.Supply{}, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete supply", err)
+		result := tx.Delete(&models.Supply{}, id)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to delete supply", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
 		}
 		return nil
 	})
@@ -180,13 +198,19 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 				"project_id":  supplies[i].ProjectID,
 				"updated_by":  supplies[i].UpdatedBy,
 			}
-			res := tx.Model(&models.Supply{}).
-				Where("id = ?", supplies[i].ID).
-				Updates(updates)
+			updateTx := tx.Model(&models.Supply{}).
+				Where("id = ?", supplies[i].ID)
+			if !supplies[i].UpdatedAt.IsZero() {
+				updateTx = updateTx.Where("updated_at = ?", supplies[i].UpdatedAt)
+			}
+			res := updateTx.Updates(updates)
 			if res.Error != nil {
 				return types.NewError(types.ErrInternal, fmt.Sprintf("failed to update supply id %d", supplies[i].ID), res.Error)
 			}
 			if res.RowsAffected == 0 {
+				if !supplies[i].UpdatedAt.IsZero() {
+					return types.NewError(types.ErrConflict, fmt.Sprintf("supply %d not found or outdated", supplies[i].ID), nil)
+				}
 				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supplies[i].ID), nil)
 			}
 		}

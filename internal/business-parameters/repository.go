@@ -3,7 +3,9 @@ package bparams
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 
@@ -82,8 +84,8 @@ func (r *Repository) Create(ctx context.Context, item *domain.BusinessParameter)
 }
 
 func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter) error {
-	if item.ID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid id", nil)
+	if err := sharedrepo.ValidateID(item.ID, "business parameter"); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -96,24 +98,34 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
-		if err := tx.Model(&models.BusinessParameter{}).
-			Where("id = ?", item.ID).
-			Updates(map[string]any{
-				"key":         item.Key,
-				"value":       item.Value,
-				"type":        item.Type,
-				"category":    item.Category,
-				"description": item.Description,
-			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update business parameter", err)
+		updateTx := tx.Model(&models.BusinessParameter{}).
+			Where("id = ?", item.ID)
+		if !item.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", item.UpdatedAt)
+		}
+		result := updateTx.Updates(map[string]any{
+			"key":         item.Key,
+			"value":       item.Value,
+			"type":        item.Type,
+			"category":    item.Category,
+			"description": item.Description,
+		})
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update business parameter", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !item.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "business parameter not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("business parameter %d not found", item.ID), nil)
 		}
 		return nil
 	})
 }
 
 func (r *Repository) Delete(ctx context.Context, id int64) error {
-	if id == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid id", nil)
+	if err := sharedrepo.ValidateID(id, "business parameter"); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -125,8 +137,12 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrNotFound, "business parameter not found", nil)
 		}
 
-		if err := tx.Delete(&models.BusinessParameter{}, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete business parameter", err)
+		result := tx.Delete(&models.BusinessParameter{}, id)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to delete business parameter", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("business parameter %d not found", id), nil)
 		}
 		return nil
 	})

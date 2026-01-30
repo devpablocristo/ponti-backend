@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/lease-type/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
@@ -25,8 +26,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) (int64, error) {
-	if lt == nil {
-		return 0, types.NewError(types.ErrValidation, "lease type is nil", nil)
+	if err := sharedrepo.ValidateEntity(lt, "lease type"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomainLeaseType(lt)
 	model.CreatedBy = lt.CreatedBy
@@ -63,23 +64,35 @@ func (r *Repository) GetLeaseType(ctx context.Context, id int64) (*domain.LeaseT
 }
 
 func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) error {
-	if lt == nil {
-		return types.NewError(types.ErrValidation, "lease type is nil", nil)
+	if err := sharedrepo.ValidateEntity(lt, "lease type"); err != nil {
+		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	if err := sharedrepo.ValidateID(lt.ID, "lease type"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.LeaseType{}).
-		Where("id = ?", lt.ID).
-		Updates(models.FromDomainLeaseType(lt))
+		Where("id = ?", lt.ID)
+	if !lt.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", lt.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update lease type", result.Error)
 	}
 	if result.RowsAffected == 0 {
+		if !lt.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "lease type not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("lease type with id %d does not exist", lt.ID), nil)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
+		return err
+	}
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.LeaseType{}, "id = ?", id)
 	if result.Error != nil {

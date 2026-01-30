@@ -154,28 +154,40 @@ func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectID int
 
 func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
 	stockUpdate := models.StockUpdateRealUnitsFromDomain(stock)
-	result := r.db.Client().WithContext(ctx).
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
-		Where("id = ?", stockID).
-		Updates(stockUpdate)
+		Where("id = ?", stockID)
+	if stock != nil && !stock.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", stock.UpdatedAt)
+	}
+	result := updateTx.Updates(stockUpdate)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
+		if stock != nil && !stock.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "stock not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, "no stock found to update", nil)
 	}
 	return nil
 }
 
 func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
-	result := r.db.Client().WithContext(ctx).
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Stock{}).
-		Where("id = ?", stockDomain.ID).
-		Update("units_consumed", gorm.Expr("units_consumed + ?", quantity))
+		Where("id = ?", stockDomain.ID)
+	if !stockDomain.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", stockDomain.UpdatedAt)
+	}
+	result := updateTx.Update("units_consumed", gorm.Expr("units_consumed + ?", quantity))
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
+		if !stockDomain.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "stock not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, "no stock found to update", nil)
 	}
 	return nil

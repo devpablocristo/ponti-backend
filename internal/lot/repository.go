@@ -24,6 +24,7 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {
@@ -84,18 +85,15 @@ func (r *Repository) GetLot(ctx context.Context, id int64) (*domain.Lot, error) 
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&m).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", id), err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get lot", err)
+		return nil, sharedrepo.HandleGormError(err, "lot", id)
 	}
 	return m.ToDomain(), nil
 }
 
 // UpdateLot actualiza datos del lote y fechas con upsert por secuencia.
 func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
-	if l.ID <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", l.ID), nil)
+	if err := sharedrepo.ValidateID(l.ID, "lot"); err != nil {
+		return err
 	}
 
 	userID, err := convertStringToID(ctx)
@@ -197,8 +195,8 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 }
 
 func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.Decimal) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
@@ -221,8 +219,8 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 
 // DeleteLot elimina un lote por ID.
 func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid lot id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
 	}
 	userID, err := convertStringToID(ctx)
 	if err != nil {

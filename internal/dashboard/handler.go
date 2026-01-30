@@ -3,7 +3,6 @@ package dashboard
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +10,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/dashboard/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -71,29 +71,33 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	// Parse query parameters for filters
 	var filter domain.DashboardFilter
 
-	if customerIDStr := c.Query("customer_id"); customerIDStr != "" {
-		if id, err := strconv.ParseInt(customerIDStr, 10, 64); err == nil {
-			filter.CustomerID = &id
-		}
+	customerID, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
+	filter.CustomerID = customerID
 
-	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
-		if id, err := strconv.ParseInt(projectIDStr, 10, 64); err == nil {
-			filter.ProjectID = &id
-		}
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
+	filter.ProjectID = projectID
 
-	if campaignIDStr := c.Query("campaign_id"); campaignIDStr != "" {
-		if id, err := strconv.ParseInt(campaignIDStr, 10, 64); err == nil {
-			filter.CampaignID = &id
-		}
+	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
+	filter.CampaignID = campaignID
 
-	if fieldIDStr := c.Query("field_id"); fieldIDStr != "" {
-		if id, err := strconv.ParseInt(fieldIDStr, 10, 64); err == nil {
-			filter.FieldID = &id
-		}
+	fieldID, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
+	filter.FieldID = fieldID
 
 	// Get dashboard data
 	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)

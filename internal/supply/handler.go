@@ -3,12 +3,11 @@ package supply
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	supplyExcel "github.com/alphacodinggroup/ponti-backend/internal/supply/excel"
 	createDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/create"
 	getDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/get"
@@ -144,14 +143,29 @@ func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 }
 
 func (h *Handler) ListSupplies(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
-	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	mode := c.Query("mode")
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 
-	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), projectID, campaignID, page, perPage, mode)
+	var projectIDValue int64
+	if projectID != nil {
+		projectIDValue = *projectID
+	}
+	var campaignIDValue int64
+	if campaignID != nil {
+		campaignIDValue = *campaignID
+	}
+	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), projectIDValue, campaignIDValue, page, perPage, mode)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -163,11 +177,9 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("supply_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid supply id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	supply, err := h.ucs.GetSupply(c.Request.Context(), id)
@@ -180,11 +192,9 @@ func (h *Handler) GetSupply(c *gin.Context) {
 }
 
 func (h *Handler) UpdateSupply(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("supply_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid supply id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req createDto.SupplyRequest
@@ -205,11 +215,9 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("supply_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid supply id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteSupply(c.Request.Context(), id); err != nil {
@@ -241,9 +249,17 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 }
 
 func (h *Handler) ExportTableSupplies(c *gin.Context) {
-	projectID, _ := strconv.ParseInt(c.Query("project_id"), 10, 64)
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var projectIDValue int64
+	if projectID != nil {
+		projectIDValue = *projectID
+	}
 
-	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), projectID)
+	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), projectIDValue)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -261,14 +277,12 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedhandlers.ParseUserID(c)
 	if handleError(err, c) {
 		return
 	}
 
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -308,8 +322,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	projectIDStr := c.Param("project_id")
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -325,14 +338,12 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
 
-	supplyMovementStr := c.Param("supply_movement_id")
-	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
+	supplyMovementId, err := sharedhandlers.ParseParamID(c.Param("supply_movement_id"), "supply_movement_id")
 	if handleError(err, c) {
 		return
 	}
@@ -355,19 +366,17 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	projectIDStr := c.Param("project_id")
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
 
-	supplyMovementStr := c.Param("supply_movement_id")
-	supplyMovementId, err := strconv.ParseInt(supplyMovementStr, 10, 64)
+	supplyMovementId, err := sharedhandlers.ParseParamID(c.Param("supply_movement_id"), "supply_movement_id")
 	if handleError(err, c) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedhandlers.ParseUserID(c)
 	if handleError(err, c) {
 		return
 	}
@@ -412,8 +421,7 @@ func handleError(err error, c *gin.Context) bool {
 func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	projectIDStr := c.Param("project_id")
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}

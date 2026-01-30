@@ -3,11 +3,10 @@ package invoice
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
@@ -70,14 +69,15 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
-	id, ok := parseParamID(c, "work_order_id")
-	if !ok {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	item, err := h.ucs.GetInvoiceByWorkOrder(c.Request.Context(), id)
 	if err != nil {
-		responseError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -87,13 +87,15 @@ func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
 }
 
 func (h *Handler) CreateInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "work_order_id")
-	if !ok {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	userID, ok := parseUserID(c)
-	if !ok {
+	userID, err := sharedhandlers.ParseUserID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -107,24 +109,26 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 
 	item := body.ToDomain(id, userID)
 
-	id, err := h.ucs.CreateInvoice(c.Request.Context(), item)
+	newID, err := h.ucs.CreateInvoice(c.Request.Context(), item)
 	if err != nil {
-		responseError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	item.ID = id
+	item.ID = newID
 	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Invoice saved"})
 }
 
 func (h *Handler) UpdateInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "work_order_id")
-	if !ok {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	userID, ok := parseUserID(c)
-	if !ok {
+	userID, err := sharedhandlers.ParseUserID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -140,7 +144,7 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 	item.ID = id
 
 	if err := h.ucs.UpdateInvoice(c.Request.Context(), item); err != nil {
-		responseError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -148,45 +152,17 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {
-	id, ok := parseParamID(c, "work_order_id")
-	if !ok {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	if err := h.ucs.DeleteInvoice(c.Request.Context(), id); err != nil {
-		responseError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	c.Status(http.StatusNoContent)
 }
 
-// ---HELPERS---
-
-func parseParamID(c *gin.Context, param string) (int64, bool) {
-	raw := c.Param(param)
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id == 0 {
-		domErr := types.NewError(types.ErrInvalidID, param+" is required", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
-		return 0, false
-	}
-	return id, true
-}
-
-func responseError(c *gin.Context, err error) {
-	apiErr, status := types.NewAPIError(err)
-	c.JSON(status, apiErr.ToResponse())
-}
-
-func parseUserID(c *gin.Context) (int64, bool) {
-	UserID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		domErr := types.NewError(types.ErrAuthorization, "invalid user_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
-		return 0, false
-	}
-	return UserID, true
-}

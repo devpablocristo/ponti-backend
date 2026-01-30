@@ -13,6 +13,7 @@ import (
 	labexcel "github.com/alphacodinggroup/ponti-backend/internal/labor/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -189,11 +190,9 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Labor
@@ -223,11 +222,9 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
@@ -239,11 +236,9 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("labor_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid labor id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
@@ -255,21 +250,14 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborCategories(c *gin.Context) {
-	projectIDStr := c.Param("project_id")
-
-	_, err := strconv.ParseInt(projectIDStr, 10, 64)
-	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if _, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id"); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("type_id"), "type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid labor type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

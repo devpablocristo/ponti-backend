@@ -3,6 +3,7 @@ package invoice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/invoice/repository/models"
@@ -58,7 +59,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 		return types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
 	}
 
-	err := r.db.Client().WithContext(ctx).
+	result := r.db.Client().WithContext(ctx).
 		Where("work_order_id = ?", item.WorkOrderID).
 		Model(models.Invoice{}).
 		Updates(map[string]any{
@@ -68,10 +69,13 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 			"status":     item.Status,
 			"updated_at": time.Now(),
 			"updated_by": item.UpdatedBy,
-		}).Error
+		})
 
-	if err != nil {
-		return types.NewError(types.ErrInternal, "Failed to update invoice", err)
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to update invoice", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("invoice for work order %d does not exist", item.WorkOrderID), nil)
 	}
 
 	return nil
@@ -82,8 +86,12 @@ func (r *Repository) Delete(ctx context.Context, workOrderID int64) error {
 		return types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
 	}
 
-	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).Delete(&models.Invoice{}).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to delete invoice", err)
+	result := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).Delete(&models.Invoice{})
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to delete invoice", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("invoice for work order %d does not exist", workOrderID), nil)
 	}
 	return nil
 }

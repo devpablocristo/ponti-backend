@@ -7,6 +7,7 @@ import (
 
 	gorm "gorm.io/gorm"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	models "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
@@ -27,8 +28,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (int64, error) {
-	if inv == nil {
-		return 0, types.NewError(types.ErrValidation, "investor is nil", nil)
+	if err := sharedrepo.ValidateEntity(inv, "investor"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomain(inv)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
@@ -71,23 +72,35 @@ func (r *Repository) GetInvestor(ctx context.Context, id int64) (*domain.Investo
 }
 
 func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) error {
-	if inv == nil {
-		return types.NewError(types.ErrValidation, "investor is nil", nil)
+	if err := sharedrepo.ValidateEntity(inv, "investor"); err != nil {
+		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	if err := sharedrepo.ValidateID(inv.ID, "investor"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Investor{}).
-		Where("id = ?", inv.ID).
-		Updates(models.FromDomain(inv))
+		Where("id = ?", inv.ID)
+	if !inv.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", inv.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomain(inv))
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update investor", result.Error)
 	}
 	if result.RowsAffected == 0 {
+		if !inv.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "investor not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d does not exist", inv.ID), nil)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
+		return err
+	}
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Investor{}, "id = ?", id)
 	if result.Error != nil {

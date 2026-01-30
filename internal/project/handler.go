@@ -4,7 +4,6 @@ package project
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -14,6 +13,7 @@ import (
 	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
 	dto "github.com/alphacodinggroup/ponti-backend/internal/project/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
 
@@ -113,14 +113,29 @@ func (h *Handler) CreateProject(c *gin.Context) {
 }
 
 func (h *Handler) ListProjects(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
-	customerID, _ := strconv.ParseInt(c.Query("customer_id"), 10, 64)
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
+	customerID, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	name := c.Query("name")
-	campaignID, _ := strconv.ParseInt(c.Query("campaign_id"), 10, 64)
+	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 
 	// Obtener los proyectos ligeros y total
-	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerID, campaignID, page, perPage)
+	var customerIDValue int64
+	if customerID != nil {
+		customerIDValue = *customerID
+	}
+	var campaignIDValue int64
+	if campaignID != nil {
+		campaignIDValue = *campaignID
+	}
+	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerIDValue, campaignIDValue, page, perPage)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -134,11 +149,9 @@ func (h *Handler) ListProjects(c *gin.Context) {
 }
 
 func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("project_id"), 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	fields, err := h.ucs.GetFieldsByProjectID(c.Request.Context(), projectID)
@@ -156,8 +169,7 @@ func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
 
 // ListProjectsDropdown maneja el endpoint GET /projects con paginación ligera.
 func (h *Handler) ListProjectsDropdown(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 
 	// Obtener los proyectos ligeros y total
 	items, total, err := h.ucs.ListProjects(c.Request.Context(), page, perPage)
@@ -174,15 +186,12 @@ func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 
 // ListProjectsByCustomerID maneja GET /projects/customers/:customer_id con paginación ligera
 func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
-	customerID, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
+	customerID, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 
 	items, total, err := h.ucs.ListProjectsByCustomerID(c.Request.Context(), customerID, page, perPage)
 	if err != nil {
@@ -197,12 +206,9 @@ func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
 
 // GetProject devuelve un proyecto por ID.
 func (h *Handler) GetProject(c *gin.Context) {
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	proj, err := h.ucs.GetProject(c.Request.Context(), id)
@@ -216,12 +222,9 @@ func (h *Handler) GetProject(c *gin.Context) {
 
 // UpdateProject actualiza un proyecto.
 func (h *Handler) UpdateProject(c *gin.Context) {
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Project
@@ -252,12 +255,9 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 
 // DeleteProject elimina un proyecto por ID.
 func (h *Handler) DeleteProject(c *gin.Context) {
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
@@ -270,12 +270,9 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
 func (h *Handler) RestoreProject(c *gin.Context) {
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.RestoreProject(c.Request.Context(), id); err != nil {
@@ -288,12 +285,9 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 
 // HardDeleteProject elimina físicamente un proyecto por ID.
 func (h *Handler) HardDeleteProject(c *gin.Context) {
-	idStr := c.Param("project_id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.HardDeleteProject(c.Request.Context(), id); err != nil {
@@ -305,8 +299,7 @@ func (h *Handler) HardDeleteProject(c *gin.Context) {
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 	name := c.Query("name")
 	var (
 		items []dto.ListedProject

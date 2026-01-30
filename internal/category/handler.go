@@ -3,10 +3,10 @@ package category
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/category/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
@@ -103,11 +103,9 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 }
 
 func (h *Handler) UpdateCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("category_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid category id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Category
@@ -128,11 +126,9 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("category_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid category id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.categoryUC.DeleteCategory(c.Request.Context(), id); err != nil {

@@ -12,6 +12,7 @@ import (
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	stockExcel "github.com/alphacodinggroup/ponti-backend/internal/stock/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock/handler/dto"
@@ -86,9 +87,7 @@ func (h *Handler) Routes() {
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -113,9 +112,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 
 func (h *Handler) getStocksPeriods(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -155,7 +152,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		return
 	}
 
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(projectIDStr, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -196,7 +193,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	stockID, err := strconv.ParseInt(stockIDStr, 10, 64)
+	stockID, err := sharedhandlers.ParseParamID(stockIDStr, "stock_id")
 	if handleError(err, c) {
 		return
 	}
@@ -281,7 +278,7 @@ func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectIDStr := c.Param("project_id")
 
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseParamID(projectIDStr, "project_id")
 	if handleError(err, c) {
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
@@ -25,8 +26,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, error) {
-	if c == nil {
-		return 0, types.NewError(types.ErrValidation, "crop is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "crop"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomainCrop(c)
 	model.Base = sharedmodels.Base{
@@ -64,23 +65,35 @@ func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error
 }
 
 func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
-	if c == nil {
-		return types.NewError(types.ErrValidation, "crop is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "crop"); err != nil {
+		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	if err := sharedrepo.ValidateID(c.ID, "crop"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Crop{}).
-		Where("id = ?", c.ID).
-		Updates(models.FromDomainCrop(c))
+		Where("id = ?", c.ID)
+	if !c.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomainCrop(c))
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update crop", result.Error)
 	}
 	if result.RowsAffected == 0 {
+		if !c.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "crop not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("crop with id %d does not exist", c.ID), nil)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
+		return err
+	}
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Crop{}, "id = ?", id)
 	if result.Error != nil {

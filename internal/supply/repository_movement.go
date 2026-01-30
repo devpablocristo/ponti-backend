@@ -9,6 +9,7 @@ import (
 	providermodel "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -17,8 +18,8 @@ import (
 )
 
 func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	if movement == nil {
-		return 0, types.NewError(types.ErrValidation, "supply movement is nil", nil)
+	if err := sharedrepo.ValidateEntity(movement, "supply movement"); err != nil {
+		return 0, err
 	}
 	model := models.SupplyMovementFromDomain(movement)
 	db := r.db.Client().WithContext(ctx)
@@ -29,8 +30,8 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 }
 
 func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomain.Provider) (int64, error) {
-	if provider == nil {
-		return 0, types.NewError(types.ErrValidation, "provider is nil", nil)
+	if err := sharedrepo.ValidateEntity(provider, "provider"); err != nil {
+		return 0, err
 	}
 
 	client := r.db.Client().WithContext(ctx)
@@ -116,7 +117,7 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 		First(&modelSupplyMovement, "id = ?", id).
 		Error; err != nil {
 
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, types.NewError(types.ErrNotFound, "supply movement not found", err)
 		}
 		return nil, types.NewError(types.ErrInternal, "failed to get supply movement", err)
@@ -126,8 +127,8 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 }
 
 func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) error {
-	if movement == nil {
-		return types.NewError(types.ErrValidation, "supply movement is nil", nil)
+	if err := sharedrepo.ValidateEntity(movement, "supply movement"); err != nil {
+		return err
 	}
 
 	model := models.SupplyMovementFromDomain(movement)
@@ -145,40 +146,39 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 }
 
 func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
-	var stockModel stockmodel.Stock
-	var supplyModel models.SupplyMovement
-	client := r.db.Client().WithContext(ctx)
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var stockModel stockmodel.Stock
+		var supplyModel models.SupplyMovement
 
-	// Obtener el movimiento a eliminar
-	err := client.
-		Where("project_id = ?", projectId).
-		Where("id = ?", supplyId).
-		First(&supplyModel).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return types.NewError(types.ErrNotFound, "supply movement not found", nil)
+		// Obtener el movimiento a eliminar
+		err := tx.
+			Where("project_id = ?", projectId).
+			Where("id = ?", supplyId).
+			First(&supplyModel).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "supply movement not found", nil)
+			}
+			return err
 		}
-		return err
-	}
 
-	// Verificar si hay stock cerrado
-	err = client.
-		Where("project_id = ?", projectId).
-		Where("supply_id = ?", supplyModel.SupplyID).
-		Where("close_date IS NOT NULL").
-		First(&stockModel).Error
-	if err == nil {
-		return types.NewError(types.ErrConflict, "ya existe un movimiento de stock cerrado para este supply en el proyecto", nil)
-	}
-	if err != gorm.ErrRecordNotFound {
-		return err
-	}
+		// Verificar si hay stock cerrado
+		err = tx.
+			Where("project_id = ?", projectId).
+			Where("supply_id = ?", supplyModel.SupplyID).
+			Where("close_date IS NOT NULL").
+			First(&stockModel).Error
+		if err == nil {
+			return types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 
-	// Verificar si es un movimiento interno
-	isInternalMovement := supplyModel.MovementType == "Movimiento interno" ||
-		supplyModel.MovementType == "Movimiento interno entrada"
+		// Verificar si es un movimiento interno
+		isInternalMovement := supplyModel.MovementType == "Movimiento interno" ||
+			supplyModel.MovementType == "Movimiento interno entrada"
 
-	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if isInternalMovement {
 			// Buscar todos los registros relacionados del movimiento interno
 			// Los registros relacionados comparten: movement_date, reference_number, supply_id, investor_id, provider_id
@@ -289,10 +289,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

@@ -7,6 +7,7 @@ import (
 
 	gorm "gorm.io/gorm"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	models "github.com/alphacodinggroup/ponti-backend/internal/manager/repository/models"
@@ -27,8 +28,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateManager(ctx context.Context, c *domain.Manager) (int64, error) {
-	if c == nil {
-		return 0, types.NewError(types.ErrValidation, "manager is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "manager"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomain(c)
 	model.CreatedBy = c.CreatedBy
@@ -64,23 +65,35 @@ func (r *Repository) GetManager(ctx context.Context, id int64) (*domain.Manager,
 }
 
 func (r *Repository) UpdateManager(ctx context.Context, c *domain.Manager) error {
-	if c == nil {
-		return types.NewError(types.ErrValidation, "manager is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "manager"); err != nil {
+		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	if err := sharedrepo.ValidateID(c.ID, "manager"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Manager{}).
-		Where("id = ?", c.ID).
-		Updates(models.FromDomain(c))
+		Where("id = ?", c.ID)
+	if !c.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update manager", result.Error)
 	}
 	if result.RowsAffected == 0 {
+		if !c.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "manager not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("manager with id %d does not exist", c.ID), nil)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteManager(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "manager"); err != nil {
+		return err
+	}
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Manager{}, "id = ?", id)
 	if result.Error != nil {

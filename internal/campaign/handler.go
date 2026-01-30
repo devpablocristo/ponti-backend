@@ -3,12 +3,12 @@ package campaign
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -65,15 +65,13 @@ func (h *Handler) Routes() {
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
 	var customerID int64
-	customerIDQuery := c.Query("customer_id")
-	if customerIDQuery != "" {
-		var err error
-		customerID, err = strconv.ParseInt(customerIDQuery, 10, 64)
-		if err != nil {
-			apiErr, _ := types.NewAPIError(err)
-			c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-			return
-		}
+	customerIDValue, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if customerIDValue != nil {
+		customerID = *customerIDValue
 	}
 
 	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), customerID, c.Query("project_name"))

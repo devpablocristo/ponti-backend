@@ -20,6 +20,7 @@ import (
 	// project
 	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -180,9 +181,9 @@ func (h *Handler) ListLots(c *gin.Context) {
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 	lot, err := h.ucs.GetLot(c.Request.Context(), id)
@@ -194,9 +195,9 @@ func (h *Handler) GetLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 
@@ -235,9 +236,9 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 
@@ -252,9 +253,9 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lot_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid lot id", err))
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {

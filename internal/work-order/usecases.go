@@ -37,14 +37,9 @@ func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
 }
 
 func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
-	workOrder, err := u.repo.GetWorkOrderByNumberAndProjectID(ctx, o.Number, o.ProjectID)
-	if err != nil {
-		return 0, err
+	if o == nil {
+		return 0, types.NewError(types.ErrValidation, "work order is nil", nil)
 	}
-	if workOrder != nil {
-		return 0, types.NewError(types.ErrConflict, "work order already exists", nil)
-	}
-
 	return u.repo.CreateWorkOrder(ctx, o)
 }
 

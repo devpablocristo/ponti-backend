@@ -8,6 +8,7 @@ import (
 
 	gorm "gorm.io/gorm"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
@@ -88,8 +89,11 @@ func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, err
 
 // --- UPDATE ---
 func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
-	if f == nil || f.ID <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid field id: %d", f.ID), nil)
+	if err := sharedrepo.ValidateEntity(f, "field"); err != nil {
+		return err
+	}
+	if err := sharedrepo.ValidateID(f.ID, "field"); err != nil {
+		return err
 	}
 	model := models.FromDomain(f)
 	model.ID = f.ID
@@ -101,13 +105,23 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
 		}
-		if err := tx.Model(&models.Field{}).
-			Where("id = ?", f.ID).
-			Updates(map[string]any{
-				"name":          f.Name,
-				"lease_type_id": f.LeaseType.ID,
-			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update field", err)
+		updateTx := tx.Model(&models.Field{}).
+			Where("id = ?", f.ID)
+		if !f.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
+		}
+		result := updateTx.Updates(map[string]any{
+			"name":          f.Name,
+			"lease_type_id": f.LeaseType.ID,
+		})
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update field", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !f.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "field not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
 		}
 		return nil
 	})
@@ -115,8 +129,8 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 
 // --- DELETE ---
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid field id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
 	}
 
 	deletedBy, err := sharedmodels.ConvertStringToID(ctx)

@@ -4,10 +4,10 @@ package field
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/field/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
@@ -102,11 +102,9 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	f, err := h.ucs.GetField(c.Request.Context(), id)
@@ -119,11 +117,9 @@ func (h *Handler) GetField(c *gin.Context) {
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.UpdateField
@@ -144,11 +140,9 @@ func (h *Handler) UpdateField(c *gin.Context) {
 }
 
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("field_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid field id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {

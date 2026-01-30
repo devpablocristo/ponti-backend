@@ -10,6 +10,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
@@ -31,8 +32,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
-	if labor == nil {
-		return 0, types.NewError(types.ErrValidation, "labor is nil", nil)
+	if err := sharedrepo.ValidateEntity(labor, "labor"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomain(labor)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
@@ -69,8 +70,8 @@ func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
 }
 
 func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
-	if labor == nil {
-		return types.NewError(types.ErrValidation, "labor is nil", nil)
+	if err := sharedrepo.ValidateEntity(labor, "labor"); err != nil {
+		return err
 	}
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).

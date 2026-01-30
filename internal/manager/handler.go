@@ -4,7 +4,6 @@ package manager
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,6 +11,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/manager/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -112,11 +112,9 @@ func (h *Handler) ListManagers(c *gin.Context) {
 }
 
 func (h *Handler) GetManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -132,11 +130,9 @@ func (h *Handler) GetManager(c *gin.Context) {
 
 // UpdateManager actualiza un manager existente.
 func (h *Handler) UpdateManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Manager
@@ -157,11 +153,9 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 
 // DeleteManager elimina un manager por su ID.
 func (h *Handler) DeleteManager(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("manager_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid manager id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteManager(c.Request.Context(), id); err != nil {

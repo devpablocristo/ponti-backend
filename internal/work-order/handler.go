@@ -4,7 +4,6 @@ package workorder
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -13,6 +12,7 @@ import (
 	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -111,10 +111,9 @@ func (h *Handler) CreateWorkOrder(c *gin.Context) {
 
 // GetWorkOrderByID obtiene una orden por ID.
 func (h *Handler) GetWorkOrderByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("work_order_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -151,10 +150,9 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	id, err := strconv.ParseInt(c.Param("work_order_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	req.ID = id
@@ -168,11 +166,9 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 
 // DeleteWorkOrderByID elimina una orden de trabajo.
 func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	idParam := c.Param("work_order_id")
-	id, err := strconv.ParseInt(idParam, 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
 	if err != nil {
-		apiErr, status := types.NewAPIError(types.NewError(types.ErrInvalidID, "invalid work_order id", err))
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -207,70 +203,46 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 // parseFilters extrae project_id, field_id, customer_id y campaign_id.
 func parseFilters(c *gin.Context) domain.WorkOrderFilter {
 	var f domain.WorkOrderFilter
-	if v := c.Query("project_id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
-			f.ProjectID = &id
-		}
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id"); err == nil {
+		f.ProjectID = id
 	}
-	if v := c.Query("field_id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
-			f.FieldID = &id
-		}
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id"); err == nil {
+		f.FieldID = id
 	}
-	if v := c.Query("customer_id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
-			f.CustomerID = &id
-		}
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id"); err == nil {
+		f.CustomerID = id
 	}
-	if v := c.Query("campaign_id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
-			f.CampaignID = &id
-		}
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id"); err == nil {
+		f.CampaignID = id
 	}
 	return f
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
 	var filt domain.WorkOrderFilter
-	if v := c.Query("project_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filt.ProjectID = &id
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id"); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	} else {
+		filt.ProjectID = id
 	}
-	if v := c.Query("field_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filt.FieldID = &id
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id"); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	} else {
+		filt.FieldID = id
 	}
-	if v := c.Query("customer_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			domErr := types.NewError(types.ErrInvalidID, "invalid customer_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filt.CustomerID = &id
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id"); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	} else {
+		filt.CustomerID = id
 	}
-	if v := c.Query("campaign_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			domErr := types.NewError(types.ErrInvalidID, "invalid campaign_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filt.CampaignID = &id
+	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id"); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	} else {
+		filt.CampaignID = id
 	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {

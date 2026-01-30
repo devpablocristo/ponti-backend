@@ -3,7 +3,6 @@ package customer
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +10,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/customer/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -99,8 +99,7 @@ func (h *Handler) CreateCustomer(c *gin.Context) {
 
 // ListCustomers recupera todos los customers.
 func (h *Handler) ListCustomers(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 
 	items, total, err := h.ucs.ListCustomers(c.Request.Context(), page, perPage)
 	if err != nil {
@@ -115,11 +114,9 @@ func (h *Handler) ListCustomers(c *gin.Context) {
 
 // GetCustomer recupera un customer por su ID.
 func (h *Handler) GetCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -135,11 +132,9 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 
 // UpdateCustomer actualiza un customer existente.
 func (h *Handler) UpdateCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Customer
@@ -160,11 +155,9 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 
 // DeleteCustomer elimina un customer por su ID.
 func (h *Handler) DeleteCustomer(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("customer_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid customer id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteCustomer(c.Request.Context(), id); err != nil {

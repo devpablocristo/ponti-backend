@@ -3,13 +3,13 @@ package dollar
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/dollar/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasePort interface {
@@ -65,11 +65,9 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("project_id"), 10, 64)
-	if err != nil || projectID == 0 {
-		domErr := types.NewError(types.ErrInvalidID, "project_id is required", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -91,11 +89,9 @@ func (h *Handler) ListByProject(c *gin.Context) {
 }
 
 func (h *Handler) CreateorUpdateBulk(c *gin.Context) {
-	projectID, err := strconv.ParseInt(c.Param("project_id"), 10, 64)
-	if err != nil || projectID == 0 {
-		domErr := types.NewError(types.ErrInvalidID, "project_id is required", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

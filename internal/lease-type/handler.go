@@ -4,12 +4,12 @@ package leasetype
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/lease-type/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
@@ -105,11 +105,9 @@ func (h *Handler) ListLeaseTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	lt, err := h.ucs.GetLeaseType(c.Request.Context(), id)
@@ -122,11 +120,9 @@ func (h *Handler) GetLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.LeaseType
@@ -146,11 +142,9 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("lease_type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid lease type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {

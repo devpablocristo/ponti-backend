@@ -3,7 +3,6 @@ package crop
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +10,7 @@ import (
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/crop/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -111,11 +111,9 @@ func (h *Handler) ListCrops(c *gin.Context) {
 
 // GetCrop retrieves a crop by its ID.
 func (h *Handler) GetCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -131,11 +129,9 @@ func (h *Handler) GetCrop(c *gin.Context) {
 
 // UpdateCrop updates an existing crop.
 func (h *Handler) UpdateCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.Crop
@@ -156,11 +152,9 @@ func (h *Handler) UpdateCrop(c *gin.Context) {
 
 // DeleteCrop deletes a crop by its ID.
 func (h *Handler) DeleteCrop(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("crop_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid crop id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteCrop(c.Request.Context(), id); err != nil {

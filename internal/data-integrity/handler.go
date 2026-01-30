@@ -9,12 +9,12 @@ package data_integrity
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
@@ -85,16 +85,12 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Parsear query params
 	var filter domain.CostsCheckFilter
 
-	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
-		projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
-		if err != nil {
-			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filter.ProjectID = &projectID
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
+	filter.ProjectID = projectID
 
 	// Ejecutar caso de uso
 	report, err := h.ucs.CheckCostsCoherence(c.Request.Context(), filter)

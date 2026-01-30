@@ -4,7 +4,6 @@ package report
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/internal/report/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 // UseCasesPort define la interfaz para los casos de uso.
@@ -136,40 +136,32 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	filters := domain.ReportFilter{}
 
 	// Parsear customer_id
-	if customerIDStr := c.Query("customer_id"); customerIDStr != "" {
-		customerID, err := strconv.ParseInt(customerIDStr, 10, 64)
-		if err != nil {
-			return filters, types.NewError(types.ErrInvalidInput, "invalid customer_id", err)
-		}
-		filters.CustomerID = &customerID
+	customerID, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	if err != nil {
+		return filters, err
 	}
+	filters.CustomerID = customerID
 
 	// Parsear project_id
-	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
-		projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
-		if err != nil {
-			return filters, types.NewError(types.ErrInvalidInput, "invalid project_id", err)
-		}
-		filters.ProjectID = &projectID
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		return filters, err
 	}
+	filters.ProjectID = projectID
 
 	// Parsear campaign_id
-	if campaignIDStr := c.Query("campaign_id"); campaignIDStr != "" {
-		campaignID, err := strconv.ParseInt(campaignIDStr, 10, 64)
-		if err != nil {
-			return filters, types.NewError(types.ErrInvalidInput, "invalid campaign_id", err)
-		}
-		filters.CampaignID = &campaignID
+	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
+	if err != nil {
+		return filters, err
 	}
+	filters.CampaignID = campaignID
 
 	// Parsear field_id
-	if fieldIDStr := c.Query("field_id"); fieldIDStr != "" {
-		fieldID, err := strconv.ParseInt(fieldIDStr, 10, 64)
-		if err != nil {
-			return filters, types.NewError(types.ErrInvalidInput, "invalid field_id", err)
-		}
-		filters.FieldID = &fieldID
+	fieldID, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id")
+	if err != nil {
+		return filters, err
 	}
+	filters.FieldID = fieldID
 
 	return filters, nil
 }

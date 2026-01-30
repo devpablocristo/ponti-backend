@@ -23,6 +23,7 @@ import (
 	manmod "github.com/alphacodinggroup/ponti-backend/internal/manager/repository/models"
 	models "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	base "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 )
 
@@ -309,8 +310,8 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 
 // GetProject obtiene un proyecto por ID.
 func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project, error) {
-	if id <= 0 {
-		return nil, types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return nil, err
 	}
 
 	var m models.Project
@@ -376,25 +377,8 @@ func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) 
 
 // UpdateProject actualiza un proyecto completo.
 func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error {
-	if d.ID <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", d.ID), nil)
-	}
-
-	var existing models.Project
-	err := r.db.Client().WithContext(ctx).
-		Preload("Managers").
-		Preload("Investors.Investor").
-		Preload("AdminCostInvestors.Investor").
-		Preload("Fields").
-		Preload("Fields.FieldInvestors.Investor").
-		Preload("Fields.Lots").
-		Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
-		First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return types.NewError(types.ErrNotFound, "registro desactualizado o no encontrado", nil)
-	}
-	if err != nil {
-		return types.NewError(types.ErrInternal, "error buscando proyecto", err)
+	if err := sharedrepo.ValidateID(d.ID, "project"); err != nil {
+		return err
 	}
 
 	userID, err := convertStringToID(ctx)
@@ -402,11 +386,29 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		return err
 	}
 	d.UpdatedBy = &userID
-	d.CreatedBy = existing.CreatedBy
 	m := models.FromDomain(d)
 	m.ID = d.ID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verificar existencia y optimistic locking dentro de la transacción
+		var existing models.Project
+		err := tx.
+			Preload("Managers").
+			Preload("Investors.Investor").
+			Preload("AdminCostInvestors.Investor").
+			Preload("Fields").
+			Preload("Fields.FieldInvestors.Investor").
+			Preload("Fields.Lots").
+			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
+			First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return types.NewError(types.ErrNotFound, "project not found or outdated", nil)
+		}
+		if err != nil {
+			return types.NewError(types.ErrInternal, "failed to find project", err)
+		}
+
+		d.CreatedBy = existing.CreatedBy
 		updates := map[string]any{
 			"updated_by": d.UpdatedBy,
 		}
@@ -470,23 +472,19 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			}
 		}
 
-		err := relinkManagers(tx, existing, d)
-		if err != nil {
+		if err := relinkManagers(tx, existing, d); err != nil {
 			return err
 		}
 
-		err = relinkInvestors(tx, existing, d)
-		if err != nil {
+		if err := relinkInvestors(tx, existing, d); err != nil {
 			return err
 		}
 
-		err = relinkAdminCostInvestors(tx, existing, d)
-		if err != nil {
+		if err := relinkAdminCostInvestors(tx, existing, d); err != nil {
 			return err
 		}
 
-		err = relinkFieldInvestors(tx, existing, d)
-		if err != nil {
+		if err := relinkFieldInvestors(tx, existing, d); err != nil {
 			return err
 		}
 
@@ -500,8 +498,8 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 
 // DeleteProject elimina un proyecto por ID.
 func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return err
 	}
 
 	userID, err := convertStringToID(ctx)
@@ -604,8 +602,8 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas.
 func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -696,8 +694,8 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 
 // HardDeleteProject elimina físicamente un proyecto y todas sus entidades relacionadas.
 func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
-	if id <= 0 {
-		return types.NewInvalidIDError(fmt.Sprintf("invalid project id: %d", id), nil)
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

@@ -2,11 +2,10 @@ package campaign
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"gorm.io/gorm"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	models "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
@@ -28,8 +27,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (int64, error) {
-	if c == nil {
-		return 0, types.NewError(types.ErrValidation, "campaign is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "campaign"); err != nil {
+		return 0, err
 	}
 
 	// Mapear a modelo y fijar Base (CreatedBy/UpdatedBy)
@@ -110,10 +109,7 @@ func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaig
 		First(&m, id).
 		Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("campaign %d not found", id), err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get campaign", err)
+		return nil, sharedrepo.HandleGormError(err, "campaign", id)
 	}
 
 	// Devolver el domain, sin exponer directamente Base

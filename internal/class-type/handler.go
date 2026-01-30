@@ -3,10 +3,10 @@ package classtype
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/class-type/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
@@ -97,11 +97,9 @@ func (h *Handler) CreateClassType(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Class type created successfully", "id": newID})
 }
 func (h *Handler) UpdateClassType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("class_type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid class type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var req dto.ClassType
@@ -121,11 +119,9 @@ func (h *Handler) UpdateClassType(c *gin.Context) {
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Class type updated successfully"})
 }
 func (h *Handler) DeleteClassType(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("class_type_id"), 10, 64)
+	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
 	if err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid class type id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.classTypeUC.DeleteClassType(c.Request.Context(), id); err != nil {

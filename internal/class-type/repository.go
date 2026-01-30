@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
@@ -48,6 +49,9 @@ func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (
 }
 
 func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) error {
+	if err := sharedrepo.ValidateID(c.ID, "class type"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.ClassType{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
@@ -56,19 +60,32 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", c.ID), nil)
 		}
-		if err := tx.Model(&models.ClassType{}).
-			Where("id = ?", c.ID).
-			Updates(map[string]any{
-				"name":       c.Name,
-				"updated_by": c.UpdatedBy,
-			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update class type", err)
+		updateTx := tx.Model(&models.ClassType{}).
+			Where("id = ?", c.ID)
+		if !c.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+		}
+		result := updateTx.Updates(map[string]any{
+			"name":       c.Name,
+			"updated_by": c.UpdatedBy,
+		})
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update class type", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !c.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "class type not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", c.ID), nil)
 		}
 		return nil
 	})
 }
 
 func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "class type"); err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.ClassType{}).Where("id = ?", id).Count(&count).Error; err != nil {
@@ -77,8 +94,12 @@ func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", id), nil)
 		}
-		if err := tx.Delete(&models.ClassType{}, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete class type", err)
+		result := tx.Delete(&models.ClassType{}, id)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to delete class type", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("class type %d not found", id), nil)
 		}
 		return nil
 	})

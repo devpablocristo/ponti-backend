@@ -3,14 +3,13 @@ package commercialization
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/commercialization/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/commercialization/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasePort interface {
@@ -67,14 +66,15 @@ func (h *Handler) Routes() {
 
 // Listar por proyecto
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, ok := parseParamID(c, "project_id")
-	if !ok {
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
-		respondError(c, err)
+		sharedhandlers.RespondErrorLegacyNotFound(c, err)
 		return
 	}
 
@@ -88,12 +88,14 @@ func (h *Handler) ListByProject(c *gin.Context) {
 
 // Crear proyecto
 func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
-	projectID, ok := parseParamID(c, "project_id")
-	if !ok {
+	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	userID, ok := parseUserID(c)
-	if !ok {
+	userID, err := sharedhandlers.ParseUserID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -107,47 +109,8 @@ func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
 
 	items := body.ToDomainSlice(projectID, userID)
 	if err := h.ucs.CreateOrUpdateBulk(c.Request.Context(), items); err != nil {
-		respondError(c, err)
+		sharedhandlers.RespondErrorLegacyNotFound(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Crop commercialization saved"})
-}
-
-// ---- HELPERS -----
-
-// Lee y valida el parametro en la ruta de tipo int64
-func parseParamID(c *gin.Context, param string) (int64, bool) {
-	raw := c.Param(param)
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id == 0 {
-		domErr := types.NewError(types.ErrInvalidID, param+" is required", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
-		return 0, false
-	}
-	return id, true
-}
-
-// extrae userID usando Sharemodels.ConvertStringToID
-func parseUserID(c *gin.Context) (int64, bool) {
-	UserID, err := sharedmodels.ConvertStringToID(c)
-	if err != nil {
-		domErr := types.NewError(types.ErrAuthorization, "invalid user_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
-		return 0, false
-	}
-	return UserID, true
-}
-
-// unifica el switch de errores
-func respondError(c *gin.Context, err error) {
-	if types.IsNotFound(err) {
-		apiErr, status := types.NewAPIError(err)
-		// Respeta el formato legacy del remoto para este endpoint.
-		c.JSON(status, gin.H{"error": apiErr.Error()})
-		return
-	}
-	apiErr, status := types.NewAPIError(err)
-	c.JSON(status, apiErr.ToResponse())
 }

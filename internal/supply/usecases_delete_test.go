@@ -52,9 +52,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(200)).
-					Return(types.NewError(types.ErrConflict, "ya existe un movimiento de stock cerrado para este supply en el proyecto", nil))
+					Return(types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil))
 			},
-			expectedError: types.NewError(types.ErrConflict, "ya existe un movimiento de stock cerrado para este supply en el proyecto", nil),
+			expectedError: types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil),
 			description:   "No se puede eliminar si el stock está cerrado",
 		},
 		{

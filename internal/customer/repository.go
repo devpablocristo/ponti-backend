@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
@@ -25,8 +26,8 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (int64, error) {
-	if c == nil {
-		return 0, types.NewError(types.ErrValidation, "customer is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "customer"); err != nil {
+		return 0, err
 	}
 	model := models.FromDomain(c)
 	model.Base = sharedmodels.Base{
@@ -84,23 +85,35 @@ func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Custome
 }
 
 func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) error {
-	if c == nil {
-		return types.NewError(types.ErrValidation, "customer is nil", nil)
+	if err := sharedrepo.ValidateEntity(c, "customer"); err != nil {
+		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	if err := sharedrepo.ValidateID(c.ID, "customer"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Customer{}).
-		Where("id = ?", c.ID).
-		Updates(models.FromDomain(c))
+		Where("id = ?", c.ID)
+	if !c.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update customer", result.Error)
 	}
 	if result.RowsAffected == 0 {
+		if !c.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "customer not found or outdated", nil)
+		}
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("customer with id %d does not exist", c.ID), nil)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
+		return err
+	}
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Customer{}, "id = ?", id)
 	if result.Error != nil {
