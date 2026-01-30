@@ -28,6 +28,7 @@ type UseCasesPort interface {
 	UpdateProject(context.Context, *domain.Project) error
 	DeleteProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
+	HardDeleteProject(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -86,6 +87,7 @@ func (h *Handler) Routes() {
 		public.PUT("/:project_id", h.UpdateProject)
 		public.PUT("/:project_id/restore", h.RestoreProject)
 		public.DELETE("/:project_id", h.DeleteProject)
+		public.DELETE("/:project_id/hard", h.HardDeleteProject)
 		public.GET("/search", h.ListProjectsByName)
 	}
 }
@@ -282,6 +284,24 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "project restored successfully"})
+}
+
+// HardDeleteProject elimina físicamente un proyecto por ID.
+func (h *Handler) HardDeleteProject(c *gin.Context) {
+	idStr := c.Param("project_id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		domErr := types.NewError(types.ErrInvalidID, "invalid project id", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	if err := h.ucs.HardDeleteProject(c.Request.Context(), id); err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "project permanently deleted"})
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {
