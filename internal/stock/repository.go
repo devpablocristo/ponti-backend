@@ -4,11 +4,12 @@ package stock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	reportdb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	models "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -31,10 +32,10 @@ func NewRepository(db GormEnginePort) *Repository {
 
 // GetStocks retorna stocks filtrando por proyecto y opcionalmente por fecha de corte.
 func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
-	db := r.db.Client().WithContext(ctx)
+	gormDB := r.db.Client().WithContext(ctx)
 	var t time.Time
 
-	query := db.Model(&models.Stock{}).
+	query := gormDB.Model(&models.Stock{}).
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
@@ -69,13 +70,13 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 			supplyIDs[i] = stock.SupplyID
 		}
 
-		// Calcular consumed para todos los supplies en una sola consulta
-		err := db.Model(&workOrderModels.WorkOrderItem{}).
-			Joins("JOIN workorders ON workorders.id = workorder_items.workorder_id").
-			Where("workorders.project_id = ? AND workorder_items.supply_id IN (?)", projectID, supplyIDs).
-			Select("workorder_items.supply_id, COALESCE(SUM(workorder_items.total_used), 0) as consumed").
-			Group("workorder_items.supply_id").
-			Scan(&consumedResults).Error
+		// Calcular consumed para todos los supplies en una sola consulta desde vista
+		query := fmt.Sprintf(`
+			SELECT supply_id, consumed
+			FROM %s
+			WHERE project_id = ? AND supply_id IN ?
+		`, reportdb.ReportView("stock_consumed_by_supply"))
+		err := gormDB.Raw(query, projectID, supplyIDs).Scan(&consumedResults).Error
 		if err != nil {
 			return nil, err
 		}
@@ -246,9 +247,9 @@ func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID
 func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error) {
 	var stockModel []models.Stock
 
-	db := r.db.Client().WithContext(ctx)
+	gormDB := r.db.Client().WithContext(ctx)
 
-	query := db.
+	query := gormDB.
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
@@ -268,12 +269,12 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 			Consumed  decimal.Decimal `gorm:"column:consumed"`
 		}
 
-		// Calcular consumed agrupado por project_id y supply_id
-		err := db.Model(&workOrderModels.WorkOrderItem{}).
-			Joins("JOIN workorders ON workorders.id = workorder_items.workorder_id").
-			Select("workorders.project_id, workorder_items.supply_id, COALESCE(SUM(workorder_items.total_used), 0) as consumed").
-			Group("workorders.project_id, workorder_items.supply_id").
-			Scan(&consumedResults).Error
+		// Calcular consumed agrupado por project_id y supply_id desde vista
+		query := fmt.Sprintf(`
+			SELECT project_id, supply_id, consumed
+			FROM %s
+		`, reportdb.ReportView("stock_consumed_by_supply"))
+		err := gormDB.Raw(query).Scan(&consumedResults).Error
 		if err != nil {
 			return nil, err
 		}

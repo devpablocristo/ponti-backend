@@ -51,3 +51,22 @@ coverage/
 
 # Archivos de backup de base de datos en la raíz
 ponti_api_db_*.dump
+
+# Archivos generados por herramientas
+*_gen.go
+*_generated.go
+*.pb.go
+wire/wire_gen.go
+
+# Migraciones SQL muy grandes (mantener solo las necesarias para contexto)
+# Las migraciones pueden ser muy grandes y causar problemas de indexación
+# migrations/*.sql
+
+# Archivos de workspace de VSCode (pueden ser grandes)
+*.code-workspace
+ws/
+
+# Archivos de configuración grandes o binarios
+*.db
+*.sqlite
+*.sqlite3

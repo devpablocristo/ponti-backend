@@ -78,19 +78,17 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]domain.FieldCropColumn, error) {
 	var columns []domain.FieldCropColumn
 
-	query := `
+	query := fmt.Sprintf(`
 		SELECT DISTINCT
-			CONCAT(f.id, '-', c.id) as id,
-			f.id as field_id,
-			f.name as field_name,
-			c.id as crop_id,
-			c.name as crop_name
-		FROM fields f
-		JOIN lots l ON f.id = l.field_id AND l.deleted_at IS NULL
-		JOIN crops c ON l.current_crop_id = c.id AND c.deleted_at IS NULL
-		WHERE f.project_id = ? AND f.deleted_at IS NULL AND l.current_crop_id IS NOT NULL
-		ORDER BY f.id, c.id
-	`
+			CONCAT(field_id, '-', current_crop_id) as id,
+			field_id,
+			field_name,
+			current_crop_id as crop_id,
+			crop_name
+		FROM %s
+		WHERE project_id = ?
+		ORDER BY field_id, current_crop_id
+	`, db.FieldCropView("cultivos"))
 
 	err := r.db.Client().Raw(query, *filters.ProjectID).Scan(&columns).Error
 	if err != nil {
