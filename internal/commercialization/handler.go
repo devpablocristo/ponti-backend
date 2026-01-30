@@ -142,6 +142,12 @@ func parseUserID(c *gin.Context) (int64, bool) {
 
 // unifica el switch de errores
 func respondError(c *gin.Context, err error) {
+	if types.IsNotFound(err) {
+		apiErr, status := types.NewAPIError(err)
+		// Respeta el formato legacy del remoto para este endpoint.
+		c.JSON(status, gin.H{"error": apiErr.Error()})
+		return
+	}
 	apiErr, status := types.NewAPIError(err)
 	c.JSON(status, apiErr.ToResponse())
 }

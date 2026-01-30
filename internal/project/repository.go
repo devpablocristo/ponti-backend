@@ -197,7 +197,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 
 	if err := db0.
 		Select("id, name").
-		Order("id DESC").
+		Order("id ASC").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {

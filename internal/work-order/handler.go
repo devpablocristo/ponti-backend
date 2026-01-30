@@ -75,6 +75,15 @@ func (h *Handler) Routes() {
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
 	}
+
+	// Ruta legacy sin guiones para compatibilidad con remoto.
+	legacy := r.Group(h.acf.APIBaseURL() + "/workorders")
+	{
+		legacy.GET("", h.ListWorkOrders)
+		legacy.GET("/:work_order_id", h.GetWorkOrderByID)
+		legacy.GET("/metrics", h.GetMetrics)
+		legacy.GET("/export", h.ExportWorkOrders)
+	}
 }
 
 // CreateWorkOrder crea una orden de trabajo.

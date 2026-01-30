@@ -79,6 +79,8 @@ func (h *Handler) Routes() {
 		public.GET("", h.ListProjects)
 		public.GET("/:project_id/fields", h.GetFieldsByProjectID)
 		public.GET("/dropdown", h.ListProjectsDropdown)
+		// Compatibilidad con ruta legacy usada en remoto.
+		public.GET("/customer/:customer_id", h.ListProjectsByCustomerID)
 		public.GET("/customers/:customer_id", h.ListProjectsByCustomerID)
 		public.GET("/:project_id", h.GetProject)
 		public.PUT("/:project_id", h.UpdateProject)

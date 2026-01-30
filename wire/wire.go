@@ -27,6 +27,7 @@ import (
 	leasetype "github.com/alphacodinggroup/ponti-backend/internal/lease-type"
 	lot "github.com/alphacodinggroup/ponti-backend/internal/lot"
 	manager "github.com/alphacodinggroup/ponti-backend/internal/manager"
+	provider "github.com/alphacodinggroup/ponti-backend/internal/provider"
 	project "github.com/alphacodinggroup/ponti-backend/internal/project"
 	report "github.com/alphacodinggroup/ponti-backend/internal/report"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock"
@@ -51,6 +52,7 @@ type Dependencies struct {
 	FieldHandler              *field.Handler
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
+	ProviderHandler           *provider.Handler
 	ReportHandler             *report.ReportHandler
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
@@ -82,6 +84,7 @@ func Initialize() (*Dependencies, error) {
 		LotSet,
 		FieldSet,
 		ManagerSet,
+		ProviderSet,
 		ProjectSet,
 		ReportSet,
 		LeaseTypeSet,
