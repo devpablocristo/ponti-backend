@@ -22,13 +22,17 @@ Estas variables se configuran en el servicio, no en Actions.
 | `DB_TYPE` | `postgres` | `postgres` |
 | `DB_HOST` | Host/IP de Postgres | `136.112.24.122` |
 | `DB_PORT` | Puerto | `5432` |
-| `DB_USER` | Usuario | `soalen-db` |
+| `DB_USER` | Usuario | `soalen-db-v3` |
 | `DB_PASSWORD` | Password | `****` |
 | `DB_NAME` | DB base del servicio | `ponti_api_db` |
 | `DB_SSL_MODE` | Modo SSL | `disable` |
 | `HTTP_SERVER_PORT` | Puerto HTTP | `8080` |
 
 > Nota: `DB_SCHEMA` siempre se usa como `public`. La aislacion es por `DB_NAME`.
+
+## Conexión a la DB (dev)
+- El servicio `ponti-backend` en dev usa **IP pública** (no Cloud SQL socket).
+- La IP actual es `136.112.24.122` (instancia `new-ponti-db-dev`).
 
 ## Deploy con GitHub Actions
 Workflow principal: `.github/workflows/deploy-cloud-run.yml`.

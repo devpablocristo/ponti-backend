@@ -35,6 +35,12 @@ Esto levanta:
 go run ./cmd/api
 ```
 
+### Sincronizar DB local con dev remoto
+```bash
+SRC_FROM_CLOUD_RUN=1 SRC_FORCE_CLOUD_RUN=1 SRC_SERVICE_NAME=ponti-backend \
+SRC_PROJECT_ID=new-ponti-dev SRC_REGION=us-central1 make new-download-gcp-db
+```
+
 ## Headers requeridos
 ```
 X-API-KEY: abc123secreta
@@ -69,3 +75,4 @@ Customer (1)──────(∞) Project (∞)──────(1) Campaign
 - `docs/DEPLOY.md`
 - `docs/CONFIGURAR_VARIABLES_GITHUB.md`
 - `docs/DIAGNOSTICO_CLOUD_RUN.md`
+- `docs/ENDPOINT_NORMALIZATION.md`

@@ -14,7 +14,7 @@ El contenedor falla al iniciar y no escucha en el puerto 8080. Esto generalmente
 
 **Opción B: Desde la terminal**
 ```bash
-gcloud run services logs read ponti-backend-dev \
+gcloud run services logs read ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --limit=100
@@ -23,7 +23,7 @@ gcloud run services logs read ponti-backend-dev \
 ### 2. Verificar variables de entorno configuradas
 
 ```bash
-gcloud run services describe ponti-backend-dev \
+gcloud run services describe ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --format="value(spec.template.spec.containers[0].env)"
@@ -31,7 +31,7 @@ gcloud run services describe ponti-backend-dev \
 
 O usar el script de diagnóstico:
 ```bash
-./scripts/diagnose-cloud-run.sh new-ponti-dev ponti-backend-dev us-central1
+./scripts/diagnose-cloud-run.sh new-ponti-dev ponti-backend us-central1
 ```
 
 ### 3. Variables críticas que DEBEN estar configuradas
@@ -74,7 +74,7 @@ O usar el script de diagnóstico:
 Si faltan variables críticas, configúralas manualmente:
 
 ```bash
-gcloud run services update ponti-backend-dev \
+gcloud run services update ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --update-env-vars="GO_ENVIRONMENT=production,HTTP_SERVER_PORT=8080,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp"
