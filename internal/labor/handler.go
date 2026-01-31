@@ -95,9 +95,7 @@ func (h *Handler) Routes() {
 
 func (h *Handler) CreateLabor(c *gin.Context) {
 	var req dto.LaborList
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -153,9 +151,7 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
 
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -174,9 +170,7 @@ func (h *Handler) ListLabor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -212,10 +206,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLabor(c *gin.Context) {
-	projectIDStr := c.Param("project_id")
-
-	_, err := strconv.ParseInt(projectIDStr, 10, 64)
-	if err != nil {
+	if _, err := sharedhandlers.ParseProjectIDParam(c, "project_id"); err != nil {
 		domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
 		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
@@ -250,7 +241,7 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborCategories(c *gin.Context) {
-	if _, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id"); err != nil {
+	if _, err := sharedhandlers.ParseProjectIDParam(c, "project_id"); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -290,8 +281,9 @@ func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
 }
 
 func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
-	projectID, ok := parseParamID(c, "project_id")
-	if !ok {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -330,8 +322,9 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
-	projectID, ok := parseParamID(c, "project_id")
-	if !ok {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -372,30 +365,15 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 
 func (h *Handler) GetMetrics(c *gin.Context) {
 	var filt domain.LaborFilter
-	if v := c.Query("project_id"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || id <= 0 {
-			domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		filt.ProjectID = &id
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
-	// Permitir field_id=0 o "null" para indicar "todos los campos"
-	if v := c.Query("field_id"); v != "" && v != "null" && v != "undefined" {
-		id, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
-			return
-		}
-		// Solo setear field_id si es > 0 (field_id=0 = todos los campos)
-		if id > 0 {
-			filt.FieldID = &id
-		}
-	}
+	filt.CustomerID = workspaceFilter.CustomerID
+	filt.ProjectID = workspaceFilter.ProjectID
+	filt.CampaignID = workspaceFilter.CampaignID
+	filt.FieldID = workspaceFilter.FieldID
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)

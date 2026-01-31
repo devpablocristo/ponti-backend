@@ -6,6 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	models "github.com/alphacodinggroup/ponti-backend/internal/dashboard/repository/models"
@@ -42,28 +43,28 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 	}
 
 	// Obtener todas las métricas principales en una sola query
-	metricsData, err := r.getMetrics(ctx, projectIDs)
+	metricsData, err := r.getMetrics(ctx, projectIDs, filter)
 	if err != nil {
 		return nil, err
 	}
 
 	// Obtener datos 1:N en paralelo (contribuciones, cultivos)
-	contributionsData, err := r.getContributionsProgress(ctx, projectIDs)
+	contributionsData, err := r.getContributionsProgress(ctx, projectIDs, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	managementBalanceData, err := r.getManagementBalance(ctx, projectIDs)
+	managementBalanceData, err := r.getManagementBalance(ctx, projectIDs, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	cropIncidenceData, err := r.getCropIncidence(ctx, projectIDs)
+	cropIncidenceData, err := r.getCropIncidence(ctx, projectIDs, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	operationalIndicatorsData, err := r.getOperationalIndicators(ctx, projectIDs)
+	operationalIndicatorsData, err := r.getOperationalIndicators(ctx, projectIDs, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +87,47 @@ func (r *Repository) GetDashboard(ctx context.Context, filter domain.DashboardFi
 
 	// Retornar datos mapeados a dominio (contributionsData ya contiene contributions_progress_pct)
 	return r.mapper.DashboardDataToDomain(tempData, cropIncidenceData, contributionsData, managementBalanceData, operationalIndicatorsData), nil
+}
+
+func (r *Repository) applyWorkspaceFilters(
+	q *gorm.DB,
+	filter domain.DashboardFilter,
+	cols sharedfilters.WorkspaceFilterColumns,
+) *gorm.DB {
+	return sharedfilters.ApplyWorkspaceFilters(q, sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	}, cols)
+}
+
+func (r *Repository) metricsView(filter domain.DashboardFilter) string {
+	if filter.FieldID != nil {
+		return db.DashboardView("metrics_field")
+	}
+	return db.DashboardView("metrics")
+}
+
+func (r *Repository) managementBalanceView(filter domain.DashboardFilter) string {
+	if filter.FieldID != nil {
+		return db.DashboardView("management_balance_field")
+	}
+	return db.DashboardView("management_balance")
+}
+
+func (r *Repository) cropIncidenceView(filter domain.DashboardFilter) string {
+	if filter.FieldID != nil {
+		return db.DashboardView("crop_incidence_field")
+	}
+	return db.DashboardView("crop_incidence")
+}
+
+func (r *Repository) operationalIndicatorsView(filter domain.DashboardFilter) string {
+	if filter.FieldID != nil {
+		return db.DashboardView("operational_indicators_field")
+	}
+	return db.DashboardView("operational_indicators")
 }
 
 // resolveProjectIDs determina los IDs de proyectos a consultar basándose en los filtros
@@ -180,14 +222,27 @@ func (r *Repository) createEmptyDashboardData() *domain.DashboardData {
 }
 
 // getMetrics obtiene todas las métricas principales del dashboard en una sola query
-func (r *Repository) getMetrics(ctx context.Context, projectIDs []int64) (*models.DashboardMetricsModel, error) {
+func (r *Repository) getMetrics(ctx context.Context, projectIDs []int64, filter domain.DashboardFilter) (*models.DashboardMetricsModel, error) {
 	var result models.DashboardMetricsModel
 
-	err := r.db.Client().WithContext(ctx).
-		Table(db.DashboardView("metrics")).
-		Select("*").
-		Where("project_id IN ?", projectIDs).
-		Scan(&result).Error
+	viewName := r.metricsView(filter)
+	columns := sharedfilters.WorkspaceFilterColumns{
+		CustomerID: "customer_id",
+		ProjectID:  "project_id",
+		CampaignID: "campaign_id",
+	}
+	if filter.FieldID != nil {
+		columns.FieldID = "field_id"
+	}
+
+	err := r.applyWorkspaceFilters(
+		r.db.Client().WithContext(ctx).
+			Table(viewName).
+			Select("*").
+			Where("project_id IN ?", projectIDs),
+		filter,
+		columns,
+	).Scan(&result).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get dashboard metrics", err)
@@ -197,15 +252,22 @@ func (r *Repository) getMetrics(ctx context.Context, projectIDs []int64) (*model
 }
 
 // getContributionsProgress obtiene los datos del avance de aportes por inversor
-func (r *Repository) getContributionsProgress(ctx context.Context, projectIDs []int64) ([]models.ContributionsProgressModel, error) {
+func (r *Repository) getContributionsProgress(ctx context.Context, projectIDs []int64, filter domain.DashboardFilter) ([]models.ContributionsProgressModel, error) {
 	var results []models.ContributionsProgressModel
 
-	err := r.db.Client().WithContext(ctx).
-		Table(db.DashboardView("contributions_progress")).
-		Select("*").
-		Where("project_id IN ?", projectIDs).
-		Order("investor_id").
-		Scan(&results).Error
+	viewName := db.DashboardView("contributions_progress")
+	columns := sharedfilters.WorkspaceFilterColumns{
+		ProjectID: "project_id",
+	}
+	err := r.applyWorkspaceFilters(
+		r.db.Client().WithContext(ctx).
+			Table(viewName).
+			Select("*").
+			Where("project_id IN ?", projectIDs).
+			Order("investor_id"),
+		filter,
+		columns,
+	).Scan(&results).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get contributions progress data", err)
@@ -215,14 +277,27 @@ func (r *Repository) getContributionsProgress(ctx context.Context, projectIDs []
 }
 
 // getManagementBalance obtiene los datos del balance de gestión
-func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int64) (*models.ManagementBalanceModel, error) {
+func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int64, filter domain.DashboardFilter) (*models.ManagementBalanceModel, error) {
 	var summary models.ManagementBalanceSummary
 
-	err := r.db.Client().WithContext(ctx).
-		Table(db.DashboardView("management_balance")).
-		Select("*").
-		Where("project_id IN ?", projectIDs).
-		Scan(&summary).Error
+	viewName := r.managementBalanceView(filter)
+	columns := sharedfilters.WorkspaceFilterColumns{
+		ProjectID: "project_id",
+	}
+	if filter.FieldID != nil {
+		columns.FieldID = "field_id"
+		columns.CustomerID = "customer_id"
+		columns.CampaignID = "campaign_id"
+	}
+
+	err := r.applyWorkspaceFilters(
+		r.db.Client().WithContext(ctx).
+			Table(viewName).
+			Select("*").
+			Where("project_id IN ?", projectIDs),
+		filter,
+		columns,
+	).Scan(&summary).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get management balance data", err)
@@ -240,15 +315,28 @@ func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int6
 }
 
 // getCropIncidence obtiene los datos de incidencia de costos por cultivo
-func (r *Repository) getCropIncidence(ctx context.Context, projectIDs []int64) ([]models.CropIncidenceModel, error) {
+func (r *Repository) getCropIncidence(ctx context.Context, projectIDs []int64, filter domain.DashboardFilter) ([]models.CropIncidenceModel, error) {
 	var results []models.CropIncidenceModel
 
-	err := r.db.Client().WithContext(ctx).
-		Table(db.DashboardView("crop_incidence")).
-		Select("*").
-		Where("project_id IN ?", projectIDs).
-		Order("crop_name").
-		Scan(&results).Error
+	viewName := r.cropIncidenceView(filter)
+	columns := sharedfilters.WorkspaceFilterColumns{
+		ProjectID: "project_id",
+	}
+	if filter.FieldID != nil {
+		columns.FieldID = "field_id"
+		columns.CustomerID = "customer_id"
+		columns.CampaignID = "campaign_id"
+	}
+
+	err := r.applyWorkspaceFilters(
+		r.db.Client().WithContext(ctx).
+			Table(viewName).
+			Select("*").
+			Where("project_id IN ?", projectIDs).
+			Order("crop_name"),
+		filter,
+		columns,
+	).Scan(&results).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get crop incidence data", err)
@@ -258,15 +346,28 @@ func (r *Repository) getCropIncidence(ctx context.Context, projectIDs []int64) (
 }
 
 // getOperationalIndicators obtiene los indicadores operativos
-func (r *Repository) getOperationalIndicators(ctx context.Context, projectIDs []int64) (*models.OperationalIndicatorModel, error) {
+func (r *Repository) getOperationalIndicators(ctx context.Context, projectIDs []int64, filter domain.DashboardFilter) (*models.OperationalIndicatorModel, error) {
 	var result models.OperationalIndicatorModel
 
-	err := r.db.Client().WithContext(ctx).
-		Table(db.DashboardView("operational_indicators")).
-		Select("*").
-		Where("project_id IN ?", projectIDs).
-		Limit(1).
-		Scan(&result).Error
+	viewName := r.operationalIndicatorsView(filter)
+	columns := sharedfilters.WorkspaceFilterColumns{
+		ProjectID: "project_id",
+	}
+	if filter.FieldID != nil {
+		columns.FieldID = "field_id"
+		columns.CustomerID = "customer_id"
+		columns.CampaignID = "campaign_id"
+	}
+
+	err := r.applyWorkspaceFilters(
+		r.db.Client().WithContext(ctx).
+			Table(viewName).
+			Select("*").
+			Where("project_id IN ?", projectIDs).
+			Limit(1),
+		filter,
+		columns,
+	).Scan(&result).Error
 
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to get operational indicators data", err)

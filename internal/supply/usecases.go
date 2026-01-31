@@ -18,8 +18,8 @@ type RepositoryPort interface {
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
-	ListSuppliesPaginated(context.Context, int64, int64, string, int, int) ([]domain.Supply, int64, error)
-	ListAllSupplies(context.Context, int64) ([]domain.Supply, int64, error)
+	ListSuppliesPaginated(context.Context, domain.SupplyFilter, string, int, int) ([]domain.Supply, int64, error)
+	ListAllSupplies(context.Context, domain.SupplyFilter) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 	CreateProvider(context.Context, *providerdomain.Provider) (int64, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
@@ -86,7 +86,9 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	}
 
 	// Chequeo adicional: podés optimizarlo usando un repo más específico
-	existing, _, err := u.repo.ListSuppliesPaginated(ctx, projectID, 0, "", 1, 10000)
+	existing, _, err := u.repo.ListSuppliesPaginated(ctx, domain.SupplyFilter{
+		ProjectID: &projectID,
+	}, "", 1, 10000)
 	if err != nil {
 		return err
 	}
@@ -126,7 +128,7 @@ func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
 
 func (u *UseCases) ListSuppliesPaginated(
 	ctx context.Context,
-	projectID, campaignID int64,
+	filter domain.SupplyFilter,
 	page, perPage int,
 	mode string,
 ) ([]domain.Supply, int64, error) {
@@ -136,7 +138,7 @@ func (u *UseCases) ListSuppliesPaginated(
 	if perPage <= 0 || perPage > 1000 {
 		perPage = 1000
 	}
-	return u.repo.ListSuppliesPaginated(ctx, projectID, campaignID, mode, page, perPage)
+	return u.repo.ListSuppliesPaginated(ctx, filter, mode, page, perPage)
 }
 
 func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
@@ -156,12 +158,12 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	return u.repo.UpdateSuppliesBulk(ctx, supplies)
 }
 
-func (u *UseCases) ExportTableSupplies(ctx context.Context, projectID int64) ([]byte, error) {
+func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	items, total, err := u.repo.ListAllSupplies(ctx, projectID)
+	items, total, err := u.repo.ListAllSupplies(ctx, filter)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "Internal error", err)
 	}

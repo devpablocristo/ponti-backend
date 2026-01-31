@@ -12,6 +12,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/report/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 )
 
 // GormEnginePort define la interfaz para el motor GORM.
@@ -665,13 +666,8 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros.
 func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
-	// Si tenemos ProjectID directamente, usarlo sin buscar
-	if filter.ProjectID != nil {
-		return []int64{*filter.ProjectID}, nil
-	}
-
 	// Si no hay filtros, devolver todos los proyectos
-	if filter.CustomerID == nil && filter.CampaignID == nil && filter.FieldID == nil {
+	if filter.ProjectID == nil && filter.CustomerID == nil && filter.CampaignID == nil && filter.FieldID == nil {
 		query := `SELECT DISTINCT p.id FROM projects p WHERE p.deleted_at IS NULL`
 		var projectIDs []int64
 		if err := r.db.Client().Raw(query).Scan(&projectIDs).Error; err != nil {
@@ -680,37 +676,12 @@ func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]i
 		return projectIDs, nil
 	}
 
-	query := `
-		SELECT DISTINCT p.id
-		FROM projects p
-		WHERE p.deleted_at IS NULL
-	`
-
-	var args []any
-	argIndex := 1
-
-	// Aplicar filtros si están presentes
-	if filter.CustomerID != nil {
-		query += " AND p.customer_id = $" + fmt.Sprintf("%d", argIndex)
-		args = append(args, *filter.CustomerID)
-		argIndex++
-	}
-	if filter.CampaignID != nil {
-		query += " AND p.campaign_id = $" + fmt.Sprintf("%d", argIndex)
-		args = append(args, *filter.CampaignID)
-		argIndex++
-	}
-	if filter.FieldID != nil {
-		query += " AND EXISTS (SELECT 1 FROM fields f WHERE f.id = $" + fmt.Sprintf("%d", argIndex) + " AND f.project_id = p.id)"
-		args = append(args, *filter.FieldID)
-	}
-
-	var projectIDs []int64
-	if err := r.db.Client().Raw(query, args...).Scan(&projectIDs).Error; err != nil {
-		return nil, fmt.Errorf("error al obtener proyectos relacionados: %w", err)
-	}
-
-	return projectIDs, nil
+	return sharedfilters.ResolveProjectIDs(context.Background(), r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
 }
 
 // getProjectInfo obtiene la información básica del proyecto.

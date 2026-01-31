@@ -135,5 +135,5 @@ __debug_bin*
 
 .cursorignore
 .cursorrules
-ponti-backend.code-workspace
-
+*.code-workspace
+*.dump

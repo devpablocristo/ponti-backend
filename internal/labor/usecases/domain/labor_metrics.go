@@ -1,3 +1,4 @@
+// Package domain define entidades de labor.
 package domain
 
 import "github.com/shopspring/decimal"
@@ -9,8 +10,10 @@ type LaborMetrics struct {
 	AvgCostPerHa decimal.Decimal
 }
 
-// LaborFilter permite filtrado opcional por proyecto y campo
+// LaborFilter permite filtrado opcional por workspace
 type LaborFilter struct {
-	ProjectID *int64
-	FieldID   *int64
+	CustomerID *int64
+	ProjectID  *int64
+	CampaignID *int64
+	FieldID    *int64
 }

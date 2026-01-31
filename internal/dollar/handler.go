@@ -65,7 +65,7 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListByProject(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -89,7 +89,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 }
 
 func (h *Handler) CreateorUpdateBulk(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

@@ -25,14 +25,13 @@ type UseCasesPort interface {
 	DeleteSupply(ctx context.Context, id int64) error
 	ListSuppliesPaginated(
 		ctx context.Context,
-		projectID int64,
-		campaignID int64,
+		filter domain.SupplyFilter,
 		page int,
 		perPage int,
 		mode string,
 	) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
-	ExportTableSupplies(ctx context.Context, projectID int64) ([]byte, error)
+	ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error)
 	GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
@@ -143,12 +142,7 @@ func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 }
 
 func (h *Handler) ListSupplies(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -157,15 +151,13 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 
-	var projectIDValue int64
-	if projectID != nil {
-		projectIDValue = *projectID
+	filter := domain.SupplyFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
 	}
-	var campaignIDValue int64
-	if campaignID != nil {
-		campaignIDValue = *campaignID
-	}
-	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), projectIDValue, campaignIDValue, page, perPage, mode)
+	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), filter, page, perPage, mode)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -249,17 +241,19 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 }
 
 func (h *Handler) ExportTableSupplies(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var projectIDValue int64
-	if projectID != nil {
-		projectIDValue = *projectID
+	filter := domain.SupplyFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
 	}
 
-	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), projectIDValue)
+	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), filter)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -282,7 +276,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -322,7 +316,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -338,7 +332,7 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -366,7 +360,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -421,7 +415,7 @@ func handleError(err error, c *gin.Context) bool {
 func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}

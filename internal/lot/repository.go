@@ -23,6 +23,7 @@ import (
 	models "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 )
@@ -304,6 +305,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 
 	where := []string{"1=1"}
 	args := []any{}
+	if projectID > 0 && fieldID > 0 {
+		if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+			return nil, err
+		}
+	}
 	if fieldID > 0 {
 		where = append(where, "lot_id IN (SELECT id FROM lots WHERE field_id = ? AND deleted_at IS NULL)")
 		args = append(args, fieldID)
@@ -349,21 +355,43 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 
 func (r *Repository) ListLots(
 	ctx context.Context,
-	projectID, fieldID, cropID int64,
+	filter domain.LotListFilter,
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 	where := []string{"1=1"}
 	args := []any{}
-	if fieldID > 0 {
-		where = append(where, "field_id = ?")
-		args = append(args, fieldID)
-	} else if projectID > 0 {
-		where = append(where, "project_id = ?")
-		args = append(args, projectID)
+	if filter.ProjectID != nil && (filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil) {
+		_, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+			CustomerID: filter.CustomerID,
+			ProjectID:  filter.ProjectID,
+			CampaignID: filter.CampaignID,
+			FieldID:    filter.FieldID,
+		})
+		if err != nil {
+			return nil, 0, decimal.Zero, decimal.Zero, err
+		}
 	}
-	if cropID > 0 {
+	if filter.FieldID != nil && *filter.FieldID > 0 {
+		where = append(where, "field_id = ?")
+		args = append(args, *filter.FieldID)
+	} else {
+		projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+			CustomerID: filter.CustomerID,
+			ProjectID:  filter.ProjectID,
+			CampaignID: filter.CampaignID,
+			FieldID:    filter.FieldID,
+		})
+		if err != nil {
+			return nil, 0, decimal.Zero, decimal.Zero, err
+		}
+		if len(projectIDs) > 0 {
+			where = append(where, "project_id IN ?")
+			args = append(args, projectIDs)
+		}
+	}
+	if filter.CropID != nil && *filter.CropID > 0 {
 		where = append(where, "(current_crop_id = ? OR previous_crop_id = ?)")
-		args = append(args, cropID, cropID)
+		args = append(args, *filter.CropID, *filter.CropID)
 	}
 	whereSQL := strings.Join(where, " AND ")
 	view := shareddb.ReportView("lot_list")

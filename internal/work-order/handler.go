@@ -202,48 +202,29 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 
 // parseFilters extrae project_id, field_id, customer_id y campaign_id.
 func parseFilters(c *gin.Context) domain.WorkOrderFilter {
-	var f domain.WorkOrderFilter
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id"); err == nil {
-		f.ProjectID = id
+	f := domain.WorkOrderFilter{}
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		return f
 	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id"); err == nil {
-		f.FieldID = id
-	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id"); err == nil {
-		f.CustomerID = id
-	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id"); err == nil {
-		f.CampaignID = id
-	}
+	f.ProjectID = workspaceFilter.ProjectID
+	f.FieldID = workspaceFilter.FieldID
+	f.CustomerID = workspaceFilter.CustomerID
+	f.CampaignID = workspaceFilter.CampaignID
 	return f
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
 	var filt domain.WorkOrderFilter
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id"); err != nil {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
-	} else {
-		filt.ProjectID = id
 	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id"); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	} else {
-		filt.FieldID = id
-	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id"); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	} else {
-		filt.CustomerID = id
-	}
-	if id, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id"); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	} else {
-		filt.CampaignID = id
-	}
+	filt.ProjectID = workspaceFilter.ProjectID
+	filt.FieldID = workspaceFilter.FieldID
+	filt.CustomerID = workspaceFilter.CustomerID
+	filt.CampaignID = workspaceFilter.CampaignID
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)

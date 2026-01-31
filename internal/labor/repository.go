@@ -9,6 +9,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
@@ -222,6 +223,9 @@ func (r *Repository) ListGroupLabor(
 	projectID int64,
 	fieldID int64,
 ) ([]domain.LaborListItem, types.PageInfo, error) {
+	if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+		return nil, types.PageInfo{}, err
+	}
 	where := []string{}
 	args := []any{}
 	if fieldID != 0 {
@@ -376,10 +380,13 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 	return v, nil
 }
 
-// TODO: Eliminar este método
-// ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA
-// Este método implementa la lógica original con cálculos en Go y join con project_dollar_values
+// ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA.
+// TODO: Eliminar este método.
+// Este método implementa la lógica original con cálculos en Go y join con project_dollar_values.
 func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
+	if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+		return nil, types.PageInfo{}, err
+	}
 	where := []string{}
 	args := []any{usdMonth}
 	if fieldID != 0 {
@@ -514,6 +521,23 @@ func safeStringPtr(ptr *string) string {
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: f.CustomerID,
+		ProjectID:  f.ProjectID,
+		CampaignID: f.CampaignID,
+		FieldID:    f.FieldID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(projectIDs) == 0 && (f.ProjectID != nil || f.CustomerID != nil || f.CampaignID != nil || f.FieldID != nil) {
+		return &domain.LaborMetrics{
+			SurfaceHa:    decimal.Zero,
+			NetTotalCost: decimal.Zero,
+			AvgCostPerHa: decimal.Zero,
+		}, nil
+	}
+
 	var row struct {
 		SurfaceHa    decimal.Decimal `gorm:"column:surface_ha"`
 		NetTotalCost decimal.Decimal `gorm:"column:total_labor_cost"`
@@ -521,16 +545,16 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	}
 
 	// Caso 1: project_id Y field_id → devolver métricas de un campo específico
-	if f.ProjectID != nil && f.FieldID != nil {
+	if len(projectIDs) > 0 && f.FieldID != nil {
 		q := fmt.Sprintf(`
 			SELECT 
 				surface_ha,
 				total_labor_cost,
 				avg_labor_cost_per_ha
 			FROM %s
-			WHERE project_id = ? AND field_id = ?
+			WHERE project_id IN ? AND field_id = ?
 		`, shareddb.ReportView("labor_metrics"))
-		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID, *f.FieldID).Scan(&row).Error; err != nil {
+		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs, *f.FieldID).Scan(&row).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 		}
 
@@ -542,7 +566,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 	}
 
 	// Caso 2: SOLO project_id (sin field_id) → sumar métricas de todos los campos del proyecto
-	if f.ProjectID != nil {
+	if len(projectIDs) > 0 {
 		q := fmt.Sprintf(`
 			SELECT 
 				COALESCE(SUM(surface_ha), 0) as surface_ha,
@@ -553,9 +577,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 					ELSE 0 
 				END as avg_labor_cost_per_ha
 			FROM %s
-			WHERE project_id = ?
+			WHERE project_id IN ?
 		`, shareddb.ReportView("labor_metrics"))
-		if err := r.db.Client().WithContext(ctx).Raw(q, *f.ProjectID).Scan(&row).Error; err != nil {
+		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs).Scan(&row).Error; err != nil {
 			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
 		}
 

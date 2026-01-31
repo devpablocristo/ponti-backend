@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
@@ -209,15 +210,29 @@ func (r *Repository) ListWorkOrders(
 		WithContext(ctx).
 		Model(&models.WorkOrderListElement{})
 
-	// 2) Aplicar filtros
-	if filt.ProjectID != nil {
-		base = base.Where("project_id = ?", *filt.ProjectID)
+	// 2) Resolver filtros de proyecto (customer/campaign/field)
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filt.CustomerID,
+		ProjectID:  filt.ProjectID,
+		CampaignID: filt.CampaignID,
+		FieldID:    filt.FieldID,
+	})
+	if err != nil {
+		return nil, types.PageInfo{}, err
 	}
+	if len(projectIDs) > 0 {
+		base = base.Where("project_id IN ?", projectIDs)
+	} else if filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil {
+		// filtros presentes pero sin resultados: devolver vacío
+		return []domain.WorkOrderListElement{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+	}
+
+	// 3) Aplicar filtros directos
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
 
-	// 3) Contar total
+	// 4) Contar total
 	var total int64
 	if err := base.
 		Count(&total).Error; err != nil {
@@ -225,10 +240,10 @@ func (r *Repository) ListWorkOrders(
 			"failed to count work orders", err)
 	}
 
-	// 4) Paginación
+	// 5) Paginación
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
-	// 5) Recuperar filas paginadas (reutiliza 'base' con filtros)
+	// 6) Recuperar filas paginadas (reutiliza 'base' con filtros)
 	var rows []models.WorkOrderListElement
 	if err := base.
 		Limit(int(inp.PageSize)).
@@ -239,7 +254,7 @@ func (r *Repository) ListWorkOrders(
 			"failed to list work orders", err)
 	}
 
-	// 6) Mapear a dominio
+	// 7) Mapear a dominio
 	list := make([]domain.WorkOrderListElement, len(rows))
 	for i, m := range rows {
 		list[i] = domain.WorkOrderListElement{
@@ -265,12 +280,30 @@ func (r *Repository) ListWorkOrders(
 		}
 	}
 
-	// 7) Construir PageInfo y devolver
+	// 8) Construir PageInfo y devolver
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return list, pageInfo, nil
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filt.CustomerID,
+		ProjectID:  filt.ProjectID,
+		CampaignID: filt.CampaignID,
+		FieldID:    filt.FieldID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(projectIDs) == 0 && (filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil) {
+		return &domain.WorkOrderMetrics{
+			SurfaceHa:  decimal.Zero,
+			Liters:     decimal.Zero,
+			Kilograms:  decimal.Zero,
+			DirectCost: decimal.Zero,
+		}, nil
+	}
+
 	// Construimos el WHERE dinámico según los filtros presentes
 	q := fmt.Sprintf(`
 		SELECT
@@ -283,21 +316,13 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 	`, shareddb.ReportView("workorder_metrics"))
 	var args []any
 
-	if filt.ProjectID != nil {
-		q += " AND project_id = ?"
-		args = append(args, *filt.ProjectID)
+	if len(projectIDs) > 0 {
+		q += " AND project_id IN ?"
+		args = append(args, projectIDs)
 	}
 	if filt.FieldID != nil {
 		q += " AND field_id = ?"
 		args = append(args, *filt.FieldID)
-	}
-	if filt.CustomerID != nil {
-		q += " AND customer_id = ?"
-		args = append(args, *filt.CustomerID)
-	}
-	if filt.CampaignID != nil {
-		q += " AND campaign_id = ?"
-		args = append(args, *filt.CampaignID)
 	}
 
 	var row struct {

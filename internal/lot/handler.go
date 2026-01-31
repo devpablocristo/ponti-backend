@@ -35,8 +35,8 @@ type UseCasesPort interface {
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
 	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
-	ListLots(context.Context, int64, int64, int64, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
-	ExportLots(context.Context, int64, int64, int64, int, int) ([]byte, error)
+	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
+	ExportLots(context.Context, domain.LotListFilter, int, int) ([]byte, error)
 }
 
 type GinEnginePort interface {
@@ -111,32 +111,19 @@ func (h *Handler) CreateLot(c *gin.Context) {
 }
 
 func (h *Handler) ListLots(c *gin.Context) {
-	projectID := int64(0)
-	if raw := c.Query("project_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
-			return
-		}
-		projectID = parsed
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
 	}
-	fieldID := int64(0)
-	if raw := c.Query("field_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
-			return
-		}
-		fieldID = parsed
-	}
-	cropID := int64(0)
+	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
 			return
 		}
-		cropID = parsed
+		cropID = &parsed
 	}
 	page := 1
 	if raw := c.Query("page"); raw != "" {
@@ -169,7 +156,14 @@ func (h *Handler) ListLots(c *gin.Context) {
 		pageSize = 1000
 	}
 
-	rows, total, sumSowed, sumCost, err := h.ucs.ListLots(c.Request.Context(), projectID, fieldID, cropID, page, pageSize)
+	filter := domain.LotListFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+		CropID:     cropID,
+	}
+	rows, total, sumSowed, sumCost, err := h.ucs.ListLots(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
 		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
@@ -306,32 +300,19 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 }
 
 func (h *Handler) ExportLots(c *gin.Context) {
-	projectID := int64(0)
-	if raw := c.Query("project_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
-			return
-		}
-		projectID = parsed
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
 	}
-	fieldID := int64(0)
-	if raw := c.Query("field_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
-			return
-		}
-		fieldID = parsed
-	}
-	cropID := int64(0)
+	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
 			return
 		}
-		cropID = parsed
+		cropID = &parsed
 	}
 	page := 1
 	if raw := c.Query("page"); raw != "" {
@@ -364,7 +345,14 @@ func (h *Handler) ExportLots(c *gin.Context) {
 		pageSize = 1000
 	}
 
-	data, err := h.ucs.ExportLots(c.Request.Context(), projectID, fieldID, cropID, page, pageSize)
+	filter := domain.LotListFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+		CropID:     cropID,
+	}
+	data, err := h.ucs.ExportLots(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
 		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return

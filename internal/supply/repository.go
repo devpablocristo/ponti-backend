@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
@@ -153,7 +154,7 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 // --- LIST CENTRALIZADO, con filtros y paginación ---
 func (r *Repository) ListSuppliesPaginated(
 	ctx context.Context,
-	projectID, campaignID int64,
+	filter domain.SupplyFilter,
 	mode string,
 	page, perPage int,
 ) ([]domain.Supply, int64, error) {
@@ -165,8 +166,19 @@ func (r *Repository) ListSuppliesPaginated(
 		Preload("Type")
 
 	// Filtrado flexible
-	if projectID > 0 {
-		db = db.Where("project_id = ?", projectID)
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(projectIDs) > 0 {
+		db = db.Where("project_id IN ?", projectIDs)
+	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
+		return []domain.Supply{}, 0, nil
 	}
 
 	// Total para paginación
@@ -218,11 +230,22 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 	})
 }
 
-func (r *Repository) ListAllSupplies(ctx context.Context, projectID int64) ([]domain.Supply, int64, error) {
+func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFilter) ([]domain.Supply, int64, error) {
 	base := r.db.Client().WithContext(ctx).Model(&models.Supply{})
 
-	if projectID > 0 {
-		base = base.Where("project_id = ?", projectID)
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(projectIDs) > 0 {
+		base = base.Where("project_id IN ?", projectIDs)
+	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
+		return []domain.Supply{}, 0, nil
 	}
 
 	var total int64

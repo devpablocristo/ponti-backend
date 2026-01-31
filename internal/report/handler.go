@@ -134,35 +134,14 @@ func (h *ReportHandler) parseFiltersByType(c *gin.Context, reportType string) (i
 // parseReportFilters parsea filtros para reportes estándar.
 func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter, error) {
 	filters := domain.ReportFilter{}
-
-	// Parsear customer_id
-	customerID, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		return filters, err
 	}
-	filters.CustomerID = customerID
-
-	// Parsear project_id
-	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
-	if err != nil {
-		return filters, err
-	}
-	filters.ProjectID = projectID
-
-	// Parsear campaign_id
-	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
-	if err != nil {
-		return filters, err
-	}
-	filters.CampaignID = campaignID
-
-	// Parsear field_id
-	fieldID, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id")
-	if err != nil {
-		return filters, err
-	}
-	filters.FieldID = fieldID
-
+	filters.CustomerID = workspaceFilter.CustomerID
+	filters.ProjectID = workspaceFilter.ProjectID
+	filters.CampaignID = workspaceFilter.CampaignID
+	filters.FieldID = workspaceFilter.FieldID
 	return filters, nil
 }
 

@@ -226,7 +226,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 				Times(1)
 
 			mockLotRepo.EXPECT().
-				ListLots(ctx, pID, int64(0), int64(0), 1, 10000).
+				ListLots(ctx, lotDomain.LotListFilter{ProjectID: &pID}, 1, 10000).
 				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
 				Times(1)
 

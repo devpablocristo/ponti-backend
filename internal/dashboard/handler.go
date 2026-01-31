@@ -1,3 +1,4 @@
+// Package dashboard expone endpoints del dashboard.
 package dashboard
 
 import (
@@ -69,35 +70,18 @@ func (h *Handler) Routes() {
 // GetDashboard retrieves dashboard data based on query parameters.
 func (h *Handler) GetDashboard(c *gin.Context) {
 	// Parse query parameters for filters
-	var filter domain.DashboardFilter
-
-	customerID, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	filter.CustomerID = customerID
 
-	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
+	filter := domain.DashboardFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
 	}
-	filter.ProjectID = projectID
-
-	campaignID, err := sharedhandlers.ParseOptionalInt64Query(c, "campaign_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	filter.CampaignID = campaignID
-
-	fieldID, err := sharedhandlers.ParseOptionalInt64Query(c, "field_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	filter.FieldID = fieldID
 
 	// Get dashboard data
 	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)

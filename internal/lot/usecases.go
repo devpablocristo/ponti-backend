@@ -24,7 +24,7 @@ type RepositoryPort interface {
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
 	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
-	ListLots(context.Context, int64, int64, int64, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
+	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 }
 
@@ -87,18 +87,18 @@ func (u *UseCases) GetMetrics(
 
 func (u *UseCases) ListLots(
 	ctx context.Context,
-	projectID, fieldID, cropID int64,
+	filter domain.LotListFilter,
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
-	return u.repo.ListLots(ctx, projectID, fieldID, cropID, page, pageSize)
+	return u.repo.ListLots(ctx, filter, page, pageSize)
 }
 
-func (u *UseCases) ExportLots(ctx context.Context, projectID, fieldID, cropID int64, page, pageSize int) ([]byte, error) {
+func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	items, _, _, _, err := u.ListLots(ctx, projectID, fieldID, cropID, page, pageSize)
+	items, _, _, _, err := u.ListLots(ctx, filter, page, pageSize)
 	if err != nil {
 		return nil, types.NewError(types.ErrInternal, "list lots", err)
 	}

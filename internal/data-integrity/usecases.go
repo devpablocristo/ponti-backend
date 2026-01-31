@@ -43,7 +43,7 @@ type DashboardRepositoryPort interface {
 
 // LotRepositoryPort define la interfaz para el repositorio de lotes
 type LotRepositoryPort interface {
-	ListLots(ctx context.Context, projectID, fieldID, cropID int64, page, pageSize int) ([]lotDomain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
+	ListLots(ctx context.Context, filter lotDomain.LotListFilter, page, pageSize int) ([]lotDomain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 }
 
 // ReportRepositoryPort define la interfaz para el repositorio de reportes
@@ -255,7 +255,8 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 	}
 
 	// RIGHT: Suma desde lotes (usa SSOT)
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -435,8 +436,8 @@ func (u *UseCases) control6_LaboresVsAportes(ctx context.Context, projectID *int
 	leftValue := dashboardData.ManagementBalance.Summary.LaboresInvertidosUSD
 
 	// RIGHT: Informe de aportes (suma de categorías sin cosecha)
-	filter := reportDomain.ReportFilter{ProjectID: projectID}
-	investorReport, err := u.reportRepo.GetInvestorContributionReport(ctx, filter)
+	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
+	investorReport, err := u.reportRepo.GetInvestorContributionReport(ctx, reportFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -525,7 +526,8 @@ func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -536,8 +538,8 @@ func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *
 	}
 
 	// RIGHT: Total Aportes Adm.Proyecto del Informe
-	filter := reportDomain.ReportFilter{ProjectID: projectID}
-	investorReport, err := u.reportRepo.GetInvestorContributionReport(ctx, filter)
+	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
+	investorReport, err := u.reportRepo.GetInvestorContributionReport(ctx, reportFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -578,7 +580,8 @@ func (u *UseCases) control9_LotesArriendoVsAportes(ctx context.Context, projectI
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -632,7 +635,8 @@ func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, proj
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -644,8 +648,8 @@ func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, proj
 	}
 
 	// RIGHT: Obtener resumen de resultados
-	filter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
-	summaryResults, err := u.reportRepo.GetSummaryResults(filter)
+	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
+	summaryResults, err := u.reportRepo.GetSummaryResults(summaryFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -683,7 +687,8 @@ func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context,
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -695,8 +700,8 @@ func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context,
 	}
 
 	// RIGHT: Informe por cultivo
-	filter := reportDomain.ReportFilter{ProjectID: projectID}
-	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(filter)
+	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
+	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(reportFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -735,7 +740,8 @@ func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Contex
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -747,8 +753,8 @@ func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Contex
 	}
 
 	// RIGHT: Informe de Resultado Generales (primera fila = GRAL)
-	filter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
-	summaryResults, err := u.reportRepo.GetSummaryResults(filter)
+	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
+	summaryResults, err := u.reportRepo.GetSummaryResults(summaryFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -786,7 +792,8 @@ func (u *UseCases) control13_LotesResultadoVsDashboard(ctx context.Context, proj
 	}
 
 	// LEFT: Calcular desde lotes
-	lots, _, _, _, err := u.lotRepo.ListLots(ctx, pID, 0, 0, 1, 10000)
+	filter := lotDomain.LotListFilter{ProjectID: &pID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, filter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}

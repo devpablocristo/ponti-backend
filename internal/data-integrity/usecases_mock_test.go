@@ -133,9 +133,9 @@ func (m *MockLotRepositoryPort) EXPECT() *MockLotRepositoryPortMockRecorder {
 }
 
 // ListLots mocks base method.
-func (m *MockLotRepositoryPort) ListLots(ctx context.Context, projectID, fieldID, cropID int64, page, pageSize int) ([]domain0.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
+func (m *MockLotRepositoryPort) ListLots(ctx context.Context, filter domain0.LotListFilter, page, pageSize int) ([]domain0.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListLots", ctx, projectID, fieldID, cropID, page, pageSize)
+	ret := m.ctrl.Call(m, "ListLots", ctx, filter, page, pageSize)
 	ret0, _ := ret[0].([]domain0.LotTable)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(decimal.Decimal)
@@ -145,9 +145,9 @@ func (m *MockLotRepositoryPort) ListLots(ctx context.Context, projectID, fieldID
 }
 
 // ListLots indicates an expected call of ListLots.
-func (mr *MockLotRepositoryPortMockRecorder) ListLots(ctx, projectID, fieldID, cropID, page, pageSize interface{}) *gomock.Call {
+func (mr *MockLotRepositoryPortMockRecorder) ListLots(ctx, filter, page, pageSize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLots", reflect.TypeOf((*MockLotRepositoryPort)(nil).ListLots), ctx, projectID, fieldID, cropID, page, pageSize)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLots", reflect.TypeOf((*MockLotRepositoryPort)(nil).ListLots), ctx, filter, page, pageSize)
 }
 
 // MockReportRepositoryPort is a mock of ReportRepositoryPort interface.

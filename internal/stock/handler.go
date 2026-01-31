@@ -87,7 +87,7 @@ func (h *Handler) Routes() {
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -112,7 +112,7 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 
 func (h *Handler) getStocksPeriods(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -128,7 +128,6 @@ func (h *Handler) getStocksPeriods(c *gin.Context) {
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
 func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("project_id")
 
 	monthPeriod, err := getMonthPeriod(c)
 	if handleError(err, c) {
@@ -152,7 +151,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		return
 	}
 
-	projectID, err := sharedhandlers.ParseParamID(projectIDStr, "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}
@@ -276,9 +275,7 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 // Ruta nueva: /api/v1/projects/:project_id/stocks/export
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectIDStr := c.Param("project_id")
-
-	projectID, err := sharedhandlers.ParseParamID(projectIDStr, "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if handleError(err, c) {
 		return
 	}

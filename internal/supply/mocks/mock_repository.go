@@ -200,7 +200,7 @@ func (mr *MockRepositoryPortMockRecorder) GetWorkOrdersBySupplyID(ctx, supplyID 
 }
 
 // ListAllSupplies mocks base method.
-func (m *MockRepositoryPort) ListAllSupplies(arg0 context.Context, arg1 int64) ([]domain1.Supply, int64, error) {
+func (m *MockRepositoryPort) ListAllSupplies(arg0 context.Context, arg1 domain1.SupplyFilter) ([]domain1.Supply, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListAllSupplies", arg0, arg1)
 	ret0, _ := ret[0].([]domain1.Supply)
@@ -216,9 +216,9 @@ func (mr *MockRepositoryPortMockRecorder) ListAllSupplies(arg0, arg1 interface{}
 }
 
 // ListSuppliesPaginated mocks base method.
-func (m *MockRepositoryPort) ListSuppliesPaginated(arg0 context.Context, arg1, arg2 int64, arg3 string, arg4, arg5 int) ([]domain1.Supply, int64, error) {
+func (m *MockRepositoryPort) ListSuppliesPaginated(arg0 context.Context, arg1 domain1.SupplyFilter, arg2 string, arg3, arg4 int) ([]domain1.Supply, int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListSuppliesPaginated", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "ListSuppliesPaginated", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].([]domain1.Supply)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
@@ -226,9 +226,9 @@ func (m *MockRepositoryPort) ListSuppliesPaginated(arg0 context.Context, arg1, a
 }
 
 // ListSuppliesPaginated indicates an expected call of ListSuppliesPaginated.
-func (mr *MockRepositoryPortMockRecorder) ListSuppliesPaginated(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListSuppliesPaginated(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSuppliesPaginated", reflect.TypeOf((*MockRepositoryPort)(nil).ListSuppliesPaginated), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSuppliesPaginated", reflect.TypeOf((*MockRepositoryPort)(nil).ListSuppliesPaginated), arg0, arg1, arg2, arg3, arg4)
 }
 
 // UpdateSuppliesBulk mocks base method.

@@ -149,7 +149,7 @@ func (h *Handler) ListProjects(c *gin.Context) {
 }
 
 func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -206,7 +206,7 @@ func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
 
 // GetProject devuelve un proyecto por ID.
 func (h *Handler) GetProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -222,7 +222,7 @@ func (h *Handler) GetProject(c *gin.Context) {
 
 // UpdateProject actualiza un proyecto.
 func (h *Handler) UpdateProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -255,7 +255,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 
 // DeleteProject elimina un proyecto por ID.
 func (h *Handler) DeleteProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -270,7 +270,7 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
 func (h *Handler) RestoreProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -285,7 +285,7 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 
 // HardDeleteProject elimina físicamente un proyecto por ID.
 func (h *Handler) HardDeleteProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
