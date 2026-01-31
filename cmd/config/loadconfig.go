@@ -16,7 +16,6 @@ type Config struct {
 	Service        Service        // Variables generales
 	API            API            // Configuración de API
 	HTTPServer     HTTPServer     // Configuración del servidor HTTP
-	Debugger       Debugger       // Configuración del debugger
 	DB             DB             // Configuración de base de datos
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
