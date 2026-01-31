@@ -1,168 +1,89 @@
-# Configuración de Variables GitHub Actions - Guía Paso a Paso
+# Configuración de Variables y Secrets en GitHub Actions
 
-## 📋 Resumen de Cambios
+Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PROD) y los workflows nuevos.
 
-Necesitas **renombrar 5 variables** (agregar `_DEV`) y **crear 5 variables nuevas** de PROD.
+## Dónde se configuran
 
----
+- **Repository variables**: valores no sensibles, comunes a todos los jobs.
+- **Repository secrets**: valores sensibles (passwords, API keys).
+- **Environments (`dev`, `stg`, `prod`)**: solo para reglas de protección.
 
-## 🔄 PASO 1: Renombrar Variables Existentes
+## Variables de repositorio (no sensibles)
 
-Ve a cada variable y **cambia el nombre** agregando `_DEV` al final. Los valores se mantienen iguales.
+### Generales (compartidas)
+| Variable | Valor |
+|----------|-------|
+| `ARTIFACT_REGISTRY` | `ponti-backend-registry` |
+| `GCP_REGION` | `us-central1` |
+| `IMAGE_NAME` | `ponti-backend` |
+| `API_VERSION` | `v1` |
+| `HTTP_SERVER_NAME` | `http-server` |
+| `HTTP_SERVER_HOST` | `0.0.0.0` |
+| `DB_TYPE` | `postgres` |
+| `DB_SSL_MODE` | `disable` |
+| `DB_PORT` | `5432` |
+| `MIGRATIONS_DIR` | `file://migrations_v4` |
+| `WORDS_SUGGESTER_LIMIT` | `100` |
+| `WORDS_SUGGESTER_THRESHOLD` | `0.3` |
+| `REPORT_SCHEMA` | `v4_report` |
+| `SERVICE_NAME_ENV` | `ponti-api` |
+| `SERVICE_VERSION_ENV` | `1.0` |
+| `SERVICE_MAX_RETRIES_ENV` | `5` |
 
-### Variables a Renombrar:
+### DEV
+| Variable | Valor |
+|----------|-------|
+| `GCP_PROJECT_ID_DEV` | `new-ponti-dev` |
+| `SERVICE_NAME_DEV` | `ponti-backend` |
+| `CLOUD_RUN_SERVICE_ACCOUNT_DEV` | `cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com` |
+| `WIF_PROVIDER_DEV` | `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
+| `WIF_SERVICE_ACCOUNT_DEV` | `github-actions@new-ponti-dev.iam.gserviceaccount.com` |
+| `CLOUDSQL_INSTANCE_DEV` | `new-ponti-dev:us-central1:new-ponti-db-dev` |
+| `DB_NAME_DEV` | `ponti_api_db` |
+| `DB_USER_DEV` | `soalen-db-v3` |
+| `DB_INSTANCE_NAME_DEV` | `new-ponti-db-dev` |
+| `PREVIEW_SERVICE_PREFIX` | `ponti-backend-preview-` |
+| `PREVIEW_BUCKET` | `backup-ponti-dev` |
+| `PREVIEW_SEED_URI` | *(vacío si no hay seed fija)* |
 
-| Nombre Actual | Nuevo Nombre | Valor Actual (mantener) |
-|---------------|--------------|-------------------------|
-| `GCP_PROJECT_ID` | `GCP_PROJECT_ID_DEV` | `new-ponti-dev` |
-| `SERVICE_NAME` | `SERVICE_NAME_DEV` | `ponti-backend-dev` |
-| `CLOUD_RUN_SERVICE_ACCOUNT` | `CLOUD_RUN_SERVICE_ACCOUNT_DEV` | `cloudrun-sa@new-ponti-dev.iam.gserviceaccount.com` |
-| `WIF_PROVIDER` | `WIF_PROVIDER_DEV` | `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
-| `WIF_SERVICE_ACCOUNT` | `WIF_SERVICE_ACCOUNT_DEV` | `github-actions@new-ponti-dev.iam.gserviceaccount.com` |
+### STG
+| Variable | Valor |
+|----------|-------|
+| `GCP_PROJECT_ID_STG` | `new-ponti-stg` |
+| `SERVICE_NAME_STG` | `ponti-backend` |
+| `CLOUD_RUN_SERVICE_ACCOUNT_STG` | `cloudrun-sa@new-ponti-stg.iam.gserviceaccount.com` |
+| `WIF_PROVIDER_STG` | `projects/65243764597/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
+| `WIF_SERVICE_ACCOUNT_STG` | `github-actions@new-ponti-stg.iam.gserviceaccount.com` |
+| `CLOUDSQL_INSTANCE_STG` | `new-ponti-stg:us-central1:new-ponti-db-stg` |
+| `DB_NAME_STG` | `ponti_api_db` |
+| `DB_USER_STG` | `soalen-db-v3` |
+| `DB_INSTANCE_NAME_STG` | `new-ponti-db-stg` |
+| `GOLDEN_SNAPSHOT_BUCKET` | `golden-ponti-stg-65243764597` |
 
-> **Nota**: El servicio en dev ahora se llama `ponti-backend-dev` (con sufijo) para mantener consistencia con `ponti-backend-prod`.
+### PROD
+| Variable | Valor |
+|----------|-------|
+| `GCP_PROJECT_ID_PROD` | `new-ponti-prod` |
+| `SERVICE_NAME_PROD` | `ponti-backend` |
+| `CLOUD_RUN_SERVICE_ACCOUNT_PROD` | `cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com` |
+| `WIF_PROVIDER_PROD` | `projects/875939220111/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
+| `WIF_SERVICE_ACCOUNT_PROD` | `github-actions@new-ponti-prod.iam.gserviceaccount.com` |
+| `CLOUDSQL_INSTANCE_PROD` | `new-ponti-prod:us-central1:new-ponti-prod-db` |
+| `DB_NAME_PROD` | `ponti_api_db` |
+| `DB_USER_PROD` | `soalen-db-v3` |
+| `DB_INSTANCE_NAME_PROD` | `new-ponti-prod-db` |
 
-**Cómo hacerlo:**
-1. Click en cada variable
-2. Click en "Edit"
-3. Cambiar el nombre agregando `_DEV` al final
-4. Guardar
-5. Eliminar la variable antigua (si existe)
+## Secrets de repositorio (sensibles)
 
----
+| Secret | Descripción |
+|--------|-------------|
+| `DB_PASSWORD_DEV` | Password del usuario DB dev |
+| `X_API_KEY_DEV` | API key dev |
+| `DB_PASSWORD_STG` | Password del usuario DB stg |
+| `X_API_KEY_STG` | API key stg |
+| `DB_PASSWORD_PROD` | Password del usuario DB prod |
+| `X_API_KEY_PROD` | API key prod |
 
-## ➕ PASO 2: Crear Variables Nuevas de PROD
+## Environments en GitHub
 
-Click en **"New repository variable"** y crea estas 5 variables:
-
-### 1. GCP_PROJECT_ID_PROD
-- **Name**: `GCP_PROJECT_ID_PROD`
-- **Value**: `new-ponti-prod`
-
-### 2. SERVICE_NAME_PROD
-- **Name**: `SERVICE_NAME_PROD`
-- **Value**: `ponti-backend-prod`
-
-> **Nota**: Ahora ambos servicios tienen sufijo consistente: `ponti-backend-dev` y `ponti-backend-prod`.
-
-### 3. CLOUD_RUN_SERVICE_ACCOUNT_PROD
-- **Name**: `CLOUD_RUN_SERVICE_ACCOUNT_PROD`
-- **Value**: `cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com`
-
-### 4. WIF_PROVIDER_PROD
-- **Name**: `WIF_PROVIDER_PROD`
-- **Value**: `projects/875939220111/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
-
-### 5. WIF_SERVICE_ACCOUNT_PROD
-- **Name**: `WIF_SERVICE_ACCOUNT_PROD`
-- **Value**: `github-actions@new-ponti-prod.iam.gserviceaccount.com`
-
----
-
-## ✅ Variables que NO Cambian (Se Mantienen Igual)
-
-Estas variables ya están bien y **NO necesitan cambios**:
-
-- ✅ `ARTIFACT_REGISTRY` = `ponti-backend-registry`
-- ✅ `GCP_REGION` = `us-central1`
-- ✅ `IMAGE_NAME` = `ponti-backend`
-- ✅ `DEPLOY_ENV_DEV` = `dev`
-- ✅ `DEPLOY_ENV_STG` = `stg`
-- ✅ `DEPLOY_ENV_PROD` = `prod`
-- ✅ `IMAGE_TAG_DEV` = `dev`
-- ✅ `IMAGE_TAG_STG` = `stg`
-- ✅ `IMAGE_TAG_PROD` = `prod`
-
----
-
-## 📝 Lista Final de Variables (Para Verificar)
-
-Después de hacer los cambios, deberías tener estas variables:
-
-### Variables Generales (compartidas)
-- `ARTIFACT_REGISTRY`
-- `GCP_REGION`
-- `IMAGE_NAME`
-- `DEPLOY_ENV_DEV`
-- `DEPLOY_ENV_STG`
-- `DEPLOY_ENV_PROD`
-- `IMAGE_TAG_DEV`
-- `IMAGE_TAG_STG`
-- `IMAGE_TAG_PROD`
-
-### Variables de DEV
-- `GCP_PROJECT_ID_DEV`
-- `SERVICE_NAME_DEV`
-- `CLOUD_RUN_SERVICE_ACCOUNT_DEV`
-- `WIF_PROVIDER_DEV`
-- `WIF_SERVICE_ACCOUNT_DEV`
-
-### Variables de PROD
-- `GCP_PROJECT_ID_PROD`
-- `SERVICE_NAME_PROD`
-- `CLOUD_RUN_SERVICE_ACCOUNT_PROD`
-- `WIF_PROVIDER_PROD`
-- `WIF_SERVICE_ACCOUNT_PROD`
-
-**Total: 19 variables**
-
----
-
-## 🔍 Verificación Rápida
-
-Después de configurar todo, verifica que:
-
-1. ✅ No queden variables con nombres genéricos (sin `_DEV` o `_PROD`)
-2. ✅ Tienes 5 variables con sufijo `_DEV`
-3. ✅ Tienes 5 variables con sufijo `_PROD`
-4. ✅ Los valores de PROD apuntan a `new-ponti-prod`
-5. ✅ Los valores de DEV apuntan a `new-ponti-dev`
-
----
-
-## 🚨 Valores Importantes (Copiar y Pegar)
-
-### Para WIF_PROVIDER_PROD (copiar completo):
-```
-projects/875939220111/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
-```
-
-### Para WIF_SERVICE_ACCOUNT_PROD:
-```
-github-actions@new-ponti-prod.iam.gserviceaccount.com
-```
-
-### Para CLOUD_RUN_SERVICE_ACCOUNT_PROD:
-```
-cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com
-```
-
----
-
-## ✅ Checklist
-
-- [ ] Renombrar `GCP_PROJECT_ID` → `GCP_PROJECT_ID_DEV`
-- [ ] Renombrar `SERVICE_NAME` → `SERVICE_NAME_DEV` (valor: `ponti-backend-dev`)
-
-> **✅ ACTUALIZADO**: El servicio `ponti-backend-dev` ya fue creado en GCP. Solo necesitas actualizar la variable en GitHub.
-- [ ] Renombrar `CLOUD_RUN_SERVICE_ACCOUNT` → `CLOUD_RUN_SERVICE_ACCOUNT_DEV`
-- [ ] Renombrar `WIF_PROVIDER` → `WIF_PROVIDER_DEV`
-- [ ] Renombrar `WIF_SERVICE_ACCOUNT` → `WIF_SERVICE_ACCOUNT_DEV`
-- [ ] Crear `GCP_PROJECT_ID_PROD` = `new-ponti-prod`
-- [ ] Crear `SERVICE_NAME_PROD` = `ponti-backend-prod`
-
-> **⚠️ IMPORTANTE**: Si el servicio `ponti-backend` (sin sufijo) todavía existe en dev, puedes eliminarlo después de verificar que `ponti-backend-dev` funciona correctamente.
-- [ ] Crear `CLOUD_RUN_SERVICE_ACCOUNT_PROD` = `cloudrun-sa@new-ponti-prod.iam.gserviceaccount.com`
-- [ ] Crear `WIF_PROVIDER_PROD` = `projects/875939220111/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`
-- [ ] Crear `WIF_SERVICE_ACCOUNT_PROD` = `github-actions@new-ponti-prod.iam.gserviceaccount.com`
-
----
-
-## 🎯 Siguiente Paso
-
-Una vez configuradas todas las variables:
-
-1. Configurar **Environment Protection** en GitHub (Settings → Environments → `prod`)
-2. Hacer el **primer deploy** a producción
-
-Ver [PROXIMOS_PASOS.md](./PROXIMOS_PASOS.md) para más detalles.
+Crear: `dev`, `stg`, `prod`.  

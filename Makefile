@@ -8,24 +8,25 @@ DOCKER_COMPOSE_YML := $(ROOT_DIR)/docker-compose.yml
 
 # Recomiendo usar variables de entorno para la base de datos
 DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}
-MIGRATIONS_DIR     := ./migrations
+MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean \
         run-api seed seed-dashboard download-gcp-db \
-        migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create
+        migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
+        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline
 
 # --------------------------------------------------
 # Migraciones
 # --------------------------------------------------
 migrate-up:
 	@echo "Running migrations..."
-	@$(MIGRATE) up
+	@bash ./scripts/db/db_migrate_up.sh
 
 migrate-down:
 	@echo "Running migrations down..."
-	@$(MIGRATE) down
+	@echo "No hay migrate-down v4 implementado en scripts. Usá el binario migrate manualmente."
 
 # Crea una nueva migración usando la variable NAME
 migrate-create:
@@ -87,6 +88,31 @@ seed-dashboard:
 download-gcp-db:
 	@echo "Downloading GCP DB and applying business_parameters rename..."
 	@set -a && source docs/GCP_DB_CREDS.md && set +a && ./scripts/download-gcp-db.sh
+
+# --------------------------------------------------
+# Base de datos (verificación local v4)
+# --------------------------------------------------
+db-reset:
+	@bash ./scripts/db/db_reset.sh
+
+db-migrate-up:
+	@bash ./scripts/db/db_migrate_up.sh
+
+db-validate:
+	@bash ./scripts/db/db_validate.sh
+
+db-schema-snapshot:
+	@bash ./scripts/db/db_schema_snapshot.sh
+
+db-schema-diff:
+	@bash ./scripts/db/db_schema_diff.sh
+
+db-verify: db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff
+	@echo "DB verify completed."
+
+db-adopt-baseline:
+	@echo "Uso: make db-adopt-baseline DB_HOST=... DB_NAME=... [DB_USER=...] [DB_PORT=...] [DB_SSL_MODE=...]"
+	@bash ./scripts/db/db_adopt_baseline.sh $(DB_HOST) $(DB_NAME) $(DB_USER) $(DB_PORT) $(DB_SSL_MODE)
 
 # --------------------------------------------------
 # Docker Compose

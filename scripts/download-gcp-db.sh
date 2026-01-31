@@ -252,10 +252,15 @@ if [[ "$SKIP_DUMP" == "1" && -f "$DUMP_FILE" ]]; then
   log "SKIP_DUMP=1 → uso dump existente: ${DUMP_FILE}"
 else
   log "Generando dump desde GCP -> ${DUMP_FILE}"
+  # Si el restore es data-only, generamos un dump de datos únicamente
+  DUMP_ARGS=(-F c --no-owner --no-acl -v -f "$DUMP_FILE")
+  if [[ "${RESTORE_MODE}" == "data-only" ]]; then
+    DUMP_ARGS+=(--data-only)
+  fi
   for attempt in $(seq 1 "$PGDUMP_RETRIES"); do
     if PGPASSWORD="$SRC_PASS" run_pg_cmd pg_dump \
       "postgresql://${SRC_USER}@${SRC_HOST}:${SRC_PORT}/${SRC_DB}?sslmode=${SRC_SSL}" \
-      -F c --no-owner --no-acl -v -f "$DUMP_FILE"; then
+      "${DUMP_ARGS[@]}"; then
       break
     fi
     if [[ "$attempt" -lt "$PGDUMP_RETRIES" ]]; then

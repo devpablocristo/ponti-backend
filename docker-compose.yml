@@ -30,7 +30,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./migrations:/migrations
+      - ./migrations_v4:/migrations
+      - ./scripts/db:/scripts/db:ro
     environment:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
@@ -38,11 +39,7 @@ services:
       - DB_PORT=${DB_PORT}
       - DB_NAME=${DB_NAME}
       - DB_SSL_MODE=${DB_SSL_MODE}
-    command: [
-      "-path", "/migrations",
-      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:${DB_PORT}/ponti_api_db?sslmode=${DB_SSL_MODE}",
-      "up"
-    ]
+    entrypoint: [ "/bin/sh", "/scripts/db/compose_migrate.sh" ]
     networks:
       - app-network
 

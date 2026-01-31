@@ -4,6 +4,7 @@ TLDR:
 1. Configurá `.env`.
 2. `docker compose up -d` (levanta DB y corre migraciones).
 3. `go run ./cmd/api` (levanta la API local).
+4. Deploys: ver `docs/DEPLOY.md`.
 
 ## Local
 
