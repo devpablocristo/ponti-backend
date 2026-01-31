@@ -1,0 +1,141 @@
+name: Deploy Preview (on-demand)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR"
+        required: true
+        type: string
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-preview:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.label.name == 'preview') }}
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
+      IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_DEV }}
+      DB_USER: ${{ vars.DB_USER_DEV }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+      X_API_KEY: ${{ secrets.X_API_KEY_DEV }}
+      API_VERSION: ${{ vars.API_VERSION }}
+      HTTP_SERVER_NAME: ${{ vars.HTTP_SERVER_NAME }}
+      HTTP_SERVER_HOST: ${{ vars.HTTP_SERVER_HOST }}
+      DB_TYPE: ${{ vars.DB_TYPE }}
+      DB_SSL_MODE: ${{ vars.DB_SSL_MODE }}
+      DB_PORT: ${{ vars.DB_PORT }}
+      MIGRATIONS_DIR: ${{ vars.MIGRATIONS_DIR }}
+      WORDS_SUGGESTER_LIMIT: ${{ vars.WORDS_SUGGESTER_LIMIT }}
+      WORDS_SUGGESTER_THRESHOLD: ${{ vars.WORDS_SUGGESTER_THRESHOLD }}
+      REPORT_SCHEMA: ${{ vars.REPORT_SCHEMA }}
+      SERVICE_ENV_NAME: ${{ vars.SERVICE_NAME_ENV }}
+      SERVICE_ENV_VERSION: ${{ vars.SERVICE_VERSION_ENV }}
+      SERVICE_ENV_MAX_RETRIES: ${{ vars.SERVICE_MAX_RETRIES_ENV }}
+      PREVIEW_DB_PREFIX: "db_pr_"
+      PREVIEW_SERVICE_PREFIX: ${{ vars.PREVIEW_SERVICE_PREFIX }}
+      PREVIEW_SEED_URI: ${{ vars.PREVIEW_SEED_URI }}
+    steps:
+      - name: Resolver datos de PR
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isDispatch = context.eventName === 'workflow_dispatch';
+            const prNumber = isDispatch ? Number(core.getInput('pr_number')) : context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_ref', pr.head.ref);
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Validar config mínima
+        run: |
+          if [ -z "$CLOUDSQL_INSTANCE" ]; then
+            echo "::error::Falta CLOUDSQL_INSTANCE_DEV"
+            exit 1
+          fi
+          if [ -z "$PREVIEW_SERVICE_PREFIX" ]; then
+            echo "::error::Falta PREVIEW_SERVICE_PREFIX"
+            exit 1
+          fi
+
+      - name: Preparar DB preview
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          DB_NAME="${PREVIEW_DB_PREFIX}${PR_NUMBER}"
+          gcloud sql databases delete "$DB_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$CLOUDSQL_INSTANCE" \
+            --quiet || true
+          gcloud sql databases create "$DB_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$CLOUDSQL_INSTANCE"
+          if [ -n "$PREVIEW_SEED_URI" ]; then
+            gcloud sql import sql "$CLOUDSQL_INSTANCE" "$PREVIEW_SEED_URI" \
+              --project="$GCP_PROJECT_ID" \
+              --database="$DB_NAME" \
+              --quiet
+          fi
+          echo "DB_NAME=$DB_NAME" >> "$GITHUB_ENV"
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build y push imagen
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          IMAGE_TAG: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:pr-${PR_NUMBER}-${IMAGE_TAG}"
+          docker build -t "$image_uri" .
+          docker push "$image_uri"
+          echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
+
+      - name: Deploy a Cloud Run (Preview)
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          DB_HOST="/cloudsql/${CLOUDSQL_INSTANCE}"
+          SERVICE_NAME="${PREVIEW_SERVICE_PREFIX}${PR_NUMBER}"
+          ENV_VARS="GO_ENVIRONMENT=cloudrun,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp,SERVICE_NAME=${SERVICE_ENV_NAME},SERVICE_VERSION=${SERVICE_ENV_VERSION},SERVICE_MAX_RETRIES=${SERVICE_ENV_MAX_RETRIES},X_API_KEY=${X_API_KEY},API_VERSION=${API_VERSION},HTTP_SERVER_NAME=${HTTP_SERVER_NAME},HTTP_SERVER_HOST=${HTTP_SERVER_HOST},DB_TYPE=${DB_TYPE},DB_USER=${DB_USER},DB_PASSWORD=${DB_PASSWORD},DB_HOST=${DB_HOST},DB_NAME=${DB_NAME},DB_SSL_MODE=${DB_SSL_MODE},DB_PORT=${DB_PORT},MIGRATIONS_DIR=${MIGRATIONS_DIR},WORDS_SUGGESTER_LIMIT=${WORDS_SUGGESTER_LIMIT},WORDS_SUGGESTER_THRESHOLD=${WORDS_SUGGESTER_THRESHOLD},REPORT_SCHEMA=${REPORT_SCHEMA}"
+          gcloud run deploy "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --image="$IMAGE_URI" \
+            --service-account="$CLOUD_RUN_SERVICE_ACCOUNT" \
+            --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+            --set-env-vars="${ENV_VARS}" \
+            --allow-unauthenticated

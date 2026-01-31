@@ -132,3 +132,8 @@ Desktop.ini
 
 # Debugging binaries
 __debug_bin*
+
+.cursorignore
+.cursorrules
+ponti-backend.code-workspace
+

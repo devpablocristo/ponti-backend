@@ -1,0 +1,64 @@
+name: Refresh Golden Snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    environment:
+      name: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STG }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_STG }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
+      DB_INSTANCE_NAME_STG: ${{ vars.DB_INSTANCE_NAME_STG }}
+      DB_NAME_STG: ${{ vars.DB_NAME_STG }}
+      GOLDEN_SNAPSHOT_BUCKET: ${{ vars.GOLDEN_SNAPSHOT_BUCKET }}
+    steps:
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Validar config mínima
+        run: |
+          if [ -z "$DB_INSTANCE_NAME_STG" ]; then
+            echo "::error::Falta DB_INSTANCE_NAME_STG"
+            exit 1
+          fi
+          if [ -z "$DB_NAME_STG" ]; then
+            echo "::error::Falta DB_NAME_STG"
+            exit 1
+          fi
+          if [ -z "$GOLDEN_SNAPSHOT_BUCKET" ]; then
+            echo "::error::Falta GOLDEN_SNAPSHOT_BUCKET"
+            exit 1
+          fi
+
+      - name: Exportar Golden Snapshot
+        run: |
+          TS=$(date +"%Y%m%d_%H%M%S")
+          SNAPSHOT_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/golden_${DB_NAME_STG}_${TS}.sql.gz"
+          LATEST_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/latest.sql.gz"
+
+          gcloud sql export sql "$DB_INSTANCE_NAME_STG" "$SNAPSHOT_URI" \
+            --project="$GCP_PROJECT_ID" \
+            --database="$DB_NAME_STG" \
+            --offload \
+            --quiet
+
+          gcloud storage cp "$SNAPSHOT_URI" "$LATEST_URI"

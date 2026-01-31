@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
   schedule:
-    - cron: '0 5 * * 1'
+    - cron: "0 5 * * 1"
 
 permissions:
   contents: read
@@ -16,9 +16,12 @@ jobs:
     env:
       GCP_REGION: ${{ vars.GCP_REGION }}
       GCP_PROJECT_ID_DEV: ${{ vars.GCP_PROJECT_ID_DEV }}
-      SERVICE_NAME_DEV: ${{ vars.SERVICE_NAME_DEV }}
       WIF_PROVIDER_DEV: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT_DEV: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
+      PREVIEW_DB_PREFIX: "db_pr_"
+      PREVIEW_SERVICE_PREFIX: ${{ vars.PREVIEW_SERVICE_PREFIX }}
+      PREVIEW_BUCKET: ${{ vars.PREVIEW_BUCKET }}
     steps:
       - name: Auth GCP
         uses: google-github-actions/auth@v2
@@ -31,94 +34,72 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID_DEV }}
 
-      - name: Resolve Cloud SQL instance (dev)
-        id: resolve_instance
-        env:
-          PROJECT_ID: ${{ env.GCP_PROJECT_ID_DEV }}
-          REGION: ${{ env.GCP_REGION }}
-          BASE_SERVICE_NAME: ${{ env.SERVICE_NAME_DEV }}
+      - name: Validar config mínima
         run: |
-          CLOUDSQL_INSTANCES=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.metadata.annotations."run.googleapis.com/cloudsql-instances")')
-          if [ -n "$CLOUDSQL_INSTANCES" ]; then
-            INSTANCE_CONN=$(echo "$CLOUDSQL_INSTANCES" | cut -d, -f1)
-          else
-            echo "::warning::Cloud Run service '$BASE_SERVICE_NAME' has no annotation run.googleapis.com/cloudsql-instances"
-            DB_HOST=$(gcloud run services describe "$BASE_SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name="DB_HOST"].value)')
-            if [ -z "$DB_HOST" ]; then
-              INSTANCE_CONN=$(gcloud sql instances list --project="$PROJECT_ID" --format='value(connectionName)' | python -c 'import sys; items=[line.strip() for line in sys.stdin if line.strip()]; print(items[0] if len(items)==1 else "")')
-              if [ -z "$INSTANCE_CONN" ]; then
-                echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V2: missing service annotation and DB_HOST not set, and multiple instances found."
-                exit 1
-              fi
-            elif echo "$DB_HOST" | grep -q '^/cloudsql/'; then
-              INSTANCE_CONN=$(echo "$DB_HOST" | sed 's#^/cloudsql/##')
-            else
-              INSTANCE_CONN=$(gcloud sql instances list --project="$PROJECT_ID" --format='json(name,connectionName,ipAddresses)' | python -c 'import json,sys; host=sys.argv[1]; items=json.load(sys.stdin); match="";\nfor item in items:\n  for ip in item.get("ipAddresses", []):\n    if ip.get("ipAddress")==host:\n      match=item.get("connectionName","");\n      break\n  if match:\n    break\nprint(match)\n' "$DB_HOST")
-              if [ -z "$INSTANCE_CONN" ]; then
-                echo "::error::CLOUDSQL_INSTANCE_INFERENCE_FAILED_V3: DB_HOST '${DB_HOST}' no coincide con IP de ninguna instancia en el proyecto."
-                exit 1
-              fi
-            fi
+          if [ -z "$DB_INSTANCE_NAME_DEV" ]; then
+            echo "::error::Falta DB_INSTANCE_NAME_DEV"
+            exit 1
           fi
-
-          INSTANCE_PROJECT=$(echo "$INSTANCE_CONN" | cut -d: -f1)
-          INSTANCE_NAME=$(echo "$INSTANCE_CONN" | cut -d: -f3)
-          if [ -z "$INSTANCE_PROJECT" ] || [ -z "$INSTANCE_NAME" ]; then
-            echo "::error::Failed to parse Cloud SQL instance from INSTANCE_CONN='$INSTANCE_CONN'"
+          if [ -z "$PREVIEW_SERVICE_PREFIX" ]; then
+            echo "::error::Falta PREVIEW_SERVICE_PREFIX"
             exit 1
           fi
 
-          if [ "$INSTANCE_PROJECT" != "$PROJECT_ID" ]; then
-            echo "::error::SECURITY: Cloud SQL instance project mismatch. Expected DEV project '$PROJECT_ID' but got '$INSTANCE_PROJECT'"
-            exit 1
-          fi
-
-          echo "instance_project=${INSTANCE_PROJECT}" >> "$GITHUB_OUTPUT"
-          echo "instance_name=${INSTANCE_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Cleanup by PR close (branch-specific)
+      - name: Cleanup por cierre de PR
         if: ${{ github.event_name == 'pull_request' }}
         env:
-          PROJECT_ID: ${{ steps.resolve_instance.outputs.instance_project }}
-          INSTANCE_NAME: ${{ steps.resolve_instance.outputs.instance_name }}
-          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Slug para DB (permite underscore)
-          BRANCH_SLUG_DB=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | cut -c1-40)
-          DB_NAME="branch_${BRANCH_SLUG_DB}"
+          DB_NAME="${PREVIEW_DB_PREFIX}${PR_NUMBER}"
+          SERVICE_NAME="${PREVIEW_SERVICE_PREFIX}${PR_NUMBER}"
 
-          # Borrar DB preview
           echo "::notice::Eliminando DB preview ${DB_NAME}"
-          gcloud sql databases delete "$DB_NAME" --project="$PROJECT_ID" --instance="$INSTANCE_NAME" --quiet || true
+          gcloud sql databases delete "$DB_NAME" \
+            --project="$GCP_PROJECT_ID_DEV" \
+            --instance="$DB_INSTANCE_NAME_DEV" \
+            --quiet || true
 
-          # Borrar snapshots del branch
-          BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python -c 'import sys; buckets=[line.strip() for line in sys.stdin if line.strip()]; name=next((b for b in buckets if "backup" in b and "dev" in b), buckets[0] if buckets else ""); print(name)')
-          if [ -z "$BUCKET_NAME" ]; then
-            echo "::error::No se encontró bucket de backups en el proyecto $PROJECT_ID."
-            exit 1
+          echo "::notice::Eliminando servicio preview ${SERVICE_NAME}"
+          gcloud run services delete "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID_DEV" \
+            --region="$GCP_REGION" \
+            --quiet || true
+
+          if [ -n "$PREVIEW_BUCKET" ]; then
+            PREFIX="gs://${PREVIEW_BUCKET}/preview-seeds/${DB_NAME}_"
+            echo "::notice::Eliminando snapshots con prefijo ${PREFIX}"
+            gcloud storage ls "gs://${PREVIEW_BUCKET}/preview-seeds/" --format=gsutil | \
+              python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREFIX" | \
+              xargs -r gcloud storage rm --quiet
           fi
 
-          PREFIX="gs://${BUCKET_NAME}/preview-seeds/preview_seed_${DB_NAME}_"
-          echo "::notice::Eliminando snapshots con prefijo ${PREFIX}"
-          gcloud storage ls "gs://${BUCKET_NAME}/preview-seeds/" --format=gsutil | python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREFIX" | \
-            xargs -r gcloud storage rm --quiet
-
-      - name: Weekly cleanup (fallback)
+      - name: Cleanup semanal (fallback)
         if: ${{ github.event_name == 'schedule' }}
-        env:
-          PROJECT_ID: ${{ steps.resolve_instance.outputs.instance_project }}
-          INSTANCE_NAME: ${{ steps.resolve_instance.outputs.instance_name }}
         run: |
-          # Limpiar todas las DB branch_* en dev
-          gcloud sql databases list --project="$PROJECT_ID" --instance="$INSTANCE_NAME" --format='value(name)' | \
-            python -c 'import sys; [print(line.strip()) for line in sys.stdin if line.strip().startswith("branch_")]' | \
-            xargs -r -I{} gcloud sql databases delete "{}" --project="$PROJECT_ID" --instance="$INSTANCE_NAME" --quiet || true
+          echo "::notice::Eliminando DBs preview con prefijo ${PREVIEW_DB_PREFIX}"
+          gcloud sql databases list \
+            --project="$GCP_PROJECT_ID_DEV" \
+            --instance="$DB_INSTANCE_NAME_DEV" \
+            --format='value(name)' | \
+            python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREVIEW_DB_PREFIX" | \
+            xargs -r -I{} gcloud sql databases delete "{}" \
+              --project="$GCP_PROJECT_ID_DEV" \
+              --instance="$DB_INSTANCE_NAME_DEV" \
+              --quiet || true
 
-          # Limpiar todos los snapshots de previews
-          BUCKET_NAME=$(gcloud storage buckets list --project="$PROJECT_ID" --format='value(name)' | python -c 'import sys; buckets=[line.strip() for line in sys.stdin if line.strip()]; name=next((b for b in buckets if "backup" in b and "dev" in b), buckets[0] if buckets else ""); print(name)')
-          if [ -z "$BUCKET_NAME" ]; then
-            echo "::error::No se encontró bucket de backups en el proyecto $PROJECT_ID."
-            exit 1
+          echo "::notice::Eliminando servicios preview con prefijo ${PREVIEW_SERVICE_PREFIX}"
+          gcloud run services list \
+            --project="$GCP_PROJECT_ID_DEV" \
+            --region="$GCP_REGION" \
+            --format='value(name)' | \
+            python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREVIEW_SERVICE_PREFIX" | \
+            xargs -r -I{} gcloud run services delete "{}" \
+              --project="$GCP_PROJECT_ID_DEV" \
+              --region="$GCP_REGION" \
+              --quiet || true
+
+          if [ -n "$PREVIEW_BUCKET" ]; then
+            echo "::notice::Eliminando snapshots preview en bucket ${PREVIEW_BUCKET}"
+            gcloud storage ls "gs://${PREVIEW_BUCKET}/preview-seeds/" --format=gsutil | \
+              xargs -r gcloud storage rm --quiet
           fi
-          gcloud storage ls "gs://${BUCKET_NAME}/preview-seeds/" --format=gsutil | \
-            xargs -r gcloud storage rm --quiet
