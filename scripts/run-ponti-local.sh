@@ -49,6 +49,37 @@ ensure_env_file() {
   exit 1
 }
 
+stop_frontend_ports() {
+  # Detener procesos del FE (UI/API) por puertos conocidos
+  local ports=("5173" "5174" "3000")
+  local port pids
+  if command -v lsof >/dev/null 2>&1; then
+    for port in "${ports[@]}"; do
+      pids="$(lsof -ti :"$port" || true)"
+      if [[ -n "$pids" ]]; then
+        echo "Deteniendo FE en puerto ${port}..."
+        kill $pids || true
+      fi
+    done
+    return 0
+  fi
+  if command -v fuser >/dev/null 2>&1; then
+    for port in "${ports[@]}"; do
+      if fuser -s "${port}/tcp"; then
+        echo "Deteniendo FE en puerto ${port}..."
+        fuser -k "${port}/tcp" || true
+      fi
+    done
+  fi
+}
+
+echo "Bajando contenedores antes de levantar..."
+docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
+docker compose -f "$AUTH_DIR/docker-compose.yml" down --remove-orphans
+
+echo "Deteniendo frontend antes de levantar..."
+stop_frontend_ports
+
 echo "Levantando backend (DB + migraciones) con Docker..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d
 
