@@ -84,9 +84,9 @@ seed-dashboard:
 # --------------------------------------------------
 # Base de datos (descarga GCP DEV)
 # --------------------------------------------------
-new-download-gcp-db:
+download-gcp-db:
 	@echo "Downloading GCP DB and applying business_parameters rename..."
-	@set -a && source docs/GCP_DB_CREDS.md && set +a && ./scripts/new-download-gcp-db.sh
+	@set -a && source docs/GCP_DB_CREDS.md && set +a && ./scripts/download-gcp-db.sh
 
 # --------------------------------------------------
 # Docker Compose
