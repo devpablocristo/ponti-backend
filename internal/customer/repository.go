@@ -76,6 +76,38 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 	return customers, total, nil
 }
 
+func (r *Repository) ListArchivedCustomers(ctx context.Context, page, perPage int) ([]domain.ListedCustomer, int64, error) {
+	var list []models.Customer
+	var total int64
+
+	db0 := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Customer{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := db0.Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count archived customers", err)
+	}
+
+	if err := db0.
+		Select("id, name").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Find(&list).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list archived customers", err)
+	}
+
+	customers := make([]domain.ListedCustomer, len(list))
+	for i, m := range list {
+		customers[i] = domain.ListedCustomer{
+			ID:   m.ID,
+			Name: m.Name,
+		}
+	}
+
+	return customers, total, nil
+}
+
 func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {
 	var model models.Customer
 	err := r.db.Client().WithContext(ctx).
@@ -124,11 +156,6 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}
-	var deletedBy *int64
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
-		deletedBy = &userID
-	}
-
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var customer models.Customer
 		if err := tx.Unscoped().Where("id = ?", id).First(&customer).Error; err != nil {
@@ -151,26 +178,10 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrConflict, "customer has active projects", nil)
 		}
 
-		if deletedBy != nil {
-			var userCount int64
-			if err := tx.Table("users").
-				Where("id = ?", *deletedBy).
-				Count(&userCount).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to validate deleted_by", err)
-			}
-			if userCount == 0 {
-				deletedBy = nil
-			}
-		}
-
 		updates := map[string]any{
 			"deleted_at": time.Now(),
 		}
-		if deletedBy == nil {
-			updates["deleted_by"] = gorm.Expr("NULL")
-		} else {
-			updates["deleted_by"] = deletedBy
-		}
+		updates["deleted_by"] = gorm.Expr("NULL")
 
 		if err := tx.Model(&models.Customer{}).
 			Where("id = ?", id).

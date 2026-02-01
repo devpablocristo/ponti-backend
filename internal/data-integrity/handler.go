@@ -1,10 +1,10 @@
-// Package data_integrity proporciona funcionalidades para validar la integridad de datos
+// Package dataintegrity proporciona funcionalidades para validar la integridad de datos
 //
 // ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
 //
 // ESTE MÓDULO CONTIENE CÁLCULOS CRÍTICOS DE INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
-package data_integrity
+package dataintegrity
 
 import (
 	"context"
@@ -42,7 +42,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler maneja las peticiones HTTP del módulo data_integrity
+// Handler maneja las peticiones HTTP del módulo dataintegrity
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort

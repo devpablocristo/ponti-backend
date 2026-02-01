@@ -352,7 +352,14 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 	// Labor cost: effective_area × labor.price
 	// Supply cost: final_dose × effective_area × price (cálculo estándar del sistema)
 	// CORREGIDO: Usar final_dose × effective_area en lugar de total_used para consistencia con vistas
-	q := `
+	whereProject := ""
+	args := []any{}
+	if projectID > 0 {
+		whereProject = "AND wo.project_id = ?"
+		args = append(args, projectID)
+	}
+
+	q := fmt.Sprintf(`
 		WITH workorder_costs AS (
 		  SELECT 
 		    wo.id,
@@ -369,14 +376,14 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		  FROM public.workorders wo
 		  JOIN public.labors l ON l.id = wo.labor_id
 		  WHERE wo.deleted_at IS NULL
-		    AND wo.project_id = ?
+		    %s
 		)
 		SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
 		FROM workorder_costs
-	`
+	`, whereProject)
 
 	var totalCost decimal.Decimal
-	if err := r.db.Client().WithContext(ctx).Raw(q, projectID).Scan(&totalCost).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&totalCost).Error; err != nil {
 		return decimal.Zero, types.NewError(types.ErrInternal, "failed to get raw direct cost", err)
 	}
 

@@ -1,4 +1,4 @@
-// Package data_integrity implementa casos de uso para validar la coherencia de datos
+// Package dataintegrity implementa casos de uso para validar la coherencia de datos
 //
 // ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
 //
@@ -13,7 +13,7 @@
 // - SIEMPRE mantener precisión completa en cálculos SQL y Go
 //
 // Si necesitas modificar algo, DEBES pedir autorización explícita primero.
-package data_integrity
+package dataintegrity
 
 import (
 	"context"
@@ -58,7 +58,7 @@ type StockRepositoryPort interface {
 	GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*stockDomain.Stock, error)
 }
 
-// UseCases contiene los casos de uso del módulo data_integrity
+// UseCases contiene los casos de uso del módulo dataintegrity
 type UseCases struct {
 	workOrderRepo WorkOrderRepositoryPort
 	dashboardRepo DashboardRepositoryPort
@@ -94,90 +94,90 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 	checks := make([]domain.IntegrityCheck, 0, 14)
 
 	// GRUPO 1: Costos Directos Ejecutados (Controles 1-4)
-	control1, err := u.control1_OrdenesVsDashboard(ctx, filter.ProjectID)
+	control1, err := u.control1OrdenesVsDashboard(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 1 failed: %w", err)
 	}
 	checks = append(checks, control1)
 
-	control2, err := u.control2_OrdenesVsLotes(ctx, filter.ProjectID)
+	control2, err := u.control2OrdenesVsLotes(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 2 failed: %w", err)
 	}
 	checks = append(checks, control2)
 
-	control3, err := u.control3_OrdenesVsInformeCampo(ctx, filter.ProjectID)
+	control3, err := u.control3OrdenesVsInformeCampo(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 3 failed: %w", err)
 	}
 	checks = append(checks, control3)
 
-	control4, err := u.control4_OrdenesVsInformeGenerales(ctx, filter.ProjectID)
+	control4, err := u.control4OrdenesVsInformeGenerales(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 4 failed: %w", err)
 	}
 	checks = append(checks, control4)
 
 	// GRUPO 2: Invertidos (Controles 5-7)
-	control5, err := u.control5_LaboresInsumosVsDashboard(ctx, filter.ProjectID)
+	control5, err := u.control5LaboresInsumosVsDashboard(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 5 failed: %w", err)
 	}
 	checks = append(checks, control5)
 
-	control6, err := u.control6_LaboresVsAportes(ctx, filter.ProjectID)
+	control6, err := u.control6LaboresVsAportes(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 6 failed: %w", err)
 	}
 	checks = append(checks, control6)
 
-	control7, err := u.control7_InsumosVsAportes(ctx, filter.ProjectID)
+	control7, err := u.control7InsumosVsAportes(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 7 failed: %w", err)
 	}
 	checks = append(checks, control7)
 
 	// GRUPO 3: Lotes → Aportes (Controles 8-9)
-	control8, err := u.control8_LotesAdminVsAportes(ctx, filter.ProjectID)
+	control8, err := u.control8LotesAdminVsAportes(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 8 failed: %w", err)
 	}
 	checks = append(checks, control8)
 
-	control9, err := u.control9_LotesArriendoVsAportes(ctx, filter.ProjectID)
+	control9, err := u.control9LotesArriendoVsAportes(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 9 failed: %w", err)
 	}
 	checks = append(checks, control9)
 
 	// GRUPO 4: Ingreso Neto (Control 10)
-	control10, err := u.control10_LotesIngresoNetoVsResumen(ctx, filter.ProjectID)
+	control10, err := u.control10LotesIngresoNetoVsResumen(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 10 failed: %w", err)
 	}
 	checks = append(checks, control10)
 
 	// GRUPO 5: Resultado Operativo (Controles 11-13)
-	control11, err := u.control11_LotesResultadoVsInformeCultivo(ctx, filter.ProjectID)
+	control11, err := u.control11LotesResultadoVsInformeCultivo(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 11 failed: %w", err)
 	}
 	checks = append(checks, control11)
 
-	control12, err := u.control12_LotesResultadoVsInformeGenerales(ctx, filter.ProjectID)
+	control12, err := u.control12LotesResultadoVsInformeGenerales(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 12 failed: %w", err)
 	}
 	checks = append(checks, control12)
 
-	control13, err := u.control13_LotesResultadoVsDashboard(ctx, filter.ProjectID)
+	control13, err := u.control13LotesResultadoVsDashboard(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 13 failed: %w", err)
 	}
 	checks = append(checks, control13)
 
 	// GRUPO 6: Stock (Control 14)
-	control14, err := u.control14_StockVsDashboard(ctx, filter.ProjectID)
+	control14, err := u.control14StockVsDashboard(ctx, filter.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("control 14 failed: %w", err)
 	}
@@ -197,7 +197,7 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 // ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
 // ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
-func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control1OrdenesVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {
 		pID = *projectID
@@ -226,9 +226,9 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 		"∑(workorders.effective_area × labors.price + workorder_items.final_dose × effective_area × supplies.price)",
 		leftValue,
 		"Tabla workorders RAW",
-		"v3_dashboard_ssot.direct_costs_total_for_project()",
+		"v4_ssot.direct_costs_total_for_project()",
 		rightValue,
-		"Vista v3_dashboard_management_balance",
+		"Vista v4_report.dashboard_management_balance",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -242,7 +242,7 @@ func (u *UseCases) control1_OrdenesVsDashboard(ctx context.Context, projectID *i
 // ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
 // ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
-func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control2OrdenesVsLotes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {
 		pID = *projectID
@@ -255,7 +255,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 	}
 
 	// RIGHT: Suma desde lotes (usa SSOT)
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -278,7 +278,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 		"Tabla workorders RAW",
 		"∑(cost_usd_per_ha × sowed_area_ha)",
 		rightValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -288,7 +288,7 @@ func (u *UseCases) control2_OrdenesVsLotes(ctx context.Context, projectID *int64
 // LEFT: ∑(Ordenes.costo_total) RAW
 // RIGHT: ∑(Costo_directo_ha_Cultivo × Superficie_Cultivo)
 // =====================================================
-func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control3OrdenesVsInformeCampo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {
 		pID = *projectID
@@ -328,7 +328,7 @@ func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID
 		"Tabla workorders RAW",
 		"∑(direct_cost_usd por field+crop)",
 		rightValue,
-		"Vista v3_report_field_crop_metrics",
+		"Vista v4_report.field_crop_metrics",
 		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
@@ -338,7 +338,7 @@ func (u *UseCases) control3_OrdenesVsInformeCampo(ctx context.Context, projectID
 // LEFT: ∑(Ordenes.costo_total) RAW
 // RIGHT: Total de informe generales
 // =====================================================
-func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control4OrdenesVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	pID := int64(0)
 	if projectID != nil {
 		pID = *projectID
@@ -373,7 +373,7 @@ func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, proje
 		"Tabla workorders RAW",
 		"summaryResults[0].TotalDirectCostsUsd",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
@@ -383,7 +383,7 @@ func (u *UseCases) control4_OrdenesVsInformeGenerales(ctx context.Context, proje
 // LEFT: ∑(Labores) + ∑(Insumos) desde dashboard breakdown
 // RIGHT: Dashboard.Invertidos total
 // =====================================================
-func (u *UseCases) control5_LaboresInsumosVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control5LaboresInsumosVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// Obtener dashboard
 	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
 	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)
@@ -424,7 +424,7 @@ func (u *UseCases) control5_LaboresInsumosVsDashboard(ctx context.Context, proje
 // LEFT: Dashboard.LaboresInvertidos (sin cosecha)
 // RIGHT: Aportes (Labores Generales + Siembra + Riego)
 // =====================================================
-func (u *UseCases) control6_LaboresVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control6LaboresVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// Obtener dashboard
 	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
 	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)
@@ -471,7 +471,7 @@ func (u *UseCases) control6_LaboresVsAportes(ctx context.Context, projectID *int
 // LEFT: Dashboard.InsumosInvertidos
 // RIGHT: Aportes (Semillas + Agroquímicos)
 // =====================================================
-func (u *UseCases) control7_InsumosVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control7InsumosVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// Obtener dashboard
 	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
 	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)
@@ -519,14 +519,9 @@ func (u *UseCases) control7_InsumosVsAportes(ctx context.Context, projectID *int
 // LEFT: ∑(AdminCost_ha × Superficie) desde lotes
 // RIGHT: Aportes Adm.Proyecto
 // =====================================================
-func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control8LotesAdminVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -560,7 +555,7 @@ func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *
 		"∑(Adm Proyecto_ha_lote × Superficie_lote) = Total Aportes Adm.Proyecto",
 		"∑(admin_cost × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Categoría 'Administración y Estructura'",
 		rightValue,
 		"Vista investor_contribution_report",
@@ -573,14 +568,9 @@ func (u *UseCases) control8_LotesAdminVsAportes(ctx context.Context, projectID *
 // LEFT: ∑(Arriendo_ha × Superficie) desde lotes
 // RIGHT: Aportes Arriendo Fijo
 // =====================================================
-func (u *UseCases) control9_LotesArriendoVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control9LotesArriendoVsAportes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -615,7 +605,7 @@ func (u *UseCases) control9_LotesArriendoVsAportes(ctx context.Context, projectI
 		"∑(Arriendo Fijo_ha_lote × Superficie_lote) = Total Aportes Arriendo Fijo",
 		"∑(rent_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Categoría 'Arriendo Capitalizable'",
 		rightValue,
 		"Vista investor_contribution_report",
@@ -628,14 +618,9 @@ func (u *UseCases) control9_LotesArriendoVsAportes(ctx context.Context, projectI
 // LEFT: ∑(Ingreso_Neto_ha × Superficie) desde lotes
 // RIGHT: ∑(Ingreso_Neto) del resumen
 // =====================================================
-func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control10LotesIngresoNetoVsResumen(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -667,10 +652,10 @@ func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, proj
 		"∑(Ingreso Neto_ha_lote × Superficie_lote) = ∑(Ingreso Neto del Resumen)",
 		"∑(income_net_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"∑(net_income_usd)",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -680,14 +665,9 @@ func (u *UseCases) control10_LotesIngresoNetoVsResumen(ctx context.Context, proj
 // LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
 // RIGHT: ∑(Resultado.Operativo × Superficie) por cultivo
 // =====================================================
-func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control11LotesResultadoVsInformeCultivo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -720,10 +700,10 @@ func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context,
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado.Operativo_ha_Cultivo × Superficie)",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"∑(operating_result_usd_ha × sown_area_ha)",
 		rightValue,
-		"Vista v3_report_field_crop_metrics",
+		"Vista v4_report.field_crop_metrics",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -733,14 +713,9 @@ func (u *UseCases) control11_LotesResultadoVsInformeCultivo(ctx context.Context,
 // LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
 // RIGHT: Total Resultado Operativo del informe general
 // =====================================================
-func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control12LotesResultadoVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	lotFilter := lotDomain.LotListFilter{ProjectID: &pID}
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -772,10 +747,10 @@ func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Contex
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado_Operativo_Cultivo)",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"summaryResults[0].TotalOperatingResultUsd",
 		rightValue,
-		"Vista v3_report_summary_results",
+		"Vista v4_report.summary_results",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -785,14 +760,9 @@ func (u *UseCases) control12_LotesResultadoVsInformeGenerales(ctx context.Contex
 // LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
 // RIGHT: Dashboard Card Resultado Operativo
 // =====================================================
-func (u *UseCases) control13_LotesResultadoVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
+func (u *UseCases) control13LotesResultadoVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// LEFT: Calcular desde lotes
-	filter := lotDomain.LotListFilter{ProjectID: &pID}
+	filter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, filter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
@@ -821,10 +791,10 @@ func (u *UseCases) control13_LotesResultadoVsDashboard(ctx context.Context, proj
 		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = Resultado_Operativo Dashboard Card",
 		"∑(operating_result_per_ha × sowed_area)",
 		leftValue,
-		"Vista v3_lot_list",
+		"Vista v4_report.lot_list",
 		"Metrics.OperatingResult.ResultUSD",
 		rightValue,
-		"Vista v3_dashboard_management_balance",
+		"Vista v4_report.dashboard_management_balance",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -834,7 +804,7 @@ func (u *UseCases) control13_LotesResultadoVsDashboard(ctx context.Context, proj
 // LEFT: Invertido - Ejecutado
 // RIGHT: Dashboard.Stock
 // =====================================================
-func (u *UseCases) control14_StockVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+func (u *UseCases) control14StockVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
 	// Obtener dashboard
 	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
 	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)

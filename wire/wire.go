@@ -18,7 +18,7 @@ import (
 	crop "github.com/alphacodinggroup/ponti-backend/internal/crop"
 	customer "github.com/alphacodinggroup/ponti-backend/internal/customer"
 	dashboard "github.com/alphacodinggroup/ponti-backend/internal/dashboard"
-	data_integrity "github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
+	dataintegrity "github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
 	dollar "github.com/alphacodinggroup/ponti-backend/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/internal/investor"
@@ -45,7 +45,7 @@ type Dependencies struct {
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
-	DataIntegrityHandler      *data_integrity.Handler
+	DataIntegrityHandler      *dataintegrity.Handler
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler

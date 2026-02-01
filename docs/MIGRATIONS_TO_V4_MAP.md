@@ -1,4 +1,4 @@
-TLDR: Mapeo v3→v4 enfocado en datos en `public`. Las vistas y funciones pasan a `v4_*` y se regeneran por migraciones; el único renombre de datos es `app_parameters`→`business_parameters`.
+TLDR: Mapeo legacy→v4 enfocado en datos en `public`. Las vistas y funciones viven en `v4_*` y se regeneran por migraciones; el único renombre de datos es `app_parameters`→`business_parameters`.
 
 ## Alcance
 - La base **v4** es `v4-only` y se crea desde cero con las migraciones actuales.
@@ -6,7 +6,7 @@ TLDR: Mapeo v3→v4 enfocado en datos en `public`. Las vistas y funciones pasan 
 - Esquemas `v4_core`, `v4_ssot`, `v4_calc`, `v4_report` contienen funciones/vistas; no se migran como datos.
 
 ## Mapeo de esquemas lógicos
-- `v3_*` (core/ssot/calc/report) → `v4_core`, `v4_ssot`, `v4_calc`, `v4_report`.
+- Esquemas históricos de vistas (core/ssot/calc/report) → `v4_core`, `v4_ssot`, `v4_calc`, `v4_report`.
 - Resultado: **no se copian datos** entre esquemas de vistas; se **recrean** por migraciones.
 
 ## Mapeo de tablas (public)

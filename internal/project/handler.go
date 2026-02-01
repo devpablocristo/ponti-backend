@@ -20,6 +20,7 @@ import (
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
 	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, decimal.Decimal, int64, error)
+	ListArchivedProjects(context.Context, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListProjectsByName(context.Context, string, int, int) ([]domain.ListedProject, int64, error)
@@ -78,6 +79,7 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateProject)
 		public.GET("", h.ListProjects)
+		public.GET("/archived", h.ListArchivedProjects)
 		public.GET("/:project_id/fields", h.GetFieldsByProjectID)
 		public.GET("/dropdown", h.ListProjectsDropdown)
 		// Compatibilidad con ruta legacy usada en remoto.
@@ -144,6 +146,20 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	}
 
 	// Construir y devolver la respuesta paginada
+	resp := dto.NewProjectsResponse(items, page, perPage, total)
+	resp.TotalHectares = totalHectares
+	c.JSON(http.StatusOK, resp)
+}
+
+// ListArchivedProjects lista proyectos archivados con clientes activos.
+func (h *Handler) ListArchivedProjects(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
+	items, totalHectares, total, err := h.ucs.ListArchivedProjects(c.Request.Context(), page, perPage)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
 	resp := dto.NewProjectsResponse(items, page, perPage, total)
 	resp.TotalHectares = totalHectares
 	c.JSON(http.StatusOK, resp)

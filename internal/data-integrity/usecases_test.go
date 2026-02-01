@@ -1,4 +1,4 @@
-package data_integrity
+package dataintegrity
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	lotDomain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
 )
 
-func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
+func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 	tests := []struct {
 		name              string
 		projectID         *int64
@@ -112,7 +112,7 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 				Times(1)
 
 			// Act
-			result, err := useCases.control1_OrdenesVsDashboard(ctx, tt.projectID)
+			result, err := useCases.control1OrdenesVsDashboard(ctx, tt.projectID)
 
 			// Assert
 			require.NoError(t, err)
@@ -122,12 +122,12 @@ func TestUseCases_control1_OrdenesVsDashboard(t *testing.T) {
 			assert.Equal(t, tt.mockRawCost, result.LeftValue)
 			assert.Equal(t, tt.mockDashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD, result.RightValue)
 			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v3_dashboard_management_balance", result.RightSource)
+			assert.Equal(t, "Vista v4_report.dashboard_management_balance", result.RightSource)
 		})
 	}
 }
 
-func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
+func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 	tests := []struct {
 		name             string
 		projectID        *int64
@@ -231,7 +231,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 				Times(1)
 
 			// Act
-			result, err := useCases.control2_OrdenesVsLotes(ctx, tt.projectID)
+			result, err := useCases.control2OrdenesVsLotes(ctx, tt.projectID)
 
 			// Assert
 			require.NoError(t, err)
@@ -240,7 +240,7 @@ func TestUseCases_control2_OrdenesVsLotes(t *testing.T) {
 			assert.Equal(t, tt.expectedLeftVal, result.LeftValue.StringFixed(2))
 			assert.Equal(t, tt.expectedRightVal, result.RightValue.StringFixed(2))
 			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v3_lot_list", result.RightSource)
+			assert.Equal(t, "Vista v4_report.lot_list", result.RightSource)
 			assert.Equal(t, "1.00", result.Tolerance.StringFixed(2))
 		})
 	}

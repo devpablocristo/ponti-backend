@@ -16,6 +16,7 @@ type RepositoryPort interface {
 	ListProjects(context.Context, int, int) ([]domain.ListedProject, int64, error)
 	GetProjects(context.Context, string, int64, int64, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
+	ListArchivedProjects(context.Context, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
@@ -79,6 +80,9 @@ func (u *UseCases) ListProjectsByCustomerID(ctx context.Context, customerID int6
 	return u.repo.ListProjectsByCustomerID(ctx, customerID, page, perPage)
 }
 
+func (u *UseCases) ListArchivedProjects(ctx context.Context, page, perPage int) ([]domain.Project, decimal.Decimal, int64, error) {
+	return u.repo.ListArchivedProjects(ctx, page, perPage)
+}
 func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 	exist, err := u.repo.GetProjectByNameAndCampaignID(ctx, p.Name, p.Campaign.ID)
 	if err != nil {

@@ -17,6 +17,7 @@ import (
 type UseCasesPort interface {
 	CreateCustomer(context.Context, *domain.Customer) (int64, error)
 	ListCustomers(context.Context, int, int) ([]domain.ListedCustomer, int64, error)
+	ListArchivedCustomers(context.Context, int, int) ([]domain.ListedCustomer, int64, error)
 	GetCustomer(context.Context, int64) (*domain.Customer, error)
 	UpdateCustomer(context.Context, *domain.Customer) error
 	DeleteCustomer(context.Context, int64) error
@@ -72,6 +73,7 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateCustomer)                // Crear un customer
 		public.GET("", h.ListCustomers)                  // Listar todos los customers
+		public.GET("/archived", h.ListArchivedCustomers) // Listar customers archivados
 		public.GET("/:customer_id", h.GetCustomer)       // Obtener un customer por ID
 		public.PUT("/:customer_id", h.UpdateCustomer)    // Actualizar un customer
 		public.PUT("/:customer_id/archive", h.ArchiveCustomer)
@@ -79,6 +81,19 @@ func (h *Handler) Routes() {
 		public.DELETE("/:customer_id/hard", h.HardDeleteCustomer)
 		public.DELETE("/:customer_id", h.DeleteCustomer) // Eliminar (soft) un customer
 	}
+}
+
+// ListArchivedCustomers lista customers archivados.
+func (h *Handler) ListArchivedCustomers(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
+	items, total, err := h.ucs.ListArchivedCustomers(c.Request.Context(), page, perPage)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	resp := dto.NewListCustomersResponse(items, page, perPage, total)
+	c.JSON(http.StatusOK, resp)
 }
 
 // CreateCustomer maneja la creación de un nuevo customer.

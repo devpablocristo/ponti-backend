@@ -276,6 +276,61 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	return projectList, totalHectares, total, nil
 }
 
+func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int) ([]domain.Project, decimal.Decimal, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
+	}
+
+	var projects []models.Project
+	var total int64
+
+	baseClient := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Project{}).
+		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
+		Where("projects.deleted_at IS NOT NULL")
+	sumClient := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Project{}).
+		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
+		Where("projects.deleted_at IS NOT NULL")
+
+	if err := baseClient.Count(&total).Error; err != nil {
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to count archived projects", err)
+	}
+
+	var totalHectares decimal.Decimal
+	if err := sumClient.
+		Joins("JOIN fields ON fields.project_id = projects.id").
+		Joins("JOIN lots ON lots.field_id = fields.id").
+		Select("COALESCE(SUM(lots.hectares), 0)").
+		Scan(&totalHectares).Error; err != nil {
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares for archived projects", err)
+	}
+
+	if err := baseClient.
+		Preload("Customer").
+		Preload("Campaign").
+		Preload("Managers").
+		Preload("Investors.Investor").
+		Order("id DESC").
+		Limit(perPage).
+		Offset((page - 1) * perPage).
+		Find(&projects).Error; err != nil {
+		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to list archived projects", err)
+	}
+
+	var projectList []domain.Project
+	for _, p := range projects {
+		projectList = append(projectList, *p.ToDomain())
+	}
+
+	return projectList, totalHectares, total, nil
+}
+
 func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID int64, page, perPage int) ([]domain.ListedProject, int64, error) {
 	if page < 1 {
 		page = 1
@@ -512,7 +567,8 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	deletedBy := userID
+	var deletedBy *int64
+	deletedBy = &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
@@ -521,6 +577,18 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		}
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), nil)
+		}
+
+		if deletedBy != nil {
+			var userCount int64
+			if err := tx.Table("users").
+				Where("id = ?", *deletedBy).
+				Count(&userCount).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to validate deleted_by", err)
+			}
+			if userCount == 0 {
+				deletedBy = nil
+			}
 		}
 
 		// clear managers
