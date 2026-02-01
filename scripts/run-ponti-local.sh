@@ -6,6 +6,7 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
 AUTH_DIR="$ROOT_DIR/ponti-auth"
 FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
+AI_DIR="$ROOT_DIR/ponti-ai-copilot"
 
 require_dir() {
   local dir="$1"
@@ -19,6 +20,7 @@ require_dir() {
 require_dir "$BACKEND_DIR" "backend"
 require_dir "$AUTH_DIR" "auth"
 require_dir "$FRONTEND_DIR" "frontend"
+require_dir "$AI_DIR" "ai-copilot"
 
 http_ok() {
   local url="$1"
@@ -76,6 +78,7 @@ stop_frontend_ports() {
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
 docker compose -f "$AUTH_DIR/docker-compose.yml" down --remove-orphans
+docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans
 
 echo "Deteniendo frontend antes de levantar..."
 stop_frontend_ports
@@ -87,11 +90,17 @@ echo "Levantando backend API..."
 if http_ok "http://localhost:8080/ping"; then
   echo "Backend API ya está levantado en :8080"
 else
+  if [[ -z "${AI_SERVICE_URL:-}" || -z "${AI_SERVICE_KEY:-}" ]]; then
+    echo "WARN: AI_SERVICE_URL / AI_SERVICE_KEY no configurados. Endpoints AI no funcionarán."
+  fi
   make -C "$BACKEND_DIR" run-api &
 fi
 
 echo "Levantando auth (DB) con Docker..."
 docker compose -f "$AUTH_DIR/docker-compose.yml" up -d
+
+echo "Levantando AI Copilot (DB + API) con Docker..."
+docker compose -f "$AI_DIR/docker-compose.yml" up -d
 
 ensure_env_file "$AUTH_DIR"
 set -a

@@ -19,6 +19,7 @@ import (
 	customer "github.com/alphacodinggroup/ponti-backend/internal/customer"
 	dashboard "github.com/alphacodinggroup/ponti-backend/internal/dashboard"
 	dataintegrity "github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
+	ai "github.com/alphacodinggroup/ponti-backend/internal/ai"
 	dollar "github.com/alphacodinggroup/ponti-backend/internal/dollar"
 	field "github.com/alphacodinggroup/ponti-backend/internal/field"
 	investor "github.com/alphacodinggroup/ponti-backend/internal/investor"
@@ -65,6 +66,7 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	AIHandler                 *ai.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -78,6 +80,7 @@ func Initialize() (*Dependencies, error) {
 		CampaignSet,
 		DashboardSet,
 		DataIntegritySet,
+		AISet,
 		InvestorSet,
 		CropSet,
 		CommercializationSet,

@@ -8,33 +8,34 @@ package wire
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/cmd/config"
-	bparams "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
+	"github.com/alphacodinggroup/ponti-backend/internal/ai"
+	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	"github.com/alphacodinggroup/ponti-backend/internal/campaign"
 	"github.com/alphacodinggroup/ponti-backend/internal/category"
-	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type"
+	"github.com/alphacodinggroup/ponti-backend/internal/class-type"
 	"github.com/alphacodinggroup/ponti-backend/internal/commercialization"
 	"github.com/alphacodinggroup/ponti-backend/internal/crop"
 	"github.com/alphacodinggroup/ponti-backend/internal/customer"
 	"github.com/alphacodinggroup/ponti-backend/internal/dashboard"
-	data_integrity "github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
+	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
 	"github.com/alphacodinggroup/ponti-backend/internal/dollar"
 	"github.com/alphacodinggroup/ponti-backend/internal/field"
 	"github.com/alphacodinggroup/ponti-backend/internal/investor"
 	"github.com/alphacodinggroup/ponti-backend/internal/invoice"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor"
-	leasetype "github.com/alphacodinggroup/ponti-backend/internal/lease-type"
+	"github.com/alphacodinggroup/ponti-backend/internal/lease-type"
 	"github.com/alphacodinggroup/ponti-backend/internal/lot"
 	"github.com/alphacodinggroup/ponti-backend/internal/manager"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider"
 	"github.com/alphacodinggroup/ponti-backend/internal/project"
+	"github.com/alphacodinggroup/ponti-backend/internal/provider"
 	"github.com/alphacodinggroup/ponti-backend/internal/report"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply"
-	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
-	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pkggin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	pkgsuggester "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+	"github.com/alphacodinggroup/ponti-backend/internal/work-order"
+	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
 )
 
 // Injectors from wire.go:
@@ -87,29 +88,29 @@ func Initialize() (*Dependencies, error) {
 	dashboardConfigAPIPort := ProvideDashboardConfigAPI(config)
 	dashboardMiddlewaresEnginePort := ProvideDashboardMiddlewaresEnginePort(middlewares)
 	dashboardHandler := ProvideDashboardHandler(dashboardGinEnginePort, dashboardUseCasesPort, dashboardConfigAPIPort, dashboardMiddlewaresEnginePort)
-	data_integrityGinEnginePort := ProvideDataIntegrityGinEnginePort(server)
+	dataintegrityGinEnginePort := ProvideDataIntegrityGinEnginePort(server)
 	gormEngine := ProvideWorkOrderGormEnginePort(repository)
-	workOrderRepository := ProvideWorkOrderRepository(gormEngine)
-	workOrderRepositoryPort := ProvideWorkOrderRepositoryPort(workOrderRepository)
-	dataIntegrityWorkOrderRepositoryPort := ProvideDataIntegrityWorkOrderRepositoryPort(workOrderRepositoryPort)
-	data_integrityDashboardRepositoryPort := ProvideDataIntegrityDashboardRepositoryPort(dashboardRepositoryPort)
+	workorderRepository := ProvideWorkOrderRepository(gormEngine)
+	workorderRepositoryPort := ProvideWorkOrderRepositoryPort(workorderRepository)
+	workOrderRepositoryPort := ProvideDataIntegrityWorkOrderRepositoryPort(workorderRepositoryPort)
+	dataintegrityDashboardRepositoryPort := ProvideDataIntegrityDashboardRepositoryPort(dashboardRepositoryPort)
 	lotGormEnginePort := ProvideLotGormEnginePort(repository)
 	lotRepository := ProvideLotRepository(lotGormEnginePort)
 	lotRepositoryPort := ProvideLotRepositoryPort(lotRepository)
-	data_integrityLotRepositoryPort := ProvideDataIntegrityLotRepositoryPort(lotRepositoryPort)
+	dataintegrityLotRepositoryPort := ProvideDataIntegrityLotRepositoryPort(lotRepositoryPort)
 	reportGormEnginePort := ProvideReportGormEnginePort(repository)
 	reportRepository := ProvideReportRepository(reportGormEnginePort)
 	reportRepositoryPort := ProvideReportRepositoryPort(reportRepository)
-	data_integrityReportRepositoryPort := ProvideDataIntegrityReportRepositoryPort(reportRepositoryPort)
+	dataintegrityReportRepositoryPort := ProvideDataIntegrityReportRepositoryPort(reportRepositoryPort)
 	stockGormEnginePort := ProvideStockGormEnginePort(repository)
 	stockRepository := ProvideStockRepository(stockGormEnginePort)
 	stockRepositoryPort := ProvideStockRepositoryPort(stockRepository)
-	data_integrityStockRepositoryPort := ProvideDataIntegrityStockRepositoryPort(stockRepositoryPort)
-	data_integrityUseCases := ProvideDataIntegrityUseCases(dataIntegrityWorkOrderRepositoryPort, data_integrityDashboardRepositoryPort, data_integrityLotRepositoryPort, data_integrityReportRepositoryPort, data_integrityStockRepositoryPort)
-	data_integrityUseCasesPort := ProvideDataIntegrityUseCasesPort(data_integrityUseCases)
-	data_integrityConfigAPIPort := ProvideDataIntegrityConfigAPI(config)
-	data_integrityMiddlewaresEnginePort := ProvideDataIntegrityMiddlewaresEnginePort(middlewares)
-	data_integrityHandler := ProvideDataIntegrityHandler(data_integrityGinEnginePort, data_integrityUseCasesPort, data_integrityConfigAPIPort, data_integrityMiddlewaresEnginePort)
+	dataintegrityStockRepositoryPort := ProvideDataIntegrityStockRepositoryPort(stockRepositoryPort)
+	dataintegrityUseCases := ProvideDataIntegrityUseCases(workOrderRepositoryPort, dataintegrityDashboardRepositoryPort, dataintegrityLotRepositoryPort, dataintegrityReportRepositoryPort, dataintegrityStockRepositoryPort)
+	dataintegrityUseCasesPort := ProvideDataIntegrityUseCasesPort(dataintegrityUseCases)
+	dataintegrityConfigAPIPort := ProvideDataIntegrityConfigAPI(config)
+	dataintegrityMiddlewaresEnginePort := ProvideDataIntegrityMiddlewaresEnginePort(middlewares)
+	dataintegrityHandler := ProvideDataIntegrityHandler(dataintegrityGinEnginePort, dataintegrityUseCasesPort, dataintegrityConfigAPIPort, dataintegrityMiddlewaresEnginePort)
 	investorGinEnginePort := ProvideInvestorGinEnginePort(server)
 	investorGormEnginePort := ProvideInvestorGormEnginePort(repository)
 	investorRepository := ProvideInvestorRepository(investorGormEnginePort)
@@ -158,15 +159,6 @@ func Initialize() (*Dependencies, error) {
 	managerConfigAPIPort := ProvideManagerConfigAPI(config)
 	managerMiddlewaresEnginePort := ProvideManagerMiddlewaresEnginePort(middlewares)
 	managerHandler := ProvideManagerHandler(managerGinEnginePort, managerUseCasesPort, managerConfigAPIPort, managerMiddlewaresEnginePort)
-	providerGinEnginePort := ProvideProviderGinEnginePort(server)
-	providerGormEnginePort := ProvideProviderGormEnginePort(repository)
-	providerRepository := ProvideProviderRepository(providerGormEnginePort)
-	providerRepositoryPort := ProvideProviderRepositoryPort(providerRepository)
-	providerUseCases := ProvideProviderUseCases(providerRepositoryPort)
-	providerUseCasesPort := ProvideProviderUseCasesPort(providerUseCases)
-	providerConfigAPIPort := ProvideProviderConfigAPI(config)
-	providerMiddlewaresEnginePort := ProvideProviderMiddlewaresEnginePort(middlewares)
-	providerHandler := ProvideProviderHandler(providerGinEnginePort, providerUseCasesPort, providerConfigAPIPort, providerMiddlewaresEnginePort)
 	projectGinEnginePort := ProvideProjectGinEnginePort(server)
 	projectGormEnginePort := ProvideProjectGormEnginePort(repository)
 	projectRepository := ProvideProjectRepository(projectGormEnginePort)
@@ -177,6 +169,15 @@ func Initialize() (*Dependencies, error) {
 	projectConfigAPIPort := ProvideProjectConfigAPI(config)
 	projectMiddlewaresEnginePort := ProvideProjectMiddlewaresEnginePort(middlewares)
 	projectHandler := ProvideProjectHandler(projectGinEnginePort, projectUseCasesPort, projectConfigAPIPort, projectMiddlewaresEnginePort)
+	providerGinEnginePort := ProvideProviderGinEnginePort(server)
+	providerGormEnginePort := ProvideProviderGormEnginePort(repository)
+	providerRepository := ProvideProviderRepository(providerGormEnginePort)
+	providerRepositoryPort := ProvideProviderRepositoryPort(providerRepository)
+	providerUseCases := ProvideProviderUseCases(providerRepositoryPort)
+	providerUseCasesPort := ProvideProviderUseCasesPort(providerUseCases)
+	providerConfigAPIPort := ProvideProviderConfigAPI(config)
+	providerMiddlewaresEnginePort := ProvideProviderMiddlewaresEnginePort(middlewares)
+	providerHandler := ProvideProviderHandler(providerGinEnginePort, providerUseCasesPort, providerConfigAPIPort, providerMiddlewaresEnginePort)
 	reportGinEnginePort := ProvideReportGinEnginePort(server)
 	reportUseCase := ProvideReportUseCases(reportRepositoryPort)
 	reportUseCasePort := ProvideReportUseCasesPort(reportUseCase)
@@ -251,18 +252,18 @@ func Initialize() (*Dependencies, error) {
 	dollarConfigAPIPort := ProvideDollarConfigAPI(config)
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
-	workOrderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
+	workorderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
 	service, err := ProvidePkgExcelService()
 	if err != nil {
 		return nil, err
 	}
-	workOrderXLSXEnginePort := ProvideXLSXEnginePort(service)
-	workOrderExporterAdapterPort := ProvideExporterPort(workOrderXLSXEnginePort)
-	workOrderUseCases := ProvideWorkOrderUseCases(workOrderRepositoryPort, workOrderExporterAdapterPort)
-	workOrderUseCasesPort := ProvideWorkOrderUseCasesPort(workOrderUseCases)
-	workOrderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
-	workOrderMiddlewaresEnginePort := ProvideWorkOrderMiddlewaresEnginePort(middlewares)
-	workOrderHandler := ProvideWorkOrderHandler(workOrderGinEnginePort, workOrderUseCasesPort, workOrderConfigAPIPort, workOrderMiddlewaresEnginePort)
+	workorderXLSXEnginePort := ProvideXLSXEnginePort(service)
+	workorderExporterAdapterPort := ProvideExporterPort(workorderXLSXEnginePort)
+	workorderUseCases := ProvideWorkOrderUseCases(workorderRepositoryPort, workorderExporterAdapterPort)
+	workorderUseCasesPort := ProvideWorkOrderUseCasesPort(workorderUseCases)
+	workorderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
+	workorderMiddlewaresEnginePort := ProvideWorkOrderMiddlewaresEnginePort(middlewares)
+	workorderHandler := ProvideWorkOrderHandler(workorderGinEnginePort, workorderUseCasesPort, workorderConfigAPIPort, workorderMiddlewaresEnginePort)
 	laborGinEnginePort := ProvideLaborGinEnginePort(server)
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
@@ -301,6 +302,14 @@ func Initialize() (*Dependencies, error) {
 	stockConfigAPIPort := ProvideStockConfigAPI(config)
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, useCasesPort2, stockConfigAPIPort, stockMiddlewaresEnginePort)
+	aiGinEnginePort := ProvideAIGinEnginePort(server)
+	ai := ProvideConfigAI(config)
+	client := ProvideAIClient(ai)
+	usecasesUseCases := ProvideAIUseCases(client)
+	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
+	aiConfigAPIPort := ProvideAIConfigAPI(config)
+	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
+	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -310,14 +319,14 @@ func Initialize() (*Dependencies, error) {
 		CustomerHandler:           handler,
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
-		DataIntegrityHandler:      data_integrityHandler,
+		DataIntegrityHandler:      dataintegrityHandler,
 		InvestorHandler:           investorHandler,
 		CropHandler:               cropHandler,
 		LotHandler:                lotHandler,
 		FieldHandler:              fieldHandler,
 		ManagerHandler:            managerHandler,
-		ProviderHandler:           providerHandler,
 		ProjectHandler:            projectHandler,
+		ProviderHandler:           providerHandler,
 		ReportHandler:             reportHandler,
 		LeaseTypeHandler:          leasetypeHandler,
 		SupplyHandler:             supplyHandler,
@@ -325,11 +334,12 @@ func Initialize() (*Dependencies, error) {
 		BusinessParametersHandler: bparamsHandler,
 		ClassTypeHandler:          classtypeHandler,
 		DollarHandler:             dollarHandler,
-		WorkOrderHandler:          workOrderHandler,
+		WorkOrderHandler:          workorderHandler,
 		LaborHandler:              laborHandler,
 		InvoiceHandler:            invoiceHandler,
 		CommercializationHandler:  commercializationHandler,
 		StockHandler:              stockHandler,
+		AIHandler:                 aiHandler,
 	}
 	return dependencies, nil
 }
@@ -345,14 +355,14 @@ type Dependencies struct {
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
-	DataIntegrityHandler      *data_integrity.Handler
+	DataIntegrityHandler      *dataintegrity.Handler
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
 	FieldHandler              *field.Handler
 	ManagerHandler            *manager.Handler
-	ProviderHandler           *provider.Handler
 	ProjectHandler            *project.Handler
+	ProviderHandler           *provider.Handler
 	ReportHandler             *report.ReportHandler
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
@@ -365,4 +375,5 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	AIHandler                 *ai.Handler
 }

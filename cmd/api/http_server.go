@@ -59,4 +59,5 @@ func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.LaborHandler.Routes()
 	deps.StockHandler.Routes()
 	deps.CommercializationHandler.Routes()
+	deps.AIHandler.Routes()
 }

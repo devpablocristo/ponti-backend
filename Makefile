@@ -13,7 +13,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean \
-        run-api seed seed-dashboard download-gcp-db \
+        run-api run-ponti-local seed seed-dashboard download-gcp-db \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline
 
@@ -73,6 +73,10 @@ lint:
 run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/
+
+run-ponti-local:
+	@echo "Running full local stack (backend + auth + frontend + ai)..."
+	@bash ./scripts/run-ponti-local.sh
 
 seed:
 	@echo "Seeding database..."

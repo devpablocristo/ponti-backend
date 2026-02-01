@@ -19,6 +19,7 @@ type Config struct {
 	DB             DB             // Configuración de base de datos
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
+	AI             AI             // Configuración del AI Copilot Service
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

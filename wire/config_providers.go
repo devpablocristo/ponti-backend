@@ -25,10 +25,16 @@ func ProvideConfigAPI(cfg *config.Config) *config.API {
 	return &cfg.API
 }
 
+// ProvideConfigAI ...
+func ProvideConfigAI(cfg *config.Config) *config.AI {
+	return &cfg.AI
+}
+
 // ConfigSet ...
 var ConfigSet = wire.NewSet(
 	ProvideAllConfigs,
 	ProvideConfigDB,
 	ProvideConfigSuggester,
 	ProvideConfigAPI,
+	ProvideConfigAI,
 )
