@@ -1,9 +1,11 @@
+// Package customer implementa el repositorio de clientes.
 package customer
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -44,7 +46,9 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 	var list []models.Customer
 	var total int64
 
-	db0 := r.db.Client().WithContext(ctx).Model(&models.Customer{})
+	db0 := r.db.Client().WithContext(ctx).
+		Model(&models.Customer{}).
+		Where("deleted_at IS NULL")
 
 	// Conteo total
 	if err := db0.Count(&total).Error; err != nil {
@@ -74,7 +78,9 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 
 func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {
 	var model models.Customer
-	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
+	err := r.db.Client().WithContext(ctx).
+		Where("id = ? AND deleted_at IS NULL", id).
+		First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("customer with id %d not found", id), err)
@@ -111,13 +117,109 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 }
 
 func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
+	return r.ArchiveCustomer(ctx, id)
+}
+
+func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
+		return err
+	}
+	var deletedBy *int64
+	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+		deletedBy = &userID
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var customer models.Customer
+		if err := tx.Unscoped().Where("id = ?", id).First(&customer).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("customer %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get customer", err)
+		}
+		if customer.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "customer already archived", nil)
+		}
+
+		var activeProjects int64
+		if err := tx.Table("projects").
+			Where("customer_id = ? AND deleted_at IS NULL", id).
+			Count(&activeProjects).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check active projects", err)
+		}
+		if activeProjects > 0 {
+			return types.NewError(types.ErrConflict, "customer has active projects", nil)
+		}
+
+		if deletedBy != nil {
+			var userCount int64
+			if err := tx.Table("users").
+				Where("id = ?", *deletedBy).
+				Count(&userCount).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to validate deleted_by", err)
+			}
+			if userCount == 0 {
+				deletedBy = nil
+			}
+		}
+
+		updates := map[string]any{
+			"deleted_at": time.Now(),
+		}
+		if deletedBy == nil {
+			updates["deleted_by"] = gorm.Expr("NULL")
+		} else {
+			updates["deleted_by"] = deletedBy
+		}
+
+		if err := tx.Model(&models.Customer{}).
+			Where("id = ?", id).
+			Updates(updates).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to archive customer", err)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var customer models.Customer
+		if err := tx.Unscoped().Where("id = ?", id).First(&customer).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("customer %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get customer", err)
+		}
+		if !customer.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "customer is not archived", nil)
+		}
+
+		if err := tx.Unscoped().Model(&models.Customer{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore customer", err)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}
 	result := r.db.Client().WithContext(ctx).
+		Unscoped().
 		Delete(&models.Customer{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete customer", result.Error)
+		return types.NewError(types.ErrInternal, "failed to hard delete customer", result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return types.NewError(types.ErrNotFound, fmt.Sprintf("customer with id %d does not exist", id), nil)

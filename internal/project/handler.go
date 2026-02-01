@@ -85,6 +85,7 @@ func (h *Handler) Routes() {
 		public.GET("/customers/:customer_id", h.ListProjectsByCustomerID)
 		public.GET("/:project_id", h.GetProject)
 		public.PUT("/:project_id", h.UpdateProject)
+		public.PUT("/:project_id/archive", h.ArchiveProject)
 		public.PUT("/:project_id/restore", h.RestoreProject)
 		public.DELETE("/:project_id", h.DeleteProject)
 		public.DELETE("/:project_id/hard", h.HardDeleteProject)
@@ -266,6 +267,21 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
+}
+
+// ArchiveProject archiva un proyecto por ID.
+func (h *Handler) ArchiveProject(c *gin.Context) {
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "project archived successfully"})
 }
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas

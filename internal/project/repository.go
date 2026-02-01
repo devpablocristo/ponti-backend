@@ -222,8 +222,12 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	var projects []models.Project
 	var total int64
 
-	baseClient := r.db.Client().WithContext(ctx).Model(&models.Project{})
-	sumClient := r.db.Client().WithContext(ctx).Model(&models.Project{})
+	baseClient := r.db.Client().WithContext(ctx).
+		Model(&models.Project{}).
+		Where("projects.deleted_at IS NULL")
+	sumClient := r.db.Client().WithContext(ctx).
+		Model(&models.Project{}).
+		Where("projects.deleted_at IS NULL")
 	if name != "" {
 		baseClient = baseClient.Where("projects.name = ?", name)
 		sumClient = sumClient.Where("projects.name = ?", name)
@@ -285,7 +289,8 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 
 	base := r.db.Client().
 		WithContext(ctx).
-		Model(&models.Project{})
+		Model(&models.Project{}).
+		Where("projects.deleted_at IS NULL")
 
 	if customerID > 0 {
 		base = base.Where("customer_id = ?", customerID)
@@ -347,6 +352,7 @@ func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name str
 	err := r.db.Client().WithContext(ctx).
 		Where("name = ?", name).
 		Where("campaign_id = ?", campaignID).
+		Where("deleted_at IS NULL").
 		First(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

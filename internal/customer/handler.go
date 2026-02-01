@@ -1,3 +1,4 @@
+// Package customer expone endpoints HTTP para clientes.
 package customer
 
 import (
@@ -19,6 +20,9 @@ type UseCasesPort interface {
 	GetCustomer(context.Context, int64) (*domain.Customer, error)
 	UpdateCustomer(context.Context, *domain.Customer) error
 	DeleteCustomer(context.Context, int64) error
+	ArchiveCustomer(context.Context, int64) error
+	RestoreCustomer(context.Context, int64) error
+	HardDeleteCustomer(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -70,7 +74,10 @@ func (h *Handler) Routes() {
 		public.GET("", h.ListCustomers)                  // Listar todos los customers
 		public.GET("/:customer_id", h.GetCustomer)       // Obtener un customer por ID
 		public.PUT("/:customer_id", h.UpdateCustomer)    // Actualizar un customer
-		public.DELETE("/:customer_id", h.DeleteCustomer) // Eliminar un customer
+		public.PUT("/:customer_id/archive", h.ArchiveCustomer)
+		public.PUT("/:customer_id/restore", h.RestoreCustomer)
+		public.DELETE("/:customer_id/hard", h.HardDeleteCustomer)
+		public.DELETE("/:customer_id", h.DeleteCustomer) // Eliminar (soft) un customer
 	}
 }
 
@@ -166,4 +173,49 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer deleted successfully"})
+}
+
+// ArchiveCustomer archiva un customer por su ID.
+func (h *Handler) ArchiveCustomer(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveCustomer(c.Request.Context(), id); err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer archived successfully"})
+}
+
+// RestoreCustomer restaura un customer archivado.
+func (h *Handler) RestoreCustomer(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreCustomer(c.Request.Context(), id); err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer restored successfully"})
+}
+
+// HardDeleteCustomer elimina físicamente un customer por ID.
+func (h *Handler) HardDeleteCustomer(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteCustomer(c.Request.Context(), id); err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer permanently deleted"})
 }
