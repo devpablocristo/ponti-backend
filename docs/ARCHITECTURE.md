@@ -36,3 +36,9 @@ Cada módulo debe indicar si:
 - `internal/report/*`: SQL directo.
 - `internal/customer/*`: GORM CRUD.
 
+## AI (Copilot + Insights)
+- Flujo: FE → BFF → Backend Go → AI Service.
+- El FE no conoce claves; el Backend Go usa `X-SERVICE-KEY`.
+- El AI Service es READ-ONLY sobre dominio y solo escribe en `ai_*`.
+- SQL en AI usa allowlist con `project_id` y `LIMIT` obligatorios.
+

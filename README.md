@@ -48,6 +48,23 @@ X-API-KEY: abc123secreta
 X-USER-ID: 123
 ```
 
+## AI (Copilot + Insights)
+Flujo seguro y cerrado:
+```
+FE (UI)
+ → BFF (ponti-frontend/api, valida JWT)
+ → Backend Go (proxy seguro)
+ → AI Service (FastAPI, READ-ONLY)
+```
+
+Notas:
+- El FE nunca ve claves.
+- El Backend Go usa `X-SERVICE-KEY` para hablar con AI Service.
+- El AI Service solo lee dominio (SELECT) y solo escribe en tablas `ai_*`.
+
+Doc de features reales:
+- `docs/FEATURE-MAP.md`
+
 ## Modelo de datos (resumen)
 - Project es el núcleo: Customer, Campaign, Managers, Investors y Fields.
 - Fields → Lots → Crops (cultivo actual y previo).
