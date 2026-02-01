@@ -11,40 +11,57 @@ import (
 
 	dashboardDomain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
 	lotDomain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	reportDomain "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
 func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 	tests := []struct {
 		name              string
 		projectID         *int64
-		mockRawCost       decimal.Decimal
-		mockRawCostErr    error
+		mockLots          []lotDomain.LotTable
+		mockLotsErr       error
 		mockDashboardData *dashboardDomain.DashboardData
 		mockDashboardErr  error
 		expectedStatus    string
 		expectedDiff      string
+		expectedLeftVal   string
 	}{
 		{
 			name:           "OK - valores iguales",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18454.39),
-			mockRawCostErr: nil,
+			mockLots: []lotDomain.LotTable{
+				{
+					CostUsdPerHa: decimal.NewFromFloat(1000.50),
+					Hectares:     decimal.NewFromFloat(10.0),
+				},
+				{
+					CostUsdPerHa: decimal.NewFromFloat(845.439),
+					Hectares:     decimal.NewFromFloat(10.0),
+				},
+			},
+			mockLotsErr: nil,
 			mockDashboardData: &dashboardDomain.DashboardData{
 				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
 					Summary: &dashboardDomain.DashboardBalanceSummary{
-						DirectCostsExecutedUSD: decimal.NewFromFloat(18454.39),
+						DirectCostsExecutedUSD: decimal.NewFromFloat(18459.39),
 					},
 				},
 			},
 			mockDashboardErr: nil,
 			expectedStatus:   "OK",
 			expectedDiff:     "0.00",
+			expectedLeftVal:  "18459.39",
 		},
 		{
 			name:           "ERROR - diferencia aunque sea pequeña (tolerancia 0)",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18454.39),
-			mockRawCostErr: nil,
+			mockLots: []lotDomain.LotTable{
+				{
+					CostUsdPerHa: decimal.NewFromFloat(1845.439),
+					Hectares:     decimal.NewFromFloat(10.0),
+				},
+			},
+			mockLotsErr: nil,
 			mockDashboardData: &dashboardDomain.DashboardData{
 				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
 					Summary: &dashboardDomain.DashboardBalanceSummary{
@@ -55,12 +72,18 @@ func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 			mockDashboardErr: nil,
 			expectedStatus:   "OK",
 			expectedDiff:     "-0.78",
+			expectedLeftVal:  "18454.39",
 		},
 		{
 			name:           "ERROR - diferencia fuera de tolerancia",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18454.39),
-			mockRawCostErr: nil,
+			mockLots: []lotDomain.LotTable{
+				{
+					CostUsdPerHa: decimal.NewFromFloat(2000.00),
+					Hectares:     decimal.NewFromFloat(10.0),
+				},
+			},
+			mockLotsErr: nil,
 			mockDashboardData: &dashboardDomain.DashboardData{
 				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
 					Summary: &dashboardDomain.DashboardBalanceSummary{
@@ -70,7 +93,8 @@ func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 			},
 			mockDashboardErr: nil,
 			expectedStatus:   "ERROR",
-			expectedDiff:     "-5.61",
+			expectedDiff:     "1540.00",
+			expectedLeftVal:  "20000.00",
 		},
 	}
 
@@ -95,15 +119,10 @@ func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 			)
 
 			ctx := context.Background()
-			pID := int64(0)
-			if tt.projectID != nil {
-				pID = *tt.projectID
-			}
-
 			// Mock expectations
-			mockWorkOrderRepo.EXPECT().
-				GetRawDirectCost(ctx, pID).
-				Return(tt.mockRawCost, tt.mockRawCostErr).
+			mockLotRepo.EXPECT().
+				ListLots(ctx, lotDomain.LotListFilter{ProjectID: tt.projectID}, 1, 10000).
+				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
 				Times(1)
 
 			mockDashboardRepo.EXPECT().
@@ -119,10 +138,10 @@ func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 			assert.Equal(t, 1, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)
 			assert.Equal(t, tt.expectedDiff, result.Difference.StringFixed(2))
-			assert.Equal(t, tt.mockRawCost, result.LeftValue)
+			assert.Equal(t, tt.expectedLeftVal, result.LeftValue.StringFixed(2))
 			assert.Equal(t, tt.mockDashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD, result.RightValue)
-			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v4_report.dashboard_management_balance", result.RightSource)
+			assert.Equal(t, "v4_report.lot_list", result.LeftSource)
+			assert.Equal(t, "v4_report.dashboard_management_balance", result.RightSource)
 		})
 	}
 }
@@ -131,10 +150,10 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 	tests := []struct {
 		name             string
 		projectID        *int64
-		mockRawCost      decimal.Decimal
-		mockRawCostErr   error
 		mockLots         []lotDomain.LotTable
 		mockLotsErr      error
+		mockFieldCrops   []reportDomain.FieldCropMetric
+		mockFieldCropsErr error
 		expectedStatus   string
 		expectedLeftVal  string
 		expectedRightVal string
@@ -142,19 +161,23 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 		{
 			name:           "OK - valores coinciden",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18459.39),
-			mockRawCostErr: nil,
 			mockLots: []lotDomain.LotTable{
 				{
 					CostUsdPerHa: decimal.NewFromFloat(1000.50),
-					SowedArea:    decimal.NewFromFloat(10.0),
+					Hectares:     decimal.NewFromFloat(10.0),
 				},
 				{
 					CostUsdPerHa: decimal.NewFromFloat(845.439),
-					SowedArea:    decimal.NewFromFloat(10.0),
+					Hectares:     decimal.NewFromFloat(10.0),
 				},
 			},
 			mockLotsErr:      nil,
+			mockFieldCrops: []reportDomain.FieldCropMetric{
+				{
+					TotalDirectCostsUsd: decimal.NewFromFloat(18459.39),
+				},
+			},
+			mockFieldCropsErr: nil,
 			expectedStatus:   "OK",
 			expectedLeftVal:  "18459.39",
 			expectedRightVal: "18459.39", // 10005.0 + 8454.39
@@ -162,15 +185,19 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 		{
 			name:           "ERROR - diferencia aunque sea pequeña (tolerancia 0)",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18454.39),
-			mockRawCostErr: nil,
 			mockLots: []lotDomain.LotTable{
 				{
-					CostUsdPerHa: decimal.NewFromFloat(1845.517),
-					SowedArea:    decimal.NewFromFloat(10.0),
+					CostUsdPerHa: decimal.NewFromFloat(1845.439),
+					Hectares:     decimal.NewFromFloat(10.0),
 				},
 			},
 			mockLotsErr:      nil,
+			mockFieldCrops: []reportDomain.FieldCropMetric{
+				{
+					TotalDirectCostsUsd: decimal.NewFromFloat(18455.17),
+				},
+			},
+			mockFieldCropsErr: nil,
 			expectedStatus:   "OK",
 			expectedLeftVal:  "18454.39",
 			expectedRightVal: "18455.17",
@@ -178,18 +205,22 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 		{
 			name:           "ERROR - diferencia fuera de tolerancia",
 			projectID:      ptr(int64(11)),
-			mockRawCost:    decimal.NewFromFloat(18454.39),
-			mockRawCostErr: nil,
 			mockLots: []lotDomain.LotTable{
 				{
 					CostUsdPerHa: decimal.NewFromFloat(2000.00),
-					SowedArea:    decimal.NewFromFloat(10.0),
+					Hectares:     decimal.NewFromFloat(10.0),
 				},
 			},
 			mockLotsErr:      nil,
+			mockFieldCrops: []reportDomain.FieldCropMetric{
+				{
+					TotalDirectCostsUsd: decimal.NewFromFloat(21000.00),
+				},
+			},
+			mockFieldCropsErr: nil,
 			expectedStatus:   "ERROR",
-			expectedLeftVal:  "18454.39",
-			expectedRightVal: "20000.00",
+			expectedLeftVal:  "20000.00",
+			expectedRightVal: "21000.00",
 		},
 	}
 
@@ -214,20 +245,14 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 			)
 
 			ctx := context.Background()
-			pID := int64(0)
-			if tt.projectID != nil {
-				pID = *tt.projectID
-			}
-
-			// Mock expectations
-			mockWorkOrderRepo.EXPECT().
-				GetRawDirectCost(ctx, pID).
-				Return(tt.mockRawCost, tt.mockRawCostErr).
+			mockLotRepo.EXPECT().
+				ListLots(ctx, lotDomain.LotListFilter{ProjectID: tt.projectID}, 1, 10000).
+				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
 				Times(1)
 
-			mockLotRepo.EXPECT().
-				ListLots(ctx, lotDomain.LotListFilter{ProjectID: &pID}, 1, 10000).
-				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
+			mockReportRepo.EXPECT().
+				GetFieldCropMetrics(reportDomain.ReportFilter{ProjectID: tt.projectID}).
+				Return(tt.mockFieldCrops, tt.mockFieldCropsErr).
 				Times(1)
 
 			// Act
@@ -239,8 +264,8 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, result.Status)
 			assert.Equal(t, tt.expectedLeftVal, result.LeftValue.StringFixed(2))
 			assert.Equal(t, tt.expectedRightVal, result.RightValue.StringFixed(2))
-			assert.Equal(t, "Tabla workorders RAW", result.LeftSource)
-			assert.Equal(t, "Vista v4_report.lot_list", result.RightSource)
+			assert.Equal(t, "v4_report.lot_list", result.LeftSource)
+			assert.Equal(t, "v4_report.field_crop_metrics", result.RightSource)
 			assert.Equal(t, "1.00", result.Tolerance.StringFixed(2))
 		})
 	}
@@ -321,12 +346,16 @@ func TestBuildCheck(t *testing.T) {
 				"Data",
 				"Target",
 				"Rule",
+				"Description",
 				"Left calc",
 				tt.leftValue,
 				"Left source",
+				"Left meaning",
 				"Right calc",
 				tt.rightValue,
 				"Right source",
+				"Right meaning",
+				"Calculation meaning",
 				tt.tolerance,
 			)
 

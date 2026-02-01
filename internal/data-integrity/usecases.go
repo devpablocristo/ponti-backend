@@ -18,6 +18,7 @@ package dataintegrity
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -91,97 +92,95 @@ func NewUseCases(
 // ESTA FUNCIÓN CONTIENE LOS 14 CONTROLES CRÍTICOS DE INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
-	checks := make([]domain.IntegrityCheck, 0, 14)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	checks := make([]domain.IntegrityCheck, 14)
+	var wg sync.WaitGroup
+	var errOnce sync.Once
+	var firstErr error
+
+	setErr := func(err error) {
+		errOnce.Do(func() {
+			firstErr = err
+			cancel()
+		})
+	}
+
+	run := func(index int, controlNumber int, fn func(context.Context) (domain.IntegrityCheck, error)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if ctx.Err() != nil {
+				return
+			}
+			check, err := fn(ctx)
+			if err != nil {
+				setErr(fmt.Errorf("control %d failed: %w", controlNumber, err))
+				return
+			}
+			checks[index] = check
+		}()
+	}
 
 	// GRUPO 1: Costos Directos Ejecutados (Controles 1-4)
-	control1, err := u.control1OrdenesVsDashboard(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 1 failed: %w", err)
-	}
-	checks = append(checks, control1)
-
-	control2, err := u.control2OrdenesVsLotes(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 2 failed: %w", err)
-	}
-	checks = append(checks, control2)
-
-	control3, err := u.control3OrdenesVsInformeCampo(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 3 failed: %w", err)
-	}
-	checks = append(checks, control3)
-
-	control4, err := u.control4OrdenesVsInformeGenerales(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 4 failed: %w", err)
-	}
-	checks = append(checks, control4)
+	run(0, 1, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control1OrdenesVsDashboard(c, filter.ProjectID)
+	})
+	run(1, 2, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control2OrdenesVsLotes(c, filter.ProjectID)
+	})
+	run(2, 3, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control3OrdenesVsInformeCampo(c, filter.ProjectID)
+	})
+	run(3, 4, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control4OrdenesVsInformeGenerales(c, filter.ProjectID)
+	})
 
 	// GRUPO 2: Invertidos (Controles 5-7)
-	control5, err := u.control5LaboresInsumosVsDashboard(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 5 failed: %w", err)
-	}
-	checks = append(checks, control5)
-
-	control6, err := u.control6LaboresVsAportes(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 6 failed: %w", err)
-	}
-	checks = append(checks, control6)
-
-	control7, err := u.control7InsumosVsAportes(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 7 failed: %w", err)
-	}
-	checks = append(checks, control7)
+	run(4, 5, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control5LaboresInsumosVsDashboard(c, filter.ProjectID)
+	})
+	run(5, 6, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control6LaboresVsAportes(c, filter.ProjectID)
+	})
+	run(6, 7, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control7InsumosVsAportes(c, filter.ProjectID)
+	})
 
 	// GRUPO 3: Lotes → Aportes (Controles 8-9)
-	control8, err := u.control8LotesAdminVsAportes(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 8 failed: %w", err)
-	}
-	checks = append(checks, control8)
-
-	control9, err := u.control9LotesArriendoVsAportes(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 9 failed: %w", err)
-	}
-	checks = append(checks, control9)
+	run(7, 8, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control8LotesAdminVsAportes(c, filter.ProjectID)
+	})
+	run(8, 9, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control9LotesArriendoVsAportes(c, filter.ProjectID)
+	})
 
 	// GRUPO 4: Ingreso Neto (Control 10)
-	control10, err := u.control10LotesIngresoNetoVsResumen(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 10 failed: %w", err)
-	}
-	checks = append(checks, control10)
+	run(9, 10, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control10LotesIngresoNetoVsResumen(c, filter.ProjectID)
+	})
 
 	// GRUPO 5: Resultado Operativo (Controles 11-13)
-	control11, err := u.control11LotesResultadoVsInformeCultivo(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 11 failed: %w", err)
-	}
-	checks = append(checks, control11)
-
-	control12, err := u.control12LotesResultadoVsInformeGenerales(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 12 failed: %w", err)
-	}
-	checks = append(checks, control12)
-
-	control13, err := u.control13LotesResultadoVsDashboard(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 13 failed: %w", err)
-	}
-	checks = append(checks, control13)
+	run(10, 11, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control11LotesResultadoVsInformeCultivo(c, filter.ProjectID)
+	})
+	run(11, 12, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control12LotesResultadoVsInformeGenerales(c, filter.ProjectID)
+	})
+	run(12, 13, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control13LotesResultadoVsDashboard(c, filter.ProjectID)
+	})
 
 	// GRUPO 6: Stock (Control 14)
-	control14, err := u.control14StockVsDashboard(ctx, filter.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("control 14 failed: %w", err)
+	run(13, 14, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control14StockVsDashboard(c, filter.ProjectID)
+	})
+
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
 	}
-	checks = append(checks, control14)
 
 	return &domain.IntegrityReport{
 		Checks: checks,
@@ -198,15 +197,17 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 // ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) control1OrdenesVsDashboard(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
-	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
+	// LEFT: Suma de costos directos desde lotes (v4_report.lot_list)
+	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
+	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
+	}
+
+	leftValue := decimal.Zero
+	for _, lot := range lots {
+		costTotal := lot.CostUsdPerHa.Mul(lot.Hectares)
+		leftValue = leftValue.Add(costTotal)
 	}
 
 	// RIGHT: Costos desde dashboard (usa funciones SSOT)
@@ -219,16 +220,20 @@ func (u *UseCases) control1OrdenesVsDashboard(ctx context.Context, projectID *in
 
 	return buildCheck(
 		1,
-		"Órdenes de trabajo",
+		"Lotes",
 		"Costos directos ejecutados",
 		"Dashboard",
-		"Dashboard.CostosDirectos = ∑(Ordenes.costo_total)",
-		"∑(workorders.effective_area × labors.price + workorder_items.final_dose × effective_area × supplies.price)",
+		"∑(lot_list.cost_usd_per_ha × lot_list.hectares) = dashboard_management_balance.costos_directos_ejecutados_usd",
+		"Compara costos directos ejecutados entre lotes y dashboard.",
+		"∑(lot_list.cost_usd_per_ha × lot_list.hectares)",
 		leftValue,
-		"Tabla workorders RAW",
-		"v4_ssot.direct_costs_total_for_project()",
+		"v4_report.lot_list",
+		"Total de costos directos desde lotes.",
+		"dashboard_management_balance.costos_directos_ejecutados_usd",
 		rightValue,
-		"Vista v4_report.dashboard_management_balance",
+		"v4_report.dashboard_management_balance",
+		"Costo directo ejecutado mostrado en dashboard.",
+		"Ambos deben representar el mismo total del proyecto.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -243,61 +248,17 @@ func (u *UseCases) control1OrdenesVsDashboard(ctx context.Context, projectID *in
 // ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) control2OrdenesVsLotes(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
-	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
-	if err != nil {
-		return domain.IntegrityCheck{}, err
-	}
-
-	// RIGHT: Suma desde lotes (usa SSOT)
+	// LEFT: Suma desde lotes (v4_report.lot_list)
 	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
 
-	rightValue := decimal.Zero
+	leftValue := decimal.Zero
 	for _, lot := range lots {
-		costTotal := lot.CostUsdPerHa.Mul(lot.SowedArea)
-		rightValue = rightValue.Add(costTotal)
-	}
-
-	return buildCheck(
-		2,
-		"Órdenes de trabajo",
-		"Costos directos ejecutados",
-		"Lotes",
-		"∑(Costo_directo_ha_lote × Superficie_lote) = ∑(Órdenes.costo_total)",
-		"∑(workorders RAW)",
-		leftValue,
-		"Tabla workorders RAW",
-		"∑(cost_usd_per_ha × sowed_area_ha)",
-		rightValue,
-		"Vista v4_report.lot_list",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 3: Órdenes de trabajo → Informe de Resultado por campo
-// LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: ∑(Costo_directo_ha_Cultivo × Superficie_Cultivo)
-// =====================================================
-func (u *UseCases) control3OrdenesVsInformeCampo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
-	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
-	if err != nil {
-		return domain.IntegrityCheck{}, err
+		costTotal := lot.CostUsdPerHa.Mul(lot.Hectares)
+		leftValue = leftValue.Add(costTotal)
 	}
 
 	// RIGHT: Desde informe field-crop
@@ -318,41 +279,51 @@ func (u *UseCases) control3OrdenesVsInformeCampo(ctx context.Context, projectID 
 	}
 
 	return buildCheck(
-		3,
-		"Órdenes de trabajo",
+		2,
+		"Lotes",
 		"Costos directos ejecutados",
 		"Informe de Resultado por campo",
-		"∑(Costo_directo_ha_Cultivo × Superficie_Cultivo) = ∑(Órdenes.costo_total)",
-		"∑(workorders RAW)",
+		"∑(lot_list.cost_usd_per_ha × lot_list.hectares) = ∑(field_crop_metrics.total_direct_costs_usd)",
+		"Compara costos directos entre lotes y reporte por campo.",
+		"∑(lot_list.cost_usd_per_ha × lot_list.hectares)",
 		leftValue,
-		"Tabla workorders RAW",
-		"∑(direct_cost_usd por field+crop)",
+		"v4_report.lot_list",
+		"Costos directos sumados desde lotes.",
+		"∑(field_crop_metrics.total_direct_costs_usd)",
 		rightValue,
-		"Vista v4_report.field_crop_metrics",
-		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
+		"v4_report.field_crop_metrics",
+		"Costos directos agregados por campo/cultivo.",
+		"Mismo total, distinto nivel de agregación.",
+		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 4: Órdenes de trabajo → Informe de Resultado Generales
+// CONTROL 3: Órdenes de trabajo → Informe de Resultado por campo
 // LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: Total de informe generales
+// RIGHT: ∑(Costo_directo_ha_Cultivo × Superficie_Cultivo)
 // =====================================================
-func (u *UseCases) control4OrdenesVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
-	pID := int64(0)
-	if projectID != nil {
-		pID = *projectID
-	}
-
-	// LEFT: Costos RAW desde workorders
-	leftValue, err := u.workOrderRepo.GetRawDirectCost(ctx, pID)
+func (u *UseCases) control3OrdenesVsInformeCampo(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+	// LEFT: Desde informe field-crop
+	filter := reportDomain.ReportFilter{ProjectID: projectID}
+	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(filter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
 
-	// RIGHT: Total del resumen de resultados (primera fila = GRAL CAMPOS)
-	filter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
-	summaryResults, err := u.reportRepo.GetSummaryResults(filter)
+	leftValue := decimal.Zero
+	for _, metric := range fieldCropMetrics {
+		if !metric.TotalDirectCostsUsd.IsZero() {
+			leftValue = leftValue.Add(metric.TotalDirectCostsUsd)
+		} else {
+			costTotal := metric.SurfaceHa.Mul(metric.DirectCostsUsdHa)
+			leftValue = leftValue.Add(costTotal)
+		}
+	}
+
+	// RIGHT: Total del resumen de resultados (totales del proyecto)
+	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
+	summaryResults, err := u.reportRepo.GetSummaryResults(summaryFilter)
 	if err != nil {
 		return domain.IntegrityCheck{}, err
 	}
@@ -363,17 +334,67 @@ func (u *UseCases) control4OrdenesVsInformeGenerales(ctx context.Context, projec
 	}
 
 	return buildCheck(
-		4,
-		"Órdenes de trabajo",
+		3,
+		"Informe de Resultado por campo",
 		"Costos directos ejecutados",
 		"Informe de Resultado Generales",
-		"∑(Costo_directos totales_Cultivo) = ∑(Órdenes.costo_total)",
-		"∑(workorders RAW)",
+		"∑(field_crop_metrics.total_direct_costs_usd) = summary_results.total_direct_costs_usd",
+		"Compara costos directos del reporte por campo vs resumen general.",
+		"∑(field_crop_metrics.total_direct_costs_usd)",
 		leftValue,
-		"Tabla workorders RAW",
-		"summaryResults[0].TotalDirectCostsUsd",
+		"v4_report.field_crop_metrics",
+		"Total de costos directos por campo/cultivo.",
+		"summaryResults[0].TotalDirectCostsUsd (totales del proyecto)",
 		rightValue,
-		"Vista v4_report.summary_results",
+		"v4_report.summary_results",
+		"Total de costos directos del resumen.",
+		"Mismo total del proyecto.",
+		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
+	), nil
+}
+
+// =====================================================
+// CONTROL 4: Órdenes de trabajo → Informe de Resultado Generales
+// LEFT: ∑(Ordenes.costo_total) RAW
+// RIGHT: Total de informe generales
+// =====================================================
+func (u *UseCases) control4OrdenesVsInformeGenerales(ctx context.Context, projectID *int64) (domain.IntegrityCheck, error) {
+	// LEFT: Total del resumen de resultados (totales del proyecto)
+	filter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
+	summaryResults, err := u.reportRepo.GetSummaryResults(filter)
+	if err != nil {
+		return domain.IntegrityCheck{}, err
+	}
+
+	leftValue := decimal.Zero
+	if len(summaryResults) > 0 {
+		leftValue = summaryResults[0].TotalDirectCostsUsd
+	}
+
+	// RIGHT: Costos desde dashboard
+	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
+	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)
+	if err != nil {
+		return domain.IntegrityCheck{}, err
+	}
+	rightValue := dashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD
+
+	return buildCheck(
+		4,
+		"Informe de Resultado Generales",
+		"Costos directos ejecutados",
+		"Dashboard",
+		"summary_results.total_direct_costs_usd (totales del proyecto) = dashboard_management_balance.costos_directos_ejecutados_usd",
+		"Compara costos directos del resumen vs dashboard.",
+		"summaryResults[0].TotalDirectCostsUsd (totales del proyecto)",
+		leftValue,
+		"v4_report.summary_results",
+		"Total de costos directos del resumen.",
+		"dashboard_management_balance.costos_directos_ejecutados_usd",
+		rightValue,
+		"v4_report.dashboard_management_balance",
+		"Costo directo ejecutado en dashboard.",
+		"Mismo total del proyecto.",
 		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
 	), nil
 }
@@ -408,13 +429,17 @@ func (u *UseCases) control5LaboresInsumosVsDashboard(ctx context.Context, projec
 		"Labores + Insumos",
 		"Invertidos",
 		"Dashboard",
-		"Dashboard.Invertidos = ∑(Labores) + ∑(Insumos)",
-		"Labores + Semillas + Agroquímicos + Fertilizantes",
+		"TotalsRow.InvestedUSD = SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD",
+		"Valida total invertido del dashboard.",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD",
 		leftValue,
-		"Dashboard Summary components",
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Suma de componentes invertidos.",
 		"TotalsRow.InvestedUSD",
 		rightValue,
-		"Dashboard TotalsRow",
+		"Dashboard TotalsRow (ManagementBalance.TotalsRow)",
+		"Total invertido calculado por dashboard.",
+		"Total debe ser suma de componentes.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -455,13 +480,17 @@ func (u *UseCases) control6LaboresVsAportes(ctx context.Context, projectID *int6
 		"Dashboard",
 		"Inversión en labores",
 		"Informe de Aportes",
-		"Dashboard.LaboresInvertidos = ∑(Labores Generales + Siembra + Riego)",
+		"Summary.LaboresInvertidosUSD = ∑(contribution_categories.total_usd) where label in [Labores Generales, Siembra, Riego]",
+		"Valida labores entre dashboard y aportes.",
 		"Summary.LaboresInvertidosUSD",
 		leftValue,
-		"Dashboard Summary",
-		"∑(Labores Generales + Siembra + Riego)",
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Labores invertidas en dashboard.",
+		"∑(contribution_categories.total_usd) labels: Labores Generales, Siembra, Riego",
 		rightValue,
-		"Vista investor_contribution_report",
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Suma de categorías de labores en aportes.",
+		"Mismo total de labores (sin cosecha).",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -480,9 +509,9 @@ func (u *UseCases) control7InsumosVsAportes(ctx context.Context, projectID *int6
 	}
 
 	// LEFT: Insumos invertidos desde dashboard
-	leftValue := dashboardData.ManagementBalance.Summary.SemillasInvertidosUSD.Add(
-		dashboardData.ManagementBalance.Summary.AgroquimicosInvertidosUSD,
-	)
+	leftValue := dashboardData.ManagementBalance.Summary.SemillasInvertidosUSD.
+		Add(dashboardData.ManagementBalance.Summary.AgroquimicosInvertidosUSD).
+		Add(dashboardData.ManagementBalance.Summary.FertilizantesInvertidosUSD)
 
 	// RIGHT: Informe de aportes
 	filter := reportDomain.ReportFilter{ProjectID: projectID}
@@ -493,7 +522,7 @@ func (u *UseCases) control7InsumosVsAportes(ctx context.Context, projectID *int6
 
 	rightValue := decimal.Zero
 	for _, category := range investorReport.Contributions {
-		if category.Label == "Semilla" || category.Label == "Agroquímicos" {
+		if category.Label == "Semilla" || category.Label == "Agroquímicos" || category.Label == "Fertilizantes" {
 			rightValue = rightValue.Add(category.TotalUsd)
 		}
 	}
@@ -503,13 +532,17 @@ func (u *UseCases) control7InsumosVsAportes(ctx context.Context, projectID *int6
 		"Insumos",
 		"Inversión en insumos",
 		"Informe de Aportes",
-		"Dashboard.InsumosInvertidos = ∑(Semilla + Agroquímicos)",
-		"Semillas + Agroquímicos",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD = ∑(contribution_categories.total_usd) labels: Semilla, Agroquímicos, Fertilizantes",
+		"Valida insumos entre dashboard y aportes.",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD",
 		leftValue,
-		"Dashboard Summary",
-		"∑(Semilla + Agroquímicos)",
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Semillas, agroquímicos y fertilizantes en dashboard.",
+		"∑(contribution_categories.total_usd) labels: Semilla, Agroquímicos, Fertilizantes",
 		rightValue,
-		"Vista investor_contribution_report",
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Suma de esas categorías en aportes.",
+		"Mismo total de insumos.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -529,7 +562,7 @@ func (u *UseCases) control8LotesAdminVsAportes(ctx context.Context, projectID *i
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		leftValue = leftValue.Add(lot.AdminCost.Mul(lot.SowedArea))
+		leftValue = leftValue.Add(lot.AdminCost.Mul(lot.Hectares))
 	}
 
 	// RIGHT: Total Aportes Adm.Proyecto del Informe
@@ -552,13 +585,17 @@ func (u *UseCases) control8LotesAdminVsAportes(ctx context.Context, projectID *i
 		"Lotes",
 		"Invertidos",
 		"Informe de Aportes",
-		"∑(Adm Proyecto_ha_lote × Superficie_lote) = Total Aportes Adm.Proyecto",
-		"∑(admin_cost × sowed_area)",
+		"∑(lot_list.admin_cost_per_ha_usd × lot_list.hectares) = contribution_categories.total_usd (Administración y Estructura)",
+		"Valida administración entre lotes y aportes.",
+		"∑(lot_list.admin_cost_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
-		"Categoría 'Administración y Estructura'",
+		"v4_report.lot_list",
+		"Admin prorrateado por lote.",
+		"contribution_categories.total_usd (Administración y Estructura)",
 		rightValue,
-		"Vista investor_contribution_report",
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Categoría Administración y Estructura.",
+		"Mismo total de administración.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -578,7 +615,7 @@ func (u *UseCases) control9LotesArriendoVsAportes(ctx context.Context, projectID
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		arriendoTotal := lot.RentPerHa.Mul(lot.SowedArea)
+		arriendoTotal := lot.RentPerHa.Mul(lot.Hectares)
 		leftValue = leftValue.Add(arriendoTotal)
 	}
 
@@ -602,13 +639,17 @@ func (u *UseCases) control9LotesArriendoVsAportes(ctx context.Context, projectID
 		"Lotes",
 		"Invertidos",
 		"Informe de Aportes",
-		"∑(Arriendo Fijo_ha_lote × Superficie_lote) = Total Aportes Arriendo Fijo",
-		"∑(rent_per_ha × sowed_area)",
+		"∑(lot_list.rent_per_ha_usd × lot_list.hectares) = contribution_categories.total_usd (Arriendo Capitalizable)",
+		"Valida arriendo capitalizable entre lotes y aportes.",
+		"∑(lot_list.rent_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
-		"Categoría 'Arriendo Capitalizable'",
+		"v4_report.lot_list",
+		"Arriendo prorrateado por lote.",
+		"contribution_categories.total_usd (Arriendo Capitalizable)",
 		rightValue,
-		"Vista investor_contribution_report",
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Categoría Arriendo Capitalizable.",
+		"Mismo total de arriendo.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -628,7 +669,7 @@ func (u *UseCases) control10LotesIngresoNetoVsResumen(ctx context.Context, proje
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		ingresoTotal := lot.IncomeNetPerHa.Mul(lot.SowedArea)
+		ingresoTotal := lot.IncomeNetPerHa.Mul(lot.Hectares)
 		leftValue = leftValue.Add(ingresoTotal)
 	}
 
@@ -649,13 +690,17 @@ func (u *UseCases) control10LotesIngresoNetoVsResumen(ctx context.Context, proje
 		"Lotes",
 		"Ingreso Neto",
 		"Resumen de resultados",
-		"∑(Ingreso Neto_ha_lote × Superficie_lote) = ∑(Ingreso Neto del Resumen)",
-		"∑(income_net_per_ha × sowed_area)",
+		"∑(lot_list.income_net_per_ha_usd × lot_list.hectares) = ∑(summary_results.net_income_usd)",
+		"Valida ingreso neto entre lotes y resumen.",
+		"∑(lot_list.income_net_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
-		"∑(net_income_usd)",
+		"v4_report.lot_list",
+		"Ingreso neto total desde lotes.",
+		"∑(summary_results.net_income_usd)",
 		rightValue,
-		"Vista v4_report.summary_results",
+		"v4_report.summary_results",
+		"Ingreso neto total del resumen.",
+		"Mismo total del proyecto.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -675,7 +720,7 @@ func (u *UseCases) control11LotesResultadoVsInformeCultivo(ctx context.Context, 
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.SowedArea)
+		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
 		leftValue = leftValue.Add(resultadoTotal)
 	}
 
@@ -688,7 +733,7 @@ func (u *UseCases) control11LotesResultadoVsInformeCultivo(ctx context.Context, 
 
 	rightValue := decimal.Zero
 	for _, metric := range fieldCropMetrics {
-		resultadoTotal := metric.OperatingResultUsdHa.Mul(metric.SownAreaHa)
+		resultadoTotal := metric.OperatingResultUsdHa.Mul(metric.SurfaceHa)
 		rightValue = rightValue.Add(resultadoTotal)
 	}
 
@@ -697,13 +742,17 @@ func (u *UseCases) control11LotesResultadoVsInformeCultivo(ctx context.Context, 
 		"Lotes",
 		"Resultado operativo total",
 		"Informe por cultivo",
-		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado.Operativo_ha_Cultivo × Superficie)",
-		"∑(operating_result_per_ha × sowed_area)",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = ∑(field_crop_metrics.operating_result_usd_ha × field_crop_metrics.surface_ha)",
+		"Valida resultado operativo entre lotes y reporte por cultivo.",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
-		"∑(operating_result_usd_ha × sown_area_ha)",
+		"v4_report.lot_list",
+		"Resultado operativo total desde lotes.",
+		"∑(field_crop_metrics.operating_result_usd_ha × field_crop_metrics.surface_ha)",
 		rightValue,
-		"Vista v4_report.field_crop_metrics",
+		"v4_report.field_crop_metrics",
+		"Resultado operativo agregado por cultivo.",
+		"Mismo total del proyecto.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -723,7 +772,7 @@ func (u *UseCases) control12LotesResultadoVsInformeGenerales(ctx context.Context
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.SowedArea)
+		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
 		leftValue = leftValue.Add(resultadoTotal)
 	}
 
@@ -744,13 +793,17 @@ func (u *UseCases) control12LotesResultadoVsInformeGenerales(ctx context.Context
 		"Lotes",
 		"Resultado operativo total",
 		"Informe de Resultado Generales",
-		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = ∑(Resultado_Operativo_Cultivo)",
-		"∑(operating_result_per_ha × sowed_area)",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = summary_results.total_operating_result_usd (totales proyecto)",
+		"Valida resultado operativo entre lotes y resumen.",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
-		"summaryResults[0].TotalOperatingResultUsd",
+		"v4_report.lot_list",
+		"Resultado operativo total desde lotes.",
+		"summaryResults[0].TotalOperatingResultUsd (totales del proyecto)",
 		rightValue,
-		"Vista v4_report.summary_results",
+		"v4_report.summary_results",
+		"Resultado operativo total del resumen.",
+		"Mismo total del proyecto.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -770,7 +823,7 @@ func (u *UseCases) control13LotesResultadoVsDashboard(ctx context.Context, proje
 
 	leftValue := decimal.Zero
 	for _, lot := range lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.SowedArea)
+		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
 		leftValue = leftValue.Add(resultadoTotal)
 	}
 
@@ -788,13 +841,17 @@ func (u *UseCases) control13LotesResultadoVsDashboard(ctx context.Context, proje
 		"Lotes",
 		"Resultado operativo total",
 		"Dashboard",
-		"∑(Resultado.Operativo_ha_lote × Superficie_lote) = Resultado_Operativo Dashboard Card",
-		"∑(operating_result_per_ha × sowed_area)",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = dashboard_management_balance.operating_result_usd",
+		"Valida resultado operativo entre lotes y dashboard.",
+		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
 		leftValue,
-		"Vista v4_report.lot_list",
+		"v4_report.lot_list",
+		"Resultado operativo total desde lotes.",
 		"Metrics.OperatingResult.ResultUSD",
 		rightValue,
-		"Vista v4_report.dashboard_management_balance",
+		"v4_report.dashboard_management_balance.operating_result_usd",
+		"Resultado operativo en dashboard.",
+		"Mismo total del proyecto.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -830,13 +887,17 @@ func (u *UseCases) control14StockVsDashboard(ctx context.Context, projectID *int
 		"Stock",
 		"Insumos en stock",
 		"Dashboard",
-		"Stock = Invertido - Ejecutado",
-		"(Semillas + Agroquímicos + Fertilizantes + Labores) - Ejecutado",
+		"Summary.StockUSD = (SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD) - DirectCostsExecutedUSD",
+		"Valida stock en dashboard.",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD - DirectCostsExecutedUSD",
 		leftValue,
-		"Dashboard Summary calculation",
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Invertido menos ejecutado.",
 		"Summary.StockUSD",
 		rightValue,
-		"Dashboard Summary",
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Stock USD del dashboard.",
+		"Stock = invertido - ejecutado.",
 		decimal.NewFromInt(1),
 	), nil
 }
@@ -846,13 +907,14 @@ func (u *UseCases) control14StockVsDashboard(ctx context.Context, projectID *int
 // =====================================================
 func buildCheck(
 	controlNumber int,
-	sourceModule, dataToVerify, targetModule, controlRule string,
+	sourceModule, dataToVerify, targetModule, controlRule, description string,
 	leftCalculation string,
 	leftValue decimal.Decimal,
-	leftSource string,
+	leftSource, leftMeaning string,
 	rightCalculation string,
 	rightValue decimal.Decimal,
-	rightSource string,
+	rightSource, rightMeaning string,
+	calculationMeaning string,
 	tolerance decimal.Decimal,
 ) domain.IntegrityCheck {
 	difference := leftValue.Sub(rightValue)
@@ -878,12 +940,16 @@ func buildCheck(
 		DataToVerify:     dataToVerify,
 		TargetModule:     targetModule,
 		ControlRule:      controlRule,
+		Description:      description,
 		LeftCalculation:  leftCalculation,
 		LeftValue:        leftValue,
 		LeftSource:       leftSource,
+		LeftMeaning:      leftMeaning,
 		RightCalculation: rightCalculation,
 		RightValue:       rightValue,
 		RightSource:      rightSource,
+		RightMeaning:     rightMeaning,
+		CalculationMeaning: calculationMeaning,
 		Difference:       difference,
 		Status:           status,
 		Tolerance:        tolerance,

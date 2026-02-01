@@ -24,14 +24,19 @@ type IntegrityCheckDTO struct {
 	DataToVerify  string `json:"data_to_verify"`
 	TargetModule  string `json:"target_module"`
 	ControlRule   string `json:"control_rule"`
+	Description   string `json:"description"`
 
 	LeftCalculation string `json:"left_calculation"`
 	LeftValue       string `json:"left_value"`
 	LeftSource      string `json:"left_source,omitempty"`
+	LeftMeaning     string `json:"left_interpretation"`
 
 	RightCalculation string `json:"right_calculation"`
 	RightValue       string `json:"right_value"`
 	RightSource      string `json:"right_source,omitempty"`
+	RightMeaning     string `json:"right_interpretation"`
+
+	CalculationMeaning string `json:"calculation_interpretation"`
 
 	Difference string `json:"difference"`
 	Status     string `json:"status"`
@@ -49,12 +54,16 @@ func ToIntegrityReportResponse(report *domain.IntegrityReport) *IntegrityReportR
 			DataToVerify:     check.DataToVerify,
 			TargetModule:     check.TargetModule,
 			ControlRule:      check.ControlRule,
+			Description:      check.Description,
 			LeftCalculation:  check.LeftCalculation,
 			LeftValue:        formatDecimal(check.LeftValue),
 			LeftSource:       check.LeftSource,
+			LeftMeaning:      check.LeftMeaning,
 			RightCalculation: check.RightCalculation,
 			RightValue:       formatDecimal(check.RightValue),
 			RightSource:      check.RightSource,
+			RightMeaning:     check.RightMeaning,
+			CalculationMeaning: check.CalculationMeaning,
 			Difference:       formatDecimal(check.Difference),
 			Status:           check.Status,
 			Tolerance:        formatDecimal(check.Tolerance),
