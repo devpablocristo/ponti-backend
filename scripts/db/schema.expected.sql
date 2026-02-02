@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.3 (Debian 16.3-1.pgdg120+1)
--- Dumped by pg_dump version 16.3 (Debian 16.3-1.pgdg120+1)
+\restrict 0tcvR4OIrSyhT1vPKR6t3HmulMxkbOIJqMYjX5ua2jxdhkbU8XK8f9ePu8F4p6E
+
+-- Dumped from database version 16.11 (Debian 16.11-1.pgdg12+1)
+-- Dumped by pg_dump version 16.11 (Debian 16.11-1.pgdg12+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -70,6 +72,20 @@ CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 --
 
 COMMENT ON EXTENSION unaccent IS 'text search dictionary that removes accents';
+
+
+--
+-- Name: vector; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
 
 
 --
@@ -1722,6 +1738,159 @@ CREATE TABLE public.admin_cost_investors (
     created_by bigint,
     updated_by bigint,
     deleted_by bigint
+);
+
+
+--
+-- Name: ai_audit_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_audit_logs (
+    request_id uuid NOT NULL,
+    project_id text NOT NULL,
+    user_id text NOT NULL,
+    question text NOT NULL,
+    intent text NOT NULL,
+    query_id text,
+    params_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    duration_ms integer NOT NULL,
+    rows_count integer NOT NULL,
+    status text NOT NULL,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_baselines; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_baselines (
+    id uuid NOT NULL,
+    scope_type text DEFAULT 'global'::text NOT NULL,
+    scope_id text,
+    cohort_key text NOT NULL,
+    feature_name text NOT NULL,
+    window_name text NOT NULL,
+    p50 double precision NOT NULL,
+    p75 double precision NOT NULL,
+    p90 double precision NOT NULL,
+    n_samples integer NOT NULL,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_entity_scores; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_entity_scores (
+    id uuid NOT NULL,
+    project_id text NOT NULL,
+    entity_type text NOT NULL,
+    entity_id text NOT NULL,
+    score double precision NOT NULL,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_insight_actions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_insight_actions (
+    id uuid NOT NULL,
+    insight_id uuid NOT NULL,
+    project_id text NOT NULL,
+    user_id text NOT NULL,
+    action text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_insights; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_insights (
+    id uuid NOT NULL,
+    project_id text NOT NULL,
+    entity_type text NOT NULL,
+    entity_id text NOT NULL,
+    type text NOT NULL,
+    severity integer NOT NULL,
+    priority integer NOT NULL,
+    title text NOT NULL,
+    summary text NOT NULL,
+    evidence_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    explanations_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    action_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model_version text NOT NULL,
+    features_version text NOT NULL,
+    computed_at timestamp with time zone NOT NULL,
+    valid_until timestamp with time zone NOT NULL,
+    status text NOT NULL,
+    impact_min double precision,
+    impact_max double precision,
+    impact_unit text,
+    confidence text,
+    dedupe_key text,
+    cooldown_until timestamp with time zone,
+    computed_by text,
+    job_run_id text,
+    rules_version text
+);
+
+
+--
+-- Name: ai_rag_chunks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_rag_chunks (
+    id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    project_id text NOT NULL,
+    chunk_index integer NOT NULL,
+    content text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_rag_documents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_rag_documents (
+    id uuid NOT NULL,
+    project_id text NOT NULL,
+    source text NOT NULL,
+    title text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_rag_embeddings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_rag_embeddings (
+    id uuid NOT NULL,
+    chunk_id uuid NOT NULL,
+    project_id text NOT NULL,
+    embedding public.vector(1536) NOT NULL,
+    model text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ai_schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_schema_migrations (
+    version bigint NOT NULL,
+    dirty boolean NOT NULL
 );
 
 
@@ -3539,6 +3708,41 @@ CREATE VIEW v4_report.dashboard_crop_incidence AS
 
 
 --
+-- Name: dashboard_crop_incidence_field; Type: VIEW; Schema: v4_report; Owner: -
+--
+
+CREATE VIEW v4_report.dashboard_crop_incidence_field AS
+ WITH field_totals AS (
+         SELECT field_crop_aggregated.project_id,
+            field_crop_aggregated.field_id,
+            sum(field_crop_aggregated.surface_ha) AS total_hectares
+           FROM v4_calc.field_crop_aggregated
+          GROUP BY field_crop_aggregated.project_id, field_crop_aggregated.field_id
+        ), by_crop AS (
+         SELECT field_crop_aggregated.project_id,
+            field_crop_aggregated.field_id,
+            field_crop_aggregated.crop_id AS current_crop_id,
+            sum(field_crop_aggregated.surface_ha) AS crop_hectares
+           FROM v4_calc.field_crop_aggregated
+          GROUP BY field_crop_aggregated.project_id, field_crop_aggregated.field_id, field_crop_aggregated.crop_id
+        )
+ SELECT p.id AS project_id,
+    p.customer_id,
+    p.campaign_id,
+    bc.field_id,
+    bc.current_crop_id,
+    c.name AS crop_name,
+    bc.crop_hectares,
+    v4_core.percentage(bc.crop_hectares, COALESCE(ft.total_hectares, (0)::numeric)) AS crop_incidence_pct,
+    v4_ssot.cost_per_ha_for_crop_ssot(p.id, bc.current_crop_id) AS cost_per_ha_usd
+   FROM (((by_crop bc
+     JOIN public.projects p ON (((p.id = bc.project_id) AND (p.deleted_at IS NULL))))
+     LEFT JOIN field_totals ft ON (((ft.project_id = bc.project_id) AND (ft.field_id = bc.field_id))))
+     LEFT JOIN public.crops c ON (((c.id = bc.current_crop_id) AND (c.deleted_at IS NULL))))
+  ORDER BY bc.project_id, bc.field_id, c.name;
+
+
+--
 -- Name: dashboard_management_balance; Type: VIEW; Schema: v4_report; Owner: -
 --
 
@@ -3576,6 +3780,103 @@ CREATE VIEW v4_report.dashboard_management_balance AS
      LEFT JOIN v4_calc.dashboard_fertilizers_invested_by_project fi ON ((fi.project_id = p.id)))
   WHERE (p.deleted_at IS NULL)
   GROUP BY p.id, sc.semillas_ejecutados_usd, sc.agroquimicos_ejecutados_usd, sc.fertilizantes_ejecutados_usd, fi.fertilizantes_invertidos_usd;
+
+
+--
+-- Name: dashboard_management_balance_field; Type: VIEW; Schema: v4_report; Owner: -
+--
+
+CREATE VIEW v4_report.dashboard_management_balance_field AS
+ WITH lots_base AS (
+         SELECT p.id AS project_id,
+            p.customer_id,
+            p.campaign_id,
+            f.id AS field_id,
+            l.id AS lot_id,
+            l.hectares
+           FROM ((public.projects p
+             JOIN public.fields f ON (((f.project_id = p.id) AND (f.deleted_at IS NULL))))
+             JOIN public.lots l ON (((l.field_id = f.id) AND (l.deleted_at IS NULL))))
+          WHERE (p.deleted_at IS NULL)
+        ), income_totals AS (
+         SELECT lots_base.project_id,
+            lots_base.field_id,
+            sum(v4_ssot.income_net_total_for_lot(lots_base.lot_id)) AS income_usd
+           FROM lots_base
+          GROUP BY lots_base.project_id, lots_base.field_id
+        ), direct_costs AS (
+         SELECT lots_base.project_id,
+            lots_base.field_id,
+            sum(v4_ssot.direct_cost_for_lot(lots_base.lot_id)) AS direct_costs_usd
+           FROM lots_base
+          GROUP BY lots_base.project_id, lots_base.field_id
+        ), rent_totals AS (
+         SELECT lots_base.project_id,
+            lots_base.field_id,
+            sum((v4_ssot.rent_per_ha_for_lot(lots_base.lot_id) * lots_base.hectares)) AS rent_total_usd
+           FROM lots_base
+          GROUP BY lots_base.project_id, lots_base.field_id
+        ), admin_totals AS (
+         SELECT lots_base.project_id,
+            lots_base.field_id,
+            sum((v4_ssot.admin_cost_per_ha_for_lot(lots_base.lot_id) * lots_base.hectares)) AS admin_total_usd
+           FROM lots_base
+          GROUP BY lots_base.project_id, lots_base.field_id
+        ), supply_costs AS (
+         SELECT field_crop_supply_costs_by_lot.project_id,
+            field_crop_supply_costs_by_lot.field_id,
+            sum(field_crop_supply_costs_by_lot.semillas_usd) AS semillas_usd,
+            sum((((field_crop_supply_costs_by_lot.herbicidas_usd + field_crop_supply_costs_by_lot.insecticidas_usd) + field_crop_supply_costs_by_lot.fungicidas_usd) + field_crop_supply_costs_by_lot.coadyuvantes_usd)) AS agroquimicos_usd,
+            sum(field_crop_supply_costs_by_lot.fertilizantes_usd) AS fertilizantes_usd
+           FROM v4_calc.field_crop_supply_costs_by_lot
+          GROUP BY field_crop_supply_costs_by_lot.project_id, field_crop_supply_costs_by_lot.field_id
+        ), labor_costs AS (
+         SELECT field_crop_labor_costs_by_lot.project_id,
+            field_crop_labor_costs_by_lot.field_id,
+            sum(field_crop_labor_costs_by_lot.total_labores_usd) AS labor_total_usd
+           FROM v4_calc.field_crop_labor_costs_by_lot
+          GROUP BY field_crop_labor_costs_by_lot.project_id, field_crop_labor_costs_by_lot.field_id
+        )
+ SELECT lb.project_id,
+    lb.customer_id,
+    lb.campaign_id,
+    lb.field_id,
+    COALESCE(it.income_usd, (0)::numeric) AS income_usd,
+    (((COALESCE(it.income_usd, (0)::numeric) - COALESCE(dc.direct_costs_usd, (0)::numeric)) - COALESCE(rt.rent_total_usd, (0)::numeric)) - COALESCE(ad.admin_total_usd, (0)::numeric)) AS operating_result_usd,
+    v4_ssot.renta_pct((((COALESCE(it.income_usd, (0)::numeric) - COALESCE(dc.direct_costs_usd, (0)::numeric)) - COALESCE(rt.rent_total_usd, (0)::numeric)) - COALESCE(ad.admin_total_usd, (0)::numeric)), ((COALESCE(dc.direct_costs_usd, (0)::numeric) + COALESCE(rt.rent_total_usd, (0)::numeric)) + COALESCE(ad.admin_total_usd, (0)::numeric))) AS operating_result_pct,
+    COALESCE(dc.direct_costs_usd, (0)::numeric) AS costos_directos_ejecutados_usd,
+    COALESCE(dc.direct_costs_usd, (0)::numeric) AS costos_directos_invertidos_usd,
+    (0)::numeric AS costos_directos_stock_usd,
+    COALESCE(sc.semillas_usd, (0)::numeric) AS semillas_ejecutados_usd,
+    COALESCE(sc.semillas_usd, (0)::numeric) AS semillas_invertidos_usd,
+    (0)::numeric AS semillas_stock_usd,
+    COALESCE(sc.agroquimicos_usd, (0)::numeric) AS agroquimicos_ejecutados_usd,
+    COALESCE(sc.agroquimicos_usd, (0)::numeric) AS agroquimicos_invertidos_usd,
+    (0)::numeric AS agroquimicos_stock_usd,
+    COALESCE(sc.fertilizantes_usd, (0)::numeric) AS fertilizantes_ejecutados_usd,
+    COALESCE(sc.fertilizantes_usd, (0)::numeric) AS fertilizantes_invertidos_usd,
+    (0)::numeric AS fertilizantes_stock_usd,
+    COALESCE(lc.labor_total_usd, (0)::numeric) AS labores_ejecutados_usd,
+    COALESCE(lc.labor_total_usd, (0)::numeric) AS labores_invertidos_usd,
+    COALESCE(rt.rent_total_usd, (0)::numeric) AS arriendo_ejecutados_usd,
+    COALESCE(rt.rent_total_usd, (0)::numeric) AS arriendo_invertidos_usd,
+    COALESCE(ad.admin_total_usd, (0)::numeric) AS estructura_ejecutados_usd,
+    COALESCE(ad.admin_total_usd, (0)::numeric) AS estructura_invertidos_usd,
+    COALESCE(sc.semillas_usd, (0)::numeric) AS semilla_cost,
+    COALESCE(sc.agroquimicos_usd, (0)::numeric) AS insumos_cost,
+    COALESCE(lc.labor_total_usd, (0)::numeric) AS labores_cost,
+    COALESCE(sc.fertilizantes_usd, (0)::numeric) AS fertilizantes_cost
+   FROM ((((((( SELECT DISTINCT lots_base.project_id,
+            lots_base.customer_id,
+            lots_base.campaign_id,
+            lots_base.field_id
+           FROM lots_base) lb
+     LEFT JOIN income_totals it ON (((it.project_id = lb.project_id) AND (it.field_id = lb.field_id))))
+     LEFT JOIN direct_costs dc ON (((dc.project_id = lb.project_id) AND (dc.field_id = lb.field_id))))
+     LEFT JOIN rent_totals rt ON (((rt.project_id = lb.project_id) AND (rt.field_id = lb.field_id))))
+     LEFT JOIN admin_totals ad ON (((ad.project_id = lb.project_id) AND (ad.field_id = lb.field_id))))
+     LEFT JOIN supply_costs sc ON (((sc.project_id = lb.project_id) AND (sc.field_id = lb.field_id))))
+     LEFT JOIN labor_costs lc ON (((lc.project_id = lb.project_id) AND (lc.field_id = lb.field_id))));
 
 
 --
@@ -3680,6 +3981,95 @@ CREATE VIEW v4_report.dashboard_metrics AS
 
 
 --
+-- Name: dashboard_metrics_field; Type: VIEW; Schema: v4_report; Owner: -
+--
+
+CREATE VIEW v4_report.dashboard_metrics_field AS
+ WITH lot_data AS (
+         SELECT lm.project_id,
+            lm.field_id,
+            lm.lot_id,
+            lm.hectares,
+            lm.seeded_area_ha,
+            lm.harvested_area_ha,
+            lm.direct_cost_per_ha_usd
+           FROM v4_report.lot_metrics lm
+        ), field_hectares AS (
+         SELECT lot_metrics.project_id,
+            lot_metrics.field_id,
+            sum(lot_metrics.hectares) AS total_hectares
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id, lot_metrics.field_id
+        ), project_hectares AS (
+         SELECT lot_metrics.project_id,
+            sum(lot_metrics.hectares) AS total_hectares
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id
+        ), rent_fixed_ssot AS (
+         SELECT f.project_id,
+            f.id AS field_id,
+            sum((v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares)) AS rent_fixed_total_usd
+           FROM (public.fields f
+             JOIN public.lots l ON (((l.field_id = f.id) AND (l.deleted_at IS NULL))))
+          WHERE (f.deleted_at IS NULL)
+          GROUP BY f.project_id, f.id
+        ), direct_costs AS (
+         SELECT lot_metrics.project_id,
+            lot_metrics.field_id,
+            sum(v4_ssot.direct_cost_for_lot(lot_metrics.lot_id)) AS direct_costs_total_usd
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id, lot_metrics.field_id
+        ), admin_costs AS (
+         SELECT lot_metrics.project_id,
+            lot_metrics.field_id,
+            sum((v4_ssot.admin_cost_per_ha_for_lot(lot_metrics.lot_id) * lot_metrics.hectares)) AS admin_total_usd
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id, lot_metrics.field_id
+        ), rent_totals AS (
+         SELECT lot_metrics.project_id,
+            lot_metrics.field_id,
+            sum((v4_ssot.rent_per_ha_for_lot(lot_metrics.lot_id) * lot_metrics.hectares)) AS rent_total_usd
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id, lot_metrics.field_id
+        ), income_totals AS (
+         SELECT lot_metrics.project_id,
+            lot_metrics.field_id,
+            sum(v4_ssot.income_net_total_for_lot(lot_metrics.lot_id)) AS income_net_total_usd
+           FROM v4_report.lot_metrics
+          GROUP BY lot_metrics.project_id, lot_metrics.field_id
+        )
+ SELECT p.customer_id,
+    p.id AS project_id,
+    p.campaign_id,
+    ld.field_id,
+    COALESCE(sum(ld.seeded_area_ha), (0)::numeric) AS sowing_hectares,
+    COALESCE(sum(ld.hectares), (0)::numeric) AS sowing_total_hectares,
+    v4_core.percentage(COALESCE(sum(ld.seeded_area_ha), (0)::numeric), COALESCE(sum(ld.hectares), (0)::numeric)) AS sowing_progress_pct,
+    COALESCE(sum(ld.harvested_area_ha), (0)::numeric) AS harvest_hectares,
+    COALESCE(sum(ld.hectares), (0)::numeric) AS harvest_total_hectares,
+    v4_core.percentage(COALESCE(sum(ld.harvested_area_ha), (0)::numeric), COALESCE(sum(ld.hectares), (0)::numeric)) AS harvest_progress_pct,
+    COALESCE((sum((ld.direct_cost_per_ha_usd * ld.seeded_area_ha)) / NULLIF(sum(ld.seeded_area_ha), (0)::numeric)), (0)::numeric) AS executed_costs_usd,
+    (COALESCE(p.planned_cost, (0)::numeric) * v4_core.safe_div(COALESCE(fh.total_hectares, (0)::numeric), COALESCE(ph.total_hectares, (0)::numeric))) AS budget_cost_usd,
+    v4_core.percentage(COALESCE((sum((ld.direct_cost_per_ha_usd * ld.seeded_area_ha)) / NULLIF(sum(ld.seeded_area_ha), (0)::numeric)), (0)::numeric), (COALESCE(p.planned_cost, (0)::numeric) * v4_core.safe_div(COALESCE(fh.total_hectares, (0)::numeric), COALESCE(ph.total_hectares, (0)::numeric)))) AS costs_progress_pct,
+    COALESCE(it.income_net_total_usd, (0)::numeric) AS operating_result_income_usd,
+    (((COALESCE(it.income_net_total_usd, (0)::numeric) - COALESCE(dc.direct_costs_total_usd, (0)::numeric)) - COALESCE(rt.rent_total_usd, (0)::numeric)) - COALESCE(ac.admin_total_usd, (0)::numeric)) AS operating_result_usd,
+    ((COALESCE(dc.direct_costs_total_usd, (0)::numeric) + COALESCE(ac.admin_total_usd, (0)::numeric)) + COALESCE(rfs.rent_fixed_total_usd, (0)::numeric)) AS operating_result_total_costs_usd,
+    v4_ssot.renta_pct((((COALESCE(it.income_net_total_usd, (0)::numeric) - COALESCE(dc.direct_costs_total_usd, (0)::numeric)) - COALESCE(rt.rent_total_usd, (0)::numeric)) - COALESCE(ac.admin_total_usd, (0)::numeric)), ((COALESCE(dc.direct_costs_total_usd, (0)::numeric) + COALESCE(ac.admin_total_usd, (0)::numeric)) + COALESCE(rfs.rent_fixed_total_usd, (0)::numeric))) AS operating_result_pct,
+    COALESCE(ph.total_hectares, (0)::numeric) AS project_total_hectares
+   FROM ((((((((public.projects p
+     LEFT JOIN lot_data ld ON ((ld.project_id = p.id)))
+     LEFT JOIN field_hectares fh ON (((fh.project_id = p.id) AND (fh.field_id = ld.field_id))))
+     LEFT JOIN project_hectares ph ON ((ph.project_id = p.id)))
+     LEFT JOIN rent_fixed_ssot rfs ON (((rfs.project_id = p.id) AND (rfs.field_id = ld.field_id))))
+     LEFT JOIN direct_costs dc ON (((dc.project_id = p.id) AND (dc.field_id = ld.field_id))))
+     LEFT JOIN admin_costs ac ON (((ac.project_id = p.id) AND (ac.field_id = ld.field_id))))
+     LEFT JOIN rent_totals rt ON (((rt.project_id = p.id) AND (rt.field_id = ld.field_id))))
+     LEFT JOIN income_totals it ON (((it.project_id = p.id) AND (it.field_id = ld.field_id))))
+  WHERE (p.deleted_at IS NULL)
+  GROUP BY p.customer_id, p.id, p.campaign_id, p.admin_cost, p.planned_cost, ph.total_hectares, fh.total_hectares, rfs.rent_fixed_total_usd, dc.direct_costs_total_usd, ac.admin_total_usd, rt.rent_total_usd, it.income_net_total_usd, ld.field_id;
+
+
+--
 -- Name: dashboard_operational_indicators; Type: VIEW; Schema: v4_report; Owner: -
 --
 
@@ -3693,6 +4083,28 @@ CREATE VIEW v4_report.dashboard_operational_indicators AS
     v4_ssot.last_stock_count_date_for_project(id) AS last_stock_count_date
    FROM public.projects p
   WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: dashboard_operational_indicators_field; Type: VIEW; Schema: v4_report; Owner: -
+--
+
+CREATE VIEW v4_report.dashboard_operational_indicators_field AS
+ SELECT p.id AS project_id,
+    p.customer_id,
+    p.campaign_id,
+    f.id AS field_id,
+    min(w.date) AS start_date,
+    max(w.date) AS end_date,
+    v4_core.calculate_campaign_closing_date(max(w.date)) AS campaign_closing_date,
+    min((w.number)::text) AS first_workorder_id,
+    max((w.number)::text) AS last_workorder_id,
+    v4_ssot.last_stock_count_date_for_project(p.id) AS last_stock_count_date
+   FROM ((public.projects p
+     JOIN public.fields f ON (((f.project_id = p.id) AND (f.deleted_at IS NULL))))
+     LEFT JOIN public.workorders w ON (((w.field_id = f.id) AND (w.deleted_at IS NULL))))
+  WHERE (p.deleted_at IS NULL)
+  GROUP BY p.id, p.customer_id, p.campaign_id, f.id;
 
 
 --
@@ -4706,6 +5118,78 @@ ALTER TABLE ONLY public.workorders ALTER COLUMN id SET DEFAULT nextval('public.w
 
 
 --
+-- Name: ai_audit_logs ai_audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_audit_logs
+    ADD CONSTRAINT ai_audit_logs_pkey PRIMARY KEY (request_id);
+
+
+--
+-- Name: ai_baselines ai_baselines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_baselines
+    ADD CONSTRAINT ai_baselines_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_entity_scores ai_entity_scores_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_entity_scores
+    ADD CONSTRAINT ai_entity_scores_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_insight_actions ai_insight_actions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_insight_actions
+    ADD CONSTRAINT ai_insight_actions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_insights ai_insights_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_insights
+    ADD CONSTRAINT ai_insights_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_rag_chunks ai_rag_chunks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_rag_chunks
+    ADD CONSTRAINT ai_rag_chunks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_rag_documents ai_rag_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_rag_documents
+    ADD CONSTRAINT ai_rag_documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_rag_embeddings ai_rag_embeddings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_rag_embeddings
+    ADD CONSTRAINT ai_rag_embeddings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_schema_migrations ai_schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_schema_migrations
+    ADD CONSTRAINT ai_schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
 -- Name: admin_cost_investors pk_admin_cost_investors; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5078,6 +5562,69 @@ ALTER TABLE ONLY public.users
 --
 
 CREATE INDEX idx_admin_cost_investors_investor_id ON public.admin_cost_investors USING btree (investor_id);
+
+
+--
+-- Name: idx_ai_audit_logs_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_audit_logs_project_id ON public.ai_audit_logs USING btree (project_id);
+
+
+--
+-- Name: idx_ai_baselines_scope_feature_window; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_baselines_scope_feature_window ON public.ai_baselines USING btree (scope_type, scope_id, cohort_key, feature_name, window_name);
+
+
+--
+-- Name: idx_ai_insight_actions_project; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_insight_actions_project ON public.ai_insight_actions USING btree (project_id);
+
+
+--
+-- Name: idx_ai_insights_dedupe; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_insights_dedupe ON public.ai_insights USING btree (project_id, entity_type, entity_id, dedupe_key);
+
+
+--
+-- Name: idx_ai_insights_entity_computed; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_insights_entity_computed ON public.ai_insights USING btree (project_id, entity_type, entity_id, computed_at DESC);
+
+
+--
+-- Name: idx_ai_insights_project_status_valid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_insights_project_status_valid ON public.ai_insights USING btree (project_id, status, valid_until);
+
+
+--
+-- Name: idx_ai_rag_chunks_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_rag_chunks_project_id ON public.ai_rag_chunks USING btree (project_id);
+
+
+--
+-- Name: idx_ai_rag_documents_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_rag_documents_project_id ON public.ai_rag_documents USING btree (project_id);
+
+
+--
+-- Name: idx_ai_rag_embeddings_project_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_rag_embeddings_project_id ON public.ai_rag_embeddings USING btree (project_id);
 
 
 --
@@ -5739,6 +6286,30 @@ CREATE TRIGGER trg_users_set_timestamp BEFORE UPDATE ON public.users FOR EACH RO
 
 
 --
+-- Name: ai_insight_actions ai_insight_actions_insight_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_insight_actions
+    ADD CONSTRAINT ai_insight_actions_insight_id_fkey FOREIGN KEY (insight_id) REFERENCES public.ai_insights(id);
+
+
+--
+-- Name: ai_rag_chunks ai_rag_chunks_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_rag_chunks
+    ADD CONSTRAINT ai_rag_chunks_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.ai_rag_documents(id);
+
+
+--
+-- Name: ai_rag_embeddings ai_rag_embeddings_chunk_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_rag_embeddings
+    ADD CONSTRAINT ai_rag_embeddings_chunk_id_fkey FOREIGN KEY (chunk_id) REFERENCES public.ai_rag_chunks(id);
+
+
+--
 -- Name: admin_cost_investors fk_admin_cost_investors_investor; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6341,4 +6912,6 @@ ALTER TABLE ONLY public.workorders
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 0tcvR4OIrSyhT1vPKR6t3HmulMxkbOIJqMYjX5ua2jxdhkbU8XK8f9ePu8F4p6E
 
