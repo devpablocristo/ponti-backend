@@ -133,7 +133,5 @@ Desktop.ini
 # Debugging binaries
 __debug_bin*
 
-.cursorignore
-.cursorrules
 *.code-workspace
 *.dump
