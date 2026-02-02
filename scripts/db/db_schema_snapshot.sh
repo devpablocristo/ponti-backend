@@ -13,6 +13,7 @@ set +a
 
 echo "Generando snapshot de schema..."
 docker compose -f "${COMPOSE_FILE}" exec -T ponti-db \
-  pg_dump -U "${DB_USER}" -d "${DB_NAME}" --schema-only --no-owner --no-privileges > "${SNAPSHOT_FILE}"
+  pg_dump -U "${DB_USER}" -d "${DB_NAME}" --schema-only --no-owner --no-privileges \
+  | sed -E '/^\\restrict /d; /^\\unrestrict /d' > "${SNAPSHOT_FILE}"
 
 echo "Snapshot generado en ${SNAPSHOT_FILE}"
