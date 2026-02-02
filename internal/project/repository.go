@@ -571,6 +571,14 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	deletedBy = &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var project models.Project
+		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to load project", err)
+		}
+
 		var count int64
 		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check project existence", err)
@@ -670,6 +678,10 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrInternal, "failed to delete project", err)
 		}
 
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
@@ -762,6 +774,14 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrInternal, "failed to restore admin cost investors", err)
 		}
 
+		var deletedBy *int64
+		if userID, err := convertStringToID(ctx); err == nil {
+			deletedBy = &userID
+		}
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
@@ -774,6 +794,14 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que el proyecto existe (con Unscoped para incluir eliminados)
+		var project models.Project
+		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to load project", err)
+		}
+
 		var count int64
 		if err := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check project existence", err)
@@ -862,6 +890,14 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 		// Finalmente eliminar el proyecto
 		if err := tx.Unscoped().Exec("DELETE FROM projects WHERE id = ?", id).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to hard delete project", err)
+		}
+
+		var deletedBy *int64
+		if userID, err := convertStringToID(ctx); err == nil {
+			deletedBy = &userID
+		}
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
+			return err
 		}
 
 		return nil
@@ -995,6 +1031,49 @@ func convertStringToID(ctx context.Context) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("user ID is not a string")
+}
+
+func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) error {
+	if customerID == 0 {
+		return nil
+	}
+
+	var activeProjects int64
+	if err := tx.Model(&models.Project{}).
+		Where("customer_id = ? AND deleted_at IS NULL", customerID).
+		Count(&activeProjects).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to check active projects for customer", err)
+	}
+
+	if activeProjects > 0 {
+		if err := tx.Unscoped().Model(&cusmod.Customer{}).
+			Where("id = ? AND deleted_at IS NOT NULL", customerID).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore customer", err)
+		}
+		return nil
+	}
+
+	updates := map[string]any{
+		"deleted_at": time.Now(),
+		"updated_at": time.Now(),
+	}
+	if deletedBy != nil {
+		updates["deleted_by"] = deletedBy
+	} else {
+		updates["deleted_by"] = gorm.Expr("NULL")
+	}
+
+	if err := tx.Unscoped().Model(&cusmod.Customer{}).
+		Where("id = ? AND deleted_at IS NULL", customerID).
+		Updates(updates).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to archive customer", err)
+	}
+	return nil
 }
 
 func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) error {

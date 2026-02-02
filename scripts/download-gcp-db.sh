@@ -53,6 +53,7 @@ PGDUMP_RETRIES="${PGDUMP_RETRIES:-3}"
 PGDUMP_RETRY_SLEEP="${PGDUMP_RETRY_SLEEP:-5}"
 RESTORE_MODE="${RESTORE_MODE:-data-only}" # data-only | full
 TRUNCATE_BEFORE_RESTORE="${TRUNCATE_BEFORE_RESTORE:-1}"
+RECONCILE_CUSTOMER_ARCHIVE="${RECONCILE_CUSTOMER_ARCHIVE:-1}"
 
 log(){ echo -e "\n[INFO] $*"; }
 warn(){ echo -e "\n[WARN] $*"; }
@@ -560,3 +561,10 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 SQL
 
 log "OK. Renombrado aplicado en DB local."
+
+if [[ "${RECONCILE_CUSTOMER_ARCHIVE}" == "1" ]]; then
+  log "Reconciliando estado de clientes (soft delete) según proyectos activos..."
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+    -v ON_ERROR_STOP=1 -f "${ROOT_DIR}/scripts/db/db_reconcile_customer_archive.sql"
+  log "OK. Reconciliación de clientes aplicada."
+fi
