@@ -257,7 +257,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	}
 
 	if err := baseClient.
-		Preload("Customer").
+		Preload("Customer", "deleted_at IS NULL").
 		Preload("Campaign").
 		Preload("Managers").
 		Preload("Investors.Investor").

@@ -187,9 +187,13 @@ BEGIN
       ('v4_report', 'field_crop_rentabilidad'),
       ('v4_report', 'summary_results'),
       ('v4_report', 'dashboard_management_balance'),
+      ('v4_report', 'dashboard_management_balance_field'),
       ('v4_report', 'dashboard_metrics'),
+      ('v4_report', 'dashboard_metrics_field'),
       ('v4_report', 'dashboard_crop_incidence'),
+      ('v4_report', 'dashboard_crop_incidence_field'),
       ('v4_report', 'dashboard_operational_indicators'),
+      ('v4_report', 'dashboard_operational_indicators_field'),
       ('v4_report', 'investor_project_base'),
       ('v4_report', 'investor_contribution_categories'),
       ('v4_report', 'investor_distributions'),
@@ -209,6 +213,57 @@ BEGIN
 
   IF v_cnt > 0 THEN
     RAISE EXCEPTION 'Faltan vistas esperadas (%).', v_cnt;
+  END IF;
+END;
+$$;
+
+-- 3) Integridad lógica: proyectos activos no pueden tener customer archivado
+DO $$
+DECLARE
+  v_cnt integer;
+BEGIN
+  SELECT COUNT(*) INTO v_cnt
+  FROM public.projects p
+  JOIN public.customers c ON c.id = p.customer_id
+  WHERE p.deleted_at IS NULL
+    AND c.deleted_at IS NOT NULL;
+
+  IF v_cnt > 0 THEN
+    RAISE EXCEPTION 'Existen % proyectos activos con customers archivados.', v_cnt;
+  END IF;
+END;
+$$;
+
+-- 4) Integridad lógica: fields activos no pueden tener proyectos archivados
+DO $$
+DECLARE
+  v_cnt integer;
+BEGIN
+  SELECT COUNT(*) INTO v_cnt
+  FROM public.fields f
+  JOIN public.projects p ON p.id = f.project_id
+  WHERE f.deleted_at IS NULL
+    AND p.deleted_at IS NOT NULL;
+
+  IF v_cnt > 0 THEN
+    RAISE EXCEPTION 'Existen % fields activos con proyectos archivados.', v_cnt;
+  END IF;
+END;
+$$;
+
+-- 5) Integridad lógica: lots activos no pueden tener fields archivados
+DO $$
+DECLARE
+  v_cnt integer;
+BEGIN
+  SELECT COUNT(*) INTO v_cnt
+  FROM public.lots l
+  JOIN public.fields f ON f.id = l.field_id
+  WHERE l.deleted_at IS NULL
+    AND f.deleted_at IS NOT NULL;
+
+  IF v_cnt > 0 THEN
+    RAISE EXCEPTION 'Existen % lots activos con fields archivados.', v_cnt;
   END IF;
 END;
 $$;
