@@ -15,7 +15,7 @@
 - `deploy-preview.yml`: manual o label `preview`.
 - `cleanup-preview.yml`: cleanup al cerrar PR + cron semanal.
 - `reset-dev.yml`: reset de DEV (golden snapshot).
-- `refresh-golden-snapshot.yml`: genera snapshot desde STG.
+- `refresh-golden-snapshot.yml`: genera snapshot desde STG (DB `new_ponti_db_staging` en instancia `new-ponti-db-dev`).
 
 ## Environments
 
@@ -31,7 +31,7 @@ Workflow: `reset-dev.yml` (manual).
 4. (Opcional) Probar health: `https://<dev-backend>/ping`.
 
 Qué hace:
-- Borra `db_dev`.
+- Borra `new_ponti_db_dev`.
 - Restaura el **Golden Snapshot**.
 - Ejecuta hardening (si `HARDENING_SQL_URI` está configurado).
 - Corre smoke test (si `SMOKE_TEST_URL` está configurado).
@@ -45,3 +45,5 @@ Workflow: `refresh-golden-snapshot.yml` (manual o cron).
 3. Verificar que el snapshot se haya exportado al bucket definido en `GOLDEN_SNAPSHOT_BUCKET`.
 
 El snapshot se usa luego por `reset-dev.yml`.
+
+**Requisito:** El SA `github-actions@new-ponti-stg` debe tener `roles/cloudsql.admin` (o equivalente) en el proyecto **new-ponti-dev** para poder exportar. Ver [GITHUB_SECRETS.md](GITHUB_SECRETS.md#permiso-iam-pendiente-refresh-golden-snapshot).

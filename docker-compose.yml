@@ -16,7 +16,7 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ponti_api_db -p ${DB_PORT}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME:-new_ponti_db_dev} -p ${DB_PORT}"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -51,6 +51,21 @@ ensure_env_file() {
   exit 1
 }
 
+stop_system_postgres() {
+  # Detener PostgreSQL del sistema si está usando el puerto 5432
+  if ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
+    echo "ERROR: PostgreSQL del sistema detectado en puerto 5432."
+    echo "       Docker no puede usar el mismo puerto."
+    echo ""
+    echo "Ejecuta primero:"
+    echo "  sudo systemctl stop postgresql"
+    echo ""
+    echo "O para deshabilitarlo permanentemente:"
+    echo "  sudo systemctl disable --now postgresql"
+    exit 1
+  fi
+}
+
 stop_frontend_ports() {
   # Detener procesos del FE (UI/API) por puertos conocidos
   local ports=("5173" "5174" "3000")
@@ -82,6 +97,9 @@ docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans
 
 echo "Deteniendo frontend antes de levantar..."
 stop_frontend_ports
+
+echo "Verificando conflictos de puerto PostgreSQL..."
+stop_system_postgres
 
 echo "Levantando backend (DB + migraciones) con Docker..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d

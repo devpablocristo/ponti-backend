@@ -39,14 +39,14 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `WIF_PROVIDER_DEV` | `projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
 | `WIF_SERVICE_ACCOUNT_DEV` | `github-actions@new-ponti-dev.iam.gserviceaccount.com` |
 | `CLOUDSQL_INSTANCE_DEV` | `new-ponti-dev:us-central1:new-ponti-db-dev` |
-| `DB_NAME_DEV` | `ponti_api_db` |
+| `DB_NAME_DEV` | `new_ponti_db_dev` |
 | `DB_USER_DEV` | `soalen-db-v3` |
 | `DB_INSTANCE_NAME_DEV` | `new-ponti-db-dev` |
 | `PREVIEW_SERVICE_PREFIX` | `ponti-backend-preview-` |
 | `PREVIEW_BUCKET` | `backup-ponti-dev` |
 | `PREVIEW_SEED_URI` | *(vacío si no hay seed fija)* |
 
-### STG
+### STG (unificado en instancia new-ponti-db-dev, instancia vieja eliminada)
 | Variable | Valor |
 |----------|-------|
 | `GCP_PROJECT_ID_STG` | `new-ponti-stg` |
@@ -54,10 +54,11 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `CLOUD_RUN_SERVICE_ACCOUNT_STG` | `cloudrun-sa@new-ponti-stg.iam.gserviceaccount.com` |
 | `WIF_PROVIDER_STG` | `projects/65243764597/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider` |
 | `WIF_SERVICE_ACCOUNT_STG` | `github-actions@new-ponti-stg.iam.gserviceaccount.com` |
-| `CLOUDSQL_INSTANCE_STG` | `new-ponti-stg:us-central1:new-ponti-db-stg` |
-| `DB_NAME_STG` | `ponti_api_db` |
-| `DB_USER_STG` | `soalen-db-v3` |
-| `DB_INSTANCE_NAME_STG` | `new-ponti-db-stg` |
+| `CLOUDSQL_INSTANCE_STG` | `new-ponti-dev:us-central1:new-ponti-db-dev` |
+| `CLOUDSQL_PROJECT_STG` | `new-ponti-dev` |
+| `DB_NAME_STG` | `new_ponti_db_staging` |
+| `DB_USER_STG` | `app_stg` |
+| `DB_INSTANCE_NAME_STG` | `new-ponti-db-dev` |
 | `GOLDEN_SNAPSHOT_BUCKET` | `golden-ponti-stg-65243764597` |
 
 ### PROD
@@ -79,7 +80,7 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 |--------|-------------|
 | `DB_PASSWORD_DEV` | Password del usuario DB dev |
 | `X_API_KEY_DEV` | API key dev |
-| `DB_PASSWORD_STG` | Password del usuario DB stg |
+| `DB_PASSWORD_STG` | Password de `app_stg` (usado por ponti-backend y ponti-auth STG) |
 | `X_API_KEY_STG` | API key stg |
 | `DB_PASSWORD_PROD` | Password del usuario DB prod |
 | `X_API_KEY_PROD` | API key prod |

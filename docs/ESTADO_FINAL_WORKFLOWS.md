@@ -23,12 +23,12 @@
 **Deploy manual por rama (`workflow_dispatch`)**
 - Input: solo `branch`
 - DB: `branch_<slug>`
-- Datos: snapshot fresco desde `new-ponti-dev-db`
+- Datos: snapshot fresco desde `new-ponti-db-dev`
 - Resultado: servicio preview con DB aislada
 - Cleanup: al cerrar PR + cron semanal
 
 **Push a `develop`**
-- DB: la configurada en el servicio dev (`new-ponti-dev-db`)
+- DB: la configurada en el servicio dev (`new-ponti-db-dev`)
 - Resultado: si altera la DB dev
 
 **Push a `main`**

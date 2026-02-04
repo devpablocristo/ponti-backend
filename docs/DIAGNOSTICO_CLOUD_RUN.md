@@ -40,11 +40,11 @@ O usar el script de diagnóstico:
 |----------|----------------|---------------------|
 | `GO_ENVIRONMENT` | `production` | Sin esto, la app intenta cargar `.env` y falla |
 | `HTTP_SERVER_PORT` | `8080` | Puerto donde debe escuchar el servidor |
-| `DB_NAME` | `branch_<slug>` o `ponti_api_db` | DB usada por el deploy |
+| `DB_NAME` | `branch_<slug>`, `new_ponti_db_dev` (dev), `new_ponti_db_staging` (stg) | DB usada por el deploy |
 | `DB_HOST` | IP o socket de Cloud SQL | Conexión a DB |
 | `DB_USER` | Usuario de DB | Conexión a DB |
 | `DB_PASSWORD` | Password de DB | Conexión a DB |
-| `DB_NAME` | `ponti_api_db` | Nombre de la DB |
+| `DB_NAME` | `new_ponti_db_dev` (dev) o `new_ponti_db_staging` (stg) | Nombre de la DB |
 | `DB_PORT` | `5432` | Puerto de DB |
 | `DB_SSL_MODE` | `disable` o `require` | Modo SSL |
 | `DEPLOY_ENV` | `dev` | Ambiente de deploy |

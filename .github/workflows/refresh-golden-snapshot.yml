@@ -16,6 +16,8 @@ jobs:
       name: stg
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STG }}
+      # Proyecto donde vive la instancia (unificada en dev)
+      CLOUDSQL_PROJECT_STG: ${{ vars.CLOUDSQL_PROJECT_STG }}
       GCP_REGION: ${{ vars.GCP_REGION }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_STG }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
@@ -48,6 +50,9 @@ jobs:
             echo "::error::Falta GOLDEN_SNAPSHOT_BUCKET"
             exit 1
           fi
+          # Proyecto donde vive la instancia (new-ponti-dev tras unificación)
+          INSTANCE_PROJECT="${CLOUDSQL_PROJECT_STG:-$GCP_PROJECT_ID}"
+          echo "INSTANCE_PROJECT=$INSTANCE_PROJECT" >> "$GITHUB_ENV"
 
       - name: Exportar Golden Snapshot
         run: |
@@ -55,8 +60,9 @@ jobs:
           SNAPSHOT_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/golden_${DB_NAME_STG}_${TS}.sql.gz"
           LATEST_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/latest.sql.gz"
 
+          # Usar proyecto donde vive la instancia (new-ponti-dev tras unificación)
           gcloud sql export sql "$DB_INSTANCE_NAME_STG" "$SNAPSHOT_URI" \
-            --project="$GCP_PROJECT_ID" \
+            --project="${INSTANCE_PROJECT}" \
             --database="$DB_NAME_STG" \
             --offload \
             --quiet

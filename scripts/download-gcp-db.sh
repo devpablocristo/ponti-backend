@@ -4,6 +4,9 @@
 # - Aplica rename local app_parameters -> business_parameters si aplica
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 ### ===== Preservar destino local antes de cargar .env =====
 LOCAL_DB_USER="${DB_USER:-}"
 LOCAL_DB_PASSWORD="${DB_PASSWORD:-}"
@@ -42,13 +45,13 @@ PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
 DB_USER="${LOCAL_DB_USER:-admin}"
 DB_PASSWORD="${LOCAL_DB_PASSWORD:-admin}"
 DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
-DB_NAME="${LOCAL_DB_NAME:-ponti_api_db}"
+DB_NAME="${LOCAL_DB_NAME:-new_ponti_db_dev}"
 DB_PORT="${LOCAL_DB_PORT:-5432}"
 
 # Control
 DISABLE_TRIGGERS="${DISABLE_TRIGGERS:-1}"  # 1= intentar deshabilitar triggers (requiere superuser)
 SKIP_DUMP="${SKIP_DUMP:-0}"                # 1= salta el pg_dump
-DUMP_FILE="${DUMP_FILE:-ponti_api_db_$(date +%F).dump}"
+DUMP_FILE="${DUMP_FILE:-new_ponti_db_dev_$(date +%F).dump}"
 PGDUMP_RETRIES="${PGDUMP_RETRIES:-3}"
 PGDUMP_RETRY_SLEEP="${PGDUMP_RETRY_SLEEP:-5}"
 RESTORE_MODE="${RESTORE_MODE:-data-only}" # data-only | full
@@ -565,6 +568,6 @@ log "OK. Renombrado aplicado en DB local."
 if [[ "${RECONCILE_CUSTOMER_ARCHIVE}" == "1" ]]; then
   log "Reconciliando estado de clientes (soft delete) según proyectos activos..."
   PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-    -v ON_ERROR_STOP=1 -f "${ROOT_DIR}/scripts/db/db_reconcile_customer_archive.sql"
+    -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/db_reconcile_customer_archive.sql"
   log "OK. Reconciliación de clientes aplicada."
 fi

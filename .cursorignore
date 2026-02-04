@@ -69,3 +69,5 @@ ws/
 
 # Archivos de documentación muy grandes (opcional, descomentar si causan problemas)
 # docs/*.md
+
+*.dump

@@ -34,7 +34,7 @@ func TestMigrationLock(t *testing.T) {
 		Host:     getEnvOrDefault("TEST_DB_HOST", "localhost"),
 		User:     getEnvOrDefault("TEST_DB_USER", "admin"),
 		Password: getEnvOrDefault("TEST_DB_PASSWORD", "admin"),
-		Name:     getEnvOrDefault("TEST_DB_NAME", "ponti_api_db"),
+		Name:     getEnvOrDefault("TEST_DB_NAME", "new_ponti_db_dev"),
 		SSLMode:  getEnvOrDefault("TEST_DB_SSL_MODE", "disable"),
 		Port:     port,
 	}
