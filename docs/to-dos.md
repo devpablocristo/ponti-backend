@@ -3,4 +3,4 @@
 ## Pendiente (revisar luego)
 
 - [ ] **Deploys / GitHub Actions**: No trabajar por ahora. Revisar más adelante.
-  - Incluye: IAM para `refresh-golden-snapshot` (github-actions@new-ponti-stg necesita `roles/cloudsql.admin` en new-ponti-dev), workflows, variables, etc.
+  - Incluye: IAM para `refresh-golden-snapshot` (ver [GITHUB_SECRETS.md](GITHUB_SECRETS.md#permiso-iam-pendiente-refresh-golden-snapshot)), workflows, variables, etc.

@@ -1,11 +1,12 @@
-name: CI PR a develop
+name: CI Release (PR a main)
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [main]
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   lint:
@@ -52,10 +53,8 @@ jobs:
       - name: Tests
         run: go test ./...
 
-  # Security scan opcional (no bloquea el PR)
   security-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,7 +64,21 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Govulncheck
+      - name: Govulncheck (vulnerabilidades en dependencias)
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
+
+      - name: Gosec (análisis de seguridad estático)
+        uses: securego/gosec@v2.22.11
+        with:
+          args: ./...
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4

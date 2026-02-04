@@ -47,3 +47,19 @@ gcloud projects add-iam-policy-binding new-ponti-dev \
 Alternativa más restrictiva: `roles/cloudsql.instances.export` si existe o el rol mínimo que permita `gcloud sql export sql`.
 
 **Verificación:** Si el workflow falla con "Permission denied" al exportar, aplicar el binding anterior.
+
+---
+
+## Permiso IAM: promote-prod (smoke tests)
+
+El workflow `promote-prod.yml` ejecuta smoke tests contra el servicio Cloud Run en PROD (que tiene `--no-allow-unauthenticated`). El SA `github-actions@new-ponti-prod` debe poder invocar el servicio:
+
+```bash
+gcloud run services add-iam-policy-binding ponti-backend \
+  --project=new-ponti-prod \
+  --region=us-central1 \
+  --member="serviceAccount:github-actions@new-ponti-prod.iam.gserviceaccount.com" \
+  --role="roles/run.invoker"
+```
+
+**Verificación:** Si los smoke tests fallan con 403 al llamar a la API, aplicar el binding anterior.

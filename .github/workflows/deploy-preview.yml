@@ -28,6 +28,7 @@ jobs:
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
       CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_DEV }}
+      DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
       DB_USER: ${{ vars.DB_USER_DEV }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
       X_API_KEY: ${{ secrets.X_API_KEY_DEV }}
@@ -86,6 +87,10 @@ jobs:
             echo "::error::Falta CLOUDSQL_INSTANCE_DEV"
             exit 1
           fi
+          if [ -z "$DB_INSTANCE_NAME_DEV" ]; then
+            echo "::error::Falta DB_INSTANCE_NAME_DEV"
+            exit 1
+          fi
           if [ -z "$PREVIEW_SERVICE_PREFIX" ]; then
             echo "::error::Falta PREVIEW_SERVICE_PREFIX"
             exit 1
@@ -98,13 +103,13 @@ jobs:
           DB_NAME="${PREVIEW_DB_PREFIX}${PR_NUMBER}"
           gcloud sql databases delete "$DB_NAME" \
             --project="$GCP_PROJECT_ID" \
-            --instance="$CLOUDSQL_INSTANCE" \
+            --instance="$DB_INSTANCE_NAME_DEV" \
             --quiet || true
           gcloud sql databases create "$DB_NAME" \
             --project="$GCP_PROJECT_ID" \
-            --instance="$CLOUDSQL_INSTANCE"
+            --instance="$DB_INSTANCE_NAME_DEV"
           if [ -n "$PREVIEW_SEED_URI" ]; then
-            gcloud sql import sql "$CLOUDSQL_INSTANCE" "$PREVIEW_SEED_URI" \
+            gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$PREVIEW_SEED_URI" \
               --project="$GCP_PROJECT_ID" \
               --database="$DB_NAME" \
               --quiet

@@ -34,7 +34,7 @@ WORKDIR /app
 
 COPY --from=builder /app/pkg  /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
-COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/migrations_v4 /app/migrations_v4
 
 EXPOSE 8080
 

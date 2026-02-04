@@ -2,71 +2,89 @@
 
 ## TLDR
 - `develop` → dev (DB fija del servicio)
-- `main` → prod (DB fija del servicio)
-- `workflow_dispatch` → preview con **DB por rama** y **snapshot automatico**
-- Limpieza automatica al cerrar PR + cron semanal
+- `main` → stg (DB fija del servicio)
+- PROD: promoción manual desde STG (`promote-prod.yml`)
+- Preview: `workflow_dispatch` (input `pr_number`) o label `preview` → DB `db_pr_<N>` y servicio `ponti-backend-preview-<N>`
+- Limpieza automática al cerrar PR + cron semanal
 
 ## Comportamiento actual
 
-### Resumen rapido
-- No hay schema por rama: la aislacion es por **DB**.
-- `develop` y `main` usan la DB fija del servicio.
-- Deploy manual crea `branch_<slug>` y clona datos desde dev (snapshot export+import).
-- Limpieza automatica al cerrar PR + cron semanal.
+### Resumen rápido
+- No hay schema por rama: la aislación es por **DB**.
+- `develop` y `main` usan la DB fija del servicio (dev y stg respectivamente).
+- Deploy preview crea `db_pr_<N>` (DB) y `ponti-backend-preview-<N>` (servicio).
+- Limpieza automática al cerrar PR + cron semanal.
 
 ### Por escenario
 **PRs (Pull Requests)**
-- Deploy automatico: no
+- Deploy automático: no (solo con label `preview` o manual)
 - DB: no toca DB dev
-- Cleanup: al cerrar PR se borran DB preview y snapshots
+- Cleanup: al cerrar PR se borran DB preview y servicio preview
 
-**Deploy manual por rama (`workflow_dispatch`)**
-- Input: solo `branch`
-- DB: `branch_<slug>`
-- Datos: snapshot fresco desde `new-ponti-db-dev`
+**Deploy preview (`deploy-preview.yml`)**
+- Trigger: `workflow_dispatch` (input `pr_number`) o label `preview` en PR
+- Input: `pr_number` (número de PR)
+- DB: `db_pr_<N>`
+- Servicio: `ponti-backend-preview-<N>`
+- Datos: opcional desde `PREVIEW_SEED_URI` (si está configurado)
 - Resultado: servicio preview con DB aislada
 - Cleanup: al cerrar PR + cron semanal
 
 **Push a `develop`**
-- DB: la configurada en el servicio dev (`new-ponti-db-dev`)
-- Resultado: si altera la DB dev
+- Workflow: `deploy-dev.yml`
+- DB: `new_ponti_db_dev` (instancia `new-ponti-db-dev`)
 
 **Push a `main`**
-- DB: la configurada en el servicio prod
-- Resultado: si altera la DB prod
+- Workflow: `deploy-staging.yml`
+- DB: `new_ponti_db_staging` (instancia `new-ponti-db-dev`, cross-project)
 
-### Limpieza automatica
-- PR cerrado (merge o close): borra DB `branch_<slug>` y snapshots `preview_seed_branch_<slug>_*`
-- Cron semanal: borra DBs `branch_*` y snapshots restantes
+**Promoción a PROD**
+- Workflow: `promote-prod.yml` (manual)
+- Input: `commit_sha` (SHA probado en STG)
+- Usa el mismo artefacto de imagen de STG, sin rebuild
+
+### Limpieza automática
+- PR cerrado (merge o close): borra DB `db_pr_<N>` y servicio `ponti-backend-preview-<N>`
+- Cron semanal: borra DBs `db_pr_*` y servicios preview restantes
 - DBs principales: nunca se limpian
 
 ---
 
 ## Workflows
 
-### 1) Deploy principal
-Archivo: `.github/workflows/deploy-cloud-run.yml`
+### 1) Deploy DEV
+Archivo: `.github/workflows/deploy-dev.yml`
 
 **Triggers**
 - `push` a `develop`
-- `push` a `main`
-- `workflow_dispatch` (manual)
 
 **Comportamiento**
-- **push a develop**: deploy a dev, usa `DB_NAME` del servicio dev.
-- **push a main**: deploy a prod, usa `DB_NAME` del servicio prod.
-- **manual**:
-  - crea `DB_NAME=branch_<slug>`
-  - borra y recrea la DB
-  - exporta snapshot desde la DB dev real
-  - importa el snapshot en `branch_<slug>`
-  - despliega servicio preview con esa DB
+- Deploy a Cloud Run en proyecto dev.
+- Usa `DB_NAME_DEV` (`new_ponti_db_dev`), instancia `new-ponti-db-dev`.
 
-**Notas**
-- `DB_SCHEMA` siempre `public`.
-- La aislacion de previews es por `DB_NAME`.
+### 2) Deploy STAGING
+Archivo: `.github/workflows/deploy-staging.yml`
 
-### 2) Cleanup de previews
+**Triggers**
+- `push` a `main`
+
+**Comportamiento**
+- Deploy a Cloud Run en proyecto stg.
+- Usa `DB_NAME_STG` (`new_ponti_db_staging`), instancia `new-ponti-db-dev` (cross-project).
+
+### 3) Deploy Preview
+Archivo: `.github/workflows/deploy-preview.yml`
+
+**Triggers**
+- `workflow_dispatch` (input `pr_number`)
+- `pull_request` con label `preview`
+
+**Comportamiento**
+- Crea DB `db_pr_<N>` en instancia dev.
+- Despliega servicio `ponti-backend-preview-<N>`.
+- Opcional: importa seed desde `PREVIEW_SEED_URI` si está configurado.
+
+### 4) Cleanup de previews
 Archivo: `.github/workflows/cleanup-preview.yml`
 
 **Triggers**
@@ -74,12 +92,20 @@ Archivo: `.github/workflows/cleanup-preview.yml`
 - `schedule` semanal
 
 **Comportamiento**
-- PR cerrado: borra `branch_<slug>` y snapshots `preview_seed_branch_<slug>_*`.
-- Cron semanal: borra DBs `branch_*` y snapshots restantes.
+- PR cerrado: borra DB `db_pr_<N>` y servicio `ponti-backend-preview-<N>`.
+- Cron semanal: borra DBs `db_pr_*` y servicios preview restantes.
+
+### 5) Otros
+- `reset-dev.yml`: reset de DEV (borra y restaura desde Golden Snapshot).
+- `refresh-golden-snapshot.yml`: exporta snapshot desde STG al bucket.
+- `promote-prod.yml`: promoción manual a PROD (usa SHA de STG).
+- `ci-pr.yml`: tests en PR a develop.
+- `db-verify.yml`: verificación de migraciones (levanta PostgreSQL en CI).
 
 ## Seguridad
-- `workflow_dispatch` solo opera en proyecto dev.
+- Deploy preview solo opera en proyecto dev.
 - Nunca toca DB prod ni DB dev principal en previews.
 
 ## Inputs manuales
-El deploy manual **solo pide la rama**.
+- **Deploy preview**: input `pr_number`.
+- **Promote prod**: input `commit_sha`.

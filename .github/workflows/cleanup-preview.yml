@@ -4,7 +4,9 @@ on:
   pull_request:
     types: [closed]
   schedule:
-    - cron: "0 5 * * 1"
+    # TTL check cada 6 horas
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -73,33 +75,54 @@ jobs:
               xargs -r gcloud storage rm --quiet
           fi
 
-      - name: Cleanup semanal (fallback)
-        if: ${{ github.event_name == 'schedule' }}
+      - name: Cleanup TTL (cada 6h - elimina previews > 48h)
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        env:
+          TTL_HOURS: 48
         run: |
-          echo "::notice::Eliminando DBs preview con prefijo ${PREVIEW_DB_PREFIX}"
-          gcloud sql databases list \
-            --project="$GCP_PROJECT_ID_DEV" \
-            --instance="$DB_INSTANCE_NAME_DEV" \
-            --format='value(name)' | \
-            python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREVIEW_DB_PREFIX" | \
-            xargs -r -I{} gcloud sql databases delete "{}" \
-              --project="$GCP_PROJECT_ID_DEV" \
-              --instance="$DB_INSTANCE_NAME_DEV" \
-              --quiet || true
+          echo "::notice::Limpiando previews con TTL > ${TTL_HOURS}h"
+          CUTOFF=$(date -u -d "${TTL_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
 
-          echo "::notice::Eliminando servicios preview con prefijo ${PREVIEW_SERVICE_PREFIX}"
+          # Listar servicios preview expirados (JSON + jq para parsing robusto)
+          echo "::notice::Buscando servicios preview expirados..."
           gcloud run services list \
             --project="$GCP_PROJECT_ID_DEV" \
             --region="$GCP_REGION" \
-            --format='value(name)' | \
-            python -c 'import sys; prefix=sys.argv[1]; [print(line.strip()) for line in sys.stdin if line.strip().startswith(prefix)]' "$PREVIEW_SERVICE_PREFIX" | \
-            xargs -r -I{} gcloud run services delete "{}" \
+            --format=json | \
+          jq -r --arg prefix "$PREVIEW_SERVICE_PREFIX" --arg cutoff "$CUTOFF" '
+            .[] | select(.metadata.name | startswith($prefix)) |
+            select(.metadata.creationTimestamp < $cutoff) |
+            .metadata.name
+          ' | while read -r name; do
+            [ -z "$name" ] && continue
+            echo "::notice::Eliminando servicio expirado: $name"
+            gcloud run services delete "$name" \
               --project="$GCP_PROJECT_ID_DEV" \
               --region="$GCP_REGION" \
               --quiet || true
 
+            # Extraer PR number (solo el número, p.ej. ponti-backend-preview-42 -> 42)
+            PR_NUM="${name#${PREVIEW_SERVICE_PREFIX}}"
+            PR_NUM="${PR_NUM%%-*}"
+            DB_NAME="${PREVIEW_DB_PREFIX}${PR_NUM}"
+            echo "::notice::Eliminando DB asociada: $DB_NAME"
+            gcloud sql databases delete "$DB_NAME" \
+              --project="$GCP_PROJECT_ID_DEV" \
+              --instance="$DB_INSTANCE_NAME_DEV" \
+              --quiet || true
+          done
+
+          # Limpiar snapshots huérfanos en bucket (solo si existen objetos)
           if [ -n "$PREVIEW_BUCKET" ]; then
-            echo "::notice::Eliminando snapshots preview en bucket ${PREVIEW_BUCKET}"
-            gcloud storage ls "gs://${PREVIEW_BUCKET}/preview-seeds/" --format=gsutil | \
-              xargs -r gcloud storage rm --quiet
+            echo "::notice::Limpiando snapshots preview huérfanos..."
+            gcloud storage ls "gs://${PREVIEW_BUCKET}/preview-seeds/" --uri 2>/dev/null | while read -r uri; do
+              [ -z "$uri" ] && continue
+              MOD_TIME=$(gcloud storage objects describe "$uri" --format='value(updated)' 2>/dev/null | tr -d '[:space:]')
+              if [ -n "$MOD_TIME" ] && [[ "$MOD_TIME" < "$CUTOFF" ]]; then
+                echo "::notice::Eliminando snapshot expirado: $uri"
+                gcloud storage rm "$uri" --quiet || true
+              fi
+            done
           fi
+
+          echo "::notice::Cleanup TTL completado"

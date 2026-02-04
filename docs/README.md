@@ -5,6 +5,7 @@
 | Doc | Descripción |
 |-----|-------------|
 | [DEPLOY.md](DEPLOY.md) | Workflows de deploy, reset, golden snapshot |
+| [ESTADO_FINAL_WORKFLOWS.md](ESTADO_FINAL_WORKFLOWS.md) | Detalle de workflows y comportamiento actual |
 | [CONFIGURAR_VARIABLES_GITHUB.md](CONFIGURAR_VARIABLES_GITHUB.md) | Variables y secrets para GitHub Actions |
 | [GITHUB_SECRETS.md](GITHUB_SECRETS.md) | Secrets, WIF e IAM (refresh-golden-snapshot) |
 | [GCP_DB_CREDS.md](GCP_DB_CREDS.md) | Credenciales Cloud SQL (dev) |

@@ -16,6 +16,7 @@
 - `cleanup-preview.yml`: cleanup al cerrar PR + cron semanal.
 - `reset-dev.yml`: reset de DEV (golden snapshot).
 - `refresh-golden-snapshot.yml`: genera snapshot desde STG (DB `new_ponti_db_staging` en instancia `new-ponti-db-dev`).
+- `db-verify.yml`: verificación de migraciones en PR a develop (levanta PostgreSQL en CI).
 
 ## Environments
 
