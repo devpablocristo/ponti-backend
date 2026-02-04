@@ -571,3 +571,31 @@ if [[ "${RECONCILE_CUSTOMER_ARCHIVE}" == "1" ]]; then
     -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/db_reconcile_customer_archive.sql"
   log "OK. Reconciliación de clientes aplicada."
 fi
+
+### ===== Fix secuencias después de data-only restore =====
+log "Sincronizando secuencias con MAX(id) de cada tabla..."
+PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+  seq_record RECORD;
+  max_id BIGINT;
+BEGIN
+  FOR seq_record IN
+    SELECT
+      seq.relname AS seq_name,
+      t.relname AS table_name,
+      a.attname AS column_name
+    FROM pg_class seq
+    JOIN pg_depend d ON d.objid = seq.oid
+    JOIN pg_class t ON d.refobjid = t.oid
+    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+    WHERE seq.relkind = 'S'
+  LOOP
+    EXECUTE format('SELECT COALESCE(MAX(%I), 0) FROM %I', seq_record.column_name, seq_record.table_name) INTO max_id;
+    EXECUTE format('SELECT setval(%L, %s + 1, false)', seq_record.seq_name, max_id);
+  END LOOP;
+END $$;
+SQL
+log "OK. Secuencias sincronizadas."
+
+log "✅ RESTAURACIÓN COMPLETA."
