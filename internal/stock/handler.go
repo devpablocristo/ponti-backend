@@ -216,7 +216,7 @@ func handleError(err error, c *gin.Context) bool {
 		return false
 	}
 	apiErr, _ := types.NewAPIError(err)
-	c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 	return true
 }
 

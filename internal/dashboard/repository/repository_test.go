@@ -38,7 +38,6 @@ func TestGetSowingProgressSQL(t *testing.T) {
 		if projectID != 0 {
 			query += " AND project_id = $" + string(rune(argIndex+'0'))
 			args = append(args, projectID)
-			argIndex++
 		}
 
 		query += " LIMIT 1"
@@ -232,7 +231,7 @@ func TestProjectIDFilterOptimization(t *testing.T) {
 
 		// Simular filtro con ProjectID directo
 		projectID := int64(5)
-		if &projectID != nil {
+		if projectID != 0 {
 			projectIDs = []int64{projectID}
 		}
 

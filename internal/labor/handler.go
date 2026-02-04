@@ -98,14 +98,14 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	userID, err := sharedmodels.ConvertStringToID(c)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 
 	if err = c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -154,14 +154,14 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage, projectID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -173,14 +173,14 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
 	userID, err := sharedmodels.ConvertStringToID(c)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -312,7 +312,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -403,14 +403,14 @@ func parseParamID(c *gin.Context, param string) (int64, bool) {
 	raw := strings.TrimSpace(c.Param(param))
 	if raw == "" {
 		apiErr := types.NewError(types.ErrInvalidID, param+" is required", nil)
-		c.Error(apiErr).SetMeta(map[string]any{"param": param})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"param": param})
 		return 0, false
 	}
 
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
 		apiErr := types.NewError(types.ErrInvalidID, param+" must be a positive integer", err)
-		c.Error(apiErr).SetMeta(map[string]any{"param": param, "value": raw})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"param": param, "value": raw})
 		return 0, false
 	}
 

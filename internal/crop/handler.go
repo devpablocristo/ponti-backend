@@ -78,7 +78,7 @@ func (h *Handler) CreateCrop(c *gin.Context) {
 	var req dto.CreateCrop
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *Handler) CreateCrop(c *gin.Context) {
 	newID, err := h.ucs.CreateCrop(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *Handler) ListCrops(c *gin.Context) {
 	crops, err := h.ucs.ListCrops(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 

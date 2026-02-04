@@ -79,7 +79,7 @@ func (h *Handler) CreateManager(c *gin.Context) {
 	var req dto.CreateManager
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *Handler) CreateManager(c *gin.Context) {
 	newID, err := h.ucs.CreateManager(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *Handler) ListManagers(c *gin.Context) {
 	items, err := h.ucs.ListManagers(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 	resp := make([]dto.Manager, len(items))

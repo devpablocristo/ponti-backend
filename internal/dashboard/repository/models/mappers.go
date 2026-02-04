@@ -339,7 +339,9 @@ func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel
 	return breakdown
 }
 
-// investorContributionsToDomain convierte InvestorContributionModel a domain.DashboardInvestorBreakdown
+// investorContributionsToDomain convierte InvestorContributionModel a domain.DashboardInvestorBreakdown.
+//
+//nolint:unused
 func (m *DashboardModelMapper) investorContributionsToDomain(models []InvestorContributionModel) []domain.DashboardInvestorBreakdown {
 	if len(models) == 0 {
 		return []domain.DashboardInvestorBreakdown{}

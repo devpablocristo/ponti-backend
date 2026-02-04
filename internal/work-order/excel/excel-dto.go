@@ -97,7 +97,9 @@ func decToFloat(d decimal.Decimal, scale int32) float64 {
 	return f
 }
 
-// helper para obtener string con decimales fijos
+// decToString obtiene string con decimales fijos (reservado para uso futuro).
+//
+//nolint:unused
 func decToString(d decimal.Decimal, scale int32) string {
 	if scale < 0 {
 		return d.String()

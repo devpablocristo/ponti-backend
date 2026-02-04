@@ -32,7 +32,7 @@ func (r *Repository) GetByWorkOrderID(ctx context.Context, workOrderID int64) (*
 	var row models.Invoice
 	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			types.NewError(types.ErrNotFound, "There is no invoice for this work order", err)
+			return nil, types.NewError(types.ErrNotFound, "There is no invoice for this work order", err)
 		}
 		return nil, types.NewError(types.ErrInternal, "Failed to find invoice", err)
 

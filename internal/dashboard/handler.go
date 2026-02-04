@@ -87,7 +87,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 

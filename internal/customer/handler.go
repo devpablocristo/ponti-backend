@@ -101,7 +101,7 @@ func (h *Handler) CreateCustomer(c *gin.Context) {
 	var req dto.CreateCustomer
 	if err := c.ShouldBindJSON(&req); err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *Handler) CreateCustomer(c *gin.Context) {
 	newID, err := h.ucs.CreateCustomer(ctx, req.ToDomain())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
-		c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
 		return
 	}
 
