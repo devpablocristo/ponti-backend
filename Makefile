@@ -91,7 +91,8 @@ seed-dashboard:
 # --------------------------------------------------
 download-gcp-db:
 	@echo "Downloading GCP DB and applying business_parameters rename..."
-	@set -a && source docs/GCP_DB_CREDS.md && set +a && ./scripts/download-gcp-db.sh
+	@set -a && [ -f .env ] && source .env; source scripts/gcp-db-creds.env && set +a && \
+	SRC_FORCE_CLOUD_RUN=0 ./scripts/download-gcp-db.sh
 
 # --------------------------------------------------
 # Base de datos (verificación local v4)
