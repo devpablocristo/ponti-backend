@@ -3,11 +3,11 @@ package pkgmwr
 import (
 	"crypto/rsa"
 	"fmt"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
 )
 
@@ -25,22 +25,30 @@ func RequireJWT(cfg pkgutils.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr, err := pkgutils.ExtractTokenFromRequest(c.Request, cfg)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		unverifiedToken, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "INVALID_TOKEN"})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		keyFunc := pkgutils.SelectKeyFunc(unverifiedToken, cfg.SecretKey, rsaPublicKey)
 		if keyFunc == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "UNEXPECTED_SIGNING_METHOD"})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "unexpected signing method", nil)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		parsedToken, err := jwt.Parse(tokenStr, keyFunc)
 		if err != nil || !parsedToken.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "INVALID_TOKEN"})
+			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
+			apiErr, status := pkgtypes.NewAPIError(domErr)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
 		c.Set(cfg.ContextKey, parsedToken)

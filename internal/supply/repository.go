@@ -1,0 +1,271 @@
+package supply
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"gorm.io/gorm"
+)
+
+type GormEnginePort interface {
+	Client() *gorm.DB
+}
+
+type Repository struct {
+	db GormEnginePort
+}
+
+func NewRepository(db GormEnginePort) *Repository {
+	return &Repository{db: db}
+}
+
+// --- CREATE ---
+func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
+	var id int64
+	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		model := models.FromDomain(s)
+		if err := tx.Create(model).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to create supply", err)
+		}
+		id = model.ID
+		return nil
+	})
+	return id, err
+}
+
+func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+	userID, err := sharedmodels.ConvertStringToID(ctx)
+	if err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		modelsSlice := make([]*models.Supply, len(supplies))
+		for i := range supplies {
+			modelsSlice[i] = models.FromDomain(&supplies[i])
+			modelsSlice[i].CreatedBy = &userID
+		}
+		if err := tx.Create(modelsSlice).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to bulk create supplies", err)
+		}
+		return nil
+	})
+}
+
+// --- GET ---
+func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
+	var m models.Supply
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Category").
+		Preload("Type").
+		First(&m, id).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "supply", id)
+	}
+	return m.ToDomain(), nil
+}
+
+// --- UPDATE ---
+func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
+	if err := sharedrepo.ValidateID(s.ID, "supply"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
+		}
+		updates := map[string]any{
+			"name":        s.Name,
+			"unit_id":     int64(s.UnitID),
+			"price":       s.Price,
+			"category_id": int64(s.CategoryID),
+			"type_id":     s.Type.ID,
+			"project_id":  s.ProjectID,
+			"updated_by":  s.UpdatedBy,
+		}
+		updateTx := tx.Model(&models.Supply{}).
+			Where("id = ?", s.ID)
+		if !s.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", s.UpdatedAt)
+		}
+		result := updateTx.Updates(updates)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to update supply", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			if !s.UpdatedAt.IsZero() {
+				return types.NewError(types.ErrConflict, "supply not found or outdated", nil)
+			}
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
+		}
+		return nil
+	})
+}
+
+// --- DELETE ---
+func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
+	var count int64
+	if err := r.db.Client().WithContext(ctx).
+		Model(&workOrderModels.WorkOrder{}).
+		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
+		Where("workorder_items.supply_id = ?", supplyID).
+		Count(&count).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, types.NewError(types.ErrInternal, "failed to get work order", err)
+	}
+	return count, nil
+}
+
+func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
+		}
+		result := tx.Delete(&models.Supply{}, id)
+		if result.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to delete supply", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
+		}
+		return nil
+	})
+}
+
+// --- LIST CENTRALIZADO, con filtros y paginación ---
+func (r *Repository) ListSuppliesPaginated(
+	ctx context.Context,
+	filter domain.SupplyFilter,
+	mode string,
+	page, perPage int,
+) ([]domain.Supply, int64, error) {
+	var supplies []models.Supply
+	var total int64
+
+	db := r.db.Client().WithContext(ctx).Model(&models.Supply{}).
+		Preload("Category").
+		Preload("Type")
+
+	// Filtrado flexible
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(projectIDs) > 0 {
+		db = db.Where("project_id IN ?", projectIDs)
+	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
+		return []domain.Supply{}, 0, nil
+	}
+
+	// Total para paginación
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count supplies", err)
+	}
+
+	offset := (page - 1) * perPage
+	if err := db.Offset(offset).Limit(perPage).Order("name").Find(&supplies).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list supplies with filters", err)
+	}
+
+	res := make([]domain.Supply, len(supplies))
+	for i := range supplies {
+		res[i] = *supplies[i].ToDomain()
+	}
+	return res, total, nil
+}
+
+func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := range supplies {
+			updates := map[string]any{
+				"name":        supplies[i].Name,
+				"unit_id":     int64(supplies[i].UnitID),
+				"price":       supplies[i].Price,
+				"category_id": int64(supplies[i].CategoryID),
+				"type_id":     supplies[i].Type.ID,
+				"project_id":  supplies[i].ProjectID,
+				"updated_by":  supplies[i].UpdatedBy,
+			}
+			updateTx := tx.Model(&models.Supply{}).
+				Where("id = ?", supplies[i].ID)
+			if !supplies[i].UpdatedAt.IsZero() {
+				updateTx = updateTx.Where("updated_at = ?", supplies[i].UpdatedAt)
+			}
+			res := updateTx.Updates(updates)
+			if res.Error != nil {
+				return types.NewError(types.ErrInternal, fmt.Sprintf("failed to update supply id %d", supplies[i].ID), res.Error)
+			}
+			if res.RowsAffected == 0 {
+				if !supplies[i].UpdatedAt.IsZero() {
+					return types.NewError(types.ErrConflict, fmt.Sprintf("supply %d not found or outdated", supplies[i].ID), nil)
+				}
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supplies[i].ID), nil)
+			}
+		}
+		return nil
+	})
+}
+
+func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFilter) ([]domain.Supply, int64, error) {
+	base := r.db.Client().WithContext(ctx).Model(&models.Supply{})
+
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(projectIDs) > 0 {
+		base = base.Where("project_id IN ?", projectIDs)
+	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
+		return []domain.Supply{}, 0, nil
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count supplies", err)
+	}
+
+	var rows []models.Supply
+	db := base.
+		Preload("Category").
+		Preload("Type").
+		Order("name")
+
+	if err := db.Find(&rows).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list all supplies", err)
+	}
+
+	out := make([]domain.Supply, len(rows))
+	for i := range rows {
+		out[i] = *rows[i].ToDomain()
+	}
+	return out, total, nil
+}

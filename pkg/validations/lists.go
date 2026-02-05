@@ -7,7 +7,7 @@ import (
 
 // ValidateStringSliceNotEmpty validates that a string slice is not empty.
 func ValidateStringSliceNotEmpty(field string, xs []string) error {
-	if xs == nil || len(xs) == 0 {
+	if len(xs) == 0 {
 		return Err(field, "cannot be empty")
 	}
 	return nil
@@ -15,7 +15,7 @@ func ValidateStringSliceNotEmpty(field string, xs []string) error {
 
 // ValidateUniqueStrings validates that all strings in a slice are unique.
 func ValidateUniqueStrings(field string, xs []string, caseInsensitive bool) error {
-	if xs == nil || len(xs) <= 1 {
+	if len(xs) <= 1 {
 		return nil
 	}
 

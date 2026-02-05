@@ -14,7 +14,7 @@ El contenedor falla al iniciar y no escucha en el puerto 8080. Esto generalmente
 
 **Opción B: Desde la terminal**
 ```bash
-gcloud run services logs read ponti-backend-dev \
+gcloud run services logs read ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --limit=100
@@ -23,7 +23,7 @@ gcloud run services logs read ponti-backend-dev \
 ### 2. Verificar variables de entorno configuradas
 
 ```bash
-gcloud run services describe ponti-backend-dev \
+gcloud run services describe ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --format="value(spec.template.spec.containers[0].env)"
@@ -31,7 +31,7 @@ gcloud run services describe ponti-backend-dev \
 
 O usar el script de diagnóstico:
 ```bash
-./scripts/diagnose-cloud-run.sh new-ponti-dev ponti-backend-dev us-central1
+./scripts/diagnose-cloud-run.sh new-ponti-dev ponti-backend us-central1
 ```
 
 ### 3. Variables críticas que DEBEN estar configuradas
@@ -40,11 +40,10 @@ O usar el script de diagnóstico:
 |----------|----------------|---------------------|
 | `GO_ENVIRONMENT` | `production` | Sin esto, la app intenta cargar `.env` y falla |
 | `HTTP_SERVER_PORT` | `8080` | Puerto donde debe escuchar el servidor |
-| `DB_NAME` | `branch_<slug>` o `ponti_api_db` | DB usada por el deploy |
+| `DB_NAME` | `db_pr_<N>` (preview), `new_ponti_db_dev` (dev), `new_ponti_db_staging` (stg) | DB usada por el deploy |
 | `DB_HOST` | IP o socket de Cloud SQL | Conexión a DB |
 | `DB_USER` | Usuario de DB | Conexión a DB |
 | `DB_PASSWORD` | Password de DB | Conexión a DB |
-| `DB_NAME` | `ponti_api_db` | Nombre de la DB |
 | `DB_PORT` | `5432` | Puerto de DB |
 | `DB_SSL_MODE` | `disable` o `require` | Modo SSL |
 | `DEPLOY_ENV` | `dev` | Ambiente de deploy |
@@ -74,7 +73,7 @@ O usar el script de diagnóstico:
 Si faltan variables críticas, configúralas manualmente:
 
 ```bash
-gcloud run services update ponti-backend-dev \
+gcloud run services update ponti-backend \
   --project=new-ponti-dev \
   --region=us-central1 \
   --update-env-vars="GO_ENVIRONMENT=production,HTTP_SERVER_PORT=8080,DEPLOY_ENV=dev,DEPLOY_PLATFORM=gcp"

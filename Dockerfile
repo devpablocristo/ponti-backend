@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 ENV TZ=America/Argentina/Buenos_Aires
 RUN apk add --no-cache \
@@ -13,13 +13,13 @@ WORKDIR /app
 
 COPY . .
 
-WORKDIR /app/projects/ponti-api
+WORKDIR /app
 RUN go mod download && go mod verify
 
 WORKDIR /app/pkg
 RUN go mod download && go mod verify
 
-WORKDIR /app/projects/ponti-api
+WORKDIR /app
 
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/prod_binary ./cmd/api/
 
@@ -34,7 +34,7 @@ WORKDIR /app
 
 COPY --from=builder /app/pkg  /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
-COPY --from=builder /app/projects/ponti-api/migrations /app/migrations
+COPY --from=builder /app/migrations_v4 /app/migrations_v4
 
 EXPOSE 8080
 

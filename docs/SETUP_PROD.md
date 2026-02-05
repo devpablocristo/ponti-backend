@@ -2,6 +2,11 @@
 
 Este documento describe cómo crear y configurar el proyecto GCP de producción desde cero, usando como modelo el proyecto de desarrollo (`new-ponti-dev`).
 
+## Nota de contexto
+
+El deploy actual usa GitHub Actions con `dev` → `stg` → **promoción manual a prod** (mismo artefacto).  
+Ver `docs/DEPLOY.md` y `docs/CONFIGURAR_VARIABLES_GITHUB.md`.
+
 ## Requisitos Previos
 
 - Google Cloud CLI (`gcloud`) instalado y configurado
@@ -225,7 +230,7 @@ gcloud run deploy "$SERVICE_NAME" \
 gcloud run services update "$SERVICE_NAME" \
   --project="$PROJECT_ID" \
   --region="$REGION" \
-  --update-env-vars="GO_ENVIRONMENT=production,DEPLOY_ENV=prod,DEPLOY_PLATFORM=gcp,APP_NAME=ponti-api,APP_VERSION=1.0,APP_MAX_RETRIES=5,X_API_KEY=<PROD_API_KEY>,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,DB_HOST=/cloudsql/$PROJECT_ID:$REGION:$INSTANCE_NAME,DB_NAME=$DB_NAME,DB_SSL_MODE=require,DB_PORT=5432,MIGRATIONS_DIR=file://migrations,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
+  --update-env-vars="SERVICE_NAME=ponti-api,SERVICE_VERSION=1.0,SERVICE_MAX_RETRIES=5,X_API_KEY=<PROD_API_KEY>,API_VERSION=v1,HTTP_SERVER_NAME=http-server,HTTP_SERVER_HOST=0.0.0.0,DB_TYPE=postgres,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,DB_HOST=/cloudsql/$PROJECT_ID:$REGION:$INSTANCE_NAME,DB_NAME=$DB_NAME,DB_SSL_MODE=require,DB_PORT=5432,MIGRATIONS_DIR=file://migrations_v4,WORDS_SUGGESTER_LIMIT=100,WORDS_SUGGESTER_THRESHOLD=0.3,REPORT_SCHEMA=v4_report"
 ```
 
 ### 8.1 Conectar Cloud Run a Cloud SQL

@@ -82,8 +82,8 @@ func FilesFinder(fileNames ...string) ([]string, error) {
 // getProjectRootDir encuentra el directorio raíz del proyecto buscando primero '.git' y luego 'go.mod'.
 // Prioriza la detección del directorio raíz basado en el control de versiones (Git).
 func getProjectRootDir() (string, error) {
-	// Si se define APP_ROOT, úsala
-	if pr := os.Getenv("APP_ROOT"); pr != "" {
+	// Si se define SERVICE_ROOT, úsala
+	if pr := os.Getenv("SERVICE_ROOT"); pr != "" {
 		return pr, nil
 	}
 
@@ -105,14 +105,9 @@ func getProjectRootDir() (string, error) {
 			return dir, nil
 		}
 
-		// Verifica si existe el archivo go.mod
+		// Verifica si existe el archivo go.mod (no directorio)
 		if stat, err := os.Stat(goModPath); err == nil && !stat.IsDir() {
-			// **Opcional:** Si deseas detener la búsqueda al encontrar el primer go.mod,
-			// descomenta la siguiente línea:
-			// return dir, nil
-
-			// **Recomendación:** En un monorepo con múltiples go.mod, es mejor continuar buscando .git
-			// para asegurarse de identificar la raíz real del monorepo.
+			_ = stat // Encontrado go.mod como archivo; continuar buscando .git para raíz real
 		}
 
 		// Mueve al directorio padre.

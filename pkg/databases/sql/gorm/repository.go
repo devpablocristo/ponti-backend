@@ -111,6 +111,9 @@ func getDialector(config ConfigPort) (gorm.Dialector, error) {
 	return dialector, nil
 }
 
+// connectWithConnectorIAMAuthN conecta a Cloud SQL con IAM auth (usado en Cloud Run).
+//
+//nolint:unused
 func connectWithConnectorIAMAuthN(config ConfigPort) (gorm.Dialector, error) {
 	mustGetenv := func(k string) string {
 		v := os.Getenv(k)

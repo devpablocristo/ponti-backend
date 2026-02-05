@@ -1,73 +1,50 @@
 # Despliegue de ponti-backend en Google Cloud Run
 
 ## TLDR
-- Deploy automatico: `push` a `develop`/`main`.
-- Deploy manual: `workflow_dispatch` (solo pide `branch`).
-- Previews: **DB por rama** `branch_<slug>` con **snapshot automatico** desde la DB dev real.
-- Limpieza: al cerrar PR y cron semanal (ver `cleanup-preview.yml`).
+- **DEV**: push a `develop` → deploy automático.
+- **STG**: push a `main` → deploy automático con **tag SHA**.
+- **PROD**: promoción manual del **mismo artefacto** probado en STG.
+- **Preview**: on‑demand por PR (DB efímera).
 
-## Requisitos previos
-- `gcloud` configurado
-- Docker instalado
-- Acceso a GCP:
-  - `new-ponti-dev`
-  - `new-ponti-prod`
+## Workflows
 
-## Variables de aplicacion (Cloud Run)
-Estas variables se configuran en el servicio, no en Actions.
+- `ci-pr.yml`: PR a `develop` → tests.
+- `deploy-dev.yml`: push a `develop` → DEV.
+- `deploy-staging.yml`: push a `main` → STG.
+- `promote-prod.yml`: manual → PROD (usa SHA de STG).
+- `deploy-preview.yml`: manual o label `preview`.
+- `cleanup-preview.yml`: cleanup al cerrar PR + cron semanal.
+- `reset-dev.yml`: reset de DEV (golden snapshot).
+- `refresh-golden-snapshot.yml`: genera snapshot desde STG (DB `new_ponti_db_staging` en instancia `new-ponti-db-dev`).
+- `db-verify.yml`: verificación de migraciones en PR a develop (levanta PostgreSQL en CI).
 
-### Minimas
-| Variable | Descripcion | Ejemplo |
-|----------|-------------|---------|
-| `GO_ENVIRONMENT` | Debe estar en `production` para evitar `.env` | `production` |
-| `DEPLOY_ENV` | `dev` o `prod` | `dev` |
-| `DEPLOY_PLATFORM` | `gcp` | `gcp` |
-| `DB_TYPE` | `postgres` | `postgres` |
-| `DB_HOST` | Host/IP de Postgres | `136.112.24.122` |
-| `DB_PORT` | Puerto | `5432` |
-| `DB_USER` | Usuario | `soalen-db-v3` |
-| `DB_PASSWORD` | Password | `****` |
-| `DB_NAME` | DB base del servicio | `ponti_api_db` |
-| `DB_SSL_MODE` | Modo SSL | `disable` |
-| `HTTP_SERVER_PORT` | Puerto HTTP | `8080` |
+## Environments
 
-> Nota: `DB_SCHEMA` siempre se usa como `public`. La aislacion es por `DB_NAME`.
+En GitHub: `dev`, `stg`, `prod`.  
 
-## Deploy con GitHub Actions
-Workflow principal: `.github/workflows/deploy-cloud-run.yml`.
+## Reset DEV (pasos concretos)
 
-### Triggers
-- `push` a `develop` → dev (DB fija del servicio)
-- `push` a `main` → prod (DB fija del servicio)
-- `workflow_dispatch` → preview en dev (**DB por rama**)
+Workflow: `reset-dev.yml` (manual).
 
-### Deploy manual por rama (preview)
-1. GitHub → Actions → **Deploy to Cloud Run**
-2. Run workflow
-3. Completar **solo**:
-   - `branch`: rama a desplegar
+1. GitHub → Actions → **Reset DEV**.
+2. Run workflow.
+3. Verificar que el workflow termine OK.
+4. (Opcional) Probar health: `https://<dev-backend>/ping`.
 
-**Que pasa en cada run manual:**
-- Se calcula `DB_NAME=branch_<slug>`.
-- Se borra y recrea la DB `branch_<slug>`.
-- Se **exporta** un snapshot de la DB dev real.
-- Se **importa** ese snapshot en la DB `branch_<slug>`.
-- Se despliega un servicio preview con esa DB.
+Qué hace:
+- Borra `new_ponti_db_dev`.
+- Restaura el **Golden Snapshot**.
+- Ejecuta hardening (si `HARDENING_SQL_URI` está configurado).
+- Corre smoke test (si `SMOKE_TEST_URL` está configurado).
 
-## Limpieza automatica
-Workflow: `.github/workflows/cleanup-preview.yml`
-- Al **cerrar PR** (merge o close): borra DB `branch_*` y snapshots asociados.
-- **Cron semanal**: limpia DBs `branch_*` y snapshots restantes.
+## Golden Snapshot (pasos concretos)
 
-## Troubleshooting rapido
-### Error: "no se pudo cargar el archivo .env base"
-**Causa**: `GO_ENVIRONMENT` no esta seteado en Cloud Run.  
-**Solucion**: setear `GO_ENVIRONMENT=production`.
+Workflow: `refresh-golden-snapshot.yml` (manual o cron).
 
-### Error: "container failed to start" + errores de DB
-**Causa**: variables de DB faltantes o DB preview sin datos.  
-**Solucion**: correr `workflow_dispatch` (se resetea y se importan datos siempre).
+1. GitHub → Actions → **Refresh Golden Snapshot**.
+2. Run workflow.
+3. Verificar que el snapshot se haya exportado al bucket definido en `GOLDEN_SNAPSHOT_BUCKET`.
 
-## Documentacion relacionada
-- `SETUP_PROD.md`
-- `GITHUB_SECRETS.md`
+El snapshot se usa luego por `reset-dev.yml`.
+
+**Requisito:** El SA `github-actions@new-ponti-stg` debe tener `roles/cloudsql.admin` (o equivalente) en el proyecto **new-ponti-dev** para poder exportar. Ver [GITHUB_SECRETS.md](GITHUB_SECRETS.md#permiso-iam-pendiente-refresh-golden-snapshot).

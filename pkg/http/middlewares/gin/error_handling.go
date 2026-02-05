@@ -2,7 +2,6 @@ package pkgmwr
 
 import (
 	"errors"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,28 +17,14 @@ func ErrorHandling() gin.HandlerFunc {
 		}
 		if len(c.Errors) > 0 {
 			ginErr := c.Errors[0]
-			var status int
-			var response any
-			var domainErr *pkgtypes.Error
-			if errors.As(ginErr.Err, &domainErr) {
-				apiErr, code := pkgtypes.NewAPIError(domainErr)
-				response = apiErr.ToResponse()
-				status = code
-			} else {
-				var apiErr *pkgtypes.APIError
-				if errors.As(ginErr.Err, &apiErr) {
-					response = apiErr.ToResponse()
-					status = apiErr.Code
-				} else {
-					response = gin.H{
-						"error":   "INTERNAL_ERROR",
-						"message": "An internal error occurred. Please try again later.",
-						"details": ginErr.Err.Error(),
-					}
-					status = http.StatusInternalServerError
-				}
+			var apiErr *pkgtypes.APIError
+			if errors.As(ginErr.Err, &apiErr) {
+				c.AbortWithStatusJSON(apiErr.Code, apiErr.ToResponse())
+				return
 			}
-			c.AbortWithStatusJSON(status, response)
+
+			apiErr, status := pkgtypes.NewAPIError(ginErr.Err)
+			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 		}
 	}
 }
