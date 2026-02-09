@@ -21,7 +21,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: dev
     env:
       GCP_REGION: ${{ vars.GCP_REGION }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
@@ -51,9 +50,7 @@ jobs:
       SERVICE_ENV_MAX_RETRIES: ${{ vars.SERVICE_MAX_RETRIES_ENV }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+        uses: actions/checkout@v3
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
