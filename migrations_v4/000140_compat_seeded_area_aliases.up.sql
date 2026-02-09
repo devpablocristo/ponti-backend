@@ -141,16 +141,7 @@ SELECT
   v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fertilizantes') AS fertilizantes_usd,
   v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Otros Insumos') AS otros_insumos_usd,
   
-  (
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Semilla') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Curasemillas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Herbicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Insecticidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fungicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Coadyuvantes') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fertilizantes') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Otros Insumos')
-  )::numeric AS total_insumos_usd,
+  v4_ssot.supply_cost_for_lot_base(lot_id)::numeric AS total_insumos_usd,
   seeded_area_ha AS sowed_area_ha,
   seeded_area_ha AS sown_area_ha
 FROM v4_calc.field_crop_lot_base;
@@ -310,7 +301,7 @@ SELECT
   SUM(v4_ssot.rent_fixed_only_for_lot(lot_id) * surface_ha)::numeric AS rent_fixed_usd,
   
   SUM(v4_ssot.rent_per_ha_for_lot(lot_id) * surface_ha)::numeric AS rent_total_usd,
-  SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd,
+  SUM(v4_ssot.admin_cost_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd,
   SUM(seeded_area_ha)::numeric AS sowed_area_ha,
   SUM(seeded_area_ha)::numeric AS sown_area_ha
 FROM v4_calc.field_crop_supply_costs_by_lot
@@ -333,7 +324,7 @@ SELECT
   COALESCE(v4_ssot.supply_cost_for_lot_base(l.id), 0)::numeric AS supply_cost_usd,
   COALESCE(v4_ssot.net_price_usd_for_lot(l.id), 0)::numeric AS net_price_usd,
   COALESCE(v4_ssot.rent_per_ha_for_lot(l.id), 0)::numeric AS rent_per_ha,
-  COALESCE(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
+  COALESCE(v4_ssot.admin_cost_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
   COALESCE(v4_ssot.board_price_for_lot(l.id), 0)::numeric AS board_price,
   COALESCE(v4_ssot.freight_cost_for_lot(l.id), 0)::numeric AS freight_cost,
   COALESCE(v4_ssot.commercial_cost_for_lot(l.id), 0)::numeric AS commercial_cost,

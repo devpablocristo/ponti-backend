@@ -260,16 +260,7 @@ SELECT
   v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fertilizantes') AS fertilizantes_usd,
   v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Otros Insumos') AS otros_insumos_usd,
   
-  (
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Semilla') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Curasemillas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Herbicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Insecticidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fungicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Coadyuvantes') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Fertilizantes') +
-    v4_ssot.supply_cost_for_lot_by_category(lot_id, 'Otros Insumos')
-  )::numeric AS total_insumos_usd
+  v4_ssot.supply_cost_for_lot_base(lot_id)::numeric AS total_insumos_usd
 FROM v4_calc.field_crop_lot_base;
 
 CREATE OR REPLACE VIEW v4_calc.field_crop_labor_costs_by_lot AS
@@ -425,7 +416,7 @@ SELECT
   SUM(v4_ssot.rent_fixed_only_for_lot(lot_id) * surface_ha)::numeric AS rent_fixed_usd,
   
   SUM(v4_ssot.rent_per_ha_for_lot(lot_id) * surface_ha)::numeric AS rent_total_usd,
-  SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd
+  SUM(v4_ssot.admin_cost_per_ha_for_lot(lot_id) * surface_ha)::numeric AS administration_usd
 FROM v4_calc.field_crop_supply_costs_by_lot
 GROUP BY project_id, field_id, crop_id;
 
@@ -446,7 +437,7 @@ SELECT
   COALESCE(v4_ssot.supply_cost_for_lot_base(l.id), 0)::numeric AS supply_cost_usd,
   COALESCE(v4_ssot.net_price_usd_for_lot(l.id), 0)::numeric AS net_price_usd,
   COALESCE(v4_ssot.rent_per_ha_for_lot(l.id), 0)::numeric AS rent_per_ha,
-  COALESCE(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
+  COALESCE(v4_ssot.admin_cost_per_ha_for_lot(l.id), 0)::numeric AS admin_per_ha,
   COALESCE(v4_ssot.board_price_for_lot(l.id), 0)::numeric AS board_price,
   COALESCE(v4_ssot.freight_cost_for_lot(l.id), 0)::numeric AS freight_cost,
   COALESCE(v4_ssot.commercial_cost_for_lot(l.id), 0)::numeric AS commercial_cost
@@ -512,12 +503,9 @@ SELECT
   p.id AS project_id,
   COALESCE(SUM(v4_ssot.supply_cost_for_lot_by_category(l.id, 'Semilla')), 0) AS semillas_ejecutados_usd,
   COALESCE(SUM(
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Coadyuvantes') +
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Curasemillas') +
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Herbicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Insecticidas') +
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Fungicidas') +
-    v4_ssot.supply_cost_for_lot_by_category(l.id, 'Otros Insumos')
+    v4_ssot.supply_cost_for_lot_base(l.id)
+    - v4_ssot.supply_cost_for_lot_by_category(l.id, 'Semilla')
+    - v4_ssot.supply_cost_for_lot_by_category(l.id, 'Fertilizantes')
   ), 0) AS agroquimicos_ejecutados_usd,
   COALESCE(SUM(v4_ssot.supply_cost_for_lot_by_category(l.id, 'Fertilizantes')), 0) AS fertilizantes_ejecutados_usd
 FROM public.projects p
@@ -552,7 +540,7 @@ seed_area AS (
     lb.project_id,
     COALESCE(SUM(lb.seeded_area_ha), 0)::numeric AS total_seeded_area_ha,
     COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS rent_capitalizable_total_usd,
-    COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS administration_total_usd
+    COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(lb.lot_id) * lb.hectares), 0)::numeric AS administration_total_usd
   FROM lot_base lb
   GROUP BY lb.project_id
 ),
@@ -655,7 +643,6 @@ investor_agrochemicals_real AS (
     AND sm.is_entry = TRUE
     AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
     AND cat.type_id = 2
-    AND cat.name IN ('Coadyuvantes', 'Curasemillas', 'Herbicidas', 'Insecticidas', 'Fungicidas', 'Otros Insumos')
   GROUP BY sm.project_id, sm.investor_id
 ),
 investor_fertilizers_real AS (

@@ -105,17 +105,17 @@ LANGUAGE sql STABLE AS $$
     AND w.deleted_at IS NULL
 $$;
 
-CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_lot(p_lot_id bigint) 
+CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_lot(p_lot_id bigint)
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM((wi.final_dose)::numeric * s.price * (w.effective_area)::numeric), 0)::numeric
+    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::numeric
      FROM public.workorders w
-     JOIN public.workorder_items wi ON wi.workorder_id = w.id
-     JOIN public.supplies s ON s.id = wi.supply_id
+     JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+     JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
      WHERE w.deleted_at IS NULL
        AND w.effective_area > 0
-       AND wi.final_dose > 0
+       AND wi.total_used > 0
        AND s.price IS NOT NULL
        AND w.lot_id = p_lot_id)
     +
@@ -388,17 +388,17 @@ LANGUAGE sql STABLE AS $$
   , 0)::numeric
 $$;
 
-CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_project(p_project_id bigint) 
+CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_project(p_project_id bigint)
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
-    (SELECT COALESCE(SUM((wi.final_dose)::numeric * s.price * (w.effective_area)::numeric), 0)::numeric
+    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::numeric
      FROM public.workorders w
-     JOIN public.workorder_items wi ON wi.workorder_id = w.id
-     JOIN public.supplies s ON s.id = wi.supply_id
+     JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+     JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
      WHERE w.deleted_at IS NULL
        AND w.effective_area > 0
-       AND wi.final_dose > 0
+       AND wi.total_used > 0
        AND s.price IS NOT NULL
        AND w.project_id = p_project_id)
     +

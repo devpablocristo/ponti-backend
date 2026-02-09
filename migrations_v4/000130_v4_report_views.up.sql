@@ -673,10 +673,10 @@ SELECT
       COALESCE(SUM(v4_ssot.rent_fixed_only_for_lot(l.id) * l.hectares), 0::numeric) / SUM(l.hectares)
     ELSE 0::numeric
   END::numeric AS lease_per_ha_usd,
-  COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::numeric)::numeric AS admin_total_usd,
+  COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0::numeric)::numeric AS admin_total_usd,
   CASE
     WHEN COALESCE(SUM(l.hectares), 0::numeric) > 0::numeric THEN
-      COALESCE(SUM(v4_ssot.admin_cost_prorated_per_ha_for_lot(l.id) * l.hectares), 0::numeric) / SUM(l.hectares)
+      COALESCE(SUM(v4_ssot.admin_cost_per_ha_for_lot(l.id) * l.hectares), 0::numeric) / SUM(l.hectares)
     ELSE 0::numeric
   END::numeric AS admin_per_ha_usd
 FROM public.projects p
