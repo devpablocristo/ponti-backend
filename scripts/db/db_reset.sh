@@ -15,7 +15,7 @@ docker compose -f "${COMPOSE_FILE}" up -d ponti-db
 
 echo "Esperando DB disponible..."
 for i in {1..30}; do
-  if docker compose -f "${COMPOSE_FILE}" exec -T ponti-db pg_isready -U "${DB_USER}" -d "postgres" -p "${DB_PORT}" >/dev/null 2>&1; then
+  if docker compose -f "${COMPOSE_FILE}" exec -T ponti-db pg_isready -U "${DB_USER}" -d "postgres" -p 5432 >/dev/null 2>&1; then
     break
   fi
   sleep 1

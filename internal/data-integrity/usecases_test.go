@@ -100,40 +100,25 @@ func TestUseCases_control1OrdenesVsDashboard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockWorkOrderRepo := NewMockWorkOrderRepositoryPort(ctrl)
-			mockDashboardRepo := NewMockDashboardRepositoryPort(ctrl)
-			mockLotRepo := NewMockLotRepositoryPort(ctrl)
-			mockReportRepo := NewMockReportRepositoryPort(ctrl)
-			mockStockRepo := NewMockStockRepositoryPort(ctrl)
-
 			useCases := NewUseCases(
-				mockWorkOrderRepo,
-				mockDashboardRepo,
-				mockLotRepo,
-				mockReportRepo,
-				mockStockRepo,
+				NewMockWorkOrderRepositoryPort(ctrl),
+				NewMockDashboardRepositoryPort(ctrl),
+				NewMockLotRepositoryPort(ctrl),
+				NewMockReportRepositoryPort(ctrl),
+				NewMockStockRepositoryPort(ctrl),
 			)
 
+			sd := &sharedData{
+				lots:          tt.mockLots,
+				dashboardData: tt.mockDashboardData,
+			}
+
 			ctx := context.Background()
-			// Mock expectations
-			mockLotRepo.EXPECT().
-				ListLots(ctx, lotDomain.LotListFilter{ProjectID: tt.projectID}, 1, 10000).
-				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
-				Times(1)
+			result, err := useCases.control1OrdenesVsDashboard(ctx, tt.projectID, sd)
 
-			mockDashboardRepo.EXPECT().
-				GetDashboard(ctx, gomock.Any()).
-				Return(tt.mockDashboardData, tt.mockDashboardErr).
-				Times(1)
-
-			// Act
-			result, err := useCases.control1OrdenesVsDashboard(ctx, tt.projectID)
-
-			// Assert
 			require.NoError(t, err)
 			assert.Equal(t, 1, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)
@@ -226,39 +211,25 @@ func TestUseCases_control2OrdenesVsLotes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockWorkOrderRepo := NewMockWorkOrderRepositoryPort(ctrl)
-			mockDashboardRepo := NewMockDashboardRepositoryPort(ctrl)
-			mockLotRepo := NewMockLotRepositoryPort(ctrl)
-			mockReportRepo := NewMockReportRepositoryPort(ctrl)
-			mockStockRepo := NewMockStockRepositoryPort(ctrl)
-
 			useCases := NewUseCases(
-				mockWorkOrderRepo,
-				mockDashboardRepo,
-				mockLotRepo,
-				mockReportRepo,
-				mockStockRepo,
+				NewMockWorkOrderRepositoryPort(ctrl),
+				NewMockDashboardRepositoryPort(ctrl),
+				NewMockLotRepositoryPort(ctrl),
+				NewMockReportRepositoryPort(ctrl),
+				NewMockStockRepositoryPort(ctrl),
 			)
 
+			sd := &sharedData{
+				lots:              tt.mockLots,
+				fieldCropMetrics:  tt.mockFieldCrops,
+			}
+
 			ctx := context.Background()
-			mockLotRepo.EXPECT().
-				ListLots(ctx, lotDomain.LotListFilter{ProjectID: tt.projectID}, 1, 10000).
-				Return(tt.mockLots, 0, decimal.Zero, decimal.Zero, tt.mockLotsErr).
-				Times(1)
+			result, err := useCases.control2OrdenesVsLotes(ctx, tt.projectID, sd)
 
-			mockReportRepo.EXPECT().
-				GetFieldCropMetrics(reportDomain.ReportFilter{ProjectID: tt.projectID}).
-				Return(tt.mockFieldCrops, tt.mockFieldCropsErr).
-				Times(1)
-
-			// Act
-			result, err := useCases.control2OrdenesVsLotes(ctx, tt.projectID)
-
-			// Assert
 			require.NoError(t, err)
 			assert.Equal(t, 2, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)

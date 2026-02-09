@@ -6,7 +6,7 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
 AUTH_DIR="$ROOT_DIR/ponti-auth"
 FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
-AI_DIR="$ROOT_DIR/ponti-ai-copilot"
+AI_DIR="$ROOT_DIR/ponti-ai"
 
 require_dir() {
   local dir="$1"
@@ -20,7 +20,7 @@ require_dir() {
 require_dir "$BACKEND_DIR" "backend"
 require_dir "$AUTH_DIR" "auth"
 require_dir "$FRONTEND_DIR" "frontend"
-require_dir "$AI_DIR" "ai-copilot"
+require_dir "$AI_DIR" "ai"
 
 http_ok() {
   local url="$1"
@@ -52,16 +52,14 @@ ensure_env_file() {
 }
 
 stop_system_postgres() {
-  # Detener PostgreSQL del sistema si está usando el puerto 5432
-  if ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
+  # Verificar conflicto solo si usamos 5432 (DB_PORT por defecto)
+  local port="${DB_PORT:-5432}"
+  if [[ "$port" = "5432" ]] && ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
     echo "ERROR: PostgreSQL del sistema detectado en puerto 5432."
     echo "       Docker no puede usar el mismo puerto."
     echo ""
-    echo "Ejecuta primero:"
-    echo "  sudo systemctl stop postgresql"
-    echo ""
-    echo "O para deshabilitarlo permanentemente:"
-    echo "  sudo systemctl disable --now postgresql"
+    echo "Ejecuta primero: sudo systemctl stop postgresql"
+    echo "O configura DB_PORT=5433 en .env para usar otro puerto."
     exit 1
   fi
 }
@@ -90,6 +88,11 @@ stop_frontend_ports() {
   fi
 }
 
+ensure_env_file "$BACKEND_DIR"
+set -a
+source "$BACKEND_DIR/.env"
+set +a
+
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
 docker compose -f "$AUTH_DIR/docker-compose.yml" down --remove-orphans
@@ -117,7 +120,7 @@ fi
 echo "Levantando auth (DB) con Docker..."
 docker compose -f "$AUTH_DIR/docker-compose.yml" up -d
 
-echo "Levantando AI Copilot (DB + API) con Docker..."
+echo "Levantando AI (DB + API) con Docker..."
 docker compose -f "$AI_DIR/docker-compose.yml" up -d
 
 ensure_env_file "$AUTH_DIR"
