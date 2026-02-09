@@ -1,26 +1,20 @@
 # Despliegue de ponti-backend en Google Cloud Run
 
 ## TLDR
+
 - **DEV**: push a `develop` → deploy automático.
-- **STG**: push a `main` → deploy automático con **tag SHA**.
-- **PROD**: promoción manual del **mismo artefacto** probado en STG.
-- **Preview**: on‑demand por PR (DB efímera).
+- **STG / PROD / Preview**: workflows no implementados actualmente.
+- **Reset DEV**: manual, restaura Golden Snapshot.
+- **Golden Snapshot**: manual o cron (lunes 4am), exporta desde STG.
 
-## Workflows
+## Workflows actuales
 
-- `ci-pr.yml`: PR a `develop` → tests.
-- `deploy-dev.yml`: push a `develop` → DEV.
-- `deploy-staging.yml`: push a `main` → STG.
-- `promote-prod.yml`: manual → PROD (usa SHA de STG).
-- `deploy-preview.yml`: manual o label `preview`.
-- `cleanup-preview.yml`: cleanup al cerrar PR + cron semanal.
-- `reset-dev.yml`: reset de DEV (golden snapshot).
-- `refresh-golden-snapshot.yml`: genera snapshot desde STG (DB `new_ponti_db_staging` en instancia `new-ponti-db-dev`).
-- `db-verify.yml`: verificación de migraciones en PR a develop (levanta PostgreSQL en CI).
-
-## Environments
-
-En GitHub: `dev`, `stg`, `prod`.  
+| Archivo | Trigger | Descripción |
+|---------|---------|-------------|
+| `ci-pr.yml` | PR a `develop` | Lint, build, test, govulncheck |
+| `deploy-dev.yml` | Push a `develop` | Deploy a Cloud Run DEV |
+| `reset-dev.yml` | Manual | Borra DB dev, restaura Golden Snapshot |
+| `refresh-golden-snapshot.yml` | Manual o cron (lun 4am) | Exporta snapshot desde STG al bucket |
 
 ## Reset DEV (pasos concretos)
 
@@ -28,14 +22,15 @@ Workflow: `reset-dev.yml` (manual).
 
 1. GitHub → Actions → **Reset DEV**.
 2. Run workflow.
-3. Verificar que el workflow termine OK.
-4. (Opcional) Probar health: `https://<dev-backend>/ping`.
+3. Verificar que termine OK.
+4. (Opcional) Probar: `https://<dev-backend>/ping`.
 
 Qué hace:
 - Borra `new_ponti_db_dev`.
-- Restaura el **Golden Snapshot**.
+- Crea la DB vacía.
+- Restaura el **Golden Snapshot** desde `GOLDEN_SNAPSHOT_URI`.
 - Ejecuta hardening (si `HARDENING_SQL_URI` está configurado).
-- Corre smoke test (si `SMOKE_TEST_URL` está configurado).
+- Smoke test (si `SMOKE_TEST_URL` está configurado).
 
 ## Golden Snapshot (pasos concretos)
 
@@ -43,8 +38,8 @@ Workflow: `refresh-golden-snapshot.yml` (manual o cron).
 
 1. GitHub → Actions → **Refresh Golden Snapshot**.
 2. Run workflow.
-3. Verificar que el snapshot se haya exportado al bucket definido en `GOLDEN_SNAPSHOT_BUCKET`.
+3. Verificar que el snapshot se exporte al bucket (`GOLDEN_SNAPSHOT_BUCKET`).
 
 El snapshot se usa luego por `reset-dev.yml`.
 
-**Requisito:** El SA `github-actions@new-ponti-stg` debe tener `roles/cloudsql.admin` (o equivalente) en el proyecto **new-ponti-dev** para poder exportar. Ver [GITHUB_SECRETS.md](GITHUB_SECRETS.md#permiso-iam-pendiente-refresh-golden-snapshot).
+**Requisito:** El SA de GitHub Actions debe tener permisos para exportar desde la instancia Cloud SQL de STG. Ver [GITHUB_SECRETS.md](GITHUB_SECRETS.md#permiso-iam-pendiente-refresh-golden-snapshot).

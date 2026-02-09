@@ -29,11 +29,6 @@ gcloud run services describe ponti-backend \
   --format="value(spec.template.spec.containers[0].env)"
 ```
 
-O usar el script de diagnóstico:
-```bash
-./scripts/diagnose-cloud-run.sh new-ponti-dev ponti-backend us-central1
-```
-
 ### 3. Variables críticas que DEBEN estar configuradas
 
 | Variable | Valor esperado | ¿Por qué es crítica? |

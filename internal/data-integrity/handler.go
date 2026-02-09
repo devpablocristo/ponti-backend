@@ -9,6 +9,7 @@ package dataintegrity
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -92,8 +93,12 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	}
 	filter.ProjectID = projectID
 
+	// Timeout 8 min para permitir completar los 14 controles (optimizados con cache)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Minute)
+	defer cancel()
+
 	// Ejecutar caso de uso
-	report, err := h.ucs.CheckCostsCoherence(c.Request.Context(), filter)
+	report, err := h.ucs.CheckCostsCoherence(ctx, filter)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
