@@ -15,7 +15,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
         build up down logs reset rebuild clean \
         run-api run-ponti-local seed seed-dashboard download-gcp-db \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
-        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline
+        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
 # --------------------------------------------------
 # Migraciones
@@ -118,6 +118,14 @@ db-verify: db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff
 db-adopt-baseline:
 	@echo "Uso: make db-adopt-baseline DB_HOST=... DB_NAME=... [DB_USER=...] [DB_PORT=...] [DB_SSL_MODE=...]"
 	@bash ./scripts/db/db_adopt_baseline.sh $(DB_HOST) $(DB_NAME) $(DB_USER) $(DB_PORT) $(DB_SSL_MODE)
+
+# Fuerza reset de la DB en GCP (DROP schema public + migraciones). Cargar credenciales antes.
+db-force-reset-gcp:
+	@bash ./scripts/db/db_force_reset_gcp.sh
+
+# Después del merge: reset GCP + migraciones + cargar datos desde DB local. Requiere .env y gcp-db-creds.env.
+db-gcp-reset-and-load-local:
+	@bash ./scripts/db/db_gcp_reset_and_load_local.sh
 
 # --------------------------------------------------
 # Docker Compose
