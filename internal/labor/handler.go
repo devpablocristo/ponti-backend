@@ -102,7 +102,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
@@ -177,7 +177,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
 	if err != nil {
 		apiErr, _ := types.NewAPIError(err)
 		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
