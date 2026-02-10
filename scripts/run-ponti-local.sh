@@ -52,15 +52,9 @@ ensure_env_file() {
 }
 
 stop_system_postgres() {
-  # Verificar conflicto solo si usamos 5432 (DB_PORT por defecto)
-  local port="${DB_PORT:-5432}"
-  if [[ "$port" = "5432" ]] && ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
-    echo "ERROR: PostgreSQL del sistema detectado en puerto 5432."
-    echo "       Docker no puede usar el mismo puerto."
-    echo ""
-    echo "Ejecuta primero: sudo systemctl stop postgresql"
-    echo "O configura DB_PORT=5433 en .env para usar otro puerto."
-    exit 1
+  # Chequear si el puerto 5433 (usado por docker-compose) ya está ocupado
+  if ss -tlnp 2>/dev/null | grep -qE '(:5433|\.5433)\s'; then
+    echo "WARN: Puerto 5433 ya en uso. Docker DB podría fallar al iniciar."
   fi
 }
 
@@ -114,7 +108,7 @@ else
   if [[ -z "${AI_SERVICE_URL:-}" || -z "${AI_SERVICE_KEY:-}" ]]; then
     echo "WARN: AI_SERVICE_URL / AI_SERVICE_KEY no configurados. Endpoints AI no funcionarán."
   fi
-  make -C "$BACKEND_DIR" run-api &
+  DB_PORT=5433 make -C "$BACKEND_DIR" run-api &
 fi
 
 echo "Levantando auth (DB) con Docker..."

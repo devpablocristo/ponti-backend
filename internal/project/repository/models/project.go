@@ -156,7 +156,7 @@ func FromDomain(d *domain.Project) *Project {
 			m.Fields[key].Lots = append(m.Fields[key].Lots, lotmod.Lot{
 				ID:             l.ID,
 				Name:           l.Name,
-				FieldID:        d.ID,
+				FieldID:        f.ID,
 				Hectares:       l.Hectares,
 				Season:         l.Season,
 				PreviousCropID: l.PreviousCrop.ID,

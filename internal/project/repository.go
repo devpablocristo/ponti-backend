@@ -249,8 +249,8 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	var totalHectares decimal.Decimal
 
 	if err := sumClient.
-		Joins("JOIN fields ON fields.project_id = projects.id").
-		Joins("JOIN lots ON lots.field_id = fields.id").
+		Joins("JOIN fields ON fields.project_id = projects.id AND fields.deleted_at IS NULL").
+		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
 		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
@@ -304,8 +304,8 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 
 	var totalHectares decimal.Decimal
 	if err := sumClient.
-		Joins("JOIN fields ON fields.project_id = projects.id").
-		Joins("JOIN lots ON lots.field_id = fields.id").
+		Joins("JOIN fields ON fields.project_id = projects.id AND fields.deleted_at IS NULL").
+		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
 		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares for archived projects", err)
@@ -1218,11 +1218,15 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 			if ef.LeaseTypeID != f.LeaseTypeID {
 				updates["lease_type_id"] = f.LeaseTypeID
 			}
-			if *ef.LeaseTypePercent != *f.LeaseTypePercent {
+			if ef.LeaseTypePercent != nil && f.LeaseTypePercent != nil && !ef.LeaseTypePercent.Equal(*f.LeaseTypePercent) {
 				updates["lease_type_percent"] = *f.LeaseTypePercent
+			} else if (ef.LeaseTypePercent == nil) != (f.LeaseTypePercent == nil) {
+				updates["lease_type_percent"] = f.LeaseTypePercent
 			}
-			if *ef.LeaseTypeValue != *f.LeaseTypeValue {
+			if ef.LeaseTypeValue != nil && f.LeaseTypeValue != nil && !ef.LeaseTypeValue.Equal(*f.LeaseTypeValue) {
 				updates["lease_type_value"] = *f.LeaseTypeValue
+			} else if (ef.LeaseTypeValue == nil) != (f.LeaseTypeValue == nil) {
+				updates["lease_type_value"] = f.LeaseTypeValue
 			}
 			if len(updates) > 0 {
 				updates["updated_by"] = f.UpdatedBy
@@ -1240,10 +1244,10 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 
 	for _, ef := range existing.Fields {
 		if _, exists := newFieldMap[ef.ID]; !exists {
-			if err := tx.Exec("DELETE FROM lots WHERE field_id = ?", ef.ID).Error; err != nil {
+			if err := tx.Where("field_id = ?", ef.ID).Delete(&lotmod.Lot{}).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to remove lots", err)
 			}
-			if err := tx.Exec("DELETE FROM fields WHERE id = ?", ef.ID).Error; err != nil {
+			if err := tx.Delete(&fieldmod.Field{}, ef.ID).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to remove field", err)
 			}
 		}
