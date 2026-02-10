@@ -1,4 +1,4 @@
-name: Reset DEV
+name: Reset DEV DB
 
 on:
   workflow_dispatch:
@@ -16,6 +16,8 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      EXPECTED_GCP_PROJECT_ID: REPLACE_ME_DEV_PROJECT
+      EXPECTED_DEV_DB_NAME: REPLACE_ME_DEV_DB
       DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
       DB_NAME_DEV: ${{ vars.DB_NAME_DEV }}
       GOLDEN_SNAPSHOT_URI: ${{ vars.GOLDEN_SNAPSHOT_URI }}
@@ -48,12 +50,59 @@ jobs:
             exit 1
           fi
 
+      - name: Guardrails (allowlist)
+        run: |
+          set -euo pipefail
+
+          # Si EXPECTED_GCP_PROJECT_ID sigue en REPLACE_ME_*, no forzamos igualdad.
+          if [[ "$EXPECTED_GCP_PROJECT_ID" != REPLACE_ME_* ]] && [[ "$GCP_PROJECT_ID" != "$EXPECTED_GCP_PROJECT_ID" ]]; then
+            echo "::error::GCP_PROJECT_ID inesperado: '$GCP_PROJECT_ID' (esperado: '$EXPECTED_GCP_PROJECT_ID')"
+            exit 1
+          fi
+
+          instance_lower="$(printf '%s' "$DB_INSTANCE_NAME_DEV" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$instance_lower" == *prod* ]]; then
+            echo "::error::DB_INSTANCE_NAME_DEV contiene 'prod': '$DB_INSTANCE_NAME_DEV'"
+            exit 1
+          fi
+          if [[ ! "$instance_lower" =~ -dev$ ]]; then
+            echo "::error::DB_INSTANCE_NAME_DEV debe terminar en '-dev': '$DB_INSTANCE_NAME_DEV'"
+            exit 1
+          fi
+
+          db_lower="$(printf '%s' "$DB_NAME_DEV" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$db_lower" == *prod* ]] || [[ "$db_lower" == *stg* ]]; then
+            echo "::error::DB_NAME_DEV no puede contener 'prod' ni 'stg': '$DB_NAME_DEV'"
+            exit 1
+          fi
+
+          # Si EXPECTED_DEV_DB_NAME sigue en REPLACE_ME_*, no forzamos igualdad.
+          if [[ "$EXPECTED_DEV_DB_NAME" != REPLACE_ME_* ]] && [[ "$DB_NAME_DEV" != "$EXPECTED_DEV_DB_NAME" ]]; then
+            echo "::error::DB_NAME_DEV inesperado: '$DB_NAME_DEV' (esperado: '$EXPECTED_DEV_DB_NAME')"
+            exit 1
+          fi
+
       - name: Reset DB dev
         run: |
-          gcloud sql databases delete "$DB_NAME_DEV" \
+          set -euo pipefail
+
+          delete_stderr="$(mktemp)"
+          if ! gcloud sql databases delete "$DB_NAME_DEV" \
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV" \
-            --quiet || true
+            --quiet 2>"$delete_stderr"; then
+            delete_err_msg="$(tr '\n' ' ' <"$delete_stderr")"
+            delete_err_lower="$(printf '%s' "$delete_err_msg" | tr '[:upper:]' '[:lower:]')"
+            if echo "$delete_err_lower" | grep -Eq "not found|does not exist"; then
+              echo "Base '$DB_NAME_DEV' no existe; continuando con create."
+            else
+              echo "::error::Fallo al borrar DB '$DB_NAME_DEV': $delete_err_msg"
+              rm -f "$delete_stderr"
+              exit 1
+            fi
+          fi
+          rm -f "$delete_stderr"
+
           gcloud sql databases create "$DB_NAME_DEV" \
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV"
