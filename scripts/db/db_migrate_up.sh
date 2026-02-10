@@ -23,7 +23,7 @@ docker run --rm \
   -v "${MIGRATIONS_RUN_PATH}:/migrations" \
   migrate/migrate:v4.17.1 \
   -path /migrations \
-  -database "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}" \
+  -database "postgres://${DB_USER}:${DB_PASSWORD}@ponti-db:5432/${DB_NAME}?sslmode=${DB_SSL_MODE}" \
   up
 
 rm -rf "${MIGRATIONS_RUN_PATH}"

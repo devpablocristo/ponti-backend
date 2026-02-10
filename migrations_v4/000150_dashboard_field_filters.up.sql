@@ -222,7 +222,7 @@ supply_costs AS (
     project_id,
     field_id,
     SUM(semillas_usd)::numeric AS semillas_usd,
-    SUM(herbicidas_usd + insecticidas_usd + fungicidas_usd + coadyuvantes_usd)::numeric AS agroquimicos_usd,
+    SUM(total_insumos_usd - semillas_usd - fertilizantes_usd)::numeric AS agroquimicos_usd,
     SUM(fertilizantes_usd)::numeric AS fertilizantes_usd
   FROM v4_calc.field_crop_supply_costs_by_lot
   GROUP BY project_id, field_id

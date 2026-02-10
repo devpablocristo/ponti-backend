@@ -43,6 +43,8 @@ type WorkOrder struct {
 	sharedmodels.Base
 }
 
+func (WorkOrder) TableName() string { return "workorders" }
+
 // WorkOrderItem GORM model.
 type WorkOrderItem struct {
 	ID          int64            `gorm:"primaryKey;autoIncrement"`
@@ -52,6 +54,8 @@ type WorkOrderItem struct {
 	TotalUsed   decimal.Decimal  `gorm:"not null"`
 	FinalDose   decimal.Decimal  `gorm:"not null"`
 }
+
+func (WorkOrderItem) TableName() string { return "workorder_items" }
 
 func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	w := &WorkOrder{

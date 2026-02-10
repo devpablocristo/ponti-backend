@@ -2,6 +2,8 @@ module github.com/alphacodinggroup/ponti-backend
 
 go 1.24
 
+toolchain go1.24.13
+
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
 	github.com/gin-gonic/gin v1.10.1

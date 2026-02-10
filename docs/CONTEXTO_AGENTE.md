@@ -18,13 +18,13 @@
 ├── ponti-backend/      # API Go (puerto 8080)
 ├── ponti-frontend/     # UI React + BFF Node (puertos 5173, 3000)
 ├── ponti-auth/         # Auth API (puerto 8081)
-└── ponti-ai-copilot/   # Servicio AI (Python)
+└── ponti-ai/           # Servicio AI (Python) - copilot + insights
 ```
 
 ### ponti-backend
 - `cmd/api/` - Entrypoint, HTTP server
 - `internal/` - Módulos por dominio (supply, lot, labor, etc.)
-- `migrations/` - SQL migrations
+- `migrations_v4/` - SQL migrations (canónico)
 - `pkg/` - Tipos compartidos, middlewares, utils
 - `wire/` - Inyección de dependencias
 

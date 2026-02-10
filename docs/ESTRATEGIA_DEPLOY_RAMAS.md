@@ -1,5 +1,7 @@
 # Estrategia de Deploy y Ramas
 
+> **Nota:** Documento conceptual. Los workflows actuales son un subconjunto: solo DEV (deploy-dev, reset-dev, refresh-golden-snapshot). STG, PROD y Preview no están implementados. Ver [ESTADO_FINAL_WORKFLOWS.md](ESTADO_FINAL_WORKFLOWS.md).
+
 ## Objetivo
 
 Tener un flujo que:
