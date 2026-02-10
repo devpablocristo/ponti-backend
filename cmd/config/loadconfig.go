@@ -27,7 +27,7 @@ func LoadConfig() (*Config, error) {
 
 	// Cargar .env solo si existe (local). En entornos cloud, usar variables de entorno.
 	if _, err := os.Stat(".env"); err == nil {
-		if err := envvars.OverloadConfig(".env"); err != nil {
+		if err := envvars.LoadConfig(".env"); err != nil {
 			return nil, fmt.Errorf("no se pudo cargar el archivo .env: %w", err)
 		}
 	}

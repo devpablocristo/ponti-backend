@@ -158,8 +158,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -171,8 +171,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -184,8 +184,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -197,8 +197,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -210,8 +210,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -223,8 +223,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -235,8 +235,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -247,8 +247,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -259,8 +259,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -271,8 +271,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0

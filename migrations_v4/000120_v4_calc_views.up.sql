@@ -98,11 +98,7 @@ supply_metrics AS (
     b.project_id, b.field_id, b.lot_id,
     SUM(CASE WHEN s.unit_id = 1 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS liters,
     SUM(CASE WHEN s.unit_id = 2 THEN (wi.final_dose * b.effective_area) ELSE 0 END)::numeric AS kilograms,
-    SUM(v4_core.supply_cost(
-      wi.final_dose::numeric,
-      s.price::numeric,
-      b.effective_area::numeric
-    ))::numeric AS supplies_cost_usd
+    SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0))::numeric AS supplies_cost_usd
   FROM base b
   LEFT JOIN public.workorder_items wi
     ON wi.workorder_id = b.workorder_id AND wi.deleted_at IS NULL
@@ -275,8 +271,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -288,8 +284,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -301,8 +297,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -314,8 +310,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -327,8 +323,8 @@ SELECT
   COALESCE((
     SELECT SUM(lab.price * w.effective_area)
     FROM public.workorders w
-    JOIN public.labors lab ON lab.id = w.labor_id
-    JOIN public.categories cat ON cat.id = lab.category_id
+    JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+    JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
     WHERE w.lot_id = lb.lot_id
       AND w.deleted_at IS NULL
       AND w.effective_area > 0
@@ -340,8 +336,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -352,8 +348,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -364,8 +360,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -376,8 +372,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -388,8 +384,8 @@ SELECT
     COALESCE((
       SELECT SUM(lab.price * w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON lab.id = w.labor_id
-      JOIN public.categories cat ON cat.id = lab.category_id
+      JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
       WHERE w.lot_id = lb.lot_id
         AND w.deleted_at IS NULL
         AND w.effective_area > 0
@@ -490,7 +486,7 @@ SELECT
   COALESCE(SUM(sm.quantity * s.price), 0) AS fertilizantes_invertidos_usd
 FROM public.supply_movements sm
 JOIN public.supplies s ON s.id = sm.supply_id
-JOIN public.categories c ON s.category_id = c.id
+JOIN public.categories c ON s.category_id = c.id AND c.deleted_at IS NULL
 WHERE sm.deleted_at IS NULL
   AND s.deleted_at IS NULL
   AND sm.is_entry = TRUE
@@ -523,8 +519,8 @@ WITH lot_base AS (
     COALESCE((
       SELECT SUM(w.effective_area)
       FROM public.workorders w
-      JOIN public.labors lab ON w.labor_id = lab.id
-      JOIN public.categories cat ON lab.category_id = cat.id
+      JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
+      JOIN public.categories cat ON lab.category_id = cat.id AND cat.deleted_at IS NULL
       WHERE w.lot_id = l.id
         AND w.deleted_at IS NULL
         AND cat.name = 'Siembra'
@@ -552,8 +548,8 @@ labor_totals AS (
     COALESCE(SUM(CASE WHEN cat.name = 'Riego' THEN lab.price * w.effective_area ELSE 0 END), 0)::numeric AS irrigation_total_usd
   FROM lot_base lb
   JOIN public.workorders w ON w.lot_id = lb.lot_id AND w.deleted_at IS NULL
-  JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lab.category_id
+  JOIN public.labors lab ON lab.id = w.labor_id AND lab.deleted_at IS NULL AND lab.deleted_at IS NULL
+  JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
   WHERE cat.type_id = 4
   GROUP BY lb.project_id
 ),
@@ -566,7 +562,7 @@ invested_totals AS (
       SELECT COALESCE(SUM(sm.quantity * s.price), 0)::numeric
       FROM public.supply_movements sm
       JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
-      JOIN public.categories cat ON cat.id = s.category_id
+      JOIN public.categories cat ON cat.id = s.category_id AND cat.deleted_at IS NULL
       WHERE sm.project_id = p.project_id
         AND sm.deleted_at IS NULL
         AND sm.is_entry = TRUE
@@ -638,7 +634,7 @@ investor_agrochemicals_real AS (
     COALESCE(SUM(sm.quantity * s.price), 0)::numeric AS agrochemicals_real_usd
   FROM public.supply_movements sm
   JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = s.category_id
+  JOIN public.categories cat ON cat.id = s.category_id AND cat.deleted_at IS NULL
   WHERE sm.deleted_at IS NULL
     AND sm.is_entry = TRUE
     AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
@@ -652,7 +648,7 @@ investor_fertilizers_real AS (
     COALESCE(SUM(sm.quantity * s.price), 0)::numeric AS fertilizers_real_usd
   FROM public.supply_movements sm
   JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = s.category_id
+  JOIN public.categories cat ON cat.id = s.category_id AND cat.deleted_at IS NULL
   WHERE sm.deleted_at IS NULL
     AND sm.is_entry = TRUE
     AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
@@ -666,7 +662,7 @@ investor_seeds_real AS (
     COALESCE(SUM(sm.quantity * s.price), 0)::numeric AS seeds_real_usd
   FROM public.supply_movements sm
   JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = s.category_id
+  JOIN public.categories cat ON cat.id = s.category_id AND cat.deleted_at IS NULL
   WHERE sm.deleted_at IS NULL
     AND sm.is_entry = TRUE
     AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
@@ -682,8 +678,8 @@ investor_general_labors_real AS (
     w.investor_id,
     COALESCE(SUM(lab.price * w.effective_area), 0)::numeric AS general_labors_real_usd
   FROM public.workorders w
-  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lab.category_id
+  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL AND lab.deleted_at IS NULL
+  JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND cat.type_id = 4
     AND cat.name IN ('Pulverización', 'Otras Labores')
@@ -695,8 +691,8 @@ investor_sowing_real AS (
     w.investor_id,
     COALESCE(SUM(lab.price * w.effective_area), 0)::numeric AS sowing_real_usd
   FROM public.workorders w
-  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lab.category_id
+  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL AND lab.deleted_at IS NULL
+  JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND cat.type_id = 4
     AND cat.name = 'Siembra'
@@ -708,8 +704,8 @@ investor_irrigation_real AS (
     w.investor_id,
     COALESCE(SUM(lab.price * w.effective_area), 0)::numeric AS irrigation_real_usd
   FROM public.workorders w
-  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lab.category_id
+  JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL AND lab.deleted_at IS NULL
+  JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND cat.type_id = 4
     AND cat.name = 'Riego'

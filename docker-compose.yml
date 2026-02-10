@@ -2,7 +2,7 @@ services:
   ponti-db:
     image: pgvector/pgvector:pg16
     ports:
-      - "${DB_PORT}:5432"
+      - "5433:${DB_PORT}"
     env_file:
       - .env
     environment:

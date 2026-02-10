@@ -26,7 +26,7 @@ RETURNS numeric
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM(lb.price * w.effective_area), 0)::numeric
   FROM public.workorders w
-  JOIN public.labors lb ON lb.id = w.labor_id
+  JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND w.effective_area > 0
     AND lb.price IS NOT NULL
@@ -60,7 +60,7 @@ LANGUAGE sql STABLE AS $$
   FROM public.workorders w
   JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
   JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
-  JOIN public.categories c ON c.id = s.category_id
+  JOIN public.categories c ON c.id = s.category_id AND c.deleted_at IS NULL
   WHERE w.lot_id = p_lot_id
     AND c.name = p_category_name
     AND w.deleted_at IS NULL
@@ -108,30 +108,15 @@ $$;
 CREATE OR REPLACE FUNCTION v4_ssot.supply_cost_for_lot(p_lot_id bigint)
 RETURNS numeric
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(
-    (SELECT COALESCE(SUM(wi.total_used * s.price), 0)::numeric
-     FROM public.workorders w
-     JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
-     JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
-     WHERE w.deleted_at IS NULL
-       AND w.effective_area > 0
-       AND wi.total_used > 0
-       AND s.price IS NOT NULL
-       AND w.lot_id = p_lot_id)
-    +
-    (SELECT COALESCE(SUM(sm.quantity * s.price), 0)::numeric
-     FROM public.supply_movements sm
-     JOIN public.supplies s ON s.id = sm.supply_id
-     JOIN public.workorders w ON w.lot_id = p_lot_id
-     WHERE sm.deleted_at IS NULL
-       AND s.deleted_at IS NULL
-       AND w.deleted_at IS NULL
-       AND sm.movement_type = 'Movimiento interno'
-       AND sm.is_entry = false
-       AND sm.project_id = w.project_id
-       AND s.price IS NOT NULL
-       AND sm.quantity > 0)
-  , 0)::numeric
+  SELECT COALESCE(SUM(wi.total_used * s.price), 0)::numeric
+  FROM public.workorders w
+  JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
+  JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+  WHERE w.deleted_at IS NULL
+    AND w.effective_area > 0
+    AND wi.total_used > 0
+    AND s.price IS NOT NULL
+    AND w.lot_id = p_lot_id
 $$;
 
 CREATE OR REPLACE FUNCTION v4_ssot.net_price_usd_for_lot(p_lot_id bigint) 
@@ -472,7 +457,7 @@ LANGUAGE sql STABLE AS $$
     (SELECT SUM(sm.quantity * s.price)
      FROM public.supply_movements sm
      JOIN public.supplies s ON s.id = sm.supply_id
-     JOIN public.categories c ON c.id = s.category_id
+     JOIN public.categories c ON c.id = s.category_id AND c.deleted_at IS NULL
      WHERE sm.project_id = p_project_id 
        AND sm.deleted_at IS NULL
        AND s.deleted_at IS NULL
@@ -489,7 +474,7 @@ LANGUAGE sql STABLE AS $$
     (SELECT SUM(sm.quantity * s.price)
      FROM public.supply_movements sm
      JOIN public.supplies s ON s.id = sm.supply_id
-     JOIN public.categories c ON c.id = s.category_id
+     JOIN public.categories c ON c.id = s.category_id AND c.deleted_at IS NULL
      WHERE sm.project_id = p_project_id 
        AND sm.deleted_at IS NULL
        AND s.deleted_at IS NULL
@@ -808,7 +793,7 @@ LANGUAGE sql STABLE AS $$
   SELECT COALESCE(SUM(lb.price * w.effective_area), 0)::numeric
   FROM public.workorders w
   JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lb.category_id
+  JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND w.effective_area > 0
     AND lb.price IS NOT NULL

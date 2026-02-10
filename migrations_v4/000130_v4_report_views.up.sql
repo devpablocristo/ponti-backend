@@ -523,8 +523,8 @@ SELECT
   COALESCE(SUM(v4_ssot.labor_cost_for_lot(l.id)), 0) AS labores_ejecutados_usd,
   COALESCE(SUM(v4_ssot.labor_cost_pre_harvest_for_lot(l.id)), 0) AS labores_invertidos_usd,
   
-  v4_ssot.lease_invested_for_project(p.id) AS arriendo_ejecutados_usd,
-  v4_ssot.lease_executed_for_project(p.id) AS arriendo_invertidos_usd,
+  v4_ssot.lease_executed_for_project(p.id) AS arriendo_ejecutados_usd,
+  v4_ssot.lease_invested_for_project(p.id) AS arriendo_invertidos_usd,
   v4_ssot.admin_cost_total_for_project(p.id) AS estructura_ejecutados_usd,
   v4_ssot.admin_cost_total_for_project(p.id) AS estructura_invertidos_usd,
   COALESCE(sc.semillas_ejecutados_usd, 0) AS semilla_cost,
@@ -748,7 +748,7 @@ investor_harvest_real AS (
     COALESCE(SUM(lab.price * w.effective_area), 0)::numeric AS harvest_real_usd
   FROM public.workorders w
   JOIN public.labors lab ON w.labor_id = lab.id AND lab.deleted_at IS NULL
-  JOIN public.categories cat ON cat.id = lab.category_id
+  JOIN public.categories cat ON cat.id = lab.category_id AND cat.deleted_at IS NULL
   WHERE w.deleted_at IS NULL
     AND cat.type_id = 4
     AND cat.name = 'Cosecha'
