@@ -1,11 +1,15 @@
 package supply
 
 import (
+	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
+	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 )
 
@@ -444,4 +448,27 @@ func TestMigration159Behavior(t *testing.T) {
 		assert.Equal(t, "1300", totalAfter.String(),
 			"✅ DESPUÉS: Suma Stock + Remito oficial + Movimiento interno = 1000 + 500 - 200 = 1300")
 	})
+}
+
+func TestHandleMovementInternalMovementOut_IncludesSupplyNameInError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	u := &UseCases{repo: mockRepo}
+
+	supplyID := int64(123)
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, Name: "Urea"}, nil)
+
+	movement := &domain.SupplyMovement{
+		Quantity: decimal.NewFromInt(5),
+		Supply:   &domain.Supply{ID: supplyID},
+	}
+	stockOrigin := stockdomain.Stock{RealStockUnits: decimal.Zero}
+
+	err := u.handleMovementInternalMovementOut(context.Background(), movement, stockOrigin)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Urea")
 }

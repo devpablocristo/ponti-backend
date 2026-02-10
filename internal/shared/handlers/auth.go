@@ -9,7 +9,7 @@ import (
 
 // ParseUserID extrae y valida el user_id desde el contexto.
 func ParseUserID(c *gin.Context) (int64, error) {
-	userID, err := sharedmodels.ConvertStringToID(c)
+	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
 	if err != nil {
 		return 0, types.NewError(types.ErrAuthorization, "invalid user_id", err)
 	}

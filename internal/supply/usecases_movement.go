@@ -103,7 +103,29 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 
 func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
-		return types.NewError(types.ErrValidation, fmt.Sprintf("La cantidad que desea mover es mayor al stock real: %s", stockOrigin.RealStockUnits.String()), nil)
+		supplyName := ""
+		if stockOrigin.Supply != nil && stockOrigin.Supply.Name != "" {
+			supplyName = stockOrigin.Supply.Name
+		} else if movement.Supply != nil && movement.Supply.Name != "" {
+			supplyName = movement.Supply.Name
+		} else if movement.Supply != nil && movement.Supply.ID != 0 {
+			if supply, err := u.repo.GetSupply(ctx, movement.Supply.ID); err == nil && supply != nil && supply.Name != "" {
+				supplyName = supply.Name
+			}
+		}
+
+		msg := fmt.Sprintf(
+			"La cantidad que desea mover (%s) es mayor al stock real (%s)",
+			movement.Quantity.String(),
+			stockOrigin.RealStockUnits.String(),
+		)
+		if supplyName != "" {
+			msg = fmt.Sprintf("%s para el insumo: %s", msg, supplyName)
+		} else if movement.Supply != nil && movement.Supply.ID != 0 {
+			msg = fmt.Sprintf("%s para el insumo (supply_id=%d)", msg, movement.Supply.ID)
+		}
+
+		return types.NewError(types.ErrValidation, msg, nil)
 	}
 
 	// Asegurar que el provider existe antes de crear los registros
