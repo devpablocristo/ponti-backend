@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/shopspring/decimal"
 	"github.com/jackc/pgconn"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
@@ -45,7 +45,10 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	// 3) crear todo en una transacción
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) insertar la cabecera para obtener model.ID
-		if err := tx.Create(&model).Error; err != nil {
+		// Importante: evitamos que GORM intente crear también las asociaciones (Items) acá,
+		// porque abajo insertamos los items explícitamente. Si se insertan dos veces puede
+		// terminar en violación de PK (duplicate key) como "pk_workorder_items".
+		if err := tx.Omit("Items").Create(&model).Error; err != nil {
 			if isUniqueViolation(err) {
 				return types.NewError(
 					types.ErrConflict,
@@ -60,6 +63,8 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 		if len(model.Items) > 0 {
 			for i := range model.Items {
 				model.Items[i].WorkOrderID = model.ID
+				// Asegurar que la PK sea generada por la DB (serial/sequence).
+				model.Items[i].ID = 0
 			}
 			if err := tx.Create(&model.Items).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to create work order items", err)
