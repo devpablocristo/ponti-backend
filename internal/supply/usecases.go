@@ -15,6 +15,7 @@ type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
 	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
+	GetSupplyByProjectAndName(context.Context, int64, string) (*domain.Supply, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
@@ -28,6 +29,7 @@ type RepositoryPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	GetProjectNameByID(ctx context.Context, projectID int64) (string, error)
 }
 
 type ExporterAdapterPort interface {

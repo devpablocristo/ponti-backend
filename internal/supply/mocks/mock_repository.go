@@ -154,6 +154,21 @@ func (mr *MockRepositoryPortMockRecorder) GetProviders(arg0 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProviders", reflect.TypeOf((*MockRepositoryPort)(nil).GetProviders), arg0)
 }
 
+// GetProjectNameByID mocks base method.
+func (m *MockRepositoryPort) GetProjectNameByID(arg0 context.Context, arg1 int64) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectNameByID", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectNameByID indicates an expected call of GetProjectNameByID.
+func (mr *MockRepositoryPortMockRecorder) GetProjectNameByID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectNameByID", reflect.TypeOf((*MockRepositoryPort)(nil).GetProjectNameByID), arg0, arg1)
+}
+
 // GetSupply mocks base method.
 func (m *MockRepositoryPort) GetSupply(arg0 context.Context, arg1 int64) (*domain1.Supply, error) {
 	m.ctrl.T.Helper()
@@ -167,6 +182,21 @@ func (m *MockRepositoryPort) GetSupply(arg0 context.Context, arg1 int64) (*domai
 func (mr *MockRepositoryPortMockRecorder) GetSupply(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSupply", reflect.TypeOf((*MockRepositoryPort)(nil).GetSupply), arg0, arg1)
+}
+
+// GetSupplyByProjectAndName mocks base method.
+func (m *MockRepositoryPort) GetSupplyByProjectAndName(arg0 context.Context, arg1 int64, arg2 string) (*domain1.Supply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSupplyByProjectAndName", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*domain1.Supply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSupplyByProjectAndName indicates an expected call of GetSupplyByProjectAndName.
+func (mr *MockRepositoryPortMockRecorder) GetSupplyByProjectAndName(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSupplyByProjectAndName", reflect.TypeOf((*MockRepositoryPort)(nil).GetSupplyByProjectAndName), arg0, arg1, arg2)
 }
 
 // GetSupplyMovementByID mocks base method.

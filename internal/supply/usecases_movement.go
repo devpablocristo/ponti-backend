@@ -102,16 +102,23 @@ func createStockDiference(isEntry bool, quantity decimal.Decimal) decimal.Decima
 }
 
 func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) error {
+	if movement.Supply == nil || movement.Supply.ID == 0 {
+		return types.NewError(types.ErrValidation, "invalid supply_id", nil)
+	}
+
+	originSupply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
+	if err != nil {
+		return fmt.Errorf("error getting origin supply: %w", err)
+	}
+
 	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
 		supplyName := ""
-		if stockOrigin.Supply != nil && stockOrigin.Supply.Name != "" {
+		if originSupply != nil && originSupply.Name != "" {
+			supplyName = originSupply.Name
+		} else if stockOrigin.Supply != nil && stockOrigin.Supply.Name != "" {
 			supplyName = stockOrigin.Supply.Name
 		} else if movement.Supply != nil && movement.Supply.Name != "" {
 			supplyName = movement.Supply.Name
-		} else if movement.Supply != nil && movement.Supply.ID != 0 {
-			if supply, err := u.repo.GetSupply(ctx, movement.Supply.ID); err == nil && supply != nil && supply.Name != "" {
-				supplyName = supply.Name
-			}
 		}
 
 		msg := fmt.Sprintf(
@@ -137,9 +144,47 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 		movement.Provider.ID = providerID
 	}
 
+	// Resolver el insumo del proyecto destino:
+	// - Si existe por nombre (normalizado), se bloquea para evitar duplicados.
+	// - Si no existe, se crea copiando la metadata del origen.
+	_, err = u.repo.GetSupplyByProjectAndName(ctx, movement.ProjectDestinationId, originSupply.Name)
+	if err == nil {
+		destProjectLabel := fmt.Sprintf("%d", movement.ProjectDestinationId)
+		if destProjectName, errProj := u.repo.GetProjectNameByID(ctx, movement.ProjectDestinationId); errProj == nil && destProjectName != "" {
+			destProjectLabel = destProjectName
+		}
+
+		return types.NewError(
+			types.ErrValidation,
+			fmt.Sprintf(
+				"No se puede transferir: el insumo %q ya existe en el proyecto destino %s",
+				originSupply.Name,
+				destProjectLabel,
+			),
+			nil,
+		)
+	}
+	if !types.IsNotFound(err) {
+		return fmt.Errorf("error checking destination supply: %w", err)
+	}
+
+	destSupplyToCreate := &domain.Supply{
+		ProjectID:  movement.ProjectDestinationId,
+		Name:       originSupply.Name,
+		UnitID:     originSupply.UnitID,
+		Price:      originSupply.Price,
+		CategoryID: originSupply.CategoryID,
+		Type:       originSupply.Type,
+		Base:       movement.Base,
+	}
+	destSupplyID, err := u.repo.CreateSupply(ctx, destSupplyToCreate)
+	if err != nil {
+		return fmt.Errorf("error creating destination supply: %w", err)
+	}
+
 	// Actualizar el stock del proyecto origen (restar la cantidad)
 	stockOrigin.RealStockUnits = stockOrigin.RealStockUnits.Sub(movement.Quantity)
-	err := u.stockUseCases.UpdateRealStockUnits(ctx, stockOrigin.ID, &stockOrigin)
+	err = u.stockUseCases.UpdateRealStockUnits(ctx, stockOrigin.ID, &stockOrigin)
 	if err != nil {
 		return fmt.Errorf("error updating origin stock: %w", err)
 	}
@@ -165,9 +210,10 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 	movementIn.MovementType = domain.INTERNAL_MOVEMENT_IN
 	movementIn.IsEntry = true
 	movementIn.ProjectDestinationId = 0
+	movementIn.Supply = &domain.Supply{ID: destSupplyID, Name: originSupply.Name}
 
 	// Buscar o crear el stock en el proyecto destino
-	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectID(ctx, movementIn.ProjectId, movement.Supply.ID)
+	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectID(ctx, movementIn.ProjectId, destSupplyID)
 	if err != nil {
 		return fmt.Errorf("error getting destination stock: %w", err)
 	}

@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -11,6 +14,7 @@ import (
 	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 // TestCreateStockDiference valida que la función calcula correctamente las diferencias de stock
@@ -471,4 +475,142 @@ func TestHandleMovementInternalMovementOut_IncludesSupplyNameInError(t *testing.
 	err := u.handleMovementInternalMovementOut(context.Background(), movement, stockOrigin)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Urea")
+}
+
+func TestHandleMovementInternalMovementOut_BlocksWhenSupplyAlreadyExistsInDestination(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	originSupplyID := int64(147)
+	destinationProjectID := int64(25)
+	movement := &domain.SupplyMovement{
+		ProjectId:            20,
+		ProjectDestinationId: destinationProjectID,
+		Quantity:             decimal.NewFromInt(10),
+		Supply:               &domain.Supply{ID: originSupplyID},
+		Provider:             &providerdomain.Provider{ID: 1, Name: "agro"},
+		Investor:             &investordomain.Investor{ID: 11},
+	}
+	stockOrigin := stockdomain.Stock{ID: 10, RealStockUnits: decimal.NewFromInt(50)}
+
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), originSupplyID).
+		Return(&domain.Supply{ID: originSupplyID, Name: "ACEITE VERSION", UnitID: 1, Price: decimal.NewFromInt(40), CategoryID: 2, Type: classdomain.ClassType{ID: 3}}, nil)
+
+	mockRepo.EXPECT().
+		GetSupplyByProjectAndName(gomock.Any(), destinationProjectID, "ACEITE VERSION").
+		Return(&domain.Supply{ID: 999, ProjectID: destinationProjectID, Name: "ACEITE VERSION"}, nil)
+
+	mockRepo.EXPECT().
+		GetProjectNameByID(gomock.Any(), destinationProjectID).
+		Return("DEPOSITO", nil)
+
+	err := u.handleMovementInternalMovementOut(context.Background(), movement, stockOrigin)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ya existe en el proyecto destino")
+	assert.Contains(t, err.Error(), "DEPOSITO")
+}
+
+func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	originSupplyID := int64(147)
+	destSupplyID := int64(888)
+	originProjectID := int64(20)
+	destProjectID := int64(25)
+
+	movement := &domain.SupplyMovement{
+		ProjectId:            originProjectID,
+		ProjectDestinationId: destProjectID,
+		Quantity:             decimal.NewFromInt(10),
+		MovementType:         domain.INTERNAL_MOVEMENT,
+		Supply:               &domain.Supply{ID: originSupplyID},
+		Provider:             &providerdomain.Provider{ID: 1, Name: "agro"},
+		Investor:             &investordomain.Investor{ID: 11},
+	}
+	stockOrigin := stockdomain.Stock{
+		ID:             10,
+		RealStockUnits: decimal.NewFromInt(50),
+		Supply:         &domain.Supply{ID: originSupplyID, Name: "ACEITE VERSION"},
+	}
+
+	originSupply := &domain.Supply{
+		ID:         originSupplyID,
+		ProjectID:  originProjectID,
+		Name:       "ACEITE VERSION",
+		UnitID:     1,
+		Price:      decimal.NewFromInt(40),
+		CategoryID: 2,
+		Type:       classdomain.ClassType{ID: 3},
+	}
+
+	var outMovementCreated *domain.SupplyMovement
+	var inMovementCreated *domain.SupplyMovement
+
+	gomock.InOrder(
+		mockRepo.EXPECT().
+			GetSupply(gomock.Any(), originSupplyID).
+			Return(originSupply, nil),
+		mockRepo.EXPECT().
+			GetSupplyByProjectAndName(gomock.Any(), destProjectID, "ACEITE VERSION").
+			Return(nil, types.NewError(types.ErrNotFound, "supply not found", nil)),
+		mockRepo.EXPECT().
+			CreateSupply(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, s *domain.Supply) (int64, error) {
+				assert.Equal(t, destProjectID, s.ProjectID)
+				assert.Equal(t, originSupply.Name, s.Name)
+				assert.Equal(t, originSupply.UnitID, s.UnitID)
+				assert.True(t, originSupply.Price.Equal(s.Price))
+				assert.Equal(t, originSupply.CategoryID, s.CategoryID)
+				assert.Equal(t, originSupply.Type.ID, s.Type.ID)
+				return destSupplyID, nil
+			}),
+		mockStock.EXPECT().
+			UpdateRealStockUnits(gomock.Any(), stockOrigin.ID, gomock.Any()).
+			Return(nil),
+		mockRepo.EXPECT().
+			CreateSupplyMovement(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
+				outMovementCreated = m
+				return 101, nil
+			}),
+		mockStock.EXPECT().
+			GetLastStockByProjectID(gomock.Any(), destProjectID, destSupplyID).
+			Return(nil, true, nil),
+		mockStock.EXPECT().
+			CreateStock(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, s *stockdomain.Stock) (int64, error) {
+				assert.Equal(t, destProjectID, s.Project.ID)
+				assert.Equal(t, destSupplyID, s.Supply.ID)
+				return 202, nil
+			}),
+		mockStock.EXPECT().
+			UpdateRealStockUnits(gomock.Any(), int64(202), gomock.Any()).
+			Return(nil),
+		mockRepo.EXPECT().
+			CreateSupplyMovement(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
+				inMovementCreated = m
+				return 102, nil
+			}),
+	)
+
+	err := u.handleMovementInternalMovementOut(context.Background(), movement, stockOrigin)
+	assert.NoError(t, err)
+	assert.NotNil(t, outMovementCreated)
+	assert.NotNil(t, inMovementCreated)
+	assert.Equal(t, originSupplyID, outMovementCreated.Supply.ID)
+	assert.True(t, outMovementCreated.Quantity.Equal(decimal.NewFromInt(-10)))
+	assert.Equal(t, destSupplyID, inMovementCreated.Supply.ID)
+	assert.True(t, inMovementCreated.Quantity.Equal(decimal.NewFromInt(10)))
+	assert.Equal(t, domain.INTERNAL_MOVEMENT_IN, inMovementCreated.MovementType)
 }

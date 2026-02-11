@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
@@ -68,6 +69,29 @@ func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, e
 		First(&m, id).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "supply", id)
 	}
+	return m.ToDomain(), nil
+}
+
+func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID int64, name string) (*domain.Supply, error) {
+	normalizedName := strings.TrimSpace(name)
+	if normalizedName == "" {
+		return nil, types.NewError(types.ErrValidation, "supply name is empty", nil)
+	}
+
+	var m models.Supply
+	err := r.db.Client().WithContext(ctx).
+		Preload("Category").
+		Preload("Type").
+		Where("project_id = ?", projectID).
+		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", normalizedName).
+		First(&m).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, "supply not found", err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get supply by project and name", err)
+	}
+
 	return m.ToDomain(), nil
 }
 
