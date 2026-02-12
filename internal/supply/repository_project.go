@@ -12,7 +12,7 @@ func (r *Repository) GetProjectNameByID(ctx context.Context, projectID int64) (s
 		Name string `gorm:"column:name"`
 	}
 
-	err := r.db.Client().WithContext(ctx).
+	err := r.getDB(ctx).
 		Table("projects").
 		Select("id, name").
 		Where("id = ? AND deleted_at IS NULL", projectID).

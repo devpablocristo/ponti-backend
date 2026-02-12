@@ -3,6 +3,7 @@ package list
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -23,21 +24,33 @@ type ListedSupply struct {
 	CategoryID   int64           `json:"category_id"`   // Rubro ID
 	TypeName     string          `json:"type_name"`     // Tipo/Clase
 	TypeID       int64           `json:"type_id"`       // Tipo/Clase ID
+	Origin       *SupplyOrigin   `json:"origin,omitempty"`
+}
+
+type SupplyOrigin struct {
+	Type            string     `json:"type"`
+	SourceProjectID *int64     `json:"source_project_id,omitempty"`
+	SourceProject   string     `json:"source_project,omitempty"`
+	MovementID      *int64     `json:"movement_id,omitempty"`
+	ReferenceNumber string     `json:"reference_number,omitempty"`
+	ProviderName    string     `json:"provider_name,omitempty"`
+	MovementDate    *time.Time `json:"movement_date,omitempty"`
 }
 
 // MarshalJSON aplica redondeo: Precio U$ con 2 decimales, Total U$ al entero más próximo
 func (s ListedSupply) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		ID           int64  `json:"id"`
-		Name         string `json:"name"`
-		Price        string `json:"price"`
-		TotalUSD     string `json:"total_usd"`
-		UnitID       int64  `json:"unit_id"`
-		UnitName     string `json:"unit_name"`
-		CategoryName string `json:"category_name"`
-		CategoryID   int64  `json:"category_id"`
-		TypeName     string `json:"type_name"`
-		TypeID       int64  `json:"type_id"`
+		ID           int64         `json:"id"`
+		Name         string        `json:"name"`
+		Price        string        `json:"price"`
+		TotalUSD     string        `json:"total_usd"`
+		UnitID       int64         `json:"unit_id"`
+		UnitName     string        `json:"unit_name"`
+		CategoryName string        `json:"category_name"`
+		CategoryID   int64         `json:"category_id"`
+		TypeName     string        `json:"type_name"`
+		TypeID       int64         `json:"type_id"`
+		Origin       *SupplyOrigin `json:"origin,omitempty"`
 	}{
 		ID:           s.ID,
 		Name:         s.Name,
@@ -49,6 +62,7 @@ func (s ListedSupply) MarshalJSON() ([]byte, error) {
 		CategoryID:   s.CategoryID,
 		TypeName:     s.TypeName,
 		TypeID:       s.TypeID,
+		Origin:       s.Origin,
 	}
 	return json.Marshal(aux)
 }
@@ -106,6 +120,7 @@ func NewListSuppliesResponse(
 			CategoryID:   s.CategoryID,   // Rubro ID
 			TypeName:     s.Type.Name,    // Tipo/Clase
 			TypeID:       s.Type.ID,      // Tipo/Clase ID
+			Origin:       mapOrigin(s.Origin),
 		}
 
 		// Acumular métricas según el tipo de unidad
@@ -130,6 +145,21 @@ func NewListSuppliesResponse(
 		TotalKg:     totalKg,
 		TotalLts:    totalLts,
 		TotalNetUSD: totalNetUSD,
+	}
+}
+
+func mapOrigin(origin *domain.SupplyOrigin) *SupplyOrigin {
+	if origin == nil {
+		return nil
+	}
+	return &SupplyOrigin{
+		Type:            origin.Type,
+		SourceProjectID: origin.SourceProjectID,
+		SourceProject:   origin.SourceProject,
+		MovementID:      origin.MovementID,
+		ReferenceNumber: origin.ReferenceNumber,
+		ProviderName:    origin.ProviderName,
+		MovementDate:    origin.MovementDate,
 	}
 }
 

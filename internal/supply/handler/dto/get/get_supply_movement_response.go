@@ -46,6 +46,8 @@ type entrySupplyMovementsResponse struct {
 	Category        string          `json:"category"`
 	Type            string          `json:"type"`
 	ProviderName    string          `json:"provider_name"`
+	OriginProjectID *int64          `json:"origin_project_id"`
+	OriginProject   *string         `json:"origin_project_name"`
 	PriceUSD        decimal.Decimal `json:"price_usd"`
 	TotalUSD        decimal.Decimal `json:"total_usd"`
 }
@@ -64,6 +66,8 @@ func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement) entrySup
 		PriceUSD:        dsm.Supply.Price,
 		TotalUSD:        dsm.Supply.Price.Mul(dsm.Quantity),
 		ProviderName:    dsm.Provider.Name,
+		OriginProjectID: dsm.OriginProjectID,
+		OriginProject:   dsm.OriginProjectName,
 	}
 }
 

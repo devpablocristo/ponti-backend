@@ -32,7 +32,7 @@ func NewRepository(db GormEnginePort) *Repository {
 
 // GetStocks retorna stocks filtrando por proyecto y opcionalmente por fecha de corte.
 func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
-	gormDB := r.db.Client().WithContext(ctx)
+	gormDB := r.getDB(ctx)
 	var t time.Time
 
 	query := gormDB.Model(&models.Stock{}).
@@ -107,7 +107,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
 	var rawPeriods []time.Time
 
-	err := r.db.Client().WithContext(ctx).
+	err := r.getDB(ctx).
 		Model(&models.Stock{}).
 		Where("project_id = ? AND close_date IS NOT NULL", projectID).
 		Distinct("close_date").
@@ -129,7 +129,7 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 		return 0, types.NewError(types.ErrBadRequest, "stock is nil", nil)
 	}
 	model := models.FromDomain(stock)
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+	if err := r.getDB(ctx).Create(model).Error; err != nil {
 		return 0, types.NewError(types.ErrInternal, "failed to create stock", err)
 	}
 	return model.ID, nil
@@ -137,7 +137,7 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 
 func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectID int64, stock *domain.Stock) error {
 	stockUpdate := models.StockUpdateCloseDateFromDomain(stock)
-	result := r.db.Client().WithContext(ctx).
+	result := r.getDB(ctx).
 		Model(&models.Stock{}).
 		Where("project_id = ?", projectID).
 		Where("close_date IS NULL").
@@ -154,7 +154,7 @@ func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectID int
 
 func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
 	stockUpdate := models.StockUpdateRealUnitsFromDomain(stock)
-	updateTx := r.db.Client().WithContext(ctx).
+	updateTx := r.getDB(ctx).
 		Model(&models.Stock{}).
 		Where("id = ?", stockID)
 	if stock != nil && !stock.UpdatedAt.IsZero() {
@@ -174,7 +174,7 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 }
 
 func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
-	updateTx := r.db.Client().WithContext(ctx).
+	updateTx := r.getDB(ctx).
 		Model(&models.Stock{}).
 		Where("id = ?", stockDomain.ID)
 	if !stockDomain.UpdatedAt.IsZero() {
@@ -195,7 +195,7 @@ func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain
 
 func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
-	err := r.db.Client().WithContext(ctx).
+	err := r.getDB(ctx).
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
@@ -213,7 +213,7 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 
 func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
-	err := r.db.Client().WithContext(ctx).
+	err := r.getDB(ctx).
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
@@ -237,7 +237,7 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
-	err := r.db.Client().WithContext(ctx).
+	err := r.getDB(ctx).
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
@@ -259,7 +259,7 @@ func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID
 func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error) {
 	var stockModel []models.Stock
 
-	gormDB := r.db.Client().WithContext(ctx)
+	gormDB := r.getDB(ctx)
 
 	query := gormDB.
 		Preload("Project").
