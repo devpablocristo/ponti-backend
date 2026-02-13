@@ -29,12 +29,12 @@ WORKDIR /app
 
 
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/prod_binary ./cmd/api/
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/migrate_binary ./cmd/migrate/
 
 
 # ---------------------------------------------------
 # Etapa 2: Imagen final para prod
 # ---------------------------------------------------
-# Etapa 2: Imagen final para prod
 FROM alpine:latest
 
 
@@ -46,12 +46,16 @@ WORKDIR /app
 
 COPY --from=builder /app/pkg /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
+COPY --from=builder /app/migrate_binary /app/migrate_binary
+COPY --from=builder /app/migrations_v4 /app/migrations_v4
+COPY --from=builder /app/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 
 EXPOSE 8080
 
 
-CMD ["/app/prod_binary"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 
 
