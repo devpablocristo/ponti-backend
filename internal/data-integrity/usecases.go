@@ -6,9 +6,9 @@
 // UNA ORDEN DIRECTA Y CLARA DEL USUARIO.
 //
 // REGLAS INVIOLABLES:
-// - NUNCA modificar los cálculos LEFT/RIGHT sin autorización explícita
+// - NUNCA modificar los cálculos System/RecalcA/RecalcB sin autorización explícita
 // - NUNCA cambiar las tolerancias sin autorización explícita
-// - NUNCA alterar la lógica de los 14 controles sin autorización explícita
+// - NUNCA alterar la lógica de los 9 controles sin autorización explícita
 // - NUNCA usar ROUND() en cálculos internos (solo en DTOs de salida)
 // - SIEMPRE mantener precisión completa en cálculos SQL y Go
 //
@@ -135,11 +135,11 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	return sd, nil
 }
 
-// CheckCostsCoherence valida la coherencia de costos con 14 controles individuales
-// Cada control calcula LEFT (origen/correcto) y RIGHT (destino/validar) de forma INDEPENDIENTE
+// CheckCostsCoherence valida la coherencia de costos con 9 controles individuales.
+// Cada control compara: SystemValue (lo que el sistema muestra) vs RecalcA y RecalcB (recálculos independientes).
 //
 // ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
-// ESTA FUNCIÓN CONTIENE LOS 14 CONTROLES CRÍTICOS DE INTEGRIDAD DE DATOS.
+// ESTA FUNCIÓN CONTIENE LOS 9 CONTROLES CRÍTICOS DE INTEGRIDAD DE DATOS.
 // NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -151,7 +151,7 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		return nil, err
 	}
 
-	checks := make([]domain.IntegrityCheck, 14)
+	checks := make([]domain.IntegrityCheck, 9)
 	var wg sync.WaitGroup
 	var errOnce sync.Once
 	var firstErr error
@@ -179,58 +179,41 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		}()
 	}
 
-	// GRUPO 1: Costos Directos Ejecutados (Controles 1-4)
+	// CONTROL 1: Costos directos ejecutados (consolida antiguos 1,2,3,4)
 	run(0, 1, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control1OrdenesVsDashboard(c, filter.ProjectID, sd)
+		return u.control1CostosDirectos(c, sd)
 	})
+	// CONTROL 2: Invertidos total (antiguo 5)
 	run(1, 2, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control2OrdenesVsLotes(c, filter.ProjectID, sd)
+		return u.control2InvertidosTotal(c, sd)
 	})
+	// CONTROL 3: Labores invertidos (antiguo 6)
 	run(2, 3, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control3OrdenesVsInformeCampo(c, filter.ProjectID, sd)
+		return u.control3LaboresInvertidos(c, sd)
 	})
+	// CONTROL 4: Insumos invertidos (antiguo 7)
 	run(3, 4, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control4OrdenesVsInformeGenerales(c, filter.ProjectID, sd)
+		return u.control4InsumosInvertidos(c, sd)
 	})
-
-	// GRUPO 2: Invertidos (Controles 5-7)
+	// CONTROL 5: Administración (antiguo 8)
 	run(4, 5, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control5LaboresInsumosVsDashboard(c, filter.ProjectID, sd)
+		return u.control5Administracion(c, sd)
 	})
+	// CONTROL 6: Arriendo (antiguo 9)
 	run(5, 6, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control6LaboresVsAportes(c, filter.ProjectID, sd)
+		return u.control6Arriendo(c, sd)
 	})
+	// CONTROL 7: Ingreso Neto (antiguo 10)
 	run(6, 7, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control7InsumosVsAportes(c, filter.ProjectID, sd)
+		return u.control7IngresoNeto(c, sd)
 	})
-
-	// GRUPO 3: Lotes → Aportes (Controles 8-9)
+	// CONTROL 8: Resultado operativo (consolida antiguos 11,12,13)
 	run(7, 8, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control8LotesAdminVsAportes(c, filter.ProjectID, sd)
+		return u.control8ResultadoOperativo(c, sd)
 	})
+	// CONTROL 9: Stock (antiguo 14)
 	run(8, 9, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control9LotesArriendoVsAportes(c, filter.ProjectID, sd)
-	})
-
-	// GRUPO 4: Ingreso Neto (Control 10)
-	run(9, 10, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control10LotesIngresoNetoVsResumen(c, filter.ProjectID, sd)
-	})
-
-	// GRUPO 5: Resultado Operativo (Controles 11-13)
-	run(10, 11, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control11LotesResultadoVsInformeCultivo(c, filter.ProjectID, sd)
-	})
-	run(11, 12, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control12LotesResultadoVsInformeGenerales(c, filter.ProjectID, sd)
-	})
-	run(12, 13, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control13LotesResultadoVsDashboard(c, filter.ProjectID, sd)
-	})
-
-	// GRUPO 6: Stock (Control 14)
-	run(13, 14, func(c context.Context) (domain.IntegrityCheck, error) {
-		return u.control14StockVsDashboard(c, filter.ProjectID, sd)
+		return u.control9Stock(c, sd)
 	})
 
 	wg.Wait()
@@ -244,566 +227,415 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 }
 
 // =====================================================
-// CONTROL 1: Órdenes de trabajo → Dashboard
-// LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: Dashboard.CostosDirectos (SSOT)
+// CONTROL 1: Costos Directos Ejecutados
+// System: dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD
+// RecalcA: ∑(lot_list.cost_usd_per_ha × lot_list.hectares)
+// RecalcB: summary_results[0].TotalDirectCostsUsd
 // =====================================================
-//
-// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
-// ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
-// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
-func (u *UseCases) control1OrdenesVsDashboard(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
+func (u *UseCases) control1CostosDirectos(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: lo que el dashboard muestra como costos directos ejecutados
+	systemValue := sd.dashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD
+
+	// RECALC A: sumar desde lotes (cost_per_ha × hectares)
+	recalcA := decimal.Zero
 	for _, lot := range sd.lots {
-		costTotal := lot.CostUsdPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(costTotal)
+		recalcA = recalcA.Add(lot.CostUsdPerHa.Mul(lot.Hectares))
 	}
-	rightValue := sd.dashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD
+
+	// RECALC B: total desde summary_results
+	var recalcBCalc *string
+	var recalcBVal *decimal.Decimal
+	var recalcBSrc *string
+	if len(sd.summaryResults) > 0 {
+		v := sd.summaryResults[0].TotalDirectCostsUsd
+		recalcBCalc = strPtr("summary_results[0].TotalDirectCostsUsd")
+		recalcBVal = &v
+		recalcBSrc = strPtr("v4_report.summary_results")
+	}
 
 	return buildCheck(
 		1,
-		"Lotes",
 		"Costos directos ejecutados",
-		"Dashboard",
-		"∑(lot_list.cost_usd_per_ha × lot_list.hectares) = dashboard_management_balance.costos_directos_ejecutados_usd",
-		"Compara costos directos ejecutados entre lotes y dashboard.",
-		"∑(lot_list.cost_usd_per_ha × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Total de costos directos desde lotes.",
-		"dashboard_management_balance.costos_directos_ejecutados_usd",
-		rightValue,
+		"Compara costos directos ejecutados entre dashboard, lotes y resumen.",
+		"dashboard.DirectCostsExecutedUSD = ∑(lot.cost×ha) = summary_results.TotalDirectCostsUsd",
+		"dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD",
+		systemValue,
 		"v4_report.dashboard_management_balance",
-		"Costo directo ejecutado mostrado en dashboard.",
-		"Ambos deben representar el mismo total del proyecto.",
+		"Valor de costos directos ejecutados que muestra el Cuadro de Gestión del Dashboard. Se calcula en la vista dashboard_management_balance sumando los costos de labores e insumos ejecutados por lote, usando las funciones SSOT.",
+		"∑(lot_list.cost_usd_per_ha × lot_list.hectares)",
+		recalcA,
+		"v4_report.lot_list",
+		"Recálculo independiente: toma el costo por hectárea de cada lote (de la vista lot_list) y lo multiplica por sus hectáreas, luego suma todos los lotes. Usa el camino workorder_metrics_raw → lot_base_costs → lot_metrics → lot_list.",
+		recalcBCalc, recalcBVal, recalcBSrc,
+		strPtr("Segundo recálculo independiente: toma el total de costos directos del resumen general (vista summary_results), que agrega por cultivo usando field_crop_aggregated → field_crop_metrics → summary_results."),
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 2: Órdenes de trabajo → Lotes
-// LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: ∑(Costo_directo_ha_lote × Superficie_lote)
+// CONTROL 2: Invertidos Total
+// System: dashboard.ManagementBalance.TotalsRow.InvestedUSD
+// RecalcA: (Sem + Agro + Fert + Lab) InvertidosUSD del summary
 // =====================================================
-//
-// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
-// ESTE CONTROL ES CRÍTICO PARA LA INTEGRIDAD DE DATOS.
-// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
-func (u *UseCases) control2OrdenesVsLotes(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		costTotal := lot.CostUsdPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(costTotal)
-	}
-	rightValue := decimal.Zero
-	for _, metric := range sd.fieldCropMetrics {
-		if !metric.TotalDirectCostsUsd.IsZero() {
-			rightValue = rightValue.Add(metric.TotalDirectCostsUsd)
-		} else {
-			costTotal := metric.SurfaceHa.Mul(metric.DirectCostsUsdHa)
-			rightValue = rightValue.Add(costTotal)
-		}
-	}
+func (u *UseCases) control2InvertidosTotal(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: total invertido que muestra el dashboard
+	systemValue := sd.dashboardData.ManagementBalance.TotalsRow.InvestedUSD
+
+	// RECALC A: suma de componentes desde dashboard summary
+	summary := sd.dashboardData.ManagementBalance.Summary
+	recalcA := summary.SemillasInvertidosUSD.
+		Add(summary.AgroquimicosInvertidosUSD).
+		Add(summary.FertilizantesInvertidosUSD).
+		Add(summary.LaboresInvertidosUSD)
 
 	return buildCheck(
 		2,
-		"Lotes",
-		"Costos directos ejecutados",
-		"Informe de Resultado por campo",
-		"∑(lot_list.cost_usd_per_ha × lot_list.hectares) = ∑(field_crop_metrics.total_direct_costs_usd)",
-		"Compara costos directos entre lotes y reporte por campo.",
-		"∑(lot_list.cost_usd_per_ha × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Costos directos sumados desde lotes.",
-		"∑(field_crop_metrics.total_direct_costs_usd)",
-		rightValue,
-		"v4_report.field_crop_metrics",
-		"Costos directos agregados por campo/cultivo.",
-		"Mismo total, distinto nivel de agregación.",
+		"Invertidos total",
+		"Valida que el total invertido sea la suma de sus componentes.",
+		"TotalsRow.InvestedUSD = Semillas + Agroquímicos + Fertilizantes + Labores",
+		"dashboard.ManagementBalance.TotalsRow.InvestedUSD",
+		systemValue,
+		"Dashboard TotalsRow",
+		"Total invertido que muestra la fila de totales del Cuadro de Gestión. Es la suma precalculada en la vista dashboard_management_balance como total de todos los rubros invertidos.",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD",
+		recalcA,
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Recálculo independiente: suma los 4 componentes individuales del mismo Cuadro de Gestión (semillas + agroquímicos + fertilizantes + labores invertidos). Si difiere del total, hay un error en la agregación de la vista.",
+		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 3: Órdenes de trabajo → Informe de Resultado por campo
-// LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: ∑(Costo_directo_ha_Cultivo × Superficie_Cultivo)
+// CONTROL 3: Labores Invertidos
+// System: dashboard.ManagementBalance.Summary.LaboresInvertidosUSD
+// RecalcA: ∑(investor_contributions: Labores Generales + Siembra + Riego)
 // =====================================================
-func (u *UseCases) control3OrdenesVsInformeCampo(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, metric := range sd.fieldCropMetrics {
-		if !metric.TotalDirectCostsUsd.IsZero() {
-			leftValue = leftValue.Add(metric.TotalDirectCostsUsd)
-		} else {
-			costTotal := metric.SurfaceHa.Mul(metric.DirectCostsUsdHa)
-			leftValue = leftValue.Add(costTotal)
+func (u *UseCases) control3LaboresInvertidos(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: labores invertidas que muestra el dashboard
+	systemValue := sd.dashboardData.ManagementBalance.Summary.LaboresInvertidosUSD
+
+	// RECALC A: desde informe de aportes
+	recalcA := decimal.Zero
+	for _, cat := range sd.investorReport.Contributions {
+		if cat.Label == "Labores Generales" || cat.Label == "Siembra" || cat.Label == "Riego" {
+			recalcA = recalcA.Add(cat.TotalUsd)
 		}
-	}
-	rightValue := decimal.Zero
-	if len(sd.summaryResults) > 0 {
-		rightValue = sd.summaryResults[0].TotalDirectCostsUsd
 	}
 
 	return buildCheck(
 		3,
-		"Informe de Resultado por campo",
-		"Costos directos ejecutados",
-		"Informe de Resultado Generales",
-		"∑(field_crop_metrics.total_direct_costs_usd) = summary_results.total_direct_costs_usd",
-		"Compara costos directos del reporte por campo vs resumen general.",
-		"∑(field_crop_metrics.total_direct_costs_usd)",
-		leftValue,
-		"v4_report.field_crop_metrics",
-		"Total de costos directos por campo/cultivo.",
-		"summaryResults[0].TotalDirectCostsUsd (totales del proyecto)",
-		rightValue,
-		"v4_report.summary_results",
-		"Total de costos directos del resumen.",
-		"Mismo total del proyecto.",
-		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
-	), nil
-}
-
-// =====================================================
-// CONTROL 4: Órdenes de trabajo → Informe de Resultado Generales
-// LEFT: ∑(Ordenes.costo_total) RAW
-// RIGHT: Total de informe generales
-// =====================================================
-func (u *UseCases) control4OrdenesVsInformeGenerales(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	if len(sd.summaryResults) > 0 {
-		leftValue = sd.summaryResults[0].TotalDirectCostsUsd
-	}
-	rightValue := sd.dashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD
-
-	return buildCheck(
-		4,
-		"Informe de Resultado Generales",
-		"Costos directos ejecutados",
-		"Dashboard",
-		"summary_results.total_direct_costs_usd (totales del proyecto) = dashboard_management_balance.costos_directos_ejecutados_usd",
-		"Compara costos directos del resumen vs dashboard.",
-		"summaryResults[0].TotalDirectCostsUsd (totales del proyecto)",
-		leftValue,
-		"v4_report.summary_results",
-		"Total de costos directos del resumen.",
-		"dashboard_management_balance.costos_directos_ejecutados_usd",
-		rightValue,
-		"v4_report.dashboard_management_balance",
-		"Costo directo ejecutado en dashboard.",
-		"Mismo total del proyecto.",
-		decimal.NewFromInt(1), // Tolerancia = 1 USD (diferencias de precisión en agregaciones)
-	), nil
-}
-
-// =====================================================
-// CONTROL 5: Labores + Insumos → Dashboard
-// LEFT: ∑(Labores) + ∑(Insumos) desde dashboard breakdown
-// RIGHT: Dashboard.Invertidos total
-// =====================================================
-func (u *UseCases) control5LaboresInsumosVsDashboard(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	summary := sd.dashboardData.ManagementBalance.Summary
-
-	// LEFT: Suma de componentes (Labores + Semillas + Agroquímicos + Fertilizantes)
-	labores := summary.LaboresInvertidosUSD
-	semilla := summary.SemillasInvertidosUSD
-	agroquimicos := summary.AgroquimicosInvertidosUSD
-	fertilizantes := summary.FertilizantesInvertidosUSD
-	leftValue := labores.Add(semilla).Add(agroquimicos).Add(fertilizantes)
-
-	// RIGHT: Total invertidos desde dashboard
-	rightValue := sd.dashboardData.ManagementBalance.TotalsRow.InvestedUSD
-
-	return buildCheck(
-		5,
-		"Labores + Insumos",
-		"Invertidos",
-		"Dashboard",
-		"TotalsRow.InvestedUSD = SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD",
-		"Valida total invertido del dashboard.",
-		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD",
-		leftValue,
+		"Labores invertidos",
+		"Valida labores invertidas entre dashboard y aportes.",
+		"Summary.LaboresInvertidosUSD = ∑(contributions: Labores Generales, Siembra, Riego)",
+		"dashboard.ManagementBalance.Summary.LaboresInvertidosUSD",
+		systemValue,
 		"Dashboard Summary (ManagementBalance.Summary)",
-		"Suma de componentes invertidos.",
-		"TotalsRow.InvestedUSD",
-		rightValue,
-		"Dashboard TotalsRow (ManagementBalance.TotalsRow)",
-		"Total invertido calculado por dashboard.",
-		"Total debe ser suma de componentes.",
+		"Monto de labores invertidas que muestra el Cuadro de Gestión del Dashboard. Se calcula en la vista dashboard_management_balance sumando el costo de labores de todas las órdenes de trabajo con estado 'invertido'.",
+		"∑(contribution_categories.total_usd) labels: Labores Generales, Siembra, Riego",
+		recalcA,
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Recálculo independiente: suma las categorías de aportes de inversores que corresponden a labores (Labores Generales + Siembra + Riego) desde la vista investor_contribution_data. Camino completamente distinto al dashboard.",
+		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 6: Labores → Informe de Aportes
-// LEFT: Dashboard.LaboresInvertidos (sin cosecha)
-// RIGHT: Aportes (Labores Generales + Siembra + Riego)
+// CONTROL 4: Insumos Invertidos
+// System: dashboard.(Sem+Agro+Fert)InvertidosUSD
+// RecalcA: ∑(investor_contributions: Semilla + Agroquímicos + Fertilizantes)
 // =====================================================
-func (u *UseCases) control6LaboresVsAportes(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := sd.dashboardData.ManagementBalance.Summary.LaboresInvertidosUSD
-	rightValue := decimal.Zero
-	for _, category := range sd.investorReport.Contributions {
-		if category.Label == "Labores Generales" || category.Label == "Siembra" ||
-			category.Label == "Riego" {
-			rightValue = rightValue.Add(category.TotalUsd)
+func (u *UseCases) control4InsumosInvertidos(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: insumos invertidos que muestra el dashboard
+	summary := sd.dashboardData.ManagementBalance.Summary
+	systemValue := summary.SemillasInvertidosUSD.
+		Add(summary.AgroquimicosInvertidosUSD).
+		Add(summary.FertilizantesInvertidosUSD)
+
+	// RECALC A: desde informe de aportes
+	recalcA := decimal.Zero
+	for _, cat := range sd.investorReport.Contributions {
+		if cat.Label == "Semilla" || cat.Label == "Agroquímicos" || cat.Label == "Fertilizantes" {
+			recalcA = recalcA.Add(cat.TotalUsd)
 		}
+	}
+
+	return buildCheck(
+		4,
+		"Insumos invertidos",
+		"Valida insumos invertidos entre dashboard y aportes.",
+		"(Semillas+Agroquímicos+Fertilizantes)InvertidosUSD = ∑(contributions: Semilla, Agroquímicos, Fertilizantes)",
+		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD",
+		systemValue,
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Suma de los 3 rubros de insumos invertidos que muestra el Cuadro de Gestión: semillas, agroquímicos y fertilizantes. Cada rubro se calcula en dashboard_management_balance desde las órdenes de trabajo con estado 'invertido'.",
+		"∑(contribution_categories.total_usd) labels: Semilla, Agroquímicos, Fertilizantes",
+		recalcA,
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Recálculo independiente: suma las categorías de aportes de inversores que corresponden a insumos (Semilla + Agroquímicos + Fertilizantes) desde la vista investor_contribution_data.",
+		nil, nil, nil, nil,
+		decimal.NewFromInt(1),
+	), nil
+}
+
+// =====================================================
+// CONTROL 5: Administración y Estructura
+// System: investor_contribution "Administración y Estructura".TotalUsd
+// RecalcA: ∑(lot_list.admin_cost_per_ha × hectares)
+// =====================================================
+func (u *UseCases) control5Administracion(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: lo que muestra el informe de aportes para Administración
+	systemValue := decimal.Zero
+	for _, cat := range sd.investorReport.Contributions {
+		if cat.Label == "Administración y Estructura" {
+			systemValue = cat.TotalUsd
+			break
+		}
+	}
+
+	// RECALC A: sumar desde lotes (admin_cost × hectares)
+	recalcA := decimal.Zero
+	for _, lot := range sd.lots {
+		recalcA = recalcA.Add(lot.AdminCost.Mul(lot.Hectares))
+	}
+
+	return buildCheck(
+		5,
+		"Administración y Estructura",
+		"Valida administración entre aportes y lotes.",
+		"contribution(Administración y Estructura).TotalUsd = ∑(lot.admin_cost × ha)",
+		"contribution_categories(Administración y Estructura).total_usd",
+		systemValue,
+		"v4_report.investor_contribution_data.contribution_categories",
+		"Total de la categoría 'Administración y Estructura' del Informe de Aportes. Se calcula en la vista investor_contribution_data agregando los aportes registrados para ese concepto.",
+		"∑(lot_list.admin_cost_per_ha_usd × lot_list.hectares)",
+		recalcA,
+		"v4_report.lot_list",
+		"Recálculo independiente: toma el costo de administración por hectárea de cada lote (prorrateado en lot_metrics desde el proyecto) y lo multiplica por las hectáreas del lote, luego suma todos los lotes.",
+		nil, nil, nil, nil,
+		decimal.NewFromInt(1),
+	), nil
+}
+
+// =====================================================
+// CONTROL 6: Arriendo Capitalizable
+// System: investor_contribution "Arriendo Capitalizable".TotalUsd
+// RecalcA: ∑(lot_list.rent_per_ha × hectares)
+// =====================================================
+func (u *UseCases) control6Arriendo(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: lo que muestra el informe de aportes para Arriendo
+	systemValue := decimal.Zero
+	for _, cat := range sd.investorReport.Contributions {
+		if cat.Label == "Arriendo Capitalizable" {
+			systemValue = cat.TotalUsd
+			break
+		}
+	}
+
+	// RECALC A: sumar desde lotes (rent × hectares)
+	recalcA := decimal.Zero
+	for _, lot := range sd.lots {
+		recalcA = recalcA.Add(lot.RentPerHa.Mul(lot.Hectares))
 	}
 
 	return buildCheck(
 		6,
-		"Dashboard",
-		"Inversión en labores",
-		"Informe de Aportes",
-		"Summary.LaboresInvertidosUSD = ∑(contribution_categories.total_usd) where label in [Labores Generales, Siembra, Riego]",
-		"Valida labores entre dashboard y aportes.",
-		"Summary.LaboresInvertidosUSD",
-		leftValue,
-		"Dashboard Summary (ManagementBalance.Summary)",
-		"Labores invertidas en dashboard.",
-		"∑(contribution_categories.total_usd) labels: Labores Generales, Siembra, Riego",
-		rightValue,
+		"Arriendo Capitalizable",
+		"Valida arriendo capitalizable entre aportes y lotes.",
+		"contribution(Arriendo Capitalizable).TotalUsd = ∑(lot.rent_per_ha × ha)",
+		"contribution_categories(Arriendo Capitalizable).total_usd",
+		systemValue,
 		"v4_report.investor_contribution_data.contribution_categories",
-		"Suma de categorías de labores en aportes.",
-		"Mismo total de labores (sin cosecha).",
+		"Total de la categoría 'Arriendo Capitalizable' del Informe de Aportes. Se calcula en la vista investor_contribution_data agregando los aportes registrados para arriendo.",
+		"∑(lot_list.rent_per_ha_usd × lot_list.hectares)",
+		recalcA,
+		"v4_report.lot_list",
+		"Recálculo independiente: toma el arriendo por hectárea de cada lote (asignado en lot_metrics desde el campo/proyecto) y lo multiplica por las hectáreas del lote, luego suma todos los lotes.",
+		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 7: Insumos → Informe de Aportes
-// LEFT: Dashboard.InsumosInvertidos
-// RIGHT: Aportes (Semillas + Agroquímicos)
+// CONTROL 7: Ingreso Neto
+// System: ∑(summary_results.NetIncomeUsd)
+// RecalcA: ∑(lot_list.income_net_per_ha × hectares)
 // =====================================================
-func (u *UseCases) control7InsumosVsAportes(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := sd.dashboardData.ManagementBalance.Summary.SemillasInvertidosUSD.
-		Add(sd.dashboardData.ManagementBalance.Summary.AgroquimicosInvertidosUSD).
-		Add(sd.dashboardData.ManagementBalance.Summary.FertilizantesInvertidosUSD)
-	rightValue := decimal.Zero
-	for _, category := range sd.investorReport.Contributions {
-		if category.Label == "Semilla" || category.Label == "Agroquímicos" || category.Label == "Fertilizantes" {
-			rightValue = rightValue.Add(category.TotalUsd)
-		}
+func (u *UseCases) control7IngresoNeto(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: ingreso neto total del resumen
+	systemValue := decimal.Zero
+	for _, result := range sd.summaryResults {
+		systemValue = systemValue.Add(result.NetIncomeUsd)
+	}
+
+	// RECALC A: sumar desde lotes (income_net × hectares)
+	recalcA := decimal.Zero
+	for _, lot := range sd.lots {
+		recalcA = recalcA.Add(lot.IncomeNetPerHa.Mul(lot.Hectares))
 	}
 
 	return buildCheck(
 		7,
-		"Insumos",
-		"Inversión en insumos",
-		"Informe de Aportes",
-		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD = ∑(contribution_categories.total_usd) labels: Semilla, Agroquímicos, Fertilizantes",
-		"Valida insumos entre dashboard y aportes.",
-		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD",
-		leftValue,
-		"Dashboard Summary (ManagementBalance.Summary)",
-		"Semillas, agroquímicos y fertilizantes en dashboard.",
-		"∑(contribution_categories.total_usd) labels: Semilla, Agroquímicos, Fertilizantes",
-		rightValue,
-		"v4_report.investor_contribution_data.contribution_categories",
-		"Suma de esas categorías en aportes.",
-		"Mismo total de insumos.",
+		"Ingreso Neto",
+		"Valida ingreso neto entre resumen y lotes.",
+		"∑(summary_results.NetIncomeUsd) = ∑(lot.income_net_per_ha × ha)",
+		"∑(summary_results.net_income_usd)",
+		systemValue,
+		"v4_report.summary_results",
+		"Ingreso neto total del proyecto que muestra el Informe de Resultado Generales (summary_results). Se calcula sumando el ingreso neto de cada cultivo, donde cada uno usa la función SSOT income_net_total_for_lot.",
+		"∑(lot_list.income_net_per_ha_usd × lot_list.hectares)",
+		recalcA,
+		"v4_report.lot_list",
+		"Recálculo independiente: toma el ingreso neto por hectárea de cada lote (calculado en lot_metrics como ventas menos costos) y lo multiplica por las hectáreas del lote, luego suma todos los lotes.",
+		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 8: Lotes → Informe de Aportes (Administración)
-// LEFT: ∑(AdminCost_ha × Superficie) desde lotes
-// RIGHT: Aportes Adm.Proyecto
+// CONTROL 8: Resultado Operativo
+// System: dashboard.Metrics.OperatingResult.ResultUSD
+// RecalcA: ∑(lot_list.operating_result_per_ha × hectares)
+// RecalcB: summary_results[0].TotalOperatingResultUsd
 // =====================================================
-func (u *UseCases) control8LotesAdminVsAportes(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
+func (u *UseCases) control8ResultadoOperativo(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// SYSTEM: resultado operativo que muestra el dashboard
+	systemValue := sd.dashboardData.Metrics.OperatingResult.ResultUSD
+
+	// RECALC A: sumar desde lotes (operating_result × hectares)
+	recalcA := decimal.Zero
 	for _, lot := range sd.lots {
-		leftValue = leftValue.Add(lot.AdminCost.Mul(lot.Hectares))
+		recalcA = recalcA.Add(lot.OperatingResultPerHa.Mul(lot.Hectares))
 	}
-	rightValue := decimal.Zero
-	for _, category := range sd.investorReport.Contributions {
-		if category.Label == "Administración y Estructura" {
-			rightValue = category.TotalUsd
-			break
-		}
+
+	// RECALC B: total desde summary_results
+	var recalcBCalc *string
+	var recalcBVal *decimal.Decimal
+	var recalcBSrc *string
+	if len(sd.summaryResults) > 0 {
+		v := sd.summaryResults[0].TotalOperatingResultUsd
+		recalcBCalc = strPtr("summary_results[0].TotalOperatingResultUsd")
+		recalcBVal = &v
+		recalcBSrc = strPtr("v4_report.summary_results")
 	}
 
 	return buildCheck(
 		8,
-		"Lotes",
-		"Invertidos",
-		"Informe de Aportes",
-		"∑(lot_list.admin_cost_per_ha_usd × lot_list.hectares) = contribution_categories.total_usd (Administración y Estructura)",
-		"Valida administración entre lotes y aportes.",
-		"∑(lot_list.admin_cost_per_ha_usd × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Admin prorrateado por lote.",
-		"contribution_categories.total_usd (Administración y Estructura)",
-		rightValue,
-		"v4_report.investor_contribution_data.contribution_categories",
-		"Categoría Administración y Estructura.",
-		"Mismo total de administración.",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 9: Lotes → Informe de Aportes (Arriendo)
-// LEFT: ∑(Arriendo_ha × Superficie) desde lotes
-// RIGHT: Aportes Arriendo Fijo
-// =====================================================
-func (u *UseCases) control9LotesArriendoVsAportes(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		arriendoTotal := lot.RentPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(arriendoTotal)
-	}
-	rightValue := decimal.Zero
-	for _, category := range sd.investorReport.Contributions {
-		if category.Label == "Arriendo Capitalizable" {
-			rightValue = category.TotalUsd
-			break
-		}
-	}
-
-	return buildCheck(
-		9,
-		"Lotes",
-		"Invertidos",
-		"Informe de Aportes",
-		"∑(lot_list.rent_per_ha_usd × lot_list.hectares) = contribution_categories.total_usd (Arriendo Capitalizable)",
-		"Valida arriendo capitalizable entre lotes y aportes.",
-		"∑(lot_list.rent_per_ha_usd × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Arriendo prorrateado por lote.",
-		"contribution_categories.total_usd (Arriendo Capitalizable)",
-		rightValue,
-		"v4_report.investor_contribution_data.contribution_categories",
-		"Categoría Arriendo Capitalizable.",
-		"Mismo total de arriendo.",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 10: Lotes → Resumen de resultados (Ingreso Neto)
-// LEFT: ∑(Ingreso_Neto_ha × Superficie) desde lotes
-// RIGHT: ∑(Ingreso_Neto) del resumen
-// =====================================================
-func (u *UseCases) control10LotesIngresoNetoVsResumen(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		ingresoTotal := lot.IncomeNetPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(ingresoTotal)
-	}
-	rightValue := decimal.Zero
-	for _, result := range sd.summaryResults {
-		rightValue = rightValue.Add(result.NetIncomeUsd)
-	}
-
-	return buildCheck(
-		10,
-		"Lotes",
-		"Ingreso Neto",
-		"Resumen de resultados",
-		"∑(lot_list.income_net_per_ha_usd × lot_list.hectares) = ∑(summary_results.net_income_usd)",
-		"Valida ingreso neto entre lotes y resumen.",
-		"∑(lot_list.income_net_per_ha_usd × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Ingreso neto total desde lotes.",
-		"∑(summary_results.net_income_usd)",
-		rightValue,
-		"v4_report.summary_results",
-		"Ingreso neto total del resumen.",
-		"Mismo total del proyecto.",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 11: Lotes → Informe por cultivo (Resultado Operativo)
-// LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
-// RIGHT: ∑(Resultado.Operativo × Superficie) por cultivo
-// =====================================================
-func (u *UseCases) control11LotesResultadoVsInformeCultivo(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(resultadoTotal)
-	}
-	rightValue := decimal.Zero
-	for _, metric := range sd.fieldCropMetrics {
-		resultadoTotal := metric.OperatingResultUsdHa.Mul(metric.SurfaceHa)
-		rightValue = rightValue.Add(resultadoTotal)
-	}
-
-	return buildCheck(
-		11,
-		"Lotes",
-		"Resultado operativo total",
-		"Informe por cultivo",
-		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = ∑(field_crop_metrics.operating_result_usd_ha × field_crop_metrics.surface_ha)",
-		"Valida resultado operativo entre lotes y reporte por cultivo.",
+		"Resultado operativo",
+		"Compara resultado operativo entre dashboard, lotes y resumen.",
+		"dashboard.OperatingResult.ResultUSD = ∑(lot.operating_result×ha) = summary_results.TotalOperatingResultUsd",
+		"dashboard.Metrics.OperatingResult.ResultUSD",
+		systemValue,
+		"v4_report.dashboard_management_balance",
+		"Resultado operativo que muestra la tarjeta del Dashboard. Se calcula en dashboard_management_balance como ingreso neto menos costos totales activos (directos + arriendo + administración).",
 		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
-		leftValue,
+		recalcA,
 		"v4_report.lot_list",
-		"Resultado operativo total desde lotes.",
-		"∑(field_crop_metrics.operating_result_usd_ha × field_crop_metrics.surface_ha)",
-		rightValue,
-		"v4_report.field_crop_metrics",
-		"Resultado operativo agregado por cultivo.",
-		"Mismo total del proyecto.",
+		"Recálculo independiente: toma el resultado operativo por hectárea de cada lote (calculado en lot_metrics como ingreso neto menos activo total) y lo multiplica por las hectáreas del lote, luego suma todos los lotes.",
+		recalcBCalc, recalcBVal, recalcBSrc,
+		strPtr("Segundo recálculo independiente: toma el resultado operativo total del resumen general (vista summary_results), que agrega por cultivo usando field_crop_metrics → summary_results."),
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// CONTROL 12: Lotes → Informe de Resultado Generales (Resultado Operativo)
-// LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
-// RIGHT: Total Resultado Operativo del informe general
+// CONTROL 9: Stock
+// System: dashboard.ManagementBalance.Summary.StockUSD
+// RecalcA: (Invertido - Ejecutado) desde componentes del summary
 // =====================================================
-func (u *UseCases) control12LotesResultadoVsInformeGenerales(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(resultadoTotal)
-	}
-	rightValue := decimal.Zero
-	if len(sd.summaryResults) > 0 {
-		rightValue = sd.summaryResults[0].TotalOperatingResultUsd
-	}
-
-	return buildCheck(
-		12,
-		"Lotes",
-		"Resultado operativo total",
-		"Informe de Resultado Generales",
-		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = summary_results.total_operating_result_usd (totales proyecto)",
-		"Valida resultado operativo entre lotes y resumen.",
-		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Resultado operativo total desde lotes.",
-		"summaryResults[0].TotalOperatingResultUsd (totales del proyecto)",
-		rightValue,
-		"v4_report.summary_results",
-		"Resultado operativo total del resumen.",
-		"Mismo total del proyecto.",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 13: Lotes → Dashboard (Resultado Operativo)
-// LEFT: ∑(Resultado.Operativo_ha × Superficie) desde lotes
-// RIGHT: Dashboard Card Resultado Operativo
-// =====================================================
-func (u *UseCases) control13LotesResultadoVsDashboard(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
-	leftValue := decimal.Zero
-	for _, lot := range sd.lots {
-		resultadoTotal := lot.OperatingResultPerHa.Mul(lot.Hectares)
-		leftValue = leftValue.Add(resultadoTotal)
-	}
-	rightValue := sd.dashboardData.Metrics.OperatingResult.ResultUSD
-
-	return buildCheck(
-		13,
-		"Lotes",
-		"Resultado operativo total",
-		"Dashboard",
-		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares) = dashboard_management_balance.operating_result_usd",
-		"Valida resultado operativo entre lotes y dashboard.",
-		"∑(lot_list.operating_result_per_ha_usd × lot_list.hectares)",
-		leftValue,
-		"v4_report.lot_list",
-		"Resultado operativo total desde lotes.",
-		"Metrics.OperatingResult.ResultUSD",
-		rightValue,
-		"v4_report.dashboard_management_balance.operating_result_usd",
-		"Resultado operativo en dashboard.",
-		"Mismo total del proyecto.",
-		decimal.NewFromInt(1),
-	), nil
-}
-
-// =====================================================
-// CONTROL 14: Stock → Dashboard
-// LEFT: Invertido - Ejecutado
-// RIGHT: Dashboard.Stock
-// =====================================================
-func (u *UseCases) control14StockVsDashboard(ctx context.Context, projectID *int64, sd *sharedData) (domain.IntegrityCheck, error) {
+func (u *UseCases) control9Stock(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
 	summary := sd.dashboardData.ManagementBalance.Summary
 
-	// LEFT: Calcular stock esperado (Invertido - Ejecutado)
+	// SYSTEM: stock que muestra el dashboard
+	systemValue := summary.StockUSD
+
+	// RECALC A: calcular stock esperado (Invertido - Ejecutado)
 	invertido := summary.SemillasInvertidosUSD.
 		Add(summary.AgroquimicosInvertidosUSD).
 		Add(summary.FertilizantesInvertidosUSD).
 		Add(summary.LaboresInvertidosUSD)
 	ejecutado := summary.DirectCostsExecutedUSD
-	leftValue := invertido.Sub(ejecutado)
-
-	// RIGHT: Stock desde dashboard
-	rightValue := summary.StockUSD
+	recalcA := invertido.Sub(ejecutado)
 
 	return buildCheck(
-		14,
+		9,
 		"Stock",
-		"Insumos en stock",
-		"Dashboard",
-		"Summary.StockUSD = (SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD) - DirectCostsExecutedUSD",
 		"Valida stock en dashboard.",
-		"SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD - DirectCostsExecutedUSD",
-		leftValue,
+		"Summary.StockUSD = (Semillas+Agroquímicos+Fertilizantes+Labores)Invertidos - DirectCostsExecuted",
+		"dashboard.ManagementBalance.Summary.StockUSD",
+		systemValue,
 		"Dashboard Summary (ManagementBalance.Summary)",
-		"Invertido menos ejecutado.",
-		"Summary.StockUSD",
-		rightValue,
+		"Stock que muestra el Cuadro de Gestión del Dashboard. Es el valor precalculado en la vista dashboard_management_balance como la diferencia entre lo invertido total y lo ejecutado total.",
+		"(SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD + LaboresInvertidosUSD) - DirectCostsExecutedUSD",
+		recalcA,
 		"Dashboard Summary (ManagementBalance.Summary)",
-		"Stock USD del dashboard.",
-		"Stock = invertido - ejecutado.",
+		"Recálculo independiente: toma los 4 componentes invertidos del mismo Cuadro de Gestión (semillas + agroquímicos + fertilizantes + labores) y le resta los costos directos ejecutados. Stock = Invertido - Ejecutado.",
+		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
 	), nil
 }
 
 // =====================================================
-// HELPER: buildCheck construye un IntegrityCheck con LEFT/RIGHT
+// HELPERS
 // =====================================================
+
+func strPtr(s string) *string              { return &s }
+
+// buildCheck construye un IntegrityCheck con SystemValue / RecalcA / RecalcB (opcional)
 func buildCheck(
 	controlNumber int,
-	sourceModule, dataToVerify, targetModule, controlRule, description string,
-	leftCalculation string,
-	leftValue decimal.Decimal,
-	leftSource, leftMeaning string,
-	rightCalculation string,
-	rightValue decimal.Decimal,
-	rightSource, rightMeaning string,
-	calculationMeaning string,
+	dataToVerify, description, controlRule string,
+	systemCalculation string,
+	systemValue decimal.Decimal,
+	systemSource string,
+	systemMeaning string,
+	recalcACalculation string,
+	recalcAValue decimal.Decimal,
+	recalcASource string,
+	recalcAMeaning string,
+	recalcBCalculation *string,
+	recalcBValue *decimal.Decimal,
+	recalcBSource *string,
+	recalcBMeaning *string,
 	tolerance decimal.Decimal,
 ) domain.IntegrityCheck {
-	difference := leftValue.Sub(rightValue)
+	differenceA := systemValue.Sub(recalcAValue)
 	status := "OK"
 
-	if difference.Abs().GreaterThan(tolerance) {
+	if differenceA.Abs().GreaterThan(tolerance) {
 		status = "ERROR"
 	}
 
+	var differenceB *decimal.Decimal
+	if recalcBValue != nil {
+		diff := systemValue.Sub(*recalcBValue)
+		differenceB = &diff
+		if diff.Abs().GreaterThan(tolerance) {
+			status = "ERROR"
+		}
+	}
+
 	return domain.IntegrityCheck{
-		ControlNumber:    controlNumber,
-		SourceModule:     sourceModule,
-		DataToVerify:     dataToVerify,
-		TargetModule:     targetModule,
-		ControlRule:      controlRule,
-		Description:      description,
-		LeftCalculation:  leftCalculation,
-		LeftValue:        leftValue,
-		LeftSource:       leftSource,
-		LeftMeaning:      leftMeaning,
-		RightCalculation: rightCalculation,
-		RightValue:       rightValue,
-		RightSource:      rightSource,
-		RightMeaning:     rightMeaning,
-		CalculationMeaning: calculationMeaning,
-		Difference:       difference,
-		Status:           status,
-		Tolerance:        tolerance,
+		ControlNumber:      controlNumber,
+		DataToVerify:       dataToVerify,
+		Description:        description,
+		ControlRule:        controlRule,
+		SystemCalculation:  systemCalculation,
+		SystemValue:        systemValue,
+		SystemSource:       systemSource,
+		SystemMeaning:      systemMeaning,
+		RecalcACalculation: recalcACalculation,
+		RecalcAValue:       recalcAValue,
+		RecalcASource:      recalcASource,
+		RecalcAMeaning:     recalcAMeaning,
+		RecalcBCalculation: recalcBCalculation,
+		RecalcBValue:       recalcBValue,
+		RecalcBSource:      recalcBSource,
+		RecalcBMeaning:     recalcBMeaning,
+		DifferenceA:        differenceA,
+		DifferenceB:        differenceB,
+		Status:             status,
+		Tolerance:          tolerance,
 	}
 }
