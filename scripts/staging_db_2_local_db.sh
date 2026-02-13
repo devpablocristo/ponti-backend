@@ -3,7 +3,7 @@
 # - Descarga dump desde GCP STAGING y restaura solo datos en DB local (tal cual, sin cambios)
 # - Origen: new_ponti_db_staging. Tratamiento: data-only, sin schema, sin renames.
 #
-# Requiere: SRC_PASS para usuario app_stg (staging).
+# Requiere: SRC_PASS para el usuario de STAGING configurado en SRC_USER/DB_USER_STG.
 # Opcional: scripts/staging_db_2_local_db.env con SRC_PASS, SRC_HOST, etc.
 #
 # Uso: SRC_PASS='...' ./scripts/staging_db_2_local_db.sh
@@ -35,7 +35,7 @@ if [[ -f "${SCRIPT_DIR}/staging_db_2_local_db.env" ]]; then
   set +a
 fi
 
-SRC_USER="${SRC_USER:-${DB_USER_STG:-app_stg}}"
+SRC_USER="${SRC_USER:-${DB_USER_STG:-soalen-db-v3}}"
 SRC_PASS="${SRC_PASS:-}"
 SRC_HOST="${SRC_HOST:-136.112.24.122}"
 SRC_PORT="${SRC_PORT:-5432}"
@@ -131,7 +131,7 @@ PY
 
 ### ===== Validaciones de credenciales origen (STAGING) =====
 if [[ -z "${SRC_PASS}" ]]; then
-  err "SRC_PASS es requerido para usuario staging (app_stg)."
+  err "SRC_PASS es requerido para el usuario de staging (${SRC_USER})."
   err "Creá scripts/staging_db_2_local_db.env con SRC_PASS=... o pasá SRC_PASS='...' $0"
   exit 1
 fi
@@ -325,41 +325,17 @@ fi
 RESTORE_COMMON=(-h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" --no-owner --no-privileges -v)
 LIST_FILE="$(mktemp)"
 LIST_FILE_FILTERED="$(mktemp)"
-TABLES_FILE="$(mktemp)"
-SEQS_FILE="$(mktemp)"
 
 log "Generando lista filtrada (sin schema_migrations)…"
 run_pg_cmd pg_restore -l "$DUMP_FILE" > "$LIST_FILE" || true
-PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -At -c \
-  "SELECT tablename FROM pg_tables WHERE schemaname='public';" > "$TABLES_FILE"
-PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -At -c \
-  "SELECT sequencename FROM pg_sequences WHERE schemaname='public';" > "$SEQS_FILE"
-python - "$LIST_FILE" "$LIST_FILE_FILTERED" "$TABLES_FILE" "$SEQS_FILE" <<'PY'
+python - "$LIST_FILE" "$LIST_FILE_FILTERED" <<'PY'
 import sys
 
-src, dst, tables_path, seqs_path = sys.argv[1:]
-with open(tables_path, "r", encoding="utf-8", errors="replace") as fh:
-    tables = {line.strip() for line in fh if line.strip()}
-with open(seqs_path, "r", encoding="utf-8", errors="replace") as fh:
-    seqs = {line.strip() for line in fh if line.strip()}
+src, dst = sys.argv[1:]
 
 def should_keep(line: str) -> bool:
     if "schema_migrations" in line:
         return False
-    stripped = line.strip()
-    if not stripped or stripped.startswith(";"):
-        return True
-    try:
-        _, rest = line.split(";", 1)
-    except ValueError:
-        return True
-    tokens = rest.strip().split()
-    if len(tokens) < 5:
-        return True
-    if len(tokens) >= 6 and tokens[2] == "TABLE" and tokens[3] == "DATA":
-        return tokens[5] in tables
-    if len(tokens) >= 5 and tokens[2] == "SEQUENCE" and tokens[3] == "SET":
-        return tokens[4] in seqs
     return True
 
 with open(src, "r", encoding="utf-8", errors="replace") as fh_in, \
@@ -374,20 +350,15 @@ RESTORE_FILTERS=(--data-only --schema=public --use-list "$LIST_FILE_FILTERED")
 log "RESTORE DATA-ONLY (tal cual, sin cambios)…"
 if [[ "$DISABLE_TRIGGERS" == "1" ]]; then
   log "  -> con --disable-triggers"
-  if PGPASSWORD="$DB_PASSWORD" run_pg_cmd pg_restore "${RESTORE_COMMON[@]}" "${RESTORE_FILTERS[@]}" --disable-triggers "$DUMP_FILE"; then
-    log "  ✅ Data-only completado exitosamente"
-  else
-    warn "  ⚠️  Data-only tuvo errores pero continuando..."
-  fi
+  # Fail-fast: nunca continuar con restore parcial luego de TRUNCATE.
+  PGPASSWORD="$DB_PASSWORD" run_pg_cmd pg_restore "${RESTORE_COMMON[@]}" "${RESTORE_FILTERS[@]}" --disable-triggers "$DUMP_FILE"
 else
-  if PGPASSWORD="$DB_PASSWORD" run_pg_cmd pg_restore "${RESTORE_COMMON[@]}" "${RESTORE_FILTERS[@]}" "$DUMP_FILE"; then
-    log "  ✅ Data-only completado exitosamente"
-  else
-    warn "  ⚠️  Data-only tuvo errores pero continuando..."
-  fi
+  # Fail-fast: nunca continuar con restore parcial luego de TRUNCATE.
+  PGPASSWORD="$DB_PASSWORD" run_pg_cmd pg_restore "${RESTORE_COMMON[@]}" "${RESTORE_FILTERS[@]}" "$DUMP_FILE"
 fi
+log "  ✅ Data-only completado exitosamente"
 
-rm -f "$LIST_FILE" "$LIST_FILE_FILTERED" "$TABLES_FILE" "$SEQS_FILE"
+rm -f "$LIST_FILE" "$LIST_FILE_FILTERED"
 
 ### ===== Verificación rápida =====
 log "Tablas (primeras 30 filas de \dt):"

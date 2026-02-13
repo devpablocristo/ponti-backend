@@ -5,7 +5,7 @@
 ## TLDR
 
 - **Proyecto**: Ponti - sistema agrícola (backend Go, frontend React, BFF Node/Express)
-- **Stack local**: `make run_ponti_local` levanta backend, auth, frontend, AI
+- **Stack local**: `make run-ponti-local` levanta backend, auth, frontend, AI
 - **Error reciente resuelto**: 500 en `/api/supplies/20` - corregido en BFF y backend
 - **Reglas críticas**: No hardcodear, no usar ROUND() en migraciones, cambios quirúrgicos
 
@@ -101,7 +101,7 @@ El BFF inyecta `X-User-Id` desde `req.user.userID` (del token). El backend usa `
 
 ```bash
 # Stack completo (backend, auth, frontend, AI)
-cd ponti-backend && make run_ponti_local
+cd ponti-backend && make run-ponti-local
 
 # Solo backend
 make run-api

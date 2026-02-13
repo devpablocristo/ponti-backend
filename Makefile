@@ -12,8 +12,8 @@ MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
-        build up down logs reset rebuild clean docker_cleanup \
-        run-api run_ponti_local seed seed-dashboard staging_db_2_local_db staging_db_2_dev_db e2e_changes \
+        build up down logs reset rebuild clean docker-cleanup \
+        run-api run-ponti-local seed seed-dashboard staging-db-2-local-db staging-db-2-dev-db e2e-changes \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
@@ -74,7 +74,7 @@ run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/
 
-run_ponti_local:
+run-ponti-local:
 	@echo "Running full local stack (backend + auth + frontend + ai)..."
 	@bash ./scripts/run_ponti_local.sh
 
@@ -89,7 +89,7 @@ seed-dashboard:
 # --------------------------------------------------
 # Base de datos (descarga GCP STAGING → local, data-only)
 # --------------------------------------------------
-staging_db_2_local_db:
+staging-db-2-local-db:
 	@echo "Downloading GCP STAGING and restoring data-only to local..."
 	@echo "Asegurando que la DB local esté levantada..."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
@@ -97,12 +97,12 @@ staging_db_2_local_db:
 	DB_PORT=5433 ./scripts/staging_db_2_local_db.sh
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
-staging_db_2_dev_db:
+staging-db-2-dev-db:
 	@set -a && [ -f scripts/staging_db_2_dev_db.env ] && source scripts/staging_db_2_dev_db.env; set +a && \
 	bash ./scripts/staging_db_2_dev_db.sh
 
-# E2E tests (AI dummies, data-integrity, lots). Uso: make e2e_changes [BASE_URL=http://...]
-e2e_changes:
+# E2E tests (AI dummies, data-integrity, lots). Uso: make e2e-changes [BASE_URL=http://...]
+e2e-changes:
 	@bash ./scripts/e2e_changes.sh $(BASE_URL)
 
 # --------------------------------------------------
@@ -171,5 +171,5 @@ logs:
 	docker compose -f $(DOCKER_COMPOSE_YML) logs -f
 
 # Limpieza total de Docker (interactivo, requiere confirmación). Usa scripts/docker_cleanup.sh.
-docker_cleanup:
+docker-cleanup:
 	@bash ./scripts/docker_cleanup.sh
