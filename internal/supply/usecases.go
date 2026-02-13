@@ -13,7 +13,7 @@ import (
 
 type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
-	CreateSuppliesBulk(context.Context, []domain.Supply) error
+	CreateSuppliesBulk(context.Context, []domain.Supply) ([]domain.Supply, error)
 	GetSupply(context.Context, int64) (*domain.Supply, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
@@ -63,9 +63,9 @@ func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, e
 	return u.repo.CreateSupply(ctx, s)
 }
 
-func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) ([]domain.Supply, error) {
 	if len(supplies) == 0 {
-		return types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
+		return nil, types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
 	}
 
 	seen := map[string]bool{}
@@ -74,14 +74,14 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	for _, s := range supplies {
 		key := fmt.Sprintf("%d:%s", s.ProjectID, s.Name)
 		if seen[key] {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply name in request: %s", s.Name), nil)
+			return nil, types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply name in request: %s", s.Name), nil)
 		}
 		seen[key] = true
 		if s.ProjectID != projectID {
-			return types.NewError(types.ErrInvalidInput, "all supplies must have the same project_id", nil)
+			return nil, types.NewError(types.ErrInvalidInput, "all supplies must have the same project_id", nil)
 		}
 		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply: %s", s.Name), nil)
+			return nil, types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply: %s", s.Name), nil)
 		}
 	}
 
@@ -90,12 +90,12 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 		ProjectID: &projectID,
 	}, "", 1, 10000)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, s := range supplies {
 		for _, e := range existing {
 			if e.Name == s.Name {
-				return types.NewError(types.ErrConflict, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
+				return nil, types.NewError(types.ErrConflict, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
 			}
 		}
 	}

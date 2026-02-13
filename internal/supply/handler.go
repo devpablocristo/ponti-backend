@@ -19,7 +19,7 @@ import (
 
 type UseCasesPort interface {
 	CreateSupply(ctx context.Context, s *domain.Supply) (int64, error)
-	CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
+	CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) ([]domain.Supply, error)
 	GetSupply(ctx context.Context, id int64) (*domain.Supply, error)
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
 	DeleteSupply(ctx context.Context, id int64) error
@@ -112,13 +112,33 @@ func (h *Handler) CreateSupply(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	newID, err := h.ucs.CreateSupply(c.Request.Context(), req.ToDomain())
+	dom := req.ToDomain()
+	if dom.ProjectID == 0 {
+		workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+		if err != nil {
+			sharedhandlers.RespondError(c, err)
+			return
+		}
+		if workspaceFilter.ProjectID != nil {
+			dom.ProjectID = *workspaceFilter.ProjectID
+		}
+	}
+
+	newID, err := h.ucs.CreateSupply(c.Request.Context(), dom)
 	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"message": "Supply created successfully", "id": newID})
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": "Supply created successfully",
+		"id":      newID,
+		"data": gin.H{
+			"id":   newID,
+			"name": dom.Name,
+		},
+	})
 }
 
 func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
@@ -133,12 +153,40 @@ func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 	for i := range req {
 		supplies[i] = *req[i].ToDomain()
 	}
-	if err := h.ucs.CreateSuppliesBulk(c.Request.Context(), supplies); err != nil {
+
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if workspaceFilter.ProjectID != nil {
+		for i := range supplies {
+			if supplies[i].ProjectID == 0 {
+				supplies[i].ProjectID = *workspaceFilter.ProjectID
+			}
+		}
+	}
+
+	createdSupplies, err := h.ucs.CreateSuppliesBulk(c.Request.Context(), supplies)
+	if err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Supplies created successfully"})
+
+	data := make([]gin.H, len(createdSupplies))
+	for i := range createdSupplies {
+		data[i] = gin.H{
+			"id":   createdSupplies[i].ID,
+			"name": createdSupplies[i].Name,
+		}
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": "Supplies created successfully",
+		"data":    data,
+	})
 }
 
 func (h *Handler) ListSupplies(c *gin.Context) {

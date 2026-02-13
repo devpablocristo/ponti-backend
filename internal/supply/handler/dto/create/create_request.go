@@ -1,8 +1,9 @@
 package create
 
 import (
-	domainclasstype "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
 	"time"
+
+	domainclasstype "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
 
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
@@ -20,6 +21,11 @@ type SupplyRequest struct {
 	CategoryID int64 `json:"category_id"`
 	TypeID     int64 `json:"type_id"`
 
+	// Compatibilidad con frontend legacy (ordenes de trabajo)
+	Unit     int64 `json:"unit,omitempty"`
+	Category int64 `json:"category,omitempty"`
+	Type     int64 `json:"type,omitempty"`
+
 	// Audit fields opcionales
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
@@ -29,15 +35,30 @@ type SupplyRequest struct {
 
 // Para entrada (request): solo mapear IDs
 func (d *SupplyRequest) ToDomain() *domain.Supply {
+	unitID := d.UnitID
+	if unitID == 0 {
+		unitID = d.Unit
+	}
+
+	categoryID := d.CategoryID
+	if categoryID == 0 {
+		categoryID = d.Category
+	}
+
+	typeID := d.TypeID
+	if typeID == 0 {
+		typeID = d.Type
+	}
+
 	return &domain.Supply{
 		ID:         d.ID,
 		ProjectID:  d.ProjectID,
 		Name:       d.Name,
 		Price:      d.Price,
-		UnitID:     d.UnitID,
-		CategoryID: d.CategoryID,
+		UnitID:     unitID,
+		CategoryID: categoryID,
 		Type: domainclasstype.ClassType{
-			ID: d.TypeID,
+			ID: typeID,
 		},
 		Base: shareddomain.Base{
 			CreatedBy: d.CreatedBy,

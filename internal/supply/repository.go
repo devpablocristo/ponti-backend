@@ -41,12 +41,14 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 	return id, err
 }
 
-func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
+func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) ([]domain.Supply, error) {
 	userID, err := sharedmodels.ConvertStringToID(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+
+	created := make([]domain.Supply, 0, len(supplies))
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		modelsSlice := make([]*models.Supply, len(supplies))
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
@@ -55,8 +57,22 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 		if err := tx.Create(modelsSlice).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to bulk create supplies", err)
 		}
+
+		for i := range modelsSlice {
+			created = append(created, domain.Supply{
+				ID:   modelsSlice[i].ID,
+				Name: modelsSlice[i].Name,
+			})
+		}
+
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return created, nil
 }
 
 // --- GET ---
