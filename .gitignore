@@ -16,6 +16,10 @@ app/main/bin/
 # Local config can include sensitive or environment-specific settings and should not be in version control.
 # Uncomment the following line if you decide to exclude environment configs
 .env
+scripts/staging_db_2_local_db.env
+scripts/staging_db_2_dev_db.env
+scripts/db/db_force_reset_gcp.env
+scripts/db/db_gcp_reset_and_load_local.env
 # .env.*
 # .env.local
 # .env.*.local

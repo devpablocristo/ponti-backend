@@ -12,8 +12,8 @@ MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
-        build up down logs reset rebuild clean \
-        run-api run-ponti-local seed seed-dashboard download-gcp-db \
+        build up down logs reset rebuild clean docker-cleanup \
+        run-api run-ponti-local seed seed-dashboard staging-db-2-local-db staging-db-2-dev-db e2e-changes \
         migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
@@ -76,7 +76,7 @@ run-api:
 
 run-ponti-local:
 	@echo "Running full local stack (backend + auth + frontend + ai)..."
-	@bash ./scripts/run-ponti-local.sh
+	@bash ./scripts/run_ponti_local.sh
 
 seed:
 	@echo "Seeding database..."
@@ -87,12 +87,23 @@ seed-dashboard:
 	@go run ./cmd/api/main.go seed
 
 # --------------------------------------------------
-# Base de datos (descarga GCP DEV)
+# Base de datos (descarga GCP STAGING → local, data-only)
 # --------------------------------------------------
-download-gcp-db:
-	@echo "Downloading GCP DB and applying business_parameters rename..."
-	@set -a && [ -f .env ] && source .env; source scripts/gcp-db-creds.env && set +a && \
-	DB_PORT=5433 SRC_FORCE_CLOUD_RUN=0 ./scripts/download-gcp-db.sh
+staging-db-2-local-db:
+	@echo "Downloading GCP STAGING and restoring data-only to local..."
+	@echo "Asegurando que la DB local esté levantada..."
+	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
+	@set -a && [ -f .env ] && source .env; [ -f scripts/staging_db_2_local_db.env ] && source scripts/staging_db_2_local_db.env; set +a && \
+	DB_PORT=5433 ./scripts/staging_db_2_local_db.sh
+
+# Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
+staging-db-2-dev-db:
+	@set -a && [ -f scripts/staging_db_2_dev_db.env ] && source scripts/staging_db_2_dev_db.env; set +a && \
+	bash ./scripts/staging_db_2_dev_db.sh
+
+# E2E tests (AI dummies, data-integrity, lots). Uso: make e2e-changes [BASE_URL=http://...]
+e2e-changes:
+	@bash ./scripts/e2e_changes.sh $(BASE_URL)
 
 # --------------------------------------------------
 # Base de datos (verificación local v4)
@@ -119,11 +130,11 @@ db-adopt-baseline:
 	@echo "Uso: make db-adopt-baseline DB_HOST=... DB_NAME=... [DB_USER=...] [DB_PORT=...] [DB_SSL_MODE=...]"
 	@bash ./scripts/db/db_adopt_baseline.sh $(DB_HOST) $(DB_NAME) $(DB_USER) $(DB_PORT) $(DB_SSL_MODE)
 
-# Fuerza reset de la DB en GCP (DROP schema public + migraciones). Cargar credenciales antes.
+# Fuerza reset de la DB en GCP (DROP schema public + migraciones). Requiere scripts/db/db_force_reset_gcp.env.
 db-force-reset-gcp:
 	@bash ./scripts/db/db_force_reset_gcp.sh
 
-# Después del merge: reset GCP + migraciones + cargar datos desde DB local. Requiere .env y gcp-db-creds.env.
+# Después del merge: reset GCP + migraciones + cargar datos desde DB local. Requiere .env y db_gcp_reset_and_load_local.env.
 db-gcp-reset-and-load-local:
 	@bash ./scripts/db/db_gcp_reset_and_load_local.sh
 
@@ -158,3 +169,7 @@ rebuild: clean build
 logs:
 	@echo "Tailing logs (compose logs -f)..."
 	docker compose -f $(DOCKER_COMPOSE_YML) logs -f
+
+# Limpieza total de Docker (interactivo, requiere confirmación). Usa scripts/docker_cleanup.sh.
+docker-cleanup:
+	@bash ./scripts/docker_cleanup.sh

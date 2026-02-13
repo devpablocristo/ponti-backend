@@ -7,12 +7,13 @@
 # Uso: make db-gcp-reset-and-load-local
 #   o: ./scripts/db/db_gcp_reset_and_load_local.sh
 #
-# Requiere: .env (conexión local) y scripts/gcp-db-creds.env (conexión GCP)
+# Requiere: .env (conexión local) y scripts/db/db_gcp_reset_and_load_local.env (conexión GCP)
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
-CREDS_FILE="${ROOT_DIR}/scripts/gcp-db-creds.env"
+CREDS_FILE="${SCRIPT_DIR}/db_gcp_reset_and_load_local.env"
 DUMP_FILE="${ROOT_DIR}/.local_to_gcp_$(date +%Y%m%d_%H%M%S).dump"
 
 log() { echo "[INFO] $*"; }
@@ -32,9 +33,9 @@ LOCAL_USER="${DB_USER:-admin}"
 LOCAL_PASS="${DB_PASSWORD:-admin}"
 LOCAL_DB="${DB_NAME:-new_ponti_db_dev}"
 
-# 2) Conexión GCP (desde gcp-db-creds.env)
+# 2) Conexión GCP (desde db_gcp_reset_and_load_local.env)
 if [[ ! -f "${CREDS_FILE}" ]]; then
-  err "Falta scripts/gcp-db-creds.env (conexión GCP)."
+  err "Falta scripts/db/db_gcp_reset_and_load_local.env (conexión GCP)."
   exit 1
 fi
 set -a
@@ -47,7 +48,7 @@ REMOTE_PASS="${SRC_PASS}"
 REMOTE_DB="${SRC_DB}"
 
 if [[ -z "${REMOTE_HOST}" || -z "${REMOTE_USER}" || -z "${REMOTE_DB}" ]]; then
-  err "En gcp-db-creds.env faltan SRC_HOST, SRC_USER o SRC_DB."
+  err "En db_gcp_reset_and_load_local.env faltan SRC_HOST, SRC_USER o SRC_DB."
   exit 1
 fi
 
@@ -56,7 +57,9 @@ log "Paso 1/3: Reset y migraciones en GCP..."
 "${ROOT_DIR}/scripts/db/db_force_reset_gcp.sh"
 
 # Re-cargar credenciales GCP por si el script anterior no las exportó en este shell
+set -a
 source "${CREDS_FILE}"
+set +a
 REMOTE_HOST="${SRC_HOST}"
 REMOTE_PORT="${SRC_PORT:-5432}"
 REMOTE_USER="${SRC_USER}"

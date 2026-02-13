@@ -4,15 +4,16 @@
 #   - Aplica todas las migraciones desde cero.
 #
 # Uso:
-#   source scripts/gcp-db-creds.env && ./scripts/db/db_force_reset_gcp.sh
-#   o: make db-force-reset-gcp  (después de cargar gcp-db-creds.env)
+#   source scripts/db/db_force_reset_gcp.env && ./scripts/db/db_force_reset_gcp.sh
+#   o: make db-force-reset-gcp  (después de cargar db_force_reset_gcp.env)
 #
 # Requiere: SRC_USER, SRC_PASS, SRC_HOST, SRC_PORT, SRC_DB, SRC_SSL
 # Opcional: USE_CLOUDSQL_PROXY=1 y SRC_INSTANCE_* para usar Cloud SQL Proxy
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CREDS_FILE="${ROOT_DIR}/scripts/gcp-db-creds.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+CREDS_FILE="${SCRIPT_DIR}/db_force_reset_gcp.env"
 MIGRATIONS_PATH="${ROOT_DIR}/migrations_v4"
 
 # Cargar credenciales GCP (origen = remoto)
@@ -37,8 +38,8 @@ SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-new-ponti-db-dev}"
 PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
 
 if [[ -z "${SRC_USER}" || -z "${SRC_PASS}" || -z "${SRC_HOST}" || -z "${SRC_DB}" ]]; then
-  echo "Faltan credenciales. Definí SRC_* o cargá scripts/gcp-db-creds.env"
-  echo "Ejemplo: source scripts/gcp-db-creds.env && ./scripts/db/db_force_reset_gcp.sh"
+  echo "Faltan credenciales. Definí SRC_* o cargá scripts/db/db_force_reset_gcp.env"
+  echo "Ejemplo: source scripts/db/db_force_reset_gcp.env && ./scripts/db/db_force_reset_gcp.sh"
   exit 1
 fi
 
