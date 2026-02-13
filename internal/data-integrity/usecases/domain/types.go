@@ -8,39 +8,45 @@ package domain
 
 import "github.com/shopspring/decimal"
 
-// IntegrityReport contiene el resultado de todas las validaciones de coherencia (14 controles)
+// IntegrityReport contiene el resultado de todas las validaciones de coherencia (9 controles)
 type IntegrityReport struct {
 	Checks []IntegrityCheck `json:"checks"`
 }
 
-// IntegrityCheck representa un control individual de coherencia de datos
-// Cada control compara DOS cálculos INDEPENDIENTES: LEFT (origen/correcto) vs RIGHT (destino/a validar)
+// IntegrityCheck representa un control individual de coherencia de datos.
+// Cada control compara hasta 3 valores:
+//   - SystemValue: el valor EXACTO que el sistema muestra al usuario
+//   - RecalcA: recálculo independiente por camino A
+//   - RecalcB: recálculo independiente por camino B (opcional)
 type IntegrityCheck struct {
-	ControlNumber int    `json:"control_number"` // 1-14
-	SourceModule  string `json:"source_module"`  // Pantalla origen: "Órdenes de trabajo", "Labores + Insumos", etc.
-	DataToVerify  string `json:"data_to_verify"` // Dato a verificar: "Costos directos ejecutados", "Invertidos", etc.
-	TargetModule  string `json:"target_module"`  // Pantalla destino: "Dashboard", "Lotes", "Informe de Aportes", etc.
-	ControlRule   string `json:"control_rule"`   // Regla de control del CSV
+	ControlNumber int    `json:"control_number"` // 1-9
+	DataToVerify  string `json:"data_to_verify"` // Dato a verificar
 	Description   string `json:"description"`    // Descripción breve del control
+	ControlRule   string `json:"control_rule"`   // Regla de control
 
-	// LEFT SIDE (ORIGEN - Fuente de verdad)
-	LeftCalculation string          `json:"left_calculation"` // Descripción del cálculo LEFT
-	LeftValue       decimal.Decimal `json:"left_value"`       // Valor calculado desde origen
-	LeftSource      string          `json:"left_source"`      // Query/Vista/Tabla usada para LEFT
-	LeftMeaning     string          `json:"left_interpretation"` // Interpretación simple de LEFT
+	// SYSTEM VALUE (lo que el usuario ve en pantalla)
+	SystemCalculation string          `json:"system_calculation"`
+	SystemValue       decimal.Decimal `json:"system_value"`
+	SystemSource      string          `json:"system_source"`
+	SystemMeaning     string          `json:"system_meaning"` // Qué representa y cómo se calcula
 
-	// RIGHT SIDE (DESTINO - A validar)
-	RightCalculation string          `json:"right_calculation"` // Descripción del cálculo RIGHT
-	RightValue       decimal.Decimal `json:"right_value"`       // Valor calculado desde destino
-	RightSource      string          `json:"right_source"`      // Query/Vista/Tabla usada para RIGHT
-	RightMeaning     string          `json:"right_interpretation"` // Interpretación simple de RIGHT
+	// RECALC A (primer recálculo independiente)
+	RecalcACalculation string          `json:"recalc_a_calculation"`
+	RecalcAValue       decimal.Decimal `json:"recalc_a_value"`
+	RecalcASource      string          `json:"recalc_a_source"`
+	RecalcAMeaning     string          `json:"recalc_a_meaning"` // Qué representa y cómo se calcula
 
-	CalculationMeaning string `json:"calculation_interpretation"` // Interpretación breve del cálculo
+	// RECALC B (segundo recálculo independiente, opcional)
+	RecalcBCalculation *string          `json:"recalc_b_calculation,omitempty"`
+	RecalcBValue       *decimal.Decimal `json:"recalc_b_value,omitempty"`
+	RecalcBSource      *string          `json:"recalc_b_source,omitempty"`
+	RecalcBMeaning     *string          `json:"recalc_b_meaning,omitempty"` // Qué representa y cómo se calcula
 
 	// RESULTADO
-	Difference decimal.Decimal `json:"difference"` // LeftValue - RightValue
-	Status     string          `json:"status"`     // OK, ERROR
-	Tolerance  decimal.Decimal `json:"tolerance"`  // Tolerancia permitida
+	DifferenceA decimal.Decimal  `json:"difference_a"`           // SystemValue - RecalcAValue
+	DifferenceB *decimal.Decimal `json:"difference_b,omitempty"` // SystemValue - RecalcBValue (nil si RecalcB no aplica)
+	Status      string           `json:"status"`                 // OK, ERROR
+	Tolerance   decimal.Decimal  `json:"tolerance"`
 }
 
 // CostsCheckFilter contiene los filtros para la validación de costos
