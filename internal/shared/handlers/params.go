@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
@@ -15,4 +16,13 @@ func ParseParamID(raw string, param string) (int64, error) {
 		return 0, types.NewError(types.ErrInvalidID, "invalid "+param, err)
 	}
 	return id, nil
+}
+
+// ParseMovementIDParam obtiene el ID de movimiento desde supply_movement_id o stock_movement_id.
+func ParseMovementIDParam(c *gin.Context) (int64, error) {
+	raw := c.Param("supply_movement_id")
+	if raw == "" {
+		raw = c.Param("stock_movement_id")
+	}
+	return ParseParamID(raw, "movement_id")
 }

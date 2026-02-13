@@ -102,6 +102,17 @@ func (h *Handler) Routes() {
 		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementById)
 		supplyMovements.DELETE("/:supply_movement_id", h.DeleteSupplyMovement)
 	}
+
+	// Editor de stock: mismas rutas que supply-movements, semántica para vista Stock
+	stockMovements := r.Group(baseURL + "/projects/:project_id/stock-movements")
+	{
+		stockMovements.POST("", h.CreateSupplyMovement)
+		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
+		stockMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
+		stockMovements.GET("/providers", h.GetProviders)
+		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementById)
+		stockMovements.DELETE("/:stock_movement_id", h.DeleteSupplyMovement)
+	}
 }
 
 func (h *Handler) CreateSupply(c *gin.Context) {
@@ -337,7 +348,7 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseParamID(c.Param("supply_movement_id"), "supply_movement_id")
+	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
 	if handleError(err, c) {
 		return
 	}
@@ -365,7 +376,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseParamID(c.Param("supply_movement_id"), "supply_movement_id")
+	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
 	if handleError(err, c) {
 		return
 	}
