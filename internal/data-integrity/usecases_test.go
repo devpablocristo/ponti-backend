@@ -403,10 +403,6 @@ func TestBuildCheck(t *testing.T) {
 	}
 }
 
-func ptr(v int64) *int64 {
-	return &v
-}
-
 func decPtr(d decimal.Decimal) *decimal.Decimal {
 	return &d
 }

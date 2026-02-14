@@ -1,0 +1,10 @@
+---
+description: No usar git a menos que el usuario lo pida explícitamente
+alwaysApply: true
+---
+
+# No Git
+
+- NUNCA ejecutes comandos git (commit, push, pull, add, stash, etc.) a menos que el usuario lo pida explícitamente.
+- No hagas commits automáticos ni sugiereas hacer commits.
+- Si necesitás ver el estado del repo, preguntá antes.

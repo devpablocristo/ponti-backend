@@ -152,7 +152,7 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ProjectID: pID})
+	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ID: pID})
 }
 
 func (h *Handler) ListProjects(c *gin.Context) {
@@ -307,7 +307,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "updated"})
+	c.Status(http.StatusNoContent)
 }
 
 // DeleteProject elimina un proyecto por ID.
@@ -322,7 +322,7 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "deleted"})
+	c.Status(http.StatusNoContent)
 }
 
 // ArchiveProject archiva un proyecto por ID.
@@ -337,7 +337,7 @@ func (h *Handler) ArchiveProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "project archived successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
@@ -352,7 +352,7 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "project restored successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // HardDeleteProject elimina físicamente un proyecto por ID.
@@ -367,7 +367,7 @@ func (h *Handler) HardDeleteProject(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "project permanently deleted"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {
@@ -409,13 +409,8 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 		return
 	}
 	resp := dto.ListProjectsResponse{
-		Data: items,
-		PageInfo: dto.PageInfo{
-			PerPage: perPage,
-			Page:    page,
-			MaxPage: int((total + int64(perPage) - 1) / int64(perPage)),
-			Total:   total,
-		},
+		Items:    items,
+		PageInfo: types.NewPageInfo(page, perPage, total),
 	}
 	c.JSON(http.StatusOK, resp)
 }

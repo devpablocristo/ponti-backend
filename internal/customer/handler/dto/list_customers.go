@@ -1,6 +1,8 @@
 package dto
 
 import (
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
 )
 
@@ -10,18 +12,10 @@ type ListedCustomer struct {
 	Name string `json:"name"`
 }
 
-// PageInfo contiene metadata de paginación.
-type PageInfo struct {
-	PerPage int   `json:"per_page"`
-	Page    int   `json:"page"`
-	MaxPage int   `json:"max_page"`
-	Total   int64 `json:"total"`
-}
-
 // ListCustomersResponse es la respuesta paginada.
 type ListCustomersResponse struct {
-	Data     []ListedCustomer `json:"data"`
-	PageInfo PageInfo         `json:"page_info"`
+	Items    []ListedCustomer `json:"items"`
+	PageInfo types.PageInfo   `json:"page_info"`
 }
 
 // NewListCustomersResponse construye la respuesta paginada.
@@ -38,14 +32,8 @@ func NewListCustomersResponse(
 		}
 	}
 
-	maxPage := int((total + int64(perPage) - 1) / int64(perPage))
 	return ListCustomersResponse{
-		Data: out,
-		PageInfo: PageInfo{
-			PerPage: perPage,
-			Page:    page,
-			MaxPage: maxPage,
-			Total:   total,
-		},
+		Items:    out,
+		PageInfo: types.NewPageInfo(page, perPage, total),
 	}
 }

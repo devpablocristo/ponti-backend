@@ -214,7 +214,7 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supply updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
@@ -228,7 +228,7 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supply deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
@@ -248,7 +248,7 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Supplies updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) ExportTableSupplies(c *gin.Context) {
@@ -358,7 +358,7 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "supply movement deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
@@ -400,7 +400,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "supply movement updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) GetProviders(c *gin.Context) {
