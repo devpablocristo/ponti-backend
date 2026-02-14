@@ -7,6 +7,6 @@ type CreateCustomer struct {
 }
 
 type CreateCustomerResponse struct {
-	Message    string `json:"message"`
-	CustomerID int64  `json:"customer_id"`
+	Message string `json:"message"`
+	ID      int64  `json:"id"`
 }

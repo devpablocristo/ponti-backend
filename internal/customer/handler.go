@@ -114,8 +114,8 @@ func (h *Handler) CreateCustomer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.CreateCustomerResponse{
-		Message:    "Customer created successfully",
-		CustomerID: newID,
+		Message: "Customer created successfully",
+		ID:      newID,
 	})
 }
 
@@ -172,7 +172,7 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer updated successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // DeleteCustomer elimina un customer por su ID.
@@ -187,7 +187,7 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // ArchiveCustomer archiva un customer por su ID.
@@ -202,7 +202,7 @@ func (h *Handler) ArchiveCustomer(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer archived successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // RestoreCustomer restaura un customer archivado.
@@ -217,7 +217,7 @@ func (h *Handler) RestoreCustomer(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer restored successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // HardDeleteCustomer elimina físicamente un customer por ID.
@@ -232,5 +232,5 @@ func (h *Handler) HardDeleteCustomer(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Customer permanently deleted"})
+	c.Status(http.StatusNoContent)
 }

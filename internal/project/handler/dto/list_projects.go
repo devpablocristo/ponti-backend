@@ -6,6 +6,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+
 	"github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
 )
 
@@ -14,16 +16,9 @@ type ListedProject struct {
 	Name string `json:"name"`
 }
 
-type PageInfo struct {
-	PerPage int   `json:"per_page"`
-	Page    int   `json:"page"`
-	MaxPage int   `json:"max_page"`
-	Total   int64 `json:"total"`
-}
-
 type ListProjectsResponse struct {
-	Data     []ListedProject `json:"data"`
-	PageInfo PageInfo        `json:"page_info"`
+	Items    []ListedProject `json:"items"`
+	PageInfo types.PageInfo  `json:"page_info"`
 }
 
 func NewListProjectsResponse(
@@ -36,33 +31,26 @@ func NewListProjectsResponse(
 		out[i] = ListedProject{ID: p.ID, Name: p.Name}
 	}
 
-	maxPage := int((total + int64(perPage) - 1) / int64(perPage))
-
 	return ListProjectsResponse{
-		Data: out,
-		PageInfo: PageInfo{
-			PerPage: perPage,
-			Page:    page,
-			MaxPage: maxPage,
-			Total:   total,
-		},
+		Items:    out,
+		PageInfo: types.NewPageInfo(page, perPage, total),
 	}
 }
 
 type ProjectsResponse struct {
-	Data          []Project       `json:"data"`
+	Items         []Project       `json:"items"`
 	TotalHectares decimal.Decimal `json:"total_hectares"`
-	PageInfo      PageInfo        `json:"page_info"`
+	PageInfo      types.PageInfo  `json:"page_info"`
 }
 
 // MarshalJSON aplica redondeo de 3 decimales al campo TotalHectares
 func (p ProjectsResponse) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		Data          []Project `json:"data"`
-		TotalHectares string    `json:"total_hectares"`
-		PageInfo      PageInfo  `json:"page_info"`
+		Items         []Project      `json:"items"`
+		TotalHectares string         `json:"total_hectares"`
+		PageInfo      types.PageInfo `json:"page_info"`
 	}{
-		Data:          p.Data,
+		Items:         p.Items,
 		TotalHectares: p.TotalHectares.Round(3).String(),
 		PageInfo:      p.PageInfo,
 	}
@@ -108,15 +96,8 @@ func NewProjectsResponse(
 		}
 	}
 
-	maxPage := int((total + int64(perPage) - 1) / int64(perPage))
-
 	return ProjectsResponse{
-		Data: out,
-		PageInfo: PageInfo{
-			PerPage: perPage,
-			Page:    page,
-			MaxPage: maxPage,
-			Total:   total,
-		},
+		Items:    out,
+		PageInfo: types.NewPageInfo(page, perPage, total),
 	}
 }

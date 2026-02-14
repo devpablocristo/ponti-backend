@@ -125,32 +125,8 @@ func (h *Handler) ListLots(c *gin.Context) {
 		}
 		cropID = &parsed
 	}
-	page := 1
-	if raw := c.Query("page"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page", err))
-			return
-		}
-		page = parsed
-	}
-	pageSize := 1000
-	if raw := c.Query("page_size"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page_size", err))
-			return
-		}
-		pageSize = parsed
-	}
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 1000
-	}
-	// Los filtros por ID son opcionales para permitir búsquedas globales
-	// Si no se proporcionan filtros, se retornan todos los lotes
+
+	page, pageSize := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 	// Cap de paginación
 	if pageSize > 1000 {
 		pageSize = 1000
@@ -314,32 +290,8 @@ func (h *Handler) ExportLots(c *gin.Context) {
 		}
 		cropID = &parsed
 	}
-	page := 1
-	if raw := c.Query("page"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page", err))
-			return
-		}
-		page = parsed
-	}
-	pageSize := 1000
-	if raw := c.Query("page_size"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidInput, "invalid page_size", err))
-			return
-		}
-		pageSize = parsed
-	}
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 1000
-	}
-	// Los filtros por ID son opcionales para permitir búsquedas globales
-	// Si no se proporcionan filtros, se retornan todos los lotes
+
+	page, pageSize := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 	// Cap de paginación
 	if pageSize > 1000 {
 		pageSize = 1000
