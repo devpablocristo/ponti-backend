@@ -1,42 +1,5 @@
 package dto
 
-type AskContext struct {
-	DateFrom string `json:"date_from,omitempty"`
-	DateTo   string `json:"date_to,omitempty"`
-}
-
-type AskRequest struct {
-	Question string      `json:"question"`
-	Context  *AskContext `json:"context,omitempty"`
-}
-
-type AskResponse struct {
-	RequestID string           `json:"request_id"`
-	Intent    string           `json:"intent"`
-	QueryID   *string          `json:"query_id"`
-	Params    map[string]any   `json:"params"`
-	Data      []map[string]any `json:"data"`
-	Answer    string           `json:"answer"`
-	Sources   []map[string]any `json:"sources"`
-	Warnings  []string         `json:"warnings"`
-}
-
-type IngestDocument struct {
-	Source   string         `json:"source"`
-	Title    string         `json:"title"`
-	Content  string         `json:"content"`
-	Metadata map[string]any `json:"metadata,omitempty"`
-}
-
-type IngestRequest struct {
-	Documents []IngestDocument `json:"documents"`
-}
-
-type IngestResponse struct {
-	RequestID string `json:"request_id"`
-	Ingested  int    `json:"ingested"`
-}
-
 type InsightItem struct {
 	ID              string         `json:"id"`
 	ProjectID       string         `json:"project_id"`
@@ -81,12 +44,4 @@ type ActionRequest struct {
 type ActionResponse struct {
 	RequestID string `json:"request_id"`
 	Status    string `json:"status"`
-}
-
-type JobRecomputeRequest struct {
-	BatchSize *int `json:"batch_size,omitempty"`
-}
-
-type JobRecomputeBaselinesRequest struct {
-	BatchSize *int `json:"batch_size,omitempty"`
 }

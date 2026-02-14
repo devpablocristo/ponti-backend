@@ -13,7 +13,6 @@ import (
 	// third-party
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	// pkg
 	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
@@ -171,28 +170,81 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			return types.NewError(types.ErrConflict, "concurrent update conflict - lot was modified by another user", nil)
 		}
 
-		// Upsert de fechas por secuencia
+		// Upsert de fechas por secuencia.
+		// No dependemos de ON CONFLICT porque algunos entornos no tienen
+		// unique index (lot_id, sequence) en lot_dates.
 		for _, date := range l.Dates {
-			lotDate := models.LotDates{
-				LotID:       l.ID,
-				SowingDate:  date.SowingDate,
-				HarvestDate: date.HarvestDate,
-				Sequence:    date.Sequence,
-				Base: sharedmodels.Base{
-					CreatedBy: &userID,
-					UpdatedBy: &userID,
-					UpdatedAt: nowTS,
-				},
-			}
-			if err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "lot_id"}, {Name: "sequence"}},
-				DoUpdates: clause.AssignmentColumns([]string{"sowing_date", "harvest_date", "updated_by", "updated_at"}),
-			}).Create(&lotDate).Error; err != nil {
+			if err := upsertLotDateBySequence(tx, l.ID, date, userID, nowTS); err != nil {
 				return types.NewError(types.ErrInternal, "failed to upsert lot dates", err)
 			}
 		}
 		return nil
 	})
+}
+
+func upsertLotDateBySequence(
+	tx *gorm.DB,
+	lotID int64,
+	date domain.LotDates,
+	userID int64,
+	nowTS time.Time,
+) error {
+	var existing []models.LotDates
+	if err := tx.Unscoped().
+		Where("lot_id = ? AND sequence = ?", lotID, date.Sequence).
+		Order("id DESC").
+		Find(&existing).Error; err != nil {
+		return err
+	}
+
+	// Si hay duplicados históricos para la misma secuencia, conservamos el más reciente
+	// y soft-deleteamos los demás para mantener consistencia.
+	if len(existing) > 1 {
+		duplicateIDs := make([]int64, 0, len(existing)-1)
+		for i := 1; i < len(existing); i++ {
+			duplicateIDs = append(duplicateIDs, existing[i].ID)
+		}
+		if len(duplicateIDs) > 0 {
+			if err := tx.Model(&models.LotDates{}).
+				Where("id IN ? AND deleted_at IS NULL", duplicateIDs).
+				Updates(map[string]any{
+					"deleted_at": nowTS,
+					"deleted_by": &userID,
+					"updated_at": nowTS,
+					"updated_by": &userID,
+				}).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(existing) > 0 {
+		keepID := existing[0].ID
+		return tx.Unscoped().
+			Model(&models.LotDates{}).
+			Where("id = ?", keepID).
+			Updates(map[string]any{
+				"sowing_date":  date.SowingDate,
+				"harvest_date": date.HarvestDate,
+				"deleted_at":   nil,
+				"deleted_by":   nil,
+				"updated_at":   nowTS,
+				"updated_by":   &userID,
+			}).Error
+	}
+
+	lotDate := models.LotDates{
+		LotID:       lotID,
+		SowingDate:  date.SowingDate,
+		HarvestDate: date.HarvestDate,
+		Sequence:    date.Sequence,
+		Base: sharedmodels.Base{
+			CreatedBy: &userID,
+			UpdatedBy: &userID,
+			UpdatedAt: nowTS,
+		},
+	}
+	return tx.Create(&lotDate).Error
 }
 
 func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.Decimal) error {

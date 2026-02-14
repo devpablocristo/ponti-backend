@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	ai "github.com/alphacodinggroup/ponti-backend/internal/ai"
 	wire "github.com/alphacodinggroup/ponti-backend/wire"
 )
 
@@ -19,6 +20,17 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
+
+	// Middleware: auto-trigger de insights después de mutaciones exitosas.
+	// Dispara cómputo async y throttleado en ponti-ai cuando una ruta con
+	// :project_id en el path responde 2xx a POST/PUT/PATCH/DELETE.
+	trigger := ai.NewInsightTrigger(
+		deps.Config.AI.ServiceURL,
+		deps.Config.AI.ServiceKey,
+		deps.Config.AI.TimeoutMS,
+		deps.Config.AI.ComputeThrottleSec,
+	)
+	deps.GinEngine.GetRouter().Use(ai.InsightTriggerMiddleware(trigger))
 
 	// Registrar todas las rutas de la aplicación.
 	// Cada handler aplica sus middlewares de validación específicos.

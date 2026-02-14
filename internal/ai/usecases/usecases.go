@@ -42,24 +42,6 @@ func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body an
 	return 200, b, nil
 }
 
-func (u *UseCases) Ask(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/ask", body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"intent":     "placeholder",
-		"data":       []any{},
-		"answer":     "AI no configurada. Configurar AI_SERVICE_URL y AI_SERVICE_KEY en Cloud Run.",
-		"sources":    []any{},
-		"warnings":   []string{"AI service not configured"},
-	})
-}
-
-func (u *UseCases) Ingest(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/rag/ingest", body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"ingested":   0,
-	})
-}
-
 func (u *UseCases) ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error) {
 	return u.dummyOrReal(ctx, "POST", "/v1/insights/compute", nil, userID, projectID, map[string]any{
 		"request_id":       "dummy",
@@ -91,16 +73,3 @@ func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightI
 	})
 }
 
-func (u *UseCases) RecomputeActive(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/jobs/recompute-active", body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"status":     "dummy",
-	})
-}
-
-func (u *UseCases) RecomputeBaselines(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/jobs/recompute-baselines", body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"status":     "dummy",
-	})
-}

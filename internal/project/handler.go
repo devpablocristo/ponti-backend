@@ -3,10 +3,14 @@ package project
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
+	"github.com/go-playground/validator/v10"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
@@ -16,6 +20,42 @@ import (
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
+
+func humanizeBindError(err error) string {
+	var validationErrs validator.ValidationErrors
+	if errors.As(err, &validationErrs) {
+		var issues []string
+		for _, fe := range validationErrs {
+			fieldPath := strings.ToLower(fe.Namespace())
+			fieldPath = strings.TrimPrefix(fieldPath, "project.")
+
+			switch fe.Tag() {
+			case "required":
+				issues = append(issues, fieldPath+" es requerido")
+			default:
+				issues = append(issues, fieldPath+" inválido ("+fe.Tag()+")")
+			}
+		}
+		if len(issues) > 0 {
+			return "payload inválido: " + strings.Join(issues, "; ")
+		}
+	}
+
+	var unmarshalTypeErr *json.UnmarshalTypeError
+	if errors.As(err, &unmarshalTypeErr) {
+		if unmarshalTypeErr.Field != "" {
+			return "payload inválido: tipo inválido en '" + unmarshalTypeErr.Field + "'"
+		}
+		return "payload inválido: tipo de dato inválido"
+	}
+
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		return "payload inválido: JSON mal formado"
+	}
+
+	return "payload inválido"
+}
 
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
@@ -99,7 +139,7 @@ func (h *Handler) Routes() {
 func (h *Handler) CreateProject(c *gin.Context) {
 	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		domErr := types.NewError(types.ErrBadRequest, humanizeBindError(err), err)
 		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
 		return
@@ -246,7 +286,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 	}
 	var req dto.Project
 	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		domErr := types.NewError(types.ErrBadRequest, humanizeBindError(err), err)
 		apiErr, status := types.NewAPIError(domErr)
 		c.JSON(status, apiErr.ToResponse())
 		return
