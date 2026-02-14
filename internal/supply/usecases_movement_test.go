@@ -477,7 +477,7 @@ func TestHandleMovementInternalMovementOut_IncludesSupplyNameInError(t *testing.
 	assert.Contains(t, err.Error(), "Urea")
 }
 
-func TestHandleMovementInternalMovementOut_BlocksWhenSupplyAlreadyExistsInDestination(t *testing.T) {
+func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestination(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
@@ -486,16 +486,21 @@ func TestHandleMovementInternalMovementOut_BlocksWhenSupplyAlreadyExistsInDestin
 	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
 
 	originSupplyID := int64(147)
+	destSupplyID := int64(999)
 	destinationProjectID := int64(25)
 	movement := &domain.SupplyMovement{
 		ProjectId:            20,
 		ProjectDestinationId: destinationProjectID,
 		Quantity:             decimal.NewFromInt(10),
+		MovementType:         domain.INTERNAL_MOVEMENT,
 		Supply:               &domain.Supply{ID: originSupplyID},
 		Provider:             &providerdomain.Provider{ID: 1, Name: "agro"},
 		Investor:             &investordomain.Investor{ID: 11},
 	}
 	stockOrigin := stockdomain.Stock{ID: 10, RealStockUnits: decimal.NewFromInt(50)}
+
+	var outMovementCreated *domain.SupplyMovement
+	var inMovementCreated *domain.SupplyMovement
 
 	mockRepo.EXPECT().
 		GetSupply(gomock.Any(), originSupplyID).
@@ -503,16 +508,41 @@ func TestHandleMovementInternalMovementOut_BlocksWhenSupplyAlreadyExistsInDestin
 
 	mockRepo.EXPECT().
 		GetSupplyByProjectAndName(gomock.Any(), destinationProjectID, "ACEITE VERSION").
-		Return(&domain.Supply{ID: 999, ProjectID: destinationProjectID, Name: "ACEITE VERSION"}, nil)
+		Return(&domain.Supply{ID: destSupplyID, ProjectID: destinationProjectID, Name: "ACEITE VERSION"}, nil)
+
+	mockStock.EXPECT().
+		UpdateRealStockUnits(gomock.Any(), stockOrigin.ID, gomock.Any()).
+		Return(nil)
 
 	mockRepo.EXPECT().
-		GetProjectNameByID(gomock.Any(), destinationProjectID).
-		Return("DEPOSITO", nil)
+		CreateSupplyMovement(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
+			outMovementCreated = m
+			return 101, nil
+		})
+
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), destinationProjectID, destSupplyID).
+		Return(&stockdomain.Stock{ID: 202, RealStockUnits: decimal.NewFromInt(3)}, false, nil)
+
+	mockStock.EXPECT().
+		UpdateRealStockUnits(gomock.Any(), int64(202), gomock.Any()).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		CreateSupplyMovement(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
+			inMovementCreated = m
+			return 102, nil
+		})
 
 	err := u.handleMovementInternalMovementOut(context.Background(), movement, stockOrigin)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ya existe en el proyecto destino")
-	assert.Contains(t, err.Error(), "DEPOSITO")
+	assert.NoError(t, err)
+	assert.NotNil(t, outMovementCreated)
+	assert.NotNil(t, inMovementCreated)
+	assert.Equal(t, originSupplyID, outMovementCreated.Supply.ID)
+	assert.Equal(t, destSupplyID, inMovementCreated.Supply.ID)
+	assert.True(t, inMovementCreated.Quantity.Equal(decimal.NewFromInt(10)))
 }
 
 func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t *testing.T) {

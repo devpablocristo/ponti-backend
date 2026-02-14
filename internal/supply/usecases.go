@@ -29,7 +29,6 @@ type RepositoryPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
-	GetProjectNameByID(ctx context.Context, projectID int64) (string, error)
 }
 
 type ExporterAdapterPort interface {
