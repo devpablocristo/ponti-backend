@@ -127,8 +127,8 @@ func TestUpdateProject_AllowsFrontendPayloadWithEmptyLeaseTypeDecimals(t *testin
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d. body=%s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d. body=%s", rr.Code, rr.Body.String())
 	}
 	if !ucs.updateCalled {
 		t.Fatal("expected UpdateProject to be called")
