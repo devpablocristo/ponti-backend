@@ -14,6 +14,7 @@ import (
 )
 
 type CreateSupplyMovementRequestBulk struct {
+	Mode            string                             `json:"mode"`
 	SupplyMovements []CreateSupplyMovementEntryRequest `json:"items"`
 }
 

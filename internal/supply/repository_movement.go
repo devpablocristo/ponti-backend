@@ -8,8 +8,8 @@ import (
 
 	providermodel "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
@@ -22,7 +22,7 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 		return 0, err
 	}
 	model := models.SupplyMovementFromDomain(movement)
-	db := r.db.Client().WithContext(ctx)
+	db := r.getDB(ctx)
 	if err := db.Create(model).Error; err != nil {
 		return 0, err
 	}
@@ -34,7 +34,7 @@ func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomai
 		return 0, err
 	}
 
-	client := r.db.Client().WithContext(ctx)
+	client := r.getDB(ctx)
 
 	provider.Name = strings.TrimSpace(provider.Name)
 
@@ -76,7 +76,7 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 }
 
 func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectId int64) ([]*domain.SupplyMovement, error) {
-	db := r.db.Client().WithContext(ctx)
+	db := r.getDB(ctx)
 
 	var modelSupplyMovements []models.SupplyMovement
 
@@ -101,11 +101,74 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 		domainSupplyMovements[i] = moddomainSupplyMovement.ToDomain()
 	}
 
+	if err := r.attachOriginsToMovements(ctx, domainSupplyMovements); err != nil {
+		return nil, err
+	}
+
 	return domainSupplyMovements, nil
 }
 
+type movementOriginRow struct {
+	MovementID      int64   `gorm:"column:movement_id"`
+	OriginProjectID *int64  `gorm:"column:origin_project_id"`
+	OriginProject   *string `gorm:"column:origin_project_name"`
+}
+
+func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*domain.SupplyMovement) error {
+	if len(movements) == 0 {
+		return nil
+	}
+
+	ids := make([]int64, 0, len(movements))
+	for i := range movements {
+		ids = append(ids, movements[i].ID)
+	}
+
+	query := `
+		SELECT
+			sm_in.id AS movement_id,
+			src.project_id AS origin_project_id,
+			pj.name AS origin_project_name
+		FROM supply_movements sm_in
+		LEFT JOIN LATERAL (
+			SELECT sm_out.project_id
+			FROM supply_movements sm_out
+			WHERE sm_out.deleted_at IS NULL
+			  AND sm_out.movement_type = 'Movimiento interno'
+			  AND sm_out.reference_number = sm_in.reference_number
+			  AND sm_out.movement_date = sm_in.movement_date
+			  AND sm_out.investor_id = sm_in.investor_id
+			  AND sm_out.provider_id = sm_in.provider_id
+			  AND sm_out.quantity = (sm_in.quantity * -1)
+			ORDER BY sm_out.id DESC
+			LIMIT 1
+		) src ON sm_in.movement_type = 'Movimiento interno entrada'
+		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL
+		WHERE sm_in.id IN ?
+	`
+
+	var rows []movementOriginRow
+	if err := r.getDB(ctx).Raw(query, ids).Scan(&rows).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to resolve origin project for supply movements", err)
+	}
+
+	originsByMovementID := make(map[int64]movementOriginRow, len(rows))
+	for i := range rows {
+		originsByMovementID[rows[i].MovementID] = rows[i]
+	}
+
+	for i := range movements {
+		if row, ok := originsByMovementID[movements[i].ID]; ok {
+			movements[i].OriginProjectID = row.OriginProjectID
+			movements[i].OriginProjectName = row.OriginProject
+		}
+	}
+
+	return nil
+}
+
 func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*domain.SupplyMovement, error) {
-	db := r.db.Client().WithContext(ctx)
+	db := r.getDB(ctx)
 
 	var modelSupplyMovement models.SupplyMovement
 
@@ -132,7 +195,7 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	}
 
 	model := models.SupplyMovementFromDomain(movement)
-	db := r.db.Client().WithContext(ctx)
+	db := r.getDB(ctx)
 
 	if err := db.Model(&models.SupplyMovement{}).
 		Where("id = ?", movement.ID).
@@ -146,7 +209,7 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 }
 
 func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var stockModel stockmodel.Stock
 		var supplyModel models.SupplyMovement
 
@@ -293,7 +356,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	var providers []providermodel.Provider
-	if err := r.db.Client().WithContext(ctx).Find(&providers).Error; err != nil {
+	if err := r.getDB(ctx).Find(&providers).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list providers", err)
 	}
 	res := make([]providerdomain.Provider, len(providers))

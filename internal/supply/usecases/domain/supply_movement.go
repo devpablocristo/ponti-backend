@@ -21,6 +21,8 @@ type SupplyMovement struct {
 	Supply               *Supply
 	Investor             *investordomain.Investor
 	Provider             *providerdomain.Provider
+	OriginProjectID      *int64
+	OriginProjectName    *string
 	IsEntry              bool
 	shareddomain.Base
 }

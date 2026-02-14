@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
+	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
@@ -27,10 +30,16 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(shareddb.WithTx(ctx, tx))
+	})
+}
+
 // --- CREATE ---
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	var id int64
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(s)
 		if err := tx.Create(model).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to create supply", err)
@@ -46,7 +55,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 	if err != nil {
 		return err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		modelsSlice := make([]*models.Supply, len(supplies))
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
@@ -62,7 +71,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 // --- GET ---
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
-	if err := r.db.Client().WithContext(ctx).
+	if err := r.getDB(ctx).
 		Preload("Category").
 		Preload("Type").
 		First(&m, id).Error; err != nil {
@@ -71,12 +80,35 @@ func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, e
 	return m.ToDomain(), nil
 }
 
+func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID int64, name string) (*domain.Supply, error) {
+	normalizedName := strings.TrimSpace(name)
+	if normalizedName == "" {
+		return nil, types.NewError(types.ErrValidation, "supply name is empty", nil)
+	}
+
+	var m models.Supply
+	err := r.getDB(ctx).
+		Preload("Category").
+		Preload("Type").
+		Where("project_id = ?", projectID).
+		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", normalizedName).
+		First(&m).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, "supply not found", err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get supply by project and name", err)
+	}
+
+	return m.ToDomain(), nil
+}
+
 // --- UPDATE ---
 func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	if err := sharedrepo.ValidateID(s.ID, "supply"); err != nil {
 		return err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
@@ -115,7 +147,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 // --- DELETE ---
 func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	var count int64
-	if err := r.db.Client().WithContext(ctx).
+	if err := r.getDB(ctx).
 		Model(&workOrderModels.WorkOrder{}).
 		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
 		Where("workorder_items.supply_id = ?", supplyID).
@@ -132,7 +164,7 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
 		return err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
@@ -161,7 +193,7 @@ func (r *Repository) ListSuppliesPaginated(
 	var supplies []models.Supply
 	var total int64
 
-	db := r.db.Client().WithContext(ctx).Model(&models.Supply{}).
+	db := r.getDB(ctx).Model(&models.Supply{}).
 		Preload("Category").
 		Preload("Type")
 
@@ -195,11 +227,16 @@ func (r *Repository) ListSuppliesPaginated(
 	for i := range supplies {
 		res[i] = *supplies[i].ToDomain()
 	}
+
+	if err := r.attachOriginsToSupplies(ctx, res); err != nil {
+		return nil, 0, err
+	}
+
 	return res, total, nil
 }
 
 func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for i := range supplies {
 			updates := map[string]any{
 				"name":        supplies[i].Name,
@@ -231,7 +268,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 }
 
 func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFilter) ([]domain.Supply, int64, error) {
-	base := r.db.Client().WithContext(ctx).Model(&models.Supply{})
+	base := r.getDB(ctx).Model(&models.Supply{})
 
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
 		CustomerID: filter.CustomerID,
@@ -267,5 +304,108 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	for i := range rows {
 		out[i] = *rows[i].ToDomain()
 	}
+
+	if err := r.attachOriginsToSupplies(ctx, out); err != nil {
+		return nil, 0, err
+	}
+
 	return out, total, nil
+}
+
+type supplyOriginRow struct {
+	SupplyID        int64      `gorm:"column:supply_id"`
+	Type            string     `gorm:"column:type"`
+	SourceProjectID *int64     `gorm:"column:source_project_id"`
+	SourceProject   *string    `gorm:"column:source_project"`
+	MovementID      *int64     `gorm:"column:movement_id"`
+	ReferenceNumber *string    `gorm:"column:reference_number"`
+	ProviderName    *string    `gorm:"column:provider_name"`
+	MovementDate    *time.Time `gorm:"column:movement_date"`
+}
+
+func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []domain.Supply) error {
+	if len(supplies) == 0 {
+		return nil
+	}
+
+	supplyIDs := make([]int64, 0, len(supplies))
+	for i := range supplies {
+		supplyIDs = append(supplyIDs, supplies[i].ID)
+	}
+
+	query := `
+		WITH latest AS (
+			SELECT DISTINCT ON (sm.supply_id)
+				sm.supply_id,
+				sm.id AS movement_id,
+				sm.movement_type,
+				sm.reference_number,
+				sm.movement_date,
+				sm.investor_id,
+				sm.provider_id,
+				sm.quantity
+			FROM supply_movements sm
+			WHERE sm.deleted_at IS NULL
+			  AND sm.is_entry = TRUE
+			  AND sm.supply_id IN ?
+			ORDER BY sm.supply_id, sm.movement_date DESC, sm.id DESC
+		)
+		SELECT
+			l.supply_id,
+			l.movement_type AS type,
+			l.movement_id,
+			l.reference_number,
+			l.movement_date,
+			pv.name AS provider_name,
+			src.project_id AS source_project_id,
+			pj.name AS source_project
+		FROM latest l
+		LEFT JOIN providers pv ON pv.id = l.provider_id
+		LEFT JOIN LATERAL (
+			SELECT sm_out.project_id
+			FROM supply_movements sm_out
+			WHERE sm_out.deleted_at IS NULL
+			  AND sm_out.movement_type = 'Movimiento interno'
+			  AND sm_out.reference_number = l.reference_number
+			  AND sm_out.movement_date = l.movement_date
+			  AND sm_out.investor_id = l.investor_id
+			  AND sm_out.provider_id = l.provider_id
+			  AND sm_out.quantity = (l.quantity * -1)
+			ORDER BY sm_out.id DESC
+			LIMIT 1
+		) src ON l.movement_type = 'Movimiento interno entrada'
+		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL
+	`
+
+	var rows []supplyOriginRow
+	if err := r.getDB(ctx).Raw(query, supplyIDs).Scan(&rows).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to resolve supply origins", err)
+	}
+
+	originBySupply := make(map[int64]*domain.SupplyOrigin, len(rows))
+	for i := range rows {
+		row := rows[i]
+		origin := &domain.SupplyOrigin{
+			Type:         row.Type,
+			MovementID:   row.MovementID,
+			MovementDate: row.MovementDate,
+		}
+		if row.ReferenceNumber != nil {
+			origin.ReferenceNumber = *row.ReferenceNumber
+		}
+		if row.ProviderName != nil {
+			origin.ProviderName = *row.ProviderName
+		}
+		origin.SourceProjectID = row.SourceProjectID
+		if row.SourceProject != nil {
+			origin.SourceProject = *row.SourceProject
+		}
+		originBySupply[row.SupplyID] = origin
+	}
+
+	for i := range supplies {
+		supplies[i].Origin = originBySupply[supplies[i].ID]
+	}
+
+	return nil
 }

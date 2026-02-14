@@ -3,6 +3,8 @@ package supply
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -34,6 +36,8 @@ type UseCasesPort interface {
 	ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error)
 	GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
+	ValidateSupplyMovement(context.Context, *domain.SupplyMovement) error
+	CreateSupplyMovementsStrict(context.Context, []*domain.SupplyMovement) ([]int64, error)
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
@@ -299,29 +303,189 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	var supplyMovementsResponse []createDto.CreateSupplyMovementResponse
-
-	for _, supplyMovement := range req.SupplyMovements {
-		var supplyMovementResponse createDto.CreateSupplyMovementResponse
-
-		err = supplyMovement.Validate()
-		if err != nil {
-			supplyMovementResponse = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
-		} else {
-			supplyMovementId, err := h.ucs.CreateSupplyMovement(ctx, supplyMovement.ToDomain(projectID, &userID))
-			if err != nil {
-				supplyMovementResponse = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
-			} else {
-				supplyMovementResponse = createDto.NewSuccessfulCreateSupplyMovementResponse(supplyMovementId)
-			}
-		}
-
-		supplyMovementsResponse = append(supplyMovementsResponse, supplyMovementResponse)
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if mode == "" {
+		mode = "strict"
+	}
+	if mode != "partial" && mode != "strict" {
+		domErr := types.NewError(types.ErrBadRequest, "mode must be one of [partial, strict]", nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
 	}
 
-	c.JSON(http.StatusMultiStatus, createDto.CreateSupplyMovementBulkResponse{
+	warnings := make([]string, 0)
+	for _, item := range req.SupplyMovements {
+		if item.MovementType == domain.INTERNAL_MOVEMENT && mode == "partial" {
+			mode = "strict"
+			warnings = append(warnings, "partial mode was overridden to strict for internal movements")
+			break
+		}
+	}
+
+	total := len(req.SupplyMovements)
+	supplyMovementsResponse := make([]createDto.CreateSupplyMovementResponse, 0, total)
+	successes := make([]createDto.SupplyMovementSuccess, 0, total)
+	failures := make([]createDto.SupplyMovementFailure, 0)
+	skipped := make([]createDto.SupplyMovementSkipped, 0)
+	domainMovements := make([]*domain.SupplyMovement, 0, total)
+	validIndexes := make([]int, 0, total)
+
+	for i, item := range req.SupplyMovements {
+		if err := item.Validate(); err != nil {
+			failures = append(failures, createDto.SupplyMovementFailure{
+				Index:    i,
+				SupplyID: item.SupplyID,
+				Code:     "validation_error",
+				Message:  err.Error(),
+			})
+			supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(err.Error()))
+			continue
+		}
+		domainMovements = append(domainMovements, item.ToDomain(projectID, &userID))
+		validIndexes = append(validIndexes, i)
+		supplyMovementsResponse = append(supplyMovementsResponse, createDto.CreateSupplyMovementResponse{})
+	}
+
+	if mode == "strict" {
+		if len(failures) == 0 && len(domainMovements) > 0 {
+			prevalidationFailedIndexes := make(map[int]bool)
+			for i, movement := range domainMovements {
+				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
+					itemIndex := validIndexes[i]
+					prevalidationFailedIndexes[itemIndex] = true
+					failures = append(failures, createDto.SupplyMovementFailure{
+						Index:    itemIndex,
+						SupplyID: req.SupplyMovements[itemIndex].SupplyID,
+						Code:     "validation_error",
+						Message:  err.Error(),
+					})
+					supplyMovementsResponse[itemIndex] = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
+				}
+			}
+
+			if len(prevalidationFailedIndexes) > 0 {
+				for _, itemIndex := range validIndexes {
+					if prevalidationFailedIndexes[itemIndex] {
+						continue
+					}
+					skipped = append(skipped, createDto.SupplyMovementSkipped{
+						Index:    itemIndex,
+						SupplyID: req.SupplyMovements[itemIndex].SupplyID,
+						Reason:   "No ejecutado por rollback estricto",
+					})
+					supplyMovementsResponse[itemIndex] = createDto.CreateSupplyMovementResponse{
+						IsSaved: false,
+					}
+				}
+				warnings = append(warnings, "Hay insumos válidos que no se ejecutaron por rollback estricto")
+			} else {
+				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
+				if err != nil {
+					failedValidPos := -1
+					msg := err.Error()
+					if strings.HasPrefix(msg, "item ") {
+						parts := strings.SplitN(msg, ": ", 2)
+						if len(parts) == 2 {
+							prefix := strings.TrimPrefix(parts[0], "item ")
+							if pos, convErr := strconv.Atoi(strings.TrimSpace(prefix)); convErr == nil {
+								failedValidPos = pos
+							}
+							msg = parts[1]
+						}
+					}
+					for _, itemIndex := range validIndexes {
+						if failedValidPos >= 0 && failedValidPos < len(validIndexes) && itemIndex == validIndexes[failedValidPos] {
+							failures = append(failures, createDto.SupplyMovementFailure{
+								Index:    itemIndex,
+								SupplyID: req.SupplyMovements[itemIndex].SupplyID,
+								Code:     "apply_error",
+								Message:  msg,
+							})
+							supplyMovementsResponse[itemIndex] = createDto.NewErrorCreateSupplyMovementResponse(msg)
+							continue
+						}
+						skipped = append(skipped, createDto.SupplyMovementSkipped{
+							Index:    itemIndex,
+							SupplyID: req.SupplyMovements[itemIndex].SupplyID,
+							Reason:   "No ejecutado por rollback estricto",
+						})
+						supplyMovementsResponse[itemIndex] = createDto.CreateSupplyMovementResponse{
+							IsSaved: false,
+						}
+					}
+					if len(skipped) > 0 {
+						warnings = append(warnings, "Hay insumos válidos que no se ejecutaron por rollback estricto")
+					}
+				} else {
+					for i, movementID := range ids {
+						itemIndex := validIndexes[i]
+						successes = append(successes, createDto.SupplyMovementSuccess{
+							Index:            itemIndex,
+							SupplyID:         req.SupplyMovements[itemIndex].SupplyID,
+							SupplyMovementID: movementID,
+						})
+						supplyMovementsResponse[itemIndex] = createDto.NewSuccessfulCreateSupplyMovementResponse(movementID)
+					}
+				}
+			}
+		} else if len(failures) > 0 {
+			msg := "No ejecutado por rollback estricto"
+			for _, itemIndex := range validIndexes {
+				skipped = append(skipped, createDto.SupplyMovementSkipped{
+					Index:    itemIndex,
+					SupplyID: req.SupplyMovements[itemIndex].SupplyID,
+					Reason:   msg,
+				})
+				supplyMovementsResponse[itemIndex] = createDto.CreateSupplyMovementResponse{
+					IsSaved: false,
+				}
+			}
+			warnings = append(warnings, "Hay insumos válidos que no se ejecutaron por rollback estricto")
+		}
+	} else {
+		validPos := 0
+		for i := range req.SupplyMovements {
+			if supplyMovementsResponse[i].IsSaved || supplyMovementsResponse[i].ErrorDetail != "" {
+				continue
+			}
+			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
+			if err != nil {
+				failures = append(failures, createDto.SupplyMovementFailure{
+					Index:    i,
+					SupplyID: req.SupplyMovements[i].SupplyID,
+					Code:     "apply_error",
+					Message:  err.Error(),
+				})
+				supplyMovementsResponse[i] = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
+			} else {
+				successes = append(successes, createDto.SupplyMovementSuccess{
+					Index:            i,
+					SupplyID:         req.SupplyMovements[i].SupplyID,
+					SupplyMovementID: supplyMovementID,
+				})
+				supplyMovementsResponse[i] = createDto.NewSuccessfulCreateSupplyMovementResponse(supplyMovementID)
+			}
+			validPos++
+		}
+	}
+
+	response := createDto.CreateSupplyMovementBulkResponse{
+		Success:         len(failures) == 0,
+		Mode:            mode,
+		Total:           total,
+		Applied:         len(successes),
+		Failed:          len(failures),
+		Successes:       successes,
+		Failures:        failures,
+		Skipped:         skipped,
+		Warnings:        warnings,
 		SupplyMovements: supplyMovementsResponse,
-	})
+	}
+
+	// Siempre responder 200 para que frontend lea failures detallados
+	// y no caiga en mensaje genérico por códigos HTTP de error.
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
