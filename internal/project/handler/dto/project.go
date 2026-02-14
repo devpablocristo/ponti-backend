@@ -1,7 +1,9 @@
 package dto
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -73,6 +75,86 @@ type Field struct {
 	LeaseTypeValue   *decimal.Decimal `json:"lease_type_value"`
 	Investors        []Investor       `json:"investors" binding:"required,dive,required"`
 	Lots             []Lot            `json:"lots" binding:"required,dive,required"`
+}
+
+// UnmarshalJSON tolera lease_type_percent/value como null, "", número o string numérico.
+func (f *Field) UnmarshalJSON(data []byte) error {
+	type fieldAlias struct {
+		ID               int64            `json:"id,omitempty"`
+		ProjectID        int64            `json:"project_id,omitempty"`
+		Name             string           `json:"name"`
+		LeaseTypeName    string           `json:"lease_type_name"`
+		LeaseTypeID      int64            `json:"lease_type_id"`
+		LeaseTypePercent json.RawMessage  `json:"lease_type_percent"`
+		LeaseTypeValue   json.RawMessage  `json:"lease_type_value"`
+		Investors        []Investor       `json:"investors"`
+		Lots             []Lot            `json:"lots"`
+	}
+
+	var aux fieldAlias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	leaseTypePercent, err := parseOptionalDecimal(aux.LeaseTypePercent)
+	if err != nil {
+		return fmt.Errorf("lease_type_percent: %w", err)
+	}
+	leaseTypeValue, err := parseOptionalDecimal(aux.LeaseTypeValue)
+	if err != nil {
+		return fmt.Errorf("lease_type_value: %w", err)
+	}
+
+	f.ID = aux.ID
+	f.ProjectID = aux.ProjectID
+	f.Name = aux.Name
+	f.LeaseTypeName = aux.LeaseTypeName
+	f.LeaseTypeID = aux.LeaseTypeID
+	f.LeaseTypePercent = leaseTypePercent
+	f.LeaseTypeValue = leaseTypeValue
+	f.Investors = aux.Investors
+	f.Lots = aux.Lots
+
+	return nil
+}
+
+func parseOptionalDecimal(raw json.RawMessage) (*decimal.Decimal, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return nil, nil
+	}
+
+	// Caso string: "", "12.5"
+	var strVal string
+	if err := json.Unmarshal(trimmed, &strVal); err == nil {
+		strVal = strings.TrimSpace(strVal)
+		if strVal == "" {
+			return nil, nil
+		}
+		d, err := decimal.NewFromString(strVal)
+		if err != nil {
+			return nil, err
+		}
+		return &d, nil
+	}
+
+	// Caso número: 12.5
+	var numVal json.Number
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.UseNumber()
+	if err := decoder.Decode(&numVal); err == nil {
+		d, err := decimal.NewFromString(numVal.String())
+		if err != nil {
+			return nil, err
+		}
+		return &d, nil
+	}
+
+	return nil, fmt.Errorf("invalid decimal value")
 }
 
 // MarshalJSON aplica redondeo de 3 decimales a los campos decimales

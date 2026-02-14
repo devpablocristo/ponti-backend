@@ -1,9 +1,3 @@
-// Package dto contiene los DTOs para el módulo de integridad de datos
-//
-// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
-//
-// ESTOS DTOs SON CRÍTICOS PARA LA INTEGRIDAD DE DATOS.
-// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 package dto
 
 import (

@@ -15,14 +15,10 @@ import (
 )
 
 type UseCasesPort interface {
-	Ask(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
-	Ingest(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
 	ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error)
 	GetInsights(ctx context.Context, userID, projectID, entityType, entityID string) (int, []byte, error)
 	GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error)
 	RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error)
-	RecomputeActive(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
-	RecomputeBaselines(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
 }
 
 type GinEnginePort interface {
@@ -67,45 +63,11 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("/ask", h.Ask)
-		public.POST("/rag/ingest", h.Ingest)
 		public.POST("/insights/compute", h.ComputeInsights)
 		public.GET("/insights/summary", h.GetSummary)
 		public.GET("/insights/:entity_type/:entity_id", h.GetInsights)
 		public.POST("/insights/:insight_id/actions", h.RecordAction)
-		public.POST("/jobs/recompute-active", h.RecomputeActive)
-		public.POST("/jobs/recompute-baselines", h.RecomputeBaselines)
 	}
-}
-
-func (h *Handler) Ask(c *gin.Context) {
-	var req dto.AskRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid request payload", err))
-		return
-	}
-	userID, projectID, err := extractIDs(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	status, body, err := h.ucs.Ask(c.Request.Context(), userID, projectID, req)
-	h.respondProxy(c, status, body, err)
-}
-
-func (h *Handler) Ingest(c *gin.Context) {
-	var req dto.IngestRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid request payload", err))
-		return
-	}
-	userID, projectID, err := extractIDs(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	status, body, err := h.ucs.Ingest(c.Request.Context(), userID, projectID, req)
-	h.respondProxy(c, status, body, err)
 }
 
 func (h *Handler) ComputeInsights(c *gin.Context) {
@@ -153,30 +115,6 @@ func (h *Handler) RecordAction(c *gin.Context) {
 		return
 	}
 	status, body, err := h.ucs.RecordAction(c.Request.Context(), userID, projectID, insightID, req)
-	h.respondProxy(c, status, body, err)
-}
-
-func (h *Handler) RecomputeActive(c *gin.Context) {
-	var req dto.JobRecomputeRequest
-	_ = c.ShouldBindJSON(&req)
-	userID, projectID, err := extractIDs(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	status, body, err := h.ucs.RecomputeActive(c.Request.Context(), userID, projectID, req)
-	h.respondProxy(c, status, body, err)
-}
-
-func (h *Handler) RecomputeBaselines(c *gin.Context) {
-	var req dto.JobRecomputeBaselinesRequest
-	_ = c.ShouldBindJSON(&req)
-	userID, projectID, err := extractIDs(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	status, body, err := h.ucs.RecomputeBaselines(c.Request.Context(), userID, projectID, req)
 	h.respondProxy(c, status, body, err)
 }
 

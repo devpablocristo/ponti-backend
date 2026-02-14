@@ -39,6 +39,7 @@ type LotTable struct {
 }
 
 type LotDates struct {
+	ID          int64      `gorm:"column:id"`
 	LotID       int64      `gorm:"lot_id"`
 	SowingDate  *time.Time `gorm:"sowing_date"`
 	HarvestDate *time.Time `gorm:"harvest_date"`

@@ -14,7 +14,7 @@ import (
 	reportDomain "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
 )
 
-func TestUseCases_control1CostosDirectos(t *testing.T) {
+func TestUseCases_control1LotesVsDashboard(t *testing.T) {
 	tests := []struct {
 		name               string
 		mockLots           []lotDomain.LotTable
@@ -23,6 +23,8 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 		expectedStatus     string
 		expectedDiffA      string
 		expectedSystemVal  string
+		hasDiffB           bool
+		expectedDiffB      string
 	}{
 		{
 			name: "OK - todos los valores iguales",
@@ -49,6 +51,8 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 			expectedStatus:    "OK",
 			expectedDiffA:     "0.00",
 			expectedSystemVal: "18459.39",
+			hasDiffB:          true,
+			expectedDiffB:     "0.00",
 		},
 		{
 			name: "OK - diferencia dentro de tolerancia",
@@ -71,6 +75,8 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 			expectedStatus:    "OK",
 			expectedDiffA:     "0.78",
 			expectedSystemVal: "18455.17",
+			hasDiffB:          true,
+			expectedDiffB:     "0.00",
 		},
 		{
 			name: "ERROR - diferencia fuera de tolerancia",
@@ -93,6 +99,8 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 			expectedStatus:    "ERROR",
 			expectedDiffA:     "-1540.00",
 			expectedSystemVal: "18460.00",
+			hasDiffB:          true,
+			expectedDiffB:     "0.00",
 		},
 	}
 
@@ -116,7 +124,7 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			result, err := useCases.control1CostosDirectos(ctx, sd)
+			result, err := useCases.control1LotesVsDashboard(ctx, sd)
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, result.ControlNumber)
@@ -125,11 +133,16 @@ func TestUseCases_control1CostosDirectos(t *testing.T) {
 			assert.Equal(t, tt.expectedSystemVal, result.SystemValue.StringFixed(2))
 			assert.Equal(t, "v4_report.dashboard_management_balance", result.SystemSource)
 			assert.Equal(t, "v4_report.lot_list", result.RecalcASource)
+
+			if tt.hasDiffB {
+				require.NotNil(t, result.DifferenceB)
+				assert.Equal(t, tt.expectedDiffB, result.DifferenceB.StringFixed(2))
+			}
 		})
 	}
 }
 
-func TestUseCases_control8ResultadoOperativo_withRecalcB(t *testing.T) {
+func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 	tests := []struct {
 		name               string
 		mockLots           []lotDomain.LotTable
@@ -208,10 +221,10 @@ func TestUseCases_control8ResultadoOperativo_withRecalcB(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			result, err := useCases.control8ResultadoOperativo(ctx, sd)
+			result, err := useCases.control13LotesResultadoVsDashboard(ctx, sd)
 
 			require.NoError(t, err)
-			assert.Equal(t, 8, result.ControlNumber)
+			assert.Equal(t, 13, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)
 			assert.Equal(t, tt.expectedDiffA, result.DifferenceA.StringFixed(2))
 

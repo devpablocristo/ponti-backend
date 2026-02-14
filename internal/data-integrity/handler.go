@@ -1,9 +1,3 @@
-// Package dataintegrity proporciona funcionalidades para validar la integridad de datos
-//
-// ⚠️  ADVERTENCIA CRÍTICA - NO MODIFICAR SIN AUTORIZACIÓN EXPLÍCITA ⚠️
-//
-// ESTE MÓDULO CONTIENE CÁLCULOS CRÍTICOS DE INTEGRIDAD DE DATOS.
-// NUNCA ALTERAR SIN AUTORIZACIÓN EXPLÍCITA DEL USUARIO.
 package dataintegrity
 
 import (
@@ -93,7 +87,7 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	}
 	filter.ProjectID = projectID
 
-	// Timeout 8 min para permitir completar los 9 controles (optimizados con cache)
+	// Timeout 8 min para permitir completar los 14 controles (optimizados con cache)
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Minute)
 	defer cancel()
 

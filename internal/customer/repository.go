@@ -226,14 +226,117 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Delete(&models.Customer{}, "id = ?", id)
-	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to hard delete customer", result.Error)
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verificar que el customer existe
+		var count int64
+		if err := tx.Unscoped().Model(&models.Customer{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check customer existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, fmt.Sprintf("customer with id %d does not exist", id), nil)
+		}
+
+		// Obtener IDs de proyectos del customer
+		var projectIDs []int64
+		if err := tx.Unscoped().Table("projects").Where("customer_id = ?", id).Pluck("id", &projectIDs).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to get projects for customer", err)
+		}
+
+		// Eliminar en cascada cada proyecto (mismo orden que HardDeleteProject)
+		for _, projectID := range projectIDs {
+			if err := hardDeleteProjectCascade(tx, projectID); err != nil {
+				return err
+			}
+		}
+
+		// Finalmente eliminar el customer
+		if err := tx.Unscoped().Delete(&models.Customer{}, "id = ?", id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete customer", err)
+		}
+		return nil
+	})
+}
+
+// hardDeleteProjectCascade elimina un proyecto y sus entidades relacionadas.
+// Orden según FKs: invoices → workorder_items → workorders → labors → supply_movements →
+// stocks → crop_commercializations → project_dollar_values → field_investors → lots →
+// fields → project_managers → project_investors → admin_cost_investors → projects.
+func hardDeleteProjectCascade(tx *gorm.DB, projectID int64) error {
+	var fieldIDs []int64
+	if err := tx.Unscoped().Table("fields").Where("project_id = ?", projectID).Pluck("id", &fieldIDs).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to get field ids", err)
 	}
-	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("customer with id %d does not exist", id), nil)
+
+	// invoices (FK → workorders via work_order_id, CASCADE pero explícito)
+	if err := tx.Exec(`
+		DELETE FROM invoices 
+		WHERE work_order_id IN (SELECT id FROM workorders WHERE project_id = ?)
+	`, projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete invoices", err)
+	}
+	// workorder_items (FK → workorders)
+	if err := tx.Exec(`
+		DELETE FROM workorder_items 
+		WHERE workorder_id IN (SELECT id FROM workorders WHERE project_id = ?)
+	`, projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete workorder_items", err)
+	}
+	// workorders (FK → labors, projects)
+	if err := tx.Exec("DELETE FROM workorders WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete workorders", err)
+	}
+	// labors (FK → projects, RESTRICT)
+	if err := tx.Exec("DELETE FROM labors WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete labors", err)
+	}
+	// supply_movements (FK → projects, RESTRICT)
+	if err := tx.Exec("DELETE FROM supply_movements WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete supply_movements", err)
+	}
+	// stocks (FK → projects, RESTRICT)
+	if err := tx.Exec("DELETE FROM stocks WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete stocks", err)
+	}
+	// crop_commercializations
+	if err := tx.Exec("DELETE FROM crop_commercializations WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete commercializations", err)
+	}
+	// project_dollar_values (RESTRICT)
+	if err := tx.Exec("DELETE FROM project_dollar_values WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete dollar values", err)
+	}
+	if len(fieldIDs) > 0 {
+		// field_investors
+		if err := tx.Exec("DELETE FROM field_investors WHERE field_id IN ?", fieldIDs).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete field_investors", err)
+		}
+		// lot_dates (si existe FK a lots)
+		tx.Exec("DELETE FROM lot_dates WHERE lot_id IN (SELECT id FROM lots WHERE field_id IN ?)", fieldIDs)
+		// lots
+		if err := tx.Exec("DELETE FROM lots WHERE field_id IN ?", fieldIDs).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete lots", err)
+		}
+	}
+	// fields
+	if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete fields", err)
+	}
+	// project_managers
+	if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete project_managers", err)
+	}
+	// project_investors
+	if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete project_investors", err)
+	}
+	// admin_cost_investors
+	if err := tx.Exec("DELETE FROM admin_cost_investors WHERE project_id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete admin_cost_investors", err)
+	}
+	// Finalmente el proyecto
+	if err := tx.Unscoped().Exec("DELETE FROM projects WHERE id = ?", projectID).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to hard delete project", err)
 	}
 	return nil
 }
