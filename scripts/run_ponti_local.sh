@@ -98,13 +98,17 @@ set +a
 
 echo "Aplicando migraciones de auth..."
 if [[ -f "$AUTH_DIR/migrations/create_users_table.sql" ]]; then
-  if docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT to_regclass('public.users');" | grep -q "users"; then
+  if docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT to_regclass('public.users');" 2>/dev/null | grep -q "users"; then
     echo "Auth: tabla users ya existe, se omite migración"
   else
     docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" < "$AUTH_DIR/migrations/create_users_table.sql"
   fi
 else
   echo "WARN: no existe migrations/create_users_table.sql en auth"
+fi
+if [[ -f "$AUTH_DIR/migrations/seed_soalenadmin25.sql" ]]; then
+  echo "Auth: aplicando seed soalenadmin25..."
+  docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" < "$AUTH_DIR/migrations/seed_soalenadmin25.sql" 2>/dev/null || true
 fi
 
 echo "Levantando auth API..."

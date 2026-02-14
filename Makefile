@@ -73,7 +73,7 @@ lint:
 run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/
-g
+
 run-ponti-local:
 	@echo "Running full local stack (backend + auth + frontend + ai)..."
 	@bash ./scripts/run_ponti_local.sh
