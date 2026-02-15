@@ -210,7 +210,7 @@ type userMembershipDTO struct {
 	UserID   int64  `json:"user_id"`
 	Email    string `json:"email"`
 	Username string `json:"username"`
-	IDPSub   string `json:"idp_sub"`
+	IDPSub   string `json:"idp_sub" gorm:"column:idp_sub"`
 	TenantID int64  `json:"tenant_id"`
 	Tenant   string `json:"tenant"`
 	Role     string `json:"role"`
