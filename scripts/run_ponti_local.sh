@@ -63,15 +63,34 @@ set -a
 source "$BACKEND_DIR/.env"
 set +a
 
+fix_bff_env_file() {
+  local env_file="$1"
+  [[ -f "$env_file" ]] || return 0
+
+  # If a previous run appended variables without a trailing newline, split them.
+  # Example broken line: X_API_KEY=abc123LOCAL_DEV_AUTH=1
+  sed -i.bak 's/^\(X_API_KEY=[^#]*\)LOCAL_DEV_AUTH=/\1\nLOCAL_DEV_AUTH=/g' "$env_file" 2>/dev/null || true
+
+  # Ensure file ends with a newline before appending new vars.
+  if [[ -s "$env_file" ]]; then
+    local last
+    last="$(tail -c 1 "$env_file" || true)"
+    if [[ "$last" != "" && "$last" != $'\n' ]]; then
+      echo >>"$env_file"
+    fi
+  fi
+}
+
 # Local defaults so the full stack runs without GCP setup.
 # - Backend: disable Identity Platform verification, use local dev auth.
 # - BFF: enable local dev auth (fake JWTs) if not configured.
 if [[ -f "$FRONTEND_DIR/api/.env" ]]; then
+  fix_bff_env_file "$FRONTEND_DIR/api/.env"
   if ! grep -qE '^LOCAL_DEV_AUTH=' "$FRONTEND_DIR/api/.env"; then
-    echo "LOCAL_DEV_AUTH=1" >>"$FRONTEND_DIR/api/.env"
+    printf "LOCAL_DEV_AUTH=1\n" >>"$FRONTEND_DIR/api/.env"
   fi
   if ! grep -qE '^LOCAL_DEV_USER_ID=' "$FRONTEND_DIR/api/.env"; then
-    echo "LOCAL_DEV_USER_ID=1" >>"$FRONTEND_DIR/api/.env"
+    printf "LOCAL_DEV_USER_ID=1\n" >>"$FRONTEND_DIR/api/.env"
   fi
 fi
 
