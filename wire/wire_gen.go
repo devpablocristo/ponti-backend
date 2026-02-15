@@ -8,6 +8,7 @@ package wire
 
 import (
 	"github.com/alphacodinggroup/ponti-backend/cmd/config"
+	"github.com/alphacodinggroup/ponti-backend/internal/admin"
 	"github.com/alphacodinggroup/ponti-backend/internal/ai"
 	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
 	"github.com/alphacodinggroup/ponti-backend/internal/campaign"
@@ -310,6 +311,18 @@ func Initialize() (*Dependencies, error) {
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
 	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort)
+	app, err := ProvideFirebaseApp(config)
+	if err != nil {
+		return nil, err
+	}
+	adminClient, err := ProvideIdentityAdmin(app)
+	if err != nil {
+		return nil, err
+	}
+	wireGinEnginePort := ProvideGinEnginePort(server)
+	api := ProvideConfigAPI(config)
+	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
+	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -340,6 +353,7 @@ func Initialize() (*Dependencies, error) {
 		CommercializationHandler:  commercializationHandler,
 		StockHandler:              stockHandler,
 		AIHandler:                 aiHandler,
+		AdminHandler:              adminHandler,
 	}
 	return dependencies, nil
 }
@@ -376,4 +390,5 @@ type Dependencies struct {
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
 	AIHandler                 *ai.Handler
+	AdminHandler              *admin.Handler
 }

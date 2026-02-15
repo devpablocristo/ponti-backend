@@ -34,6 +34,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/stock"
 	supply "github.com/alphacodinggroup/ponti-backend/internal/supply"
 	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
+	admin "github.com/alphacodinggroup/ponti-backend/internal/admin"
 	"github.com/google/wire"
 )
 
@@ -67,6 +68,7 @@ type Dependencies struct {
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
 	AIHandler                 *ai.Handler
+	AdminHandler              *admin.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -100,6 +102,7 @@ func Initialize() (*Dependencies, error) {
 		LaborSet,
 		StockSet,
 		InvoiceSet,
+		AdminSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil
