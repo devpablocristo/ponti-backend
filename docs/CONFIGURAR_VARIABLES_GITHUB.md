@@ -80,7 +80,7 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 |--------|-------------|
 | `DB_PASSWORD_DEV` | Password del usuario DB dev |
 | `X_API_KEY_DEV` | API key dev |
-| `DB_PASSWORD_STG` | Password de `app_stg` (usado por ponti-backend y ponti-auth STG) |
+| `DB_PASSWORD_STG` | Password de DB staging (usado por ponti-backend STG) |
 | `X_API_KEY_STG` | API key stg |
 | `DB_PASSWORD_PROD` | Password del usuario DB prod |
 | `X_API_KEY_PROD` | API key prod |

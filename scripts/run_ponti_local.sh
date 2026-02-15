@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
-AUTH_DIR="$ROOT_DIR/ponti-auth"
 FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
 AI_DIR="$ROOT_DIR/ponti-ai"
 
@@ -18,7 +17,6 @@ require_dir() {
 }
 
 require_dir "$BACKEND_DIR" "backend"
-require_dir "$AUTH_DIR" "auth"
 require_dir "$FRONTEND_DIR" "frontend"
 require_dir "$AI_DIR" "ai"
 
@@ -65,7 +63,6 @@ set +a
 
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
-docker compose -f "$AUTH_DIR/docker-compose.yml" down --remove-orphans
 docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans
 [[ -f "$FRONTEND_DIR/docker-compose.yml" ]] && docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans || true
 
@@ -85,41 +82,8 @@ else
   make -C "$BACKEND_DIR" run-api &
 fi
 
-echo "Levantando auth (DB) con Docker..."
-docker compose -f "$AUTH_DIR/docker-compose.yml" up -d
-
 echo "Levantando AI (DB + API) con Docker..."
 docker compose -f "$AI_DIR/docker-compose.yml" up -d
-
-ensure_env_file "$AUTH_DIR"
-set -a
-source "$AUTH_DIR/.env"
-set +a
-
-echo "Aplicando migraciones de auth..."
-if [[ -f "$AUTH_DIR/migrations/create_users_table.sql" ]]; then
-  if docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT to_regclass('public.users');" 2>/dev/null | grep -q "users"; then
-    echo "Auth: tabla users ya existe, se omite migración"
-  else
-    docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" < "$AUTH_DIR/migrations/create_users_table.sql"
-  fi
-else
-  echo "WARN: no existe migrations/create_users_table.sql en auth"
-fi
-if [[ -f "$AUTH_DIR/migrations/seed_soalenadmin25.sql" ]]; then
-  echo "Auth: aplicando seed soalenadmin25..."
-  docker exec -i postgres psql -U "$DB_USER" -d "$DB_NAME" < "$AUTH_DIR/migrations/seed_soalenadmin25.sql" 2>/dev/null || true
-fi
-
-echo "Levantando auth API..."
-if http_ok "http://localhost:8081/api/v1/auth/ping"; then
-  echo "Auth API ya está levantado en :8081"
-else
-  (cd "$AUTH_DIR" && GO_ENVIRONMENT=production PORT=8081 go run ./cmd/api) &
-fi
-
-# Evitar que el PORT del auth contamine frontend (conflicto 8081)
-unset PORT
 
 echo "Levantando frontend con Docker Compose..."
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
@@ -131,7 +95,6 @@ fi
 
 echo "Todos los servicios fueron lanzados. Mostrando logs (Ctrl+C para salir)..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" logs -f &
-docker compose -f "$AUTH_DIR/docker-compose.yml" logs -f &
 docker compose -f "$AI_DIR/docker-compose.yml" logs -f &
 docker compose -f "$FRONTEND_DIR/docker-compose.yml" logs -f &
 wait

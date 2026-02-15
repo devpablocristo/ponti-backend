@@ -17,7 +17,6 @@
 /home/pablo/Projects/Pablo/
 ├── ponti-backend/      # API Go (puerto 8080)
 ├── ponti-frontend/     # UI React + BFF Node (puertos 5173, 3000)
-├── ponti-auth/         # Auth API (puerto 8081)
 └── ponti-ai/           # Servicio AI (Python) - copilot + insights
 ```
 
@@ -100,7 +99,7 @@ El BFF inyecta `X-User-Id` desde `req.user.userID` (del token). El backend usa `
 ## Cómo Ejecutar
 
 ```bash
-# Stack completo (backend, auth, frontend, AI)
+# Stack completo (backend, frontend, AI)
 cd ponti-backend && make run-ponti-local
 
 # Solo backend
@@ -118,7 +117,7 @@ curl -s "http://localhost:8080/api/v1/supplies?project_id=20" \
 1. **User ID no en context**: Handlers que llaman use cases deben pasar `c.Request.Context()`, no `c`
 2. **BFF estructura respuesta**: Backend devuelve `{ data, page_info }` - BFF debe mapear a `{ data: { data, page_info } }` para el frontend
 3. **BFF URL incorrecta**: Backend tiene `GET /supplies` (list) y `GET /supplies/:supply_id` (uno) - no confundir
-4. **Auth**: BFF requiere token válido; en modo `local` usa auth API en 8081
+4. **Auth**: BFF requiere token válido (JWT de Identity Platform)
 
 ---
 

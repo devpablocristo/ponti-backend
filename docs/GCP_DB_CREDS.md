@@ -11,7 +11,7 @@
 
 **Dónde se aplicó en GCP:**
 - Cloud SQL: instancia `new-ponti-db-dev` (proyecto new-ponti-dev) – `ALTER DATABASE ponti_api_db RENAME TO new_ponti_db_dev`
-- Cloud Run: servicios `ponti-backend` y `ponti-auth` (proyecto new-ponti-dev, región us-central1) – env `DB_NAME=new_ponti_db_dev`
+- Cloud Run: servicio `ponti-backend` (proyecto new-ponti-dev, región us-central1) – env `DB_NAME=new_ponti_db_dev`
 
 ---
 # App / download (soalen-db-v3)
@@ -27,12 +27,6 @@ POSTGRES_USER=postgres
 POSTGRES_PASS='Soalen*25.'
 
 ---
-# Auth (ponti-auth en new-ponti-dev, misma instancia)
-SRC_USER=soalen-db-v3
-SRC_PASS='Soalen*25.'
-SRC_HOST=136.112.24.122
-SRC_PORT=5432
-SRC_SSL=disable
-SRC_DB=new_ponti_db_dev
-ADMIN_USER=soalenadmin25
-ADMIN_PASS=Soalen*25.
+# Nota
+# - `ponti-auth` fue eliminado; AuthN ahora es Google Cloud Identity Platform.
+# - Los usuarios/credenciales se gestionan en Identity Platform; no hay DB separada para auth.
