@@ -48,7 +48,7 @@ COPY --from=builder /app/pkg /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
 COPY --from=builder /app/migrate_binary /app/migrate_binary
 COPY --from=builder /app/migrations_v4 /app/migrations_v4
-COPY --from=builder /app/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /app/scripts/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# staging_db_2_local_db.sh
+# db_staging_to_local.sh
 # - Descarga dump desde GCP STAGING y restaura solo datos en DB local (tal cual, sin cambios)
 # - Origen: new_ponti_db_staging. Tratamiento: data-only, sin schema, sin renames.
 #
 # Requiere: SRC_PASS para el usuario de STAGING configurado en SRC_USER/DB_USER_STG.
-# Opcional: scripts/staging_db_2_local_db.env con SRC_PASS, SRC_HOST, etc.
+# Opcional: scripts/db/db_staging_to_local.env con SRC_PASS, SRC_HOST, etc.
 #
-# Uso: SRC_PASS='...' ./scripts/staging_db_2_local_db.sh
-#   o: cp scripts/staging_db_2_local_db.env.example scripts/staging_db_2_local_db.env && ./scripts/staging_db_2_local_db.sh
+# Uso: SRC_PASS='...' ./scripts/db/db_staging_to_local.sh
+#   o: cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env && ./scripts/db/db_staging_to_local.sh
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 ### ===== Preservar destino local antes de cargar .env =====
 LOCAL_DB_USER="${DB_USER:-}"
@@ -28,10 +28,10 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
-### ===== Origen: STAGING (desde staging_db_2_local_db.env) =====
-if [[ -f "${SCRIPT_DIR}/staging_db_2_local_db.env" ]]; then
+### ===== Origen: STAGING (desde db_staging_to_local.env) =====
+if [[ -f "${SCRIPT_DIR}/db_staging_to_local.env" ]]; then
   set -a
-  source "${SCRIPT_DIR}/staging_db_2_local_db.env"
+  source "${SCRIPT_DIR}/db_staging_to_local.env"
   set +a
 fi
 
@@ -132,13 +132,13 @@ PY
 ### ===== Validaciones de credenciales origen (STAGING) =====
 if [[ -z "${SRC_PASS}" ]]; then
   err "SRC_PASS es requerido para el usuario de staging (${SRC_USER})."
-  err "Creá scripts/staging_db_2_local_db.env con SRC_PASS=... o pasá SRC_PASS='...' $0"
+  err "Creá scripts/db/db_staging_to_local.env con SRC_PASS=... o pasá SRC_PASS='...' $0"
   exit 1
 fi
 
 if [[ -z "${SRC_USER}" || -z "${SRC_HOST}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
   err "Faltan credenciales de origen. Definí SRC_USER, SRC_PASS, SRC_HOST, SRC_DB, SRC_PORT."
-  err "Ejemplo: SRC_PASS='...' ./scripts/staging_db_2_local_db.sh"
+  err "Ejemplo: SRC_PASS='...' ./scripts/db/db_staging_to_local.sh"
   exit 1
 fi
 
@@ -361,7 +361,7 @@ log "  ✅ Data-only completado exitosamente"
 rm -f "$LIST_FILE" "$LIST_FILE_FILTERED"
 
 ### ===== Verificación rápida =====
-log "Tablas (primeras 30 filas de \dt):"
+log "Tablas (primeras 30 filas de \\dt):"
 PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "\dt public.*" | sed -n '1,30p' || true
 
 ### ===== Fix secuencias después de data-only restore =====
