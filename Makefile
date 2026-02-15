@@ -93,8 +93,8 @@ staging-db-2-local-db:
 	@echo "Downloading GCP STAGING and restoring data-only to local..."
 	@echo "Asegurando que la DB local esté levantada..."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
-	@set -a && [ -f .env ] && source .env; [ -f scripts/staging_db_2_local_db.env ] && source scripts/staging_db_2_local_db.env; set +a && \
-	DB_PORT=5433 ./scripts/staging_db_2_local_db.sh
+	@set -a && [ -f .env ] && source .env; [ -f scripts/db/db_staging_to_local.env ] && source scripts/db/db_staging_to_local.env; set +a && \
+	DB_PORT=5433 bash ./scripts/db/db_staging_to_local.sh
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:

@@ -23,7 +23,7 @@ type RepositoryPort interface {
 
 type ExporterAdapterPort interface {
 	Export(ctx context.Context, items []domain.LaborListItem) ([]byte, error)
-	ExportTable(ctx context.Context, items []domain.LaborListItem) ([]byte, error)
+	ExportTable(ctx context.Context, items []domain.ListedLabor) ([]byte, error)
 	Close() error
 }
 
@@ -114,18 +114,15 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 	return u.excel.Export(ctx, items)
 }
 
-func (u *UseCases) ExportAllGroupLabors(ctx context.Context) ([]byte, error) {
+func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
 	}
 
-	raw, err := u.repo.ListAllGroupLabor(ctx)
+	// Usar un page_size grande para obtener todas las labores del proyecto
+	items, _, err := u.repo.ListLabor(ctx, 1, 100000, projectID)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list group labor", err)
-	}
-	items := make([]domain.LaborListItem, len(raw))
-	for i, r := range raw {
-		items[i] = domain.LaborListItem(r)
+		return nil, types.NewError(types.ErrInternal, "list labors for export", err)
 	}
 	if len(items) == 0 {
 		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)

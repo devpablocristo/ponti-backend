@@ -26,7 +26,7 @@ type UseCasesPort interface {
 	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
-	ExportAllGroupLabors(context.Context) ([]byte, error)
+	ExportAllGroupLabors(context.Context, int64) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 }
 
@@ -384,13 +384,24 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
-	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context())
+	projectIDStr := c.Query("project_id")
+	if projectIDStr == "" {
+		types.NewErrorResponseHelper().BadRequest(c, "project_id is required", nil)
+		return
+	}
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	if err != nil || projectID <= 0 {
+		types.NewErrorResponseHelper().BadRequest(c, "project_id must be a valid positive integer", nil)
+		return
+	}
+
+	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), projectID)
 	if err != nil {
 		types.NewErrorResponseHelper().HandleDomainError(c, err)
 		return
 	}
 
-	filename := "tabla_labores.xlsx"
+	filename := "labores_base_datos.xlsx"
 
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
