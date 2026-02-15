@@ -54,7 +54,7 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	middlewares := ProvideMiddlewares()
+	middlewares := ProvideMiddlewares(config, repository)
 	pkgsuggesterDB := ProvideSuggesterDB(repository)
 	wordsSuggester := ProvideConfigSuggester(config)
 	pkgsuggesterWordsSuggester, err := ProvideSuggester(pkgsuggesterDB, wordsSuggester)

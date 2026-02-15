@@ -17,6 +17,7 @@ type Config struct {
 	API            API            // Configuración de API
 	HTTPServer     HTTPServer     // Configuración del servidor HTTP
 	DB             DB             // Configuración de base de datos
+	Auth           Auth           // Configuración de autenticación/autorización
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
 	AI             AI             // Configuración del AI Copilot Service

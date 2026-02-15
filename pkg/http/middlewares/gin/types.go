@@ -7,8 +7,15 @@ type contextKey string
 const (
 	HeaderAPIKey       = "X-API-KEY"
 	HeaderUserID       = "X-USER-ID"
+	HeaderTenantID     = "X-Tenant-Id"
 	ContextUserID      = "userID"
 	ContextUserIDKey   = contextKey("userID")
+	ContextUserEmail   = "userEmail"
+	ContextUserEmailKey = contextKey("userEmail")
+	ContextTenantID    = "tenantID"
+	ContextTenantIDKey = contextKey("tenantID")
+	ContextRoles       = "roles"
+	ContextRolesKey    = contextKey("roles")
 	ContextAPIKey      = "apiKey"
 	EnvAPIKey          = "X_API_KEY"
 	ContextCredentials = "credentials"

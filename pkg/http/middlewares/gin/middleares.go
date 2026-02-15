@@ -1,9 +1,11 @@
 package pkgmwr
 
 import (
-	"github.com/gin-gonic/gin"
+	"time"
 
-	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
 )
 
 type Middlewares struct {
@@ -12,8 +14,12 @@ type Middlewares struct {
 	protected  []gin.HandlerFunc
 }
 
-func NewDefaultMiddlewares() *Middlewares {
-	cfg := pkgutils.NewConfigFromEnv()
+type BuildConfig struct {
+	DB   *gorm.DB
+	Auth IdentityAuthConfig
+}
+
+func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	global := []gin.HandlerFunc{
 		ErrorHandling(),
 		RequestAndResponseLogger(HttpLoggingOptions{
@@ -24,12 +30,15 @@ func NewDefaultMiddlewares() *Middlewares {
 		}),
 	}
 	validation := []gin.HandlerFunc{
-		RequireUserIDHeader(),
 		RequireAPIKey(),
+		RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB),
 	}
-	protected := []gin.HandlerFunc{
-		RequireJWT(cfg),
+	protected := []gin.HandlerFunc{}
+
+	if cfg.Auth.CacheTTL <= 0 {
+		cfg.Auth.CacheTTL = 5 * time.Minute
 	}
+
 	return &Middlewares{
 		global:     global,
 		validation: validation,
