@@ -56,18 +56,6 @@ type identityClaims struct {
 	jwt.RegisteredClaims
 }
 
-// Legacy tokens are issued by the old ponti-auth service (HS256) and contain
-// custom claims like ID/Username/Rol. We accept them as a temporary fallback
-// while Identity Platform is being rolled out, but ONLY after API-key auth.
-type legacyClaims struct {
-	ID       any    `json:"ID"`
-	Username string `json:"Username"`
-	Rol      any    `json:"Rol"`
-	Hash     string `json:"Hash"`
-	Exp      any    `json:"exp"`
-	jwt.RegisteredClaims
-}
-
 type membershipResolved struct {
 	TenantID    int64
 	RoleName    string
@@ -231,12 +219,6 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 
 		claims, err := verifier.verify(tokenStr)
 		if err != nil {
-			// Fallback: accept legacy HS256 token (ponti-auth) to keep the system usable
-			// until Identity Platform configuration is finished.
-			if ok := tryLegacyTokenAuth(c, db, cfg, permission, start, tokenStr); ok {
-				return
-			}
-
 			denyAuthRequest(c, "invalid token")
 			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
 			return
@@ -299,94 +281,6 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 
 		logAuthDecision(claims.Subject, tenantIDStr, c.FullPath(), permission, "ALLOW", start)
 		c.Next()
-	}
-}
-
-func tryLegacyTokenAuth(
-	c *gin.Context,
-	db *gorm.DB,
-	cfg IdentityAuthConfig,
-	requiredPermission string,
-	start time.Time,
-	rawToken string,
-) bool {
-	// Parse without verification; API-key auth already ran before this middleware.
-	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	lc := &legacyClaims{}
-	_, _, err := parser.ParseUnverified(rawToken, lc)
-	if err != nil {
-		return false
-	}
-
-	// Legacy tokens don't set RegisteredClaims.Subject; they use ID/Username.
-	userID, err := anyToInt64(lc.ID)
-	if err != nil || userID <= 0 {
-		return false
-	}
-
-	// Ensure membership so tenant + permissions are available for handlers.
-	membership, err := resolveMembership(c.Request.Context(), db, userID, c.GetHeader(cfg.TenantHeader))
-	if err != nil {
-		if cfg.AutoProvision {
-			membership, err = ensureDefaultMembership(
-				c.Request.Context(),
-				db,
-				userID,
-				cfg.DefaultTenant,
-				cfg.DefaultRole,
-			)
-		}
-		if err != nil {
-			return false
-		}
-	}
-
-	// For legacy tokens we treat role-permissions from auth tables the same way.
-	if _, ok := membership.Permissions[requiredPermission]; !ok {
-		return false
-	}
-
-	userIDStr := strconv.FormatInt(userID, 10)
-	tenantIDStr := strconv.FormatInt(membership.TenantID, 10)
-
-	ctx := c.Request.Context()
-	ctx = context.WithValue(ctx, ContextUserIDKey, userIDStr)
-	ctx = context.WithValue(ctx, ContextUserEmailKey, "")
-	ctx = context.WithValue(ctx, ContextTenantIDKey, tenantIDStr)
-	ctx = context.WithValue(ctx, ContextRolesKey, []string{membership.RoleName})
-	c.Request = c.Request.WithContext(ctx)
-	c.Set(ContextUserID, userIDStr)
-	c.Set(ContextUserEmail, "")
-	c.Set(ContextTenantID, tenantIDStr)
-	c.Set(ContextRoles, []string{membership.RoleName})
-
-	sub := lc.Username
-	if strings.TrimSpace(sub) == "" {
-		sub = userIDStr
-	}
-	logAuthDecision("legacy:"+sub, tenantIDStr, c.FullPath(), requiredPermission, "ALLOW", start)
-	c.Next()
-	return true
-}
-
-func anyToInt64(v any) (int64, error) {
-	switch t := v.(type) {
-	case float64:
-		return int64(t), nil
-	case float32:
-		return int64(t), nil
-	case int:
-		return int64(t), nil
-	case int64:
-		return t, nil
-	case int32:
-		return int64(t), nil
-	case json.Number:
-		return t.Int64()
-	case string:
-		return strconv.ParseInt(strings.TrimSpace(t), 10, 64)
-	default:
-		return 0, fmt.Errorf("unsupported type %T", v)
 	}
 }
 
