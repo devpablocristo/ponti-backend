@@ -87,7 +87,7 @@ fi
 
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
-docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans
+docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans -v
 [[ -f "$FRONTEND_DIR/docker-compose.yml" ]] && docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans || true
 
 echo "Verificando conflictos de puerto PostgreSQL..."
@@ -107,7 +107,8 @@ else
 fi
 
 echo "Levantando AI (DB + API) con Docker..."
-docker compose -f "$AI_DIR/docker-compose.yml" up -d
+# Levantar solo lo necesario (evitar ai-test en local)
+docker compose -f "$AI_DIR/docker-compose.yml" up -d ai-db ollama ai-migrate ponti-ai
 
 echo "Levantando frontend con Docker Compose..."
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
