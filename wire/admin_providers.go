@@ -14,12 +14,19 @@ import (
 
 func ProvideFirebaseApp(cfg *config.Config) (*firebase.App, error) {
 	// Uses ADC in Cloud Run; for local, rely on GOOGLE_APPLICATION_CREDENTIALS.
+	// When AUTH is disabled (local mode), don't require ADC just to boot the API.
+	if !cfg.Auth.Enabled {
+		return nil, nil
+	}
 	return firebase.NewApp(context.Background(), &firebase.Config{
 		ProjectID: cfg.Auth.IdentityProjectID,
 	})
 }
 
-func ProvideIdentityAdmin(app *firebase.App) (adminidp.AdminClient, error) {
+func ProvideIdentityAdmin(cfg *config.Config, app *firebase.App) (adminidp.AdminClient, error) {
+	if !cfg.Auth.Enabled || app == nil {
+		return &adminidp.NoopAdmin{}, nil
+	}
 	return adminidp.NewFirebaseAdmin(app)
 }
 

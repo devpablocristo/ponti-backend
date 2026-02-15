@@ -315,7 +315,7 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	adminClient, err := ProvideIdentityAdmin(app)
+	adminClient, err := ProvideIdentityAdmin(config, app)
 	if err != nil {
 		return nil, err
 	}
