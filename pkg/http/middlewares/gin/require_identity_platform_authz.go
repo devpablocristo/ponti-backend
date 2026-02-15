@@ -28,6 +28,7 @@ const (
 )
 
 type IdentityAuthConfig struct {
+	Enabled      bool
 	ProjectID    string
 	Issuer       string
 	Audience     string

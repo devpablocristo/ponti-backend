@@ -57,9 +57,35 @@ stop_system_postgres() {
 }
 
 ensure_env_file "$BACKEND_DIR"
+ensure_env_file "$FRONTEND_DIR/api"
+ensure_env_file "$AI_DIR"
 set -a
 source "$BACKEND_DIR/.env"
 set +a
+
+# Local defaults so the full stack runs without GCP setup.
+# - Backend: disable Identity Platform verification, use local dev auth.
+# - BFF: enable local dev auth (fake JWTs) if not configured.
+if [[ -f "$FRONTEND_DIR/api/.env" ]]; then
+  if ! grep -qE '^LOCAL_DEV_AUTH=' "$FRONTEND_DIR/api/.env"; then
+    echo "LOCAL_DEV_AUTH=1" >>"$FRONTEND_DIR/api/.env"
+  fi
+  if ! grep -qE '^LOCAL_DEV_USER_ID=' "$FRONTEND_DIR/api/.env"; then
+    echo "LOCAL_DEV_USER_ID=1" >>"$FRONTEND_DIR/api/.env"
+  fi
+fi
+
+if ! grep -qE '^AUTH_ENABLED=' "$BACKEND_DIR/.env"; then
+  echo "AUTH_ENABLED=false" >>"$BACKEND_DIR/.env"
+else
+  # Force local mode unless explicitly set by the user.
+  # Keep it simple: override in-place.
+  sed -i.bak 's/^AUTH_ENABLED=.*/AUTH_ENABLED=false/' "$BACKEND_DIR/.env" 2>/dev/null || true
+fi
+
+if ! grep -qE '^IDENTITY_PROJECT_ID=' "$BACKEND_DIR/.env"; then
+  echo "IDENTITY_PROJECT_ID=new-ponti-dev" >>"$BACKEND_DIR/.env"
+fi
 
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans

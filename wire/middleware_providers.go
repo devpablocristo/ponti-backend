@@ -32,6 +32,7 @@ func ProvideMiddlewares(cfg *config.Config, repo *pgorm.Repository) *mwr.Middlew
 	return mwr.NewDefaultMiddlewares(mwr.BuildConfig{
 		DB: repo.Client(),
 		Auth: mwr.IdentityAuthConfig{
+			Enabled:      cfg.Auth.Enabled,
 			ProjectID:    cfg.Auth.IdentityProjectID,
 			Issuer:       issuer,
 			Audience:     audience,

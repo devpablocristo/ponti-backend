@@ -29,9 +29,11 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 			ExcludedPaths:  []string{"/health", "/ping", "/swagger/spec", "/swagger/ui/index.html"},
 		}),
 	}
-	validation := []gin.HandlerFunc{
-		RequireAPIKey(),
-		RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB),
+	validation := []gin.HandlerFunc{RequireAPIKey()}
+	if cfg.Auth.Enabled {
+		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
+	} else {
+		validation = append(validation, RequireLocalDevAuthz(cfg.Auth))
 	}
 	protected := []gin.HandlerFunc{}
 
