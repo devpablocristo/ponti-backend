@@ -36,7 +36,7 @@ func (e *ExcelExporter) Export(ctx context.Context, items []domain.LaborListItem
 	return buf.Bytes(), nil
 }
 
-func (e *ExcelExporter) ExportTable(ctx context.Context, items []domain.LaborListItem) ([]byte, error) {
+func (e *ExcelExporter) ExportTable(ctx context.Context, items []domain.ListedLabor) ([]byte, error) {
 	_ = ctx
 	if len(items) == 0 {
 		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
