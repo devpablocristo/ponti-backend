@@ -75,16 +75,14 @@ if [[ -f "$FRONTEND_DIR/api/.env" ]]; then
   fi
 fi
 
-if ! grep -qE '^AUTH_ENABLED=' "$BACKEND_DIR/.env"; then
-  echo "AUTH_ENABLED=false" >>"$BACKEND_DIR/.env"
-else
-  # Force local mode unless explicitly set by the user.
-  # Keep it simple: override in-place.
-  sed -i.bak 's/^AUTH_ENABLED=.*/AUTH_ENABLED=false/' "$BACKEND_DIR/.env" 2>/dev/null || true
+# By default, local stack runs without contacting GCP. To use real Identity Platform
+# locally, run with: PONTI_LOCAL_USE_GCP_AUTH=1
+if [[ "${PONTI_LOCAL_USE_GCP_AUTH:-}" != "1" ]]; then
+  export AUTH_ENABLED=false
 fi
 
-if ! grep -qE '^IDENTITY_PROJECT_ID=' "$BACKEND_DIR/.env"; then
-  echo "IDENTITY_PROJECT_ID=new-ponti-dev" >>"$BACKEND_DIR/.env"
+if [[ -z "${IDENTITY_PROJECT_ID:-}" ]]; then
+  export IDENTITY_PROJECT_ID="new-ponti-dev"
 fi
 
 echo "Bajando contenedores antes de levantar..."
