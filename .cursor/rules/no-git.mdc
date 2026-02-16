@@ -1,10 +1,14 @@
 ---
-description: No usar git a menos que el usuario lo pida explícitamente
+description: No hacer push, deploy, merge ni cambios remotos sin autorización expresa
 alwaysApply: true
 ---
 
-# No Git
+# No Git / No Deploy sin autorización
 
-- NUNCA ejecutes comandos git (commit, push, pull, add, stash, etc.) a menos que el usuario lo pida explícitamente.
+- NUNCA ejecutes comandos git (commit, push, pull, add, stash, merge, cherry-pick, etc.) a menos que el usuario lo pida explícitamente.
+- NUNCA hagas push a ninguna rama (origin, upstream, etc.) sin autorización expresa del usuario.
+- NUNCA hagas merge ni cherry-pick entre ramas sin autorización expresa del usuario.
+- NUNCA dispares deploys (ni directa ni indirectamente vía push) sin autorización expresa del usuario.
 - No hagas commits automáticos ni sugiereas hacer commits.
-- Si necesitás ver el estado del repo, preguntá antes.
+- Si necesitás ver el estado del repo (git status, git log, git diff), podés hacerlo sin preguntar.
+- Todos los cambios quedan en local hasta que el usuario autorice explícitamente el push/deploy.
