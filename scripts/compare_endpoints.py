@@ -395,7 +395,7 @@ def main() -> int:
         return 2
 
     headers = {
-        "X-API-KEY": os.environ.get("X_API_KEY", env.get("X_API_KEY", "abc123secreta")),
+        "X-API-KEY": os.environ.get("X_API_KEY", env.get("X_API_KEY", "local-dev-api-key")),
         "X-USER-ID": os.environ.get("X_USER_ID", "123"),
         "Accept": "application/json",
     }

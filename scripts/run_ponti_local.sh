@@ -50,64 +50,49 @@ ensure_env_file() {
 }
 
 stop_system_postgres() {
-  # Chequear si el puerto 5433 (usado por docker-compose) ya está ocupado
-  if ss -tlnp 2>/dev/null | grep -qE '(:5433|\.5433)\s'; then
-    echo "WARN: Puerto 5433 ya en uso. Docker DB podría fallar al iniciar."
+  # Chequear si el puerto que vamos a usar para la DB ya está ocupado.
+  local port="${DB_PORT:-5432}"
+  if ss -tlnp 2>/dev/null | grep -qE "(:${port}|\\.${port})\\s"; then
+    echo "WARN: Puerto ${port} ya en uso. Docker DB podría fallar al iniciar."
   fi
 }
 
 ensure_env_file "$BACKEND_DIR"
 ensure_env_file "$FRONTEND_DIR/api"
 ensure_env_file "$AI_DIR"
+
+# Importante: este script NO setea defaults de infraestructura ni modifica .env.
+# La configuración debe vivir en los archivos `.env` de cada servicio (local)
+# o en las variables de entorno del ambiente (dev/staging/prod).
 set -a
 source "$BACKEND_DIR/.env"
 set +a
 
-fix_bff_env_file() {
-  local env_file="$1"
-  [[ -f "$env_file" ]] || return 0
-
-  # If a previous run appended variables without a trailing newline, split them.
-  # Example broken line: X_API_KEY=abc123LOCAL_DEV_AUTH=1
-  sed -i.bak 's/^\(X_API_KEY=[^#]*\)LOCAL_DEV_AUTH=/\1\nLOCAL_DEV_AUTH=/g' "$env_file" 2>/dev/null || true
-
-  # Ensure file ends with a newline before appending new vars.
-  if [[ -s "$env_file" ]]; then
-    local last
-    last="$(tail -c 1 "$env_file" || true)"
-    if [[ "$last" != "" && "$last" != $'\n' ]]; then
-      echo >>"$env_file"
-    fi
-  fi
-}
-
-# Local defaults so the full stack runs without GCP setup.
-# - Backend: disable Identity Platform verification, use local dev auth.
-# - BFF: enable local dev auth (fake JWTs) if not configured.
-if [[ -f "$FRONTEND_DIR/api/.env" ]]; then
-  fix_bff_env_file "$FRONTEND_DIR/api/.env"
-  if ! grep -qE '^LOCAL_DEV_AUTH=' "$FRONTEND_DIR/api/.env"; then
-    printf "LOCAL_DEV_AUTH=1\n" >>"$FRONTEND_DIR/api/.env"
-  fi
-  if ! grep -qE '^LOCAL_DEV_USER_ID=' "$FRONTEND_DIR/api/.env"; then
-    printf "LOCAL_DEV_USER_ID=1\n" >>"$FRONTEND_DIR/api/.env"
+# Si DB_PORT=5432 pero el 5432 está ocupado, fallar con instrucción clara.
+if [[ "${DB_PORT:-5432}" == "5432" ]]; then
+  if ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
+    echo "ERROR: 5432 está ocupado. Para correr el stack local, setea DB_PORT=5433 en $BACKEND_DIR/.env" >&2
+    exit 1
   fi
 fi
 
-# By default, local stack runs without contacting GCP. To use real Identity Platform
-# locally, run with: PONTI_LOCAL_USE_GCP_AUTH=1
-if [[ "${PONTI_LOCAL_USE_GCP_AUTH:-}" != "1" ]]; then
-  export AUTH_ENABLED=false
-fi
-
-if [[ -z "${IDENTITY_PROJECT_ID:-}" ]]; then
-  export IDENTITY_PROJECT_ID="new-ponti-dev"
+# Validación mínima de coherencia local:
+# - Si el backend corre con AUTH_ENABLED=false, el BFF debería usar LOCAL_DEV_AUTH=1.
+if grep -qE '^AUTH_ENABLED=false' "$BACKEND_DIR/.env" 2>/dev/null; then
+  if ! grep -qE '^LOCAL_DEV_AUTH=1' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
+    echo "WARN: $BACKEND_DIR/.env tiene AUTH_ENABLED=false pero $FRONTEND_DIR/api/.env no tiene LOCAL_DEV_AUTH=1. Login local puede fallar."
+  fi
 fi
 
 echo "Bajando contenedores antes de levantar..."
 docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
 docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans -v
-[[ -f "$FRONTEND_DIR/docker-compose.yml" ]] && docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans || true
+if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
+  # A veces Vite/Yarn se quedan colgados y el stop falla; hacer down "best effort".
+  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+  docker compose -f "$FRONTEND_DIR/docker-compose.yml" kill || true
+  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+fi
 
 echo "Verificando conflictos de puerto PostgreSQL..."
 stop_system_postgres
@@ -122,12 +107,20 @@ else
   if [[ -z "${AI_SERVICE_URL:-}" || -z "${AI_SERVICE_KEY:-}" ]]; then
     echo "WARN: AI_SERVICE_URL / AI_SERVICE_KEY no configurados. Endpoints AI no funcionarán."
   fi
-  make -C "$BACKEND_DIR" run-api &
+  # Detach: si salís del follow de logs (Ctrl+C), no debería matar la API.
+  nohup env DB_PORT="${DB_PORT:-5432}" make -C "$BACKEND_DIR" run-api >"$BACKEND_DIR/.run-api.local.log" 2>&1 &
+  echo "Backend API iniciada (detached). Log: $BACKEND_DIR/.run-api.local.log"
 fi
 
 echo "Levantando AI (DB + API) con Docker..."
-# Levantar solo lo necesario (evitar ai-test en local)
-docker compose -f "$AI_DIR/docker-compose.yml" up -d ai-db ollama ai-migrate ponti-ai
+# Levantar solo lo necesario (evitar ai-test en local).
+# Ollama solo si el .env indica LLM_PROVIDER=ollama.
+ai_services=(ai-db ai-migrate ponti-ai)
+llm_provider="$(grep -E '^LLM_PROVIDER=' "$AI_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]' || true)"
+if [[ "$llm_provider" == "ollama" ]]; then
+  ai_services+=(ollama)
+fi
+docker compose -f "$AI_DIR/docker-compose.yml" up -d "${ai_services[@]}"
 
 echo "Levantando frontend con Docker Compose..."
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then

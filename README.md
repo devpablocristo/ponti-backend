@@ -40,12 +40,12 @@ go run ./cmd/api
 ### Sincronizar DB local con dev remoto
 ```bash
 SRC_FROM_CLOUD_RUN=1 SRC_FORCE_CLOUD_RUN=1 SRC_SERVICE_NAME=ponti-backend \
-SRC_PROJECT_ID=new-ponti-dev SRC_REGION=us-central1 make staging-db-2-local-db
+SRC_PROJECT_ID=<gcp_project_id> SRC_REGION=<gcp_region> make staging-db-2-local-db
 ```
 
 ## Headers requeridos
 ```
-X-API-KEY: abc123secreta
+X-API-KEY: <tu_api_key>
 X-USER-ID: 123
 ```
 

@@ -32,9 +32,9 @@ SRC_DB="${SRC_DB:-${REMOTE_DB:-}}"
 SRC_SSL="${SRC_SSL:-${REMOTE_SSL:-disable}}"
 USE_CLOUDSQL_PROXY="${USE_CLOUDSQL_PROXY:-0}"
 SRC_PROXY_PORT="${SRC_PROXY_PORT:-55432}"
-SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-new-ponti-dev}"
-SRC_INSTANCE_REGION="${SRC_INSTANCE_REGION:-us-central1}"
-SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-new-ponti-db-dev}"
+SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-}"
+SRC_INSTANCE_REGION="${SRC_INSTANCE_REGION:-}"
+SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-}"
 PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
 
 if [[ -z "${SRC_USER}" || -z "${SRC_PASS}" || -z "${SRC_HOST}" || -z "${SRC_DB}" ]]; then
@@ -73,6 +73,11 @@ start_proxy() {
 
 # Conexión directa o vía proxy
 if [[ "${USE_CLOUDSQL_PROXY}" == "1" ]]; then
+  if [[ -z "${SRC_INSTANCE_PROJECT}" || -z "${SRC_INSTANCE_REGION}" || -z "${SRC_INSTANCE_NAME}" ]]; then
+    err "USE_CLOUDSQL_PROXY=1 pero faltan SRC_INSTANCE_PROJECT/SRC_INSTANCE_REGION/SRC_INSTANCE_NAME."
+    err "Definilos en scripts/db/db_force_reset_gcp.env (no se hardcodean defaults en el repo)."
+    exit 1
+  fi
   start_proxy
   trap cleanup_proxy EXIT
   SRC_HOST="127.0.0.1"

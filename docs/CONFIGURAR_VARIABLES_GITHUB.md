@@ -46,6 +46,17 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `PREVIEW_BUCKET` | `backup-ponti-dev` |
 | `PREVIEW_SEED_URI` | *(vacío si no hay seed fija)* |
 
+#### Frontend (DEV)
+| Variable | Descripción |
+|----------|-------------|
+| `CLOUD_RUN_SERVICE_FRONTEND_DEV` | Nombre del servicio Cloud Run del frontend (DEV) |
+| `BASE_MANAGER_API_DEV` | URL del backend (DEV) usada por el BFF |
+
+#### AI (DEV)
+| Variable | Descripción |
+|----------|-------------|
+| `CLOUD_RUN_SERVICE_AI_DEV` | Nombre del servicio Cloud Run de AI (DEV) |
+
 ### STG (unificado en instancia new-ponti-db-dev, instancia vieja eliminada)
 | Variable | Valor |
 |----------|-------|
@@ -60,6 +71,17 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `DB_USER_STG` | `app_stg` |
 | `DB_INSTANCE_NAME_STG` | `new-ponti-db-dev` |
 | `GOLDEN_SNAPSHOT_BUCKET` | `golden-ponti-stg-65243764597` |
+
+#### Frontend (STG)
+| Variable | Descripción |
+|----------|-------------|
+| `CLOUD_RUN_SERVICE_FRONTEND_STG` | Nombre del servicio Cloud Run del frontend (STG) |
+| `BASE_MANAGER_API_STG` | URL del backend (STG) usada por el BFF |
+
+#### AI (STG)
+| Variable | Descripción |
+|----------|-------------|
+| `CLOUD_RUN_SERVICE_AI_STG` | Nombre del servicio Cloud Run de AI (STG) |
 
 ### PROD
 | Variable | Valor |

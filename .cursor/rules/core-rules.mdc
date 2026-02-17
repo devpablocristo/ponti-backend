@@ -59,4 +59,4 @@ alwaysApply: true
 - Usar vista fix_labors_list para cálculos de labores
 
 ## Pruebas con curl
-- Usar estos headers: X-API-KEY abc123secreta, X-USER-ID 123
+- Usar estos headers: X-API-KEY <tu_api_key>, X-USER-ID 123

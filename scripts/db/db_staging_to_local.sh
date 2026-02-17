@@ -37,16 +37,16 @@ fi
 
 SRC_USER="${SRC_USER:-${DB_USER_STG:-soalen-db-v3}}"
 SRC_PASS="${SRC_PASS:-}"
-SRC_HOST="${SRC_HOST:-136.112.24.122}"
+SRC_HOST="${SRC_HOST:-}"
 SRC_PORT="${SRC_PORT:-5432}"
 SRC_DB="${SRC_DB:-${DB_NAME_STG:-new_ponti_db_staging}}"
 SRC_SSL="${SRC_SSL:-disable}"
 
 # Cloud SQL Proxy (fallback si no hay acceso directo)
 USE_CLOUDSQL_PROXY="${USE_CLOUDSQL_PROXY:-auto}" # auto | 1 | 0
-SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-${CLOUDSQL_PROJECT_STG:-new-ponti-dev}}"
-SRC_INSTANCE_REGION="${SRC_INSTANCE_REGION:-us-central1}"
-SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_STG:-new-ponti-db-dev}}"
+SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-${CLOUDSQL_PROJECT_STG:-}}"
+SRC_INSTANCE_REGION="${SRC_INSTANCE_REGION:-}"
+SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_STG:-}}"
 SRC_INSTANCE_CONN="${SRC_INSTANCE_CONN:-}"
 SRC_PROXY_PORT="${SRC_PROXY_PORT:-55433}"
 PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
@@ -136,9 +136,15 @@ if [[ -z "${SRC_PASS}" ]]; then
   exit 1
 fi
 
-if [[ -z "${SRC_USER}" || -z "${SRC_HOST}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
-  err "Faltan credenciales de origen. Definí SRC_USER, SRC_PASS, SRC_HOST, SRC_DB, SRC_PORT."
+if [[ -z "${SRC_USER}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
+  err "Faltan credenciales mínimas de origen. Definí SRC_USER, SRC_PASS, SRC_DB, SRC_PORT."
   err "Ejemplo: SRC_PASS='...' ./scripts/db/db_staging_to_local.sh"
+  exit 1
+fi
+
+# Para conexión directa se requiere SRC_HOST; para proxy puede omitirse.
+if [[ -z "${SRC_HOST}" && "${USE_CLOUDSQL_PROXY}" != "1" && "${USE_CLOUDSQL_PROXY}" != "auto" ]]; then
+  err "SRC_HOST vacío y USE_CLOUDSQL_PROXY=0. Definí SRC_HOST o usá USE_CLOUDSQL_PROXY=auto/1."
   exit 1
 fi
 
@@ -166,6 +172,11 @@ start_proxy() {
     fi
   fi
   if [[ -z "${SRC_INSTANCE_CONN}" ]]; then
+    if [[ -z "${SRC_INSTANCE_PROJECT}" && -z "${SRC_INSTANCE_REGION}" && -z "${SRC_INSTANCE_NAME}" ]]; then
+      err "Para usar Cloud SQL Proxy faltan SRC_INSTANCE_* (project/region/name) o SRC_INSTANCE_CONN."
+      err "Definilos en scripts/db/db_staging_to_local.env (no se hardcodean defaults en el repo)."
+      return 1
+    fi
     if command -v gcloud >/dev/null 2>&1; then
       local inferred
       inferred="$(gcloud sql instances list --project="${SRC_INSTANCE_PROJECT}" --format='value(connectionName)' 2>/dev/null | tr -d '\r' | head -n 1)"

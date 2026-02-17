@@ -75,7 +75,7 @@ run-api:
 	@go run ./cmd/api/
 
 run-ponti-local:
-	@echo "Running full local stack (backend + auth + frontend + ai)..."
+	@echo "Running full local stack (backend + frontend + ai)..."
 	@if [ -f ./scripts/run-ponti-local.sh ]; then bash ./scripts/run-ponti-local.sh; else bash ./scripts/run_ponti_local.sh; fi
 
 seed:

@@ -24,7 +24,8 @@ jobs:
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
       SANITIZED_OK: ${{ vars.SANITIZED_OK }}
-      EXPECTED_INSTANCE_PROJECT: REPLACE_ME_INSTANCE_PROJECT
+      # Opcional: si se define, se enforcea el proyecto esperado.
+      EXPECTED_INSTANCE_PROJECT: ${{ vars.EXPECTED_INSTANCE_PROJECT }}
       DB_INSTANCE_NAME_STG: ${{ vars.DB_INSTANCE_NAME_STG }}
       DB_NAME_STG: ${{ vars.DB_NAME_STG }}
       # Guardamos el snapshot en el bucket de DEV (mismo bucket que previews) para evitar permisos cross-project.
@@ -55,7 +56,7 @@ jobs:
             echo "::error::Falta GOLDEN_SNAPSHOT_BUCKET"
             exit 1
           fi
-          # Proyecto donde vive la instancia (new-ponti-dev tras unificación)
+          # Proyecto donde vive la instancia (definido por vars del repo / environment)
           INSTANCE_PROJECT="${CLOUDSQL_PROJECT_STG:-$GCP_PROJECT_ID}"
           echo "INSTANCE_PROJECT=$INSTANCE_PROJECT" >> "$GITHUB_ENV"
 
@@ -71,8 +72,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Si EXPECTED_INSTANCE_PROJECT sigue en REPLACE_ME_*, no forzamos igualdad.
-          if [[ "$EXPECTED_INSTANCE_PROJECT" != REPLACE_ME_* ]] && [[ "$INSTANCE_PROJECT" != "$EXPECTED_INSTANCE_PROJECT" ]]; then
+          # Si EXPECTED_INSTANCE_PROJECT está definido, forzamos igualdad.
+          if [[ -n "${EXPECTED_INSTANCE_PROJECT:-}" ]] && [[ "$INSTANCE_PROJECT" != "$EXPECTED_INSTANCE_PROJECT" ]]; then
             echo "::error::INSTANCE_PROJECT inesperado: '$INSTANCE_PROJECT' (esperado: '$EXPECTED_INSTANCE_PROJECT')"
             exit 1
           fi
@@ -107,7 +108,7 @@ jobs:
           SNAPSHOT_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/golden_${DB_NAME_STG}_${TS}.sql.gz"
           LATEST_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/latest.sql.gz"
 
-          # Usar proyecto donde vive la instancia (new-ponti-dev tras unificación)
+          # Usar proyecto donde vive la instancia (definido por vars del repo / environment)
           gcloud sql export sql "$DB_INSTANCE_NAME_STG" "$SNAPSHOT_URI" \
             --project="${INSTANCE_PROJECT}" \
             --database="$DB_NAME_STG" \
