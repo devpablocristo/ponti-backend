@@ -363,9 +363,10 @@ func (r *Repository) ListGroupLabor(
 func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, error) {
 	var value string
 	err := r.db.Client().WithContext(ctx).
-		Table("bparams").
+		// business_parameters es la tabla real (bparams era un nombre legacy).
+		Table("business_parameters").
 		Select("value").
-		Where("key = ?", "iva_percentage").
+		Where("key = ? AND deleted_at IS NULL", "iva_percentage").
 		Scan(&value).Error
 	if err != nil || value == "" {
 		return decimal.NewFromFloat(0.105), nil
