@@ -64,11 +64,17 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${SANITIZED_OK:-}" != "true" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "::warning::SANITIZED_OK != 'true'. Skipping scheduled golden snapshot export."
+              echo "SKIP_EXPORT=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
             echo "::error::SANITIZED_OK debe ser 'true' para exportar snapshot golden."
             exit 1
           fi
 
       - name: Guardrails (allowlist)
+        if: ${{ env.SKIP_EXPORT != 'true' }}
         run: |
           set -euo pipefail
 
@@ -103,6 +109,7 @@ jobs:
           fi
 
       - name: Exportar Golden Snapshot
+        if: ${{ env.SKIP_EXPORT != 'true' }}
         run: |
           TS=$(date +"%Y%m%d_%H%M%S")
           SNAPSHOT_URI="gs://${GOLDEN_SNAPSHOT_BUCKET}/golden/golden_${DB_NAME_STG}_${TS}.sql.gz"
