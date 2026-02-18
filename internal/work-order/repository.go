@@ -48,7 +48,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 		// Importante: evitamos que GORM intente crear también las asociaciones (Items) acá,
 		// porque abajo insertamos los items explícitamente. Si se insertan dos veces puede
 		// terminar en violación de PK (duplicate key) como "pk_workorder_items".
-		if err := tx.Omit("Items").Create(&model).Error; err != nil {
+		if err := tx.Omit("Items", "InvestorSplits").Create(&model).Error; err != nil {
 			if isUniqueViolation(err) {
 				return types.NewError(
 					types.ErrConflict,
@@ -71,6 +71,17 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			}
 		}
 
+		// 3.3) Insertar splits por inversor (si existen)
+		if len(model.InvestorSplits) > 0 {
+			for i := range model.InvestorSplits {
+				model.InvestorSplits[i].WorkOrderID = model.ID
+				model.InvestorSplits[i].ID = 0
+			}
+			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to create work order investor splits", err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -84,6 +95,7 @@ func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.Wo
 	var m models.WorkOrder
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Items").
+		Preload("InvestorSplits").
 		Where("id = ?", id).
 		First(&m).Error; err != nil {
 
@@ -128,7 +140,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
-		query := tx.Preload("Items").Where("id = ?", model.ID)
+		query := tx.Preload("Items").Preload("InvestorSplits").Where("id = ?", model.ID)
 		if !o.Base.UpdatedAt.IsZero() {
 			query = query.Where("updated_at = ?", o.Base.UpdatedAt)
 		}
@@ -149,9 +161,16 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 			return types.NewError(types.ErrInternal, "failed to delete old items", err)
 		}
 
+		// 3.2b) Eliminar splits antiguos
+		if err := tx.
+			Where("workorder_id = ?", model.ID).
+			Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete old investor splits", err)
+		}
+
 		// 3.3) Actualizar sólo la cabecera, omitiendo campos de auditoría y la asociación Items
 		updateTx := tx.Model(&orig).
-			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items")
+			Omit("CreatedAt", "CreatedBy", "DeletedAt", "DeletedBy", "Items", "InvestorSplits")
 		if !o.Base.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", o.Base.UpdatedAt)
 		}
@@ -170,6 +189,17 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		if len(model.Items) > 0 {
 			if err := tx.Create(&model.Items).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to insert new items", err)
+			}
+		}
+
+		// 3.5) Insertar splits nuevos
+		if len(model.InvestorSplits) > 0 {
+			for i := range model.InvestorSplits {
+				model.InvestorSplits[i].WorkOrderID = model.ID
+				model.InvestorSplits[i].ID = 0
+			}
+			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
+				return types.NewError(types.ErrInternal, "failed to insert new investor splits", err)
 			}
 		}
 

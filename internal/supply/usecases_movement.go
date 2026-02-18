@@ -51,15 +51,6 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	}
 	movement.StockId = stock.ID
 
-	stockDiference := createStockDiference(movement.IsEntry, movement.Quantity)
-
-	stock.RealStockUnits = stock.RealStockUnits.Add(stockDiference)
-
-	err = u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock)
-	if err != nil {
-		return 0, err
-	}
-
 	if movement.Provider.ID == 0 {
 		providerID, err := u.repo.CreateProvider(ctx, movement.Provider)
 		if err != nil {
@@ -137,13 +128,15 @@ func createStockDomainFromSupplyMovement(supplyMovement *domain.SupplyMovement) 
 		Project: &projdom.Project{
 			ID: supplyMovement.ProjectId,
 		},
-		Supply:       supplyMovement.Supply,
-		Investor:     supplyMovement.Investor,
-		CloseDate:    nil,
-		InitialStock: supplyMovement.Quantity,
-		YearPeriod:   int64(time.Now().Year()),
-		MonthPeriod:  int64(time.Now().Month()),
-		Base:         supplyMovement.Base,
+		Supply:    supplyMovement.Supply,
+		Investor:  supplyMovement.Investor,
+		CloseDate: nil,
+		// `real_stock_units` representa "stock de campo" (recuento manual), por default 0.
+		RealStockUnits: decimal.Zero,
+		InitialStock:   decimal.Zero,
+		YearPeriod:     int64(time.Now().Year()),
+		MonthPeriod:    int64(time.Now().Month()),
+		Base:           supplyMovement.Base,
 	}
 }
 
@@ -194,13 +187,6 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 		}
 	}
 
-	// Actualizar el stock del proyecto origen (restar la cantidad)
-	stockOrigin.RealStockUnits = stockOrigin.RealStockUnits.Sub(movement.Quantity)
-	err = u.stockUseCases.UpdateRealStockUnits(ctx, stockOrigin.ID, &stockOrigin)
-	if err != nil {
-		return fmt.Errorf("error updating origin stock: %w", err)
-	}
-
 	// Crear registro de salida con cantidad NEGATIVA para el proyecto origen
 	// Esto representa la salida de inversión y aparecerá en la lista de insumos
 	movementOut := *movement
@@ -241,13 +227,6 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 	// Asignar el stock del proyecto destino
 	movementIn.StockId = stockDest.ID
 
-	// Actualizar el stock real del proyecto destino
-	stockDest.RealStockUnits = stockDest.RealStockUnits.Add(movementIn.Quantity)
-	err = u.stockUseCases.UpdateRealStockUnits(ctx, stockDest.ID, stockDest)
-	if err != nil {
-		return fmt.Errorf("error updating destination stock: %w", err)
-	}
-
 	// Crear el movimiento de entrada directamente (sin recursión)
 	_, err = u.repo.CreateSupplyMovement(ctx, &movementIn)
 	if err != nil {
@@ -270,7 +249,8 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 		return nil, nil, fmt.Errorf("error getting origin supply: %w", err)
 	}
 
-	if stockOrigin.RealStockUnits.LessThan(movement.Quantity) {
+	available := stockOrigin.GetStockUnits()
+	if available.LessThan(movement.Quantity) {
 		supplyName := ""
 		if originSupply != nil && originSupply.Name != "" {
 			supplyName = originSupply.Name
@@ -281,9 +261,9 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 		}
 
 		msg := fmt.Sprintf(
-			"La cantidad que desea mover (%s) es mayor al stock real (%s)",
+			"La cantidad que desea mover (%s) es mayor al stock de sistema (%s)",
 			movement.Quantity.String(),
-			stockOrigin.RealStockUnits.String(),
+			available.String(),
 		)
 		if supplyName != "" {
 			msg = fmt.Sprintf("%s para el insumo: %s", msg, supplyName)

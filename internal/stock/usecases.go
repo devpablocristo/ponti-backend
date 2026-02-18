@@ -107,13 +107,14 @@ func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.S
 func createNewStockPeriod(userID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
 	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
 	newStock := domain.Stock{
-		Project:        stock.Project,
-		YearPeriod:     newYearPeriod,
-		MonthPeriod:    newMonthPeriod,
-		Supply:         stock.Supply,
-		Investor:       stock.Investor,
-		InitialStock:   stock.RealStockUnits,
-		RealStockUnits: stock.RealStockUnits,
+		Project:     stock.Project,
+		YearPeriod:  newYearPeriod,
+		MonthPeriod: newMonthPeriod,
+		Supply:      stock.Supply,
+		Investor:    stock.Investor,
+		// "Stock de campo" es recuento manual, por default arranca en 0 en cada periodo.
+		InitialStock:   decimal.Zero,
+		RealStockUnits: decimal.Zero,
 		Base: shareddomain.Base{
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),

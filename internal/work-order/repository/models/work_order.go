@@ -20,25 +20,26 @@ import (
 
 // WorkOrder GORM model con todas las relaciones.
 type WorkOrder struct {
-	ID            int64              `gorm:"primaryKey;column:id"`
-	Number        string             `gorm:"column:number;uniqueIndex"`
-	ProjectID     int64              `gorm:"not null"`
-	Project       projectmod.Project `gorm:"foreignKey:ProjectID"`
-	FieldID       int64              `gorm:"not null"`
-	Field         fieldmod.Field     `gorm:"foreignKey:FieldID"`
-	LotID         int64              `gorm:"not null"`
-	Lot           lotmod.Lot         `gorm:"foreignKey:LotID"`
-	CropID        int64              `gorm:"not null"`
-	Crop          cropmod.Crop       `gorm:"foreignKey:CropID"`
-	LaborID       int64              `gorm:"not null"`
-	Labor         labormod.Labor     `gorm:"foreignKey:LaborID"`
-	Contractor    string             `gorm:"size:100"`
-	Observations  string             `gorm:"size:1000"`
-	Date          time.Time          `gorm:"type:date;not null"`
-	InvestorID    int64              `gorm:"not null"`
-	EffectiveArea decimal.Decimal    `gorm:"not null"`
-	DeletedAt     gorm.DeletedAt     `gorm:"index"`
-	Items         []WorkOrderItem    `gorm:"foreignKey:WorkOrderID;references:ID;constraint:OnDelete:CASCADE"`
+	ID             int64                    `gorm:"primaryKey;column:id"`
+	Number         string                   `gorm:"column:number;uniqueIndex"`
+	ProjectID      int64                    `gorm:"not null"`
+	Project        projectmod.Project       `gorm:"foreignKey:ProjectID"`
+	FieldID        int64                    `gorm:"not null"`
+	Field          fieldmod.Field           `gorm:"foreignKey:FieldID"`
+	LotID          int64                    `gorm:"not null"`
+	Lot            lotmod.Lot               `gorm:"foreignKey:LotID"`
+	CropID         int64                    `gorm:"not null"`
+	Crop           cropmod.Crop             `gorm:"foreignKey:CropID"`
+	LaborID        int64                    `gorm:"not null"`
+	Labor          labormod.Labor           `gorm:"foreignKey:LaborID"`
+	Contractor     string                   `gorm:"size:100"`
+	Observations   string                   `gorm:"size:1000"`
+	Date           time.Time                `gorm:"type:date;not null"`
+	InvestorID     int64                    `gorm:"not null"`
+	EffectiveArea  decimal.Decimal          `gorm:"not null"`
+	DeletedAt      gorm.DeletedAt           `gorm:"index"`
+	Items          []WorkOrderItem          `gorm:"foreignKey:WorkOrderID;references:ID;constraint:OnDelete:CASCADE"`
+	InvestorSplits []WorkOrderInvestorSplit `gorm:"foreignKey:WorkOrderID;references:ID;constraint:OnDelete:CASCADE"`
 
 	sharedmodels.Base
 }
@@ -88,6 +89,17 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		}
 		w.Items = items
 	}
+
+	if len(o.InvestorSplits) > 0 {
+		splits := make([]WorkOrderInvestorSplit, len(o.InvestorSplits))
+		for i, s := range o.InvestorSplits {
+			splits[i] = WorkOrderInvestorSplit{
+				InvestorID: s.InvestorID,
+				Percentage: s.Percentage,
+			}
+		}
+		w.InvestorSplits = splits
+	}
 	return w
 }
 
@@ -104,20 +116,32 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 			}
 		}
 	}
+
+	var splits []domain.WorkOrderInvestorSplit
+	if len(m.InvestorSplits) > 0 {
+		splits = make([]domain.WorkOrderInvestorSplit, len(m.InvestorSplits))
+		for i, s := range m.InvestorSplits {
+			splits[i] = domain.WorkOrderInvestorSplit{
+				InvestorID: s.InvestorID,
+				Percentage: s.Percentage,
+			}
+		}
+	}
 	return &domain.WorkOrder{
-		ID:            m.ID,
-		Number:        m.Number,
-		ProjectID:     m.ProjectID,
-		FieldID:       m.FieldID,
-		LotID:         m.LotID,
-		CropID:        m.CropID,
-		LaborID:       m.LaborID,
-		Contractor:    m.Contractor,
-		Observations:  m.Observations,
-		Date:          m.Date,
-		InvestorID:    m.InvestorID,
-		EffectiveArea: m.EffectiveArea,
-		Items:         items,
+		ID:             m.ID,
+		Number:         m.Number,
+		ProjectID:      m.ProjectID,
+		FieldID:        m.FieldID,
+		LotID:          m.LotID,
+		CropID:         m.CropID,
+		LaborID:        m.LaborID,
+		Contractor:     m.Contractor,
+		Observations:   m.Observations,
+		Date:           m.Date,
+		InvestorID:     m.InvestorID,
+		EffectiveArea:  m.EffectiveArea,
+		Items:          items,
+		InvestorSplits: splits,
 		Base: shareddomain.Base{
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,

@@ -497,7 +497,13 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 		Provider:             &providerdomain.Provider{ID: 1, Name: "agro"},
 		Investor:             &investordomain.Investor{ID: 11},
 	}
-	stockOrigin := stockdomain.Stock{ID: 10, RealStockUnits: decimal.NewFromInt(50)}
+	stockOrigin := stockdomain.Stock{
+		ID: 10,
+		SupplyMovements: []domain.SupplyMovement{
+			{IsEntry: true, Quantity: decimal.NewFromInt(50)},
+		},
+		Consumed: decimal.Zero,
+	}
 
 	var outMovementCreated *domain.SupplyMovement
 	var inMovementCreated *domain.SupplyMovement
@@ -510,10 +516,6 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 		GetSupplyByProjectAndName(gomock.Any(), destinationProjectID, "ACEITE VERSION").
 		Return(&domain.Supply{ID: destSupplyID, ProjectID: destinationProjectID, Name: "ACEITE VERSION"}, nil)
 
-	mockStock.EXPECT().
-		UpdateRealStockUnits(gomock.Any(), stockOrigin.ID, gomock.Any()).
-		Return(nil)
-
 	mockRepo.EXPECT().
 		CreateSupplyMovement(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
@@ -524,10 +526,6 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 	mockStock.EXPECT().
 		GetLastStockByProjectID(gomock.Any(), destinationProjectID, destSupplyID).
 		Return(&stockdomain.Stock{ID: 202, RealStockUnits: decimal.NewFromInt(3)}, false, nil)
-
-	mockStock.EXPECT().
-		UpdateRealStockUnits(gomock.Any(), int64(202), gomock.Any()).
-		Return(nil)
 
 	mockRepo.EXPECT().
 		CreateSupplyMovement(gomock.Any(), gomock.Any()).
@@ -568,9 +566,12 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 		Investor:             &investordomain.Investor{ID: 11},
 	}
 	stockOrigin := stockdomain.Stock{
-		ID:             10,
-		RealStockUnits: decimal.NewFromInt(50),
-		Supply:         &domain.Supply{ID: originSupplyID, Name: "ACEITE VERSION"},
+		ID:     10,
+		Supply: &domain.Supply{ID: originSupplyID, Name: "ACEITE VERSION"},
+		SupplyMovements: []domain.SupplyMovement{
+			{IsEntry: true, Quantity: decimal.NewFromInt(50)},
+		},
+		Consumed: decimal.Zero,
 	}
 
 	originSupply := &domain.Supply{
@@ -604,9 +605,6 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 				assert.Equal(t, originSupply.Type.ID, s.Type.ID)
 				return destSupplyID, nil
 			}),
-		mockStock.EXPECT().
-			UpdateRealStockUnits(gomock.Any(), stockOrigin.ID, gomock.Any()).
-			Return(nil),
 		mockRepo.EXPECT().
 			CreateSupplyMovement(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
@@ -623,9 +621,6 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 				assert.Equal(t, destSupplyID, s.Supply.ID)
 				return 202, nil
 			}),
-		mockStock.EXPECT().
-			UpdateRealStockUnits(gomock.Any(), int64(202), gomock.Any()).
-			Return(nil),
 		mockRepo.EXPECT().
 			CreateSupplyMovement(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {

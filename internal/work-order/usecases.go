@@ -40,6 +40,9 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 	if o == nil {
 		return 0, types.NewError(types.ErrValidation, "work order is nil", nil)
 	}
+	if err := validateInvestorSplits(o); err != nil {
+		return 0, err
+	}
 	return u.repo.CreateWorkOrder(ctx, o)
 }
 
@@ -52,7 +55,41 @@ func (u *UseCases) DuplicateWorkOrder(ctx context.Context, number string) (strin
 }
 
 func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
+	if err := validateInvestorSplits(o); err != nil {
+		return err
+	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
+}
+
+func validateInvestorSplits(o *domain.WorkOrder) error {
+	if o == nil {
+		return types.NewError(types.ErrValidation, "work order is nil", nil)
+	}
+	if len(o.InvestorSplits) == 0 {
+		return nil
+	}
+
+	seen := map[int64]struct{}{}
+	sum := decimal.Zero
+	for _, s := range o.InvestorSplits {
+		if s.InvestorID <= 0 {
+			return types.NewError(types.ErrValidation, "invalid investor_id in investor_splits", nil)
+		}
+		if s.Percentage.LessThanOrEqual(decimal.Zero) {
+			return types.NewError(types.ErrValidation, "invalid percentage in investor_splits", nil)
+		}
+		if _, ok := seen[s.InvestorID]; ok {
+			return types.NewError(types.ErrValidation, "duplicate investor_id in investor_splits", nil)
+		}
+		seen[s.InvestorID] = struct{}{}
+		sum = sum.Add(s.Percentage)
+	}
+
+	// Permitir un margen mínimo por decimales.
+	if sum.Sub(decimal.NewFromInt(100)).Abs().GreaterThan(decimal.NewFromFloat(0.001)) {
+		return types.NewError(types.ErrValidation, "investor_splits percentage must sum to 100", nil)
+	}
+	return nil
 }
 
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {

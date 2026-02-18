@@ -1,0 +1,158 @@
+name: Reset DB (STAGING) from PROD (sanitized)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: reset-db-staging
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    env:
+      # La instancia Cloud SQL vive en DEV (unificada para ahorrar recursos)
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+
+      # Instancia + DBs (la instancia suele ser la misma para dev/stg/prod)
+      DB_INSTANCE_NAME: ${{ vars.DB_INSTANCE_NAME_DEV }}
+      DB_NAME_PROD: ${{ vars.DB_NAME_PROD }}
+      DB_NAME_STG: ${{ vars.DB_NAME_STG }}
+
+      # Bucket para dumps temporales (mismo bucket que ya usan snapshots)
+      WORK_BUCKET: ${{ vars.PREVIEW_BUCKET }}
+
+      # Guardrail: hay que setearlo a true para habilitar el flujo.
+      SANITIZED_OK: ${{ vars.SANITIZED_OK }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth GCP (DEV project - instancia unificada)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Validar config mínima + guardrails
+        run: |
+          set -euo pipefail
+
+          if [ "${SANITIZED_OK:-}" != "true" ]; then
+            echo "::error::SANITIZED_OK debe ser 'true' para ejecutar este workflow."
+            exit 1
+          fi
+
+          if [ -z "${DB_INSTANCE_NAME:-}" ]; then
+            echo "::error::Falta DB_INSTANCE_NAME"
+            exit 1
+          fi
+          if [ -z "${DB_NAME_PROD:-}" ]; then
+            echo "::error::Falta DB_NAME_PROD"
+            exit 1
+          fi
+          if [ -z "${DB_NAME_STG:-}" ]; then
+            echo "::error::Falta DB_NAME_STG"
+            exit 1
+          fi
+          if [ -z "${WORK_BUCKET:-}" ]; then
+            echo "::error::Falta WORK_BUCKET (PREVIEW_BUCKET)"
+            exit 1
+          fi
+
+          inst_lower="$(printf '%s' "$DB_INSTANCE_NAME" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$inst_lower" == *prod* ]]; then
+            echo "::error::DB_INSTANCE_NAME contiene 'prod': '$DB_INSTANCE_NAME' (instancia debe ser la unificada en dev)"
+            exit 1
+          fi
+
+          stg_lower="$(printf '%s' "$DB_NAME_STG" | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$stg_lower" =~ (_stg|-stg)$ ]]; then
+            echo "::error::DB_NAME_STG debe terminar en _stg o -stg: '$DB_NAME_STG'"
+            exit 1
+          fi
+
+          prod_lower="$(printf '%s' "$DB_NAME_PROD" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$prod_lower" != *prod* ]]; then
+            echo "::warning::DB_NAME_PROD no contiene 'prod': '$DB_NAME_PROD' (verificar)"
+          fi
+
+      - name: Export PROD dump (SQL.gz) a GCS
+        run: |
+          set -euo pipefail
+          TS="$(date +'%Y%m%d_%H%M%S')"
+          PROD_URI="gs://${WORK_BUCKET}/prod_exports/prod_${DB_NAME_PROD}_${TS}.sql.gz"
+          echo "PROD_URI=$PROD_URI" >> "$GITHUB_ENV"
+
+          gcloud sql export sql "$DB_INSTANCE_NAME" "$PROD_URI" \
+            --project="$GCP_PROJECT_ID" \
+            --database="$DB_NAME_PROD" \
+            --offload \
+            --quiet
+
+      - name: Reset STAGING DB (drop + create)
+        run: |
+          set -euo pipefail
+
+          delete_stderr="$(mktemp)"
+          if ! gcloud sql databases delete "$DB_NAME_STG" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$DB_INSTANCE_NAME" \
+            --quiet 2>"$delete_stderr"; then
+            msg="$(tr '\n' ' ' <"$delete_stderr")"
+            msg_lower="$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]')"
+            if echo "$msg_lower" | grep -Eq "not found|does not exist"; then
+              echo "DB '$DB_NAME_STG' no existe; continuo."
+            else
+              echo "::error::Fallo al borrar DB '$DB_NAME_STG': $msg"
+              exit 1
+            fi
+          fi
+          rm -f "$delete_stderr"
+
+          gcloud sql databases create "$DB_NAME_STG" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$DB_INSTANCE_NAME"
+
+      - name: Import PROD dump en STAGING
+        run: |
+          set -euo pipefail
+          gcloud sql import sql "$DB_INSTANCE_NAME" "$PROD_URI" \
+            --project="$GCP_PROJECT_ID" \
+            --database="$DB_NAME_STG" \
+            --quiet
+
+      - name: Subir SQL de sanitizacion a GCS (temporal)
+        run: |
+          set -euo pipefail
+          TS="$(date +'%Y%m%d_%H%M%S')"
+          SAN_URI="gs://${WORK_BUCKET}/sanitizers/sanitize_prod_to_stg_${TS}.sql"
+          echo "SAN_URI=$SAN_URI" >> "$GITHUB_ENV"
+          gcloud storage cp "scripts/db/sanitize_prod_to_staging.sql" "$SAN_URI"
+
+      - name: Ejecutar sanitizacion (solo STAGING)
+        run: |
+          set -euo pipefail
+          gcloud sql import sql "$DB_INSTANCE_NAME" "$SAN_URI" \
+            --project="$GCP_PROJECT_ID" \
+            --database="$DB_NAME_STG" \
+            --quiet
+

@@ -6,6 +6,7 @@ alwaysApply: true
 # No Git / No Deploy sin autorización
 
 - NUNCA ejecutes comandos git (commit, push, pull, add, stash, merge, cherry-pick, etc.) a menos que el usuario lo pida explícitamente.
+- NUNCA cambies de rama (git switch/checkout) sin que el usuario lo pida explícitamente. Trabajá siempre desde la rama actual; si necesitás otra, pedí confirmación primero.
 - NUNCA hagas push a ninguna rama (origin, upstream, etc.) sin autorización expresa del usuario.
 - NUNCA hagas merge ni cherry-pick entre ramas sin autorización expresa del usuario.
 - NUNCA dispares deploys (ni directa ni indirectamente vía push) sin autorización expresa del usuario.

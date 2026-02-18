@@ -10,6 +10,7 @@ alwaysApply: true
 - NUNCA usar ROUND() en migraciones SQL, mantener precisión completa
 - NUNCA cambiar nada que no sea quirúrgicamente lo que se pide
 - Siempre usar parámetros dinámicos y configurables
+- Iterar en local hasta obtener resultados válidos: reproducir el problema, correr el stack local/tests, revisar logs y reintentar; no alcanza con “escribir código” sin verificar.
 - Siempre comenzar con TLDR
 - Siempre antes de implementar esperar que acepte para lo pretendido
 
@@ -30,6 +31,23 @@ alwaysApply: true
 - Use cases solo trabajan con primitives o domain types
 - Repository usa models del package models
 - Migraciones separadas por entidad
+
+## Infra (GCP) - Contexto del proyecto
+- Ambientes: `dev` (proyecto GCP `new-ponti-dev`) y `staging` (proyecto GCP `new-ponti-stg`).
+- Cloud Run: un solo service canonico por app y ambiente: `ponti-frontend`, `ponti-backend`, `ponti-ai` (evitar duplicados tipo `*-dev` / `*-staging`).
+- URLs Cloud Run: usar traffic tags para que el hostname indique ambiente (`dev---...run.app`, `stg---...run.app`).
+- Cloud SQL: para ahorrar recursos, `dev` y `staging` comparten la MISMA instancia Cloud SQL:
+  - connection name: `new-ponti-dev:us-central1:new-ponti-db-dev`
+  - lo que separa ambientes es el nombre de la DB, no la instancia.
+- Backend DBs (misma instancia):
+  - `dev`: `DB_NAME=new_ponti_db_dev`
+  - `staging`: `DB_NAME=new_ponti_db_staging`
+- AI DBs (misma instancia, via `DB_DSN`):
+  - `dev`: `ponti_ai_dev`
+  - `staging`: `ponti_ai_staging`
+- Identity Platform:
+  - `dev`: `IDENTITY_PROJECT_ID=new-ponti-dev`
+  - `staging`: `IDENTITY_PROJECT_ID=new-ponti-stg`
 
 ## Base de Datos
 - Priorizar SQL migrations sobre modelos Go

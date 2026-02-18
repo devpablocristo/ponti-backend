@@ -1,4 +1,4 @@
-name: Reset DEV DB
+name: Reset DB (DEV) from STAGING
 
 on:
   workflow_dispatch:
@@ -7,10 +7,15 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: reset-db-dev
+  cancel-in-progress: false
+
 jobs:
   reset:
     runs-on: ubuntu-latest
-    environment: dev
+    environment:
+      name: dev
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
       GCP_REGION: ${{ vars.GCP_REGION }}
@@ -20,7 +25,9 @@ jobs:
       EXPECTED_DEV_DB_NAME: REPLACE_ME_DEV_DB
       DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
       DB_NAME_DEV: ${{ vars.DB_NAME_DEV }}
-      GOLDEN_SNAPSHOT_URI: ${{ vars.GOLDEN_SNAPSHOT_URI }}
+      # Fuente: STAGING (vive en la misma instancia unificada)
+      DB_NAME_STG: ${{ vars.DB_NAME_STG }}
+      WORK_BUCKET: ${{ vars.PREVIEW_BUCKET }}
       HARDENING_SQL_URI: ${{ vars.HARDENING_SQL_URI }}
       SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
     steps:
@@ -45,8 +52,12 @@ jobs:
             echo "::error::Falta DB_NAME_DEV"
             exit 1
           fi
-          if [ -z "$GOLDEN_SNAPSHOT_URI" ]; then
-            echo "::error::Falta GOLDEN_SNAPSHOT_URI"
+          if [ -z "$DB_NAME_STG" ]; then
+            echo "::error::Falta DB_NAME_STG"
+            exit 1
+          fi
+          if [ -z "$WORK_BUCKET" ]; then
+            echo "::error::Falta WORK_BUCKET (PREVIEW_BUCKET)"
             exit 1
           fi
 
@@ -82,7 +93,29 @@ jobs:
             exit 1
           fi
 
-      - name: Reset DB dev
+          stg_lower="$(printf '%s' "$DB_NAME_STG" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$stg_lower" == *prod* ]]; then
+            echo "::error::DB_NAME_STG no puede contener 'prod': '$DB_NAME_STG'"
+            exit 1
+          fi
+          if [[ ! "$stg_lower" =~ (_stg|-stg|staging)$ ]] && [[ ! "$stg_lower" =~ _staging$ ]]; then
+            echo "::warning::DB_NAME_STG no termina en _stg/_staging: '$DB_NAME_STG' (verificar)"
+          fi
+
+      - name: Export STAGING dump (SQL.gz) a GCS
+        run: |
+          set -euo pipefail
+          TS="$(date +'%Y%m%d_%H%M%S')"
+          STG_URI="gs://${WORK_BUCKET}/dev_resets/from_stg_${DB_NAME_STG}_${TS}.sql.gz"
+          echo "STG_URI=$STG_URI" >> "$GITHUB_ENV"
+
+          gcloud sql export sql "$DB_INSTANCE_NAME_DEV" "$STG_URI" \
+            --project="$GCP_PROJECT_ID" \
+            --database="$DB_NAME_STG" \
+            --offload \
+            --quiet
+
+      - name: Reset DEV DB (drop + create)
         run: |
           set -euo pipefail
 
@@ -107,9 +140,9 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV"
 
-      - name: Restaurar Golden Snapshot
+      - name: Import STAGING dump en DEV
         run: |
-          gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$GOLDEN_SNAPSHOT_URI" \
+          gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$STG_URI" \
             --project="$GCP_PROJECT_ID" \
             --database="$DB_NAME_DEV" \
             --quiet
@@ -126,3 +159,4 @@ jobs:
         if: ${{ env.SMOKE_TEST_URL != '' }}
         run: |
           curl -fsS "$SMOKE_TEST_URL"
+

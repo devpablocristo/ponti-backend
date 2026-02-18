@@ -13,7 +13,6 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -277,8 +276,9 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				return types.NewError(types.ErrInternal, "failed to delete related supply movements", err)
 			}
 
-			// Eliminar stocks de todos los proyectos afectados solo si no tienen más movimientos
-			// O actualizar RealStockUnits si quedan movimientos
+			// Eliminar stocks de todos los proyectos afectados solo si no tienen más movimientos.
+			// Nota: `real_stock_units` representa "stock de campo" (recuento manual) y NO se recalcula
+			// automáticamente a partir de movimientos.
 			for projectIDAffected := range affectedProjects {
 				// Obtener movimientos restantes para recalcular el stock
 				var remainingMovements []models.SupplyMovement
@@ -291,23 +291,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 					// No quedan movimientos, eliminar el stock
 					if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).Error; err != nil {
 						return types.NewError(types.ErrInternal, "failed to delete stock", err)
-					}
-				} else {
-					// Recalcular RealStockUnits basándose en los movimientos restantes
-					realStockUnits := decimal.Zero
-					for _, mov := range remainingMovements {
-						if mov.IsEntry {
-							realStockUnits = realStockUnits.Add(mov.Quantity)
-						} else {
-							realStockUnits = realStockUnits.Sub(mov.Quantity)
-						}
-					}
-
-					// Actualizar el stock con el nuevo RealStockUnits
-					if err := tx.Model(&stockmodel.Stock{}).
-						Where("project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).
-						Update("real_stock_units", realStockUnits).Error; err != nil {
-						return types.NewError(types.ErrInternal, "failed to update stock real units", err)
 					}
 				}
 			}
@@ -329,23 +312,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				// No quedan movimientos, eliminar el stock
 				if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).Error; err != nil {
 					return types.NewError(types.ErrInternal, "failed to delete stock", err)
-				}
-			} else {
-				// Recalcular RealStockUnits basándose en los movimientos restantes
-				realStockUnits := decimal.Zero
-				for _, mov := range remainingMovements {
-					if mov.IsEntry {
-						realStockUnits = realStockUnits.Add(mov.Quantity)
-					} else {
-						realStockUnits = realStockUnits.Sub(mov.Quantity)
-					}
-				}
-
-				// Actualizar el stock con el nuevo RealStockUnits
-				if err := tx.Model(&stockmodel.Stock{}).
-					Where("project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).
-					Update("real_stock_units", realStockUnits).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to update stock real units", err)
 				}
 			}
 		}

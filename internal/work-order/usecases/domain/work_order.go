@@ -24,8 +24,16 @@ type WorkOrder struct {
 	InvestorID    int64
 	EffectiveArea decimal.Decimal
 	Items         []WorkOrderItem
+	// InvestorSplits permite repartir el aporte de la labor entre inversores
+	// sin duplicar workorders. Si está vacío, se usa InvestorID al 100%.
+	InvestorSplits []WorkOrderInvestorSplit
 
 	Base shareddomain.Base
+}
+
+type WorkOrderInvestorSplit struct {
+	InvestorID int64
+	Percentage decimal.Decimal
 }
 
 // WorkOrderItem representa un item de la orden de trabajo.

@@ -213,12 +213,14 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 
 func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
-	err := r.getDB(ctx).
+	gormDB := r.getDB(ctx)
+	err := gormDB.
 		Preload("Project").
 		Preload("Supply").
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
+		Preload("SupplyMovements").
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
 		Where("close_date is null").
@@ -230,6 +232,21 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 
 		return nil, false, types.NewError(types.ErrInternal, "failed to get last stock", err)
 	}
+
+	// Para validaciones (p.ej. movimientos internos) necesitamos el stock de sistema,
+	// que depende de `consumed`. Lo resolvemos desde la vista de reportes.
+	var consumedResult struct {
+		Consumed decimal.Decimal `gorm:"column:consumed"`
+	}
+	query := fmt.Sprintf(`
+		SELECT consumed
+		FROM %s
+		WHERE project_id = ? AND supply_id = ?
+	`, reportdb.ReportView("stock_consumed_by_supply"))
+	if err := gormDB.Raw(query, projectID, supplyID).Scan(&consumedResult).Error; err != nil {
+		return nil, false, types.NewError(types.ErrInternal, "failed to load stock consumed", err)
+	}
+	stockModel.Consumed = consumedResult.Consumed
 
 	return stockModel.ToDomain(), false, nil
 }
