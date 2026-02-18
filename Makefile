@@ -92,6 +92,7 @@ seed-dashboard:
 staging-db-2-local-db:
 	@echo "Downloading GCP STAGING and restoring data-only to local..."
 	@echo "Asegurando que la DB local esté levantada..."
+	@echo "Tip: si no seteás SRC_PASS, el script intenta leer db-password-dev desde Secret Manager (requiere gcloud auth)."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
 	@set -a && [ -f .env ] && source .env; [ -f scripts/db/db_staging_to_local.env ] && source scripts/db/db_staging_to_local.env; set +a && \
 	DB_PORT=5433 bash ./scripts/db/db_staging_to_local.sh

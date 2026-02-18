@@ -42,6 +42,19 @@ SRC_PORT="${SRC_PORT:-5432}"
 SRC_DB="${SRC_DB:-${DB_NAME_STG:-new_ponti_db_staging}}"
 SRC_SSL="${SRC_SSL:-disable}"
 
+# Si no se provee SRC_PASS, intentar obtenerlo automáticamente desde Secret Manager.
+# Esto evita tener que guardar contraseñas en archivos locales.
+SRC_PASS_SECRET_PROJECT="${SRC_PASS_SECRET_PROJECT:-new-ponti-dev}"
+SRC_PASS_SECRET_NAME="${SRC_PASS_SECRET_NAME:-db-password-dev}"
+if [[ -z "${SRC_PASS}" ]] && command -v gcloud >/dev/null 2>&1; then
+  # No mostrar el valor en stdout/stderr.
+  if SRC_PASS="$(gcloud secrets versions access latest --secret="${SRC_PASS_SECRET_NAME}" --project="${SRC_PASS_SECRET_PROJECT}" 2>/dev/null)"; then
+    :
+  else
+    SRC_PASS=""
+  fi
+fi
+
 # Cloud SQL Proxy (fallback si no hay acceso directo)
 USE_CLOUDSQL_PROXY="${USE_CLOUDSQL_PROXY:-auto}" # auto | 1 | 0
 SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-${CLOUDSQL_PROJECT_STG:-}}"
@@ -132,7 +145,10 @@ PY
 ### ===== Validaciones de credenciales origen (STAGING) =====
 if [[ -z "${SRC_PASS}" ]]; then
   err "SRC_PASS es requerido para el usuario de staging (${SRC_USER})."
-  err "Creá scripts/db/db_staging_to_local.env con SRC_PASS=... o pasá SRC_PASS='...' $0"
+  err "Opciones:"
+  err "  - Creá scripts/db/db_staging_to_local.env con SRC_PASS=..."
+  err "  - O pasá SRC_PASS='...' $0"
+  err "  - O configurá gcloud ADC y setea SRC_PASS_SECRET_PROJECT/SRC_PASS_SECRET_NAME (default: new-ponti-dev/db-password-dev)"
   exit 1
 fi
 
@@ -142,8 +158,30 @@ if [[ -z "${SRC_USER}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
   exit 1
 fi
 
-# Para conexión directa se requiere SRC_HOST; para proxy puede omitirse.
-if [[ -z "${SRC_HOST}" && "${USE_CLOUDSQL_PROXY}" != "1" && "${USE_CLOUDSQL_PROXY}" != "auto" ]]; then
+infer_src_host_from_gcloud() {
+  if ! command -v gcloud >/dev/null 2>&1; then
+    return 1
+  fi
+
+  # Defaults seguros para este repo: STAGING vive en la instancia unificada de DEV.
+  local proj="${SRC_INSTANCE_PROJECT:-new-ponti-dev}"
+  local inst="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_DEV:-new-ponti-db-dev}}"
+
+  local ip
+  ip="$(gcloud sql instances describe "$inst" --project="$proj" --format='value(ipAddresses[0].ipAddress)' 2>/dev/null | tr -d '\r' || true)"
+  if [[ -n "${ip}" ]]; then
+    SRC_HOST="${ip}"
+    return 0
+  fi
+  return 1
+}
+
+# Si no hay SRC_HOST, intentamos inferirlo. Si no se puede, dejamos que el modo proxy (auto/1)
+# se encargue; si USE_CLOUDSQL_PROXY=0, fallamos con error claro.
+if [[ -z "${SRC_HOST}" ]]; then
+  infer_src_host_from_gcloud || true
+fi
+if [[ -z "${SRC_HOST}" && "${USE_CLOUDSQL_PROXY}" == "0" ]]; then
   err "SRC_HOST vacío y USE_CLOUDSQL_PROXY=0. Definí SRC_HOST o usá USE_CLOUDSQL_PROXY=auto/1."
   exit 1
 fi
