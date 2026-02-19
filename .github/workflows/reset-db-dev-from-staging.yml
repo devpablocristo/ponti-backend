@@ -21,8 +21,11 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
-      EXPECTED_GCP_PROJECT_ID: REPLACE_ME_DEV_PROJECT
-      EXPECTED_DEV_DB_NAME: REPLACE_ME_DEV_DB
+      # Hard guardrails: if these do not match, the workflow must fail fast.
+      EXPECTED_GCP_PROJECT_ID: new-ponti-dev
+      EXPECTED_DB_INSTANCE_NAME_DEV: new-ponti-db-dev
+      EXPECTED_DEV_DB_NAME: new_ponti_db_dev
+      EXPECTED_STG_DB_NAME: new_ponti_db_staging
       DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
       DB_NAME_DEV: ${{ vars.DB_NAME_DEV }}
       # Fuente: STAGING (vive en la misma instancia unificada)
@@ -65,9 +68,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Si EXPECTED_GCP_PROJECT_ID sigue en REPLACE_ME_*, no forzamos igualdad.
-          if [[ "$EXPECTED_GCP_PROJECT_ID" != REPLACE_ME_* ]] && [[ "$GCP_PROJECT_ID" != "$EXPECTED_GCP_PROJECT_ID" ]]; then
+          if [[ -z "${EXPECTED_GCP_PROJECT_ID:-}" ]]; then
+            echo "::error::EXPECTED_GCP_PROJECT_ID vacío (guardrail)"
+            exit 1
+          fi
+          if [[ "$GCP_PROJECT_ID" != "$EXPECTED_GCP_PROJECT_ID" ]]; then
             echo "::error::GCP_PROJECT_ID inesperado: '$GCP_PROJECT_ID' (esperado: '$EXPECTED_GCP_PROJECT_ID')"
+            exit 1
+          fi
+
+          if [[ -z "${EXPECTED_DB_INSTANCE_NAME_DEV:-}" ]]; then
+            echo "::error::EXPECTED_DB_INSTANCE_NAME_DEV vacío (guardrail)"
+            exit 1
+          fi
+          if [[ "$DB_INSTANCE_NAME_DEV" != "$EXPECTED_DB_INSTANCE_NAME_DEV" ]]; then
+            echo "::error::DB_INSTANCE_NAME_DEV inesperado: '$DB_INSTANCE_NAME_DEV' (esperado: '$EXPECTED_DB_INSTANCE_NAME_DEV')"
             exit 1
           fi
 
@@ -82,13 +97,17 @@ jobs:
           fi
 
           db_lower="$(printf '%s' "$DB_NAME_DEV" | tr '[:upper:]' '[:lower:]')"
-          if [[ "$db_lower" == *prod* ]] || [[ "$db_lower" == *stg* ]]; then
-            echo "::error::DB_NAME_DEV no puede contener 'prod' ni 'stg': '$DB_NAME_DEV'"
+          # Explicitly block any accidental reset of staging/prod DBs.
+          if [[ "$db_lower" == *prod* ]] || [[ "$db_lower" == *stg* ]] || [[ "$db_lower" == *staging* ]]; then
+            echo "::error::DB_NAME_DEV no puede contener 'prod', 'stg' ni 'staging': '$DB_NAME_DEV'"
             exit 1
           fi
 
-          # Si EXPECTED_DEV_DB_NAME sigue en REPLACE_ME_*, no forzamos igualdad.
-          if [[ "$EXPECTED_DEV_DB_NAME" != REPLACE_ME_* ]] && [[ "$DB_NAME_DEV" != "$EXPECTED_DEV_DB_NAME" ]]; then
+          if [[ -z "${EXPECTED_DEV_DB_NAME:-}" ]]; then
+            echo "::error::EXPECTED_DEV_DB_NAME vacío (guardrail)"
+            exit 1
+          fi
+          if [[ "$DB_NAME_DEV" != "$EXPECTED_DEV_DB_NAME" ]]; then
             echo "::error::DB_NAME_DEV inesperado: '$DB_NAME_DEV' (esperado: '$EXPECTED_DEV_DB_NAME')"
             exit 1
           fi
@@ -98,8 +117,18 @@ jobs:
             echo "::error::DB_NAME_STG no puede contener 'prod': '$DB_NAME_STG'"
             exit 1
           fi
-          if [[ ! "$stg_lower" =~ (_stg|-stg|staging)$ ]] && [[ ! "$stg_lower" =~ _staging$ ]]; then
-            echo "::warning::DB_NAME_STG no termina en _stg/_staging: '$DB_NAME_STG' (verificar)"
+          if [[ -z "${EXPECTED_STG_DB_NAME:-}" ]]; then
+            echo "::error::EXPECTED_STG_DB_NAME vacío (guardrail)"
+            exit 1
+          fi
+          if [[ "$DB_NAME_STG" != "$EXPECTED_STG_DB_NAME" ]]; then
+            echo "::error::DB_NAME_STG inesperado: '$DB_NAME_STG' (esperado: '$EXPECTED_STG_DB_NAME')"
+            exit 1
+          fi
+
+          if [[ "$DB_NAME_DEV" == "$DB_NAME_STG" ]]; then
+            echo "::error::DB_NAME_DEV y DB_NAME_STG son iguales ('$DB_NAME_DEV'). Abortando para no romper STAGING."
+            exit 1
           fi
 
       - name: Export STAGING dump (SQL.gz) a GCS
