@@ -1,3 +1,4 @@
+// Package dataintegrity implementa controles de coherencia entre módulos (integridad de datos).
 package dataintegrity
 
 import (
@@ -77,6 +78,8 @@ type sharedData struct {
 	fieldCropMetrics []reportDomain.FieldCropMetric
 	summaryResults   []reportDomain.SummaryResults
 	investorReport   *reportDomain.InvestorContributionReport
+	workOrderMetrics *workOrderDomain.WorkOrderMetrics
+	workOrderRawCost decimal.Decimal
 }
 
 // fetchSharedData obtiene una sola vez los datos usados por múltiples controles.
@@ -117,10 +120,28 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	}
 	sd.investorReport = investorReport
 
+	// Work orders: métricas (v4_report.workorder_metrics) + cálculo RAW independiente.
+	woFilter := workOrderDomain.WorkOrderFilter{ProjectID: projectID}
+	woMetrics, err := u.workOrderRepo.GetMetrics(ctx, woFilter)
+	if err != nil {
+		return nil, fmt.Errorf("fetch workorder_metrics: %w", err)
+	}
+	sd.workOrderMetrics = woMetrics
+
+	rawProjectID := int64(0)
+	if projectID != nil {
+		rawProjectID = *projectID
+	}
+	rawCost, err := u.workOrderRepo.GetRawDirectCost(ctx, rawProjectID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch workorder_raw_direct_cost: %w", err)
+	}
+	sd.workOrderRawCost = rawCost
+
 	return sd, nil
 }
 
-// CheckCostsCoherence valida la coherencia de costos con 14 controles individuales.
+// CheckCostsCoherence valida la coherencia de costos con 16 controles individuales.
 // Cada control compara: SystemValue (1 directo) vs RecalcA y opcionalmente RecalcB (2 independientes).
 func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -131,7 +152,7 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		return nil, err
 	}
 
-	checks := make([]domain.IntegrityCheck, 14)
+	checks := make([]domain.IntegrityCheck, 16)
 	var wg sync.WaitGroup
 	var errOnce sync.Once
 	var firstErr error
@@ -215,6 +236,16 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		return u.control14StockVsDashboard(c, sd)
 	})
 
+	// GRUPO 7: Órdenes de trabajo (Control 15)
+	run(14, 15, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control15DashboardVsWorkOrdersDirectCosts(c, sd)
+	})
+
+	// GRUPO 8: Costos directos aportados (Control 16)
+	run(15, 16, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control16DashboardAportadoVsLaborsAndSupplies(c, sd)
+	})
+
 	wg.Wait()
 	if firstErr != nil {
 		return nil, firstErr
@@ -267,6 +298,102 @@ func sumFieldCropOperatingResult(metrics []reportDomain.FieldCropMetric) decimal
 		total = total.Add(m.OperatingResultUsdHa.Mul(m.SurfaceHa))
 	}
 	return total
+}
+
+// =====================================================
+// CONTROL 15: Dashboard (ejecutados) → WorkOrders (costos directos)
+// System: dashboard.DirectCostsExecutedUSD
+// RecalcA: ∑(workorder_metrics.direct_cost_usd)
+// RecalcB: RAW desde tablas workorders + workorder_items
+// =====================================================
+func (u *UseCases) control15DashboardVsWorkOrdersDirectCosts(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	systemValue := sd.dashboardData.ManagementBalance.Summary.DirectCostsExecutedUSD
+
+	recalcA := decimal.Zero
+	if sd.workOrderMetrics != nil {
+		recalcA = sd.workOrderMetrics.DirectCost
+	}
+	recalcBVal := sd.workOrderRawCost
+
+	return buildCheck(
+		15,
+		"Costos directos ejecutados",
+		"Dashboard vs Órdenes de trabajo (métricas + RAW)",
+		"dashboard.DirectCostsExecutedUSD = ∑(workorder_metrics.direct_cost_usd) = ∑(wo RAW cost)",
+		"dashboard.ManagementBalance.Summary.DirectCostsExecutedUSD",
+		systemValue,
+		"v4_report.dashboard_management_balance",
+		"Costos directos ejecutados del Dashboard (SSOT).",
+		"∑(workorder_metrics.direct_cost_usd)",
+		recalcA,
+		"v4_report.workorder_metrics",
+		"Recálculo: suma de costos directos por lote/campo desde la vista de métricas de órdenes de trabajo.",
+		strPtr("∑(wo.effective_area*l.price + ∑(wi.total_used*s.price))"),
+		&recalcBVal,
+		strPtr("public.workorders + public.workorder_items + public.supplies + public.labors"),
+		strPtr("Segundo recálculo (RAW): calcula el costo directo desde tablas base (labor + insumos), respetando deleted_at y sin depender de vistas SSOT."),
+		decimal.NewFromInt(1),
+	), nil
+}
+
+// =====================================================
+// CONTROL 16: Dashboard (aportado) → Labores + Insumos (neto) + Aportes (3ra vía)
+// System: dashboard.DirectCostsInvestedUSD
+// RecalcA: dashboard.(LaboresInvertidosUSD + SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD)
+// RecalcB: ∑(investor_contribution categories) para labores + insumos
+// =====================================================
+func (u *UseCases) control16DashboardAportadoVsLaborsAndSupplies(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	summary := sd.dashboardData.ManagementBalance.Summary
+
+	systemValue := summary.DirectCostsInvestedUSD
+
+	// RecalcA: sumar "Total USD / Neto" de Labores + Insumos tal como el dashboard los expone.
+	// Insumos neto = semillas + agroquímicos + fertilizantes (en invertidos).
+	insumosNeto := summary.SemillasInvertidosUSD.
+		Add(summary.AgroquimicosInvertidosUSD).
+		Add(summary.FertilizantesInvertidosUSD)
+	laboresNeto := summary.LaboresInvertidosUSD
+	recalcA := laboresNeto.Add(insumosNeto)
+
+	// RecalcB (3ra vía): sumar categorías desde el reporte de aportes (independiente del dashboard).
+	var recalcBCalc, recalcBSrc, recalcBMeaning *string
+	var recalcBVal *decimal.Decimal
+	if sd.investorReport != nil {
+		total := decimal.Zero
+		for _, cat := range sd.investorReport.Contributions {
+			// Labores (mismo set usado en control 6)
+			if cat.Label == "Labores Generales" || cat.Label == "Siembra" || cat.Label == "Riego" {
+				total = total.Add(cat.TotalUsd)
+				continue
+			}
+			// Insumos
+			if cat.Label == "Semilla" || cat.Label == "Agroquímicos" || cat.Label == "Fertilizantes" {
+				total = total.Add(cat.TotalUsd)
+				continue
+			}
+		}
+		recalcBCalc = strPtr("∑(contribution_categories.total_usd) labels: Labores + Insumos")
+		recalcBVal = &total
+		recalcBSrc = strPtr("v4_report.investor_contribution_data.contribution_categories")
+		recalcBMeaning = strPtr("Tercera vía: suma aportes por categorías (Labores + Insumos) desde el reporte de aportes. Camino independiente al dashboard.")
+	}
+
+	return buildCheck(
+		16,
+		"Costos directos aportados",
+		"Dashboard aportado vs Labores+Insumos (neto) vs Aportes",
+		"dashboard.DirectCostsInvestedUSD = (LaboresNeto + InsumosNeto) = ∑(aportes: labores + insumos)",
+		"dashboard.ManagementBalance.Summary.DirectCostsInvestedUSD",
+		systemValue,
+		"v4_report.dashboard_management_balance",
+		"Costos directos aportados/invertidos del Dashboard.",
+		"dashboard.(LaboresInvertidosUSD + SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD)",
+		recalcA,
+		"Dashboard Summary (ManagementBalance.Summary)",
+		"Recálculo: total neto de labores + insumos (semillas+agroquímicos+fertilizantes) desde el resumen del dashboard.",
+		recalcBCalc, recalcBVal, recalcBSrc, recalcBMeaning,
+		decimal.NewFromInt(1),
+	), nil
 }
 
 // =====================================================

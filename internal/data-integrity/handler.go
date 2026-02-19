@@ -71,7 +71,7 @@ func (h *Handler) Routes() {
 // @Tags data-integrity
 // @Accept json
 // @Produce json
-// @Param project_id query int false "Project ID"
+// @Param project_id query int true "Project ID"
 // @Success 200 {object} dto.IntegrityReportResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
@@ -83,6 +83,15 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if projectID == nil {
+		apiErr, status := types.NewAPIError(types.NewError(
+			types.ErrBadRequest,
+			"missing required query param: project_id",
+			nil,
+		))
+		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	filter.ProjectID = projectID

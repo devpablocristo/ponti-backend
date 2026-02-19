@@ -1,8 +1,9 @@
+// Package domain define los tipos del módulo de integridad de datos.
 package domain
 
 import "github.com/shopspring/decimal"
 
-// IntegrityReport contiene el resultado de todas las validaciones de coherencia (14 controles)
+// IntegrityReport contiene el resultado de todas las validaciones de coherencia (16 controles)
 type IntegrityReport struct {
 	Checks []IntegrityCheck `json:"checks"`
 }

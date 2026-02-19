@@ -3,37 +3,27 @@
 # - Descarga dump desde GCP STAGING y restaura solo datos en DB local (tal cual, sin cambios)
 # - Origen: new_ponti_db_staging. Tratamiento: data-only, sin schema, sin renames.
 #
-# Requiere: SRC_PASS para el usuario de STAGING configurado en SRC_USER/DB_USER_STG.
-# Opcional: scripts/db/db_staging_to_local.env con SRC_PASS, SRC_HOST, etc.
+# Requiere: scripts/db/db_staging_to_local.env (origen + destino).
 #
-# Uso: SRC_PASS='...' ./scripts/db/db_staging_to_local.sh
-#   o: cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env && ./scripts/db/db_staging_to_local.sh
+# Uso:
+#   cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env
+#   editar scripts/db/db_staging_to_local.env
+#   ./scripts/db/db_staging_to_local.sh
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-### ===== Preservar destino local antes de cargar .env =====
-LOCAL_DB_USER="${DB_USER:-}"
-LOCAL_DB_PASSWORD="${DB_PASSWORD:-}"
-LOCAL_DB_HOST="${DB_HOST:-}"
-LOCAL_DB_NAME="${DB_NAME:-}"
-LOCAL_DB_PORT="${DB_PORT:-}"
-
-### ===== Cargar .env del backend =====
-ENV_FILE="${BACKEND_DIR}/.env"
-if [[ -f "$ENV_FILE" ]]; then
-  set -a
-  source "$ENV_FILE"
-  set +a
+### ===== Config (SIEMPRE desde scripts/db/db_staging_to_local.env) =====
+CREDS_FILE="${SCRIPT_DIR}/db_staging_to_local.env"
+if [[ ! -f "${CREDS_FILE}" ]]; then
+  echo "[ERROR] Falta ${CREDS_FILE}."
+  echo "[ERROR] Copiá el ejemplo: cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env"
+  exit 1
 fi
-
-### ===== Origen: STAGING (desde db_staging_to_local.env) =====
-if [[ -f "${SCRIPT_DIR}/db_staging_to_local.env" ]]; then
-  set -a
-  source "${SCRIPT_DIR}/db_staging_to_local.env"
-  set +a
-fi
+set -a
+source "${CREDS_FILE}"
+set +a
 
 SRC_USER="${SRC_USER:-${DB_USER_STG:-soalen-db-v3}}"
 SRC_PASS="${SRC_PASS:-}"
@@ -65,11 +55,17 @@ SRC_PROXY_PORT="${SRC_PROXY_PORT:-55433}"
 PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
 
 ### ===== Destino (Local) =====
-DB_USER="${LOCAL_DB_USER:-admin}"
-DB_PASSWORD="${LOCAL_DB_PASSWORD:-admin}"
-DB_HOST="${LOCAL_DB_HOST:-127.0.0.1}"
-DB_NAME="${LOCAL_DB_NAME:-new_ponti_db_dev}"
-DB_PORT="${LOCAL_DB_PORT:-5432}"
+DB_USER="${DST_DB_USER:-}"
+DB_PASSWORD="${DST_DB_PASSWORD:-}"
+DB_HOST="${DST_DB_HOST:-127.0.0.1}"
+DB_NAME="${DST_DB_NAME:-}"
+DB_PORT="${DST_DB_PORT:-}"
+
+if [[ -z "${DB_USER}" || -z "${DB_PASSWORD}" || -z "${DB_NAME}" || -z "${DB_PORT}" ]]; then
+  echo "[ERROR] En ${CREDS_FILE} faltan variables del destino local."
+  echo "[ERROR] Requeridas: DST_DB_USER, DST_DB_PASSWORD, DST_DB_NAME, DST_DB_PORT (DST_DB_HOST opcional)."
+  exit 1
+fi
 
 # Control
 DISABLE_TRIGGERS="${DISABLE_TRIGGERS:-1}"  # 1= intentar deshabilitar triggers (requiere superuser)
@@ -142,13 +138,19 @@ PY
 }
 # trap removido para permitir que el script continúe con errores menores
 
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  log "DRY_RUN=1 (sin dump/restore)"
+  log "Origen efectivo: ${SRC_USER}@${SRC_HOST:-<infer>}:${SRC_PORT}/${SRC_DB} (sslmode=${SRC_SSL})"
+  log "Destino efectivo: ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+  exit 0
+fi
+
 ### ===== Validaciones de credenciales origen (STAGING) =====
 if [[ -z "${SRC_PASS}" ]]; then
   err "SRC_PASS es requerido para el usuario de staging (${SRC_USER})."
   err "Opciones:"
-  err "  - Creá scripts/db/db_staging_to_local.env con SRC_PASS=..."
-  err "  - O pasá SRC_PASS='...' $0"
-  err "  - O configurá gcloud ADC y setea SRC_PASS_SECRET_PROJECT/SRC_PASS_SECRET_NAME (default: new-ponti-dev/db-password-dev)"
+  err "  - Editá ${CREDS_FILE} y seteá SRC_PASS=..."
+  err "  - O configurá gcloud ADC y seteá SRC_PASS_SECRET_PROJECT/SRC_PASS_SECRET_NAME"
   exit 1
 fi
 
