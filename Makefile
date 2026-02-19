@@ -97,6 +97,10 @@ staging-db-2-local-db:
 	@set -a && [ -f .env ] && source .env; [ -f scripts/db/db_staging_to_local.env ] && source scripts/db/db_staging_to_local.env; set +a && \
 	DB_PORT=5433 bash ./scripts/db/db_staging_to_local.sh
 
+# Alias explícito (mismo comportamiento)
+db-staging-to-local:
+	@$(MAKE) staging-db-2-local-db
+
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:
 	@set -a && [ -f scripts/staging_db_2_dev_db.env ] && source scripts/staging_db_2_dev_db.env; set +a && \
