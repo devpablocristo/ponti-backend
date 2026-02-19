@@ -385,8 +385,11 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
 	// Query RAW: suma directa desde workorders + workorder_items
 	// Labor cost: effective_area × labor.price
-	// Supply cost: final_dose × effective_area × price (cálculo estándar del sistema)
-	// CORREGIDO: Usar final_dose × effective_area en lugar de total_used para consistencia con vistas
+	// Supply cost: total_used × price (consistente con v4_calc.workorder_metrics).
+	//
+	// Importante:
+	// - Respetar soft-delete (deleted_at) como en vistas/reportes.
+	// - Usar COALESCE para no "perder" items con price NULL.
 	whereProject := ""
 	args := []any{}
 	if projectID > 0 {
@@ -399,18 +402,20 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		  SELECT 
 		    wo.id,
 		    -- Costo de la labor (área efectiva × precio de la labor)
-		    (wo.effective_area * l.price) AS labor_cost,
-		    -- Costo de insumos (suma de items: final_dose × effective_area × price)
+		    (COALESCE(wo.effective_area, 0) * COALESCE(l.price, 0)) AS labor_cost,
+		    -- Costo de insumos (suma de items: total_used × price)
 		    COALESCE((
-		      SELECT SUM(wi.final_dose * wo.effective_area * s.price)
+		      SELECT SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0))
 		      FROM public.workorder_items wi
-		      JOIN public.supplies s ON s.id = wi.supply_id
+		      JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
 		      WHERE wi.workorder_id = wo.id 
 		        AND wi.deleted_at IS NULL
 		    ), 0) AS supply_cost
 		  FROM public.workorders wo
-		  JOIN public.labors l ON l.id = wo.labor_id
+		  JOIN public.labors l ON l.id = wo.labor_id AND l.deleted_at IS NULL
 		  WHERE wo.deleted_at IS NULL
+		    AND wo.effective_area IS NOT NULL
+		    AND wo.effective_area > 0
 		    %s
 		)
 		SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost

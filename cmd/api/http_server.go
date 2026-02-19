@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
+	"runtime"
+	"time"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/gin-gonic/gin"
 
 	ai "github.com/alphacodinggroup/ponti-backend/internal/ai"
 	wire "github.com/alphacodinggroup/ponti-backend/wire"
@@ -31,6 +35,36 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 		deps.Config.AI.ComputeThrottleSec,
 	)
 	deps.GinEngine.GetRouter().Use(ai.InsightTriggerMiddleware(trigger))
+
+	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
+	apiBase := deps.Config.API.APIBaseURL()
+	deps.GinEngine.GetRouter().GET(apiBase+"/version", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"service": gin.H{
+				"name":       deps.Config.Service.Name,
+				"version":    deps.Config.Service.Version,
+				"git_sha":    deps.Config.Service.GitSHA,
+				"build_time": deps.Config.Service.BuildTime,
+			},
+			"api": gin.H{
+				"base_url": apiBase,
+				"version":  deps.Config.API.APIVersion(),
+			},
+			"runtime": gin.H{
+				"go": runtime.Version(),
+			},
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+	deps.GinEngine.GetRouter().GET(apiBase+"/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "healthy",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+	deps.GinEngine.GetRouter().GET(apiBase+"/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "pong"})
+	})
 
 	// Registrar todas las rutas de la aplicación.
 	// Cada handler aplica sus middlewares de validación específicos.
