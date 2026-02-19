@@ -3,7 +3,7 @@ package domain
 
 import "github.com/shopspring/decimal"
 
-// IntegrityReport contiene el resultado de todas las validaciones de coherencia (16 controles)
+// IntegrityReport contiene el resultado de todas las validaciones de coherencia (17 controles)
 type IntegrityReport struct {
 	Checks []IntegrityCheck `json:"checks"`
 }

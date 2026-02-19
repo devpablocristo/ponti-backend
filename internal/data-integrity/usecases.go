@@ -141,7 +141,7 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	return sd, nil
 }
 
-// CheckCostsCoherence valida la coherencia de costos con 16 controles individuales.
+// CheckCostsCoherence valida la coherencia de costos con 17 controles individuales.
 // Cada control compara: SystemValue (1 directo) vs RecalcA y opcionalmente RecalcB (2 independientes).
 func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -152,7 +152,7 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		return nil, err
 	}
 
-	checks := make([]domain.IntegrityCheck, 16)
+	checks := make([]domain.IntegrityCheck, 17)
 	var wg sync.WaitGroup
 	var errOnce sync.Once
 	var firstErr error
@@ -244,6 +244,11 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 	// GRUPO 8: Costos directos aportados (Control 16)
 	run(15, 16, func(c context.Context) (domain.IntegrityCheck, error) {
 		return u.control16DashboardAportadoVsLaborsAndSupplies(c, sd)
+	})
+
+	// GRUPO 9: Renta / Total activo (Control 17)
+	run(16, 17, func(c context.Context) (domain.IntegrityCheck, error) {
+		return u.control17TotalCostsVsWorkOrdersLeaseStructure(c, sd)
 	})
 
 	wg.Wait()
@@ -391,6 +396,73 @@ func (u *UseCases) control16DashboardAportadoVsLaborsAndSupplies(_ context.Conte
 		recalcA,
 		"Dashboard Summary (ManagementBalance.Summary)",
 		"Recálculo: total neto de labores + insumos (semillas+agroquímicos+fertilizantes) desde el resumen del dashboard.",
+		recalcBCalc, recalcBVal, recalcBSrc, recalcBMeaning,
+		decimal.NewFromInt(1),
+	), nil
+}
+
+// =====================================================
+// CONTROL 17: Dashboard (total_costs_usd rojo) → WorkOrders + Arriendo + Estructura
+// System: dashboard.metrics.operating_result.total_costs_usd (valor rojo)
+// RecalcA: workorder_metrics.direct_cost_usd + dashboard.rent_executed_usd + dashboard.structure_executed_usd
+// RecalcB: workorder_metrics.direct_cost_usd + aportes(arriendo + admin)
+// =====================================================
+func (u *UseCases) control17TotalCostsVsWorkOrdersLeaseStructure(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	// System: lo que muestra la tarjeta roja del dashboard.
+	systemValue := decimal.Zero
+	if sd.dashboardData != nil && sd.dashboardData.Metrics != nil && sd.dashboardData.Metrics.OperatingResult != nil {
+		systemValue = sd.dashboardData.Metrics.OperatingResult.TotalCostsUSD
+	}
+
+	// Base: costos directos desde órdenes (métricas).
+	woDirect := decimal.Zero
+	if sd.workOrderMetrics != nil {
+		woDirect = sd.workOrderMetrics.DirectCost
+	}
+
+	// RecalcA: usar valores del dashboard (ejecutados) para Arriendo + Estructura.
+	rentExecuted := decimal.Zero
+	structExecuted := decimal.Zero
+	if sd.dashboardData != nil && sd.dashboardData.ManagementBalance != nil && sd.dashboardData.ManagementBalance.Summary != nil {
+		rentExecuted = sd.dashboardData.ManagementBalance.Summary.RentExecutedUSD
+		structExecuted = sd.dashboardData.ManagementBalance.Summary.StructureExecutedUSD
+	}
+	recalcA := woDirect.Add(rentExecuted).Add(structExecuted)
+
+	// RecalcB: usar reporte de aportes para Arriendo + Administración y Estructura (3ra vía).
+	var recalcBCalc, recalcBSrc, recalcBMeaning *string
+	var recalcBVal *decimal.Decimal
+	if sd.investorReport != nil {
+		rent := decimal.Zero
+		admin := decimal.Zero
+		for _, cat := range sd.investorReport.Contributions {
+			if cat.Label == "Arriendo Capitalizable" {
+				rent = rent.Add(cat.TotalUsd)
+			}
+			if cat.Label == "Administración y Estructura" {
+				admin = admin.Add(cat.TotalUsd)
+			}
+		}
+		v := woDirect.Add(rent).Add(admin)
+		recalcBCalc = strPtr("workorder_metrics.direct_cost_usd + aportes(Arriendo Capitalizable + Administración y Estructura)")
+		recalcBVal = &v
+		recalcBSrc = strPtr("v4_report.workorder_metrics + v4_report.investor_contribution_data")
+		recalcBMeaning = strPtr("Tercera vía: toma costo directo de órdenes y suma aportes de arriendo + estructura desde el reporte de aportes.")
+	}
+
+	return buildCheck(
+		17,
+		"Renta / Total activo",
+		"Dashboard (total_costs_usd) vs Órdenes + Arriendo + Estructura",
+		"dashboard.total_costs_usd = workorders + arriendo + estructura",
+		"dashboard.metrics.operating_result.total_costs_usd",
+		systemValue,
+		"Dashboard metrics.operating_result",
+		"Total de costos (valor rojo) usado en la tarjeta Renta (RDO. OPER. / TOTAL ACTIVO).",
+		"workorder_metrics.direct_cost_usd + dashboard.RentExecutedUSD + dashboard.StructureExecutedUSD",
+		recalcA,
+		"v4_report.workorder_metrics + dashboard summary",
+		"Recálculo: suma costos directos de órdenes + arriendo ejecutado + estructura ejecutada.",
 		recalcBCalc, recalcBVal, recalcBSrc, recalcBMeaning,
 		decimal.NewFromInt(1),
 	), nil
