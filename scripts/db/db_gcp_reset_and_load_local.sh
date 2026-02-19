@@ -7,12 +7,11 @@
 # Uso: make db-gcp-reset-and-load-local
 #   o: ./scripts/db/db_gcp_reset_and_load_local.sh
 #
-# Requiere: .env (conexión local) y scripts/db/db_gcp_reset_and_load_local.env (conexión GCP)
+# Requiere: scripts/db/db_gcp_reset_and_load_local.env (conexión local + conexión GCP)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
 CREDS_FILE="${SCRIPT_DIR}/db_gcp_reset_and_load_local.env"
 DUMP_FILE="${ROOT_DIR}/.local_to_gcp_$(date +%Y%m%d_%H%M%S).dump"
 
@@ -70,21 +69,7 @@ load_remote_creds() {
   export REMOTE_HOST REMOTE_PORT REMOTE_USER REMOTE_PASS REMOTE_DB
 }
 
-# 1) Conexión local (desde .env)
-if [[ ! -f "${ENV_FILE}" ]]; then
-  err "Falta .env (conexión local)."
-  exit 1
-fi
-set -a
-source "${ENV_FILE}"
-set +a
-LOCAL_HOST="${DB_HOST:-127.0.0.1}"
-LOCAL_PORT="${DB_PORT:-5432}"
-LOCAL_USER="${DB_USER:-admin}"
-LOCAL_PASS="${DB_PASSWORD:-admin}"
-LOCAL_DB="${DB_NAME:-new_ponti_db_dev}"
-
-# 2) Conexión GCP (desde db_gcp_reset_and_load_local.env)
+# 1) Conexión local + 2) Conexión GCP (SIEMPRE desde db_gcp_reset_and_load_local.env)
 if [[ ! -f "${CREDS_FILE}" ]]; then
   err "Falta scripts/db/db_gcp_reset_and_load_local.env (conexión GCP)."
   exit 1
@@ -92,7 +77,27 @@ fi
 set -a
 source "${CREDS_FILE}"
 set +a
+
+LOCAL_HOST="${LOCAL_DB_HOST:-}"
+LOCAL_PORT="${LOCAL_DB_PORT:-}"
+LOCAL_USER="${LOCAL_DB_USER:-}"
+LOCAL_PASS="${LOCAL_DB_PASSWORD:-}"
+LOCAL_DB="${LOCAL_DB_NAME:-}"
+
+if [[ -z "${LOCAL_HOST}" || -z "${LOCAL_PORT}" || -z "${LOCAL_USER}" || -z "${LOCAL_PASS}" || -z "${LOCAL_DB}" ]]; then
+  err "En scripts/db/db_gcp_reset_and_load_local.env faltan variables locales."
+  err "Requeridas: LOCAL_DB_HOST, LOCAL_DB_PORT, LOCAL_DB_USER, LOCAL_DB_PASSWORD, LOCAL_DB_NAME."
+  exit 1
+fi
+
 load_remote_creds
+
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  log "DRY_RUN=1 (sin reset/dump/restore)"
+  log "Local: ${LOCAL_USER}@${LOCAL_HOST}:${LOCAL_PORT}/${LOCAL_DB}"
+  log "Remote: ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PORT}/${REMOTE_DB}"
+  exit 0
+fi
 
 # 3) Reset en GCP + migraciones
 log "Paso 1/3: Reset y migraciones en GCP..."
