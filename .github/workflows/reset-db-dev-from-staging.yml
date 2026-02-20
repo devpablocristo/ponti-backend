@@ -21,6 +21,9 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION }}
       WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      DB_USER: ${{ vars.DB_USER_DEV }}
+      SECRET_DB_PASSWORD_NAME: db-password-dev
+      CLOUDSQL_PROXY_PORT: "55432"
       # Hard guardrails: if these do not match, the workflow must fail fast.
       EXPECTED_GCP_PROJECT_ID: new-ponti-dev
       EXPECTED_DB_INSTANCE_NAME_DEV: new-ponti-db-dev
@@ -30,10 +33,12 @@ jobs:
       DB_NAME_DEV: ${{ vars.DB_NAME_DEV }}
       # Fuente: STAGING (vive en la misma instancia unificada)
       DB_NAME_STG: ${{ vars.DB_NAME_STG }}
-      WORK_BUCKET: ${{ vars.PREVIEW_BUCKET }}
       HARDENING_SQL_URI: ${{ vars.HARDENING_SQL_URI }}
       SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Auth GCP
         uses: google-github-actions/auth@v2
         with:
@@ -44,6 +49,11 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
       - name: Validar config mínima
         run: |
@@ -59,8 +69,8 @@ jobs:
             echo "::error::Falta DB_NAME_STG"
             exit 1
           fi
-          if [ -z "$WORK_BUCKET" ]; then
-            echo "::error::Falta WORK_BUCKET (PREVIEW_BUCKET)"
+          if [ -z "$DB_USER" ]; then
+            echo "::error::Falta DB_USER"
             exit 1
           fi
 
@@ -131,18 +141,56 @@ jobs:
             exit 1
           fi
 
-      - name: Export STAGING dump (SQL.gz) a GCS
+      - name: Resolve DB password
         run: |
           set -euo pipefail
-          TS="$(date +'%Y%m%d_%H%M%S')"
-          STG_URI="gs://${WORK_BUCKET}/dev_resets/from_stg_${DB_NAME_STG}_${TS}.sql.gz"
-          echo "STG_URI=$STG_URI" >> "$GITHUB_ENV"
-
-          gcloud sql export sql "$DB_INSTANCE_NAME_DEV" "$STG_URI" \
+          db_password="$(gcloud secrets versions access latest \
             --project="$GCP_PROJECT_ID" \
-            --database="$DB_NAME_STG" \
-            --offload \
-            --quiet
+            --secret="$SECRET_DB_PASSWORD_NAME")"
+          if [[ -z "$db_password" ]]; then
+            echo "::error::No se pudo resolver DB_PASSWORD desde Secret Manager."
+            exit 1
+          fi
+          echo "::add-mask::$db_password"
+          echo "DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          set -euo pipefail
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-reset-dev >/dev/null 2>&1 || true
+          docker run -d --name cloudsql-proxy-reset-dev \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 \
+            --port 5432 \
+            --token "$token" \
+            "${GCP_PROJECT_ID}:${GCP_REGION}:${DB_INSTANCE_NAME_DEV}" >/dev/null
+
+          for i in {1..30}; do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Cloud SQL Proxy no quedó listo."
+          exit 1
+
+      - name: Dump STAGING data-only
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" pg_dump \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            --data-only \
+            --exclude-table=schema_migrations \
+            --exclude-table=schema_migrations_lock \
+            --file=/tmp/staging_data.dump
 
       - name: Reset DEV DB (drop + create)
         run: |
@@ -169,12 +217,61 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV"
 
-      - name: Import STAGING dump en DEV
+      - name: Apply migrations on DEV (fresh schema)
         run: |
-          gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$STG_URI" \
-            --project="$GCP_PROJECT_ID" \
-            --database="$DB_NAME_DEV" \
-            --quiet
+          set -euo pipefail
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_DEV}?sslmode=disable" \
+            up
+
+      - name: Restore data-only into DEV
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" pg_restore \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            --no-owner \
+            --no-acl \
+            --data-only \
+            --exit-on-error \
+            /tmp/staging_data.dump
+
+      - name: Sync sequences after restore
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            seq_record RECORD;
+            max_id BIGINT;
+          BEGIN
+            FOR seq_record IN
+              SELECT
+                seq.relname AS seq_name,
+                t.relname AS table_name,
+                a.attname AS column_name
+              FROM pg_class seq
+              JOIN pg_depend d ON d.objid = seq.oid
+              JOIN pg_class t ON d.refobjid = t.oid
+              JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+              WHERE seq.relkind = 'S'
+            LOOP
+              EXECUTE format('SELECT COALESCE(MAX(%I), 0) FROM %I', seq_record.column_name, seq_record.table_name) INTO max_id;
+              EXECUTE format('SELECT setval(%L, %s + 1, false)', seq_record.seq_name, max_id);
+            END LOOP;
+          END $$;
+          SQL
 
       - name: Hardening post-restore (opcional)
         if: ${{ env.HARDENING_SQL_URI != '' }}
@@ -188,4 +285,8 @@ jobs:
         if: ${{ env.SMOKE_TEST_URL != '' }}
         run: |
           curl -fsS "$SMOKE_TEST_URL"
+
+      - name: Stop Cloud SQL Proxy
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-reset-dev >/dev/null 2>&1 || true
 
