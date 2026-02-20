@@ -90,3 +90,33 @@ jobs:
             --set-env-vars="${ENV_VARS}" \
             --set-secrets="DB_PASSWORD=${SECRET_DB_PASSWORD_NAME_DEV}:latest,X_API_KEY=${SECRET_X_API_KEY_NAME_DEV}:latest" \
             --allow-unauthenticated
+
+      - name: Resolve service URL (DEV)
+        run: |
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del servicio DEV."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Read X-API-Key secret (DEV)
+        run: |
+          x_api_key="$(gcloud secrets versions access latest \
+            --project="$GCP_PROJECT_ID" \
+            --secret="$SECRET_X_API_KEY_NAME_DEV")"
+          if [[ -z "$x_api_key" ]]; then
+            echo "ERROR: X-API-Key secreto vacío en DEV."
+            exit 1
+          fi
+          echo "::add-mask::$x_api_key"
+          echo "SMOKE_X_API_KEY=$x_api_key" >> "$GITHUB_ENV"
+
+      - name: Smoke release checks (DEV)
+        run: |
+          bash ./scripts/smoke_release.sh "$SERVICE_URL"
+        env:
+          X_API_KEY: ${{ env.SMOKE_X_API_KEY }}

@@ -82,9 +82,9 @@ staging-db-2-dev-db:
 	@set -a && [ -f scripts/staging_db_2_dev_db.env ] && source scripts/staging_db_2_dev_db.env; set +a && \
 	bash ./scripts/staging_db_2_dev_db.sh
 
-# E2E tests (AI dummies, data-integrity, lots). Uso: make e2e-changes [BASE_URL=http://...]
+# Smoke tests de release (incluye divisor de aportes). Uso: make e2e-changes [BASE_URL=http://...]
 e2e-changes:
-	@bash ./scripts/e2e_changes.sh $(BASE_URL)
+	@bash ./scripts/smoke_release.sh $(BASE_URL)
 
 # --------------------------------------------------
 # Base de datos (verificación local v4)

@@ -124,3 +124,33 @@ jobs:
             --set-secrets="DB_PASSWORD=${SECRET_DB_PASSWORD_NAME_PROD}:latest,X_API_KEY=${SECRET_X_API_KEY_NAME_PROD}:latest" \
             --allow-unauthenticated
 
+      - name: Resolve service URL (PROD)
+        run: |
+          service_url="$(gcloud run services describe "$SERVICE_NAME_PROD" \
+            --project="$GCP_PROJECT_ID_PROD" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del servicio PROD."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Read X-API-Key secret (PROD)
+        run: |
+          x_api_key="$(gcloud secrets versions access latest \
+            --project="$GCP_PROJECT_ID_PROD" \
+            --secret="$SECRET_X_API_KEY_NAME_PROD")"
+          if [[ -z "$x_api_key" ]]; then
+            echo "ERROR: X-API-Key secreto vacío en PROD."
+            exit 1
+          fi
+          echo "::add-mask::$x_api_key"
+          echo "SMOKE_X_API_KEY=$x_api_key" >> "$GITHUB_ENV"
+
+      - name: Smoke release checks (PROD)
+        run: |
+          bash ./scripts/smoke_release.sh "$SERVICE_URL"
+        env:
+          X_API_KEY: ${{ env.SMOKE_X_API_KEY }}
+
