@@ -13,33 +13,14 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup \
-        run-api run-ponti-local seed seed-dashboard staging-db-2-local-db staging-db-2-dev-db e2e-changes \
-        migrate-up migrate-down migrate-force migrate-force-dc migrate-version migrate-create \
+        run-api run-ponti-local seed seed-dashboard db-staging-to-local staging-db-2-dev-db e2e-changes \
+        migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
-
-# --------------------------------------------------
-# Migraciones
-# --------------------------------------------------
-migrate-up:
-	@echo "Running migrations..."
-	@bash ./scripts/db/db_migrate_up.sh
-
-migrate-down:
-	@echo "Running migrations down..."
-	@echo "No hay migrate-down v4 implementado en scripts. Usá el binario migrate manualmente."
 
 # Crea una nueva migración usando la variable NAME
 migrate-create:
 	@echo "Creating migration $(MIGRATIONS_NAME)..."
 	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(MIGRATIONS_NAME)
-
-migrate-force:
-	@echo "Forcing migration to -1..."
-	@$(MIGRATE) force -1
-
-migrate-version:
-	@echo "Current migration version:"
-	@$(MIGRATE) version
 
 # --------------------------------------------------
 # Compilación y ejecución
@@ -89,16 +70,12 @@ seed-dashboard:
 # --------------------------------------------------
 # Base de datos (descarga GCP STAGING → local, data-only)
 # --------------------------------------------------
-staging-db-2-local-db:
+db-staging-to-local:
 	@echo "Downloading GCP STAGING and restoring data-only to local..."
 	@echo "Asegurando que la DB local esté levantada..."
 	@echo "Tip: si no seteás SRC_PASS, el script intenta leer db-password-dev desde Secret Manager (requiere gcloud auth)."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
 	@bash ./scripts/db/db_staging_to_local.sh
-
-# Alias explícito (mismo comportamiento)
-db-staging-to-local:
-	@$(MAKE) staging-db-2-local-db
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:

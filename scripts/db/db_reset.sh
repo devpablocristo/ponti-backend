@@ -23,6 +23,13 @@ done
 
 echo "Recreando base de datos ${DB_NAME}..."
 docker compose -f "${COMPOSE_FILE}" exec -T ponti-db psql -U "${DB_USER}" -d "postgres" -v ON_ERROR_STOP=1 <<SQL
+-- Evitar "database is being accessed by other users" cuando quedó alguna sesión colgada
+-- (ej. backend local, UI, pgadmin, etc.).
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = '${DB_NAME}'
+  AND pid <> pg_backend_pid();
+
 DROP DATABASE IF EXISTS ${DB_NAME};
 CREATE DATABASE ${DB_NAME};
 SQL
