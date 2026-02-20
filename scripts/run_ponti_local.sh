@@ -77,11 +77,12 @@ if [[ "${DB_PORT:-5432}" == "5432" ]]; then
 fi
 
 # Validación mínima de coherencia local:
-# - Si el backend corre con AUTH_ENABLED=false, el BFF debería usar LOCAL_DEV_AUTH=1.
-if grep -qE '^AUTH_ENABLED=false' "$BACKEND_DIR/.env" 2>/dev/null; then
-  if ! grep -qE '^LOCAL_DEV_AUTH=1' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
-    echo "WARN: $BACKEND_DIR/.env tiene AUTH_ENABLED=false pero $FRONTEND_DIR/api/.env no tiene LOCAL_DEV_AUTH=1. Login local puede fallar."
-  fi
+# - El BFF usa siempre Identity Platform (sin dev-mode de auth).
+if ! grep -qE '^IDENTITY_PLATFORM_API_KEY=' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
+  echo "WARN: falta IDENTITY_PLATFORM_API_KEY en $FRONTEND_DIR/api/.env. Login local puede fallar."
+fi
+if ! grep -qE '^IDENTITY_PLATFORM_PROJECT_ID=' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
+  echo "WARN: falta IDENTITY_PLATFORM_PROJECT_ID en $FRONTEND_DIR/api/.env. Login local puede fallar."
 fi
 
 echo "Bajando contenedores antes de levantar..."

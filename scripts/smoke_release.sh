@@ -154,16 +154,29 @@ data=obj.get("data",obj)
 rows=data.get("data") if isinstance(data,dict) else data
 if not isinstance(rows,list):
     rows=[]
-if rows:
-    first=rows[0]
-    print(first.get("id",""))
-    print(first.get("contractor_name",""))
+picked=None
+for row in rows:
+    try:
+        price=float(str(row.get("price","0")).replace(",","."))
+    except Exception:
+        price=0.0
+    if price > 0:
+        picked=row
+        break
+if picked is None and rows:
+    picked=rows[0]
+if picked:
+    print(picked.get("id",""))
+    print(picked.get("contractor_name",""))
+    print(picked.get("price","0"))
 else:
+    print("")
     print("")
     print("")
 ')
 labor_id="${labor_data[0]:-}"
 contractor="${labor_data[1]:-}"
+labor_price="${labor_data[2]:-0}"
 if [[ -z "${labor_id}" ]]; then
   echo "ERROR: El proyecto ${project_id} no tiene labores para prueba." >&2
   exit 1
@@ -194,6 +207,29 @@ print(json.dumps({
 }))
 PY
 )"
+
+echo "[smoke] Snapshot report before split..."
+resp="$(request GET "$(api_url "/reports/investor-contribution?project_id=${project_id}")")"
+before_report_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
+before_report_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
+expect_status "200" "${before_report_status}" "No se pudo obtener reporte previo de aportes"
+
+readarray -t before_values < <(json_extract "${before_report_body}" '
+data=obj.get("data",obj)
+inv=data.get("pre_harvest",{}).get("investors",[])
+a=b=0.0
+for row in inv:
+    iid=int(row.get("investor_id",0) or 0)
+    amount=float(row.get("amount_usd",0) or 0)
+    if iid==int("'"${investor_a}"'"):
+        a=amount
+    if iid==int("'"${investor_b}"'"):
+        b=amount
+print(a)
+print(b)
+')
+before_a="${before_values[0]:-0}"
+before_b="${before_values[1]:-0}"
 
 echo "[smoke] Create split work-order..."
 resp="$(request POST "$(api_url "/work-orders")" "${payload}")"
@@ -239,7 +275,37 @@ print("ok")
 echo "[smoke] Validate investor-contribution report endpoint..."
 resp="$(request GET "$(api_url "/reports/investor-contribution?project_id=${project_id}")")"
 report_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
+report_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
 expect_status "200" "${report_status}" "Reporte de aporte por inversor no disponible"
+
+echo "[smoke] Validate split effect in report..."
+REPORT_BODY_B64="$(printf "%s" "${report_body}" | base64 -w0)"
+python3 - <<PY
+import base64
+import json
+before_a=float("${before_a}")
+before_b=float("${before_b}")
+after=json.loads(base64.b64decode("${REPORT_BODY_B64}").decode("utf-8"))
+data=after.get("data",after)
+inv=data.get("pre_harvest",{}).get("investors",[])
+after_a=after_b=0.0
+for row in inv:
+    iid=int(row.get("investor_id",0) or 0)
+    amount=float(row.get("amount_usd",0) or 0)
+    if iid==int("${investor_a}"):
+        after_a=amount
+    if iid==int("${investor_b}"):
+        after_b=amount
+delta_a=after_a-before_a
+delta_b=after_b-before_b
+total=delta_a+delta_b
+if total <= 0:
+    raise SystemExit(f"reporte no reflejó incremento por labor dividida (delta_total={total})")
+ratio=delta_a/total if total else 0.0
+if not (0.40 <= ratio <= 0.80):
+    raise SystemExit(f"ratio inesperado para split 60/40 (ratio={ratio:.4f}, delta_a={delta_a:.4f}, delta_b={delta_b:.4f})")
+print("ok")
+PY
 
 echo "[smoke] Cleanup work-order..."
 resp="$(request DELETE "$(api_url "/work-orders/${workorder_id}")")"
