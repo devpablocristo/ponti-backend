@@ -215,6 +215,39 @@ jobs:
           END $$;
           SQL
 
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -At -c "SELECT tablename FROM pg_tables WHERE schemaname='public'" > /tmp/stg_tables.txt
+
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -At -c "SELECT sequencename FROM pg_sequences WHERE schemaname='public'" > /tmp/stg_sequences.txt
+
+          pg_restore -l /tmp/prod_data.dump > /tmp/prod_data.list
+          python3 - <<'PY'
+          import pathlib
+          tables = {x.strip() for x in pathlib.Path('/tmp/stg_tables.txt').read_text().splitlines() if x.strip()}
+          seqs = {x.strip() for x in pathlib.Path('/tmp/stg_sequences.txt').read_text().splitlines() if x.strip()}
+          out = []
+          for line in pathlib.Path('/tmp/prod_data.list').read_text().splitlines():
+            if " TABLE DATA public " in line:
+              table = line.split(" TABLE DATA public ", 1)[1].split()[0]
+              if table not in tables:
+                continue
+            if " SEQUENCE SET public " in line:
+              seq = line.split(" SEQUENCE SET public ", 1)[1].split()[0]
+              if seq not in seqs:
+                continue
+            out.append(line)
+          pathlib.Path('/tmp/prod_data.filtered.list').write_text("\n".join(out) + "\n")
+          PY
+
           PGPASSWORD="$DB_PASSWORD" pg_restore \
             -h 127.0.0.1 \
             -p "$CLOUDSQL_PROXY_PORT" \
@@ -224,6 +257,7 @@ jobs:
             --no-acl \
             --data-only \
             --exit-on-error \
+            --use-list=/tmp/prod_data.filtered.list \
             /tmp/prod_data.dump
 
       - name: Sync sequences after restore
