@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // RequireLocalDevAuthz is a lightweight auth middleware intended for local development.
@@ -18,17 +19,21 @@ import (
 // - It always assigns the "admin" role by default.
 //
 // Enable it by setting AUTH_ENABLED=false in the backend.
-func RequireLocalDevAuthz(cfg IdentityAuthConfig) gin.HandlerFunc {
+func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		permission := permissionForMethod(c.Request.Method)
 
 		// Try to extract subject from a (possibly fake) JWT so the BFF can just pass Authorization.
 		subject := ""
+		email := ""
 		if tokenStr := extractBearer(c.GetHeader("Authorization")); tokenStr != "" {
 			if payload := decodeTokenPayload(tokenStr); payload != nil {
 				if v, ok := payload["sub"]; ok {
 					subject = strings.TrimSpace(toString(v))
+				}
+				if v, ok := payload["email"]; ok {
+					email = strings.TrimSpace(toString(v))
 				}
 			}
 		}
@@ -39,6 +44,17 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig) gin.HandlerFunc {
 		if subject == "" {
 			subject = "1"
 		}
+		// Normalize context user ID to numeric string, matching the rest of the backend.
+		// If the subject is an IDP UID, resolve/create a local user and use its numeric ID.
+		resolvedUserID := int64(1)
+		if parsed, err := strconv.ParseInt(subject, 10, 64); err == nil {
+			resolvedUserID = parsed
+		} else if db != nil {
+			if ensuredID, ensureErr := ensureUserByIDPSub(c.Request.Context(), db, subject, email); ensureErr == nil {
+				resolvedUserID = ensuredID
+			}
+		}
+		subject = strconv.FormatInt(resolvedUserID, 10)
 
 		tenantID := strings.TrimSpace(c.GetHeader(cfg.TenantHeader))
 		if tenantID == "" {

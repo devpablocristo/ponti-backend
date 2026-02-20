@@ -33,7 +33,7 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {
-		validation = append(validation, RequireLocalDevAuthz(cfg.Auth))
+		validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
 	}
 	protected := []gin.HandlerFunc{}
 
