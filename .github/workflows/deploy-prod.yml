@@ -136,17 +136,22 @@ jobs:
           fi
           echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
 
-      - name: Read X-API-Key secret (PROD)
+      - name: Resolve X-API-Key for smoke (PROD)
         run: |
-          x_api_key="$(gcloud secrets versions access latest \
-            --project="$GCP_PROJECT_ID_PROD" \
-            --secret="$SECRET_X_API_KEY_NAME_PROD")"
+          x_api_key="${SMOKE_X_API_KEY:-}"
           if [[ -z "$x_api_key" ]]; then
-            echo "ERROR: X-API-Key secreto vacío en PROD."
+            x_api_key="$(gcloud secrets versions access latest \
+              --project="$GCP_PROJECT_ID_PROD" \
+              --secret="$SECRET_X_API_KEY_NAME_PROD" 2>/dev/null || true)"
+          fi
+          if [[ -z "$x_api_key" ]]; then
+            echo "ERROR: no se pudo resolver X-API-Key (GitHub secret o Secret Manager) en PROD."
             exit 1
           fi
           echo "::add-mask::$x_api_key"
           echo "SMOKE_X_API_KEY=$x_api_key" >> "$GITHUB_ENV"
+        env:
+          SMOKE_X_API_KEY: ${{ secrets.X_API_KEY_PROD || secrets.X_API_KEY }}
 
       - name: Smoke release checks (PROD)
         run: |

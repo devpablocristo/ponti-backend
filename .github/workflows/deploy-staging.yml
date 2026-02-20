@@ -103,17 +103,22 @@ jobs:
           fi
           echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
 
-      - name: Read X-API-Key secret (STAGING)
+      - name: Resolve X-API-Key for smoke (STAGING)
         run: |
-          x_api_key="$(gcloud secrets versions access latest \
-            --project="$GCP_PROJECT_ID" \
-            --secret="$SECRET_X_API_KEY_NAME")"
+          x_api_key="${SMOKE_X_API_KEY:-}"
           if [[ -z "$x_api_key" ]]; then
-            echo "ERROR: X-API-Key secreto vacío en STAGING."
+            x_api_key="$(gcloud secrets versions access latest \
+              --project="$GCP_PROJECT_ID" \
+              --secret="$SECRET_X_API_KEY_NAME" 2>/dev/null || true)"
+          fi
+          if [[ -z "$x_api_key" ]]; then
+            echo "ERROR: no se pudo resolver X-API-Key (GitHub secret o Secret Manager) en STAGING."
             exit 1
           fi
           echo "::add-mask::$x_api_key"
           echo "SMOKE_X_API_KEY=$x_api_key" >> "$GITHUB_ENV"
+        env:
+          SMOKE_X_API_KEY: ${{ secrets.X_API_KEY_STG || secrets.X_API_KEY }}
 
       - name: Smoke release checks (STAGING)
         run: |
