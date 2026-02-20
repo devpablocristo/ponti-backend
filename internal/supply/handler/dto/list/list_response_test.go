@@ -16,7 +16,7 @@ func TestListedSupply_MarshalJSON_Rounding(t *testing.T) {
 		Price:        decimal.NewFromFloat(123.456),  // Debería redondearse a 123.46 (2 decimales)
 		TotalUSD:     decimal.NewFromFloat(5678.901), // Debería redondearse a 5679 (entero)
 		UnitID:       1,
-		UnitName:     "Lts",
+		UnitName:     "Lt",
 		CategoryName: "Test Category",
 		CategoryID:   1,
 		TypeName:     "Test Type",
@@ -162,7 +162,7 @@ func TestListedSupply_MarshalJSON_PriceRounding(t *testing.T) {
 				Price:        decimal.NewFromFloat(tt.price),
 				TotalUSD:     decimal.NewFromFloat(tt.totalUSD),
 				UnitID:       1,
-				UnitName:     "Lts",
+				UnitName:     "Lt",
 				CategoryName: "Test",
 				CategoryID:   1,
 				TypeName:     "Test",

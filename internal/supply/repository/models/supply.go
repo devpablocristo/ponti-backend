@@ -81,7 +81,7 @@ func (m *Supply) getUnitName() string {
 	case 2:
 		return "Kg" // unit_kilos
 	case 3:
-		return "Ha" // unit_hectares
+		return "Bags" // unit_bags
 	default:
 		return "Unknown"
 	}
