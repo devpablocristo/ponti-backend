@@ -32,6 +32,8 @@ jobs:
       WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
       SECRET_DB_PASSWORD_NAME_DEV: db-password-dev
       SECRET_X_API_KEY_NAME_DEV: x-api-key-dev
+      CLOUDSQL_PROXY_PORT: "55432"
+      REQUIRE_AUTH_SMOKE: "0"
       CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_DEV }}
       DB_NAME: ${{ vars.DB_NAME_DEV }}
       DB_USER: ${{ vars.DB_USER_DEV }}
@@ -64,6 +66,11 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
@@ -103,6 +110,58 @@ jobs:
           fi
           echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
 
+      - name: Resolve DB password for schema checks (DEV)
+        run: |
+          db_password="${SMOKE_DB_PASSWORD:-}"
+          if [[ -z "$db_password" ]]; then
+            db_password="$(gcloud secrets versions access latest \
+              --project="$GCP_PROJECT_ID" \
+              --secret="$SECRET_DB_PASSWORD_NAME_DEV" 2>/dev/null || true)"
+          fi
+          if [[ -z "$db_password" ]]; then
+            echo "ERROR: no se pudo resolver DB password para schema checks en DEV."
+            exit 1
+          fi
+          echo "::add-mask::$db_password"
+          echo "SMOKE_DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+        env:
+          SMOKE_DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV || secrets.DB_PASSWORD }}
+
+      - name: Start Cloud SQL Proxy for schema checks (DEV)
+        run: |
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-deploy-dev >/dev/null 2>&1 || true
+          instance_connection="$CLOUDSQL_INSTANCE"
+          if [[ "$instance_connection" != *:*:* ]]; then
+            instance_connection="${GCP_PROJECT_ID}:${GCP_REGION}:${CLOUDSQL_INSTANCE}"
+          fi
+          docker run -d --name cloudsql-proxy-deploy-dev \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 \
+            --port 5432 \
+            --token "$token" \
+            "$instance_connection" >/dev/null
+          for i in {1..30}; do
+            if PGPASSWORD="$SMOKE_DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: cloud sql proxy no quedó listo en DEV"
+          exit 1
+
+      - name: Schema guardrails (DEV)
+        run: |
+          chmod +x scripts/check_schema_guardrails.sh
+          DB_HOST=127.0.0.1 \
+          DB_PORT="$CLOUDSQL_PROXY_PORT" \
+          DB_USER="$DB_USER" \
+          DB_NAME="$DB_NAME" \
+          DB_PASSWORD="$SMOKE_DB_PASSWORD" \
+          MIGRATIONS_DIR="migrations_v4" \
+          scripts/check_schema_guardrails.sh
+
       - name: Resolve X-API-Key for smoke (DEV)
         run: |
           x_api_key="${SMOKE_X_API_KEY:-}"
@@ -120,8 +179,26 @@ jobs:
         env:
           SMOKE_X_API_KEY: ${{ secrets.X_API_KEY_DEV || secrets.X_API_KEY }}
 
+      - name: Resolve auth token for functional smoke (DEV)
+        run: |
+          token="${SMOKE_AUTH_BEARER_TOKEN:-}"
+          if [[ -z "$token" ]]; then
+            echo "WARN: SMOKE_AUTH_BEARER_TOKEN no configurado; se ejecutará smoke no autenticado."
+          else
+            echo "::add-mask::$token"
+            echo "AUTH_BEARER_TOKEN=$token" >> "$GITHUB_ENV"
+          fi
+        env:
+          SMOKE_AUTH_BEARER_TOKEN: ${{ secrets.SMOKE_AUTH_BEARER_TOKEN_DEV || secrets.SMOKE_AUTH_BEARER_TOKEN }}
+
       - name: Smoke release checks (DEV)
         run: |
           bash ./scripts/smoke_release.sh "$SERVICE_URL"
         env:
           X_API_KEY: ${{ env.SMOKE_X_API_KEY }}
+          AUTH_BEARER_TOKEN: ${{ env.AUTH_BEARER_TOKEN }}
+          REQUIRE_AUTH_SMOKE: ${{ env.REQUIRE_AUTH_SMOKE }}
+
+      - name: Stop Cloud SQL Proxy (DEV)
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-deploy-dev >/dev/null 2>&1 || true

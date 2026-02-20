@@ -5,6 +5,7 @@ BASE_URL="${1:-${BASE_URL:-http://localhost:8080}}"
 API_PREFIX="${API_PREFIX:-/api/v1}"
 X_API_KEY="${X_API_KEY:-}"
 AUTH_BEARER_TOKEN="${AUTH_BEARER_TOKEN:-}"
+REQUIRE_AUTH_SMOKE="${REQUIRE_AUTH_SMOKE:-0}"
 
 if [[ -z "${BASE_URL}" ]]; then
   echo "ERROR: BASE_URL vacío." >&2
@@ -72,7 +73,11 @@ resp="$(request GET "$(api_url "/projects?page=1&per_page=1")")"
 proj_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
 proj_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
 if [[ "${proj_status}" == "401" || "${proj_status}" == "403" ]]; then
-  echo "[smoke] WARN: /projects requiere auth de usuario en este ambiente; se omite validación profunda del divisor."
+  if [[ "${REQUIRE_AUTH_SMOKE}" == "1" ]]; then
+    echo "ERROR: smoke autenticado requerido pero /projects respondió ${proj_status}. Configurá AUTH_BEARER_TOKEN válido." >&2
+    exit 1
+  fi
+  echo "[smoke] WARN: /projects requiere auth de usuario; sin token se omite validación funcional del divisor."
   echo "[smoke] OK - smoke básico completado (ping + seguridad de acceso)."
   exit 0
 fi
