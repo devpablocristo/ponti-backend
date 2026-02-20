@@ -336,10 +336,16 @@ jobs:
       - name: Hardening post-restore (opcional)
         if: ${{ env.HARDENING_SQL_URI != '' }}
         run: |
+          set +e
           gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$HARDENING_SQL_URI" \
             --project="$GCP_PROJECT_ID" \
             --database="$DB_NAME_DEV" \
             --quiet
+          code=$?
+          set -e
+          if [[ "$code" -ne 0 ]]; then
+            echo "::warning::Hardening opcional falló (se continúa): código=$code"
+          fi
 
       - name: Smoke tests (opcional)
         if: ${{ env.SMOKE_TEST_URL != '' }}
