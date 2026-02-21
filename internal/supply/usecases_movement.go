@@ -59,7 +59,22 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 		movement.Provider.ID = providerID
 	}
 
-	return u.repo.CreateSupplyMovement(ctx, movement)
+	movementID, err := u.repo.CreateSupplyMovement(ctx, movement)
+	if err != nil {
+		return 0, err
+	}
+
+	// Reflejar ingresos en "stock de campo" para que la columna del panel de Stock
+	// muestre el impacto al crear movimientos de carga.
+	if movement.MovementType == domain.STOCK || movement.MovementType == domain.OFFICIAL_INVOICE {
+		stock.RealStockUnits = stock.RealStockUnits.Add(movement.Quantity)
+		stock.UpdatedBy = movement.UpdatedBy
+		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+			return 0, err
+		}
+	}
+
+	return movementID, nil
 }
 
 func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) error {

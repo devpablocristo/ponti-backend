@@ -13,7 +13,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup \
-        run-api run-ponti-local seed seed-dashboard db-staging-to-local staging-db-2-dev-db e2e-changes \
+        run-api run-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
@@ -76,6 +76,10 @@ db-staging-to-local:
 	@echo "Tip: si no seteás SRC_PASS, el script intenta leer db-password-dev desde Secret Manager (requiere gcloud auth)."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
 	@bash ./scripts/db/db_staging_to_local.sh
+
+# Reset local DB + migraciones + carga data-only desde STAGING
+db-reset-from-staging: db-reset db-migrate-up db-staging-to-local
+	@echo "Local DB reset + migrate + staging data-only restore completed."
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:

@@ -99,18 +99,17 @@ echo "Verificando conflictos de puerto PostgreSQL..."
 stop_system_postgres
 
 echo "Levantando backend (DB + migraciones) con Docker..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d
+docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d ponti-db
 
-echo "Levantando backend API..."
-if http_ok "http://localhost:8080/ping"; then
-  echo "Backend API ya está levantado en :8080"
-else
-  if [[ -z "${AI_SERVICE_URL:-}" || -z "${AI_SERVICE_KEY:-}" ]]; then
-    echo "WARN: AI_SERVICE_URL / AI_SERVICE_KEY no configurados. Endpoints AI no funcionarán."
-  fi
-  # Detach: si salís del follow de logs (Ctrl+C), no debería matar la API.
-  nohup env DB_PORT="${DB_PORT:-5432}" make -C "$BACKEND_DIR" run-api >"$BACKEND_DIR/.run-api.local.log" 2>&1 &
-  echo "Backend API iniciada (detached). Log: $BACKEND_DIR/.run-api.local.log"
+echo "Levantando backend API (docker)..."
+docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d --build ponti-api
+
+if ! http_ok "http://localhost:8080/ping"; then
+  echo "WARN: backend API aún no responde en :8080 (puede tardar por build/migrate inicial)." >&2
+fi
+
+if [[ -z "${AI_SERVICE_URL:-}" || -z "${AI_SERVICE_KEY:-}" ]]; then
+  echo "WARN: AI_SERVICE_URL / AI_SERVICE_KEY no configurados. Endpoints AI no funcionarán."
 fi
 
 echo "Levantando AI (DB + API) con Docker..."
