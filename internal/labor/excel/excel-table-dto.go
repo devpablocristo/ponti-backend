@@ -5,10 +5,9 @@ import (
 )
 
 type ExcelTableDto struct {
-	ID             int64   `excel:"ID"`
 	Name           string  `excel:"NOMBRE"`
-	Price          float64 `excel:"PRECIO"`
 	CategoryName   string  `excel:"CATEGORÍA"`
+	Price          float64 `excel:"PRECIO"`
 	ContractorName string  `excel:"CONTRATISTA"`
 }
 
@@ -17,7 +16,6 @@ func BuildExcelTableDTO(items []domain.ListedLabor) []ExcelTableDto {
 	for _, it := range items {
 		price, _ := it.Price.Float64()
 		out = append(out, ExcelTableDto{
-			ID:             it.ID,
 			Name:           it.Name,
 			Price:          price,
 			CategoryName:   it.CategoryName,

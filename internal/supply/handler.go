@@ -25,6 +25,7 @@ type UseCasesPort interface {
 	GetSupply(ctx context.Context, id int64) (*domain.Supply, error)
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
 	DeleteSupply(ctx context.Context, id int64) error
+	CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	ListSuppliesPaginated(
 		ctx context.Context,
 		filter domain.SupplyFilter,
@@ -95,6 +96,7 @@ func (h *Handler) Routes() {
 		supplies.GET("/:supply_id", h.GetSupply)
 		supplies.PUT("/:supply_id", h.UpdateSupply)
 		supplies.DELETE("/:supply_id", h.DeleteSupply)
+		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
 	supplyMovements := r.Group(baseURL + "/projects/:project_id/supply-movements")
@@ -233,6 +235,21 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	count, err := h.ucs.CountWorkOrdersBySupplyID(c.Request.Context(), id)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"count": count})
 }
 
 func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {

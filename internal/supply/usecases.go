@@ -116,15 +116,11 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 }
 
 func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
-	count, err := u.repo.GetWorkOrdersBySupplyID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return types.NewError(types.ErrConflict, "supply is being used in a work order", nil)
-	}
-
 	return u.repo.DeleteSupply(ctx, id)
+}
+
+func (u *UseCases) CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
+	return u.repo.GetWorkOrdersBySupplyID(ctx, supplyID)
 }
 
 func (u *UseCases) ListSuppliesPaginated(

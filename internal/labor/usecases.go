@@ -63,14 +63,11 @@ func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectID i
 }
 
 func (u *UseCases) DeleteLabor(ctx context.Context, laborID int64) error {
-	count, err := u.repo.GetWorkOrdersByLaborID(ctx, laborID)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return types.NewError(types.ErrConflict, "labor is being used in a work order", nil)
-	}
 	return u.repo.DeleteLabor(ctx, laborID)
+}
+
+func (u *UseCases) CountWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
+	return u.repo.GetWorkOrdersByLaborID(ctx, laborID)
 }
 
 func (u *UseCases) UpdateLabor(ctx context.Context, labor *domain.Labor) error {

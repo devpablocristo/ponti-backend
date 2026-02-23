@@ -22,6 +22,7 @@ type UseCasesPort interface {
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
 	DeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
+	CountWorkOrdersByLaborID(context.Context, int64) (int64, error)
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
 	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
@@ -78,6 +79,7 @@ func (h *Handler) Routes() {
 		projectLaborsGroup.GET("", h.ListLabor)
 		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
 		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
+		projectLaborsGroup.GET("/:labor_id/workorders-count", h.CountWorkOrdersByLaborID)
 		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
 		projectLaborsGroup.GET("/export", h.ExportProjectLabors)
 	}
@@ -225,6 +227,21 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
+}
+
+func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	count, err := h.ucs.CountWorkOrdersByLaborID(c.Request.Context(), id)
+	if err != nil {
+		apiErr, status := types.NewAPIError(err)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"count": count})
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {

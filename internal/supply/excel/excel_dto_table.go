@@ -4,6 +4,7 @@ import "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domai
 
 type SupplyTableDTO struct {
 	Name         string  `excel:"NOMBRE"`
+	UnitName     string  `excel:"UNIDAD"`
 	Price        float64 `excel:"PRECIO"`
 	CategoryName string  `excel:"RUBRO"`
 	TypeName     string  `excel:"TIPO/CLASE"`
@@ -15,6 +16,7 @@ func BuildDTO(items []domain.Supply) []SupplyTableDTO {
 	for _, it := range items {
 		out = append(out, SupplyTableDTO{
 			Name:         it.Name,
+			UnitName:     it.UnitName,
 			Price:        decToFloat(it.Price, 2),
 			CategoryName: it.CategoryName,
 			TypeName:     it.Type.Name,
