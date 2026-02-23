@@ -150,7 +150,7 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 	if err := r.getDB(ctx).
 		Model(&workOrderModels.WorkOrder{}).
 		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
-		Where("workorder_items.supply_id = ?", supplyID).
+		Where("workorder_items.supply_id = ? AND workorders.deleted_at IS NULL", supplyID).
 		Count(&count).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil

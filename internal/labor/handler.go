@@ -79,6 +79,7 @@ func (h *Handler) Routes() {
 		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
 		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
 		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
+		projectLaborsGroup.GET("/export", h.ExportProjectLabors)
 	}
 
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
@@ -381,6 +382,26 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+}
+
+func (h *Handler) ExportProjectLabors(c *gin.Context) {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), projectID)
+	if err != nil {
+		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		return
+	}
+
+	filename := "labores_base_datos.xlsx"
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {

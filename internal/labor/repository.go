@@ -48,7 +48,7 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 	if err := r.db.Client().WithContext(ctx).
 		Model(&workOrderModels.WorkOrder{}).
 		Joins("JOIN labors ON labors.id = workorders.labor_id").
-		Where("labors.id = ?", laborID).
+		Where("labors.id = ? AND workorders.deleted_at IS NULL", laborID).
 		Count(&count).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
