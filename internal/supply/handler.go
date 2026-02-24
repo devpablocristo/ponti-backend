@@ -215,6 +215,15 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 	}
 	dom := req.ToDomain()
 	dom.ID = id
+	if req.IsPartialPrice == nil {
+		currentSupply, err := h.ucs.GetSupply(c.Request.Context(), id)
+		if err != nil {
+			apiErr, status := types.NewAPIError(err)
+			c.JSON(status, apiErr.ToResponse())
+			return
+		}
+		dom.IsPartialPrice = currentSupply.IsPartialPrice
+	}
 	if err := h.ucs.UpdateSupply(c.Request.Context(), dom); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
@@ -262,7 +271,17 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 	}
 	supplies := make([]domain.Supply, len(req))
 	for i := range req {
-		supplies[i] = *req[i].ToDomain()
+		supply := req[i].ToDomain()
+		if req[i].IsPartialPrice == nil && supply.ID != 0 {
+			currentSupply, err := h.ucs.GetSupply(c.Request.Context(), supply.ID)
+			if err != nil {
+				apiErr, status := types.NewAPIError(err)
+				c.JSON(status, apiErr.ToResponse())
+				return
+			}
+			supply.IsPartialPrice = currentSupply.IsPartialPrice
+		}
+		supplies[i] = *supply
 	}
 	if err := h.ucs.UpdateSuppliesBulk(c.Request.Context(), supplies); err != nil {
 		apiErr, status := types.NewAPIError(err)
