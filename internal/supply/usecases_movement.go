@@ -64,10 +64,10 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 		return 0, err
 	}
 
-	// Reflejar ingresos en "stock de campo" para que la columna del panel de Stock
-	// muestre el impacto al crear movimientos de carga.
-	if movement.MovementType == domain.STOCK || movement.MovementType == domain.OFFICIAL_INVOICE {
-		stock.RealStockUnits = stock.RealStockUnits.Add(movement.Quantity)
+	// Solo "Stock" (conteo manual) sobreescribe el stock de campo.
+	// "Remito oficial" y "Movimiento interno" no lo tocan.
+	if movement.MovementType == domain.STOCK {
+		stock.RealStockUnits = movement.Quantity
 		stock.UpdatedBy = movement.UpdatedBy
 		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
 			return 0, err

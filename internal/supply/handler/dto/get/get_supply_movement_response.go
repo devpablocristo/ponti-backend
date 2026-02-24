@@ -75,7 +75,7 @@ func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) 
 	var totalKg decimal.Decimal
 	var totalLt decimal.Decimal
 	var totalUSD decimal.Decimal
-	var entrySupplyMovementsResponses []entrySupplyMovementsResponse
+	entrySupplyMovementsResponses := make([]entrySupplyMovementsResponse, 0)
 
 	for i, supplyMovement := range entriesDomain {
 		entrySupplyMovementsResponses = append(
