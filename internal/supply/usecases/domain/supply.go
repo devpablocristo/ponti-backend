@@ -19,16 +19,17 @@ type SupplyOrigin struct {
 }
 
 type Supply struct {
-	ID           int64
-	ProjectID    int64
-	Name         string
-	UnitID       int64
-	UnitName     string
-	Price        decimal.Decimal
-	CategoryID   int64
-	CategoryName string
-	Type         classdomain.ClassType
-	Origin       *SupplyOrigin
+	ID        int64
+	ProjectID int64
+	Name      string
+	UnitID    int64
+	UnitName  string
+	Price     decimal.Decimal
+	IsPartialPrice bool
+	CategoryID     int64
+	CategoryName   string
+	Type           classdomain.ClassType
+	Origin         *SupplyOrigin
 
 	shareddomain.Base // Audit fields
 }

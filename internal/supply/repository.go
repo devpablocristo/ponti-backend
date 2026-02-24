@@ -117,13 +117,14 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
 		}
 		updates := map[string]any{
-			"name":        s.Name,
-			"unit_id":     int64(s.UnitID),
-			"price":       s.Price,
-			"category_id": int64(s.CategoryID),
-			"type_id":     s.Type.ID,
-			"project_id":  s.ProjectID,
-			"updated_by":  s.UpdatedBy,
+			"name":    s.Name,
+			"unit_id": int64(s.UnitID),
+			"price":   s.Price,
+			"is_partial_price": s.IsPartialPrice,
+			"category_id":      int64(s.CategoryID),
+			"type_id":          s.Type.ID,
+			"project_id":       s.ProjectID,
+			"updated_by":       s.UpdatedBy,
 		}
 		updateTx := tx.Model(&models.Supply{}).
 			Where("id = ?", s.ID)
@@ -239,13 +240,14 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for i := range supplies {
 			updates := map[string]any{
-				"name":        supplies[i].Name,
-				"unit_id":     int64(supplies[i].UnitID),
-				"price":       supplies[i].Price,
-				"category_id": int64(supplies[i].CategoryID),
-				"type_id":     supplies[i].Type.ID,
-				"project_id":  supplies[i].ProjectID,
-				"updated_by":  supplies[i].UpdatedBy,
+				"name":    supplies[i].Name,
+				"unit_id": int64(supplies[i].UnitID),
+				"price":   supplies[i].Price,
+				"is_partial_price": supplies[i].IsPartialPrice,
+				"category_id":      int64(supplies[i].CategoryID),
+				"type_id":          supplies[i].Type.ID,
+				"project_id":       supplies[i].ProjectID,
+				"updated_by":       supplies[i].UpdatedBy,
 			}
 			updateTx := tx.Model(&models.Supply{}).
 				Where("id = ?", supplies[i].ID)
