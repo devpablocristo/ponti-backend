@@ -2,6 +2,7 @@ package supply
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ type UseCasesPort interface {
 	CreateSupply(ctx context.Context, s *domain.Supply) (int64, error)
 	CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
 	GetSupply(ctx context.Context, id int64) (*domain.Supply, error)
+	GetSuppliesByIDs(ctx context.Context, ids []int64) (map[int64]domain.Supply, error)
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
 	DeleteSupply(ctx context.Context, id int64) error
 	CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
@@ -269,13 +271,39 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		c.JSON(status, apiErr.ToResponse())
 		return
 	}
+
+	idsToResolve := make([]int64, 0, len(req))
+	seen := make(map[int64]struct{}, len(req))
+	for i := range req {
+		if req[i].IsPartialPrice != nil || req[i].ID == 0 {
+			continue
+		}
+		if _, exists := seen[req[i].ID]; exists {
+			continue
+		}
+		seen[req[i].ID] = struct{}{}
+		idsToResolve = append(idsToResolve, req[i].ID)
+	}
+
+	currentSuppliesByID := map[int64]domain.Supply{}
+	if len(idsToResolve) > 0 {
+		resolved, err := h.ucs.GetSuppliesByIDs(c.Request.Context(), idsToResolve)
+		if err != nil {
+			apiErr, status := types.NewAPIError(err)
+			c.JSON(status, apiErr.ToResponse())
+			return
+		}
+		currentSuppliesByID = resolved
+	}
+
 	supplies := make([]domain.Supply, len(req))
 	for i := range req {
 		supply := req[i].ToDomain()
 		if req[i].IsPartialPrice == nil && supply.ID != 0 {
-			currentSupply, err := h.ucs.GetSupply(c.Request.Context(), supply.ID)
-			if err != nil {
-				apiErr, status := types.NewAPIError(err)
+			currentSupply, ok := currentSuppliesByID[supply.ID]
+			if !ok {
+				domErr := types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supply.ID), nil)
+				apiErr, status := types.NewAPIError(domErr)
 				c.JSON(status, apiErr.ToResponse())
 				return
 			}
