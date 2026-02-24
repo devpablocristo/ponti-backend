@@ -22,6 +22,20 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	if err != nil {
 		return 0, err
 	}
+
+	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
+	if movement.MovementType == domain.STOCK {
+		if isFirst {
+			return 0, types.NewError(types.ErrBadRequest, "no existe stock para este insumo en el proyecto", nil)
+		}
+		stock.RealStockUnits = movement.Quantity
+		stock.UpdatedBy = movement.UpdatedBy
+		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
+
 	if isFirst {
 		stock = createStockDomainFromSupplyMovement(movement)
 		stockID, err := u.stockUseCases.CreateStock(ctx, stock)
@@ -62,16 +76,6 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	movementID, err := u.repo.CreateSupplyMovement(ctx, movement)
 	if err != nil {
 		return 0, err
-	}
-
-	// Solo "Stock" (conteo manual) sobreescribe el stock de campo.
-	// "Remito oficial" y "Movimiento interno" no lo tocan.
-	if movement.MovementType == domain.STOCK {
-		stock.RealStockUnits = movement.Quantity
-		stock.UpdatedBy = movement.UpdatedBy
-		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
-			return 0, err
-		}
 	}
 
 	return movementID, nil

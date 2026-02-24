@@ -81,7 +81,7 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 
 	if err := db.
 		Model(&models.SupplyMovement{}).
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
@@ -172,7 +172,7 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 	var modelSupplyMovement models.SupplyMovement
 
 	if err := db.
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Unit").
 		Preload("Investor").
 		Preload("Provider").

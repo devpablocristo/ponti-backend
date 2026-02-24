@@ -37,7 +37,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 
 	query := gormDB.Model(&models.Stock{}).
 		Preload("Project").
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
@@ -197,7 +197,7 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 	var stockModel models.Stock
 	err := r.getDB(ctx).
 		Preload("Project").
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
@@ -216,7 +216,7 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 	gormDB := r.getDB(ctx)
 	err := gormDB.
 		Preload("Project").
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
@@ -256,7 +256,7 @@ func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID
 
 	err := r.getDB(ctx).
 		Preload("Project").
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
@@ -280,7 +280,7 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 
 	query := gormDB.
 		Preload("Project").
-		Preload("Supply").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
 		Preload("Investor").
