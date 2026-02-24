@@ -15,6 +15,7 @@ type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
 	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
+	GetSuppliesByIDs(context.Context, []int64) ([]domain.Supply, error)
 	GetSupplyByProjectAndName(context.Context, int64, string) (*domain.Supply, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
@@ -106,6 +107,23 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 
 func (u *UseCases) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	return u.repo.GetSupply(ctx, id)
+}
+
+func (u *UseCases) GetSuppliesByIDs(ctx context.Context, ids []int64) (map[int64]domain.Supply, error) {
+	if len(ids) == 0 {
+		return map[int64]domain.Supply{}, nil
+	}
+
+	supplies, err := u.repo.GetSuppliesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[int64]domain.Supply, len(supplies))
+	for i := range supplies {
+		out[supplies[i].ID] = supplies[i]
+	}
+	return out, nil
 }
 
 func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {

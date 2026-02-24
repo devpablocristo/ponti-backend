@@ -181,3 +181,28 @@ func TestListedSupply_MarshalJSON_PriceRounding(t *testing.T) {
 		})
 	}
 }
+
+func TestListedSupply_MarshalJSON_IsPartialPrice(t *testing.T) {
+	supply := ListedSupply{
+		ID:             1,
+		Name:           "Test",
+		Price:          decimal.NewFromFloat(10.5),
+		IsPartialPrice: true,
+		TotalUSD:       decimal.NewFromFloat(11),
+		UnitID:         1,
+		UnitName:       "Lt",
+		CategoryName:   "Test",
+		CategoryID:     1,
+		TypeName:       "Test",
+		TypeID:         1,
+	}
+
+	jsonData, err := json.Marshal(supply)
+	assert.NoError(t, err)
+
+	var result map[string]interface{}
+	err = json.Unmarshal(jsonData, &result)
+	assert.NoError(t, err)
+
+	assert.Equal(t, true, result["is_partial_price"])
+}

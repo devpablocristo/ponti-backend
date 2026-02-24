@@ -192,13 +192,14 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 		}
 	} else {
 		destSupplyToCreate := &domain.Supply{
-			ProjectID:  movement.ProjectDestinationId,
-			Name:       originSupply.Name,
-			UnitID:     originSupply.UnitID,
-			Price:      originSupply.Price,
-			CategoryID: originSupply.CategoryID,
-			Type:       originSupply.Type,
-			Base:       movement.Base,
+			ProjectID: movement.ProjectDestinationId,
+			Name:      originSupply.Name,
+			UnitID:    originSupply.UnitID,
+			Price:     originSupply.Price,
+			IsPartialPrice: originSupply.IsPartialPrice,
+			CategoryID:     originSupply.CategoryID,
+			Type:           originSupply.Type,
+			Base:           movement.Base,
 		}
 		destSupplyID, err = u.repo.CreateSupply(ctx, destSupplyToCreate)
 		if err != nil {

@@ -14,17 +14,18 @@ import (
 
 // Estructura de supply para listados con información completa
 type ListedSupply struct {
-	ID           int64           `json:"id"`
-	Name         string          `json:"name"`
-	Price        decimal.Decimal `json:"price"`         // Precio U$
-	TotalUSD     decimal.Decimal `json:"total_usd"`     // Total U$
-	UnitID       int64           `json:"unit_id"`       // Unidad ID
-	UnitName     string          `json:"unit_name"`     // Nombre de unidad
-	CategoryName string          `json:"category_name"` // Rubro
-	CategoryID   int64           `json:"category_id"`   // Rubro ID
-	TypeName     string          `json:"type_name"`     // Tipo/Clase
-	TypeID       int64           `json:"type_id"`       // Tipo/Clase ID
-	Origin       *SupplyOrigin   `json:"origin,omitempty"`
+	ID    int64           `json:"id"`
+	Name  string          `json:"name"`
+	Price decimal.Decimal `json:"price"` // Precio U$
+	IsPartialPrice bool            `json:"is_partial_price"`
+	TotalUSD       decimal.Decimal `json:"total_usd"`     // Total U$
+	UnitID         int64           `json:"unit_id"`       // Unidad ID
+	UnitName       string          `json:"unit_name"`     // Nombre de unidad
+	CategoryName   string          `json:"category_name"` // Rubro
+	CategoryID     int64           `json:"category_id"`   // Rubro ID
+	TypeName       string          `json:"type_name"`     // Tipo/Clase
+	TypeID         int64           `json:"type_id"`       // Tipo/Clase ID
+	Origin         *SupplyOrigin   `json:"origin,omitempty"`
 }
 
 type SupplyOrigin struct {
@@ -40,29 +41,31 @@ type SupplyOrigin struct {
 // MarshalJSON aplica redondeo: Precio U$ con 2 decimales, Total U$ al entero más próximo
 func (s ListedSupply) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		ID           int64         `json:"id"`
-		Name         string        `json:"name"`
-		Price        string        `json:"price"`
-		TotalUSD     string        `json:"total_usd"`
-		UnitID       int64         `json:"unit_id"`
-		UnitName     string        `json:"unit_name"`
-		CategoryName string        `json:"category_name"`
-		CategoryID   int64         `json:"category_id"`
-		TypeName     string        `json:"type_name"`
-		TypeID       int64         `json:"type_id"`
-		Origin       *SupplyOrigin `json:"origin,omitempty"`
+		ID             int64         `json:"id"`
+		Name           string        `json:"name"`
+		Price          string        `json:"price"`
+		IsPartialPrice bool          `json:"is_partial_price"`
+		TotalUSD       string        `json:"total_usd"`
+		UnitID         int64         `json:"unit_id"`
+		UnitName       string        `json:"unit_name"`
+		CategoryName   string        `json:"category_name"`
+		CategoryID     int64         `json:"category_id"`
+		TypeName       string        `json:"type_name"`
+		TypeID         int64         `json:"type_id"`
+		Origin         *SupplyOrigin `json:"origin,omitempty"`
 	}{
-		ID:           s.ID,
-		Name:         s.Name,
-		Price:        s.Price.StringFixed(2),    // Precio U$: 2 decimales
-		TotalUSD:     s.TotalUSD.StringFixed(0), // Total U$: entero más próximo
-		UnitID:       s.UnitID,
-		UnitName:     s.UnitName,
-		CategoryName: s.CategoryName,
-		CategoryID:   s.CategoryID,
-		TypeName:     s.TypeName,
-		TypeID:       s.TypeID,
-		Origin:       s.Origin,
+		ID:             s.ID,
+		Name:           s.Name,
+		Price:          s.Price.StringFixed(2), // Precio U$: 2 decimales
+		IsPartialPrice: s.IsPartialPrice,
+		TotalUSD:       s.TotalUSD.StringFixed(0), // Total U$: entero más próximo
+		UnitID:         s.UnitID,
+		UnitName:       s.UnitName,
+		CategoryName:   s.CategoryName,
+		CategoryID:     s.CategoryID,
+		TypeName:       s.TypeName,
+		TypeID:         s.TypeID,
+		Origin:         s.Origin,
 	}
 	return json.Marshal(aux)
 }
@@ -110,17 +113,19 @@ func NewListSuppliesResponse(
 		totalUSD := s.Price // TODO: multiplicar por cantidad real si existe
 
 		out[i] = ListedSupply{
-			ID:           s.ID,
-			Name:         s.Name,
-			Price:        s.Price,        // Precio U$
-			TotalUSD:     totalUSD,       // Total U$
-			UnitID:       s.UnitID,       // Unidad ID
-			UnitName:     s.UnitName,     // Nombre de unidad
-			CategoryName: s.CategoryName, // Rubro
-			CategoryID:   s.CategoryID,   // Rubro ID
-			TypeName:     s.Type.Name,    // Tipo/Clase
-			TypeID:       s.Type.ID,      // Tipo/Clase ID
-			Origin:       mapOrigin(s.Origin),
+			ID:    s.ID,
+			Name:  s.Name,
+			Price: s.Price, // Precio U$
+			// Nuevo: enviamos el estado parcial/final al listado.
+			IsPartialPrice: s.IsPartialPrice,
+			TotalUSD:       totalUSD,       // Total U$
+			UnitID:         s.UnitID,       // Unidad ID
+			UnitName:       s.UnitName,     // Nombre de unidad
+			CategoryName:   s.CategoryName, // Rubro
+			CategoryID:     s.CategoryID,   // Rubro ID
+			TypeName:       s.Type.Name,    // Tipo/Clase
+			TypeID:         s.Type.ID,      // Tipo/Clase ID
+			Origin:         mapOrigin(s.Origin),
 		}
 
 		// Acumular métricas según el tipo de unidad
