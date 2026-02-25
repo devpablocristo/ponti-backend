@@ -23,7 +23,7 @@ jobs:
   promote-and-deploy:
     runs-on: ubuntu-latest
     env:
-      GCP_REGION: ${{ vars.GCP_REGION_PROD || vars.GCP_REGION || 'europe-west1' }}
+      GCP_REGION: ${{ vars.GCP_REGION_PROD }}
       ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
       IMAGE_NAME: ${{ vars.IMAGE_NAME }}
 
@@ -191,7 +191,7 @@ jobs:
           echo "::add-mask::$db_password"
           echo "SMOKE_DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
         env:
-          SMOKE_DB_PASSWORD: ${{ secrets.DB_PASSWORD_PROD || secrets.DB_PASSWORD }}
+          SMOKE_DB_PASSWORD: ${{ secrets.DB_PASSWORD_PROD }}
 
       - name: Start Cloud SQL Proxy for schema checks (PROD)
         run: |
@@ -243,7 +243,7 @@ jobs:
           echo "::add-mask::$x_api_key"
           echo "SMOKE_X_API_KEY=$x_api_key" >> "$GITHUB_ENV"
         env:
-          SMOKE_X_API_KEY: ${{ secrets.X_API_KEY_PROD || secrets.X_API_KEY }}
+          SMOKE_X_API_KEY: ${{ secrets.X_API_KEY_PROD }}
 
       - name: Resolve auth token for functional smoke (PROD)
         run: |
@@ -255,7 +255,7 @@ jobs:
             echo "AUTH_BEARER_TOKEN=$token" >> "$GITHUB_ENV"
           fi
         env:
-          SMOKE_AUTH_BEARER_TOKEN: ${{ secrets.SMOKE_AUTH_BEARER_TOKEN_PROD || secrets.SMOKE_AUTH_BEARER_TOKEN }}
+          SMOKE_AUTH_BEARER_TOKEN: ${{ secrets.SMOKE_AUTH_BEARER_TOKEN_PROD }}
 
       - name: Smoke release checks (PROD)
         run: |
@@ -268,4 +268,3 @@ jobs:
       - name: Stop Cloud SQL Proxy (PROD)
         if: ${{ always() }}
         run: docker rm -f cloudsql-proxy-deploy-prod >/dev/null 2>&1 || true
-
