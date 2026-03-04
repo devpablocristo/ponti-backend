@@ -3,6 +3,7 @@ package supply
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	projdom "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
@@ -18,6 +19,10 @@ type transactionExecutor interface {
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
+	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+		return 0, err
+	}
+
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err
@@ -82,6 +87,10 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 }
 
 func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) error {
+	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+		return err
+	}
+
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return err
@@ -93,6 +102,31 @@ func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.
 	if movement.MovementType == domain.INTERNAL_MOVEMENT {
 		_, _, err := u.validateInternalMovementOut(ctx, movement, *stock)
 		return err
+	}
+
+	return nil
+}
+
+func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movement *domain.SupplyMovement) error {
+	if movement == nil || movement.Supply == nil || movement.Supply.ID <= 0 {
+		return nil
+	}
+
+	reference := strings.TrimSpace(movement.ReferenceNumber)
+	if reference == "" {
+		return nil
+	}
+
+	exists, err := u.repo.ExistsSupplyMovementByProjectReferenceAndSupply(ctx, movement.ProjectId, reference, movement.Supply.ID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return types.NewError(
+			types.ErrConflict,
+			fmt.Sprintf("El remito %s ya tiene el insumo %d cargado", reference, movement.Supply.ID),
+			nil,
+		)
 	}
 
 	return nil
@@ -192,10 +226,10 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 		}
 	} else {
 		destSupplyToCreate := &domain.Supply{
-			ProjectID: movement.ProjectDestinationId,
-			Name:      originSupply.Name,
-			UnitID:    originSupply.UnitID,
-			Price:     originSupply.Price,
+			ProjectID:      movement.ProjectDestinationId,
+			Name:           originSupply.Name,
+			UnitID:         originSupply.UnitID,
+			Price:          originSupply.Price,
 			IsPartialPrice: originSupply.IsPartialPrice,
 			CategoryID:     originSupply.CategoryID,
 			Type:           originSupply.Type,

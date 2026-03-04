@@ -7,6 +7,10 @@ import (
 	"strings"
 	"time"
 
+	investormodels "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
+	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
+	providermodels "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
+	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
@@ -122,6 +126,46 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 	}
 
 	return m.ToDomain(), nil
+}
+
+func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain.Investor, error) {
+	var model investormodels.Investor
+	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d not found", id), err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get investor", err)
+	}
+	return model.ToDomain(), nil
+}
+
+func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain.Provider, error) {
+	var model providermodels.Provider
+	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("provider with id %d not found", id), err)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to get provider", err)
+	}
+	return model.ToDomain(), nil
+}
+
+func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
+	ctx context.Context,
+	projectID int64,
+	reference string,
+	supplyID int64,
+) (bool, error) {
+	var count int64
+	if err := r.getDB(ctx).
+		Model(&models.SupplyMovement{}).
+		Where("project_id = ? AND reference_number = ? AND supply_id = ?", projectID, reference, supplyID).
+		Count(&count).Error; err != nil {
+		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement", err)
+	}
+	return count > 0, nil
 }
 
 // --- UPDATE ---

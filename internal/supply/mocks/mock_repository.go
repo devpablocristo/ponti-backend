@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	domain2 "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	domain0 "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	domain1 "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
@@ -124,6 +125,20 @@ func (mr *MockRepositoryPortMockRecorder) DeleteSupplyMovement(arg0, arg1, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupplyMovement), arg0, arg1, arg2)
 }
 
+// ExecuteInTransaction mocks base method.
+func (m *MockRepositoryPort) ExecuteInTransaction(arg0 context.Context, arg1 func(context.Context) error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExecuteInTransaction", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExecuteInTransaction indicates an expected call of ExecuteInTransaction.
+func (mr *MockRepositoryPortMockRecorder) ExecuteInTransaction(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteInTransaction", reflect.TypeOf((*MockRepositoryPort)(nil).ExecuteInTransaction), arg0, arg1)
+}
+
 // GetEntriesSupplyMovementsByProjectID mocks base method.
 func (m *MockRepositoryPort) GetEntriesSupplyMovementsByProjectID(arg0 context.Context, arg1 int64) ([]*domain1.SupplyMovement, error) {
 	m.ctrl.T.Helper()
@@ -152,6 +167,36 @@ func (m *MockRepositoryPort) GetProviders(arg0 context.Context) ([]domain.Provid
 func (mr *MockRepositoryPortMockRecorder) GetProviders(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProviders", reflect.TypeOf((*MockRepositoryPort)(nil).GetProviders), arg0)
+}
+
+// GetProvider mocks base method.
+func (m *MockRepositoryPort) GetProvider(arg0 context.Context, arg1 int64) (*domain.Provider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProvider", arg0, arg1)
+	ret0, _ := ret[0].(*domain.Provider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProvider indicates an expected call of GetProvider.
+func (mr *MockRepositoryPortMockRecorder) GetProvider(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProvider", reflect.TypeOf((*MockRepositoryPort)(nil).GetProvider), arg0, arg1)
+}
+
+// GetInvestor mocks base method.
+func (m *MockRepositoryPort) GetInvestor(arg0 context.Context, arg1 int64) (*domain2.Investor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetInvestor", arg0, arg1)
+	ret0, _ := ret[0].(*domain2.Investor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetInvestor indicates an expected call of GetInvestor.
+func (mr *MockRepositoryPortMockRecorder) GetInvestor(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInvestor", reflect.TypeOf((*MockRepositoryPort)(nil).GetInvestor), arg0, arg1)
 }
 
 // GetSupply mocks base method.
@@ -212,6 +257,21 @@ func (m *MockRepositoryPort) GetSupplyMovementByID(arg0 context.Context, arg1 in
 func (mr *MockRepositoryPortMockRecorder) GetSupplyMovementByID(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSupplyMovementByID", reflect.TypeOf((*MockRepositoryPort)(nil).GetSupplyMovementByID), arg0, arg1)
+}
+
+// ExistsSupplyMovementByProjectReferenceAndSupply mocks base method.
+func (m *MockRepositoryPort) ExistsSupplyMovementByProjectReferenceAndSupply(arg0 context.Context, arg1 int64, arg2 string, arg3 int64) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsSupplyMovementByProjectReferenceAndSupply", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsSupplyMovementByProjectReferenceAndSupply indicates an expected call of ExistsSupplyMovementByProjectReferenceAndSupply.
+func (mr *MockRepositoryPortMockRecorder) ExistsSupplyMovementByProjectReferenceAndSupply(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsSupplyMovementByProjectReferenceAndSupply", reflect.TypeOf((*MockRepositoryPort)(nil).ExistsSupplyMovementByProjectReferenceAndSupply), arg0, arg1, arg2, arg3)
 }
 
 // GetWorkOrdersBySupplyID mocks base method.
