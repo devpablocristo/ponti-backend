@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
@@ -17,6 +18,9 @@ type RepositoryPort interface {
 	GetSupply(context.Context, int64) (*domain.Supply, error)
 	GetSuppliesByIDs(context.Context, []int64) ([]domain.Supply, error)
 	GetSupplyByProjectAndName(context.Context, int64, string) (*domain.Supply, error)
+	GetInvestor(context.Context, int64) (*investordomain.Investor, error)
+	GetProvider(context.Context, int64) (*providerdomain.Provider, error)
+	ExistsSupplyMovementByProjectReferenceAndSupply(context.Context, int64, string, int64) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
@@ -48,6 +52,14 @@ type UseCases struct {
 	repo          RepositoryPort
 	excel         ExporterAdapterPort
 	stockUseCases StockUseCasesPort
+}
+
+type SupplyMovementImportFailure struct {
+	Index    int
+	RowIndex int
+	SupplyID int64
+	Code     string
+	Message  string
 }
 
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
