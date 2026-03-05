@@ -46,6 +46,30 @@ func TestErrorWithContext(t *testing.T) {
 	}
 }
 
+func TestErrorMessage(t *testing.T) {
+	t.Run("domain error returns Message", func(t *testing.T) {
+		err := NewError(ErrBadRequest, "campo requerido", nil)
+		if got := ErrorMessage(err); got != "campo requerido" {
+			t.Errorf("expected 'campo requerido', got '%s'", got)
+		}
+	})
+
+	t.Run("plain error returns Error()", func(t *testing.T) {
+		err := errors.New("something failed")
+		if got := ErrorMessage(err); got != "something failed" {
+			t.Errorf("expected 'something failed', got '%s'", got)
+		}
+	})
+
+	t.Run("wrapped domain error returns Message", func(t *testing.T) {
+		inner := NewError(ErrConflict, "duplicado", nil)
+		wrapped := errors.Join(errors.New("wrap"), inner)
+		if got := ErrorMessage(wrapped); got != "duplicado" {
+			t.Errorf("expected 'duplicado', got '%s'", got)
+		}
+	})
+}
+
 func TestSpecializedErrors(t *testing.T) {
 	// Test specialized error constructors
 	details := errors.New("not a number")

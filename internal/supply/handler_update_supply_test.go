@@ -2,6 +2,7 @@ package supply
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,17 +13,23 @@ import (
 
 	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	sharedtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type handlerUseCasesStub struct {
-	getSupplyFn         func(ctx context.Context, id int64) (*domain.Supply, error)
-	getSuppliesByIDsFn  func(ctx context.Context, ids []int64) (map[int64]domain.Supply, error)
-	updateSupplyFn      func(ctx context.Context, s *domain.Supply) error
-	updateSuppliesFn    func(ctx context.Context, supplies []domain.Supply) error
-	getSupplyCalls      []int64
-	getSuppliesIDsCalls [][]int64
-	updateSupplyCalls   []domain.Supply
-	updateBulkCalls     [][]domain.Supply
+	getSupplyFn             func(ctx context.Context, id int64) (*domain.Supply, error)
+	getSuppliesByIDsFn      func(ctx context.Context, ids []int64) (map[int64]domain.Supply, error)
+	updateSupplyFn          func(ctx context.Context, s *domain.Supply) error
+	updateSuppliesFn        func(ctx context.Context, supplies []domain.Supply) error
+	createSupplyMovementFn  func(ctx context.Context, movement *domain.SupplyMovement) (int64, error)
+	validateMovementFn      func(ctx context.Context, movement *domain.SupplyMovement) error
+	importSupplyMovementsFn func(ctx context.Context, movements []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error)
+	getSupplyCalls          []int64
+	getSuppliesIDsCalls     [][]int64
+	updateSupplyCalls       []domain.Supply
+	updateBulkCalls         [][]domain.Supply
+	importCalls             [][]*domain.SupplyMovement
 }
 
 func (s *handlerUseCasesStub) CreateSupply(context.Context, *domain.Supply) (int64, error) {
@@ -87,11 +94,17 @@ func (s *handlerUseCasesStub) GetEntriesSupplyMovementsByProjectID(context.Conte
 	return nil, nil
 }
 
-func (s *handlerUseCasesStub) CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error) {
+func (s *handlerUseCasesStub) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
+	if s.createSupplyMovementFn != nil {
+		return s.createSupplyMovementFn(ctx, movement)
+	}
 	return 0, nil
 }
 
-func (s *handlerUseCasesStub) ValidateSupplyMovement(context.Context, *domain.SupplyMovement) error {
+func (s *handlerUseCasesStub) ValidateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) error {
+	if s.validateMovementFn != nil {
+		return s.validateMovementFn(ctx, movement)
+	}
 	return nil
 }
 
@@ -124,7 +137,17 @@ func newHandlerJSONContext(method, target, body string) (*gin.Context, *httptest
 	ctx, _ := gin.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(method, target, strings.NewReader(body))
 	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), pkgmwr.ContextUserIDKey, "123"))
 	return ctx, rec
+}
+
+func (s *handlerUseCasesStub) ImportSupplyMovements(ctx context.Context, movements []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error) {
+	callCopy := append([]*domain.SupplyMovement(nil), movements...)
+	s.importCalls = append(s.importCalls, callCopy)
+	if s.importSupplyMovementsFn != nil {
+		return s.importSupplyMovementsFn(ctx, movements)
+	}
+	return nil, nil, nil
 }
 
 func TestHandler_UpdateSupply_OmittedIsPartialPrice_PreservesStoredValue(t *testing.T) {
@@ -277,4 +300,319 @@ func TestHandler_UpdateSuppliesBulk_OmittedIsPartialPrice_MissingSupplyReturnsNo
 	assert.Equal(t, http.StatusNotFound, ctx.Writer.Status())
 	assert.Len(t, stub.getSuppliesIDsCalls, 1)
 	assert.Empty(t, stub.updateBulkCalls)
+}
+
+func TestHandler_ImportSupplyMovements_ReturnsRowIndexFailures(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{
+		importSupplyMovementsFn: func(_ context.Context, _ []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error) {
+			return nil, []SupplyMovementImportFailure{{
+				Index:    1,
+				RowIndex: 3,
+				SupplyID: 99,
+				Code:     "duplicate_request",
+				Message:  "El remito R-1 ya contiene el insumo 99 dentro del request",
+			}}, nil
+		},
+	}
+
+	h := &Handler{ucs: stub}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{
+		"mode": "strict",
+		"items": [
+			{
+				"quantity": "10",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "R-1",
+				"project_destination_id": 0,
+				"supply_id": 10,
+				"investor_id": 11,
+				"provider": { "id": 5, "name": "Provider 5" }
+			},
+			{
+				"quantity": "10",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "R-1",
+				"project_destination_id": 0,
+				"supply_id": 99,
+				"investor_id": 11,
+				"provider": { "id": 5, "name": "Provider 5" }
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp struct {
+		Success  bool `json:"success"`
+		Failures []struct {
+			Index    int    `json:"index"`
+			RowIndex int    `json:"row_index"`
+			SupplyID int64  `json:"supply_id"`
+			Code     string `json:"code"`
+			Message  string `json:"message"`
+		} `json:"failures"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.False(t, resp.Success)
+	if assert.Len(t, resp.Failures, 1) {
+		assert.Equal(t, 1, resp.Failures[0].Index)
+		assert.Equal(t, 3, resp.Failures[0].RowIndex)
+		assert.Equal(t, int64(99), resp.Failures[0].SupplyID)
+	}
+}
+
+func TestHandler_ImportSupplyMovements_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{
+		importSupplyMovementsFn: func(_ context.Context, movements []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error) {
+			assert.Len(t, movements, 2)
+			assert.Equal(t, int64(18), movements[0].ProjectId)
+			return []int64{101, 102}, nil, nil
+		},
+	}
+
+	h := &Handler{ucs: stub}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{
+		"mode": "strict",
+		"items": [
+			{
+				"quantity": "10",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "R-1",
+				"project_destination_id": 0,
+				"supply_id": 10,
+				"investor_id": 11,
+				"provider": { "id": 5, "name": "Provider 5" }
+			},
+			{
+				"quantity": "11",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-05T00:00:00Z",
+				"reference_number": "R-2",
+				"project_destination_id": 0,
+				"supply_id": 11,
+				"investor_id": 12,
+				"provider": { "id": 6, "name": "Provider 6" }
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		Success bool `json:"success"`
+		Applied int  `json:"applied"`
+		Failed  int  `json:"failed"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.True(t, resp.Success)
+	assert.Equal(t, 2, resp.Applied)
+	assert.Equal(t, 0, resp.Failed)
+}
+
+func TestHandler_ImportSupplyMovements_InitialValidationUsesRowIndex(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := &Handler{ucs: &handlerUseCasesStub{}}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{
+		"mode": "strict",
+		"items": [
+			{
+				"quantity": "10",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "R-1",
+				"project_destination_id": 0,
+				"supply_id": 10,
+				"investor_id": 11,
+				"provider": { "id": 5, "name": "Provider 5" }
+			},
+			{
+				"quantity": "10",
+				"movement_type": "Invalido",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "R-2",
+				"project_destination_id": 0,
+				"supply_id": 11,
+				"investor_id": 12,
+				"provider": { "id": 6, "name": "Provider 6" }
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp struct {
+		Failures []struct {
+			Index    int `json:"index"`
+			RowIndex int `json:"row_index"`
+		} `json:"failures"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	if assert.Len(t, resp.Failures, 1) {
+		assert.Equal(t, 1, resp.Failures[0].Index)
+		assert.Equal(t, 3, resp.Failures[0].RowIndex)
+	}
+}
+
+func TestHandler_ImportSupplyMovements_InvalidUserIDReturnsUnauthorized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	h := &Handler{ucs: &handlerUseCasesStub{}}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{"mode":"strict","items":[]}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), pkgmwr.ContextUserIDKey, "invalid"))
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	var resp sharedtypes.APIErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.Equal(t, sharedtypes.APIErrForbidden, resp.Type)
+}
+
+func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{
+		validateMovementFn: func(_ context.Context, movement *domain.SupplyMovement) error {
+			if movement.ReferenceNumber == "REM-EXCEL" && movement.Supply != nil && movement.Supply.ID == 10 {
+				return sharedtypes.NewError(sharedtypes.ErrConflict, "El remito REM-EXCEL ya tiene el insumo 10 cargado", nil)
+			}
+			return nil
+		},
+	}
+
+	h := &Handler{ucs: stub}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements", `{
+		"mode": "strict",
+		"items": [
+			{
+				"quantity": "2",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "REM-EXCEL",
+				"project_destination_id": 0,
+				"supply_id": 10,
+				"investor_id": 11,
+				"provider": { "id": 5, "name": "Provider 5" }
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.CreateSupplyMovement(ctx)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		Success  bool `json:"success"`
+		Applied  int  `json:"applied"`
+		Failed   int  `json:"failed"`
+		Failures []struct {
+			Index    int    `json:"index"`
+			RowIndex int    `json:"row_index"`
+			Code     string `json:"code"`
+			Message  string `json:"message"`
+		} `json:"failures"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.False(t, resp.Success)
+	assert.Equal(t, 0, resp.Applied)
+	assert.Equal(t, 1, resp.Failed)
+	if assert.Len(t, resp.Failures, 1) {
+		assert.Equal(t, 0, resp.Failures[0].Index)
+		assert.Equal(t, 2, resp.Failures[0].RowIndex)
+		assert.Equal(t, "validation_error", resp.Failures[0].Code)
+		assert.Equal(t, "El remito REM-EXCEL ya tiene el insumo 10 cargado", resp.Failures[0].Message)
+	}
+}
+
+func TestHandler_ImportSupplyMovements_ExceedsMaxItems(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{}
+	h := &Handler{ucs: stub}
+
+	items := make([]string, 501)
+	for i := range items {
+		items[i] = `{
+			"quantity": "1",
+			"movement_type": "Remito oficial",
+			"movement_date": "2026-03-04T00:00:00Z",
+			"reference_number": "REM-1",
+			"supply_id": 10,
+			"investor_id": 5,
+			"provider": {"id": 1, "name": "P"}
+		}`
+	}
+	body := `{"items": [` + strings.Join(items, ",") + `]}`
+
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", body)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp sharedtypes.APIErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.Contains(t, resp.Message, "500")
+	assert.Contains(t, resp.Message, "501")
+}
+
+func TestHandler_ImportSupplyMovements_FailuresReturnWarningWithAccents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{
+		importSupplyMovementsFn: func(_ context.Context, _ []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error) {
+			return nil, []SupplyMovementImportFailure{
+				{Index: 0, RowIndex: 2, SupplyID: 10, Code: "duplicate_db", Message: "duplicado"},
+			}, nil
+		},
+	}
+
+	h := &Handler{ucs: stub}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{
+		"items": [
+			{
+				"quantity": "5",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "REM-1",
+				"supply_id": 10,
+				"investor_id": 5,
+				"provider": {"id": 1, "name": "P"}
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp struct {
+		Warnings []string `json:"warnings"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	if assert.Len(t, resp.Warnings, 1) {
+		assert.Equal(t, "No se guardó ningún movimiento porque la importación es atómica", resp.Warnings[0])
+	}
 }

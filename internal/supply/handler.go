@@ -41,6 +41,7 @@ type UseCasesPort interface {
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
 	ValidateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	CreateSupplyMovementsStrict(context.Context, []*domain.SupplyMovement) ([]int64, error)
+	ImportSupplyMovements(context.Context, []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error)
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
@@ -104,6 +105,7 @@ func (h *Handler) Routes() {
 	supplyMovements := r.Group(baseURL + "/projects/:project_id/supply-movements")
 	{
 		supplyMovements.POST("", h.CreateSupplyMovement)
+		supplyMovements.POST("/import", h.ImportSupplyMovements)
 		supplyMovements.GET("", h.GetSupplyMovementsByProjectID)
 		supplyMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		supplyMovements.GET("/providers", h.GetProviders)
@@ -397,13 +399,15 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
+			message := types.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
+				RowIndex: i + 2,
 				SupplyID: item.SupplyID,
 				Code:     "validation_error",
-				Message:  err.Error(),
+				Message:  message,
 			})
-			supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(err.Error()))
+			supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(message))
 			continue
 		}
 		domainMovements = append(domainMovements, item.ToDomain(projectID, &userID))
@@ -417,14 +421,16 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			for i, movement := range domainMovements {
 				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
 					itemIndex := validIndexes[i]
+					message := types.ErrorMessage(err)
 					prevalidationFailedIndexes[itemIndex] = true
 					failures = append(failures, createDto.SupplyMovementFailure{
 						Index:    itemIndex,
+						RowIndex: itemIndex + 2,
 						SupplyID: req.SupplyMovements[itemIndex].SupplyID,
 						Code:     "validation_error",
-						Message:  err.Error(),
+						Message:  message,
 					})
-					supplyMovementsResponse[itemIndex] = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
+					supplyMovementsResponse[itemIndex] = createDto.NewErrorCreateSupplyMovementResponse(message)
 				}
 			}
 
@@ -447,7 +453,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
 				if err != nil {
 					failedValidPos := -1
-					msg := err.Error()
+					msg := types.ErrorMessage(err)
 					if strings.HasPrefix(msg, "item ") {
 						parts := strings.SplitN(msg, ": ", 2)
 						if len(parts) == 2 {
@@ -462,6 +468,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 						if failedValidPos >= 0 && failedValidPos < len(validIndexes) && itemIndex == validIndexes[failedValidPos] {
 							failures = append(failures, createDto.SupplyMovementFailure{
 								Index:    itemIndex,
+								RowIndex: itemIndex + 2,
 								SupplyID: req.SupplyMovements[itemIndex].SupplyID,
 								Code:     "apply_error",
 								Message:  msg,
@@ -515,13 +522,15 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			}
 			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
 			if err != nil {
+				message := types.ErrorMessage(err)
 				failures = append(failures, createDto.SupplyMovementFailure{
 					Index:    i,
+					RowIndex: i + 2,
 					SupplyID: req.SupplyMovements[i].SupplyID,
 					Code:     "apply_error",
-					Message:  err.Error(),
+					Message:  message,
 				})
-				supplyMovementsResponse[i] = createDto.NewErrorCreateSupplyMovementResponse(err.Error())
+				supplyMovementsResponse[i] = createDto.NewErrorCreateSupplyMovementResponse(message)
 			} else {
 				successes = append(successes, createDto.SupplyMovementSuccess{
 					Index:            i,
@@ -550,6 +559,123 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	// Siempre responder 200 para que frontend lea failures detallados
 	// y no caiga en mensaje genérico por códigos HTTP de error.
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *Handler) ImportSupplyMovements(c *gin.Context) {
+	ctx := c.Request.Context()
+	var req createDto.CreateSupplyMovementRequestBulk
+
+	userID, err := sharedhandlers.ParseUserID(c)
+	if handleError(err, c) {
+		return
+	}
+
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if handleError(err, c) {
+		return
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+
+	total := len(req.SupplyMovements)
+	const maxImportItems = 500
+	if total > maxImportItems {
+		domErr := types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+
+	domainMovements := make([]*domain.SupplyMovement, 0, total)
+	failures := make([]createDto.SupplyMovementFailure, 0)
+	supplyMovementsResponse := make([]createDto.CreateSupplyMovementResponse, total)
+
+	for i, item := range req.SupplyMovements {
+		if err := item.Validate(); err != nil {
+			message := types.ErrorMessage(err)
+			failures = append(failures, createDto.SupplyMovementFailure{
+				Index:    i,
+				RowIndex: i + 2,
+				SupplyID: item.SupplyID,
+				Code:     "validation_error",
+				Message:  message,
+			})
+			supplyMovementsResponse[i] = createDto.NewErrorCreateSupplyMovementResponse(message)
+			continue
+		}
+		domainMovements = append(domainMovements, item.ToDomain(projectID, &userID))
+	}
+
+	if len(failures) == 0 {
+		ids, importFailures, err := h.ucs.ImportSupplyMovements(ctx, domainMovements)
+		if err != nil {
+			handleError(err, c)
+			return
+		}
+
+		if len(importFailures) > 0 {
+			for _, failure := range importFailures {
+				failures = append(failures, createDto.SupplyMovementFailure{
+					Index:    failure.Index,
+					RowIndex: failure.RowIndex,
+					SupplyID: failure.SupplyID,
+					Code:     failure.Code,
+					Message:  failure.Message,
+				})
+				if failure.Index >= 0 && failure.Index < len(supplyMovementsResponse) {
+					supplyMovementsResponse[failure.Index] = createDto.NewErrorCreateSupplyMovementResponse(failure.Message)
+				}
+			}
+		} else {
+			successes := make([]createDto.SupplyMovementSuccess, 0, len(ids))
+			for i, movementID := range ids {
+				successes = append(successes, createDto.SupplyMovementSuccess{
+					Index:            i,
+					SupplyID:         req.SupplyMovements[i].SupplyID,
+					SupplyMovementID: movementID,
+				})
+				supplyMovementsResponse[i] = createDto.NewSuccessfulCreateSupplyMovementResponse(movementID)
+			}
+			c.JSON(http.StatusOK, createDto.CreateSupplyMovementBulkResponse{
+				Success:         true,
+				Mode:            "strict",
+				Total:           total,
+				Applied:         len(ids),
+				Failed:          0,
+				Successes:       successes,
+				Failures:        nil,
+				Skipped:         nil,
+				Warnings:        nil,
+				SupplyMovements: supplyMovementsResponse,
+			})
+			return
+		}
+	}
+
+	for i := range supplyMovementsResponse {
+		if supplyMovementsResponse[i].IsSaved || supplyMovementsResponse[i].ErrorDetail != "" {
+			continue
+		}
+		supplyMovementsResponse[i] = createDto.CreateSupplyMovementResponse{IsSaved: false}
+	}
+
+	c.JSON(http.StatusBadRequest, createDto.CreateSupplyMovementBulkResponse{
+		Success:         false,
+		Mode:            "strict",
+		Total:           total,
+		Applied:         0,
+		Failed:          len(failures),
+		Successes:       nil,
+		Failures:        failures,
+		Skipped:         nil,
+		Warnings:        []string{"No se guardó ningún movimiento porque la importación es atómica"},
+		SupplyMovements: supplyMovementsResponse,
+	})
 }
 
 func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
@@ -650,6 +776,7 @@ func handleError(err error, c *gin.Context) bool {
 	c.JSON(status, apiErr.ToResponse())
 	return true
 }
+
 
 func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()

@@ -158,6 +158,16 @@ func GetErrorContext(err error) (map[string]any, bool) {
 	return nil, false
 }
 
+// ErrorMessage extrae el mensaje legible de un Error de dominio;
+// si no es un Error de dominio, retorna err.Error().
+func ErrorMessage(err error) string {
+	var e *Error
+	if errors.As(err, &e) && e.Message != "" {
+		return e.Message
+	}
+	return err.Error()
+}
+
 func IsErrInvalidInput(err error) bool {
 	var e *Error
 	return errors.As(err, &e) &&

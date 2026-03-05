@@ -14,6 +14,7 @@ type SupplyMovementSuccess struct {
 
 type SupplyMovementFailure struct {
 	Index    int    `json:"index"`
+	RowIndex int    `json:"row_index"`
 	SupplyID int64  `json:"supply_id"`
 	Code     string `json:"code"`
 	Message  string `json:"message"`
