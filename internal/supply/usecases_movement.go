@@ -22,7 +22,12 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
 		return 0, err
 	}
+	return u.createSupplyMovementInternal(ctx, movement)
+}
 
+// createSupplyMovementInternal crea el movimiento sin chequear duplicados
+// (para uso en flujos que ya validaron previamente, ej. import).
+func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err

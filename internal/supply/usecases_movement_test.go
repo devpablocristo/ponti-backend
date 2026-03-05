@@ -804,12 +804,10 @@ func TestImportSupplyMovements_AllowsMultipleLogicalGroupsInSameRequest(t *testi
 		Times(2)
 	mockRepo.EXPECT().
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-100", supplyA).
-		Return(false, nil).
-		Times(2)
+		Return(false, nil)
 	mockRepo.EXPECT().
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-101", supplyB).
-		Return(false, nil).
-		Times(2)
+		Return(false, nil)
 	mockStock.EXPECT().
 		GetLastStockByProjectID(gomock.Any(), projectID, supplyA).
 		Return(&stockdomain.Stock{}, false, nil).
@@ -961,8 +959,7 @@ func TestImportSupplyMovements_CreatesProviderByName(t *testing.T) {
 		})
 	mockRepo.EXPECT().
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-202", supplyID).
-		Return(false, nil).
-		Times(2)
+		Return(false, nil)
 	mockStock.EXPECT().
 		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{}, false, nil).

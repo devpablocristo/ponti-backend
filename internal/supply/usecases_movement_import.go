@@ -38,7 +38,7 @@ func (u *UseCases) ImportSupplyMovements(
 
 		ids = make([]int64, len(validated))
 		for i := range validated {
-			id, err := u.CreateSupplyMovement(txCtx, validated[i])
+			id, err := u.createSupplyMovementInternal(txCtx, validated[i])
 			if err != nil {
 				failures = []SupplyMovementImportFailure{{
 					Index:    i,
@@ -220,7 +220,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				RowIndex: importRowIndex(i),
 				SupplyID: movement.Supply.ID,
 				Code:     code,
-				Message:  importErrorMessage(err),
+				Message:  types.ErrorMessage(err),
 			})
 			continue
 		}
@@ -295,10 +295,3 @@ func importRowIndex(index int) int {
 	return index + 2
 }
 
-func importErrorMessage(err error) string {
-	var domainErr *types.Error
-	if errors.As(err, &domainErr) && domainErr.Message != "" {
-		return domainErr.Message
-	}
-	return err.Error()
-}

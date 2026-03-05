@@ -543,3 +543,76 @@ func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T
 		assert.Equal(t, "El remito REM-EXCEL ya tiene el insumo 10 cargado", resp.Failures[0].Message)
 	}
 }
+
+func TestHandler_ImportSupplyMovements_ExceedsMaxItems(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{}
+	h := &Handler{ucs: stub}
+
+	items := make([]string, 501)
+	for i := range items {
+		items[i] = `{
+			"quantity": "1",
+			"movement_type": "Remito oficial",
+			"movement_date": "2026-03-04T00:00:00Z",
+			"reference_number": "REM-1",
+			"supply_id": 10,
+			"investor_id": 5,
+			"provider": {"id": 1, "name": "P"}
+		}`
+	}
+	body := `{"items": [` + strings.Join(items, ",") + `]}`
+
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", body)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp sharedtypes.APIErrorResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.Contains(t, resp.Message, "500")
+	assert.Contains(t, resp.Message, "501")
+}
+
+func TestHandler_ImportSupplyMovements_FailuresReturnWarningWithAccents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &handlerUseCasesStub{
+		importSupplyMovementsFn: func(_ context.Context, _ []*domain.SupplyMovement) ([]int64, []SupplyMovementImportFailure, error) {
+			return nil, []SupplyMovementImportFailure{
+				{Index: 0, RowIndex: 2, SupplyID: 10, Code: "duplicate_db", Message: "duplicado"},
+			}, nil
+		},
+	}
+
+	h := &Handler{ucs: stub}
+	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{
+		"items": [
+			{
+				"quantity": "5",
+				"movement_type": "Remito oficial",
+				"movement_date": "2026-03-04T00:00:00Z",
+				"reference_number": "REM-1",
+				"supply_id": 10,
+				"investor_id": 5,
+				"provider": {"id": 1, "name": "P"}
+			}
+		]
+	}`)
+	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
+
+	h.ImportSupplyMovements(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var resp struct {
+		Warnings []string `json:"warnings"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	if assert.Len(t, resp.Warnings, 1) {
+		assert.Equal(t, "No se guardó ningún movimiento porque la importación es atómica", resp.Warnings[0])
+	}
+}

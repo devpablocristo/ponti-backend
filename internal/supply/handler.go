@@ -2,7 +2,6 @@ package supply
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -400,7 +399,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := errorMessage(err)
+			message := types.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -422,7 +421,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			for i, movement := range domainMovements {
 				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
 					itemIndex := validIndexes[i]
-					message := errorMessage(err)
+					message := types.ErrorMessage(err)
 					prevalidationFailedIndexes[itemIndex] = true
 					failures = append(failures, createDto.SupplyMovementFailure{
 						Index:    itemIndex,
@@ -454,7 +453,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
 				if err != nil {
 					failedValidPos := -1
-					msg := errorMessage(err)
+					msg := types.ErrorMessage(err)
 					if strings.HasPrefix(msg, "item ") {
 						parts := strings.SplitN(msg, ": ", 2)
 						if len(parts) == 2 {
@@ -523,7 +522,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			}
 			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
 			if err != nil {
-				message := errorMessage(err)
+				message := types.ErrorMessage(err)
 				failures = append(failures, createDto.SupplyMovementFailure{
 					Index:    i,
 					RowIndex: i + 2,
@@ -584,13 +583,21 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	}
 
 	total := len(req.SupplyMovements)
+	const maxImportItems = 500
+	if total > maxImportItems {
+		domErr := types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil)
+		apiErr, status := types.NewAPIError(domErr)
+		c.JSON(status, apiErr.ToResponse())
+		return
+	}
+
 	domainMovements := make([]*domain.SupplyMovement, 0, total)
 	failures := make([]createDto.SupplyMovementFailure, 0)
 	supplyMovementsResponse := make([]createDto.CreateSupplyMovementResponse, total)
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := errorMessage(err)
+			message := types.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -666,7 +673,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 		Successes:       nil,
 		Failures:        failures,
 		Skipped:         nil,
-		Warnings:        []string{"No se guardo ningun movimiento porque la importacion es atomica"},
+		Warnings:        []string{"No se guardó ningún movimiento porque la importación es atómica"},
 		SupplyMovements: supplyMovementsResponse,
 	})
 }
@@ -770,13 +777,6 @@ func handleError(err error, c *gin.Context) bool {
 	return true
 }
 
-func errorMessage(err error) string {
-	var domainErr *types.Error
-	if errors.As(err, &domainErr) && domainErr.Message != "" {
-		return domainErr.Message
-	}
-	return err.Error()
-}
 
 func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
