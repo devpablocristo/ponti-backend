@@ -12,6 +12,7 @@ type Labor struct {
 	Name           string          `json:"name"`
 	ContractorName string          `json:"contractor_name"`
 	Price          decimal.Decimal `json:"price"`
+	IsPartialPrice *bool			   `json:"is_partial_price"`
 	CategoryId     int64           `json:"category_id"`
 }
 
@@ -21,6 +22,7 @@ func (l Labor) ToDomain(projectId int64, userId int64) *domain.Labor {
 		Name:           l.Name,
 		ContractorName: l.ContractorName,
 		Price:          l.Price,
+		IsPartialPrice: boolOrDefault(l.IsPartialPrice, false),
 		ProjectId:      projectId,
 		CategoryId:     l.CategoryId,
 		Base: shareddomain.Base{
@@ -35,6 +37,8 @@ func FromDomain(d domain.Labor) *Labor {
 		Name:           d.Name,
 		ContractorName: d.ContractorName,
 		Price:          d.Price,
+		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
 
 }
+

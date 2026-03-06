@@ -43,6 +43,17 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	return model.ID, nil
 }
 
+func (r *Repository) GetLabor(ctx context.Context, laborID int64) (*domain.Labor, error) {
+	var m models.Labor
+	if err := r.db.Client().WithContext(ctx).
+		Preload("Category").
+		First(&m, laborID).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "labor", laborID)
+	}
+	return m.ToDomain(), nil
+}
+
+
 func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
 	var count int64
 	if err := r.db.Client().WithContext(ctx).
@@ -74,10 +85,22 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 	if err := sharedrepo.ValidateEntity(labor, "labor"); err != nil {
 		return err
 	}
+
+	updates := map[string]any{
+		"name":             labor.Name,
+		"contractor_name":  labor.ContractorName,
+		"price":            labor.Price,
+		"is_partial_price": labor.IsPartialPrice,
+		"project_id":       labor.ProjectId,
+		"category_id":      labor.CategoryId,
+		"updated_by":       labor.UpdatedBy,
+	}
+
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
 		Where("id = ?", labor.ID).
-		Updates(models.FromDomain(labor))
+		Updates(updates)
+
 	if result.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update labor", result.Error)
 	}
@@ -87,21 +110,23 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 	return nil
 }
 
+
 func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
 	var list []models.Labor
 	var total int64
 
-	db0 := r.db.Client().WithContext(ctx).Model(&models.Labor{})
+	base := r.db.Client().WithContext(ctx).
+		Model(&models.Labor{}).
+		Where("project_id = ?", projectID)
 
-	// Conteo total
-	if err := db0.Count(&total).Error; err != nil {
+	// Conteo total filtrado por proyecto
+	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, types.NewError(types.ErrInternal, "failed to count labors", err)
 	}
 
-	if err := db0.
+	if err := base.
 		Preload("Category").
-		Select("id, name, contractor_name, price, category_id").
-		Where("project_id = ?", projectID).
+		Select("id, name, contractor_name, price, is_partial_price, category_id").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -115,6 +140,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 			ID:             labor.ID,
 			Name:           labor.Name,
 			Price:          labor.Price,
+			IsPartialPrice: labor.IsPartialPrice,
 			ContractorName: labor.ContractorName,
 			CategoryId:     labor.LaborCategoryID,
 			CategoryName:   labor.Category.Name,

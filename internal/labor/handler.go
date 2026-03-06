@@ -29,6 +29,7 @@ type UseCasesPort interface {
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
 	ExportAllGroupLabors(context.Context, int64) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
+	GetLabor(context.Context, int64) (*domain.Labor, error)
 }
 
 type GinEnginePort interface {
@@ -200,7 +201,19 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 	req.ID = id
-	if err := h.ucs.UpdateLabor(c.Request.Context(), req.ToDomain(projectID, userID)); err != nil {
+	dom := req.ToDomain(projectID, userID)
+
+	if req.IsPartialPrice == nil {
+		currentLabor, err := h.ucs.GetLabor(c.Request.Context(), id)
+		if err != nil {
+			apiErr, status := types.NewAPIError(err)
+			c.JSON(status, apiErr.ToResponse())
+			return
+		}
+		dom.IsPartialPrice = currentLabor.IsPartialPrice
+	}
+
+	if err := h.ucs.UpdateLabor(c.Request.Context(), dom); err != nil {
 		apiErr, status := types.NewAPIError(err)
 		c.JSON(status, apiErr.ToResponse())
 		return
