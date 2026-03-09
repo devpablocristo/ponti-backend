@@ -42,8 +42,8 @@ func FromDomain(d *domain.Labor) *Labor {
 		LaborCategoryID: d.CategoryId,
 		IsPartialPrice:  d.IsPartialPrice,
 		Base: sharedmodels.Base{
-			CreatedBy: d.Base.CreatedBy,
-			UpdatedBy: d.Base.UpdatedBy,
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
 		},
 	}
 }

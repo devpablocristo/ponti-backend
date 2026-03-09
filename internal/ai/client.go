@@ -63,7 +63,7 @@ func (c *Client) Do(
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {

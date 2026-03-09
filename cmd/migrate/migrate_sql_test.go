@@ -44,7 +44,7 @@ func TestMigrationLock(t *testing.T) {
 
 	sqlDB, err := sql.Open("postgres", dsn)
 	require.NoError(t, err)
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
