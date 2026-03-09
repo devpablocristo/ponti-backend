@@ -14,6 +14,7 @@ type ListedLabor struct {
 	Name           string          `json:"name"`
 	CategoryId     int64           `json:"category_id"`
 	Price          decimal.Decimal `json:"price"`
+	IsPartialPrice bool            `json:"is_partial_price"`
 	ContractorName string          `json:"contractor_name"`
 	CategoryName   string          `json:"category_name"`
 	UpdatedAt      time.Time       `json:"updated_at"`
@@ -26,6 +27,7 @@ func (l ListedLabor) MarshalJSON() ([]byte, error) {
 		Name           string    `json:"name"`
 		CategoryId     int64     `json:"category_id"`
 		Price          string    `json:"price"`
+		IsPartialPrice bool      `json:"is_partial_price"`
 		ContractorName string    `json:"contractor_name"`
 		CategoryName   string    `json:"category_name"`
 		UpdatedAt      time.Time `json:"updated_at"`
@@ -34,6 +36,7 @@ func (l ListedLabor) MarshalJSON() ([]byte, error) {
 		Name:           l.Name,
 		CategoryId:     l.CategoryId,
 		Price:          l.Price.StringFixed(2), // Costo u$s/ha: 2 decimales
+		IsPartialPrice: l.IsPartialPrice,
 		ContractorName: l.ContractorName,
 		CategoryName:   l.CategoryName,
 		UpdatedAt:      l.UpdatedAt,
@@ -66,6 +69,7 @@ func NewListLaborsResponse(
 			Name:           l.Name,
 			CategoryId:     l.CategoryId,
 			Price:          l.Price,
+			IsPartialPrice: l.IsPartialPrice,
 			ContractorName: l.ContractorName,
 			CategoryName:   l.CategoryName,
 			UpdatedAt:      l.UpdatedAt,

@@ -19,6 +19,7 @@ type RepositoryPort interface {
 	ListGroupLabor(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
 	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
+	GetLabor(context.Context, int64) (*domain.Labor, error)
 }
 
 type ExporterAdapterPort interface {
@@ -56,6 +57,10 @@ func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64,
 		return 0, err
 	}
 	return u.repo.CreateLabor(ctx, labor)
+}
+
+func (u *UseCases) GetLabor(ctx context.Context, laborID int64) (*domain.Labor, error) {
+	return u.repo.GetLabor(ctx, laborID)
 }
 
 func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {

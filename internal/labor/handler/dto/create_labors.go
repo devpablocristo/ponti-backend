@@ -11,6 +11,7 @@ type CreateLaborRequest struct {
 	Name           string          `json:"name"`
 	ContractorName string          `json:"contractor_name"`
 	Price          decimal.Decimal `json:"price"`
+	IsPartialPrice *bool           `json:"is_partial_price"`
 	CategoryId     int64           `json:"category_id"`
 	CreatedBy      int64           `json:"created_by"`
 }
@@ -36,6 +37,7 @@ func (l CreateLaborRequest) ToDomain(projectId int64, userId int64) *domain.Labo
 		Name:           l.Name,
 		ContractorName: l.ContractorName,
 		Price:          l.Price,
+		IsPartialPrice: boolOrDefault(l.IsPartialPrice, false),
 		ProjectId:      projectId,
 		CategoryId:     l.CategoryId,
 		Base: shareddomain.Base{
@@ -50,5 +52,6 @@ func CreateLaborRequestFromDomain(d domain.Labor) *CreateLaborRequest {
 		Name:           d.Name,
 		ContractorName: d.ContractorName,
 		Price:          d.Price,
+		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
 }

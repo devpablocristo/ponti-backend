@@ -10,6 +10,7 @@ type Labor struct {
 	Name           string
 	ContractorName string
 	Price          decimal.Decimal
+	IsPartialPrice bool
 	ProjectId      int64
 	CategoryId     int64
 	shareddomain.Base
@@ -20,6 +21,7 @@ type ListedLabor struct {
 	Name           string
 	ContractorName string
 	Price          decimal.Decimal
+	IsPartialPrice bool
 	ProjectId      int64
 	CategoryId     int64
 	CategoryName   string

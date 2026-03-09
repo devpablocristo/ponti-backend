@@ -10,7 +10,6 @@ import (
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
 	supplymod "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	supplymovmod "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
 	supplymovementdomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
@@ -24,7 +23,7 @@ type Stock struct {
 	InvestorID      int64                         `gorm:"not null;index;column:investor_id"`
 	Investor        investormod.Investor          `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	CloseDate       *time.Time                    `gorm:"null;column:close_date"`
-	SupplyMovements []supplymovmod.SupplyMovement `gorm:"foreignKey:StockId;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	SupplyMovements []supplymod.SupplyMovement `gorm:"foreignKey:StockId;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	InitialStock    decimal.Decimal               `gorm:"not null;column:initial_units"`
 	YearPeriod      int64                         `gorm:"not null;column:year_period"`
 	MonthPeriod     int64                         `gorm:"not null;column:month_period"`
@@ -77,7 +76,7 @@ func FromDomain(d *domain.Stock) *Stock {
 		MonthPeriod:     d.MonthPeriod,
 		InitialStock:    d.InitialStock,
 		CloseDate:       d.CloseDate,
-		SupplyMovements: []supplymovmod.SupplyMovement{},
+		SupplyMovements: []supplymod.SupplyMovement{},
 		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,
 			UpdatedAt: d.UpdatedAt,

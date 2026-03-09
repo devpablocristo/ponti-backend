@@ -90,7 +90,7 @@ func (r *Service) ExportToWriter(data any, w io.Writer) error {
 		return fmt.Errorf("export: data is nil")
 	}
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if err := exportToFile(f, r.config, data); err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (r *Service) createWorkbookIfNotExists(config ConfigPort) error {
 			}
 		}
 		f := excelize.NewFile()
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		// Si la hoja pedida no es "Sheet1", renombramos la default para evitar hojas sobrantes
 		if config.GetSheet() != "Sheet1" {
 			if err := f.SetSheetName("Sheet1", config.GetSheet()); err != nil {

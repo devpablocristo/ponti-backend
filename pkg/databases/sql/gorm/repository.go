@@ -200,7 +200,7 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		if err != nil {
 			return fmt.Errorf("failed to get sql.DB: %w", err)
 		}
-		defer sqlDB.Close()
+		defer func() { _ = sqlDB.Close() }()
 
 		var exists bool
 		checkQuery := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = '%s')", config.GetDBName())
@@ -230,7 +230,7 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		if err != nil {
 			return fmt.Errorf("failed to get sql.DB: %w", err)
 		}
-		defer sqlDB.Close()
+		defer func() { _ = sqlDB.Close() }()
 
 		createDBSQL := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", config.GetDBName())
 		if err := db.Exec(createDBSQL).Error; err != nil {

@@ -13,7 +13,7 @@ type StockUpdateRealUnits struct {
 func StockUpdateRealUnitsFromDomain(d *domain.Stock) *StockUpdateRealUnits {
 	return &StockUpdateRealUnits{
 		RealStockUnits: d.RealStockUnits,
-		UpdatedBy:      *d.Base.UpdatedBy,
+		UpdatedBy:      *d.UpdatedBy,
 	}
 }
 

@@ -12,6 +12,7 @@ type Labor struct {
 	Name            string          `gorm:"type:varchar(255);not null;column:name"`
 	ContractorName  string          `gorm:"type:varchar(255);not null;column:contractor_name"`
 	Price           decimal.Decimal `gorm:"not null;column:price"`
+	IsPartialPrice  bool            `gorm:"not null;default:false;column:is_partial_price"`
 	ProjectId       int64           `gorm:"not null;column:project_id"`
 	LaborCategoryID int64           `gorm:"not null;column:category_id"`
 	Category        catmod.Category `gorm:"foreignKey:LaborCategoryID;references:ID" json:"category"`
@@ -27,6 +28,7 @@ func (l Labor) ToDomain() *domain.Labor {
 		Price:          l.Price,
 		ProjectId:      l.ProjectId,
 		CategoryId:     l.LaborCategoryID,
+		IsPartialPrice: l.IsPartialPrice,
 	}
 }
 
@@ -38,9 +40,10 @@ func FromDomain(d *domain.Labor) *Labor {
 		Price:           d.Price,
 		ProjectId:       d.ProjectId,
 		LaborCategoryID: d.CategoryId,
+		IsPartialPrice:  d.IsPartialPrice,
 		Base: sharedmodels.Base{
-			CreatedBy: d.Base.CreatedBy,
-			UpdatedBy: d.Base.UpdatedBy,
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
 		},
 	}
 }

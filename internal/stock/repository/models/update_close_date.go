@@ -14,7 +14,7 @@ type StockUpdate struct {
 func StockUpdateCloseDateFromDomain(d *domain.Stock) *StockUpdate {
 	return &StockUpdate{
 		CloseDate: *d.CloseDate,
-		UpdatedBy: *d.Base.UpdatedBy,
+		UpdatedBy: *d.UpdatedBy,
 	}
 }
 

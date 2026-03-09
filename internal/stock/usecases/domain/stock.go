@@ -8,7 +8,6 @@ import (
 	projdom "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	supplydomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	supplymovementdomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -18,7 +17,7 @@ type Stock struct {
 	Supply           *supplydomain.Supply
 	Investor         *domain.Investor
 	CloseDate        *time.Time
-	SupplyMovements  []supplymovementdomain.SupplyMovement
+	SupplyMovements  []supplydomain.SupplyMovement
 	RealStockUnits   decimal.Decimal
 	Consumed         decimal.Decimal
 	UnitsTransferred decimal.Decimal

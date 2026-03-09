@@ -73,8 +73,8 @@ func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, userId 
 		sm.Provider.Name = *usmer.Provider.Name
 	}
 
-	sm.Base.UpdatedBy = userId
-	sm.Base.UpdatedAt = time.Now()
+	sm.UpdatedBy = userId
+	sm.UpdatedAt = time.Now()
 
 	return sm
 }

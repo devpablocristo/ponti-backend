@@ -86,9 +86,10 @@ func NewGetEntrySupplyMovementsResponse(entriesDomain []*domain.SupplyMovement) 
 		// Usar unit_id directamente en lugar de buscar strings en el nombre
 		// unit_id = 1 → Lt (litros)
 		// unit_id = 2 → Kg (kilos)
-		if supplyMovement.Supply.UnitID == 2 {
+		switch supplyMovement.Supply.UnitID {
+		case 2:
 			totalKg = totalKg.Add(supplyMovement.Quantity)
-		} else if supplyMovement.Supply.UnitID == 1 {
+		case 1:
 			totalLt = totalLt.Add(supplyMovement.Quantity)
 		}
 		totalUSD = totalUSD.Add(entrySupplyMovementsResponses[i].TotalUSD)
