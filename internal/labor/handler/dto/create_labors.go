@@ -55,5 +55,3 @@ func CreateLaborRequestFromDomain(d domain.Labor) *CreateLaborRequest {
 		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
 }
-
-

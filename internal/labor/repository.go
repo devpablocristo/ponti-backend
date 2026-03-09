@@ -9,6 +9,7 @@ import (
 
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
 	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
 	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
 	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
@@ -52,7 +53,6 @@ func (r *Repository) GetLabor(ctx context.Context, laborID int64) (*domain.Labor
 	}
 	return m.ToDomain(), nil
 }
-
 
 func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
 	var count int64
@@ -110,7 +110,6 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 	return nil
 }
 
-
 func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
 	var list []models.Labor
 	var total int64
@@ -126,7 +125,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 
 	if err := base.
 		Preload("Category").
-		Select("id, name, contractor_name, price, is_partial_price, category_id").
+		Select("id, name, contractor_name, price, is_partial_price, category_id, updated_at").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -144,6 +143,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 			ContractorName: labor.ContractorName,
 			CategoryId:     labor.LaborCategoryID,
 			CategoryName:   labor.Category.Name,
+			Base:           shareddomain.Base{UpdatedAt: labor.UpdatedAt},
 		}
 	}
 

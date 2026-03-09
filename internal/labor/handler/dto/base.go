@@ -12,7 +12,7 @@ type Labor struct {
 	Name           string          `json:"name"`
 	ContractorName string          `json:"contractor_name"`
 	Price          decimal.Decimal `json:"price"`
-	IsPartialPrice *bool			   `json:"is_partial_price"`
+	IsPartialPrice *bool           `json:"is_partial_price"`
 	CategoryId     int64           `json:"category_id"`
 }
 
@@ -39,6 +39,5 @@ func FromDomain(d domain.Labor) *Labor {
 		Price:          d.Price,
 		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
-
 }
 
