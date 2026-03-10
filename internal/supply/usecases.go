@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	GetSupplyByProjectAndName(context.Context, int64, string) (*domain.Supply, error)
 	GetInvestor(context.Context, int64) (*investordomain.Investor, error)
 	GetProvider(context.Context, int64) (*providerdomain.Provider, error)
+	ProjectExists(context.Context, int64) (bool, error)
 	ExistsSupplyMovementByProjectReferenceAndSupply(context.Context, int64, string, int64) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
@@ -55,11 +56,13 @@ type UseCases struct {
 }
 
 type SupplyMovementImportFailure struct {
-	Index    int
-	RowIndex int
-	SupplyID int64
-	Code     string
-	Message  string
+	Index           int
+	RowIndex        int
+	SupplyID        int64
+	SupplyName      string
+	ReferenceNumber string
+	Code            string
+	Message         string
 }
 
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {

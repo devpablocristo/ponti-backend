@@ -152,6 +152,17 @@ func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain
 	return model.ToDomain(), nil
 }
 
+func (r *Repository) ProjectExists(ctx context.Context, projectID int64) (bool, error) {
+	var count int64
+	if err := r.getDB(ctx).
+		Table("projects").
+		Where("id = ? AND deleted_at IS NULL", projectID).
+		Count(&count).Error; err != nil {
+		return false, types.NewError(types.ErrInternal, "failed to check destination project", err)
+	}
+	return count > 0, nil
+}
+
 func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
 	ctx context.Context,
 	projectID int64,

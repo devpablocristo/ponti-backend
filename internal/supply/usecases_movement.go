@@ -302,6 +302,24 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 	if movement.Supply == nil || movement.Supply.ID == 0 {
 		return nil, nil, types.NewError(types.ErrValidation, "invalid supply_id", nil)
 	}
+	if movement.ProjectDestinationId <= 0 {
+		return nil, nil, types.NewError(types.ErrValidation, "invalid project_destination_id", nil)
+	}
+	if movement.ProjectDestinationId == movement.ProjectId {
+		return nil, nil, types.NewError(types.ErrValidation, "project_destination_id must be different from project_id", nil)
+	}
+
+	projectExists, err := u.repo.ProjectExists(ctx, movement.ProjectDestinationId)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !projectExists {
+		return nil, nil, types.NewError(
+			types.ErrValidation,
+			fmt.Sprintf("El proyecto destino %d no existe", movement.ProjectDestinationId),
+			nil,
+		)
+	}
 
 	originSupply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 	if err != nil {
