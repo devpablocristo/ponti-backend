@@ -24,7 +24,7 @@ func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	return runMigrationsWithInstance(sqlDB, dbConfig, migConfig)
 }

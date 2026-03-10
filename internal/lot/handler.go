@@ -183,7 +183,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 
 	// Obtener user ID del contexto para campos de auditoría
 	if userID, err := sharedmodels.ConvertStringToID(c.Request.Context()); err == nil {
-		dom.Base.UpdatedBy = &userID
+		dom.UpdatedBy = &userID
 	}
 
 	// Si el cliente no envía field_id, usamos el existente para evitar inconsistencias

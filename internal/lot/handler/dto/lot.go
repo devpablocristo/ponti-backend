@@ -98,9 +98,9 @@ func FromDomain(l *domain.Lot) *Lot {
 		Season:           l.Season,
 		Variety:          l.Variety,
 		Status:           l.Status,
-		CreatedAt:        l.Base.CreatedAt,
-		UpdatedAt:        l.Base.UpdatedAt,
-		CreatedBy:        l.Base.CreatedBy,
-		UpdatedBy:        l.Base.UpdatedBy,
+		CreatedAt:        l.CreatedAt,
+		UpdatedAt:        l.UpdatedAt,
+		CreatedBy:        l.CreatedBy,
+		UpdatedBy:        l.UpdatedBy,
 	}
 }

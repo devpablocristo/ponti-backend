@@ -385,7 +385,7 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error querying supply categories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	categories := make(map[string]string)
 	for rows.Next() {
@@ -444,7 +444,7 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error querying labor categories: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	categories := make(map[string]string)
 	for rows.Next() {

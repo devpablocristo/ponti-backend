@@ -76,7 +76,7 @@ func (t *InsightTrigger) NotifyDataChange(projectID, userID string) {
 			log.Printf("[ai-trigger] error computando insights para proyecto %s: %v", projectID, err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
 
 		if resp.StatusCode >= 300 {

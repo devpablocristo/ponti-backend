@@ -1,8 +1,8 @@
 module github.com/alphacodinggroup/ponti-backend
 
-go 1.24.0
+go 1.26.0
 
-toolchain go1.24.13
+toolchain go1.26.1
 
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2

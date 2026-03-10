@@ -85,7 +85,7 @@ func (d *LotUpdate) ToDomain() (*domain.Lot, error) {
 
 	// Preservar UpdatedBy si se proporciona en el DTO
 	if d.UpdatedBy != nil {
-		lot.Base.UpdatedBy = d.UpdatedBy
+		lot.UpdatedBy = d.UpdatedBy
 	}
 
 	return lot, nil
