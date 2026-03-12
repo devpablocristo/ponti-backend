@@ -2,18 +2,15 @@ package field
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
-	gorm "gorm.io/gorm"
+	"gorm.io/gorm"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	models "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type GormEnginePort interface {
@@ -28,7 +25,6 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-// --- CREATE ---
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -37,7 +33,6 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 			return types.NewError(types.ErrInternal, "failed to create field", err)
 		}
 		fieldID = model.ID
-		// Crear lots si vienen anidados
 		for _, lot := range f.Lots {
 			lotModel := lotmod.Lot{
 				Name:           lot.Name,
@@ -59,35 +54,44 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	return fieldID, nil
 }
 
-// --- LIST ---
-func (r *Repository) ListFields(ctx context.Context) ([]domain.Field, error) {
+func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error) {
+	var total int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.Field{}).Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count fields", err)
+	}
+
 	var list []models.Field
-	if err := r.db.Client().WithContext(ctx).
-		Find(&list).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list fields", err)
+	offset := (page - 1) * perPage
+	err := r.db.Client().WithContext(ctx).
+		Offset(offset).
+		Limit(perPage).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list fields", err)
 	}
-	result := make([]domain.Field, len(list))
+
+	result := make([]domain.Field, 0, len(list))
 	for i := range list {
-		result[i] = *list[i].ToDomain()
+		result = append(result, *list[i].ToDomain())
 	}
-	return result, nil
+	return result, total, nil
 }
 
-// --- GET ---
 func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, error) {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return nil, err
+	}
 	var model models.Field
-	err := r.db.Client().WithContext(ctx).
-		First(&model, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("field with id %d not found", id), err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get field", err)
+	if err := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Where("id = ?", id).
+		First(&model).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "field", id)
 	}
 	return model.ToDomain(), nil
 }
 
-// --- UPDATE ---
 func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if err := sharedrepo.ValidateEntity(f, "field"); err != nil {
 		return err
@@ -95,56 +99,70 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if err := sharedrepo.ValidateID(f.ID, "field"); err != nil {
 		return err
 	}
-	model := models.FromDomain(f)
-	model.ID = f.ID
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.Field{}).Where("id = ?", f.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check field existence", err)
-		}
-		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
-		}
-		updateTx := tx.Model(&models.Field{}).
-			Where("id = ?", f.ID)
-		if !f.UpdatedAt.IsZero() {
-			updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
-		}
-		result := updateTx.Updates(map[string]any{
-			"name":          f.Name,
-			"lease_type_id": f.LeaseType.ID,
-		})
-		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update field", result.Error)
-		}
-		if result.RowsAffected == 0 {
-			if !f.UpdatedAt.IsZero() {
-				return types.NewError(types.ErrConflict, "field not found or outdated", nil)
-			}
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
-		}
-		return nil
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("id = ?", f.ID)
+	if !f.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
+	}
+	result := updateTx.Updates(map[string]any{
+		"name":          f.Name,
+		"lease_type_id": f.LeaseType.ID,
 	})
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to update field", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		if !f.UpdatedAt.IsZero() {
+			return types.NewError(types.ErrConflict, "field not found or outdated", nil)
+		}
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
+	}
+	return nil
 }
 
-// --- DELETE ---
+// DeleteField ejecuta un hard delete (permanente).
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
+	result := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Delete(&models.Field{}, "id = ?", id)
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to delete field", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", id), nil)
+	}
+	return nil
+}
 
-	deletedBy, err := sharedmodels.ConvertStringToID(ctx)
-	if err != nil {
+// ArchiveField ejecuta un soft delete (idempotente).
+func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
+	result := r.db.Client().WithContext(ctx).
+		Delete(&models.Field{}, "id = ?", id)
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to archive field", result.Error)
+	}
+	return nil
+}
 
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.Field{}).Where("id = ?", id).Updates(map[string]any{
-			"deleted_at": time.Now(),
-			"deleted_by": deletedBy,
-		}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete field", err)
-		}
-		return nil
-	})
+// RestoreField restaura un registro previamente archivado.
+func (r *Repository) RestoreField(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
+	}
+	result := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Field{}).
+		Where("id = ?", id).
+		Update("deleted_at", nil)
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to restore field", result.Error)
+	}
+	return nil
 }

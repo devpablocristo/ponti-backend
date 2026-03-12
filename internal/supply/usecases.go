@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	GetSupplyByProjectAndName(context.Context, int64, string) (*domain.Supply, error)
 	GetInvestor(context.Context, int64) (*investordomain.Investor, error)
 	GetProvider(context.Context, int64) (*providerdomain.Provider, error)
+	ProjectExists(context.Context, int64) (bool, error)
 	ExistsSupplyMovementByProjectReferenceAndSupply(context.Context, int64, string, int64) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
@@ -34,6 +35,8 @@ type RepositoryPort interface {
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
+	ArchiveSupply(context.Context, int64) error
+	RestoreSupply(context.Context, int64) error
 }
 
 type ExporterAdapterPort interface {
@@ -55,11 +58,13 @@ type UseCases struct {
 }
 
 type SupplyMovementImportFailure struct {
-	Index    int
-	RowIndex int
-	SupplyID int64
-	Code     string
-	Message  string
+	Index           int
+	RowIndex        int
+	SupplyID        int64
+	SupplyName      string
+	ReferenceNumber string
+	Code            string
+	Message         string
 }
 
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
@@ -147,6 +152,14 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 
 func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
 	return u.repo.DeleteSupply(ctx, id)
+}
+
+func (u *UseCases) ArchiveSupply(ctx context.Context, id int64) error {
+	return u.repo.ArchiveSupply(ctx, id)
+}
+
+func (u *UseCases) RestoreSupply(ctx context.Context, id int64) error {
+	return u.repo.RestoreSupply(ctx, id)
 }
 
 func (u *UseCases) CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {

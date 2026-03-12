@@ -98,29 +98,29 @@ func (h *Handler) CreateLot(c *gin.Context) {
 
 	lotDomain, err := req.ToDomain()
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "invalid domain conversion", err))
+		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid domain conversion", err))
 		return
 	}
 
 	newID, err := h.ucs.CreateLot(c.Request.Context(), lotDomain)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.CreateLotResponse{Message: "Lot created successfully", ID: newID})
+	sharedhandlers.RespondCreated(c, newID)
 }
 
 func (h *Handler) ListLots(c *gin.Context) {
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
 			return
 		}
 		cropID = &parsed
@@ -141,33 +141,33 @@ func (h *Handler) ListLots(c *gin.Context) {
 	}
 	rows, total, sumSowed, sumCost, err := h.ucs.ListLots(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	pageInfo := types.NewPageInfo(page, pageSize, int64(total))
 	resp := dto.FromDomainList(pageInfo, rows, sumSowed, sumCost)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	lot, err := h.ucs.GetLot(c.Request.Context(), id)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(lot))
+	sharedhandlers.RespondOK(c, dto.FromDomain(lot))
 }
 
 func (h *Handler) UpdateLot(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -176,7 +176,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 
 	dom, err := req.ToDomain()
 	if err != nil {
-		types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrValidation, "invalid domain conversion", err))
+		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid domain conversion", err))
 		return
 	}
 	dom.ID = id
@@ -191,24 +191,21 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		if cur, getErr := h.ucs.GetLot(c.Request.Context(), id); getErr == nil {
 			dom.FieldID = cur.FieldID
 		} else {
-			types.NewErrorResponseHelper().InvalidPayload(
-				c,
-				types.NewError(types.ErrInvalidID, "field_id is required", nil),
-			)
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "field_id is required", nil))
 			return
 		}
 	}
 	if err := h.ucs.UpdateLot(c.Request.Context(), dom); err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -216,23 +213,23 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 	tons := c.MustGet("validated_tons").(decimal.Decimal)
 
 	if err := h.ucs.UpdateLotTons(c.Request.Context(), id, tons); err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
@@ -240,7 +237,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("project_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid project_id", err))
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid project_id", err))
 			return
 		}
 		projectID = parsed
@@ -249,7 +246,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("field_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid field_id", err))
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid field_id", err))
 			return
 		}
 		fieldID = parsed
@@ -258,7 +255,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
 			return
 		}
 		cropID = parsed
@@ -269,23 +266,23 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 
 	m, err := h.ucs.GetMetrics(c.Request.Context(), projectID, fieldID, cropID)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+	sharedhandlers.RespondOK(c, dto.FromDomainMetrics(m))
 }
 
 func (h *Handler) ExportLots(c *gin.Context) {
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			types.NewErrorResponseHelper().InvalidPayload(c, types.NewError(types.ErrInvalidID, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
 			return
 		}
 		cropID = &parsed
@@ -306,7 +303,7 @@ func (h *Handler) ExportLots(c *gin.Context) {
 	}
 	data, err := h.ucs.ExportLots(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

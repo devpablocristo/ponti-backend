@@ -1,0 +1,52 @@
+# Patrón canónico CRUD
+
+## Contrato HTTP
+
+| Operación | Método | Path | Status | Response |
+|-----------|--------|------|--------|----------|
+| Create | POST /{entities} | 201 | `{"id": N}` via `sharedhandlers.RespondCreated` |
+| Get | GET /{entities}/{id} | 200 | DTO tipado via `sharedhandlers.RespondOK` |
+| List | GET /{entities} | 200 | `{"data": [...], "page_info": {...}}` via `sharedhandlers.RespondOK` |
+| Update | PUT /{entities}/{id} | 204 | sin body via `sharedhandlers.RespondNoContent` |
+| Delete | DELETE /{entities}/{id} | 204 | sin body via `sharedhandlers.RespondNoContent` |
+| Archive | POST /{entities}/{id}/archive | 204 | sin body via `sharedhandlers.RespondNoContent` |
+| Restore | POST /{entities}/{id}/restore | 204 | sin body via `sharedhandlers.RespondNoContent` |
+
+## Helpers obligatorios
+
+- Error handling: SIEMPRE `sharedhandlers.RespondError(c, err)`
+- Bind JSON: SIEMPRE `sharedhandlers.BindJSON(c, &req)`
+- Parse ID: SIEMPRE `sharedhandlers.ParseParamID(c.Param("entity_id"), "entity_id")`
+- Paginación: SIEMPRE `sharedhandlers.ParsePaginationParams(c, defaultPage, defaultPerPage)`
+
+## Prohibiciones
+
+- NUNCA usar `gin.H{}` como response
+- NUNCA usar `types.MessageResponse`
+- NUNCA usar `c.Error(apiErr).SetMeta(...)`
+- NUNCA usar `types.NewErrorResponseHelper()`
+- NUNCA usar `c.ShouldBindJSON` directo (usar `sharedhandlers.BindJSON`)
+- NUNCA exponer domain structs directo por HTTP
+- NUNCA crear DTOs `Create*Response` individuales (usar `sharedhandlers.CreateResponse`)
+
+## Handler struct
+
+- Use cases field: siempre `ucs`
+- Config field: siempre `acf`
+- List envelope key: siempre `data` (no `items`)
+- List siempre paginado con `page_info`
+
+## DTOs
+
+- Request: `Create<Entity>Request`, `Update<Entity>Request` con `ToDomain()`
+- Response: `<Entity>Response` con función `<Entity>FromDomain()`
+- List response: `List<Entity>Response` con `Data []<Entity>Response` + `PageInfo types.PageInfo`
+- Archivos: `requests.go` y `responses.go` bajo `handler/dto/`
+
+## Archive/Restore
+
+- Archive = soft delete (`deleted_at`), Restore = clear `deleted_at`
+- Delete = SIEMPRE hard delete (físico)
+- Archive y Restore son idempotentes (204 aunque ya esté en ese estado)
+- GET /{id} devuelve archivados (con `archived_at` en DTO)
+- LIST excluye archivados por default; `?status=archived` o `?status=all` para incluir

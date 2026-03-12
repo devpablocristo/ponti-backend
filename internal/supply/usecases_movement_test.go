@@ -463,14 +463,21 @@ func TestHandleMovementInternalMovementOut_IncludesSupplyNameInError(t *testing.
 	mockRepo := mocks.NewMockRepositoryPort(ctrl)
 	u := &UseCases{repo: mockRepo}
 
+	projectID := int64(20)
+	destinationProjectID := int64(25)
 	supplyID := int64(123)
+	mockRepo.EXPECT().
+		ProjectExists(gomock.Any(), destinationProjectID).
+		Return(true, nil)
 	mockRepo.EXPECT().
 		GetSupply(gomock.Any(), supplyID).
 		Return(&domain.Supply{ID: supplyID, Name: "Urea"}, nil)
 
 	movement := &domain.SupplyMovement{
-		Quantity: decimal.NewFromInt(5),
-		Supply:   &domain.Supply{ID: supplyID},
+		ProjectId:            projectID,
+		ProjectDestinationId: destinationProjectID,
+		Quantity:             decimal.NewFromInt(5),
+		Supply:               &domain.Supply{ID: supplyID},
 	}
 	stockOrigin := stockdomain.Stock{RealStockUnits: decimal.Zero}
 
@@ -509,6 +516,10 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 
 	var outMovementCreated *domain.SupplyMovement
 	var inMovementCreated *domain.SupplyMovement
+
+	mockRepo.EXPECT().
+		ProjectExists(gomock.Any(), destinationProjectID).
+		Return(true, nil)
 
 	mockRepo.EXPECT().
 		GetSupply(gomock.Any(), originSupplyID).
@@ -590,6 +601,9 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 	var inMovementCreated *domain.SupplyMovement
 
 	gomock.InOrder(
+		mockRepo.EXPECT().
+			ProjectExists(gomock.Any(), destProjectID).
+			Return(true, nil),
 		mockRepo.EXPECT().
 			GetSupply(gomock.Any(), originSupplyID).
 			Return(originSupply, nil),
@@ -985,6 +999,132 @@ func TestImportSupplyMovements_CreatesProviderByName(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, failures)
 	assert.Equal(t, []int64{101}, ids)
+}
+
+func TestImportSupplyMovements_InternalMovementFailsWhenDestinationEqualsOrigin(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(18)
+	supplyID := int64(157)
+	investorID := int64(11)
+	providerID := int64(5)
+	date := mustTime(t, "2026-03-04T00:00:00Z")
+
+	mockRepo.EXPECT().
+		ExecuteInTransaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockRepo.EXPECT().
+		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "INT-001", supplyID).
+		Return(false, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(&stockdomain.Stock{
+			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
+			Consumed:        decimal.Zero,
+		}, false, nil)
+
+	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{{
+		ProjectId:            projectID,
+		ProjectDestinationId: projectID,
+		Quantity:             decimal.NewFromInt(2),
+		MovementType:         domain.INTERNAL_MOVEMENT,
+		MovementDate:         &date,
+		ReferenceNumber:      "INT-001",
+		Supply:               &domain.Supply{ID: supplyID},
+		Investor:             &investordomain.Investor{ID: investorID},
+		Provider:             &providerdomain.Provider{ID: providerID},
+	}})
+
+	assert.NoError(t, err)
+	assert.Nil(t, ids)
+	if assert.Len(t, failures, 1) {
+		assert.Equal(t, 2, failures[0].RowIndex)
+		assert.Equal(t, "validation_error", failures[0].Code)
+		assert.Equal(t, "project_destination_id must be different from project_id", failures[0].Message)
+		assert.Equal(t, "INT-001", failures[0].ReferenceNumber)
+		assert.Equal(t, "Urea", failures[0].SupplyName)
+	}
+}
+
+func TestImportSupplyMovements_InternalMovementFailsWhenDestinationProjectDoesNotExist(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(18)
+	destinationProjectID := int64(99)
+	supplyID := int64(157)
+	investorID := int64(11)
+	providerID := int64(5)
+	date := mustTime(t, "2026-03-04T00:00:00Z")
+
+	mockRepo.EXPECT().
+		ExecuteInTransaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockRepo.EXPECT().
+		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "INT-002", supplyID).
+		Return(false, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(&stockdomain.Stock{
+			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
+			Consumed:        decimal.Zero,
+		}, false, nil)
+	mockRepo.EXPECT().
+		ProjectExists(gomock.Any(), destinationProjectID).
+		Return(false, nil)
+
+	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{{
+		ProjectId:            projectID,
+		ProjectDestinationId: destinationProjectID,
+		Quantity:             decimal.NewFromInt(2),
+		MovementType:         domain.INTERNAL_MOVEMENT,
+		MovementDate:         &date,
+		ReferenceNumber:      "INT-002",
+		Supply:               &domain.Supply{ID: supplyID},
+		Investor:             &investordomain.Investor{ID: investorID},
+		Provider:             &providerdomain.Provider{ID: providerID},
+	}})
+
+	assert.NoError(t, err)
+	assert.Nil(t, ids)
+	if assert.Len(t, failures, 1) {
+		assert.Equal(t, 2, failures[0].RowIndex)
+		assert.Equal(t, "validation_error", failures[0].Code)
+		assert.Equal(t, "El proyecto destino 99 no existe", failures[0].Message)
+		assert.Equal(t, "INT-002", failures[0].ReferenceNumber)
+		assert.Equal(t, "Urea", failures[0].SupplyName)
+	}
 }
 
 func TestValidateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {

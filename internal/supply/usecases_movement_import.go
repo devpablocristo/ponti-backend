@@ -41,11 +41,13 @@ func (u *UseCases) ImportSupplyMovements(
 			id, err := u.createSupplyMovementInternal(txCtx, validated[i])
 			if err != nil {
 				failures = []SupplyMovementImportFailure{{
-					Index:    i,
-					RowIndex: importRowIndex(i),
-					SupplyID: validated[i].Supply.ID,
-					Code:     "apply_error",
-					Message:  err.Error(),
+					Index:           i,
+					RowIndex:        importRowIndex(i),
+					SupplyID:        validated[i].Supply.ID,
+					SupplyName:      validated[i].Supply.Name,
+					ReferenceNumber: validated[i].ReferenceNumber,
+					Code:            "apply_error",
+					Message:         types.ErrorMessage(err),
 				}}
 				return errImportValidation
 			}
@@ -93,22 +95,24 @@ func (u *UseCases) validateSupplyMovementImport(
 		}
 		if movement.Investor == nil || movement.Investor.ID <= 0 {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  "invalid investor_id",
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         "invalid investor_id",
 			})
 			continue
 		}
 
 		if movement.Quantity.LessThanOrEqual(decimal.Zero) {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  "quantity must be greater than 0",
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         "quantity must be greater than 0",
 			})
 			continue
 		}
@@ -116,11 +120,12 @@ func (u *UseCases) validateSupplyMovementImport(
 		reference := strings.TrimSpace(movement.ReferenceNumber)
 		if reference == "" {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  "reference_number is required",
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         "reference_number is required",
 			})
 			continue
 		}
@@ -128,11 +133,12 @@ func (u *UseCases) validateSupplyMovementImport(
 
 		if err := validateImportMovementType(movement.MovementType); err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  err.Error(),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         types.ErrorMessage(err),
 			})
 			continue
 		}
@@ -140,21 +146,23 @@ func (u *UseCases) validateSupplyMovementImport(
 		supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 		if err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  fmt.Sprintf("El insumo %d no existe", movement.Supply.ID),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         fmt.Sprintf("El insumo %d no existe", movement.Supply.ID),
 			})
 			continue
 		}
 		if supply.ProjectID != movement.ProjectId {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  fmt.Sprintf("El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         fmt.Sprintf("El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId),
 			})
 			continue
 		}
@@ -163,11 +171,13 @@ func (u *UseCases) validateSupplyMovementImport(
 		investor, err := u.repo.GetInvestor(ctx, movement.Investor.ID)
 		if err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  fmt.Sprintf("El inversor %d no existe", movement.Investor.ID),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				SupplyName:      movement.Supply.Name,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         fmt.Sprintf("El inversor %d no existe", movement.Investor.ID),
 			})
 			continue
 		}
@@ -176,11 +186,13 @@ func (u *UseCases) validateSupplyMovementImport(
 		provider, err := u.resolveImportProvider(ctx, movement.Provider)
 		if err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  err.Error(),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				SupplyName:      movement.Supply.Name,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         types.ErrorMessage(err),
 			})
 			continue
 		}
@@ -188,11 +200,13 @@ func (u *UseCases) validateSupplyMovementImport(
 
 		if movement.MovementDate == nil {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "validation_error",
-				Message:  "movement_date is required",
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				SupplyName:      movement.Supply.Name,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         "movement_date is required",
 			})
 			continue
 		}
@@ -200,11 +214,13 @@ func (u *UseCases) validateSupplyMovementImport(
 		requestDuplicateKey := fmt.Sprintf("%d|%s|%d", movement.ProjectId, reference, movement.Supply.ID)
 		if _, exists := requestDuplicates[requestDuplicateKey]; exists {
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     "duplicate_request",
-				Message:  fmt.Sprintf("El remito %s ya contiene el insumo %d dentro del request", reference, movement.Supply.ID),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				SupplyName:      movement.Supply.Name,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "duplicate_request",
+				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %d dentro del request", reference, movement.Supply.ID),
 			})
 			continue
 		}
@@ -216,11 +232,13 @@ func (u *UseCases) validateSupplyMovementImport(
 				code = "duplicate_db"
 			}
 			failures = append(failures, SupplyMovementImportFailure{
-				Index:    i,
-				RowIndex: importRowIndex(i),
-				SupplyID: movement.Supply.ID,
-				Code:     code,
-				Message:  types.ErrorMessage(err),
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				SupplyName:      movement.Supply.Name,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            code,
+				Message:         types.ErrorMessage(err),
 			})
 			continue
 		}
@@ -294,4 +312,3 @@ func validateImportMovementType(movementType string) error {
 func importRowIndex(index int) int {
 	return index + 2
 }
-

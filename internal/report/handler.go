@@ -193,6 +193,5 @@ func (h *ReportHandler) reportError(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
-	apiErr, _ := types.NewAPIError(err)
-	_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	sharedhandlers.RespondError(c, err)
 }

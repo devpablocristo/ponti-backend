@@ -14,9 +14,8 @@ type Manager struct {
 	sharedmodels.Base
 }
 
-// Model → Domain
 func (m Manager) ToDomain() *domain.Manager {
-	return &domain.Manager{
+	d := &domain.Manager{
 		ID:   m.ID,
 		Name: m.Name,
 		Base: shareddomain.Base{
@@ -26,9 +25,13 @@ func (m Manager) ToDomain() *domain.Manager {
 			UpdatedBy: m.UpdatedBy,
 		},
 	}
+	if m.DeletedAt.Valid {
+		t := m.DeletedAt.Time
+		d.ArchivedAt = &t
+	}
+	return d
 }
 
-// Domain → Model
 func FromDomain(d *domain.Manager) *Manager {
 	m := &Manager{
 		Name: d.Name,

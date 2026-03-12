@@ -8,7 +8,7 @@ import (
 
 type RepositoryPort interface {
 	CreateCrop(context.Context, *domain.Crop) (int64, error)
-	ListCrops(context.Context) ([]domain.Crop, error)
+	ListCrops(context.Context, int, int) ([]domain.Crop, int64, error)
 	GetCrop(context.Context, int64) (*domain.Crop, error)
 	UpdateCrop(context.Context, *domain.Crop) error
 	DeleteCrop(context.Context, int64) error
@@ -18,7 +18,6 @@ type UseCases struct {
 	repo RepositoryPort
 }
 
-// NewUseCases creates a new instance of Crop use cases.
 func NewUseCases(repo RepositoryPort) *UseCases {
 	return &UseCases{repo: repo}
 }
@@ -27,8 +26,8 @@ func (u *UseCases) CreateCrop(ctx context.Context, c *domain.Crop) (int64, error
 	return u.repo.CreateCrop(ctx, c)
 }
 
-func (u *UseCases) ListCrops(ctx context.Context) ([]domain.Crop, error) {
-	return u.repo.ListCrops(ctx)
+func (u *UseCases) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
+	return u.repo.ListCrops(ctx, page, perPage)
 }
 
 func (u *UseCases) GetCrop(ctx context.Context, id int64) (*domain.Crop, error) {

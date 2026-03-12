@@ -7,8 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	"github.com/alphacodinggroup/ponti-backend/internal/provider/handler/dto"
 	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
 )
@@ -73,18 +72,10 @@ func (h *Handler) GetProviders(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	providers, err := h.ucs.GetProviders(ctx)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, dto.NewGetProvidersResponse(providers))
-}
-
-func handleError(err error, c *gin.Context) bool {
-	if err == nil {
-		return false
-	}
-	apiErr, _ := types.NewAPIError(err)
-	_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-	return true
 }

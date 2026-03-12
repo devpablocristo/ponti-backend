@@ -18,7 +18,7 @@ import (
 	prjmodels "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
 )
 
-// TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects verifica que HardDeleteCustomer
+// TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects verifica que DeleteCustomer (hard)
 // completa correctamente eliminando primero los proyectos del customer en cascada.
 // Requiere TEST_DB_HOST o DB_HOST para ejecutarse.
 func TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects(t *testing.T) {
@@ -82,8 +82,8 @@ func TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects(t *testin
 
 	require.NoError(t, tx.Commit().Error)
 
-	// Act: HardDeleteCustomer debe completar (cascade delete de proyectos primero)
-	err = repo.HardDeleteCustomer(ctx, customerID)
+	// Act: DeleteCustomer (hard) debe completar (cascade delete de proyectos primero)
+	err = repo.DeleteCustomer(ctx, customerID)
 
 	// Assert: debe completar sin error
 	require.NoError(t, err)

@@ -1,21 +1,18 @@
-// Package leasetype expone endpoints HTTP para tipos de arrendamiento.
 package leasetype
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/lease-type/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {
 	CreateLeaseType(context.Context, *domain.LeaseType) (int64, error)
-	ListLeaseTypes(context.Context) ([]domain.LeaseType, error)
+	ListLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
 	DeleteLeaseType(context.Context, int64) error
@@ -37,7 +34,6 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the LeaseType HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -73,35 +69,26 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) CreateLeaseType(c *gin.Context) {
-	var req dto.LeaseType
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.CreateLeaseTypeRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	dom := &domain.LeaseType{Name: req.Name}
-	id, err := h.ucs.CreateLeaseType(c.Request.Context(), dom)
+	id, err := h.ucs.CreateLeaseType(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.CreateLeaseTypeResponse{Message: "Lease type created", ID: id})
+	sharedhandlers.RespondCreated(c, id)
 }
 
 func (h *Handler) ListLeaseTypes(c *gin.Context) {
-	list, err := h.ucs.ListLeaseTypes(c.Request.Context())
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	leaseTypes, total, err := h.ucs.ListLeaseTypes(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	resp := make([]dto.LeaseType, len(list))
-	for i, lt := range list {
-		resp[i] = *dto.FromDomain(lt)
-	}
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, dto.NewListLeaseTypesResponse(leaseTypes, page, perPage, total))
 }
 
 func (h *Handler) GetLeaseType(c *gin.Context) {
@@ -112,11 +99,10 @@ func (h *Handler) GetLeaseType(c *gin.Context) {
 	}
 	lt, err := h.ucs.GetLeaseType(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(*lt))
+	sharedhandlers.RespondOK(c, dto.LeaseTypeFromDomain(lt))
 }
 
 func (h *Handler) UpdateLeaseType(c *gin.Context) {
@@ -125,20 +111,15 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.LeaseType
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateLeaseTypeRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateLeaseType(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateLeaseType(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lease type updated"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
@@ -148,9 +129,8 @@ func (h *Handler) DeleteLeaseType(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Lease type deleted"})
+	sharedhandlers.RespondNoContent(c)
 }

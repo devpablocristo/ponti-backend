@@ -3,11 +3,8 @@ package customer
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/customer/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
@@ -23,7 +20,6 @@ type UseCasesPort interface {
 	DeleteCustomer(context.Context, int64) error
 	ArchiveCustomer(context.Context, int64) error
 	RestoreCustomer(context.Context, int64) error
-	HardDeleteCustomer(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -42,7 +38,6 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -50,7 +45,6 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -60,7 +54,6 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/customers"
@@ -71,111 +64,115 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateCustomer)                // Crear un customer
-		public.GET("", h.ListCustomers)                  // Listar todos los customers
-		public.GET("/archived", h.ListArchivedCustomers) // Listar customers archivados
-		public.GET("/:customer_id", h.GetCustomer)       // Obtener un customer por ID
-		public.PUT("/:customer_id", h.UpdateCustomer)    // Actualizar un customer
-		public.PUT("/:customer_id/archive", h.ArchiveCustomer)
-		public.PUT("/:customer_id/restore", h.RestoreCustomer)
-		public.DELETE("/:customer_id/hard", h.HardDeleteCustomer)
-		public.DELETE("/:customer_id", h.DeleteCustomer) // Eliminar (soft) un customer
+		public.POST("", h.CreateCustomer)
+		public.GET("", h.ListCustomers)
+		public.GET("/archived", h.ListArchivedCustomers)
+		public.GET("/:customer_id", h.GetCustomer)
+		public.PUT("/:customer_id", h.UpdateCustomer)
+		public.DELETE("/:customer_id", h.DeleteCustomer)
+		public.POST("/:customer_id/archive", h.ArchiveCustomer)
+		public.POST("/:customer_id/restore", h.RestoreCustomer)
 	}
 }
 
-// ListArchivedCustomers lista customers archivados.
-func (h *Handler) ListArchivedCustomers(c *gin.Context) {
-	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
-	items, total, err := h.ucs.ListArchivedCustomers(c.Request.Context(), page, perPage)
-	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	resp := dto.NewListCustomersResponse(items, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
-}
-
-// CreateCustomer maneja la creación de un nuevo customer.
 func (h *Handler) CreateCustomer(c *gin.Context) {
-	var req dto.CreateCustomer
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	var req dto.CreateCustomerRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateCustomer(ctx, req.ToDomain())
+	id, err := h.ucs.CreateCustomer(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusCreated, dto.CreateCustomerResponse{
-		Message: "Customer created successfully",
-		ID:      newID,
-	})
+	sharedhandlers.RespondCreated(c, id)
 }
 
-// ListCustomers recupera todos los customers.
 func (h *Handler) ListCustomers(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 
-	items, total, err := h.ucs.ListCustomers(c.Request.Context(), page, perPage)
-	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
+	status := c.DefaultQuery("status", "active")
+	switch status {
+	case "archived":
+		h.listByStatus(c, page, perPage, true)
+	case "all":
+		h.listAll(c, page, perPage)
+	default:
+		h.listByStatus(c, page, perPage, false)
 	}
-
-	resp := dto.NewListCustomersResponse(items, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
 }
 
-// GetCustomer recupera un customer por su ID.
+// ListArchivedCustomers mantiene compatibilidad con GET /archived.
+func (h *Handler) ListArchivedCustomers(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
+	h.listByStatus(c, page, perPage, true)
+}
+
+func (h *Handler) listByStatus(c *gin.Context, page, perPage int, archived bool) {
+	var (
+		items []domain.ListedCustomer
+		total int64
+		err   error
+	)
+	if archived {
+		items, total, err = h.ucs.ListArchivedCustomers(c.Request.Context(), page, perPage)
+	} else {
+		items, total, err = h.ucs.ListCustomers(c.Request.Context(), page, perPage)
+	}
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListCustomersResponse(items, page, perPage, total))
+}
+
+func (h *Handler) listAll(c *gin.Context, page, perPage int) {
+	active, totalA, err := h.ucs.ListCustomers(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	archived, totalAr, err := h.ucs.ListArchivedCustomers(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	all := append(active, archived...)
+	sharedhandlers.RespondOK(c, dto.NewListCustomersResponse(all, page, perPage, totalA+totalAr))
+}
+
 func (h *Handler) GetCustomer(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	customer, err := h.ucs.GetCustomer(c.Request.Context(), id)
+	cust, err := h.ucs.GetCustomer(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, customer)
+	sharedhandlers.RespondOK(c, dto.CustomerFromDomain(cust))
 }
 
-// UpdateCustomer actualiza un customer existente.
 func (h *Handler) UpdateCustomer(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.Customer
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateCustomerRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateCustomer(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateCustomer(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteCustomer elimina un customer por su ID.
+// DeleteCustomer ejecuta hard delete del customer.
 func (h *Handler) DeleteCustomer(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
@@ -183,14 +180,13 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteCustomer(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
-// ArchiveCustomer archiva un customer por su ID.
+// ArchiveCustomer ejecuta soft delete (archivado) del customer.
 func (h *Handler) ArchiveCustomer(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
@@ -198,14 +194,12 @@ func (h *Handler) ArchiveCustomer(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.ArchiveCustomer(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
-// RestoreCustomer restaura un customer archivado.
 func (h *Handler) RestoreCustomer(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
 	if err != nil {
@@ -213,24 +207,8 @@ func (h *Handler) RestoreCustomer(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.RestoreCustomer(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-// HardDeleteCustomer elimina físicamente un customer por ID.
-func (h *Handler) HardDeleteCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
-	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.HardDeleteCustomer(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }

@@ -108,9 +108,10 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 }
 
 type movementOriginRow struct {
-	MovementID      int64   `gorm:"column:movement_id"`
-	OriginProjectID *int64  `gorm:"column:origin_project_id"`
-	OriginProject   *string `gorm:"column:origin_project_name"`
+	MovementID           int64   `gorm:"column:movement_id"`
+	OriginProjectID      *int64  `gorm:"column:origin_project_id"`
+	OriginProject        *string `gorm:"column:origin_project_name"`
+	DestinationProjectID *int64  `gorm:"column:destination_project_id"`
 }
 
 func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*domain.SupplyMovement) error {
@@ -127,7 +128,11 @@ func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*
 		SELECT
 			sm_in.id AS movement_id,
 			src.project_id AS origin_project_id,
-			pj.name AS origin_project_name
+			pj.name AS origin_project_name,
+			CASE
+				WHEN sm_in.movement_type = 'Movimiento interno entrada' THEN sm_in.project_id
+				ELSE COALESCE(NULLIF(sm_in.project_destination_id, 0), dst.project_id)
+			END AS destination_project_id
 		FROM supply_movements sm_in
 		LEFT JOIN LATERAL (
 			SELECT sm_out.project_id
@@ -142,6 +147,19 @@ func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*
 			ORDER BY sm_out.id DESC
 			LIMIT 1
 		) src ON sm_in.movement_type = 'Movimiento interno entrada'
+		LEFT JOIN LATERAL (
+			SELECT sm_dst.project_id
+			FROM supply_movements sm_dst
+			WHERE sm_dst.deleted_at IS NULL
+			  AND sm_dst.movement_type = 'Movimiento interno entrada'
+			  AND sm_dst.reference_number = sm_in.reference_number
+			  AND sm_dst.movement_date = sm_in.movement_date
+			  AND sm_dst.investor_id = sm_in.investor_id
+			  AND sm_dst.provider_id = sm_in.provider_id
+			  AND sm_dst.quantity = (sm_in.quantity * -1)
+			ORDER BY sm_dst.id DESC
+			LIMIT 1
+		) dst ON sm_in.movement_type = 'Movimiento interno'
 		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL
 		WHERE sm_in.id IN ?
 	`
@@ -160,10 +178,92 @@ func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*
 		if row, ok := originsByMovementID[movements[i].ID]; ok {
 			movements[i].OriginProjectID = row.OriginProjectID
 			movements[i].OriginProjectName = row.OriginProject
+			movements[i].DestinationProjectID = row.DestinationProjectID
 		}
 	}
 
+	destinationIDs := make([]int64, 0, len(movements))
+	seenDestination := make(map[int64]struct{}, len(movements))
+	for i := range movements {
+		if movements[i].DestinationProjectID == nil {
+			continue
+		}
+		id := *movements[i].DestinationProjectID
+		if _, seen := seenDestination[id]; seen {
+			continue
+		}
+		seenDestination[id] = struct{}{}
+		destinationIDs = append(destinationIDs, id)
+	}
+
+	destinationByID, err := r.getDestinationProjectMetadata(ctx, destinationIDs)
+	if err != nil {
+		return err
+	}
+	for i := range movements {
+		if movements[i].DestinationProjectID == nil {
+			continue
+		}
+		meta, ok := destinationByID[*movements[i].DestinationProjectID]
+		if !ok {
+			continue
+		}
+		movements[i].DestinationProject = meta.ProjectName
+		movements[i].DestinationCustomer = meta.CustomerName
+		movements[i].DestinationCampaign = meta.CampaignName
+	}
+
 	return nil
+}
+
+type destinationProjectMetadata struct {
+	ProjectName  *string
+	CustomerName *string
+	CampaignName *string
+}
+
+type destinationProjectMetadataRow struct {
+	ProjectID    int64   `gorm:"column:project_id"`
+	ProjectName  *string `gorm:"column:project_name"`
+	CustomerName *string `gorm:"column:customer_name"`
+	CampaignName *string `gorm:"column:campaign_name"`
+}
+
+func (r *Repository) getDestinationProjectMetadata(
+	ctx context.Context,
+	projectIDs []int64,
+) (map[int64]destinationProjectMetadata, error) {
+	if len(projectIDs) == 0 {
+		return map[int64]destinationProjectMetadata{}, nil
+	}
+
+	const query = `
+		SELECT
+			p.id AS project_id,
+			p.name AS project_name,
+			cu.name AS customer_name,
+			ca.name AS campaign_name
+		FROM projects p
+		LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.deleted_at IS NULL
+		LEFT JOIN campaigns ca ON ca.id = p.campaign_id AND ca.deleted_at IS NULL
+		WHERE p.id IN ? AND p.deleted_at IS NULL
+	`
+
+	var rows []destinationProjectMetadataRow
+	if err := r.getDB(ctx).Raw(query, projectIDs).Scan(&rows).Error; err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to resolve destination project metadata", err)
+	}
+
+	out := make(map[int64]destinationProjectMetadata, len(rows))
+	for i := range rows {
+		out[rows[i].ProjectID] = destinationProjectMetadata{
+			ProjectName:  rows[i].ProjectName,
+			CustomerName: rows[i].CustomerName,
+			CampaignName: rows[i].CampaignName,
+		}
+	}
+
+	return out, nil
 }
 
 func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*domain.SupplyMovement, error) {
@@ -173,7 +273,8 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 
 	if err := db.
 		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Unit").
+		Preload("Supply.Type").
+		Preload("Supply.Category").
 		Preload("Investor").
 		Preload("Provider").
 		First(&modelSupplyMovement, "id = ?", id).

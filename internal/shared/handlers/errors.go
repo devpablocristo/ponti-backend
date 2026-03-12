@@ -12,12 +12,3 @@ func RespondError(c *gin.Context, err error) {
 	c.JSON(status, apiErr.ToResponse())
 }
 
-// RespondErrorLegacyNotFound mantiene el formato legacy para NotFound.
-func RespondErrorLegacyNotFound(c *gin.Context, err error) {
-	if types.IsNotFound(err) {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, gin.H{"error": apiErr.Error()})
-		return
-	}
-	RespondError(c, err)
-}

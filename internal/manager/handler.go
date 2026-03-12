@@ -3,11 +3,8 @@ package manager
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/manager/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
@@ -16,10 +13,12 @@ import (
 
 type UseCasesPort interface {
 	CreateManager(context.Context, *domain.Manager) (int64, error)
-	ListManagers(context.Context) ([]domain.Manager, error)
+	ListManagers(context.Context, int, int) ([]domain.Manager, int64, error)
 	GetManager(context.Context, int64) (*domain.Manager, error)
 	UpdateManager(context.Context, *domain.Manager) error
 	DeleteManager(context.Context, int64) error
+	ArchiveManager(context.Context, int64) error
+	RestoreManager(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -65,50 +64,39 @@ func (h *Handler) Routes() {
 		r.Use(mw)
 	}
 
-	public := r.Group(baseURL)
+	group := r.Group(baseURL)
 	{
-		public.POST("", h.CreateManager)               // Crear un manager
-		public.GET("", h.ListManagers)                 // Listar managers
-		public.GET("/:manager_id", h.GetManager)       // Obtener un manager por ID
-		public.PUT("/:manager_id", h.UpdateManager)    // Actualizar un manager
-		public.DELETE("/:manager_id", h.DeleteManager) // Eliminar un manager
+		group.POST("", h.CreateManager)
+		group.GET("", h.ListManagers)
+		group.GET("/:manager_id", h.GetManager)
+		group.PUT("/:manager_id", h.UpdateManager)
+		group.DELETE("/:manager_id", h.DeleteManager)
+		group.POST("/:manager_id/archive", h.ArchiveManager)
+		group.POST("/:manager_id/restore", h.RestoreManager)
 	}
 }
 
 func (h *Handler) CreateManager(c *gin.Context) {
-	var req dto.CreateManager
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	var req dto.CreateManagerRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateManager(ctx, req.ToDomain())
+	id, err := h.ucs.CreateManager(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusCreated, dto.CreateManagerResponse{
-		Message:   "Manager created successfully",
-		ManagerID: newID,
-	})
+	sharedhandlers.RespondCreated(c, id)
 }
 
 func (h *Handler) ListManagers(c *gin.Context) {
-	items, err := h.ucs.ListManagers(c.Request.Context())
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListManagers(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	resp := make([]dto.Manager, len(items))
-	for i := range items {
-		resp[i] = *dto.FromDomain(items[i])
-	}
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, dto.NewListManagersResponse(items, page, perPage, total))
 }
 
 func (h *Handler) GetManager(c *gin.Context) {
@@ -117,41 +105,31 @@ func (h *Handler) GetManager(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	manager, err := h.ucs.GetManager(c.Request.Context(), id)
+	m, err := h.ucs.GetManager(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, dto.FromDomain(*manager))
+	sharedhandlers.RespondOK(c, dto.ManagerFromDomain(m))
 }
 
-// UpdateManager actualiza un manager existente.
 func (h *Handler) UpdateManager(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.Manager
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateManagerRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateManager(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateManager(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Manager updated successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteManager elimina un manager por su ID.
 func (h *Handler) DeleteManager(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
 	if err != nil {
@@ -159,9 +137,34 @@ func (h *Handler) DeleteManager(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteManager(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Manager deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ArchiveManager(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveManager(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreManager(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreManager(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }

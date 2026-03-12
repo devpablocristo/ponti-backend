@@ -25,7 +25,7 @@ services:
   ponti-api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     depends_on:
       ponti-db:
         condition: service_healthy
@@ -37,6 +37,10 @@ services:
       - HTTP_SERVER_HOST=0.0.0.0
       - DB_HOST=ponti-db
       - DB_PORT=5432
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
     networks:
       - app-network
     restart: unless-stopped
@@ -50,3 +54,5 @@ networks:
 volumes:
   ponti-db_data:
   pgadmin_data:
+  go-modules:
+  go-build-cache:

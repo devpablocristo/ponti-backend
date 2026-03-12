@@ -1,20 +1,18 @@
-// File: ./repository.go
-
 package category
 
 import (
 	"context"
 	"fmt"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"gorm.io/gorm"
+
 	models "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"gorm.io/gorm"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
-// GormEnginePort exposes the required DB interface.
 type GormEnginePort interface {
 	Client() *gorm.DB
 }
@@ -27,21 +25,11 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ListCategories(ctx context.Context) ([]domain.Category, error) {
-	var categories []models.Category
-	if err := r.db.Client().WithContext(ctx).Find(&categories).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list categories", err)
-	}
-	res := make([]domain.Category, len(categories))
-	for i := range categories {
-		res[i] = *categories[i].ToDomain()
-	}
-	return res, nil
-}
-
 func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (int64, error) {
+	if err := sharedrepo.ValidateEntity(c, "category"); err != nil {
+		return 0, err
+	}
 	model := models.FromDomain(c)
-	// Se asegura de setear CreatedBy y UpdatedBy (otros campos los setea GORM)
 	model.Base = sharedmodels.Base{
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
@@ -52,60 +40,78 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 	return model.ID, nil
 }
 
+func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
+	var total int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.Category{}).Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count categories", err)
+	}
+
+	var list []models.Category
+	offset := (page - 1) * perPage
+	err := r.db.Client().WithContext(ctx).
+		Offset(offset).
+		Limit(perPage).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list categories", err)
+	}
+
+	result := make([]domain.Category, 0, len(list))
+	for _, c := range list {
+		result = append(result, *c.ToDomain())
+	}
+	return result, total, nil
+}
+
+func (r *Repository) GetCategory(ctx context.Context, id int64) (*domain.Category, error) {
+	if err := sharedrepo.ValidateID(id, "category"); err != nil {
+		return nil, err
+	}
+	var model models.Category
+	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "category", id)
+	}
+	return model.ToDomain(), nil
+}
+
 func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) error {
+	if err := sharedrepo.ValidateEntity(c, "category"); err != nil {
+		return err
+	}
 	if err := sharedrepo.ValidateID(c.ID, "category"); err != nil {
 		return err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.Category{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check category existence", err)
-		}
-		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", c.ID), nil)
-		}
-		// Solo actualiza el nombre (puedes extender para UpdatedBy, etc. si lo necesitas)
-		updateTx := tx.Model(&models.Category{}).
-			Where("id = ?", c.ID)
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Category{}).
+		Where("id = ?", c.ID)
+	if !c.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomain(c))
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to update category", result.Error)
+	}
+	if result.RowsAffected == 0 {
 		if !c.UpdatedAt.IsZero() {
-			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+			return types.NewError(types.ErrConflict, "category not found or outdated", nil)
 		}
-		result := updateTx.Updates(map[string]any{
-			"name":       c.Name,
-			"updated_by": c.UpdatedBy,
-		})
-		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update category", result.Error)
-		}
-		if result.RowsAffected == 0 {
-			if !c.UpdatedAt.IsZero() {
-				return types.NewError(types.ErrConflict, "category not found or outdated", nil)
-			}
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", c.ID), nil)
-		}
-		return nil
-	})
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("category with id %d does not exist", c.ID), nil)
+	}
+	return nil
 }
 
 func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "category"); err != nil {
 		return err
 	}
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.Category{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check category existence", err)
-		}
-		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", id), nil)
-		}
-		result := tx.Delete(&models.Category{}, id)
-		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to delete category", result.Error)
-		}
-		if result.RowsAffected == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("category %d not found", id), nil)
-		}
-		return nil
-	})
+	result := r.db.Client().WithContext(ctx).
+		Delete(&models.Category{}, "id = ?", id)
+	if result.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to delete category", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, fmt.Sprintf("category with id %d does not exist", id), nil)
+	}
+	return nil
 }

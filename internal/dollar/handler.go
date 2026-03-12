@@ -2,9 +2,7 @@ package dollar
 
 import (
 	"context"
-	"net/http"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/dollar/handler/dto"
@@ -74,8 +72,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 	// Llamo al caso de uso
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -85,7 +82,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 		resp[i] = dto.FromDomainMonth(&d)
 	}
 
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) CreateorUpdateBulk(c *gin.Context) {
@@ -97,20 +94,16 @@ func (h *Handler) CreateorUpdateBulk(c *gin.Context) {
 
 	// Parseo el body JSON a DTO
 	var in dto.BulkDollarAverageRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &in); err != nil {
 		return
 	}
 
 	// Convierto el DTO a Slice de domain
 	items := in.ToDomainSlice(projectID)
 	if err := h.ucs.CreateOrUpdateBulk(c.Request.Context(), items); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Dollar average saved"})
+	sharedhandlers.RespondNoContent(c)
 }

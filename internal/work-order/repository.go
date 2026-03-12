@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgconn"
 	"github.com/shopspring/decimal"
@@ -212,20 +213,78 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1) Verificar existencia dentro de la transacción
-		var m models.WorkOrder
-		if err := tx.First(&m, id).Error; err != nil {
+		var count int64
+		if err := tx.Unscoped().Model(&models.WorkOrder{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check work order existence", err)
+		}
+		if count == 0 {
+			return types.NewError(types.ErrNotFound, "work order not found", nil)
+		}
+
+		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete work order items", err)
+		}
+		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to delete work order investor splits", err)
+		}
+		if err := tx.Unscoped().Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete work order", err)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var wo models.WorkOrder
+		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return types.NewError(types.ErrNotFound, "work order not found", err)
 			}
-			return types.NewError(types.ErrInternal, "failed to find work order", err)
+			return types.NewError(types.ErrInternal, "failed to get work order", err)
+		}
+		if wo.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order already archived", nil)
 		}
 
-		// 2) Soft-delete dentro de la misma transacción
-		if err := tx.Delete(&m).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete work order", err)
+		if err := tx.Model(&models.WorkOrder{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to archive work order", err)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var wo models.WorkOrder
+		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "work order not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get work order", err)
+		}
+		if !wo.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order is not archived", nil)
 		}
 
+		if err := tx.Unscoped().Model(&models.WorkOrder{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore work order", err)
+		}
 		return nil
 	})
 }
