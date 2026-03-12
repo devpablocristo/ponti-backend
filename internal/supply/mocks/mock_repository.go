@@ -125,6 +125,34 @@ func (mr *MockRepositoryPortMockRecorder) DeleteSupplyMovement(arg0, arg1, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupplyMovement), arg0, arg1, arg2)
 }
 
+// ArchiveSupply mocks base method.
+func (m *MockRepositoryPort) ArchiveSupply(arg0 context.Context, arg1 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ArchiveSupply", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ArchiveSupply indicates an expected call of ArchiveSupply.
+func (mr *MockRepositoryPortMockRecorder) ArchiveSupply(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ArchiveSupply", reflect.TypeOf((*MockRepositoryPort)(nil).ArchiveSupply), arg0, arg1)
+}
+
+// RestoreSupply mocks base method.
+func (m *MockRepositoryPort) RestoreSupply(arg0 context.Context, arg1 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RestoreSupply", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RestoreSupply indicates an expected call of RestoreSupply.
+func (mr *MockRepositoryPortMockRecorder) RestoreSupply(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestoreSupply", reflect.TypeOf((*MockRepositoryPort)(nil).RestoreSupply), arg0, arg1)
+}
+
 // ExecuteInTransaction mocks base method.
 func (m *MockRepositoryPort) ExecuteInTransaction(arg0 context.Context, arg1 func(context.Context) error) error {
 	m.ctrl.T.Helper()

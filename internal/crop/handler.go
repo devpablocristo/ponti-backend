@@ -2,11 +2,8 @@ package crop
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/crop/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
@@ -15,7 +12,7 @@ import (
 
 type UseCasesPort interface {
 	CreateCrop(context.Context, *domain.Crop) (int64, error)
-	ListCrops(context.Context) ([]domain.Crop, error)
+	ListCrops(context.Context, int, int) ([]domain.Crop, int64, error)
 	GetCrop(context.Context, int64) (*domain.Crop, error)
 	UpdateCrop(context.Context, *domain.Crop) error
 	DeleteCrop(context.Context, int64) error
@@ -37,7 +34,7 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
+// Handler encapsula las dependencias del handler HTTP de Crop.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -45,7 +42,7 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
+// NewHandler crea un handler de Crop.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -55,7 +52,7 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
+// Routes registra las rutas del módulo Crop.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/crops"
@@ -75,82 +72,59 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) CreateCrop(c *gin.Context) {
-	var req dto.CreateCrop
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	var req dto.CreateCropRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateCrop(ctx, req.ToDomain())
+	id, err := h.ucs.CreateCrop(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusCreated, dto.CreateCropResponse{
-		Message: "Crop created successfully",
-		ID:      newID,
-	})
+	sharedhandlers.RespondCreated(c, id)
 }
 
-// ListCrops retrieves all crops.
 func (h *Handler) ListCrops(c *gin.Context) {
-	crops, err := h.ucs.ListCrops(c.Request.Context())
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	crops, total, err := h.ucs.ListCrops(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	resp := dto.NewListCropsResponse(crops)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, dto.NewListCropsResponse(crops, page, perPage, total))
 }
 
-// GetCrop retrieves a crop by its ID.
 func (h *Handler) GetCrop(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-
 	crop, err := h.ucs.GetCrop(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, crop)
+	sharedhandlers.RespondOK(c, dto.CropFromDomain(crop))
 }
 
-// UpdateCrop updates an existing crop.
 func (h *Handler) UpdateCrop(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.Crop
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateCropRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateCrop(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateCrop(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Crop updated successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteCrop deletes a crop by its ID.
 func (h *Handler) DeleteCrop(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
 	if err != nil {
@@ -158,9 +132,8 @@ func (h *Handler) DeleteCrop(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteCrop(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Crop deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
 }

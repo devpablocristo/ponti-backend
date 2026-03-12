@@ -232,18 +232,73 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := tx.Unscoped().Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
 		}
 		if count == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
 		}
-		result := tx.Delete(&models.Supply{}, id)
+		result := tx.Unscoped().Delete(&models.Supply{}, id)
 		if result.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to delete supply", result.Error)
 		}
 		if result.RowsAffected == 0 {
 			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var supply models.Supply
+		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get supply", err)
+		}
+		if supply.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "supply already archived", nil)
+		}
+
+		if err := tx.Model(&models.Supply{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to archive supply", err)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var supply models.Supply
+		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get supply", err)
+		}
+		if !supply.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "supply is not archived", nil)
+		}
+
+		if err := tx.Unscoped().Model(&models.Supply{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to restore supply", err)
 		}
 		return nil
 	})

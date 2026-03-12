@@ -2,9 +2,7 @@ package commercialization
 
 import (
 	"context"
-	"net/http"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/commercialization/handler/dto"
@@ -74,7 +72,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 
 	items, err := h.ucs.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
-		sharedhandlers.RespondErrorLegacyNotFound(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -83,7 +81,7 @@ func (h *Handler) ListByProject(c *gin.Context) {
 		resp[i] = dto.FromDomain(&d)
 	}
 
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 // Crear proyecto
@@ -100,17 +98,14 @@ func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
 	}
 
 	var body dto.BulkCommercializationRequest
-	if err := c.ShouldBindJSON(&body); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &body); err != nil {
 		return
 	}
 
 	items := body.ToDomainSlice(projectID, userID)
 	if err := h.ucs.CreateOrUpdateBulk(c.Request.Context(), items); err != nil {
-		sharedhandlers.RespondErrorLegacyNotFound(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Crop commercialization saved"})
+	sharedhandlers.RespondNoContent(c)
 }

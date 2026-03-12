@@ -16,7 +16,6 @@ type RepositoryPort interface {
 	DeleteCustomer(context.Context, int64) error
 	ArchiveCustomer(context.Context, int64) error
 	RestoreCustomer(context.Context, int64) error
-	HardDeleteCustomer(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -58,8 +57,4 @@ func (u *UseCases) ArchiveCustomer(ctx context.Context, id int64) error {
 
 func (u *UseCases) RestoreCustomer(ctx context.Context, id int64) error {
 	return u.repo.RestoreCustomer(ctx, id)
-}
-
-func (u *UseCases) HardDeleteCustomer(ctx context.Context, id int64) error {
-	return u.repo.HardDeleteCustomer(ctx, id)
 }

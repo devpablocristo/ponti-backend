@@ -2,15 +2,15 @@ package crop
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"gorm.io/gorm"
+
 	models "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"gorm.io/gorm"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type GormEnginePort interface {
@@ -40,26 +40,37 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 	return model.ID, nil
 }
 
-func (r *Repository) ListCrops(ctx context.Context) ([]domain.Crop, error) {
-	var list []models.Crop
-	if err := r.db.Client().WithContext(ctx).Find(&list).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list crops", err)
+func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
+	var total int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.Crop{}).Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count crops", err)
 	}
+
+	var list []models.Crop
+	offset := (page - 1) * perPage
+	err := r.db.Client().WithContext(ctx).
+		Offset(offset).
+		Limit(perPage).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list crops", err)
+	}
+
 	result := make([]domain.Crop, 0, len(list))
 	for _, c := range list {
 		result = append(result, *c.ToDomain())
 	}
-	return result, nil
+	return result, total, nil
 }
 
 func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error) {
+	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
+		return nil, err
+	}
 	var model models.Crop
-	err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("crop with id %d not found", id), err)
-		}
-		return nil, types.NewError(types.ErrInternal, "failed to get crop", err)
+	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "crop", id)
 	}
 	return model.ToDomain(), nil
 }

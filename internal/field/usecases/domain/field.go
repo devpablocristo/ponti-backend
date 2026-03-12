@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	invdom "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
@@ -10,13 +12,14 @@ import (
 )
 
 type Field struct {
-	ID                int64
-	ProjectID         int64
-	Name              string
-	LeaseType         *leasetypedom.LeaseType
-	LeaseTypePercent  *decimal.Decimal
-	LeaseTypeValue    *decimal.Decimal
-	Investors         []invdom.Investor
-	Lots              []lotdom.Lot
-	shareddomain.Base // Incluye CreatedAt, UpdatedAt, etc
+	ID               int64
+	ProjectID        int64
+	Name             string
+	LeaseType        *leasetypedom.LeaseType
+	LeaseTypePercent *decimal.Decimal
+	LeaseTypeValue   *decimal.Decimal
+	Investors        []invdom.Investor
+	Lots             []lotdom.Lot
+	ArchivedAt       *time.Time
+	shareddomain.Base
 }

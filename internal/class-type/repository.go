@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"gorm.io/gorm"
+
 	models "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
 	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"gorm.io/gorm"
+	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type GormEnginePort interface {
@@ -24,18 +25,6 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ListClassTypes(ctx context.Context) ([]domain.ClassType, error) {
-	var classTypes []models.ClassType
-	if err := r.db.Client().WithContext(ctx).Find(&classTypes).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list class types", err)
-	}
-	res := make([]domain.ClassType, len(classTypes))
-	for i := range classTypes {
-		res[i] = *classTypes[i].ToDomain()
-	}
-	return res, nil
-}
-
 func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (int64, error) {
 	model := models.FromDomain(c)
 	model.Base = sharedmodels.Base{
@@ -46,6 +35,41 @@ func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (
 		return 0, types.NewError(types.ErrInternal, "failed to create class type", err)
 	}
 	return model.ID, nil
+}
+
+func (r *Repository) ListClassTypes(ctx context.Context, page, perPage int) ([]domain.ClassType, int64, error) {
+	var total int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.ClassType{}).Count(&total).Error; err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to count class types", err)
+	}
+
+	var list []models.ClassType
+	offset := (page - 1) * perPage
+	err := r.db.Client().WithContext(ctx).
+		Offset(offset).
+		Limit(perPage).
+		Order("id ASC").
+		Find(&list).Error
+	if err != nil {
+		return nil, 0, types.NewError(types.ErrInternal, "failed to list class types", err)
+	}
+
+	result := make([]domain.ClassType, 0, len(list))
+	for _, m := range list {
+		result = append(result, *m.ToDomain())
+	}
+	return result, total, nil
+}
+
+func (r *Repository) GetClassType(ctx context.Context, id int64) (*domain.ClassType, error) {
+	if err := sharedrepo.ValidateID(id, "class type"); err != nil {
+		return nil, err
+	}
+	var model models.ClassType
+	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		return nil, sharedrepo.HandleGormError(err, "class type", id)
+	}
+	return model.ToDomain(), nil
 }
 
 func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) error {

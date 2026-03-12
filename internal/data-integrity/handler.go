@@ -86,12 +86,11 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 		return
 	}
 	if projectID == nil {
-		apiErr, status := types.NewAPIError(types.NewError(
+		sharedhandlers.RespondError(c, types.NewError(
 			types.ErrBadRequest,
 			"missing required query param: project_id",
 			nil,
 		))
-		c.JSON(status, apiErr.ToResponse())
 		return
 	}
 	filter.ProjectID = projectID
@@ -103,8 +102,7 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Ejecutar caso de uso
 	report, err := h.ucs.CheckCostsCoherence(ctx, filter)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

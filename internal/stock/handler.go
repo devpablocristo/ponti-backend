@@ -88,7 +88,8 @@ func (h *Handler) Routes() {
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -96,33 +97,37 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 	var cutoffDate time.Time
 	if cutoffDateStr != "" {
 		cutoffDate, err = time.Parse("2006-01-02", cutoffDateStr)
-		if handleError(err, c) {
+		if err != nil {
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 	}
 
 	stocks, err := h.ucs.GetStocksSummary(ctx, projectID, cutoffDate)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.NewGetStocksListed(stocks)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) getStocksPeriods(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	periods, err := h.ucs.GetStocksPeriods(ctx, projectID)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, periods)
+	sharedhandlers.RespondOK(c, periods)
 }
 
 // UpdateStocksCloseDate actualiza el close_date de los stocks por proyecto y field
@@ -130,33 +135,35 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	monthPeriod, err := getMonthPeriod(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	yearPeriod, err := getYearPeriod(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	var req dto.UpdateCloseDateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	userID, err := sharedmodels.ConvertStringToID(ctx)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	if err := req.Validate(); handleError(err, c) {
+	if err := req.Validate(); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -168,11 +175,12 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		req.ToDomain(&userID),
 	)
 
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.UpdateCloseDateResponse{Message: "close_date updated successfully"})
+	sharedhandlers.RespondOK(c, dto.UpdateCloseDateResponse{Message: "close_date updated successfully"})
 }
 
 func (h *Handler) UpdateRealStock(c *gin.Context) {
@@ -180,24 +188,24 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	stockIDStr := c.Param("stock_id")
 
 	var req dto.UpdateRealStockRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	userID, err := sharedmodels.ConvertStringToID(ctx)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	stockID, err := sharedhandlers.ParseParamID(stockIDStr, "stock_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	stockDomain, err := h.ucs.GetStockByID(ctx, stockID)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -205,19 +213,11 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	stockDomain.UpdatedBy = &userID
 
 	err = h.ucs.UpdateRealStockUnits(ctx, stockID, stockDomain)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.NewUpdateRealStockResponse("real stock updated successfully"))
-}
-
-func handleError(err error, c *gin.Context) bool {
-	if err == nil {
-		return false
-	}
-	apiErr, _ := types.NewAPIError(err)
-	_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
-	return true
+	sharedhandlers.RespondOK(c, dto.NewUpdateRealStockResponse("real stock updated successfully"))
 }
 
 func getMonthPeriodOrDefault(c *gin.Context) (int64, error) {
@@ -276,12 +276,14 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	data, err := h.ucs.ExportStocksByProject(ctx, projectID)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

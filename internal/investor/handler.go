@@ -2,11 +2,8 @@ package investor
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/investor/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
@@ -15,10 +12,12 @@ import (
 
 type UseCasesPort interface {
 	CreateInvestor(context.Context, *domain.Investor) (int64, error)
-	ListInvestors(context.Context) ([]domain.ListedInvestor, error)
+	ListInvestors(context.Context, int, int) ([]domain.Investor, int64, error)
 	GetInvestor(context.Context, int64) (*domain.Investor, error)
 	UpdateInvestor(context.Context, *domain.Investor) error
 	DeleteInvestor(context.Context, int64) error
+	ArchiveInvestor(context.Context, int64) error
+	RestoreInvestor(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -37,7 +36,6 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Project HTTP handler.
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -45,7 +43,6 @@ type Handler struct {
 	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Project handler.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
 		ucs: u,
@@ -55,7 +52,6 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
-// Routes registers all project routes.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/investors"
@@ -66,91 +62,70 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
-		public.POST("", h.CreateInvestor)                // Create an investor
-		public.GET("", h.ListInvestors)                  // List all investors
-		public.GET("/:investor_id", h.GetInvestor)       // Get an investor by ID
-		public.PUT("/:investor_id", h.UpdateInvestor)    // Update an investor
-		public.DELETE("/:investor_id", h.DeleteInvestor) // Delete an investor
+		public.POST("", h.CreateInvestor)
+		public.GET("", h.ListInvestors)
+		public.GET("/:investor_id", h.GetInvestor)
+		public.PUT("/:investor_id", h.UpdateInvestor)
+		public.DELETE("/:investor_id", h.DeleteInvestor)
+		public.POST("/:investor_id/archive", h.ArchiveInvestor)
+		public.POST("/:investor_id/restore", h.RestoreInvestor)
 	}
 }
 
-// CreateInvestor handles the creation of a new investor.
 func (h *Handler) CreateInvestor(c *gin.Context) {
-	var req dto.Investor
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	var req dto.CreateInvestorRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-
-	ctx := c.Request.Context()
-	newID, err := h.ucs.CreateInvestor(ctx, req.ToDomain())
+	id, err := h.ucs.CreateInvestor(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusCreated, dto.CreateInvestorResponse{
-		Message:    "Investor created successfully",
-		InvestorID: newID,
-	})
+	sharedhandlers.RespondCreated(c, id)
 }
 
 func (h *Handler) ListInvestors(c *gin.Context) {
-	items, err := h.ucs.ListInvestors(c.Request.Context())
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	investors, total, err := h.ucs.ListInvestors(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	resp := dto.NewListInvestorsResponse(items)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, dto.NewListInvestorsResponse(investors, page, perPage, total))
 }
 
-// GetInvestor retrieves an investor by its ID.
 func (h *Handler) GetInvestor(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	investor, err := h.ucs.GetInvestor(c.Request.Context(), id)
+	inv, err := h.ucs.GetInvestor(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, investor)
+	sharedhandlers.RespondOK(c, dto.InvestorFromDomain(inv))
 }
 
-// UpdateInvestor updates an existing investor.
 func (h *Handler) UpdateInvestor(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.Investor
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateInvestorRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	req.ID = id
-	if err := h.ucs.UpdateInvestor(c.Request.Context(), req.ToDomain()); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateInvestor(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Investor updated successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteInvestor deletes an investor by its ID.
 func (h *Handler) DeleteInvestor(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
 	if err != nil {
@@ -158,9 +133,34 @@ func (h *Handler) DeleteInvestor(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteInvestor(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Investor deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ArchiveInvestor(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveInvestor(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreInvestor(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreInvestor(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }

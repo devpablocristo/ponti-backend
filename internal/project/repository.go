@@ -557,8 +557,8 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	})
 }
 
-// DeleteProject elimina un proyecto por ID.
-func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
+// ArchiveProject archiva (soft delete) un proyecto por ID.
+func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "project"); err != nil {
 		return err
 	}
@@ -786,8 +786,8 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	})
 }
 
-// HardDeleteProject elimina físicamente un proyecto y todas sus entidades relacionadas.
-func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
+// DeleteProject elimina físicamente un proyecto y todas sus entidades relacionadas.
+func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "project"); err != nil {
 		return err
 	}

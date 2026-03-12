@@ -50,9 +50,9 @@ func (f *fakeUseCases) UpdateProject(_ context.Context, p *domain.Project) error
 	f.updatedProj = p
 	return f.updateErr
 }
-func (f *fakeUseCases) DeleteProject(context.Context, int64) error     { return nil }
-func (f *fakeUseCases) RestoreProject(context.Context, int64) error    { return nil }
-func (f *fakeUseCases) HardDeleteProject(context.Context, int64) error { return nil }
+func (f *fakeUseCases) ArchiveProject(context.Context, int64) error { return nil }
+func (f *fakeUseCases) RestoreProject(context.Context, int64) error { return nil }
+func (f *fakeUseCases) DeleteProject(context.Context, int64) error  { return nil }
 
 type fakeGinEngine struct{ r *gin.Engine }
 
@@ -196,8 +196,8 @@ func TestUpdateProject_RejectsInvalidLeaseTypeDecimal(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d. body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), "payload inválido") {
-		t.Fatalf("expected explicit payload inválido message, got body=%s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "invalid payload") {
+		t.Fatalf("expected explicit invalid payload message, got body=%s", rr.Body.String())
 	}
 	if !strings.Contains(rr.Body.String(), "lease_type_percent") {
 		t.Fatalf("expected error details about lease_type_percent, got body=%s", rr.Body.String())
@@ -252,7 +252,7 @@ func TestUpdateProject_RejectsMissingFieldInvestorsWithExplicitMessage(t *testin
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d. body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), "fields[0].investors es requerido") {
+	if !strings.Contains(rr.Body.String(), "investors is required") {
 		t.Fatalf("expected explicit missing field investors message, got body=%s", rr.Body.String())
 	}
 	if ucs.updateCalled {

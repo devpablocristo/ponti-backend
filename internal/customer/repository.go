@@ -148,10 +148,6 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 	return nil
 }
 
-func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
-	return r.ArchiveCustomer(ctx, id)
-}
-
 func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
@@ -222,7 +218,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	})
 }
 
-func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
+func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}

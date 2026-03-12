@@ -13,7 +13,7 @@ type Investor struct {
 }
 
 func (i Investor) ToDomain() *domain.Investor {
-	return &domain.Investor{
+	inv := &domain.Investor{
 		ID:   i.ID,
 		Name: i.Name,
 		Base: shareddomain.Base{
@@ -23,6 +23,11 @@ func (i Investor) ToDomain() *domain.Investor {
 			UpdatedBy: i.UpdatedBy,
 		},
 	}
+	if i.DeletedAt.Valid {
+		t := i.DeletedAt.Time
+		inv.ArchivedAt = &t
+	}
+	return inv
 }
 
 func FromDomain(d *domain.Investor) *Investor {

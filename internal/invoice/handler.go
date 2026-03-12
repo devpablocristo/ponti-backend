@@ -2,12 +2,10 @@ package invoice
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/alphacodinggroup/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -83,7 +81,7 @@ func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
 
 	resp := dto.FromDomain(item)
 
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) CreateInvoice(c *gin.Context) {
@@ -100,10 +98,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 	}
 
 	var body dto.InvoiceRequest
-	if err := c.ShouldBindJSON(&body); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &body); err != nil {
 		return
 	}
 
@@ -115,8 +110,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 		return
 	}
 
-	item.ID = newID
-	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Invoice saved"})
+	sharedhandlers.RespondCreated(c, newID)
 }
 
 func (h *Handler) UpdateInvoice(c *gin.Context) {
@@ -133,10 +127,7 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 	}
 
 	var body dto.InvoiceRequest
-	if err := c.ShouldBindJSON(&body); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &body); err != nil {
 		return
 	}
 
@@ -148,7 +139,7 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Invoice saved"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {
@@ -163,6 +154,6 @@ func (h *Handler) DeleteInvoice(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 

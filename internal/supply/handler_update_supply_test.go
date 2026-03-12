@@ -132,6 +132,14 @@ func (s *handlerUseCasesStub) DeleteSupplyMovement(context.Context, int64, int64
 	return nil
 }
 
+func (s *handlerUseCasesStub) ArchiveSupply(ctx context.Context, id int64) error {
+	return nil
+}
+
+func (s *handlerUseCasesStub) RestoreSupply(ctx context.Context, id int64) error {
+	return nil
+}
+
 func newHandlerJSONContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)

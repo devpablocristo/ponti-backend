@@ -13,7 +13,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup \
-        run-api run-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
+        run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
@@ -55,9 +55,13 @@ run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/
 
-run-ponti-local:
-	@echo "Running full local stack (backend + frontend + ai)..."
+up-ponti-local:
+	@echo "Starting full local stack (backend + frontend + ai)..."
 	@if [ -f ./scripts/run-ponti-local.sh ]; then bash ./scripts/run-ponti-local.sh; else bash ./scripts/run_ponti_local.sh; fi
+
+down-ponti-local:
+	@echo "Stopping full local stack (backend + frontend + ai)..."
+	@bash ./scripts/down_ponti_local.sh
 
 seed:
 	@echo "Seeding database..."
