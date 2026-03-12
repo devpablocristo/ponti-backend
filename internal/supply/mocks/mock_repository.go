@@ -212,6 +212,21 @@ func (mr *MockRepositoryPortMockRecorder) GetProvider(arg0, arg1 interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProvider", reflect.TypeOf((*MockRepositoryPort)(nil).GetProvider), arg0, arg1)
 }
 
+// ProjectExists mocks base method.
+func (m *MockRepositoryPort) ProjectExists(arg0 context.Context, arg1 int64) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProjectExists", arg0, arg1)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProjectExists indicates an expected call of ProjectExists.
+func (mr *MockRepositoryPortMockRecorder) ProjectExists(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectExists", reflect.TypeOf((*MockRepositoryPort)(nil).ProjectExists), arg0, arg1)
+}
+
 // GetInvestor mocks base method.
 func (m *MockRepositoryPort) GetInvestor(arg0 context.Context, arg1 int64) (*domain2.Investor, error) {
 	m.ctrl.T.Helper()

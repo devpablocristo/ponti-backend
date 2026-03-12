@@ -620,11 +620,13 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 		if len(importFailures) > 0 {
 			for _, failure := range importFailures {
 				failures = append(failures, createDto.SupplyMovementFailure{
-					Index:    failure.Index,
-					RowIndex: failure.RowIndex,
-					SupplyID: failure.SupplyID,
-					Code:     failure.Code,
-					Message:  failure.Message,
+					Index:           failure.Index,
+					RowIndex:        failure.RowIndex,
+					SupplyID:        failure.SupplyID,
+					SupplyName:      failure.SupplyName,
+					ReferenceNumber: failure.ReferenceNumber,
+					Code:            failure.Code,
+					Message:         failure.Message,
 				})
 				if failure.Index >= 0 && failure.Index < len(supplyMovementsResponse) {
 					supplyMovementsResponse[failure.Index] = createDto.NewErrorCreateSupplyMovementResponse(failure.Message)
