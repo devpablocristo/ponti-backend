@@ -16,6 +16,8 @@ type RepositoryPort interface {
 	GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	DeleteWorkOrderByID(context.Context, int64) error
+	ArchiveWorkOrder(context.Context, int64) error
+	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
@@ -94,6 +96,14 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
+}
+
+func (u *UseCases) ArchiveWorkOrder(ctx context.Context, id int64) error {
+	return u.repo.ArchiveWorkOrder(ctx, id)
+}
+
+func (u *UseCases) RestoreWorkOrder(ctx context.Context, id int64) error {
+	return u.repo.RestoreWorkOrder(ctx, id)
 }
 
 // ListWorkOrders delega al repositorio.

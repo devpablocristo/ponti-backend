@@ -12,8 +12,8 @@ MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
-        build up down logs reset rebuild clean docker-cleanup \
-        run-api run-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
+        build up down logs reset rebuild clean docker-cleanup dev dev-logs \
+        run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
@@ -55,9 +55,13 @@ run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/
 
-run-ponti-local:
-	@echo "Running full local stack (backend + frontend + ai)..."
+up-ponti-local:
+	@echo "Starting full local stack (backend + frontend + ai)..."
 	@if [ -f ./scripts/run-ponti-local.sh ]; then bash ./scripts/run-ponti-local.sh; else bash ./scripts/run_ponti_local.sh; fi
+
+down-ponti-local:
+	@echo "Stopping full local stack (backend + frontend + ai)..."
+	@bash ./scripts/down_ponti_local.sh
 
 seed:
 	@echo "Seeding database..."
@@ -122,6 +126,19 @@ db-force-reset-gcp:
 # Después del merge: reset GCP + migraciones + cargar datos desde DB local. Requiere scripts/db/db_gcp_reset_and_load_local.env.
 db-gcp-reset-and-load-local:
 	@bash ./scripts/db/db_gcp_reset_and_load_local.sh
+
+# --------------------------------------------------
+# Desarrollo con hot reload (Air)
+# --------------------------------------------------
+dev:
+	@echo "Starting dev environment with hot reload (Air)..."
+	docker compose -f $(DOCKER_COMPOSE_YML) up --build -d ponti-db
+	@echo "Waiting for DB to be healthy..."
+	@until docker compose -f $(DOCKER_COMPOSE_YML) exec ponti-db pg_isready -U $${DB_USER:-admin} -q 2>/dev/null; do sleep 1; done
+	docker compose -f $(DOCKER_COMPOSE_YML) up --build ponti-api
+
+dev-logs:
+	docker compose -f $(DOCKER_COMPOSE_YML) logs -f ponti-api
 
 # --------------------------------------------------
 # Docker Compose

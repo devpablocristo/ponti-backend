@@ -7,8 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
 	dto "github.com/alphacodinggroup/ponti-backend/internal/dashboard/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
@@ -86,8 +84,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	// Get dashboard data
 	dashboardData, err := h.ucs.GetDashboard(c.Request.Context(), filter)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

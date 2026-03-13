@@ -8,7 +8,6 @@ import (
 
 	domain "github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {
@@ -76,8 +75,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 
 	campaigns, err := h.ucs.ListCampaigns(c.Request.Context(), customerID, c.Query("project_name"))
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, campaigns)

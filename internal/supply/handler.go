@@ -47,6 +47,8 @@ type UseCasesPort interface {
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
 	ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
+	ArchiveSupply(context.Context, int64) error
+	RestoreSupply(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -99,6 +101,8 @@ func (h *Handler) Routes() {
 		supplies.GET("/:supply_id", h.GetSupply)
 		supplies.PUT("/:supply_id", h.UpdateSupply)
 		supplies.DELETE("/:supply_id", h.DeleteSupply)
+		supplies.POST("/:supply_id/archive", h.ArchiveSupply)
+		supplies.POST("/:supply_id/restore", h.RestoreSupply)
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
@@ -127,27 +131,20 @@ func (h *Handler) Routes() {
 
 func (h *Handler) CreateSupply(c *gin.Context) {
 	var req createDto.SupplyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	newID, err := h.ucs.CreateSupply(c.Request.Context(), req.ToDomain())
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"message": "Supply created successfully", "id": newID})
+	sharedhandlers.RespondCreated(c, newID)
 }
 
 func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 	var req []createDto.SupplyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	supplies := make([]domain.Supply, len(req))
@@ -155,11 +152,10 @@ func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
 		supplies[i] = *req[i].ToDomain()
 	}
 	if err := h.ucs.CreateSuppliesBulk(c.Request.Context(), supplies); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, types.MessageResponse{Message: "Supplies created successfully"})
+	c.Status(http.StatusCreated)
 }
 
 func (h *Handler) ListSupplies(c *gin.Context) {
@@ -180,13 +176,12 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 	}
 	supplies, total, err := h.ucs.ListSuppliesPaginated(c.Request.Context(), filter, page, perPage, mode)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := listDto.NewListSuppliesResponse(supplies, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {
@@ -197,11 +192,10 @@ func (h *Handler) GetSupply(c *gin.Context) {
 	}
 	supply, err := h.ucs.GetSupply(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, createDto.FromDomain(supply))
+	sharedhandlers.RespondOK(c, createDto.FromDomain(supply))
 }
 
 func (h *Handler) UpdateSupply(c *gin.Context) {
@@ -211,10 +205,7 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 		return
 	}
 	var req createDto.SupplyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	dom := req.ToDomain()
@@ -222,18 +213,16 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 	if req.IsPartialPrice == nil {
 		currentSupply, err := h.ucs.GetSupply(c.Request.Context(), id)
 		if err != nil {
-			apiErr, status := types.NewAPIError(err)
-			c.JSON(status, apiErr.ToResponse())
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 		dom.IsPartialPrice = currentSupply.IsPartialPrice
 	}
 	if err := h.ucs.UpdateSupply(c.Request.Context(), dom); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
@@ -243,11 +232,36 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteSupply(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ArchiveSupply(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveSupply(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreSupply(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreSupply(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
@@ -258,19 +272,15 @@ func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
 	}
 	count, err := h.ucs.CountWorkOrdersBySupplyID(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"count": count})
+	sharedhandlers.RespondOK(c, gin.H{"count": count})
 }
 
 func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 	var req []createDto.SupplyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
@@ -291,8 +301,7 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 	if len(idsToResolve) > 0 {
 		resolved, err := h.ucs.GetSuppliesByIDs(c.Request.Context(), idsToResolve)
 		if err != nil {
-			apiErr, status := types.NewAPIError(err)
-			c.JSON(status, apiErr.ToResponse())
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 		currentSuppliesByID = resolved
@@ -304,9 +313,7 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		if req[i].IsPartialPrice == nil && supply.ID != 0 {
 			currentSupply, ok := currentSuppliesByID[supply.ID]
 			if !ok {
-				domErr := types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supply.ID), nil)
-				apiErr, status := types.NewAPIError(domErr)
-				c.JSON(status, apiErr.ToResponse())
+				sharedhandlers.RespondError(c, types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supply.ID), nil))
 				return
 			}
 			supply.IsPartialPrice = currentSupply.IsPartialPrice
@@ -314,11 +321,10 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		supplies[i] = *supply
 	}
 	if err := h.ucs.UpdateSuppliesBulk(c.Request.Context(), supplies); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) ExportTableSupplies(c *gin.Context) {
@@ -336,8 +342,7 @@ func (h *Handler) ExportTableSupplies(c *gin.Context) {
 
 	data, err := h.ucs.ExportTableSupplies(c.Request.Context(), filter)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -353,19 +358,18 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	var req createDto.CreateSupplyMovementRequestBulk
 
 	userID, err := sharedhandlers.ParseUserID(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
@@ -374,9 +378,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		mode = "strict"
 	}
 	if mode != "partial" && mode != "strict" {
-		domErr := types.NewError(types.ErrBadRequest, "mode must be one of [partial, strict]", nil)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "mode must be one of [partial, strict]", nil))
 		return
 	}
 
@@ -566,28 +568,25 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	var req createDto.CreateSupplyMovementRequestBulk
 
 	userID, err := sharedhandlers.ParseUserID(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	total := len(req.SupplyMovements)
 	const maxImportItems = 500
 	if total > maxImportItems {
-		domErr := types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil))
 		return
 	}
 
@@ -614,18 +613,20 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	if len(failures) == 0 {
 		ids, importFailures, err := h.ucs.ImportSupplyMovements(ctx, domainMovements)
 		if err != nil {
-			handleError(err, c)
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 
 		if len(importFailures) > 0 {
 			for _, failure := range importFailures {
 				failures = append(failures, createDto.SupplyMovementFailure{
-					Index:    failure.Index,
-					RowIndex: failure.RowIndex,
-					SupplyID: failure.SupplyID,
-					Code:     failure.Code,
-					Message:  failure.Message,
+					Index:           failure.Index,
+					RowIndex:        failure.RowIndex,
+					SupplyID:        failure.SupplyID,
+					SupplyName:      failure.SupplyName,
+					ReferenceNumber: failure.ReferenceNumber,
+					Code:            failure.Code,
+					Message:         failure.Message,
 				})
 				if failure.Index >= 0 && failure.Index < len(supplyMovementsResponse) {
 					supplyMovementsResponse[failure.Index] = createDto.NewErrorCreateSupplyMovementResponse(failure.Message)
@@ -682,112 +683,111 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	supplyMovements, err := h.ucs.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, getDto.NewGetEntrySupplyMovementsResponse(supplyMovements))
+	sharedhandlers.RespondOK(c, getDto.NewGetEntrySupplyMovementsResponse(supplyMovements))
 }
 
 func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementId)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req updateDto.UpdateSupplyMovementEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	userID, err := sharedhandlers.ParseUserID(c)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementId)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	if err = req.Validate(); handleError(err, c) {
+	if err = req.Validate(); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectID, &userID, supplyMovement))
-
-	if handleError(err, c) {
+	if err = h.ucs.UpdateSupplyMovement(ctx, req.ToDomain(projectID, &userID, supplyMovement)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) GetProviders(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	providers, err := h.ucs.GetProviders(ctx)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, getDto.NewGetProvidersResponse(providers))
+	sharedhandlers.RespondOK(c, getDto.NewGetProvidersResponse(providers))
 }
-
-func handleError(err error, c *gin.Context) bool {
-	if err == nil {
-		return false
-	}
-	apiErr, status := types.NewAPIError(err)
-	c.JSON(status, apiErr.ToResponse())
-	return true
-}
-
 
 func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	data, err := h.ucs.ExportSupplyMovementsByProjectID(ctx, projectID)
-	if handleError(err, c) {
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 

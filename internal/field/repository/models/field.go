@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	fielddom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
@@ -50,31 +52,28 @@ func FromDomain(d *fielddom.Field) *Field {
 	}
 }
 
-// TO DOMAIN (sin preload de lots)
 func (m *Field) ToDomain() *fielddom.Field {
 	base := shareddomain.Base{
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
-		// Agrega otros campos si existen
 	}
-	if m.LeaseType == nil {
-		return &fielddom.Field{
-			ID:               m.ID,
-			Name:             m.Name,
-			ProjectID:        m.ProjectID,
-			LeaseType:        &leasetypedom.LeaseType{ID: m.LeaseTypeID, Name: ""},
-			LeaseTypePercent: m.LeaseTypePercent,
-			LeaseTypeValue:   m.LeaseTypeValue,
-			Base:             base,
-		}
+	var archivedAt *time.Time
+	if m.DeletedAt.Valid {
+		t := m.DeletedAt.Time
+		archivedAt = &t
+	}
+	ltName := ""
+	if m.LeaseType != nil {
+		ltName = m.LeaseType.Name
 	}
 	return &fielddom.Field{
 		ID:               m.ID,
 		Name:             m.Name,
 		ProjectID:        m.ProjectID,
-		LeaseType:        &leasetypedom.LeaseType{ID: m.LeaseTypeID, Name: m.LeaseType.Name},
+		LeaseType:        &leasetypedom.LeaseType{ID: m.LeaseTypeID, Name: ltName},
 		LeaseTypePercent: m.LeaseTypePercent,
 		LeaseTypeValue:   m.LeaseTypeValue,
+		ArchivedAt:       archivedAt,
 		Base:             base,
 	}
 }

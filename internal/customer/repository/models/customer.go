@@ -14,7 +14,7 @@ type Customer struct {
 }
 
 func (c Customer) ToDomain() *domain.Customer {
-	return &domain.Customer{
+	d := &domain.Customer{
 		ID:   c.ID,
 		Name: c.Name,
 		Base: shareddomain.Base{
@@ -24,6 +24,11 @@ func (c Customer) ToDomain() *domain.Customer {
 			UpdatedBy: c.UpdatedBy,
 		},
 	}
+	if c.DeletedAt.Valid {
+		t := c.DeletedAt.Time
+		d.ArchivedAt = &t
+	}
+	return d
 }
 
 func FromDomain(d *domain.Customer) *Customer {

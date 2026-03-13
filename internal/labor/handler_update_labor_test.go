@@ -100,8 +100,8 @@ func TestHandler_UpdateLabor_OmittedIsPartialPrice_PreservesStoredValue(t *testi
 
 	h.UpdateLabor(ctx)
 
-	if ctx.Writer.Status() != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.Writer.Status())
+	if ctx.Writer.Status() != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
 	}
 	if len(stub.getLaborCalls) != 1 || stub.getLaborCalls[0] != 42 {
 		t.Fatalf("expected GetLabor to be called with id 42, got %#v", stub.getLaborCalls)
@@ -139,8 +139,8 @@ func TestHandler_UpdateLabor_ExplicitIsPartialPrice_DoesNotFetchCurrent(t *testi
 
 	h.UpdateLabor(ctx)
 
-	if ctx.Writer.Status() != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.Writer.Status())
+	if ctx.Writer.Status() != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
 	}
 	if len(stub.getLaborCalls) != 0 {
 		t.Fatalf("expected no GetLabor call, got %#v", stub.getLaborCalls)

@@ -20,9 +20,9 @@ type RepositoryPort interface {
 	GetProject(context.Context, int64) (*domain.Project, error)
 	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
-	DeleteProject(context.Context, int64) error
+	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
-	HardDeleteProject(context.Context, int64) error
+	DeleteProject(context.Context, int64) error
 	GetFieldsByProjectID(context.Context, int64) ([]domainField.Field, error)
 }
 
@@ -95,16 +95,16 @@ func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 	return u.repo.UpdateProject(ctx, p)
 }
 
-func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
-	return u.repo.DeleteProject(ctx, id)
+func (u *UseCases) ArchiveProject(ctx context.Context, id int64) error {
+	return u.repo.ArchiveProject(ctx, id)
 }
 
 func (u *UseCases) RestoreProject(ctx context.Context, id int64) error {
 	return u.repo.RestoreProject(ctx, id)
 }
 
-func (u *UseCases) HardDeleteProject(ctx context.Context, id int64) error {
-	return u.repo.HardDeleteProject(ctx, id)
+func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
+	return u.repo.DeleteProject(ctx, id)
 }
 
 func (u *UseCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {

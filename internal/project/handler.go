@@ -3,14 +3,9 @@ package project
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
-	"github.com/go-playground/validator/v10"
 
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
 
@@ -20,42 +15,6 @@ import (
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
 	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
 )
-
-func humanizeBindError(err error) string {
-	var validationErrs validator.ValidationErrors
-	if errors.As(err, &validationErrs) {
-		var issues []string
-		for _, fe := range validationErrs {
-			fieldPath := strings.ToLower(fe.Namespace())
-			fieldPath = strings.TrimPrefix(fieldPath, "project.")
-
-			switch fe.Tag() {
-			case "required":
-				issues = append(issues, fieldPath+" es requerido")
-			default:
-				issues = append(issues, fieldPath+" inválido ("+fe.Tag()+")")
-			}
-		}
-		if len(issues) > 0 {
-			return "payload inválido: " + strings.Join(issues, "; ")
-		}
-	}
-
-	var unmarshalTypeErr *json.UnmarshalTypeError
-	if errors.As(err, &unmarshalTypeErr) {
-		if unmarshalTypeErr.Field != "" {
-			return "payload inválido: tipo inválido en '" + unmarshalTypeErr.Field + "'"
-		}
-		return "payload inválido: tipo de dato inválido"
-	}
-
-	var syntaxErr *json.SyntaxError
-	if errors.As(err, &syntaxErr) {
-		return "payload inválido: JSON mal formado"
-	}
-
-	return "payload inválido"
-}
 
 type UseCasesPort interface {
 	CreateProject(context.Context, *domain.Project) (int64, error)
@@ -67,9 +26,9 @@ type UseCasesPort interface {
 	GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
-	DeleteProject(context.Context, int64) error
+	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
-	HardDeleteProject(context.Context, int64) error
+	DeleteProject(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -127,10 +86,9 @@ func (h *Handler) Routes() {
 		public.GET("/customers/:customer_id", h.ListProjectsByCustomerID)
 		public.GET("/:project_id", h.GetProject)
 		public.PUT("/:project_id", h.UpdateProject)
-		public.PUT("/:project_id/archive", h.ArchiveProject)
-		public.PUT("/:project_id/restore", h.RestoreProject)
+		public.POST("/:project_id/archive", h.ArchiveProject)
+		public.POST("/:project_id/restore", h.RestoreProject)
 		public.DELETE("/:project_id", h.DeleteProject)
-		public.DELETE("/:project_id/hard", h.HardDeleteProject)
 		public.GET("/search", h.ListProjectsByName)
 	}
 }
@@ -138,21 +96,17 @@ func (h *Handler) Routes() {
 // CreateProject crea un proyecto.
 func (h *Handler) CreateProject(c *gin.Context) {
 	var req dto.Project
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, humanizeBindError(err), err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	ctx := c.Request.Context()
 	pID, err := h.ucs.CreateProject(ctx, req.ToDomain())
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.CreateProjectResponse{Message: "created", ID: pID})
+	sharedhandlers.RespondCreated(c, pID)
 }
 
 func (h *Handler) ListProjects(c *gin.Context) {
@@ -169,7 +123,6 @@ func (h *Handler) ListProjects(c *gin.Context) {
 		return
 	}
 
-	// Obtener los proyectos ligeros y total
 	var customerIDValue int64
 	if customerID != nil {
 		customerIDValue = *customerID
@@ -180,15 +133,13 @@ func (h *Handler) ListProjects(c *gin.Context) {
 	}
 	items, totalHectares, total, err := h.ucs.GetProjects(c.Request.Context(), name, customerIDValue, campaignIDValue, page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	// Construir y devolver la respuesta paginada
 	resp := dto.NewProjectsResponse(items, page, perPage, total)
 	resp.TotalHectares = totalHectares
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 // ListArchivedProjects lista proyectos archivados con clientes activos.
@@ -196,13 +147,12 @@ func (h *Handler) ListArchivedProjects(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 	items, totalHectares, total, err := h.ucs.ListArchivedProjects(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	resp := dto.NewProjectsResponse(items, page, perPage, total)
 	resp.TotalHectares = totalHectares
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
@@ -213,32 +163,28 @@ func (h *Handler) GetFieldsByProjectID(c *gin.Context) {
 	}
 	fields, err := h.ucs.GetFieldsByProjectID(c.Request.Context(), projectID)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	dtos := make([]dto.Field, len(fields))
 	for i, f := range fields {
 		dtos[i] = dto.FieldsFromDomain(f)
 	}
-	c.JSON(http.StatusOK, dtos)
+	sharedhandlers.RespondOK(c, dtos)
 }
 
 // ListProjectsDropdown maneja el endpoint GET /projects con paginación ligera.
 func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 100)
 
-	// Obtener los proyectos ligeros y total
 	items, total, err := h.ucs.ListProjects(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	// Construir y devolver la respuesta paginada
 	resp := dto.NewListProjectsResponse(items, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 // ListProjectsByCustomerID maneja GET /projects/customers/:customer_id con paginación ligera
@@ -252,13 +198,12 @@ func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
 
 	items, total, err := h.ucs.ListProjectsByCustomerID(c.Request.Context(), customerID, page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.NewListProjectsResponse(items, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 // GetProject devuelve un proyecto por ID.
@@ -270,11 +215,10 @@ func (h *Handler) GetProject(c *gin.Context) {
 	}
 	proj, err := h.ucs.GetProject(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomain(proj))
+	sharedhandlers.RespondOK(c, dto.FromDomain(proj))
 }
 
 // UpdateProject actualiza un proyecto.
@@ -285,16 +229,11 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		return
 	}
 	var req dto.Project
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, humanizeBindError(err), err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	if req.UpdatedAt == nil {
-		domErr := types.NewError(types.ErrBadRequest, "updated_at is required", nil)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "updated_at is required", nil))
 		return
 	}
 	dom := req.ToDomain()
@@ -303,26 +242,10 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		UpdatedAt: *req.UpdatedAt,
 	}
 	if err := h.ucs.UpdateProject(c.Request.Context(), dom); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-// DeleteProject elimina un proyecto por ID.
-func (h *Handler) DeleteProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 // ArchiveProject archiva un proyecto por ID.
@@ -332,12 +255,11 @@ func (h *Handler) ArchiveProject(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.ArchiveProject(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
@@ -348,26 +270,24 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.RestoreProject(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
-// HardDeleteProject elimina físicamente un proyecto por ID.
-func (h *Handler) HardDeleteProject(c *gin.Context) {
+// DeleteProject elimina físicamente un proyecto por ID.
+func (h *Handler) DeleteProject(c *gin.Context) {
 	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.HardDeleteProject(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {
@@ -379,7 +299,6 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 		err   error
 	)
 	if name != "" {
-		// Delegar al caso de uso ListProjectsByName
 		list, t, errName := h.ucs.ListProjectsByName(c.Request.Context(), name, page, perPage)
 		if errName != nil {
 			err = errName
@@ -391,7 +310,6 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 			}
 		}
 	} else {
-		// Usar ListProjects como fallback
 		list, t, errList := h.ucs.ListProjects(c.Request.Context(), page, perPage)
 		if errList != nil {
 			err = errList
@@ -404,13 +322,12 @@ func (h *Handler) ListProjectsByName(c *gin.Context) {
 		}
 	}
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 	resp := dto.ListProjectsResponse{
 		Items:    items,
 		PageInfo: types.NewPageInfo(page, perPage, total),
 	}
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }

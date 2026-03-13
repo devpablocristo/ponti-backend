@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -101,23 +100,19 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 	var req dto.LaborList
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	if err = c.ShouldBindJSON(&req); err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
@@ -157,34 +152,30 @@ func (h *Handler) ListLabor(c *gin.Context) {
 
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	items, total, err := h.ucs.ListLabor(c.Request.Context(), page, perPage, projectID)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.NewListLaborsResponse(items, page, perPage, total)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -194,10 +185,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 	var req dto.Labor
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 	req.ID = id
@@ -206,26 +194,22 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 	if req.IsPartialPrice == nil {
 		currentLabor, err := h.ucs.GetLabor(c.Request.Context(), id)
 		if err != nil {
-			apiErr, status := types.NewAPIError(err)
-			c.JSON(status, apiErr.ToResponse())
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 		dom.IsPartialPrice = currentLabor.IsPartialPrice
 	}
 
 	if err := h.ucs.UpdateLabor(c.Request.Context(), dom); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor updated successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteLabor(c *gin.Context) {
 	if _, err := sharedhandlers.ParseProjectIDParam(c, "project_id"); err != nil {
-		domErr := types.NewError(types.ErrInvalidID, "invalid project_id", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -235,11 +219,10 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
@@ -250,11 +233,10 @@ func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 	}
 	count, err := h.ucs.CountWorkOrdersByLaborID(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"count": count})
+	sharedhandlers.RespondOK(c, gin.H{"count": count})
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {
@@ -264,11 +246,10 @@ func (h *Handler) DeleteLaborByID(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Labor deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) ListLaborCategories(c *gin.Context) {
@@ -283,32 +264,31 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 		return
 	}
 
-	laborCategories, err := h.ucs.ListLaborCategoriesByTypeID(c, id)
+	laborCategories, err := h.ucs.ListLaborCategoriesByTypeID(c.Request.Context(), id)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.NewLaborCategoriesListResponse(laborCategories)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
-	workOrderID, ok := parseParamID(c, "work_order_id")
-	if !ok {
+	workOrderID, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	items, err := h.ucs.ListLaborByWorkOrder(c.Request.Context(), workOrderID)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.ToLaborListResponse(items)
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
@@ -321,19 +301,15 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
 		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, domErr)
 		return
 	}
 
 	var fieldID int64
 	if fieldIDParam != "" {
-		var err error
-		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
+		fieldID, err = sharedhandlers.ParseParamID(fieldIDParam, "field_id")
 		if err != nil {
-			domErr := types.NewError(types.ErrInvalidID, "invalid field_id", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 	}
@@ -342,14 +318,13 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
-		apiErr, _ := types.NewAPIError(err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"details": err.Error()})
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.FromDomainList(pageInfo, list)
 
-	c.JSON(http.StatusOK, resp)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
@@ -361,16 +336,16 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		types.NewErrorResponseHelper().BadRequest(c, "fieldID or projectID requires a value", nil)
+		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		sharedhandlers.RespondError(c, domErr)
 		return
 	}
 
 	var fieldID int64
 	if fieldIDParam != "" {
-		var err error
-		fieldID, err = strconv.ParseInt(fieldIDParam, 10, 64)
+		fieldID, err = sharedhandlers.ParseParamID(fieldIDParam, "field_id")
 		if err != nil {
-			types.NewErrorResponseHelper().BadRequest(c, "fieldID is not a valid integer", nil)
+			sharedhandlers.RespondError(c, err)
 			return
 		}
 	}
@@ -383,7 +358,7 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 
 	data, err := h.ucs.ExportGroupLaborXLSX(c.Request.Context(), input, projectID, fieldID)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -407,11 +382,10 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	filt.FieldID = workspaceFilter.FieldID
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.FromDomainMetrics(m))
+	sharedhandlers.RespondOK(c, dto.FromDomainMetrics(m))
 }
 
 func (h *Handler) ExportProjectLabors(c *gin.Context) {
@@ -423,7 +397,7 @@ func (h *Handler) ExportProjectLabors(c *gin.Context) {
 
 	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), projectID)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -435,20 +409,15 @@ func (h *Handler) ExportProjectLabors(c *gin.Context) {
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
-	projectIDStr := c.Query("project_id")
-	if projectIDStr == "" {
-		types.NewErrorResponseHelper().BadRequest(c, "project_id is required", nil)
-		return
-	}
-	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
-	if err != nil || projectID <= 0 {
-		types.NewErrorResponseHelper().BadRequest(c, "project_id must be a valid positive integer", nil)
+	projectID, err := sharedhandlers.ParseParamID(c.Query("project_id"), "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), projectID)
 	if err != nil {
-		types.NewErrorResponseHelper().HandleDomainError(c, err)
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -459,22 +428,3 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
-// ----- HELPER -----
-
-func parseParamID(c *gin.Context, param string) (int64, bool) {
-	raw := strings.TrimSpace(c.Param(param))
-	if raw == "" {
-		apiErr := types.NewError(types.ErrInvalidID, param+" is required", nil)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"param": param})
-		return 0, false
-	}
-
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id <= 0 {
-		apiErr := types.NewError(types.ErrInvalidID, param+" must be a positive integer", err)
-		_ = c.Error(apiErr).SetMeta(map[string]any{"param": param, "value": raw})
-		return 0, false
-	}
-
-	return id, true
-}

@@ -13,11 +13,13 @@ type SupplyMovementSuccess struct {
 }
 
 type SupplyMovementFailure struct {
-	Index    int    `json:"index"`
-	RowIndex int    `json:"row_index"`
-	SupplyID int64  `json:"supply_id"`
-	Code     string `json:"code"`
-	Message  string `json:"message"`
+	Index           int    `json:"index"`
+	RowIndex        int    `json:"row_index"`
+	SupplyID        int64  `json:"supply_id"`
+	SupplyName      string `json:"supply_name,omitempty"`
+	ReferenceNumber string `json:"reference_number,omitempty"`
+	Code            string `json:"code"`
+	Message         string `json:"message"`
 }
 
 type SupplyMovementSkipped struct {

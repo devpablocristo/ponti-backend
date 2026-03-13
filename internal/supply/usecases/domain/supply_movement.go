@@ -23,6 +23,10 @@ type SupplyMovement struct {
 	Provider             *providerdomain.Provider
 	OriginProjectID      *int64
 	OriginProjectName    *string
+	DestinationProjectID *int64
+	DestinationProject   *string
+	DestinationCustomer  *string
+	DestinationCampaign  *string
 	IsEntry              bool
 	shareddomain.Base
 }

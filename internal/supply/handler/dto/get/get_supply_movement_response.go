@@ -36,38 +36,46 @@ func (s summary) MarshalJSON() ([]byte, error) {
 }
 
 type entrySupplyMovementsResponse struct {
-	ID              int64           `json:"id"`
-	EntryType       string          `json:"entry_type"`
-	ReferenceNumber string          `json:"reference_number"`
-	EntryDate       time.Time       `json:"entry_date"`
-	InvestorName    string          `json:"investor_name"`
-	SupplyName      string          `json:"supply_name"`
-	Quantity        string          `json:"quantity"`
-	Category        string          `json:"category"`
-	Type            string          `json:"type"`
-	ProviderName    string          `json:"provider_name"`
-	OriginProjectID *int64          `json:"origin_project_id"`
-	OriginProject   *string         `json:"origin_project_name"`
-	PriceUSD        decimal.Decimal `json:"price_usd"`
-	TotalUSD        decimal.Decimal `json:"total_usd"`
+	ID                   int64           `json:"id"`
+	EntryType            string          `json:"entry_type"`
+	ReferenceNumber      string          `json:"reference_number"`
+	EntryDate            time.Time       `json:"entry_date"`
+	InvestorName         string          `json:"investor_name"`
+	SupplyName           string          `json:"supply_name"`
+	Quantity             string          `json:"quantity"`
+	Category             string          `json:"category"`
+	Type                 string          `json:"type"`
+	ProviderName         string          `json:"provider_name"`
+	OriginProjectID      *int64          `json:"origin_project_id"`
+	OriginProject        *string         `json:"origin_project_name"`
+	DestinationProjectID *int64          `json:"destination_project_id"`
+	DestinationProject   *string         `json:"destination_project_name"`
+	DestinationCustomer  *string         `json:"destination_customer_name"`
+	DestinationCampaign  *string         `json:"destination_campaign_name"`
+	PriceUSD             decimal.Decimal `json:"price_usd"`
+	TotalUSD             decimal.Decimal `json:"total_usd"`
 }
 
 func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement) entrySupplyMovementsResponse {
 	return entrySupplyMovementsResponse{
-		ID:              dsm.ID,
-		EntryType:       dsm.MovementType,
-		ReferenceNumber: dsm.ReferenceNumber,
-		EntryDate:       *dsm.MovementDate,
-		InvestorName:    dsm.Investor.Name,
-		SupplyName:      dsm.Supply.Name,
-		Quantity:        fmt.Sprintf("%s %s", dsm.Quantity.String(), dsm.Supply.UnitName),
-		Category:        dsm.Supply.CategoryName,
-		Type:            dsm.Supply.Type.Name,
-		PriceUSD:        dsm.Supply.Price,
-		TotalUSD:        dsm.Supply.Price.Mul(dsm.Quantity),
-		ProviderName:    dsm.Provider.Name,
-		OriginProjectID: dsm.OriginProjectID,
-		OriginProject:   dsm.OriginProjectName,
+		ID:                   dsm.ID,
+		EntryType:            dsm.MovementType,
+		ReferenceNumber:      dsm.ReferenceNumber,
+		EntryDate:            *dsm.MovementDate,
+		InvestorName:         dsm.Investor.Name,
+		SupplyName:           dsm.Supply.Name,
+		Quantity:             fmt.Sprintf("%s %s", dsm.Quantity.String(), dsm.Supply.UnitName),
+		Category:             dsm.Supply.CategoryName,
+		Type:                 dsm.Supply.Type.Name,
+		PriceUSD:             dsm.Supply.Price,
+		TotalUSD:             dsm.Supply.Price.Mul(dsm.Quantity),
+		ProviderName:         dsm.Provider.Name,
+		OriginProjectID:      dsm.OriginProjectID,
+		OriginProject:        dsm.OriginProjectName,
+		DestinationProjectID: dsm.DestinationProjectID,
+		DestinationProject:   dsm.DestinationProject,
+		DestinationCustomer:  dsm.DestinationCustomer,
+		DestinationCampaign:  dsm.DestinationCampaign,
 	}
 }
 

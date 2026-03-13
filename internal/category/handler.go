@@ -2,19 +2,18 @@ package category
 
 import (
 	"context"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 
 	dto "github.com/alphacodinggroup/ponti-backend/internal/category/handler/dto"
 	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
 	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/gin-gonic/gin"
 )
 
-// UseCasesPort expects domain.Category, not dto.Category
 type UseCasesPort interface {
-	ListCategories(context.Context) ([]domain.Category, error)
 	CreateCategory(context.Context, *domain.Category) (int64, error)
+	ListCategories(context.Context, int, int) ([]domain.Category, int64, error)
+	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
 	DeleteCategory(context.Context, int64) error
 }
@@ -35,25 +34,25 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
-// Handler encapsulates all dependencies for the Category HTTP handler.
+// Handler encapsula las dependencias del handler HTTP de Category.
 type Handler struct {
-	categoryUC UseCasesPort
-	gsv        GinEnginePort
-	acf        ConfigAPIPort
-	mws        MiddlewaresEnginePort
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
-// NewHandler creates a new Category handler.
+// NewHandler crea un handler de Category.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
-		categoryUC: u,
-		gsv:        s,
-		acf:        c,
-		mws:        m,
+		ucs: u,
+		gsv: s,
+		acf: c,
+		mws: m,
 	}
 }
 
-// Routes registers all category routes.
+// Routes registra las rutas del módulo Category.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/categories"
@@ -64,42 +63,49 @@ func (h *Handler) Routes() {
 
 	group := r.Group(baseURL)
 	{
-		group.GET("", h.ListCategories)
 		group.POST("", h.CreateCategory)
+		group.GET("", h.ListCategories)
+		group.GET("/:category_id", h.GetCategory)
 		group.PUT("/:category_id", h.UpdateCategory)
 		group.DELETE("/:category_id", h.DeleteCategory)
 	}
 }
 
-func (h *Handler) ListCategories(c *gin.Context) {
-	categories, err := h.categoryUC.ListCategories(c.Request.Context())
-	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+func (h *Handler) CreateCategory(c *gin.Context) {
+	var req dto.CreateCategoryRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	out := make([]dto.Category, len(categories))
-	for i := range categories {
-		out[i] = *dto.FromDomain(&categories[i])
+	id, err := h.ucs.CreateCategory(c.Request.Context(), req.ToDomain())
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
-	c.JSON(http.StatusOK, out)
+	sharedhandlers.RespondCreated(c, id)
 }
 
-func (h *Handler) CreateCategory(c *gin.Context) {
-	var req dto.Category
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
-		return
-	}
-	newID, err := h.categoryUC.CreateCategory(c.Request.Context(), req.ToDomain())
+func (h *Handler) ListCategories(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	categories, total, err := h.ucs.ListCategories(c.Request.Context(), page, perPage)
 	if err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"message": "Category created successfully", "id": newID})
+	sharedhandlers.RespondOK(c, dto.NewListCategoriesResponse(categories, page, perPage, total))
+}
+
+func (h *Handler) GetCategory(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	cat, err := h.ucs.GetCategory(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.CategoryFromDomain(cat))
 }
 
 func (h *Handler) UpdateCategory(c *gin.Context) {
@@ -108,21 +114,15 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	var req dto.Category
-	if err := c.ShouldBindJSON(&req); err != nil {
-		domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-		apiErr, status := types.NewAPIError(domErr)
-		c.JSON(status, apiErr.ToResponse())
+	var req dto.UpdateCategoryRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	dom := req.ToDomain()
-	dom.ID = id
-	if err := h.categoryUC.UpdateCategory(c.Request.Context(), dom); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.UpdateCategory(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category updated successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
@@ -131,10 +131,9 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.categoryUC.DeleteCategory(c.Request.Context(), id); err != nil {
-		apiErr, status := types.NewAPIError(err)
-		c.JSON(status, apiErr.ToResponse())
+	if err := h.ucs.DeleteCategory(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, types.MessageResponse{Message: "Category deleted successfully"})
+	sharedhandlers.RespondNoContent(c)
 }
