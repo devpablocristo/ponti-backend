@@ -129,6 +129,7 @@ jobs:
             --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
             --set-env-vars="${ENV_VARS}" \
             --set-secrets="DB_PASSWORD=${SECRET_DB_PASSWORD_NAME_PROD}:latest,X_API_KEY=${SECRET_X_API_KEY_NAME_PROD}:latest" \
+            --min-instances=1 \
             --allow-unauthenticated
 
       - name: Resolve service URL (PROD)
