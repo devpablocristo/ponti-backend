@@ -317,6 +317,36 @@ func (mr *MockRepositoryPortMockRecorder) ExistsSupplyMovementByProjectReference
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsSupplyMovementByProjectReferenceAndSupply", reflect.TypeOf((*MockRepositoryPort)(nil).ExistsSupplyMovementByProjectReferenceAndSupply), arg0, arg1, arg2, arg3)
 }
 
+// ExistsSupplyMovementByProjectReferenceAndType mocks base method.
+func (m *MockRepositoryPort) ExistsSupplyMovementByProjectReferenceAndType(arg0 context.Context, arg1 int64, arg2, arg3 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsSupplyMovementByProjectReferenceAndType", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsSupplyMovementByProjectReferenceAndType indicates an expected call of ExistsSupplyMovementByProjectReferenceAndType.
+func (mr *MockRepositoryPortMockRecorder) ExistsSupplyMovementByProjectReferenceAndType(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsSupplyMovementByProjectReferenceAndType", reflect.TypeOf((*MockRepositoryPort)(nil).ExistsSupplyMovementByProjectReferenceAndType), arg0, arg1, arg2, arg3)
+}
+
+// ExistsSupplyMovementByProjectReferenceSupplyAndType mocks base method.
+func (m *MockRepositoryPort) ExistsSupplyMovementByProjectReferenceSupplyAndType(arg0 context.Context, arg1 int64, arg2 string, arg3 int64, arg4 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsSupplyMovementByProjectReferenceSupplyAndType", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsSupplyMovementByProjectReferenceSupplyAndType indicates an expected call of ExistsSupplyMovementByProjectReferenceSupplyAndType.
+func (mr *MockRepositoryPortMockRecorder) ExistsSupplyMovementByProjectReferenceSupplyAndType(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsSupplyMovementByProjectReferenceSupplyAndType", reflect.TypeOf((*MockRepositoryPort)(nil).ExistsSupplyMovementByProjectReferenceSupplyAndType), arg0, arg1, arg2, arg3, arg4)
+}
+
 // GetWorkOrdersBySupplyID mocks base method.
 func (m *MockRepositoryPort) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	m.ctrl.T.Helper()

@@ -36,6 +36,9 @@ type ProviderRequest struct {
 
 func (csmr *CreateSupplyMovementEntryRequest) Validate() error {
 	var err error
+	if err = validateQuantity(csmr.Quantity); err != nil {
+		return err
+	}
 	if err = validateMovementType(csmr.MovementType); err != nil {
 		return err
 	}
@@ -84,17 +87,28 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int
 }
 
 func validateMovementType(movementType string) error {
-	if movementType != domain.INTERNAL_MOVEMENT && movementType != domain.OFFICIAL_INVOICE && movementType != domain.STOCK {
+	if movementType != domain.INTERNAL_MOVEMENT &&
+		movementType != domain.OFFICIAL_INVOICE &&
+		movementType != domain.STOCK &&
+		movementType != domain.RETURN_MOVEMENT {
 		return types.NewError(
 			types.ErrValidation,
 			fmt.Sprintf(
-				"must be a valid type [%s, %s, %s]",
+				"must be a valid type [%s, %s, %s, %s]",
 				domain.INTERNAL_MOVEMENT,
 				domain.OFFICIAL_INVOICE,
 				domain.STOCK,
+				domain.RETURN_MOVEMENT,
 			),
 			nil,
 		)
+	}
+	return nil
+}
+
+func validateQuantity(quantity decimal.Decimal) error {
+	if quantity.LessThanOrEqual(decimal.Zero) {
+		return types.NewError(types.ErrValidation, "quantity must be greater than 0", nil)
 	}
 	return nil
 }

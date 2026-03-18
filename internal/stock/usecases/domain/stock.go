@@ -32,8 +32,7 @@ func (s *Stock) GetTotalUSD() decimal.Decimal {
 }
 
 func (s *Stock) GetStockUnits() decimal.Decimal {
-
-	return s.GetEntryStock().Sub(s.Consumed)
+	return s.GetNetMovementUnits().Sub(s.Consumed)
 }
 
 func (s *Stock) GetStockDifference() decimal.Decimal {
@@ -43,24 +42,27 @@ func (s *Stock) GetStockDifference() decimal.Decimal {
 func (s *Stock) GetEntryStock() decimal.Decimal {
 	var stockUnits decimal.Decimal
 	for _, supplyMovement := range s.SupplyMovements {
-		if supplyMovement.IsEntry {
+		if supplyMovement.IsEntry && supplyMovement.Quantity.GreaterThanOrEqual(decimal.Zero) {
 			stockUnits = stockUnits.Add(supplyMovement.Quantity)
 		}
 	}
-
-	if s.UnitsTransferred.GreaterThan(decimal.Zero) {
-		stockUnits = stockUnits.Sub(s.UnitsTransferred)
-	}
-
 	return stockUnits
 }
 
 func (s *Stock) GetOutStock() decimal.Decimal {
 	var stockUnits decimal.Decimal
 	for _, supplyMovement := range s.SupplyMovements {
-		if !supplyMovement.IsEntry {
-			stockUnits = stockUnits.Add(supplyMovement.Quantity)
+		if supplyMovement.IsEntry && supplyMovement.Quantity.LessThan(decimal.Zero) {
+			stockUnits = stockUnits.Add(supplyMovement.Quantity.Abs())
+			continue
 		}
+		if !supplyMovement.IsEntry {
+			stockUnits = stockUnits.Add(supplyMovement.Quantity.Abs())
+		}
+	}
+
+	if s.UnitsTransferred.GreaterThan(decimal.Zero) {
+		stockUnits = stockUnits.Add(s.UnitsTransferred)
 	}
 
 	return stockUnits
@@ -68,4 +70,21 @@ func (s *Stock) GetOutStock() decimal.Decimal {
 
 func (s *Stock) GetSupplyUnitName() string {
 	return s.Supply.UnitName
+}
+
+func (s *Stock) GetNetMovementUnits() decimal.Decimal {
+	var stockUnits decimal.Decimal
+	for _, supplyMovement := range s.SupplyMovements {
+		if supplyMovement.IsEntry {
+			stockUnits = stockUnits.Add(supplyMovement.Quantity)
+			continue
+		}
+		stockUnits = stockUnits.Sub(supplyMovement.Quantity.Abs())
+	}
+
+	if s.UnitsTransferred.GreaterThan(decimal.Zero) {
+		stockUnits = stockUnits.Sub(s.UnitsTransferred)
+	}
+
+	return stockUnits
 }

@@ -22,6 +22,8 @@ type RepositoryPort interface {
 	GetProvider(context.Context, int64) (*providerdomain.Provider, error)
 	ProjectExists(context.Context, int64) (bool, error)
 	ExistsSupplyMovementByProjectReferenceAndSupply(context.Context, int64, string, int64) (bool, error)
+	ExistsSupplyMovementByProjectReferenceAndType(context.Context, int64, string, string) (bool, error)
+	ExistsSupplyMovementByProjectReferenceSupplyAndType(context.Context, int64, string, int64, string) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
