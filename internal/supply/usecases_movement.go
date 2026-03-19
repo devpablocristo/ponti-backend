@@ -19,10 +19,10 @@ type transactionExecutor interface {
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	if err := u.resolveMovementReferences(ctx, movement); err != nil {
+	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
 		return 0, err
 	}
-	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+	if err := u.resolveMovementReferences(ctx, movement); err != nil {
 		return 0, err
 	}
 	return u.createSupplyMovementInternal(ctx, movement)
@@ -119,13 +119,16 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 }
 
 func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) error {
-	if err := u.resolveMovementReferences(ctx, movement); err != nil {
-		return err
-	}
 	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
 		return err
 	}
+	if err := u.resolveMovementReferences(ctx, movement); err != nil {
+		return err
+	}
+	return u.validateSupplyMovementResolved(ctx, movement)
+}
 
+func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement *domain.SupplyMovement) error {
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return err
