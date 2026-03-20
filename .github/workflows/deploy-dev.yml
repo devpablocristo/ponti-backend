@@ -80,7 +80,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -t "$image_uri" .
+          docker build --build-arg GO_MODULES_TOKEN=${{ secrets.GO_MODULES_TOKEN }} -t "$image_uri" .
           docker push "$image_uri"
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
 

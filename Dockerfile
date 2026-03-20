@@ -1,5 +1,6 @@
 FROM golang:1.26.1-alpine AS builder
 
+ARG GO_MODULES_TOKEN
 
 ENV TZ=America/Argentina/Buenos_Aires
 RUN apk add --no-cache \
@@ -10,12 +11,15 @@ RUN apk add --no-cache \
    musl-dev \
    git
 
+# Configurar acceso a repos privados de Go
+ENV GOPRIVATE=github.com/devpablocristo/*
+RUN if [ -n "$GO_MODULES_TOKEN" ]; then \
+      git config --global url."https://${GO_MODULES_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
 
 WORKDIR /app
 
-
 COPY . .
-
 
 WORKDIR /app
 RUN go mod download && go mod verify

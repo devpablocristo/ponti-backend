@@ -13,7 +13,9 @@
       "Bash(for module:*)",
       "Bash(make up-ponti-local:*)",
       "Read(//home/pablo/Projects/Pablo/ponti/**)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(go mod:*)",
+      "Bash(GOPRIVATE=github.com/devpablocristo/*)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
