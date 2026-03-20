@@ -10,7 +10,7 @@ import (
 
 	// project
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
@@ -95,16 +95,16 @@ func (u *UseCases) ListLots(
 
 func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, _, _, _, err := u.ListLots(ctx, filter, page, pageSize)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list lots", err)
+		return nil, domainerr.Internal("list lots")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)

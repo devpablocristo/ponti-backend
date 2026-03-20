@@ -6,7 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/saas-core/shared/httperr"
 )
 
 // RequireAPIKey asegura que el request tenga un API key válido en el header.
@@ -15,15 +16,15 @@ func RequireAPIKey() gin.HandlerFunc {
 		apiKey := strings.TrimSpace(c.GetHeader(HeaderAPIKey))
 		expectedKey := os.Getenv(EnvAPIKey)
 		if apiKey == "" {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "api key is required", nil)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			err := domainerr.Unauthorized("api key is required")
+			status, apiErr := httperr.Normalize(err)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		if expectedKey == "" || apiKey != expectedKey {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "api key is invalid", nil)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			err := domainerr.Unauthorized("api key is invalid")
+			status, apiErr := httperr.Normalize(err)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		c.Set(ContextAPIKey, apiKey)

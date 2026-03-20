@@ -10,7 +10,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type GormEnginePort interface {
@@ -35,7 +35,7 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 		UpdatedBy: inv.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create investor", err)
+		return 0, domainerr.Internal("failed to create investor")
 	}
 	return model.ID, nil
 }
@@ -43,7 +43,7 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]domain.Investor, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.Investor{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count investors", err)
+		return nil, 0, domainerr.Internal("failed to count investors")
 	}
 
 	var list []models.Investor
@@ -54,7 +54,7 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list investors", err)
+		return nil, 0, domainerr.Internal("failed to list investors")
 	}
 
 	result := make([]domain.Investor, 0, len(list))
@@ -87,13 +87,13 @@ func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 	}
 	result := updateTx.Updates(models.FromDomain(inv))
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update investor", result.Error)
+		return domainerr.Internal("failed to update investor")
 	}
 	if result.RowsAffected == 0 {
 		if !inv.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "investor not found or outdated", nil)
+			return domainerr.Conflict("investor not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d does not exist", inv.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d does not exist", inv.ID))
 	}
 	return nil
 }
@@ -104,10 +104,10 @@ func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
 	}
 	result := r.db.Client().WithContext(ctx).Unscoped().Delete(&models.Investor{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete investor", result.Error)
+		return domainerr.Internal("failed to delete investor")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d does not exist", id))
 	}
 	return nil
 }
@@ -118,7 +118,7 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 	}
 	result := r.db.Client().WithContext(ctx).Delete(&models.Investor{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to archive investor", result.Error)
+		return domainerr.Internal("failed to archive investor")
 	}
 	// Idempotente: si ya estaba archivado, RowsAffected == 0 es OK
 	return nil
@@ -133,7 +133,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 		Where("id = ?", id).
 		Update("deleted_at", nil)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to restore investor", result.Error)
+		return domainerr.Internal("failed to restore investor")
 	}
 	return nil
 }

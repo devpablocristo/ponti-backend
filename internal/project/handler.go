@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
@@ -233,7 +234,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		return
 	}
 	if req.UpdatedAt == nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "updated_at is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("updated_at is required"))
 		return
 	}
 	dom := req.ToDomain()

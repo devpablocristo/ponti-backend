@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
@@ -80,7 +80,7 @@ func (h *ReportHandler) GetReport(c *gin.Context) {
 
 	// Validar tipo de reporte
 	if !h.isValidReportType(reportType) {
-		h.reportError(c, types.NewError(types.ErrInvalidInput, "invalid report type", nil))
+		h.reportError(c, domainerr.Validation("invalid report type"))
 		return
 	}
 
@@ -94,7 +94,7 @@ func (h *ReportHandler) GetReport(c *gin.Context) {
 	if reportType == "field-crop" {
 		reportFilters := filters.(domain.ReportFilter)
 		if reportFilters.ProjectID == nil {
-			h.reportError(c, types.NewError(types.ErrInvalidInput, "project_id is required", nil))
+			h.reportError(c, domainerr.Validation("project_id is required"))
 			return
 		}
 	}
@@ -149,7 +149,7 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 func (h *ReportHandler) parseSummaryFilters(c *gin.Context) (domain.SummaryResultsFilter, error) {
 	var request dto.SummaryResultsRequest
 	if err := c.ShouldBindQuery(&request); err != nil {
-		return domain.SummaryResultsFilter{}, types.NewError(types.ErrInvalidInput, "invalid summary filters", err)
+		return domain.SummaryResultsFilter{}, domainerr.Validation("invalid summary filters")
 	}
 	return dto.ToDomainSummaryResultsFilter(request), nil
 }
@@ -179,7 +179,7 @@ func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, fil
 		return dto.FromDomainSummaryResults(report), nil
 
 	default:
-		return nil, types.NewError(types.ErrInvalidInput, "invalid report type", nil)
+		return nil, domainerr.Validation("invalid report type")
 	}
 }
 

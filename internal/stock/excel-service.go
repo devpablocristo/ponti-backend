@@ -5,7 +5,7 @@ import (
 	"context"
 	"io"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
@@ -27,7 +27,7 @@ func (e *ExcelExporter) Export(ctx context.Context, items []*domain.Stock) ([]by
 	_ = ctx
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	rows := stockExcel.BuildExcelDTO(items)

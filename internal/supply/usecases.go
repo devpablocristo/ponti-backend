@@ -9,7 +9,7 @@ import (
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type RepositoryPort interface {
@@ -77,14 +77,14 @@ func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases S
 
 func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	if s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
-		return 0, types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+		return 0, domainerr.Validation("missing required fields")
 	}
 	return u.repo.CreateSupply(ctx, s)
 }
 
 func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
 	if len(supplies) == 0 {
-		return types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
+		return domainerr.Validation("no supplies provided")
 	}
 
 	seen := map[string]bool{}
@@ -93,14 +93,14 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	for _, s := range supplies {
 		key := fmt.Sprintf("%d:%s", s.ProjectID, s.Name)
 		if seen[key] {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply name in request: %s", s.Name), nil)
+			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("duplicate supply name in request: %s", s.Name))
 		}
 		seen[key] = true
 		if s.ProjectID != projectID {
-			return types.NewError(types.ErrInvalidInput, "all supplies must have the same project_id", nil)
+			return domainerr.Validation("all supplies must have the same project_id")
 		}
 		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply: %s", s.Name), nil)
+			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("missing fields in supply: %s", s.Name))
 		}
 	}
 
@@ -114,7 +114,7 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 	for _, s := range supplies {
 		for _, e := range existing {
 			if e.Name == s.Name {
-				return types.NewError(types.ErrConflict, fmt.Sprintf("supply already exists with name: %s", s.Name), nil)
+				return domainerr.New(domainerr.KindConflict, fmt.Sprintf("supply already exists with name: %s", s.Name))
 			}
 		}
 	}
@@ -145,7 +145,7 @@ func (u *UseCases) GetSuppliesByIDs(ctx context.Context, ids []int64) (map[int64
 
 func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
-		return types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+		return domainerr.Validation("missing required fields")
 	}
 	return u.repo.UpdateSupply(ctx, s)
 }
@@ -183,15 +183,15 @@ func (u *UseCases) ListSuppliesPaginated(
 
 func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
 	if len(supplies) == 0 {
-		return types.NewError(types.ErrInvalidInput, "no supplies provided", nil)
+		return domainerr.Validation("no supplies provided")
 	}
 	seen := map[int64]bool{}
 	for _, s := range supplies {
 		if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("missing fields in supply id: %d", s.ID), nil)
+			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("missing fields in supply id: %d", s.ID))
 		}
 		if seen[s.ID] {
-			return types.NewError(types.ErrInvalidInput, fmt.Sprintf("duplicate supply id in request: %d", s.ID), nil)
+			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("duplicate supply id in request: %d", s.ID))
 		}
 		seen[s.ID] = true
 	}
@@ -200,20 +200,20 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 
 func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, total, err := u.repo.ListAllSupplies(ctx, filter)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "Internal error", err)
+		return nil, domainerr.Internal("Internal error")
 	}
 
 	if total == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	itemPointers := make([]*domain.Supply, len(items))

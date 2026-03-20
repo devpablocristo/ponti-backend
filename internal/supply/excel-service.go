@@ -7,7 +7,7 @@ import (
 
 	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type XLSXEnginePort interface {
@@ -27,7 +27,7 @@ func (e *ExcelExporter) ExportSupplies(ctx context.Context, items []*domain.Supp
 	_ = ctx
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	supplies := make([]domain.Supply, len(items))
@@ -47,7 +47,7 @@ func (e *ExcelExporter) ExportSupplyMovements(ctx context.Context, items []*doma
 	_ = ctx
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	rows := supplyExcel.BuildSupplyMovementDTO(items)

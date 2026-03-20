@@ -2,9 +2,11 @@
 package sharedhandlers
 
 import (
-	filters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
+
+	"github.com/devpablocristo/saas-core/shared/domainerr"
+
+	filters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
 
 // ParseWorkspaceFilter parsea filtros comunes desde la query string.
@@ -49,7 +51,7 @@ func ParseProjectIDParam(c *gin.Context, paramName string) (int64, error) {
 		return 0, err
 	}
 	if queryProjectID != nil && *queryProjectID != projectID {
-		return 0, types.NewError(types.ErrInvalidID, "project_id does not match path", nil)
+		return 0, domainerr.Validation("project_id does not match path")
 	}
 	return projectID, nil
 }

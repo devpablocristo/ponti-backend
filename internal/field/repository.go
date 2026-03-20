@@ -10,7 +10,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type GormEnginePort interface {
@@ -30,7 +30,7 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(f)
 		if err := tx.Create(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to create field", err)
+			return domainerr.Internal("failed to create field")
 		}
 		fieldID = model.ID
 		for _, lot := range f.Lots {
@@ -43,7 +43,7 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 				Season:         lot.Season,
 			}
 			if err := tx.Create(&lotModel).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to create lot", err)
+				return domainerr.Internal("failed to create lot")
 			}
 		}
 		return nil
@@ -57,7 +57,7 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.Field{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count fields", err)
+		return nil, 0, domainerr.Internal("failed to count fields")
 	}
 
 	var list []models.Field
@@ -68,7 +68,7 @@ func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domai
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list fields", err)
+		return nil, 0, domainerr.Internal("failed to list fields")
 	}
 
 	result := make([]domain.Field, 0, len(list))
@@ -110,13 +110,13 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 		"lease_type_id": f.LeaseType.ID,
 	})
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update field", result.Error)
+		return domainerr.Internal("failed to update field")
 	}
 	if result.RowsAffected == 0 {
 		if !f.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "field not found or outdated", nil)
+			return domainerr.Conflict("field not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", f.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", f.ID))
 	}
 	return nil
 }
@@ -130,10 +130,10 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 		Unscoped().
 		Delete(&models.Field{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete field", result.Error)
+		return domainerr.Internal("failed to delete field")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("field %d not found", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Field{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to archive field", result.Error)
+		return domainerr.Internal("failed to archive field")
 	}
 	return nil
 }
@@ -162,7 +162,7 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 		Where("id = ?", id).
 		Update("deleted_at", nil)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to restore field", result.Error)
+		return domainerr.Internal("failed to restore field")
 	}
 	return nil
 }

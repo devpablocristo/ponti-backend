@@ -10,7 +10,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type UseCasesPort interface {
@@ -76,7 +76,7 @@ func (h *Handler) Routes() {
 func (h *Handler) GetParameter(c *gin.Context) {
 	key := c.Param("parameter_key")
 	if key == "" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "parameter_key is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("parameter_key is required"))
 		return
 	}
 	param, err := h.ucs.GetParameter(c.Request.Context(), key)
@@ -90,7 +90,7 @@ func (h *Handler) GetParameter(c *gin.Context) {
 func (h *Handler) GetParametersByCategory(c *gin.Context) {
 	category := c.Param("category")
 	if category == "" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "category is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("category is required"))
 		return
 	}
 	params, err := h.ucs.GetParametersByCategory(c.Request.Context(), category)

@@ -10,7 +10,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // UseCasesPort define la interfaz para los casos de uso
@@ -86,10 +86,8 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 		return
 	}
 	if projectID == nil {
-		sharedhandlers.RespondError(c, types.NewError(
-			types.ErrBadRequest,
+		sharedhandlers.RespondError(c, domainerr.Validation(
 			"missing required query param: project_id",
-			nil,
 		))
 		return
 	}

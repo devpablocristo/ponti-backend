@@ -3,7 +3,7 @@ package commercialization
 import (
 	"context"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 )
@@ -24,7 +24,7 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 
 func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.CropCommercialization) error {
 	if len(items) == 0 {
-		return types.NewError(types.ErrInvalidInput, "no items provided", nil)
+		return domainerr.Validation("no items provided")
 	}
 
 	for i := range items {
@@ -37,14 +37,14 @@ func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.CropCo
 			toCreate = append(toCreate, it)
 		} else {
 			if err := u.repo.Update(ctx, &it); err != nil {
-				return types.NewError(types.ErrInternal, "failed to update crop commercialization", err)
+				return domainerr.Internal("failed to update crop commercialization")
 			}
 		}
 	}
 
 	if len(toCreate) > 0 {
 		if err := u.repo.CreateBulk(ctx, toCreate); err != nil {
-			return types.NewError(types.ErrInternal, "failed to create crop commercialization", err)
+			return domainerr.Internal("failed to create crop commercialization")
 		}
 	}
 

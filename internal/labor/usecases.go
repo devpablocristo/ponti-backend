@@ -5,6 +5,7 @@ import (
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
@@ -44,13 +45,13 @@ func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC Proje
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {
-		return 0, types.NewError(types.ErrInvalidInput, "labor is required", nil)
+		return 0, domainerr.Validation("labor is required")
 	}
 	if labor.ProjectId == 0 {
-		return 0, types.NewError(types.ErrInvalidID, "project_id is required", nil)
+		return 0, domainerr.Validation("project_id is required")
 	}
 	if u.projectUC == nil {
-		return 0, types.NewError(types.ErrInternal, "project usecases not configured", nil)
+		return 0, domainerr.Internal("project usecases not configured")
 	}
 	// Validar que el proyecto exista antes de crear labor
 	if _, err := u.projectUC.GetProject(ctx, labor.ProjectId); err != nil {
@@ -101,16 +102,16 @@ func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Inpu
 
 func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, _, err := u.ListGroupLaborByWorkOrder(ctx, in, pid, fid)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list group labor", err)
+		return nil, domainerr.Internal("list group labor")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)
@@ -118,16 +119,16 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 
 func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	// Usar un page_size grande para obtener todas las labores del proyecto
 	items, _, err := u.repo.ListLabor(ctx, 1, 100000, projectID)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list labors for export", err)
+		return nil, domainerr.Internal("list labors for export")
 	}
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.ExportTable(ctx, items)

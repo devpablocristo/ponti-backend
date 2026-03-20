@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
@@ -300,7 +301,7 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		domErr := domainerr.Validation("field_id or project_id is required")
 		sharedhandlers.RespondError(c, domErr)
 		return
 	}
@@ -336,7 +337,7 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		domErr := domainerr.Validation("field_id or project_id is required")
 		sharedhandlers.RespondError(c, domErr)
 		return
 	}

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // ParseOptionalInt64Query parsea un query param opcional a int64.
@@ -16,7 +16,7 @@ func ParseOptionalInt64Query(c *gin.Context, key string) (*int64, error) {
 	}
 	val, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || val <= 0 {
-		return nil, types.NewError(types.ErrInvalidID, "invalid "+key, err)
+		return nil, domainerr.Validation("invalid " + key)
 	}
 	return &val, nil
 }

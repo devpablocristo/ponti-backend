@@ -1,11 +1,9 @@
 package pkgmwr
 
 import (
-	"errors"
-
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/httperr"
 )
 
 // ErrorHandling maneja errores del contexto Gin y responde con JSON formateado.
@@ -17,14 +15,8 @@ func ErrorHandling() gin.HandlerFunc {
 		}
 		if len(c.Errors) > 0 {
 			ginErr := c.Errors[0]
-			var apiErr *pkgtypes.APIError
-			if errors.As(ginErr.Err, &apiErr) {
-				c.AbortWithStatusJSON(apiErr.Code, apiErr.ToResponse())
-				return
-			}
-
-			apiErr, status := pkgtypes.NewAPIError(ginErr.Err)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			status, apiErr := httperr.Normalize(ginErr.Err)
+			c.AbortWithStatusJSON(status, apiErr)
 		}
 	}
 }

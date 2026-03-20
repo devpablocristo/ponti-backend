@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -227,11 +227,11 @@ func getMonthPeriodOrDefault(c *gin.Context) (int64, error) {
 	}
 	monthPeriod, err := strconv.ParseInt(monthPeriodStr, 10, 64)
 	if err != nil {
-		return 0, types.NewError(types.ErrValidation, "Month period is in invalid format", nil)
+		return 0, domainerr.Validation("Month period is in invalid format")
 	}
 
 	if monthPeriod < 1 || monthPeriod > 12 {
-		return 0, types.NewError(types.ErrValidation, "Month period must be between 1 and 12", nil)
+		return 0, domainerr.Validation("Month period must be between 1 and 12")
 	}
 	return monthPeriod, nil
 }
@@ -247,7 +247,7 @@ func getYearPeriodOrDefault(c *gin.Context) (int64, error) {
 	}
 
 	if yearPeriod < 0 {
-		return 0, types.NewError(types.ErrValidation, "Year period must be greater than 0", nil)
+		return 0, domainerr.Validation("Year period must be greater than 0")
 	}
 
 	return yearPeriod, nil
@@ -257,7 +257,7 @@ func getMonthPeriod(c *gin.Context) (int64, error) {
 	monthPeriodStr := c.Query("month_period")
 
 	if monthPeriodStr == "" {
-		return 0, types.NewMissingFieldError("month_period")
+		return 0, domainerr.Validation("The field 'month_period' is required")
 	}
 	return getMonthPeriodOrDefault(c)
 }
@@ -266,7 +266,7 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 	yearPeriodStr := c.Query("year_period")
 
 	if yearPeriodStr == "" {
-		return 0, types.NewMissingFieldError("year_period")
+		return 0, domainerr.Validation("The field 'year_period' is required")
 	}
 	return getYearPeriodOrDefault(c)
 }

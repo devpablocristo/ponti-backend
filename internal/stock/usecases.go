@@ -8,7 +8,7 @@ import (
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/shopspring/decimal"
 )
 
@@ -91,7 +91,7 @@ func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stoc
 
 func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
 	if stockID <= 0 {
-		return nil, types.NewError(types.ErrInvalidInput, "stock_id must be greater than 0", nil)
+		return nil, domainerr.Validation("stock_id must be greater than 0")
 	}
 	return u.repo.GetStockByID(ctx, stockID)
 }
@@ -142,7 +142,7 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 // ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
 func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	// Usar GetStocks con tiempo vacío para obtener stocks activos del proyecto
@@ -152,11 +152,11 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 	}
 	items, err := u.repo.GetStocks(ctx, projectID, emptyTime)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list Stocks", err)
+		return nil, domainerr.Internal("list Stocks")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)
@@ -164,10 +164,10 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 
 func (u *UseCases) validateProject(ctx context.Context, projectID int64) error {
 	if projectID <= 0 {
-		return types.NewError(types.ErrInvalidInput, "project_id must be greater than 0", nil)
+		return domainerr.Validation("project_id must be greater than 0")
 	}
 	if u.projectUC == nil {
-		return types.NewError(types.ErrInternal, "project usecases not configured", nil)
+		return domainerr.Internal("project usecases not configured")
 	}
 	_, err := u.projectUC.GetProject(ctx, projectID)
 	return err

@@ -116,7 +116,7 @@ func (h *Handler) DuplicateWorkOrder(c *gin.Context) {
 	// orig := c.Param("work_order_number")
 	// newNum, err := h.ucs.DuplicateWorkOrder(c.Request.Context(), orig)
 	// if err != nil {
-	// 	apiErr, status := types.NewAPIError(err)
+	// 	status, apiErr := httperr.Normalize(err)
 	// 	c.JSON(status, apiErr.ToResponse())
 	// 	return
 	// }

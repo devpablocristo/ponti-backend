@@ -2,15 +2,17 @@ package supply
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 
@@ -36,7 +38,7 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
 	if movement.MovementType == domain.STOCK {
 		if isFirst {
-			return 0, types.NewError(types.ErrBadRequest, "no existe stock para este insumo en el proyecto", nil)
+			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
 		}
 		stock.RealStockUnits = movement.Quantity
 		stock.UpdatedBy = movement.UpdatedBy
@@ -127,10 +129,8 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 		return err
 	}
 	if exists {
-		return types.NewError(
-			types.ErrConflict,
-			fmt.Sprintf("El remito %s ya tiene el insumo %d cargado", reference, movement.Supply.ID),
-			nil,
+		return domainerr.Newf(domainerr.KindConflict,
+			"El remito %s ya tiene el insumo %d cargado", reference, movement.Supply.ID,
 		)
 	}
 
@@ -140,7 +140,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []*domain.SupplyMovement) ([]int64, error) {
 	txRepo, ok := u.repo.(transactionExecutor)
 	if !ok {
-		return nil, types.NewError(types.ErrInternal, "transactions not supported for strict mode", nil)
+		return nil, domainerr.Internal("transactions not supported for strict mode")
 	}
 
 	ids := make([]int64, len(movements))
@@ -300,13 +300,13 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 
 func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *domain.SupplyMovement, stockOrigin stockdomain.Stock) (*domain.Supply, *domain.Supply, error) {
 	if movement.Supply == nil || movement.Supply.ID == 0 {
-		return nil, nil, types.NewError(types.ErrValidation, "invalid supply_id", nil)
+		return nil, nil, domainerr.Validation("invalid supply_id")
 	}
 	if movement.ProjectDestinationId <= 0 {
-		return nil, nil, types.NewError(types.ErrValidation, "invalid project_destination_id", nil)
+		return nil, nil, domainerr.Validation("invalid project_destination_id")
 	}
 	if movement.ProjectDestinationId == movement.ProjectId {
-		return nil, nil, types.NewError(types.ErrValidation, "project_destination_id must be different from project_id", nil)
+		return nil, nil, domainerr.Validation("project_destination_id must be different from project_id")
 	}
 
 	projectExists, err := u.repo.ProjectExists(ctx, movement.ProjectDestinationId)
@@ -314,10 +314,8 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 		return nil, nil, err
 	}
 	if !projectExists {
-		return nil, nil, types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf("El proyecto destino %d no existe", movement.ProjectDestinationId),
-			nil,
+		return nil, nil, domainerr.Newf(domainerr.KindValidation,
+			"El proyecto destino %d no existe", movement.ProjectDestinationId,
 		)
 	}
 
@@ -348,7 +346,7 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 			msg = fmt.Sprintf("%s para el insumo (supply_id=%d)", msg, movement.Supply.ID)
 		}
 
-		return nil, nil, types.NewError(types.ErrValidation, msg, nil)
+		return nil, nil, domainerr.Validation(msg)
 	}
 
 	// Resolver el insumo del proyecto destino:
@@ -358,7 +356,7 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 	if err == nil {
 		return originSupply, destinationSupply, nil
 	}
-	if !types.IsNotFound(err) {
+	if !errors.Is(err, domainerr.NotFound("")) {
 		return nil, nil, fmt.Errorf("error checking destination supply: %w", err)
 	}
 
@@ -367,16 +365,16 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 
 func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, err := u.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list Supply Movements", err)
+		return nil, domainerr.Internal("list Supply Movements")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.ExportSupplyMovements(ctx, items)

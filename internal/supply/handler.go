@@ -17,7 +17,7 @@ import (
 	listDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/list"
 	updateDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/update"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type UseCasesPort interface {
@@ -313,7 +313,7 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		if req[i].IsPartialPrice == nil && supply.ID != 0 {
 			currentSupply, ok := currentSuppliesByID[supply.ID]
 			if !ok {
-				sharedhandlers.RespondError(c, types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supply.ID), nil))
+				sharedhandlers.RespondError(c, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", supply.ID)))
 				return
 			}
 			supply.IsPartialPrice = currentSupply.IsPartialPrice
@@ -378,7 +378,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		mode = "strict"
 	}
 	if mode != "partial" && mode != "strict" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "mode must be one of [partial, strict]", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("mode must be one of [partial, strict]"))
 		return
 	}
 
@@ -401,7 +401,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := types.ErrorMessage(err)
+			message := err.Error()
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -423,7 +423,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			for i, movement := range domainMovements {
 				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
 					itemIndex := validIndexes[i]
-					message := types.ErrorMessage(err)
+					message := err.Error()
 					prevalidationFailedIndexes[itemIndex] = true
 					failures = append(failures, createDto.SupplyMovementFailure{
 						Index:    itemIndex,
@@ -455,7 +455,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
 				if err != nil {
 					failedValidPos := -1
-					msg := types.ErrorMessage(err)
+					msg := err.Error()
 					if strings.HasPrefix(msg, "item ") {
 						parts := strings.SplitN(msg, ": ", 2)
 						if len(parts) == 2 {
@@ -524,7 +524,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			}
 			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
 			if err != nil {
-				message := types.ErrorMessage(err)
+				message := err.Error()
 				failures = append(failures, createDto.SupplyMovementFailure{
 					Index:    i,
 					RowIndex: i + 2,
@@ -586,7 +586,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	total := len(req.SupplyMovements)
 	const maxImportItems = 500
 	if total > maxImportItems {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil))
+		sharedhandlers.RespondError(c, domainerr.New(domainerr.KindValidation, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total)))
 		return
 	}
 
@@ -596,7 +596,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := types.ErrorMessage(err)
+			message := err.Error()
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,

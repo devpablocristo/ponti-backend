@@ -7,7 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/saas-core/shared/httperr"
+
 	pkgutils "github.com/devpablocristo/ponti-backend/pkg/utils"
 )
 
@@ -25,30 +27,30 @@ func RequireJWT(cfg pkgutils.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr, err := pkgutils.ExtractTokenFromRequest(c.Request, cfg)
 		if err != nil {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			domErr := domainerr.Unauthorized("invalid token")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		unverifiedToken, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
 		if err != nil {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			domErr := domainerr.Unauthorized("invalid token")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		keyFunc := pkgutils.SelectKeyFunc(unverifiedToken, cfg.SecretKey, rsaPublicKey)
 		if keyFunc == nil {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "unexpected signing method", nil)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			domErr := domainerr.Unauthorized("unexpected signing method")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		parsedToken, err := jwt.Parse(tokenStr, keyFunc)
 		if err != nil || !parsedToken.Valid {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, "invalid token", err)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			domErr := domainerr.Unauthorized("invalid token")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			return
 		}
 		c.Set(cfg.ContextKey, parsedToken)

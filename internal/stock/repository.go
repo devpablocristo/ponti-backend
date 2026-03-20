@@ -10,7 +10,7 @@ import (
 	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -126,11 +126,11 @@ func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]s
 
 func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int64, error) {
 	if stock == nil {
-		return 0, types.NewError(types.ErrBadRequest, "stock is nil", nil)
+		return 0, domainerr.Validation("stock is nil")
 	}
 	model := models.FromDomain(stock)
 	if err := r.getDB(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create stock", err)
+		return 0, domainerr.Internal("failed to create stock")
 	}
 	return model.ID, nil
 }
@@ -147,7 +147,7 @@ func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectID int
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, "no stocks found to update", nil)
+		return domainerr.NotFound("no stocks found to update")
 	}
 	return nil
 }
@@ -166,9 +166,9 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 	}
 	if result.RowsAffected == 0 {
 		if stock != nil && !stock.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "stock not found or outdated", nil)
+			return domainerr.Conflict("stock not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, "no stock found to update", nil)
+		return domainerr.NotFound("no stock found to update")
 	}
 	return nil
 }
@@ -186,9 +186,9 @@ func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain
 	}
 	if result.RowsAffected == 0 {
 		if !stockDomain.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "stock not found or outdated", nil)
+			return domainerr.Conflict("stock not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, "no stock found to update", nil)
+		return domainerr.NotFound("no stock found to update")
 	}
 	return nil
 }
@@ -204,9 +204,9 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 		First(&stockModel, stockID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "stock not found", nil)
+			return nil, domainerr.NotFound("stock not found")
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get stock", err)
+		return nil, domainerr.Internal("failed to get stock")
 	}
 	return stockModel.ToDomain(), nil
 }
@@ -230,7 +230,7 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 			return nil, true, nil
 		}
 
-		return nil, false, types.NewError(types.ErrInternal, "failed to get last stock", err)
+		return nil, false, domainerr.Internal("failed to get last stock")
 	}
 
 	// Para validaciones (p.ej. movimientos internos) necesitamos el stock de sistema,
@@ -244,7 +244,7 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 		WHERE project_id = ? AND supply_id = ?
 	`, reportdb.ReportView("stock_consumed_by_supply"))
 	if err := gormDB.Raw(query, projectID, supplyID).Scan(&consumedResult).Error; err != nil {
-		return nil, false, types.NewError(types.ErrInternal, "failed to load stock consumed", err)
+		return nil, false, domainerr.Internal("failed to load stock consumed")
 	}
 	stockModel.Consumed = consumedResult.Consumed
 
@@ -265,9 +265,9 @@ func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID
 		First(&stockModel).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "stock not found", nil)
+			return nil, domainerr.NotFound("stock not found")
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get stock by period", err)
+		return nil, domainerr.Internal("failed to get stock by period")
 	}
 
 	return stockModel.ToDomain(), nil

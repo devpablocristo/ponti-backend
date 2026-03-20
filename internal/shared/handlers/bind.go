@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // BindJSON parsea el body JSON, valida los campos con binding tags
@@ -17,7 +17,7 @@ import (
 func BindJSON(c *gin.Context, req any) error {
 	if err := c.ShouldBindJSON(req); err != nil {
 		msg := HumanizeBindError(err)
-		domErr := types.NewError(types.ErrBadRequest, msg, err)
+		domErr := domainerr.Validation(msg)
 		RespondError(c, domErr)
 		return err
 	}

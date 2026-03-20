@@ -7,7 +7,6 @@ require (
 	firebase.google.com/go/v4 v4.19.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-playground/validator/v10 v10.27.0
-	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
@@ -25,6 +24,8 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )
+
+require github.com/golang-jwt/jwt/v5 v5.3.1
 
 // Dependencias para testing
 require (
@@ -132,4 +133,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/devpablocristo/saas-core => /home/pablo/Projects/Pablo/saas-core
+replace github.com/devpablocristo/saas-core => ../../saas-core

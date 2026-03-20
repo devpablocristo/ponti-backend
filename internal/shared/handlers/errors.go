@@ -3,12 +3,11 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/httperr"
 )
 
 // RespondError responde errores de dominio usando el helper estándar.
 func RespondError(c *gin.Context, err error) {
-	apiErr, status := types.NewAPIError(err)
-	c.JSON(status, apiErr.ToResponse())
+	status, apiErr := httperr.Normalize(err)
+	c.JSON(status, apiErr)
 }
-

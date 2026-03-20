@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
 )
@@ -69,7 +69,7 @@ func (h *Handler) Routes() {
 func requireAdmin(c *gin.Context) bool {
 	role, _ := c.Request.Context().Value(ctxkeys.Role).(string)
 	if role != "admin" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrAuthorization, "admin role required", nil))
+		sharedhandlers.RespondError(c, domainerr.Forbidden("admin role required"))
 		return false
 	}
 	return true
@@ -98,7 +98,7 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 	}
 	var req createTenantReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 	rp := newRepo(h.db)
@@ -143,7 +143,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 	var req createUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 	password := strings.TrimSpace(req.Password)
 	if email == "" || password == "" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "email and password required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("email and password required"))
 		return
 	}
 
@@ -168,7 +168,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		}
 	}
 	if err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "unable to create identity user", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("unable to create identity user"))
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 	}
 	var req upsertMembershipReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 
@@ -251,14 +251,14 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		email = usernameToEmail(req.Username)
 	}
 	if email == "" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "email required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("email required"))
 		return
 	}
 
 	ctx := c.Request.Context()
 	uid, err := h.idp.GetUserUIDByEmail(ctx, email)
 	if err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "identity user not found", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("identity user not found"))
 		return
 	}
 

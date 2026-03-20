@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // WorkspaceFilter define filtros comunes de workspace.
@@ -63,10 +63,10 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 
 		var count int64
 		if err := query.Count(&count).Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to validate project filters", err)
+			return nil, domainerr.Internal("failed to validate project filters")
 		}
 		if count == 0 {
-			return nil, types.NewError(types.ErrInvalidID, "project_id does not match provided filters", nil)
+			return nil, domainerr.Validation("project_id does not match provided filters")
 		}
 
 		return []int64{*f.ProjectID}, nil
@@ -96,7 +96,7 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 
 	var projectIDs []int64
 	if err := query.Pluck("p.id", &projectIDs).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to resolve project IDs", err)
+		return nil, domainerr.Internal("failed to resolve project IDs")
 	}
 
 	return projectIDs, nil
@@ -113,10 +113,10 @@ func ValidateFieldBelongsToProject(ctx context.Context, db *gorm.DB, projectID i
 		Table("fields f").
 		Where("f.id = ? AND f.project_id = ? AND f.deleted_at IS NULL", fieldID, projectID).
 		Count(&count).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to validate field against project", err)
+		return domainerr.Internal("failed to validate field against project")
 	}
 	if count == 0 {
-		return types.NewError(types.ErrInvalidID, "field_id does not belong to project_id", nil)
+		return domainerr.Validation("field_id does not belong to project_id")
 	}
 	return nil
 }

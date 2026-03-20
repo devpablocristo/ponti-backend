@@ -5,7 +5,7 @@ import (
 	"context"
 	"io"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
@@ -26,7 +26,7 @@ func NewExcelExporter(eng XLSXEnginePort) *ExcelExporter {
 func (e *ExcelExporter) Export(ctx context.Context, items []domain.LaborListItem) ([]byte, error) {
 	_ = ctx
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 	rows := labexcel.BuildExcelDTO(items)
 	var buf bytes.Buffer
@@ -39,7 +39,7 @@ func (e *ExcelExporter) Export(ctx context.Context, items []domain.LaborListItem
 func (e *ExcelExporter) ExportTable(ctx context.Context, items []domain.ListedLabor) ([]byte, error) {
 	_ = ctx
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 	rows := labexcel.BuildExcelTableDTO(items)
 	var buf bytes.Buffer

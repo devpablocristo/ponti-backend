@@ -6,13 +6,13 @@ import (
 
 	"gorm.io/gorm"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // HandleGormError centraliza el manejo de ErrRecordNotFound y errores internos.
 func HandleGormError(err error, entity string, id int64) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("%s %d not found", entity, id), err)
+		return domainerr.NotFound(fmt.Sprintf("%s %d not found", entity, id))
 	}
-	return types.NewError(types.ErrInternal, fmt.Sprintf("failed to get %s", entity), err)
+	return domainerr.Internal(fmt.Sprintf("failed to get %s", entity))
 }

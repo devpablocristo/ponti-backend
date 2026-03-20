@@ -10,7 +10,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type GormEnginePort interface {
@@ -35,7 +35,7 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create category", err)
+		return 0, domainerr.Internal("failed to create category")
 	}
 	return model.ID, nil
 }
@@ -43,7 +43,7 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.Category{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count categories", err)
+		return nil, 0, domainerr.Internal("failed to count categories")
 	}
 
 	var list []models.Category
@@ -54,7 +54,7 @@ func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]d
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list categories", err)
+		return nil, 0, domainerr.Internal("failed to list categories")
 	}
 
 	result := make([]domain.Category, 0, len(list))
@@ -90,13 +90,13 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 	}
 	result := updateTx.Updates(models.FromDomain(c))
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update category", result.Error)
+		return domainerr.Internal("failed to update category")
 	}
 	if result.RowsAffected == 0 {
 		if !c.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "category not found or outdated", nil)
+			return domainerr.Conflict("category not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("category with id %d does not exist", c.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category with id %d does not exist", c.ID))
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Category{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete category", result.Error)
+		return domainerr.Internal("failed to delete category")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("category with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category with id %d does not exist", id))
 	}
 	return nil
 }

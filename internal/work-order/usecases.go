@@ -7,6 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
@@ -40,7 +41,7 @@ func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
 
 func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
 	if o == nil {
-		return 0, types.NewError(types.ErrValidation, "work order is nil", nil)
+		return 0, domainerr.Validation("work order is nil")
 	}
 	if err := validateInvestorSplits(o); err != nil {
 		return 0, err
@@ -65,7 +66,7 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 
 func validateInvestorSplits(o *domain.WorkOrder) error {
 	if o == nil {
-		return types.NewError(types.ErrValidation, "work order is nil", nil)
+		return domainerr.Validation("work order is nil")
 	}
 	if len(o.InvestorSplits) == 0 {
 		return nil
@@ -75,13 +76,13 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 	sum := decimal.Zero
 	for _, s := range o.InvestorSplits {
 		if s.InvestorID <= 0 {
-			return types.NewError(types.ErrValidation, "invalid investor_id in investor_splits", nil)
+			return domainerr.Validation("invalid investor_id in investor_splits")
 		}
 		if s.Percentage.LessThanOrEqual(decimal.Zero) {
-			return types.NewError(types.ErrValidation, "invalid percentage in investor_splits", nil)
+			return domainerr.Validation("invalid percentage in investor_splits")
 		}
 		if _, ok := seen[s.InvestorID]; ok {
-			return types.NewError(types.ErrValidation, "duplicate investor_id in investor_splits", nil)
+			return domainerr.Validation("duplicate investor_id in investor_splits")
 		}
 		seen[s.InvestorID] = struct{}{}
 		sum = sum.Add(s.Percentage)
@@ -89,7 +90,7 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 
 	// Permitir un margen mínimo por decimales.
 	if sum.Sub(decimal.NewFromInt(100)).Abs().GreaterThan(decimal.NewFromFloat(0.001)) {
-		return types.NewError(types.ErrValidation, "investor_splits percentage must sum to 100", nil)
+		return domainerr.Validation("investor_splits percentage must sum to 100")
 	}
 	return nil
 }
@@ -122,16 +123,16 @@ func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkOrderFilter) (*d
 
 func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFilter, inp types.Input) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, _, err := u.ListWorkOrders(ctx, filt, inp)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list work orders", err)
+		return nil, domainerr.Internal("list work orders")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)

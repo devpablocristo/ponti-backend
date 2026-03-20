@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type repo struct {
@@ -29,7 +29,7 @@ func (r *repo) ensureLocalUserByIDPSub(ctx context.Context, idpSub, email string
 	idpSub = strings.TrimSpace(idpSub)
 	email = strings.TrimSpace(email)
 	if idpSub == "" {
-		return nil, pkgtypes.NewError(pkgtypes.ErrBadRequest, "missing idp_sub", nil)
+		return nil, domainerr.Validation("missing idp_sub")
 	}
 
 	type row struct {

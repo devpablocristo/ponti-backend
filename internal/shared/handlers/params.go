@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // ParseParamID parsea un ID de path y valida que sea > 0.
@@ -13,7 +14,7 @@ func ParseParamID(raw string, param string) (int64, error) {
 	value := strings.TrimSpace(raw)
 	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 {
-		return 0, types.NewError(types.ErrInvalidID, "invalid "+param, err)
+		return 0, domainerr.Validation("invalid " + param)
 	}
 	return id, nil
 }

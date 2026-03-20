@@ -7,16 +7,16 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // ParseActor extrae el actor (email/sub) desde el contexto.
 func ParseActor(c *gin.Context) (string, error) {
 	actor, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
-		return "", types.NewError(types.ErrAuthorization, "invalid actor", err)
+		return "", domainerr.Forbidden("invalid actor")
 	}
 	return actor, nil
 }
@@ -25,11 +25,11 @@ func ParseActor(c *gin.Context) (string, error) {
 func ParseOrgID(c *gin.Context) (uuid.UUID, error) {
 	v := c.Request.Context().Value(ctxkeys.OrgID)
 	if v == nil {
-		return uuid.Nil, types.NewError(types.ErrAuthorization, "invalid org_id", fmt.Errorf("org_id missing in context"))
+		return uuid.Nil, domainerr.Forbidden(fmt.Sprintf("invalid org_id: %s", "org_id missing in context"))
 	}
 	id, ok := v.(uuid.UUID)
 	if !ok || id == uuid.Nil {
-		return uuid.Nil, types.NewError(types.ErrAuthorization, "invalid org_id", fmt.Errorf("org_id is not a valid uuid"))
+		return uuid.Nil, domainerr.Forbidden(fmt.Sprintf("invalid org_id: %s", "org_id is not a valid uuid"))
 	}
 	return id, nil
 }

@@ -2,26 +2,22 @@ package pkgmwr
 
 import (
 	"context"
-	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/saas-core/identity/executor/jwks"
 	"github.com/devpablocristo/saas-core/shared/ctxkeys"
-
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/saas-core/shared/httperr"
 )
 
 const (
@@ -42,21 +38,9 @@ type IdentityAuthConfig struct {
 	DefaultRole   string
 }
 
-type jwksCache struct {
-	mu      sync.RWMutex
-	keys    map[string]*rsa.PublicKey
-	expires time.Time
-}
-
-type identityVerifier struct {
-	cfg    IdentityAuthConfig
-	client *http.Client
-	cache  *jwksCache
-}
-
 type identityClaims struct {
-	Email string `json:"email"`
-	jwt.RegisteredClaims
+	Subject string
+	Email   string
 }
 
 type membershipResolved struct {
@@ -65,150 +49,19 @@ type membershipResolved struct {
 	Permissions map[string]struct{}
 }
 
-func newIdentityVerifier(cfg IdentityAuthConfig) *identityVerifier {
-	return &identityVerifier{
-		cfg: cfg,
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
-		cache: &jwksCache{
-			keys: map[string]*rsa.PublicKey{},
-		},
+func extractClaimsFromMap(m map[string]any) identityClaims {
+	var c identityClaims
+	if sub, ok := m["sub"].(string); ok {
+		c.Subject = sub
 	}
-}
-
-func (v *identityVerifier) verify(rawToken string) (*identityClaims, error) {
-	parser := jwt.NewParser(
-		jwt.WithValidMethods([]string{"RS256"}),
-		jwt.WithAudience(v.cfg.Audience),
-		jwt.WithIssuer(v.cfg.Issuer),
-	)
-	claims := &identityClaims{}
-
-	token, err := parser.ParseWithClaims(rawToken, claims, func(token *jwt.Token) (any, error) {
-		kid, _ := token.Header["kid"].(string)
-		if kid == "" {
-			return nil, errors.New("token missing kid")
-		}
-		key, keyErr := v.getKeyByKID(kid)
-		if keyErr != nil {
-			return nil, keyErr
-		}
-		return key, nil
-	})
-	if err != nil {
-		return nil, err
+	if email, ok := m["email"].(string); ok {
+		c.Email = email
 	}
-	if token == nil || !token.Valid {
-		return nil, errors.New("invalid token")
-	}
-	return claims, nil
-}
-
-func (v *identityVerifier) getKeyByKID(kid string) (*rsa.PublicKey, error) {
-	v.cache.mu.RLock()
-	key, ok := v.cache.keys[kid]
-	notExpired := time.Now().Before(v.cache.expires)
-	v.cache.mu.RUnlock()
-	if ok && notExpired {
-		return key, nil
-	}
-
-	v.cache.mu.Lock()
-	defer v.cache.mu.Unlock()
-
-	// double-check after acquiring write lock
-	if key, ok := v.cache.keys[kid]; ok && time.Now().Before(v.cache.expires) {
-		return key, nil
-	}
-
-	keys, ttl, err := v.fetchJWKS()
-	if err != nil {
-		return nil, err
-	}
-	v.cache.keys = keys
-	v.cache.expires = time.Now().Add(ttl)
-
-	key, ok = v.cache.keys[kid]
-	if !ok {
-		return nil, fmt.Errorf("kid %s not found in jwks", kid)
-	}
-	return key, nil
-}
-
-func (v *identityVerifier) fetchJWKS() (map[string]*rsa.PublicKey, time.Duration, error) {
-	req, err := http.NewRequest(http.MethodGet, v.cfg.JWKSURL, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	resp, err := v.client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("jwks returned status %d", resp.StatusCode)
-	}
-
-	var payload struct {
-		Keys []struct {
-			Kid string `json:"kid"`
-			Kty string `json:"kty"`
-			Alg string `json:"alg"`
-			Use string `json:"use"`
-			N   string `json:"n"`
-			E   string `json:"e"`
-		} `json:"keys"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, 0, err
-	}
-
-	keys := make(map[string]*rsa.PublicKey, len(payload.Keys))
-	for _, k := range payload.Keys {
-		if k.Kty != "RSA" || k.N == "" || k.E == "" || k.Kid == "" {
-			continue
-		}
-		pub, err := parseRSAPublicKeyFromJWK(k.N, k.E)
-		if err != nil {
-			continue
-		}
-		keys[k.Kid] = pub
-	}
-	if len(keys) == 0 {
-		return nil, 0, errors.New("jwks did not contain usable rsa keys")
-	}
-
-	ttl := v.cfg.CacheTTL
-	if ttl <= 0 {
-		ttl = 5 * time.Minute
-	}
-	return keys, ttl, nil
-}
-
-func parseRSAPublicKeyFromJWK(nStr, eStr string) (*rsa.PublicKey, error) {
-	nBytes, err := base64.RawURLEncoding.DecodeString(nStr)
-	if err != nil {
-		return nil, err
-	}
-	eBytes, err := base64.RawURLEncoding.DecodeString(eStr)
-	if err != nil {
-		return nil, err
-	}
-	n := new(big.Int).SetBytes(nBytes)
-	e := 0
-	for _, b := range eBytes {
-		e = e<<8 + int(b)
-	}
-	if e == 0 {
-		return nil, errors.New("invalid exponent")
-	}
-	return &rsa.PublicKey{N: n, E: e}, nil
+	return c
 }
 
 func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
-	verifier := newIdentityVerifier(cfg)
+	verifier := jwks.NewVerifier(cfg.JWKSURL)
 	return func(c *gin.Context) {
 		start := time.Now()
 		permission := permissionForMethod(c.Request.Method)
@@ -220,12 +73,14 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			return
 		}
 
-		claims, err := verifier.verify(tokenStr)
+		claimsMap, err := verifier.VerifyToken(c.Request.Context(), tokenStr)
 		if err != nil {
 			denyAuthRequest(c, "invalid token")
 			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
 			return
 		}
+
+		claims := extractClaimsFromMap(claimsMap)
 		if claims.Subject == "" {
 			denyAuthRequest(c, "token missing subject")
 			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
@@ -234,9 +89,9 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 
 		userID, err := ensureUserByIDPSub(c.Request.Context(), db, claims.Subject, claims.Email)
 		if err != nil {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthorization, "unable to resolve user", err)
-			apiErr, status := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(status, apiErr.ToResponse())
+			domErr := domainerr.Forbidden("unable to resolve user")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
 			return
 		}
@@ -253,18 +108,18 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 				)
 			}
 			if err != nil {
-				domErr := pkgtypes.NewError(pkgtypes.ErrAuthorization, "tenant membership required", err)
-				apiErr, _ := pkgtypes.NewAPIError(domErr)
-				c.AbortWithStatusJSON(http.StatusForbidden, apiErr.ToResponse())
+				domErr := domainerr.Forbidden("tenant membership required")
+				status, apiErr := httperr.Normalize(domErr)
+				c.AbortWithStatusJSON(status, apiErr)
 				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
 				return
 			}
 		}
 
 		if _, ok := membership.Permissions[permission]; !ok {
-			domErr := pkgtypes.NewError(pkgtypes.ErrAuthorization, "insufficient permissions", nil)
-			apiErr, _ := pkgtypes.NewAPIError(domErr)
-			c.AbortWithStatusJSON(http.StatusForbidden, apiErr.ToResponse())
+			domErr := domainerr.Forbidden("insufficient permissions")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
 			logAuthDecision(claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "DENY", start)
 			return
 		}
@@ -485,9 +340,9 @@ func permissionForMethod(method string) string {
 }
 
 func denyAuthRequest(c *gin.Context, details string) {
-	domErr := pkgtypes.NewError(pkgtypes.ErrAuthentication, details, nil)
-	apiErr, status := pkgtypes.NewAPIError(domErr)
-	c.AbortWithStatusJSON(status, apiErr.ToResponse())
+	domErr := domainerr.Unauthorized(details)
+	status, apiErr := httperr.Normalize(domErr)
+	c.AbortWithStatusJSON(status, apiErr)
 }
 
 func logAuthDecision(sub, tenantID, route, permission, result string, start time.Time) {

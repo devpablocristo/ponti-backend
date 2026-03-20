@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	models "github.com/devpablocristo/ponti-backend/internal/dashboard/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
@@ -161,7 +161,7 @@ func (r *Repository) getRelatedProjectIDs(ctx context.Context, filter domain.Das
 
 	var projectIDs []int64
 	if err := query.Pluck("p.id", &projectIDs).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get related project IDs", err)
+		return nil, domainerr.Internal("failed to get related project IDs")
 	}
 
 	return projectIDs, nil
@@ -245,7 +245,7 @@ func (r *Repository) getMetrics(ctx context.Context, projectIDs []int64, filter 
 	).Scan(&result).Error
 
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get dashboard metrics", err)
+		return nil, domainerr.Internal("failed to get dashboard metrics")
 	}
 
 	return &result, nil
@@ -270,7 +270,7 @@ func (r *Repository) getContributionsProgress(ctx context.Context, projectIDs []
 	).Scan(&results).Error
 
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get contributions progress data", err)
+		return nil, domainerr.Internal("failed to get contributions progress data")
 	}
 
 	return results, nil
@@ -300,7 +300,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int6
 	).Scan(&summary).Error
 
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get management balance data", err)
+		return nil, domainerr.Internal("failed to get management balance data")
 	}
 
 	return &models.ManagementBalanceModel{
@@ -339,7 +339,7 @@ func (r *Repository) getCropIncidence(ctx context.Context, projectIDs []int64, f
 	).Scan(&results).Error
 
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get crop incidence data", err)
+		return nil, domainerr.Internal("failed to get crop incidence data")
 	}
 
 	return results, nil
@@ -370,7 +370,7 @@ func (r *Repository) getOperationalIndicators(ctx context.Context, projectIDs []
 	).Scan(&result).Error
 
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get operational indicators data", err)
+		return nil, domainerr.Internal("failed to get operational indicators data")
 	}
 
 	return &result, nil

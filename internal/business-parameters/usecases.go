@@ -4,7 +4,7 @@ import (
 	"context"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type RepositoryPort interface {
@@ -28,7 +28,7 @@ func NewUseCases(repository RepositoryPort) *UseCases {
 
 func (u *UseCases) GetParameter(ctx context.Context, key string) (*domain.BusinessParameter, error) {
 	if key == "" {
-		return nil, types.NewError(types.ErrInvalidInput, "key is required", nil)
+		return nil, domainerr.Validation("key is required")
 	}
 
 	return u.repository.GetByKey(ctx, key)
@@ -36,7 +36,7 @@ func (u *UseCases) GetParameter(ctx context.Context, key string) (*domain.Busine
 
 func (u *UseCases) GetParametersByCategory(ctx context.Context, category string) ([]domain.BusinessParameter, error) {
 	if category == "" {
-		return nil, types.NewError(types.ErrInvalidInput, "category is required", nil)
+		return nil, domainerr.Validation("category is required")
 	}
 
 	return u.repository.ListByCategory(ctx, category)
@@ -48,7 +48,7 @@ func (u *UseCases) GetAllParameters(ctx context.Context) ([]domain.BusinessParam
 
 func (u *UseCases) CreateParameter(ctx context.Context, param *domain.BusinessParameter) (int64, error) {
 	if param.Key == "" || param.Value == "" || param.Type == "" || param.Category == "" {
-		return 0, types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+		return 0, domainerr.Validation("missing required fields")
 	}
 
 	return u.repository.Create(ctx, param)
@@ -56,11 +56,11 @@ func (u *UseCases) CreateParameter(ctx context.Context, param *domain.BusinessPa
 
 func (u *UseCases) UpdateParameter(ctx context.Context, param *domain.BusinessParameter) error {
 	if param.ID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid id", nil)
+		return domainerr.Validation("invalid id")
 	}
 
 	if param.Key == "" || param.Value == "" || param.Type == "" || param.Category == "" {
-		return types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+		return domainerr.Validation("missing required fields")
 	}
 
 	return u.repository.Update(ctx, param)
@@ -68,7 +68,7 @@ func (u *UseCases) UpdateParameter(ctx context.Context, param *domain.BusinessPa
 
 func (u *UseCases) DeleteParameter(ctx context.Context, id int64) error {
 	if id == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid id", nil)
+		return domainerr.Validation("invalid id")
 	}
 
 	return u.repository.Delete(ctx, id)

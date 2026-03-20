@@ -10,7 +10,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type GormEnginePort interface {
@@ -35,7 +35,7 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 		UpdatedBy: m.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create manager", err)
+		return 0, domainerr.Internal("failed to create manager")
 	}
 	return model.ID, nil
 }
@@ -43,7 +43,7 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]domain.Manager, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.Manager{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count managers", err)
+		return nil, 0, domainerr.Internal("failed to count managers")
 	}
 
 	var list []models.Manager
@@ -54,7 +54,7 @@ func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]dom
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list managers", err)
+		return nil, 0, domainerr.Internal("failed to list managers")
 	}
 
 	result := make([]domain.Manager, 0, len(list))
@@ -90,13 +90,13 @@ func (r *Repository) UpdateManager(ctx context.Context, m *domain.Manager) error
 	}
 	result := updateTx.Updates(models.FromDomain(m))
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update manager", result.Error)
+		return domainerr.Internal("failed to update manager")
 	}
 	if result.RowsAffected == 0 {
 		if !m.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "manager not found or outdated", nil)
+			return domainerr.Conflict("manager not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("manager with id %d does not exist", m.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager with id %d does not exist", m.ID))
 	}
 	return nil
 }
@@ -110,10 +110,10 @@ func (r *Repository) DeleteManager(ctx context.Context, id int64) error {
 		Unscoped().
 		Delete(&models.Manager{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete manager", result.Error)
+		return domainerr.Internal("failed to delete manager")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("manager with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager with id %d does not exist", id))
 	}
 	return nil
 }
@@ -126,7 +126,7 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Manager{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to archive manager", result.Error)
+		return domainerr.Internal("failed to archive manager")
 	}
 	return nil
 }
@@ -142,10 +142,10 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 		Where("id = ?", id).
 		Update("deleted_at", nil)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to restore manager", result.Error)
+		return domainerr.Internal("failed to restore manager")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("manager with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager with id %d does not exist", id))
 	}
 	return nil
 }

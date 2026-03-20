@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"gorm.io/gorm"
 
 	models "github.com/devpablocristo/ponti-backend/internal/commercialization/repository/models"
@@ -34,7 +34,7 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 	}
 
 	if err := r.db.Client().WithContext(ctx).Create(&modelList).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to bulk insert crop commercializations", err)
+		return domainerr.Internal("failed to bulk insert crop commercializations")
 	}
 
 	return nil
@@ -50,11 +50,11 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 	var rows []models.CropCommercialization
 
 	if err := tx.Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list crop commercialization", err)
+		return nil, domainerr.Internal("failed to list crop commercialization")
 	}
 
 	if len(rows) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "no commercializations found for this project", nil)
+		return nil, domainerr.NotFound("no commercializations found for this project")
 	}
 
 	out := make([]domain.CropCommercialization, len(rows))
@@ -67,7 +67,7 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 
 func (r *Repository) Update(ctx context.Context, item *domain.CropCommercialization) error {
 	if item.ID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid ID", nil)
+		return domainerr.Validation("invalid ID")
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -75,10 +75,10 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 		if err := tx.Model(&models.CropCommercialization{}).
 			Where("id = ?", item.ID).
 			Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check existence", err)
+			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, "crop commercialization not found", nil)
+			return domainerr.NotFound("crop commercialization not found")
 		}
 
 		if err := tx.Model(&models.CropCommercialization{}).
@@ -92,7 +92,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 				"updated_at":      time.Now(),
 				"updated_by":      item.UpdatedBy,
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update crop commercialization", err)
+			return domainerr.Internal("failed to update crop commercialization")
 		}
 		return nil
 	})

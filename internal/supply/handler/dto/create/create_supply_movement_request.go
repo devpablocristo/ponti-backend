@@ -1,13 +1,12 @@
 package create
 
 import (
-	"fmt"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 
 	"time"
@@ -85,15 +84,11 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *str
 
 func validateMovementType(movementType string) error {
 	if movementType != domain.INTERNAL_MOVEMENT && movementType != domain.OFFICIAL_INVOICE && movementType != domain.STOCK {
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf(
-				"must be a valid type [%s, %s, %s]",
-				domain.INTERNAL_MOVEMENT,
-				domain.OFFICIAL_INVOICE,
-				domain.STOCK,
-			),
-			nil,
+		return domainerr.Newf(domainerr.KindValidation,
+			"must be a valid type [%s, %s, %s]",
+			domain.INTERNAL_MOVEMENT,
+			domain.OFFICIAL_INVOICE,
+			domain.STOCK,
 		)
 	}
 	return nil
@@ -101,14 +96,14 @@ func validateMovementType(movementType string) error {
 
 func validateMovementDate(movementDate *time.Time) error {
 	if movementDate == nil {
-		return types.NewMissingFieldError("movement_date")
+		return domainerr.Validation("The field 'movement_date' is required")
 	}
 	return nil
 }
 
 func validateReference(reference string) error {
 	if reference == "" {
-		return types.NewMissingFieldError("reference")
+		return domainerr.Validation("The field 'reference' is required")
 	}
 
 	return nil
@@ -116,7 +111,7 @@ func validateReference(reference string) error {
 
 func validateSupplyID(supplyId int64) error {
 	if supplyId < 0 {
-		return types.NewInvalidIDError("invalid supply_id", nil)
+		return domainerr.Validation("invalid supply_id")
 	}
 
 	return nil
@@ -124,14 +119,14 @@ func validateSupplyID(supplyId int64) error {
 
 func validateInvestorId(investorId int64) error {
 	if investorId < 0 {
-		return types.NewInvalidIDError("invalid investor_id", nil)
+		return domainerr.Validation("invalid investor_id")
 	}
 	return nil
 }
 
 func validateProjectDestinationId(projectDestinationId int64, movementType string) error {
 	if movementType == domain.INTERNAL_MOVEMENT && projectDestinationId <= 0 {
-		return types.NewInvalidIDError("invalid project_destination_id", nil)
+		return domainerr.Validation("invalid project_destination_id")
 	}
 	return nil
 }
@@ -139,10 +134,10 @@ func validateProjectDestinationId(projectDestinationId int64, movementType strin
 func validateProvider(provider ProviderRequest, movementType string) error {
 	if movementType == domain.STOCK {
 		if provider.ID < 0 {
-			return types.NewInvalidIDError("invalid provider_id", nil)
+			return domainerr.Validation("invalid provider_id")
 		}
 		if provider.Name == "" {
-			return types.NewMissingFieldError("provider_name")
+			return domainerr.Validation("The field 'provider_name' is required")
 		}
 	}
 

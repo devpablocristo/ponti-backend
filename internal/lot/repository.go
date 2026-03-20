@@ -14,7 +14,7 @@ import (
 	gorm "gorm.io/gorm"
 
 	// pkg
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	// project
 	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
@@ -47,14 +47,14 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 			lotID = existing.ID
 			return nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return types.NewError(types.ErrInternal, "failed to check lot", err)
+			return domainerr.Internal("failed to check lot")
 		}
 		model := models.FromDomain(l)
 		model.CreatedBy = l.CreatedBy
 		model.UpdatedBy = l.UpdatedBy
 
 		if err := tx.Create(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to create lot", err)
+			return domainerr.Internal("failed to create lot")
 		}
 		lotID = model.ID
 		return nil
@@ -71,7 +71,7 @@ func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]doma
 	if err := r.db.Client().WithContext(ctx).
 		Where("field_id = ? AND deleted_at IS NULL", fieldID).
 		Find(&lots).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list lots", err)
+		return nil, domainerr.Internal("failed to list lots")
 	}
 	return mapLotsToDomain(lots), nil
 }
@@ -105,9 +105,9 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// Unicidad de nombre dentro del field (si aplica renombrado)
 		if err := tx.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
 			l.Name, l.FieldID, l.ID).First(&models.Lot{}).Error; err == nil {
-			return types.NewError(types.ErrConflict, "lot with same name already exists in this field", nil)
+			return domainerr.Conflict("lot with same name already exists in this field")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return types.NewError(types.ErrInternal, "failed to check lot unique name", err)
+			return domainerr.Internal("failed to check lot unique name")
 		}
 
 		// Verificación de existencia (distingue 404 de 409)
@@ -115,10 +115,10 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Count(&exists).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
+			return domainerr.Internal("failed to check lot existence")
 		}
 		if exists == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", l.ID), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", l.ID))
 		}
 
 		// Optimistic locking por fecha: WHERE id = ? AND updated_at = ? (última fecha conocida)
@@ -127,7 +127,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// Obtener la fecha de actualización actual para optimistic locking
 		var currentLot models.Lot
 		if err := tx.Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to get current lot for optimistic locking", err)
+			return domainerr.Internal("failed to get current lot for optimistic locking")
 		}
 
 		// Construir mapa de actualización solo con campos no vacíos
@@ -161,11 +161,11 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Updates(updateFields)
 		if res.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update lot", res.Error)
+			return domainerr.Internal("failed to update lot")
 		}
 		if res.RowsAffected == 0 {
 			// Fila existe pero fecha de actualización no matchea -> conflicto por concurrencia
-			return types.NewError(types.ErrConflict, "concurrent update conflict - lot was modified by another user", nil)
+			return domainerr.Conflict("concurrent update conflict - lot was modified by another user")
 		}
 
 		// Upsert de fechas por secuencia.
@@ -173,7 +173,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// unique index (lot_id, sequence) en lot_dates.
 		for _, date := range l.Dates {
 			if err := upsertLotDateBySequence(tx, l.ID, date, userID, nowTS); err != nil {
-				return types.NewError(types.ErrInternal, "failed to upsert lot dates", err)
+				return domainerr.Internal("failed to upsert lot dates")
 			}
 		}
 		return nil
@@ -252,17 +252,17 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
+			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
 			Updates(map[string]any{
 				"tons": tons,
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update lot tons", err)
+			return domainerr.Internal("failed to update lot tons")
 		}
 		return nil
 	})
@@ -282,10 +282,10 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
 			Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check lot existence", err)
+			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("lot %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
 		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
@@ -293,7 +293,7 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 				"deleted_at": time.Now(),
 				"deleted_by": &userID,
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft-delete lot", err)
+			return domainerr.Internal("failed to soft-delete lot")
 		}
 		return nil
 	})
@@ -306,7 +306,7 @@ func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]
 		Where("fields.project_id = ? AND lots.deleted_at IS NULL", projectID).
 		Find(&lots).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list lots by project", err)
+		return nil, domainerr.Internal("failed to list lots by project")
 	}
 	return mapLotsToDomain(lots), nil
 }
@@ -318,7 +318,7 @@ func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, f
 		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID).
 		Find(&lots).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list lots by project and field", err)
+		return nil, domainerr.Internal("failed to list lots by project and field")
 	}
 	return mapLotsToDomain(lots), nil
 }
@@ -338,7 +338,7 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	}
 	err := db.Find(&lots).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list lots by project, field and crop", err)
+		return nil, domainerr.Internal("failed to list lots by project, field and crop")
 	}
 	return mapLotsToDomain(lots), nil
 }
@@ -386,7 +386,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 
 	var row rowAgg
 	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to scan lot metrics", err)
+		return nil, domainerr.Internal("failed to scan lot metrics")
 	}
 
 	superficieTotal := row.SuperficieTotal
@@ -450,20 +450,20 @@ func (r *Repository) ListLots(
 	var total int64
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to count lots", err)
+		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to count lots")
 	}
 
 	var sumSowedArea decimal.Decimal
 	sumSowedQuery := fmt.Sprintf("SELECT COALESCE(SUM(sowed_area_ha),0) FROM %s WHERE %s", view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(sumSowedQuery, args...).Scan(&sumSowedArea).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to sum sowed area", err)
+		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to sum sowed area")
 	}
 
 	// sumCost: promedio ponderado de cost_usd_per_ha por superficie total
 	var sumCost decimal.Decimal
 	sumCostQuery := fmt.Sprintf("SELECT COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares),0), 0) FROM %s WHERE %s", view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(sumCostQuery, args...).Scan(&sumCost).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to calculate cost per hectare", err)
+		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to calculate cost per hectare")
 	}
 
 	// página
@@ -501,7 +501,7 @@ func (r *Repository) ListLots(
 		var allDates []models.LotDates
 		datesQuery := "SELECT * FROM lot_dates WHERE lot_id IN ? AND deleted_at IS NULL ORDER BY lot_id, sequence"
 		if err := r.db.Client().WithContext(ctx).Raw(datesQuery, lotIDs).Scan(&allDates).Error; err != nil {
-			return nil, 0, decimal.Zero, decimal.Zero, types.NewError(types.ErrInternal, "failed to get lot dates", err)
+			return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to get lot dates")
 		}
 		datesByLot := make(map[int64][]models.LotDates)
 		for _, d := range allDates {

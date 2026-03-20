@@ -13,7 +13,8 @@ import (
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/saas-core/shared/httperr"
 	"github.com/devpablocristo/ponti-backend/pkg/validations"
 )
 
@@ -310,9 +311,9 @@ func ValidateLotRequest() gin.HandlerFunc {
 		var req dto.Lot
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -360,9 +361,9 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		var req dto.LotUpdate
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -431,9 +432,9 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -441,18 +442,18 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		// Validar formato de toneladas
 		tons, err := decimal.NewFromString(req.Tons)
 		if err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid tons format", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid tons format")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
 
 		// Validar valor de toneladas
 		if err := ValidateTons(tons, "tons"); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, err.Error(), err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation(err.Error())
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
