@@ -81,6 +81,35 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 	return nil
 }
 
+func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page, perPage int) ([]domain.Invoice, int64, error) {
+	if projectID == 0 {
+		return nil, 0, domainerr.Validation("invalid projectID")
+	}
+
+	var total int64
+	query := r.db.Client().WithContext(ctx).
+		Model(&models.Invoice{}).
+		Joins("JOIN work_orders ON work_orders.id = invoices.work_order_id").
+		Where("work_orders.project_id = ?", projectID)
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count invoices")
+	}
+
+	var rows []models.Invoice
+	offset := (page - 1) * perPage
+	if err := query.Offset(offset).Limit(perPage).Order("invoices.id DESC").Find(&rows).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list invoices")
+	}
+
+	out := make([]domain.Invoice, len(rows))
+	for i, row := range rows {
+		out[i] = *row.ToDomain()
+	}
+
+	return out, total, nil
+}
+
 func (r *Repository) Delete(ctx context.Context, workOrderID int64) error {
 	if workOrderID == 0 {
 		return domainerr.Validation("invalid WorkOrderID")

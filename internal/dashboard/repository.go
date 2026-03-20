@@ -303,9 +303,16 @@ func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int6
 		return nil, domainerr.Internal("failed to get management balance data")
 	}
 
+	breakdown := []models.ManagementBalanceBreakdown{
+		{Category: "Semillas", ExecutedUSD: summary.SemillaCostUSD, InvestedUSD: summary.SemillasInvertidosUSD, StockUSD: summary.SemillasStockUSD},
+		{Category: "Agroquímicos", ExecutedUSD: summary.InsumosCostUSD, InvestedUSD: summary.AgroquimicosInvertidosUSD, StockUSD: summary.AgroquimicosStockUSD},
+		{Category: "Fertilizantes", ExecutedUSD: summary.FertilizantesCostUSD, InvestedUSD: summary.FertilizantesInvertidosUSD, StockUSD: summary.FertilizantesStockUSD},
+		{Category: "Labores", ExecutedUSD: summary.LaboresCostUSD, InvestedUSD: summary.LaboresInvertidosUSD, StockUSD: decimal.Zero},
+	}
+
 	return &models.ManagementBalanceModel{
 		Summary:   &summary,
-		Breakdown: []models.ManagementBalanceBreakdown{}, // TODO: Implementar cuando se requiera
+		Breakdown: breakdown,
 		TotalsRow: &models.ManagementBalanceTotals{
 			TotalExecutedUSD: summary.DirectCostsExecutedUSD,
 			TotalInvestedUSD: summary.DirectCostsInvestedUSD,

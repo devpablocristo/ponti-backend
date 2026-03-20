@@ -25,6 +25,7 @@ type Supply struct {
 	UnitID    int64
 	UnitName  string
 	Price     decimal.Decimal
+	Quantity  decimal.Decimal // Cantidad total de stock (suma de movimientos de entrada)
 	IsPartialPrice bool
 	CategoryID     int64
 	CategoryName   string

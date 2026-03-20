@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
@@ -364,6 +366,10 @@ func (r *Repository) ListSuppliesPaginated(
 		return nil, 0, err
 	}
 
+	if err := r.attachQuantitiesToSupplies(ctx, res); err != nil {
+		return nil, 0, err
+	}
+
 	return res, total, nil
 }
 
@@ -439,6 +445,10 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	}
 
 	if err := r.attachOriginsToSupplies(ctx, out); err != nil {
+		return nil, 0, err
+	}
+
+	if err := r.attachQuantitiesToSupplies(ctx, out); err != nil {
 		return nil, 0, err
 	}
 
@@ -538,6 +548,47 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 
 	for i := range supplies {
 		supplies[i].Origin = originBySupply[supplies[i].ID]
+	}
+
+	return nil
+}
+
+type supplyQuantityRow struct {
+	SupplyID int64           `gorm:"column:supply_id"`
+	Total    decimal.Decimal `gorm:"column:total"`
+}
+
+// attachQuantitiesToSupplies calcula la cantidad total por supply sumando los movimientos de entrada.
+func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []domain.Supply) error {
+	if len(supplies) == 0 {
+		return nil
+	}
+
+	supplyIDs := make([]int64, 0, len(supplies))
+	for i := range supplies {
+		supplyIDs = append(supplyIDs, supplies[i].ID)
+	}
+
+	var rows []supplyQuantityRow
+	err := r.getDB(ctx).
+		Table("supply_movements").
+		Select("supply_id, COALESCE(SUM(quantity), 0) AS total").
+		Where("deleted_at IS NULL AND is_entry = TRUE AND supply_id IN ?", supplyIDs).
+		Group("supply_id").
+		Scan(&rows).Error
+	if err != nil {
+		return domainerr.Internal("failed to resolve supply quantities")
+	}
+
+	qtyBySupply := make(map[int64]decimal.Decimal, len(rows))
+	for _, row := range rows {
+		qtyBySupply[row.SupplyID] = row.Total
+	}
+
+	for i := range supplies {
+		if qty, ok := qtyBySupply[supplies[i].ID]; ok {
+			supplies[i].Quantity = qty
+		}
 	}
 
 	return nil

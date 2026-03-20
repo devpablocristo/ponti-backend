@@ -109,8 +109,8 @@ func NewListSuppliesResponse(
 
 	out := make([]ListedSupply, len(items))
 	for i, s := range items {
-		// Calcular Total U$ como precio * cantidad (asumiendo cantidad = 1 por ahora)
-		totalUSD := s.Price // TODO: multiplicar por cantidad real si existe
+		// Calcular Total U$ como precio * cantidad real
+		totalUSD := s.Price.Mul(s.Quantity)
 
 		out[i] = ListedSupply{
 			ID:    s.ID,
@@ -130,9 +130,9 @@ func NewListSuppliesResponse(
 
 		// Acumular métricas según el tipo de unidad
 		if isKG(s.UnitName) {
-			totalKg = totalKg.Add(decimal.NewFromInt(1)) // TODO: usar cantidad real
+			totalKg = totalKg.Add(s.Quantity)
 		} else if isLt(s.UnitName) {
-			totalLts = totalLts.Add(decimal.NewFromInt(1)) // TODO: usar cantidad real
+			totalLts = totalLts.Add(s.Quantity)
 		}
 		totalNetUSD = totalNetUSD.Add(totalUSD)
 	}

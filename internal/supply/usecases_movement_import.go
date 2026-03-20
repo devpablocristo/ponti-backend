@@ -48,7 +48,7 @@ func (u *UseCases) ImportSupplyMovements(
 					SupplyName:      validated[i].Supply.Name,
 					ReferenceNumber: validated[i].ReferenceNumber,
 					Code:            "apply_error",
-					Message:         err.Error(),
+					Message:         errorMessage(err),
 				}}
 				return errImportValidation
 			}
@@ -139,7 +139,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyID:        movement.Supply.ID,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         err.Error(),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -193,7 +193,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         err.Error(),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -239,7 +239,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            code,
-				Message:         err.Error(),
+				Message:         errorMessage(err),
 			})
 			continue
 		}

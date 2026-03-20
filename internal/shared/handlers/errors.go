@@ -1,8 +1,11 @@
 package sharedhandlers
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/devpablocristo/saas-core/shared/httperr"
 )
 
@@ -10,4 +13,14 @@ import (
 func RespondError(c *gin.Context, err error) {
 	status, apiErr := httperr.Normalize(err)
 	c.JSON(status, apiErr)
+}
+
+// ErrorMessage extracts the human-readable message from a domainerr.Error,
+// falling back to err.Error() for other error types.
+func ErrorMessage(err error) string {
+	var de domainerr.Error
+	if errors.As(err, &de) {
+		return de.Message()
+	}
+	return err.Error()
 }

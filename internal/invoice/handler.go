@@ -2,10 +2,12 @@ package invoice
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +16,7 @@ type UseCasePort interface {
 	CreateInvoice(context.Context, *domain.Invoice) (int64, error)
 	UpdateInvoice(context.Context, *domain.Invoice) error
 	DeleteInvoice(context.Context, int64) error
+	ListInvoices(context.Context, int64, int, int) ([]domain.Invoice, int64, error)
 }
 
 type GinEnginePort interface {
@@ -58,11 +61,11 @@ func (h *Handler) Routes() {
 
 	public := r.Group(baseURL)
 	{
+		public.GET("", h.ListInvoices)
 		public.GET("/:work_order_id", h.GetInvoiceByWorkOrder)
 		public.POST("/:work_order_id", h.CreateInvoice)
 		public.PUT("/:work_order_id", h.UpdateInvoice)
 		public.DELETE("/:work_order_id", h.DeleteInvoice)
-
 	}
 }
 
@@ -99,6 +102,11 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 
 	var body dto.InvoiceRequest
 	if err := sharedhandlers.BindJSON(c, &body); err != nil {
+		return
+	}
+
+	if err := body.Validate(); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return
 	}
 
@@ -140,6 +148,32 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ListInvoices(c *gin.Context) {
+	projectIDParam := c.Query("project_id")
+	if projectIDParam == "" {
+		sharedhandlers.RespondError(c, domainerr.Validation("project_id is required"))
+		return
+	}
+
+	projectID, err := strconv.ParseInt(projectIDParam, 10, 64)
+	if err != nil || projectID <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("project_id is required"))
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+
+	items, total, err := h.ucs.ListInvoices(c.Request.Context(), projectID, page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewListInvoicesResponse(items, page, perPage, total)
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {

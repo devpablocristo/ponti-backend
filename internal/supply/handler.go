@@ -401,7 +401,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := err.Error()
+			message := sharedhandlers.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -423,7 +423,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			for i, movement := range domainMovements {
 				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
 					itemIndex := validIndexes[i]
-					message := err.Error()
+					message := sharedhandlers.ErrorMessage(err)
 					prevalidationFailedIndexes[itemIndex] = true
 					failures = append(failures, createDto.SupplyMovementFailure{
 						Index:    itemIndex,
@@ -455,7 +455,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
 				if err != nil {
 					failedValidPos := -1
-					msg := err.Error()
+					msg := sharedhandlers.ErrorMessage(err)
 					if strings.HasPrefix(msg, "item ") {
 						parts := strings.SplitN(msg, ": ", 2)
 						if len(parts) == 2 {
@@ -524,7 +524,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			}
 			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
 			if err != nil {
-				message := err.Error()
+				message := sharedhandlers.ErrorMessage(err)
 				failures = append(failures, createDto.SupplyMovementFailure{
 					Index:    i,
 					RowIndex: i + 2,
@@ -596,7 +596,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := err.Error()
+			message := sharedhandlers.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,

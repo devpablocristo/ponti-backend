@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // TestUseCases_DeleteSupplyMovement tests para la eliminación de movimientos de suministro
@@ -40,9 +40,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(999)).
-					Return(types.NewError(types.ErrNotFound, "supply movement not found", nil))
+					Return(domainerr.NotFound("supply movement not found"))
 			},
-			expectedError: types.NewError(types.ErrNotFound, "supply movement not found", nil),
+			expectedError: domainerr.NotFound("supply movement not found"),
 			description:   "Error cuando el movimiento no existe",
 		},
 		{
@@ -52,9 +52,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(200)).
-					Return(types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil))
+					Return(domainerr.Conflict("closed stock movement already exists for this supply in the project"))
 			},
-			expectedError: types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil),
+			expectedError: domainerr.Conflict("closed stock movement already exists for this supply in the project"),
 			description:   "No se puede eliminar si el stock está cerrado",
 		},
 		{
@@ -77,9 +77,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(400)).
-					Return(types.NewError(types.ErrInternal, "database error", nil))
+					Return(domainerr.Internal("database error"))
 			},
-			expectedError: types.NewError(types.ErrInternal, "database error", nil),
+			expectedError: domainerr.Internal("database error"),
 			description:   "Error interno del repository se propaga correctamente",
 		},
 		{
@@ -102,9 +102,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(0), int64(100)).
-					Return(types.NewError(types.ErrValidation, "invalid project id", nil))
+					Return(domainerr.Validation("invalid project id"))
 			},
-			expectedError: types.NewError(types.ErrValidation, "invalid project id", nil),
+			expectedError: domainerr.Validation("invalid project id"),
 			description:   "Validación de ID de proyecto inválido",
 		},
 		{
@@ -114,9 +114,9 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(0)).
-					Return(types.NewError(types.ErrValidation, "invalid supply movement id", nil))
+					Return(domainerr.Validation("invalid supply movement id"))
 			},
-			expectedError: types.NewError(types.ErrValidation, "invalid supply movement id", nil),
+			expectedError: domainerr.Validation("invalid supply movement id"),
 			description:   "Validación de ID de movimiento inválido",
 		},
 	}
@@ -232,7 +232,7 @@ func TestDeleteSupplyMovement_InternalMovementScenarios(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(500)).
-					Return(types.NewError(types.ErrInternal, "failed to delete related supply movements", nil))
+					Return(domainerr.Internal("failed to delete related supply movements"))
 			},
 			expectError: true,
 			description: "Error en transacción al eliminar registros relacionados",
@@ -245,7 +245,7 @@ func TestDeleteSupplyMovement_InternalMovementScenarios(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(600)).
-					Return(types.NewError(types.ErrInternal, "failed to update stock real units", nil))
+					Return(domainerr.Internal("failed to update stock real units"))
 			},
 			expectError: true,
 			description: "Error al recalcular RealStockUnits después de eliminación",
@@ -295,7 +295,7 @@ func TestDeleteSupplyMovement_EdgeCases(t *testing.T) {
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(-1), int64(-100)).
-					Return(types.NewError(types.ErrValidation, "invalid ids", nil))
+					Return(domainerr.Validation("invalid ids"))
 			},
 			expectError: true,
 			description: "IDs negativos deben ser rechazados",

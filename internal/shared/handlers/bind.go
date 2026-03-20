@@ -63,5 +63,5 @@ func HumanizeBindError(err error) string {
 		return "invalid payload: malformed JSON"
 	}
 
-	return "invalid payload"
+	return "invalid payload: " + err.Error()
 }

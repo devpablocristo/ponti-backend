@@ -44,7 +44,13 @@ func Bootstrap(dbTypeStr, host, user, password, name, sslMode string, port int) 
 			name = os.Getenv("DB_NAME")
 		}
 		if port == 0 {
-			port, _ = strconv.Atoi(os.Getenv("DB_PORT"))
+			if portStr := os.Getenv("DB_PORT"); portStr != "" {
+				var err error
+				port, err = strconv.Atoi(portStr)
+				if err != nil {
+					return nil, fmt.Errorf("invalid DB_PORT %q: %w", portStr, err)
+				}
+			}
 		}
 
 		config = newConfig(

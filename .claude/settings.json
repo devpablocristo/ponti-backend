@@ -11,12 +11,15 @@
       "Read(//home/pablo/Projects/Pablo/saas-core/entitlements/**)",
       "Read(//home/pablo/Projects/Pablo/saas-core/**)",
       "Bash(for module:*)",
-      "Bash(make up-ponti-local:*)"
+      "Bash(make up-ponti-local:*)",
+      "Read(//home/pablo/Projects/Pablo/ponti/**)",
+      "Bash(npx tsc:*)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
       "/home/pablo/Projects/Pablo/saas-core/billing",
-      "/home/pablo/Projects/Pablo/saas-core/admin"
+      "/home/pablo/Projects/Pablo/saas-core/admin",
+      "/home/pablo/Projects/Pablo/ponti"
     ]
   }
 }

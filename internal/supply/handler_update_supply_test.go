@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+	"github.com/devpablocristo/saas-core/shared/domainerr"
 
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	sharedtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type handlerUseCasesStub struct {
@@ -490,10 +490,13 @@ func TestHandler_ImportSupplyMovements_InvalidUserIDReturnsUnauthorized(t *testi
 	h.ImportSupplyMovements(ctx)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	var resp sharedtypes.APIErrorResponse
+	var resp struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
 	err := json.Unmarshal(rec.Body.Bytes(), &resp)
 	assert.NoError(t, err)
-	assert.Equal(t, sharedtypes.APIErrForbidden, resp.Type)
+	assert.Equal(t, "FORBIDDEN", resp.Code)
 }
 
 func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T) {
@@ -502,7 +505,7 @@ func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T
 	stub := &handlerUseCasesStub{
 		validateMovementFn: func(_ context.Context, movement *domain.SupplyMovement) error {
 			if movement.ReferenceNumber == "REM-EXCEL" && movement.Supply != nil && movement.Supply.ID == 10 {
-				return sharedtypes.NewError(sharedtypes.ErrConflict, "El remito REM-EXCEL ya tiene el insumo 10 cargado", nil)
+				return domainerr.Conflict("El remito REM-EXCEL ya tiene el insumo 10 cargado")
 			}
 			return nil
 		},
@@ -579,7 +582,10 @@ func TestHandler_ImportSupplyMovements_ExceedsMaxItems(t *testing.T) {
 	h.ImportSupplyMovements(ctx)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	var resp sharedtypes.APIErrorResponse
+	var resp struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
 	err := json.Unmarshal(rec.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Contains(t, resp.Message, "500")

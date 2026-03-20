@@ -73,8 +73,8 @@ func (h *Handler) Routes() {
 // @Produce json
 // @Param project_id query int true "Project ID"
 // @Success 200 {object} dto.IntegrityReportResponse
-// @Failure 400 {object} types.ErrorResponse
-// @Failure 500 {object} types.ErrorResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
 // @Router /data-integrity/costs-check [get]
 func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Parsear query params

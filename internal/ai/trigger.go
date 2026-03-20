@@ -21,6 +21,7 @@ type InsightTrigger struct {
 	httpClient *http.Client
 	throttle   sync.Map      // projectID -> time.Time
 	cooldown   time.Duration // mínimo entre disparos por proyecto
+	sem        chan struct{}  // semáforo para limitar goroutines concurrentes
 }
 
 // NewInsightTrigger crea un trigger con cooldown configurable.
@@ -37,6 +38,7 @@ func NewInsightTrigger(baseURL, serviceKey string, timeoutMS, cooldownSec int) *
 		serviceKey: serviceKey,
 		httpClient: &http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond},
 		cooldown:   time.Duration(cooldownSec) * time.Second,
+		sem:        make(chan struct{}, 32), // limitar a 32 goroutines concurrentes
 	}
 }
 
@@ -56,8 +58,15 @@ func (t *InsightTrigger) NotifyDataChange(projectID, userID string) {
 	}
 	t.throttle.Store(projectID, now)
 
-	// Fire and forget
+	// Fire and forget con semáforo para limitar concurrencia
+	select {
+	case t.sem <- struct{}{}:
+	default:
+		log.Printf("[ai-trigger] semáforo lleno, descartando trigger para proyecto %s", projectID)
+		return
+	}
 	go func() {
+		defer func() { <-t.sem }()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 

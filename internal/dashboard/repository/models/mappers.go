@@ -330,7 +330,7 @@ func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel
 			ID:           model.CropID,
 			Name:         model.Name,
 			Hectares:     model.Hectares,
-			RotationPct:  decimal.Zero, // TODO: Implementar cuando se requiera
+			RotationPct:  model.IncidencePct,
 			CostUSDPerHa: model.CostPerHa,
 			IncidencePct: model.IncidencePct,
 		}

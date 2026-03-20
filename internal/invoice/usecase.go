@@ -11,6 +11,7 @@ type RepositoryPort interface {
 	Create(context.Context, *domain.Invoice) (int64, error)
 	Update(context.Context, *domain.Invoice) error
 	Delete(context.Context, int64) error
+	ListByProjectID(context.Context, int64, int, int) ([]domain.Invoice, int64, error)
 }
 
 type UseCases struct {
@@ -35,4 +36,8 @@ func (u *UseCases) UpdateInvoice(ctx context.Context, item *domain.Invoice) erro
 
 func (u *UseCases) DeleteInvoice(ctx context.Context, WorkOrderID int64) error {
 	return u.repo.Delete(ctx, WorkOrderID)
+}
+
+func (u *UseCases) ListInvoices(ctx context.Context, projectID int64, page, perPage int) ([]domain.Invoice, int64, error) {
+	return u.repo.ListByProjectID(ctx, projectID, page, perPage)
 }

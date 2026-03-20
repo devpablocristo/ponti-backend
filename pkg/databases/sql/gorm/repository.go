@@ -203,8 +203,7 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		defer func() { _ = sqlDB.Close() }()
 
 		var exists bool
-		checkQuery := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = '%s')", config.GetDBName())
-		if err := db.Raw(checkQuery).Scan(&exists).Error; err != nil {
+		if err := db.Raw("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = ?)", config.GetDBName()).Scan(&exists).Error; err != nil {
 			return fmt.Errorf("failed to check if database exists: %w", err)
 		}
 

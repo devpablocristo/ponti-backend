@@ -379,3 +379,13 @@ func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, project
 
 	return u.excel.ExportSupplyMovements(ctx, items)
 }
+
+// errorMessage extracts the human-readable message from a domainerr.Error,
+// falling back to err.Error() for other error types.
+func errorMessage(err error) string {
+	var de domainerr.Error
+	if errors.As(err, &de) {
+		return de.Message()
+	}
+	return err.Error()
+}

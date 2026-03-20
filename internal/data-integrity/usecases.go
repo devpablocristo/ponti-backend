@@ -649,6 +649,17 @@ func (u *UseCases) control5LaboresInsumosVsDashboard(_ context.Context, sd *shar
 // RecalcA: ∑(contributions: Labores Generales + Siembra + Riego)
 // =====================================================
 func (u *UseCases) control6LaboresVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	if sd.dashboardData == nil || sd.dashboardData.ManagementBalance == nil || sd.dashboardData.ManagementBalance.Summary == nil ||
+		sd.investorReport == nil {
+		return domain.IntegrityCheck{
+			ControlNumber: 6,
+			DataToVerify:  "Inversión en labores",
+			Description:   "Dashboard labores vs Informe de Aportes",
+			Status:        "SKIPPED",
+			SystemMeaning: "Datos insuficientes: dashboardData o investorReport es nil.",
+		}, nil
+	}
+
 	systemValue := sd.dashboardData.ManagementBalance.Summary.LaboresInvertidosUSD
 
 	recalcA := decimal.Zero
@@ -682,6 +693,17 @@ func (u *UseCases) control6LaboresVsAportes(_ context.Context, sd *sharedData) (
 // RecalcA: ∑(contributions: Semilla + Agroquímicos + Fertilizantes)
 // =====================================================
 func (u *UseCases) control7InsumosVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	if sd.dashboardData == nil || sd.dashboardData.ManagementBalance == nil || sd.dashboardData.ManagementBalance.Summary == nil ||
+		sd.investorReport == nil {
+		return domain.IntegrityCheck{
+			ControlNumber: 7,
+			DataToVerify:  "Inversión en insumos",
+			Description:   "Dashboard insumos vs Informe de Aportes",
+			Status:        "SKIPPED",
+			SystemMeaning: "Datos insuficientes: dashboardData o investorReport es nil.",
+		}, nil
+	}
+
 	summary := sd.dashboardData.ManagementBalance.Summary
 	systemValue := summary.SemillasInvertidosUSD.
 		Add(summary.AgroquimicosInvertidosUSD).
@@ -718,6 +740,16 @@ func (u *UseCases) control7InsumosVsAportes(_ context.Context, sd *sharedData) (
 // RecalcA: ∑(lot.admin_cost × hectares)
 // =====================================================
 func (u *UseCases) control8LotesAdminVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	if sd.investorReport == nil {
+		return domain.IntegrityCheck{
+			ControlNumber: 8,
+			DataToVerify:  "Administración y Estructura",
+			Description:   "Informe de Aportes vs Lotes admin",
+			Status:        "SKIPPED",
+			SystemMeaning: "Datos insuficientes: investorReport es nil.",
+		}, nil
+	}
+
 	systemValue := decimal.Zero
 	for _, cat := range sd.investorReport.Contributions {
 		if cat.Label == "Administración y Estructura" {
@@ -755,6 +787,16 @@ func (u *UseCases) control8LotesAdminVsAportes(_ context.Context, sd *sharedData
 // RecalcA: ∑(lot.rent_per_ha × hectares)
 // =====================================================
 func (u *UseCases) control9LotesArriendoVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
+	if sd.investorReport == nil {
+		return domain.IntegrityCheck{
+			ControlNumber: 9,
+			DataToVerify:  "Arriendo Capitalizable",
+			Description:   "Informe de Aportes vs Lotes arriendo",
+			Status:        "SKIPPED",
+			SystemMeaning: "Datos insuficientes: investorReport es nil.",
+		}, nil
+	}
+
 	systemValue := decimal.Zero
 	for _, cat := range sd.investorReport.Contributions {
 		if cat.Label == "Arriendo Capitalizable" {

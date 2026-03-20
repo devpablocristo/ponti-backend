@@ -1,6 +1,8 @@
 package models
 
 import (
+	"log/slog"
+
 	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtype "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
@@ -74,10 +76,11 @@ func FromDomain(d *domain.Supply) *Supply {
 	}
 }
 
-// getUnitName obtiene el nombre de la unidad desde bparams
+// getUnitName obtiene el nombre de la unidad.
+// Mapeo hardcodeado porque business_parameters no almacena nombres de unidades
+// por ID — solo almacena claves como "iva_percentage". Cuando se agregue una
+// tabla "units" o se extienda bparams con unit_id → name, reemplazar este switch.
 func (m *Supply) getUnitName() string {
-	// Mapeo temporal hasta que se implemente la consulta a bparams
-	// TODO: Implementar consulta real a bparams
 	switch m.UnitID {
 	case 1:
 		return "Lt" // unit_liters
@@ -86,6 +89,8 @@ func (m *Supply) getUnitName() string {
 	case 3:
 		return "Bags" // unit_bags
 	default:
+		slog.Warn("unknown unit ID in supply, returning 'Unknown'",
+			"unit_id", m.UnitID, "supply_id", m.ID)
 		return "Unknown"
 	}
 }

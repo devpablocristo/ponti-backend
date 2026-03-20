@@ -54,7 +54,9 @@ func Bootstrap(filePath, sheet, dateFormat string, writeHeader *bool, columnWidt
 
 	// Ensure destination directory
 	if dir := filepath.Dir(filePath); dir != "." && dir != "" {
-		_ = os.MkdirAll(dir, 0o755)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("excel bootstrap: failed to create directory %q: %w", dir, err)
+		}
 	}
 
 	// Validar parámetros obligatorios
