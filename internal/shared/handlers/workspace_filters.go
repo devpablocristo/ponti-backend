@@ -2,8 +2,8 @@
 package sharedhandlers
 
 import (
-	filters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	filters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 

@@ -9,9 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type laborHandlerUseCasesStub struct {
@@ -70,8 +71,8 @@ func newLaborHandlerJSONContext(method, target, body string) (*gin.Context, *htt
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	// UpdateLabor requiere user_id en contexto como string
-	req = req.WithContext(context.WithValue(req.Context(), pkgmwr.ContextUserIDKey, "123"))
+	// UpdateLabor requiere actor en contexto como string
+	req = req.WithContext(context.WithValue(req.Context(), ctxkeys.Actor, "test@example.com"))
 
 	ctx.Request = req
 	return ctx, rec

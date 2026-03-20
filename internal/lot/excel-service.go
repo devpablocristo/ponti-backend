@@ -5,9 +5,9 @@ import (
 	"context"
 	"io"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	lotExcel "github.com/alphacodinggroup/ponti-backend/internal/lot/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
+	"github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 type XLSXEnginePort interface {

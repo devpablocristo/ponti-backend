@@ -3,7 +3,7 @@ package campaign
 import (
 	"context"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 )
 
 type RepositoryPort interface {

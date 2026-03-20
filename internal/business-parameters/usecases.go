@@ -3,8 +3,8 @@ package bparams
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type RepositoryPort interface {

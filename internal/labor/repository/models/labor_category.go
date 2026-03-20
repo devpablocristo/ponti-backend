@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type LaborCategory struct {

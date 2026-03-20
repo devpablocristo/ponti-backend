@@ -7,9 +7,9 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // Estructura de supply para listados con información completa

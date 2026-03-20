@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/ai/handler/dto"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	dto "github.com/devpablocristo/ponti-backend/internal/ai/handler/dto"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {

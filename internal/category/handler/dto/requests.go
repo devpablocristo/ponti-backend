@@ -1,7 +1,7 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
 )
 
 // CreateCategoryRequest es el DTO de entrada para crear una categoría.

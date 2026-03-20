@@ -7,13 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	labexcel "github.com/alphacodinggroup/ponti-backend/internal/labor/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
+	"github.com/devpablocristo/ponti-backend/internal/labor/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -104,7 +104,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -173,7 +173,7 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

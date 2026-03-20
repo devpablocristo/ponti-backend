@@ -6,10 +6,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+
+	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
-// RequireUserIDHeader asegura que un header de ID de usuario válido esté presente.
+// RequireUserIDHeader asegura que un header de ID de usuario valido este presente.
 func RequireUserIDHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := strings.TrimSpace(c.GetHeader(HeaderUserID))
@@ -19,9 +21,9 @@ func RequireUserIDHeader() gin.HandlerFunc {
 			c.AbortWithStatusJSON(status, apiErr.ToResponse())
 			return
 		}
-		c.Set(ContextUserID, userID)
-		// Propagar también al request.Context() para capas que usan ctx estándar
-		ctx := context.WithValue(c.Request.Context(), ContextUserIDKey, userID)
+		c.Set(string(ctxkeys.Actor), userID)
+		// Propagar tambien al request.Context() para capas que usan ctx estandar
+		ctx := context.WithValue(c.Request.Context(), ctxkeys.Actor, userID)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}

@@ -7,9 +7,9 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 type LotDate struct {

@@ -4,14 +4,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/alphacodinggroup/ponti-backend/cmd/config"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor"
-	labexcel "github.com/alphacodinggroup/ponti-backend/internal/labor/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/project"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	"github.com/devpablocristo/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/internal/labor"
+	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
+	"github.com/devpablocristo/ponti-backend/internal/project"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	pkgexcel "github.com/devpablocristo/ponti-backend/pkg/files-io/excel/excelize"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 	"github.com/google/wire"
 )
 

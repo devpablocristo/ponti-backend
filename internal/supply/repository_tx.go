@@ -3,7 +3,7 @@ package supply
 import (
 	"context"
 
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	"gorm.io/gorm"
 )
 

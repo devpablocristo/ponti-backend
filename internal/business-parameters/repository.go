@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
+	models "github.com/devpablocristo/ponti-backend/internal/business-parameters/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
 
 type GormEnginePort interface {

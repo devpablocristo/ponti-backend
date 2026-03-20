@@ -3,9 +3,9 @@ package labor
 import (
 	"context"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	projectdomain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type RepositoryPort interface {

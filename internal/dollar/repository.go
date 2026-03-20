@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/dollar/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	models "github.com/devpablocristo/ponti-backend/internal/dollar/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 
 type GormEnginePort interface {

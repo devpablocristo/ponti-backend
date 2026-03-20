@@ -10,13 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	stockExcel "github.com/alphacodinggroup/ponti-backend/internal/stock/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
+	"github.com/devpablocristo/ponti-backend/internal/stock/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type UseCasesPort interface {
@@ -150,7 +150,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	userID, err := sharedmodels.ConvertStringToID(ctx)
+	userID, err := sharedmodels.ActorFromContext(ctx)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -192,7 +192,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(ctx)
+	userID, err := sharedmodels.ActorFromContext(ctx)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

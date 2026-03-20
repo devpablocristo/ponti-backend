@@ -3,7 +3,7 @@ package dashboard
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 )
 
 type RepositoryPort interface {

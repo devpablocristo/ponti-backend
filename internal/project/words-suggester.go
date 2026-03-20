@@ -3,8 +3,8 @@ package project
 import (
 	"context"
 
-	pgs "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	pgs "github.com/devpablocristo/ponti-backend/pkg/words-suggesters/trigram-search"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 
 // WordsSuggesterEnginePort es la interfaz del motor externo de sugerencias.

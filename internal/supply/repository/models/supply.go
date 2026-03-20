@@ -1,12 +1,12 @@
 package models
 
 import (
-	catmod "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
-	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
-	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
+	classtype "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
+	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

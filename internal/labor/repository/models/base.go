@@ -1,9 +1,9 @@
 package models
 
 import (
-	catmod "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/shopspring/decimal"
 )
 

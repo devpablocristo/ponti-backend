@@ -3,7 +3,7 @@ package sharedrepo
 import (
 	"fmt"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // ValidateEntity valida que el payload no sea nil.

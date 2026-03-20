@@ -3,9 +3,9 @@ package commercialization
 import (
 	"context"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/commercialization/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 )
 
 type RepositoryPort interface {

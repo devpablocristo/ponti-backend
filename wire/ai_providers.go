@@ -1,11 +1,11 @@
 package wire
 
 import (
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	ai "github.com/alphacodinggroup/ponti-backend/internal/ai"
-	aiusecases "github.com/alphacodinggroup/ponti-backend/internal/ai/usecases"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	ai "github.com/devpablocristo/ponti-backend/internal/ai"
+	aiusecases "github.com/devpablocristo/ponti-backend/internal/ai/usecases"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 	"github.com/google/wire"
 )
 

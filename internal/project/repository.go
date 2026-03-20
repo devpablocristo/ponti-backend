@@ -4,27 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	casmod "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
-	cropmod "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	cusmod "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
-	fieldmod "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	invmod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	manmod "github.com/alphacodinggroup/ponti-backend/internal/manager/repository/models"
-	models "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	base "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
+	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	cusmod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
+	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	invmod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
+	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type GormEnginePort interface {
@@ -43,7 +41,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 	var projectID int64
 
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		userID, err := convertStringToID(ctx)
+		userID, err := actorFromContext(ctx)
 		if err != nil {
 			return err
 		}
@@ -442,7 +440,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		return err
 	}
 
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -563,11 +561,11 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		return err
 	}
 
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
-	var deletedBy *int64
+	var deletedBy *string
 	deletedBy = &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -774,8 +772,8 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrInternal, "failed to restore admin cost investors", err)
 		}
 
-		var deletedBy *int64
-		if userID, err := convertStringToID(ctx); err == nil {
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
 			deletedBy = &userID
 		}
 		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
@@ -892,8 +890,8 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 			return types.NewError(types.ErrInternal, "failed to hard delete project", err)
 		}
 
-		var deletedBy *int64
-		if userID, err := convertStringToID(ctx); err == nil {
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
 			deletedBy = &userID
 		}
 		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
@@ -1021,19 +1019,11 @@ func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
 	return c.ID, nil
 }
 
-func convertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserIDKey)
-	if s, ok := userID.(string); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i, nil
-		} else {
-			return 0, fmt.Errorf("failed to parse user ID: %w", err)
-		}
-	}
-	return 0, fmt.Errorf("user ID is not a string")
+func actorFromContext(ctx context.Context) (string, error) {
+	return base.ActorFromContext(ctx)
 }
 
-func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) error {
+func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *string) error {
 	if customerID == 0 {
 		return nil
 	}

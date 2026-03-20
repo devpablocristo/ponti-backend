@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	pkggorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	pkggorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
 )
 
 type repoAdapter struct {

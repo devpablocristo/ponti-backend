@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	reportdb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	models "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

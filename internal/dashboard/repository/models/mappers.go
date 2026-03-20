@@ -1,7 +1,7 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

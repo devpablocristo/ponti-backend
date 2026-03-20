@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/business-parameters/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {
@@ -124,7 +124,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 		return
 	}
 	param := req.ToDomain()
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err == nil {
 		param.CreatedBy = &userID
 		param.UpdatedBy = &userID
@@ -148,7 +148,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 		return
 	}
 	param := req.ToDomain(id)
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err == nil {
 		param.UpdatedBy = &userID
 	}

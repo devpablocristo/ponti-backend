@@ -11,10 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	sharedtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	sharedtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type handlerUseCasesStub struct {
@@ -145,7 +146,7 @@ func newHandlerJSONContext(method, target, body string) (*gin.Context, *httptest
 	ctx, _ := gin.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(method, target, strings.NewReader(body))
 	ctx.Request.Header.Set("Content-Type", "application/json")
-	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), pkgmwr.ContextUserIDKey, "123"))
+	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), ctxkeys.Actor, "test@example.com"))
 	return ctx, rec
 }
 
@@ -484,7 +485,7 @@ func TestHandler_ImportSupplyMovements_InvalidUserIDReturnsUnauthorized(t *testi
 	h := &Handler{ucs: &handlerUseCasesStub{}}
 	ctx, rec := newHandlerJSONContext(http.MethodPost, "/api/v1/projects/18/supply-movements/import", `{"mode":"strict","items":[]}`)
 	ctx.Params = gin.Params{{Key: "project_id", Value: "18"}}
-	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), pkgmwr.ContextUserIDKey, "invalid"))
+	ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), ctxkeys.Actor, ""))
 
 	h.ImportSupplyMovements(ctx)
 

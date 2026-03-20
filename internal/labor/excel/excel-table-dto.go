@@ -1,7 +1,7 @@
 package excel
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
 
 type ExcelTableDto struct {

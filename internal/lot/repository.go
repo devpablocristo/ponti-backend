@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,16 +14,15 @@ import (
 	gorm "gorm.io/gorm"
 
 	// pkg
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	// project
-	models "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
+	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {
@@ -96,7 +94,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		return err
 	}
 
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -186,7 +184,7 @@ func upsertLotDateBySequence(
 	tx *gorm.DB,
 	lotID int64,
 	date domain.LotDates,
-	userID int64,
+	userID string,
 	nowTS time.Time,
 ) error {
 	var existing []models.LotDates
@@ -275,7 +273,7 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
 	}
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -526,17 +524,6 @@ func mapLotsToDomain(lots []models.Lot) []domain.Lot {
 	return res
 }
 
-func convertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserIDKey)
-	if i, ok := userID.(int64); ok {
-		return i, nil
-	}
-	if s, ok := userID.(string); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i, nil
-		} else {
-			return 0, fmt.Errorf("failed to parse user ID: %w", err)
-		}
-	}
-	return 0, fmt.Errorf("user ID is not a string")
+func actorFromContext(ctx context.Context) (string, error) {
+	return sharedmodels.ActorFromContext(ctx)
 }

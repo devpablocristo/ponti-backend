@@ -9,15 +9,15 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	campdom "github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	customerdom "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	fielddom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	investordom "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	leasetypedom "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
-	lotdom "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	managerdom "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	campdom "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	customerdom "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	investordom "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	leasetypedom "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	lotdom "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	managerdom "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 
 type Project struct {
@@ -32,8 +32,8 @@ type Project struct {
 	AdminCostInvestors []AdminCostInvestor `json:"admin_cost_investors" binding:"required,dive,required"`
 	Fields             []Field             `json:"fields" binding:"required,dive,required"`
 	UpdatedAt          *time.Time          `json:"updated_at,omitempty"`
-	CreatedBy          *int64              `json:"created_by,omitempty"`
-	UpdatedBy          *int64              `json:"updated_by,omitempty"`
+	CreatedBy          *string             `json:"created_by,omitempty"`
+	UpdatedBy          *string             `json:"updated_by,omitempty"`
 }
 
 type Customer struct {

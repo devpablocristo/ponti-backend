@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/shopspring/decimal"
 )
 

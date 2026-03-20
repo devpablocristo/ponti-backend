@@ -7,10 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // UseCasesPort define la interfaz para los casos de uso

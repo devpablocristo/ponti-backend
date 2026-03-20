@@ -8,7 +8,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type GetStocksResponse struct {

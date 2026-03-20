@@ -10,16 +10,18 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+
+	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 const (
@@ -28,13 +30,13 @@ const (
 )
 
 type IdentityAuthConfig struct {
-	Enabled      bool
-	ProjectID    string
-	Issuer       string
-	Audience     string
-	JWKSURL      string
-	CacheTTL     time.Duration
-	TenantHeader string
+	Enabled       bool
+	ProjectID     string
+	Issuer        string
+	Audience      string
+	JWKSURL       string
+	CacheTTL      time.Duration
+	TenantHeader  string
 	AutoProvision bool
 	DefaultTenant string
 	DefaultRole   string
@@ -58,7 +60,7 @@ type identityClaims struct {
 }
 
 type membershipResolved struct {
-	TenantID    int64
+	TenantID    uuid.UUID
 	RoleName    string
 	Permissions map[string]struct{}
 }
@@ -263,29 +265,36 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			domErr := pkgtypes.NewError(pkgtypes.ErrAuthorization, "insufficient permissions", nil)
 			apiErr, _ := pkgtypes.NewAPIError(domErr)
 			c.AbortWithStatusJSON(http.StatusForbidden, apiErr.ToResponse())
-			logAuthDecision(claims.Subject, strconv.FormatInt(membership.TenantID, 10), c.FullPath(), permission, "DENY", start)
+			logAuthDecision(claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "DENY", start)
 			return
 		}
 
-		userIDStr := strconv.FormatInt(userID, 10)
-		tenantIDStr := strconv.FormatInt(membership.TenantID, 10)
-		ctx := c.Request.Context()
-		ctx = context.WithValue(ctx, ContextUserIDKey, userIDStr)
-		ctx = context.WithValue(ctx, ContextUserEmailKey, claims.Email)
-		ctx = context.WithValue(ctx, ContextTenantIDKey, tenantIDStr)
-		ctx = context.WithValue(ctx, ContextRolesKey, []string{membership.RoleName})
-		c.Request = c.Request.WithContext(ctx)
-		c.Set(ContextUserID, userIDStr)
-		c.Set(ContextUserEmail, claims.Email)
-		c.Set(ContextTenantID, tenantIDStr)
-		c.Set(ContextRoles, []string{membership.RoleName})
+		// Build scopes list from permissions.
+		scopes := make([]string, 0, len(membership.Permissions))
+		for p := range membership.Permissions {
+			scopes = append(scopes, p)
+		}
 
-		logAuthDecision(claims.Subject, tenantIDStr, c.FullPath(), permission, "ALLOW", start)
+		// Inject saas-core context keys.
+		ctx := c.Request.Context()
+		ctx = context.WithValue(ctx, ctxkeys.Actor, claims.Subject)
+		ctx = context.WithValue(ctx, ctxkeys.OrgID, membership.TenantID)
+		ctx = context.WithValue(ctx, ctxkeys.Role, membership.RoleName)
+		ctx = context.WithValue(ctx, ctxkeys.Scopes, scopes)
+		c.Request = c.Request.WithContext(ctx)
+
+		// Also set gin keys for convenience.
+		c.Set(string(ctxkeys.Actor), claims.Subject)
+		c.Set(string(ctxkeys.OrgID), membership.TenantID)
+		c.Set(string(ctxkeys.Role), membership.RoleName)
+		c.Set(string(ctxkeys.Scopes), scopes)
+
+		logAuthDecision(claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "ALLOW", start)
 		c.Next()
 	}
 }
 
-func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID int64, tenantName, roleName string) (*membershipResolved, error) {
+func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, tenantName, roleName string) (*membershipResolved, error) {
 	if strings.TrimSpace(tenantName) == "" {
 		tenantName = "default"
 	}
@@ -294,10 +303,10 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID int64, ten
 	}
 
 	type tenantRow struct {
-		ID int64
+		ID uuid.UUID
 	}
 	type roleRow struct {
-		ID int64
+		ID uuid.UUID
 	}
 
 	var tenant tenantRow
@@ -330,13 +339,13 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID int64, ten
 				"updated_at": now,
 			}).Error
 	}
-	return resolveMembership(ctx, db, userID, strconv.FormatInt(tenant.ID, 10))
+	return resolveMembership(ctx, db, userID, tenant.ID.String())
 }
 
-func resolveMembership(ctx context.Context, db *gorm.DB, userID int64, requestedTenant string) (*membershipResolved, error) {
+func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, requestedTenant string) (*membershipResolved, error) {
 	type membershipRow struct {
-		TenantID int64
-		RoleID   int64
+		TenantID uuid.UUID
+		RoleID   uuid.UUID
 		RoleName string
 	}
 
@@ -347,7 +356,7 @@ func resolveMembership(ctx context.Context, db *gorm.DB, userID int64, requested
 		Where("m.user_id = ? AND m.status = 'active'", userID)
 
 	if strings.TrimSpace(requestedTenant) != "" {
-		tenantID, err := strconv.ParseInt(strings.TrimSpace(requestedTenant), 10, 64)
+		tenantID, err := uuid.Parse(strings.TrimSpace(requestedTenant))
 		if err != nil {
 			return nil, err
 		}
@@ -383,9 +392,9 @@ func resolveMembership(ctx context.Context, db *gorm.DB, userID int64, requested
 	}, nil
 }
 
-func ensureUserByIDPSub(ctx context.Context, db *gorm.DB, sub, email string) (int64, error) {
+func ensureUserByIDPSub(ctx context.Context, db *gorm.DB, sub, email string) (uuid.UUID, error) {
 	type userRow struct {
-		ID int64
+		ID uuid.UUID
 	}
 	var existing userRow
 	if err := db.WithContext(ctx).
@@ -396,7 +405,7 @@ func ensureUserByIDPSub(ctx context.Context, db *gorm.DB, sub, email string) (in
 		Take(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, err
+		return uuid.Nil, err
 	}
 
 	if email == "" {
@@ -431,7 +440,7 @@ func ensureUserByIDPSub(ctx context.Context, db *gorm.DB, sub, email string) (in
 			Take(&existing).Error; err2 == nil {
 			return existing.ID, nil
 		}
-		return 0, err
+		return uuid.Nil, err
 	}
 
 	if err := db.WithContext(ctx).
@@ -440,7 +449,7 @@ func ensureUserByIDPSub(ctx context.Context, db *gorm.DB, sub, email string) (in
 		Where("idp_sub = ?", sub).
 		Limit(1).
 		Take(&existing).Error; err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
 	return existing.ID, nil
 }

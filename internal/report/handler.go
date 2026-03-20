@@ -7,11 +7,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/report/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	"github.com/devpablocristo/ponti-backend/internal/report/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 // UseCasesPort define la interfaz para los casos de uso.

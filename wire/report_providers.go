@@ -3,12 +3,12 @@ package wire
 import (
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
-	report "github.com/alphacodinggroup/ponti-backend/internal/report"
+	report "github.com/devpablocristo/ponti-backend/internal/report"
 )
 
 // ProvideReportRepository crea la implementación concreta de report.Repository.

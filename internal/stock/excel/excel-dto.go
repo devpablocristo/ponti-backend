@@ -3,7 +3,7 @@ package excel
 import (
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

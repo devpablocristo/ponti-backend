@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	pkgutils "github.com/alphacodinggroup/ponti-backend/pkg/utils"
+	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	pkgutils "github.com/devpablocristo/ponti-backend/pkg/utils"
 )
 
 // RequireJWT valida el token JWT en la solicitud.

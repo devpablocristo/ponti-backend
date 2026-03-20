@@ -3,7 +3,7 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // RespondError responde errores de dominio usando el helper estándar.

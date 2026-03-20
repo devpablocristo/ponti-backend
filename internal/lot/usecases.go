@@ -10,8 +10,8 @@ import (
 
 	// project
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 type RepositoryPort interface {

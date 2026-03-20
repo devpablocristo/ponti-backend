@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/pkg/validations"
+	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/pkg/validations"
 )
 
 // ValidationError representa un error de validación específico
@@ -325,15 +324,10 @@ func ValidateLotRequest() gin.HandlerFunc {
 			return
 		}
 
-		// Establecer ID de usuario desde el contexto
-		userID := c.Value(pkgmwr.ContextUserIDKey)
-		if userID != nil {
-			if s, ok := userID.(string); ok {
-				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-					req.CreatedBy = &i
-					req.UpdatedBy = &i
-				}
-			}
+		// Establecer actor desde el contexto
+		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
+			req.CreatedBy = &actor
+			req.UpdatedBy = &actor
 		}
 
 		// Validar los campos del Base
@@ -408,14 +402,9 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		// 	return
 		// }
 
-		// Set user ID from context
-		userID := c.Value(pkgmwr.ContextUserIDKey)
-		if userID != nil {
-			if s, ok := userID.(string); ok {
-				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-					req.UpdatedBy = &i
-				}
-			}
+		// Set actor from context
+		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
+			req.UpdatedBy = &actor
 		}
 
 		// Establecer timestamp actual para UpdatedAt

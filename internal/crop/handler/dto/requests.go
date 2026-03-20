@@ -1,7 +1,7 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
 )
 
 // CreateCropRequest es el DTO de entrada para crear un crop.

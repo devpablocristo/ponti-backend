@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 func TestSupplyRequest_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {

@@ -3,11 +3,11 @@ package models
 import (
 	"time"
 
-	investormod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	provmod "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	provmod "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

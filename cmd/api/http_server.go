@@ -11,8 +11,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/gin-gonic/gin"
 
-	ai "github.com/alphacodinggroup/ponti-backend/internal/ai"
-	wire "github.com/alphacodinggroup/ponti-backend/wire"
+	ai "github.com/devpablocristo/ponti-backend/internal/ai"
+	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
 // runHTTPServer registra rutas en Gin y levanta el servidor HTTP.

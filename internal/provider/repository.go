@@ -3,9 +3,9 @@ package provider
 import (
 	"context"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
 

@@ -3,9 +3,9 @@ package invoice
 import (
 	"context"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/invoice/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	"github.com/gin-gonic/gin"
 )
 
@@ -91,7 +91,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -120,7 +120,7 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

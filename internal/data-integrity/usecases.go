@@ -9,12 +9,12 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	dashboardDomain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
-	lotDomain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	reportDomain "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	stockDomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	workOrderDomain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	stockDomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	workOrderDomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 // WorkOrderRepositoryPort define la interfaz para el repositorio de work orders.

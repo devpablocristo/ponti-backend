@@ -1,6 +1,6 @@
 package excel
 
-import "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+import "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 
 type SupplyTableDTO struct {
 	Name     string  `excel:"NOMBRE"`

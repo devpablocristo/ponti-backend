@@ -1,13 +1,13 @@
 package wire
 
 import (
-	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	gormpkg "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 	"github.com/google/wire"
 
-	cfg "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	commercialization "github.com/alphacodinggroup/ponti-backend/internal/commercialization"
+	cfg "github.com/devpablocristo/ponti-backend/cmd/config"
+	commercialization "github.com/devpablocristo/ponti-backend/internal/commercialization"
 )
 
 // ---- GORM -----

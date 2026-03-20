@@ -3,16 +3,16 @@ package wire
 import (
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
-	dashboard "github.com/alphacodinggroup/ponti-backend/internal/dashboard"
-	dataintegrity "github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
-	lot "github.com/alphacodinggroup/ponti-backend/internal/lot"
-	report "github.com/alphacodinggroup/ponti-backend/internal/report"
-	stock "github.com/alphacodinggroup/ponti-backend/internal/stock"
-	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
+	dashboard "github.com/devpablocristo/ponti-backend/internal/dashboard"
+	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
+	lot "github.com/devpablocristo/ponti-backend/internal/lot"
+	report "github.com/devpablocristo/ponti-backend/internal/report"
+	stock "github.com/devpablocristo/ponti-backend/internal/stock"
+	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
 )
 
 // ProvideDataIntegrityUseCases construye los casos de uso de dataintegrity

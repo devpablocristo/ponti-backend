@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // ParseOptionalInt64Query parsea un query param opcional a int64.

@@ -6,15 +6,15 @@ import (
 
 	"github.com/google/wire"
 
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	pkgexcel "github.com/devpablocristo/ponti-backend/pkg/files-io/excel/excelize"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	stock "github.com/alphacodinggroup/ponti-backend/internal/stock"
-	supply "github.com/alphacodinggroup/ponti-backend/internal/supply"
-	supplyExcel "github.com/alphacodinggroup/ponti-backend/internal/supply/excel"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	stock "github.com/devpablocristo/ponti-backend/internal/stock"
+	supply "github.com/devpablocristo/ponti-backend/internal/supply"
+	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
 )
 
 // ProvideSupplyRepository crea la implementación concreta de supply.Repository.

@@ -3,11 +3,11 @@ package create
 import (
 	"fmt"
 
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 
 	"time"
@@ -61,7 +61,7 @@ func (csmr *CreateSupplyMovementEntryRequest) Validate() error {
 	return err
 }
 
-func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64) *domain.SupplyMovement {
+func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *string) *domain.SupplyMovement {
 	return &domain.SupplyMovement{
 		ProjectId:            projectId,
 		Quantity:             r.Quantity,

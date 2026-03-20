@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
 )
 
 type MiddlewaresEnginePort interface {

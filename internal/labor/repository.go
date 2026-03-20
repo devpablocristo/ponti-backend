@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 

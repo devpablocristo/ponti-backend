@@ -5,13 +5,13 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	fielddom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	invdom "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	leasetypemod "github.com/alphacodinggroup/ponti-backend/internal/lease-type/repository/models"
-	leasetypedom "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	invdom "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	leasetypemod "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
+	leasetypedom "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type Field struct {

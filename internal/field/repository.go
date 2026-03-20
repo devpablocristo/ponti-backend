@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type GormEnginePort interface {

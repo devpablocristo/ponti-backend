@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/invoice/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
 

@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
+	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // TestCreateStockDiference valida que la función calcula correctamente las diferencias de stock

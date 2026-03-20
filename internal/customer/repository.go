@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	models "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"gorm.io/gorm"
 )
 

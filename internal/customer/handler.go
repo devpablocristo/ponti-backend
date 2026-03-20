@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/customer/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/customer/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {

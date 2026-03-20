@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	providermodel "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"gorm.io/gorm"
 )
 

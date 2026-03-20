@@ -9,15 +9,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	supplyExcel "github.com/alphacodinggroup/ponti-backend/internal/supply/excel"
-	createDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/create"
-	getDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/get"
-	listDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/list"
-	updateDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/update"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
+	createDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/create"
+	getDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/get"
+	listDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/list"
+	updateDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/update"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type UseCasesPort interface {
@@ -357,7 +357,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -567,7 +567,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -740,7 +740,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

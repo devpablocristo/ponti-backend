@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	projdom "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 

@@ -4,8 +4,8 @@ package models
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/shopspring/decimal"
 )
 

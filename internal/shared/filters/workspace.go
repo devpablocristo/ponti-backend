@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // WorkspaceFilter define filtros comunes de workspace.

@@ -3,8 +3,8 @@ package dollar
 import (
 	"context"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 
 type RepositoryPort interface {

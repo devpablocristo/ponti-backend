@@ -3,12 +3,12 @@ package wire
 import (
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
-	crop "github.com/alphacodinggroup/ponti-backend/internal/crop"
+	crop "github.com/devpablocristo/ponti-backend/internal/crop"
 )
 
 // ProvideCropRepository crea la implementación concreta de crop.Repository.

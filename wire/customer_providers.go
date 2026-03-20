@@ -3,12 +3,12 @@ package wire
 import (
 	"github.com/google/wire"
 
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	customer "github.com/alphacodinggroup/ponti-backend/internal/customer"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	customer "github.com/devpablocristo/ponti-backend/internal/customer"
 )
 
 // ProvideCustomerRepository crea la implementación concreta de customer.Repository.

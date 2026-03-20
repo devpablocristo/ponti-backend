@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -29,7 +29,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 func TestUpsertLotDateBySequence_CreateWhenMissing(t *testing.T) {
 	db := newTestDB(t)
 	now := time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC)
-	userID := int64(7)
+	userID := "test@example.com"
 	sowing := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 
 	err := upsertLotDateBySequence(db, 10, domain.LotDates{
@@ -58,7 +58,7 @@ func TestUpsertLotDateBySequence_CreateWhenMissing(t *testing.T) {
 func TestUpsertLotDateBySequence_ReactivatesDeletedAndDeduplicates(t *testing.T) {
 	db := newTestDB(t)
 	now := time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC)
-	userID := int64(9)
+	userID := "test@example.com"
 
 	oldSowing := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
 	midSowing := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)
@@ -124,6 +124,6 @@ func TestUpsertLotDateBySequence_ReactivatesDeletedAndDeduplicates(t *testing.T)
 		t.Fatal("expected older duplicate row to be soft-deleted")
 	}
 	if olderRow.DeletedBy == nil || *olderRow.DeletedBy != userID {
-		t.Fatalf("expected deleted_by to be set to %d, got %+v", userID, olderRow.DeletedBy)
+		t.Fatalf("expected deleted_by to be set to %s, got %+v", userID, olderRow.DeletedBy)
 	}
 }

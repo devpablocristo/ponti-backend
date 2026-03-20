@@ -6,12 +6,12 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/dashboard/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
-	db "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	models "github.com/devpablocristo/ponti-backend/internal/dashboard/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	db "github.com/devpablocristo/ponti-backend/internal/shared/db"
 )
 
 type GormEnginePort interface {

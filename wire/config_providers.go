@@ -1,7 +1,7 @@
 package wire
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/cmd/config"
 	"github.com/google/wire"
 )
 

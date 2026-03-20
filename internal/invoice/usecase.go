@@ -3,7 +3,7 @@ package invoice
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 )
 
 type RepositoryPort interface {

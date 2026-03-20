@@ -5,10 +5,10 @@ import (
 	"context"
 	"time"
 
-	projectdomain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 
@@ -104,7 +104,7 @@ func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.S
 	return u.repo.UpdateUnitsConsumed(ctx, stockDomain, quantity)
 }
 
-func createNewStockPeriod(userID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
+func createNewStockPeriod(userID string, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
 	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
 	newStock := domain.Stock{
 		Project:     stock.Project,

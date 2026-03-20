@@ -11,13 +11,13 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type GormEngine interface {
@@ -38,7 +38,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.CreatedBy = &userID
 		model.UpdatedBy = &userID
 	}
@@ -134,7 +134,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	model.ID = o.ID
 
 	// 2) Poblar UpdatedBy si hay usuario en contexto
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.UpdatedBy = &userID
 	}
 

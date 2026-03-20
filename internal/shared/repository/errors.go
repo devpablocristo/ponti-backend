@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // HandleGormError centraliza el manejo de ErrRecordNotFound y errores internos.

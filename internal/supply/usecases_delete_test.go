@@ -7,8 +7,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // TestUseCases_DeleteSupplyMovement tests para la eliminación de movimientos de suministro

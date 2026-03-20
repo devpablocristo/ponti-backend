@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	wire "github.com/alphacodinggroup/ponti-backend/wire"
+	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
 func main() {

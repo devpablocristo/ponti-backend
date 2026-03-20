@@ -5,10 +5,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/report/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases"
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/mappers"
+	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/mappers"
 )
 
 // ===== PORTS (Hexagonal Architecture) =====

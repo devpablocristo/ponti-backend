@@ -14,7 +14,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
 )
 
 func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {

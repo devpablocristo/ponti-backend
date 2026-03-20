@@ -1,12 +1,12 @@
 package domain
 
 import (
-	campdom "github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
-	customerdom "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	fieldom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	investordom "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	managerdom "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	campdom "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
+	customerdom "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	fieldom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	investordom "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	managerdom "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 

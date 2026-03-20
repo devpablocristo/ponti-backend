@@ -39,6 +39,7 @@ services:
       - DB_PORT=5432
     volumes:
       - .:/app
+      - ../../saas-core:/saas-core
       - go-modules:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
     networks:

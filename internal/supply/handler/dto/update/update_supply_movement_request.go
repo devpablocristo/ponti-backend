@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )
 
@@ -46,7 +46,7 @@ func (usmr *UpdateSupplyMovementEntryRequest) Validate() error {
 	return err
 }
 
-func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *int64, sm *domain.SupplyMovement) *domain.SupplyMovement {
+func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *string, sm *domain.SupplyMovement) *domain.SupplyMovement {
 	if usmer.Quantity != nil {
 		sm.Quantity = *usmer.Quantity
 	}

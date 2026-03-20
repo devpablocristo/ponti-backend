@@ -3,17 +3,17 @@ package dto
 import (
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type UpdateCloseDateRequest struct {
 	CloseDate time.Time `json:"close_date"`
 }
 
-func (r *UpdateCloseDateRequest) ToDomain(updateBy *int64) *domain.Stock {
+func (r *UpdateCloseDateRequest) ToDomain(updateBy *string) *domain.Stock {
 	return &domain.Stock{
 		CloseDate: &r.CloseDate,
 		Base: shareddomain.Base{

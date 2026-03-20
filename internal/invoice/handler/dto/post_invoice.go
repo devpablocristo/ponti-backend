@@ -3,8 +3,8 @@ package dto
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type InvoiceRequest struct {
@@ -14,7 +14,7 @@ type InvoiceRequest struct {
 	Status  string    `json:"status" binding:"required"`
 }
 
-func (ir *InvoiceRequest) ToDomain(workOrderID, userID int64) *domain.Invoice {
+func (ir *InvoiceRequest) ToDomain(workOrderID int64, userID string) *domain.Invoice {
 	return &domain.Invoice{
 		WorkOrderID: workOrderID,
 		Number:      ir.Number,

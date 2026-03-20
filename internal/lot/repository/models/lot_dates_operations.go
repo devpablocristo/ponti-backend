@@ -1,7 +1,7 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 // FromDomainDates convierte las fechas del dominio al modelo de persistencia

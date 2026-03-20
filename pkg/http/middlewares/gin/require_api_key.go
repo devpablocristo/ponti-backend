@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 // RequireAPIKey asegura que el request tenga un API key válido en el header.

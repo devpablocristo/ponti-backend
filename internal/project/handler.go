@@ -7,13 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	dto "github.com/alphacodinggroup/ponti-backend/internal/project/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	dto "github.com/devpablocristo/ponti-backend/internal/project/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type UseCasesPort interface {

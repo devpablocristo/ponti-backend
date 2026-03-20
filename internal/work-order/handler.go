@@ -7,12 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type UseCasesPort interface {

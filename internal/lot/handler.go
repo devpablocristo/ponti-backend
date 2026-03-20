@@ -12,16 +12,16 @@ import (
 	"github.com/shopspring/decimal"
 
 	// pkg
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	// excel
-	lotExcel "github.com/alphacodinggroup/ponti-backend/internal/lot/excel"
+	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
 
 	// project
-	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -182,7 +182,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 	dom.ID = id
 
 	// Obtener user ID del contexto para campos de auditoría
-	if userID, err := sharedmodels.ConvertStringToID(c.Request.Context()); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(c.Request.Context()); err == nil {
 		dom.UpdatedBy = &userID
 	}
 

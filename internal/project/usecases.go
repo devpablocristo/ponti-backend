@@ -5,10 +5,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 
 type RepositoryPort interface {

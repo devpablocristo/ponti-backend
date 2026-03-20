@@ -3,11 +3,11 @@ package wire
 import (
 	"github.com/google/wire"
 
-	cfg "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	bparams "github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
-	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	cfg "github.com/devpablocristo/ponti-backend/cmd/config"
+	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
+	gormpkg "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 )
 
 // ProvideBusinessParametersGormEnginePort ...

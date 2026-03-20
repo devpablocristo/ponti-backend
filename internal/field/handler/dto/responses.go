@@ -5,8 +5,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	fielddom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type LotResponse struct {

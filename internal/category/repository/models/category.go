@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type Category struct {

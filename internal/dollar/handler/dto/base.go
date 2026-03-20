@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 
 type MonthResponse struct {

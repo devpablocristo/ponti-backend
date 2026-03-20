@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/pablo/Projects/Pablo/ponti/ponti-frontend/ui/src/hooks/useSupplies/**)",
+      "Read(//home/pablo/Projects/Pablo/ponti/ponti-frontend/ui/src/pages/admin/database/products/**)",
+      "Read(//home/pablo/Projects/Pablo/ponti/ponti-frontend/ui/src/**)",
+      "Read(//home/pablo/Projects/Pablo/ponti/ponti-frontend/**)",
+      "Read(//home/pablo/Projects/Pablo/saas-core/admin/**)",
+      "Read(//home/pablo/Projects/Pablo/saas-core/clerkwebhook/**)",
+      "Read(//home/pablo/Projects/Pablo/saas-core/usagemetering/**)",
+      "Read(//home/pablo/Projects/Pablo/saas-core/entitlements/**)",
+      "Read(//home/pablo/Projects/Pablo/saas-core/**)",
+      "Bash(for module:*)",
+      "Bash(make up-ponti-local:*)"
+    ],
+    "additionalDirectories": [
+      "/home/pablo/Projects/Pablo/saas-core/org",
+      "/home/pablo/Projects/Pablo/saas-core/billing",
+      "/home/pablo/Projects/Pablo/saas-core/admin"
+    ]
+  }
+}
