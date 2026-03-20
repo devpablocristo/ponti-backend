@@ -9,8 +9,8 @@ import (
 	"os"
 
 	"cloud.google.com/go/cloudsqlconn"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -149,7 +149,7 @@ func connectWithConnectorIAMAuthN(config ConfigPort) (gorm.Dialector, error) {
 		return nil, err
 	}
 
-	dbConfigPort.DialFunc = func(ctx context.Context, network, instance string) (net.Conn, error) {
+	dbConfigPort.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return d.Dial(ctx, instanceConnectionName, opts...)
 	}
 	dbURI := stdlib.RegisterConnConfig(dbConfigPort)
