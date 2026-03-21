@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"gorm.io/gorm"
 
 	models "github.com/devpablocristo/ponti-backend/internal/commercialization/repository/models"

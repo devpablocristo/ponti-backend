@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 // HandleGormError centraliza el manejo de ErrRecordNotFound y errores internos.

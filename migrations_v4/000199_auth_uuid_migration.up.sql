@@ -1,14 +1,13 @@
 -- =============================================================================
--- Migración: auth tables int64 → UUID + created_by/updated_by → text
--- Prepara ponti para integración con core/saas/go (que usa uuid.UUID)
+-- Migration 000199: auth tables bigint -> UUID + actor columns bigint/varchar -> text
+-- Prepares ponti-backend for core/saas/go, while preserving legacy IDs for rollback.
 -- =============================================================================
--- NOTA: sin BEGIN/COMMIT explícito — golang-migrate maneja la transacción.
+-- NOTE: no explicit BEGIN/COMMIT. golang-migrate wraps the migration in a transaction.
 
--- 1. Extensión para gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- =============================================================================
--- 2. Drop 36 FK constraints de created_by/updated_by/deleted_by → users(id)
+-- 1. Drop audit FKs pointing to public.users(id)
 -- =============================================================================
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS fk_customers_created_by;
 ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS fk_customers_updated_by;
@@ -48,8 +47,7 @@ ALTER TABLE public.project_investors DROP CONSTRAINT IF EXISTS fk_project_invest
 ALTER TABLE public.project_investors DROP CONSTRAINT IF EXISTS fk_project_investors_deleted_by;
 
 -- =============================================================================
--- 3. Convertir created_by/updated_by/deleted_by → text en TODAS las tablas
---    (29 tablas: bigint se castea a text, varchar se castea a text)
+-- 2. Convert actor columns to text
 -- =============================================================================
 ALTER TABLE public.users ALTER COLUMN created_by TYPE text USING created_by::text;
 ALTER TABLE public.users ALTER COLUMN updated_by TYPE text USING updated_by::text;
@@ -155,7 +153,6 @@ ALTER TABLE public.field_investors ALTER COLUMN created_by TYPE text USING creat
 ALTER TABLE public.field_investors ALTER COLUMN updated_by TYPE text USING updated_by::text;
 ALTER TABLE public.field_investors ALTER COLUMN deleted_by TYPE text USING deleted_by::text;
 
--- Tablas con varchar (labor_categories, labor_types, providers) ya son text-compatible:
 ALTER TABLE public.labor_categories ALTER COLUMN created_by TYPE text USING created_by::text;
 ALTER TABLE public.labor_categories ALTER COLUMN updated_by TYPE text USING updated_by::text;
 ALTER TABLE public.labor_categories ALTER COLUMN deleted_by TYPE text USING deleted_by::text;
@@ -168,133 +165,124 @@ ALTER TABLE public.providers ALTER COLUMN created_by TYPE text USING created_by:
 ALTER TABLE public.providers ALTER COLUMN updated_by TYPE text USING updated_by::text;
 ALTER TABLE public.providers ALTER COLUMN deleted_by TYPE text USING deleted_by::text;
 
--- stock_movements (si existe)
-DO $$ BEGIN
-    ALTER TABLE public.stock_movements ALTER COLUMN created_by TYPE text USING created_by::text;
-    ALTER TABLE public.stock_movements ALTER COLUMN updated_by TYPE text USING updated_by::text;
-    ALTER TABLE public.stock_movements ALTER COLUMN deleted_by TYPE text USING deleted_by::text;
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
-
 -- =============================================================================
--- 4. Migrar auth_tenants.id bigserial → uuid
+-- 3. auth_tenants bigint -> uuid, preserving legacy_id
 -- =============================================================================
 ALTER TABLE public.auth_memberships DROP CONSTRAINT IF EXISTS auth_memberships_tenant_id_fkey;
 
-ALTER TABLE public.auth_tenants ADD COLUMN new_id uuid DEFAULT gen_random_uuid();
-UPDATE public.auth_tenants SET new_id = gen_random_uuid() WHERE new_id IS NULL;
-
-CREATE TEMPORARY TABLE _tenant_map AS SELECT id AS old_id, new_id FROM public.auth_tenants;
-
+ALTER TABLE public.auth_tenants ADD COLUMN new_id uuid NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE public.auth_tenants DROP CONSTRAINT IF EXISTS auth_tenants_pkey;
-ALTER TABLE public.auth_tenants DROP COLUMN id;
+ALTER TABLE public.auth_tenants RENAME COLUMN id TO legacy_id;
 ALTER TABLE public.auth_tenants RENAME COLUMN new_id TO id;
-ALTER TABLE public.auth_tenants ADD PRIMARY KEY (id);
 ALTER TABLE public.auth_tenants ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.auth_tenants ALTER COLUMN legacy_id SET DEFAULT nextval('public.auth_tenants_id_seq'::regclass);
+ALTER TABLE public.auth_tenants ADD CONSTRAINT auth_tenants_pkey PRIMARY KEY (id);
+ALTER TABLE public.auth_tenants ADD CONSTRAINT uq_auth_tenants_legacy_id UNIQUE (legacy_id);
+ALTER SEQUENCE IF EXISTS public.auth_tenants_id_seq OWNED BY public.auth_tenants.legacy_id;
 
 -- =============================================================================
--- 5. Migrar auth_roles.id bigserial → uuid
+-- 4. auth_roles bigint -> uuid, preserving legacy_id
 -- =============================================================================
 ALTER TABLE public.auth_role_permissions DROP CONSTRAINT IF EXISTS auth_role_permissions_role_id_fkey;
 ALTER TABLE public.auth_memberships DROP CONSTRAINT IF EXISTS auth_memberships_role_id_fkey;
 
-ALTER TABLE public.auth_roles ADD COLUMN new_id uuid DEFAULT gen_random_uuid();
-UPDATE public.auth_roles SET new_id = gen_random_uuid() WHERE new_id IS NULL;
-
-CREATE TEMPORARY TABLE _role_map AS SELECT id AS old_id, new_id FROM public.auth_roles;
-
+ALTER TABLE public.auth_roles ADD COLUMN new_id uuid NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE public.auth_roles DROP CONSTRAINT IF EXISTS auth_roles_pkey;
-ALTER TABLE public.auth_roles DROP COLUMN id;
+ALTER TABLE public.auth_roles RENAME COLUMN id TO legacy_id;
 ALTER TABLE public.auth_roles RENAME COLUMN new_id TO id;
-ALTER TABLE public.auth_roles ADD PRIMARY KEY (id);
 ALTER TABLE public.auth_roles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.auth_roles ALTER COLUMN legacy_id SET DEFAULT nextval('public.auth_roles_id_seq'::regclass);
+ALTER TABLE public.auth_roles ADD CONSTRAINT auth_roles_pkey PRIMARY KEY (id);
+ALTER TABLE public.auth_roles ADD CONSTRAINT uq_auth_roles_legacy_id UNIQUE (legacy_id);
+ALTER SEQUENCE IF EXISTS public.auth_roles_id_seq OWNED BY public.auth_roles.legacy_id;
 
 -- =============================================================================
--- 6. Migrar auth_permissions.id bigserial → uuid
+-- 5. auth_permissions bigint -> uuid, preserving legacy_id
 -- =============================================================================
 ALTER TABLE public.auth_role_permissions DROP CONSTRAINT IF EXISTS auth_role_permissions_permission_id_fkey;
 
-ALTER TABLE public.auth_permissions ADD COLUMN new_id uuid DEFAULT gen_random_uuid();
-UPDATE public.auth_permissions SET new_id = gen_random_uuid() WHERE new_id IS NULL;
-
-CREATE TEMPORARY TABLE _perm_map AS SELECT id AS old_id, new_id FROM public.auth_permissions;
-
+ALTER TABLE public.auth_permissions ADD COLUMN new_id uuid NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE public.auth_permissions DROP CONSTRAINT IF EXISTS auth_permissions_pkey;
-ALTER TABLE public.auth_permissions DROP COLUMN id;
+ALTER TABLE public.auth_permissions RENAME COLUMN id TO legacy_id;
 ALTER TABLE public.auth_permissions RENAME COLUMN new_id TO id;
-ALTER TABLE public.auth_permissions ADD PRIMARY KEY (id);
 ALTER TABLE public.auth_permissions ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.auth_permissions ALTER COLUMN legacy_id SET DEFAULT nextval('public.auth_permissions_id_seq'::regclass);
+ALTER TABLE public.auth_permissions ADD CONSTRAINT auth_permissions_pkey PRIMARY KEY (id);
+ALTER TABLE public.auth_permissions ADD CONSTRAINT uq_auth_permissions_legacy_id UNIQUE (legacy_id);
+ALTER SEQUENCE IF EXISTS public.auth_permissions_id_seq OWNED BY public.auth_permissions.legacy_id;
 
 -- =============================================================================
--- 7. Reconstruir auth_role_permissions con UUIDs
+-- 6. auth_role_permissions bigint FKs -> uuid FKs
 -- =============================================================================
 ALTER TABLE public.auth_role_permissions DROP CONSTRAINT IF EXISTS auth_role_permissions_pkey;
-
 ALTER TABLE public.auth_role_permissions ADD COLUMN new_role_id uuid;
 ALTER TABLE public.auth_role_permissions ADD COLUMN new_permission_id uuid;
 
 UPDATE public.auth_role_permissions rp
-SET new_role_id = rm.new_id
-FROM _role_map rm WHERE rm.old_id = rp.role_id;
+SET new_role_id = ar.id
+FROM public.auth_roles ar
+WHERE ar.legacy_id = rp.role_id;
 
 UPDATE public.auth_role_permissions rp
-SET new_permission_id = pm.new_id
-FROM _perm_map pm WHERE pm.old_id = rp.permission_id;
+SET new_permission_id = ap.id
+FROM public.auth_permissions ap
+WHERE ap.legacy_id = rp.permission_id;
 
 ALTER TABLE public.auth_role_permissions DROP COLUMN role_id;
 ALTER TABLE public.auth_role_permissions DROP COLUMN permission_id;
 ALTER TABLE public.auth_role_permissions RENAME COLUMN new_role_id TO role_id;
 ALTER TABLE public.auth_role_permissions RENAME COLUMN new_permission_id TO permission_id;
-ALTER TABLE public.auth_role_permissions ADD PRIMARY KEY (role_id, permission_id);
+ALTER TABLE public.auth_role_permissions ALTER COLUMN role_id SET NOT NULL;
+ALTER TABLE public.auth_role_permissions ALTER COLUMN permission_id SET NOT NULL;
+ALTER TABLE public.auth_role_permissions ADD CONSTRAINT auth_role_permissions_pkey PRIMARY KEY (role_id, permission_id);
 ALTER TABLE public.auth_role_permissions
-    ADD CONSTRAINT fk_auth_rp_role FOREIGN KEY (role_id) REFERENCES public.auth_roles(id) ON DELETE CASCADE;
+    ADD CONSTRAINT auth_role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.auth_roles(id) ON DELETE CASCADE;
 ALTER TABLE public.auth_role_permissions
-    ADD CONSTRAINT fk_auth_rp_perm FOREIGN KEY (permission_id) REFERENCES public.auth_permissions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT auth_role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES public.auth_permissions(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_auth_role_permissions_permission_id
+    ON public.auth_role_permissions (permission_id);
 
 -- =============================================================================
--- 8. Migrar users.id bigint → uuid
+-- 7. users bigint -> uuid, preserving legacy_id
 -- =============================================================================
 ALTER TABLE public.auth_memberships DROP CONSTRAINT IF EXISTS auth_memberships_user_id_fkey;
 
--- Drop FK from other tables that reference users(id)
--- (id_rol FK if exists)
-ALTER TABLE public.users DROP CONSTRAINT IF EXISTS fk_users_id_rol;
-
-ALTER TABLE public.users ADD COLUMN new_id uuid DEFAULT gen_random_uuid();
-UPDATE public.users SET new_id = gen_random_uuid() WHERE new_id IS NULL;
-
-CREATE TEMPORARY TABLE _user_map AS SELECT id AS old_id, new_id FROM public.users;
-
+ALTER TABLE public.users ADD COLUMN new_id uuid NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE public.users DROP CONSTRAINT IF EXISTS pk_users;
-ALTER TABLE public.users DROP COLUMN id;
+ALTER TABLE public.users RENAME COLUMN id TO legacy_id;
 ALTER TABLE public.users RENAME COLUMN new_id TO id;
-ALTER TABLE public.users ADD PRIMARY KEY (id);
 ALTER TABLE public.users ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.users ALTER COLUMN legacy_id SET DEFAULT nextval('public.users_id_seq'::regclass);
+ALTER TABLE public.users ADD CONSTRAINT pk_users PRIMARY KEY (id);
+ALTER TABLE public.users ADD CONSTRAINT uq_users_legacy_id UNIQUE (legacy_id);
+ALTER SEQUENCE IF EXISTS public.users_id_seq OWNED BY public.users.legacy_id;
 
 -- =============================================================================
--- 9. Reconstruir auth_memberships con UUIDs
+-- 8. auth_memberships bigint PK/FKs -> uuid PK/FKs
 -- =============================================================================
 ALTER TABLE public.auth_memberships DROP CONSTRAINT IF EXISTS auth_memberships_pkey;
 ALTER TABLE public.auth_memberships DROP CONSTRAINT IF EXISTS auth_memberships_user_id_tenant_id_key;
-
-ALTER TABLE public.auth_memberships ADD COLUMN new_id uuid DEFAULT gen_random_uuid();
+ALTER TABLE public.auth_memberships ADD COLUMN new_id uuid NOT NULL DEFAULT gen_random_uuid();
 ALTER TABLE public.auth_memberships ADD COLUMN new_user_id uuid;
 ALTER TABLE public.auth_memberships ADD COLUMN new_tenant_id uuid;
 ALTER TABLE public.auth_memberships ADD COLUMN new_role_id uuid;
 
-UPDATE public.auth_memberships m
-SET new_user_id = um.new_id
-FROM _user_map um WHERE um.old_id = m.user_id;
+UPDATE public.auth_memberships am
+SET new_user_id = u.id
+FROM public.users u
+WHERE u.legacy_id = am.user_id;
 
-UPDATE public.auth_memberships m
-SET new_tenant_id = tm.new_id
-FROM _tenant_map tm WHERE tm.old_id = m.tenant_id;
+UPDATE public.auth_memberships am
+SET new_tenant_id = t.id
+FROM public.auth_tenants t
+WHERE t.legacy_id = am.tenant_id;
 
-UPDATE public.auth_memberships m
-SET new_role_id = rm.new_id
-FROM _role_map rm WHERE rm.old_id = m.role_id;
+UPDATE public.auth_memberships am
+SET new_role_id = r.id
+FROM public.auth_roles r
+WHERE r.legacy_id = am.role_id;
 
-ALTER TABLE public.auth_memberships DROP COLUMN id;
+ALTER TABLE public.auth_memberships RENAME COLUMN id TO legacy_id;
 ALTER TABLE public.auth_memberships DROP COLUMN user_id;
 ALTER TABLE public.auth_memberships DROP COLUMN tenant_id;
 ALTER TABLE public.auth_memberships DROP COLUMN role_id;
@@ -302,19 +290,22 @@ ALTER TABLE public.auth_memberships RENAME COLUMN new_id TO id;
 ALTER TABLE public.auth_memberships RENAME COLUMN new_user_id TO user_id;
 ALTER TABLE public.auth_memberships RENAME COLUMN new_tenant_id TO tenant_id;
 ALTER TABLE public.auth_memberships RENAME COLUMN new_role_id TO role_id;
-ALTER TABLE public.auth_memberships ADD PRIMARY KEY (id);
-ALTER TABLE public.auth_memberships ADD CONSTRAINT uq_membership_user_tenant UNIQUE (user_id, tenant_id);
+ALTER TABLE public.auth_memberships ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE public.auth_memberships ALTER COLUMN legacy_id SET DEFAULT nextval('public.auth_memberships_id_seq'::regclass);
+ALTER TABLE public.auth_memberships ALTER COLUMN user_id SET NOT NULL;
+ALTER TABLE public.auth_memberships ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE public.auth_memberships ALTER COLUMN role_id SET NOT NULL;
+ALTER TABLE public.auth_memberships ADD CONSTRAINT auth_memberships_pkey PRIMARY KEY (id);
+ALTER TABLE public.auth_memberships ADD CONSTRAINT uq_auth_memberships_legacy_id UNIQUE (legacy_id);
+ALTER TABLE public.auth_memberships ADD CONSTRAINT auth_memberships_user_id_tenant_id_key UNIQUE (user_id, tenant_id);
 ALTER TABLE public.auth_memberships
-    ADD CONSTRAINT fk_memberships_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT auth_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 ALTER TABLE public.auth_memberships
-    ADD CONSTRAINT fk_memberships_tenant FOREIGN KEY (tenant_id) REFERENCES public.auth_tenants(id) ON DELETE CASCADE;
+    ADD CONSTRAINT auth_memberships_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.auth_tenants(id) ON DELETE CASCADE;
 ALTER TABLE public.auth_memberships
-    ADD CONSTRAINT fk_memberships_role FOREIGN KEY (role_id) REFERENCES public.auth_roles(id);
-
--- =============================================================================
--- 10. Limpiar secuencias huérfanas
--- =============================================================================
-DROP SEQUENCE IF EXISTS auth_tenants_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS auth_roles_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS auth_permissions_id_seq CASCADE;
-DROP SEQUENCE IF EXISTS auth_memberships_id_seq CASCADE;
+    ADD CONSTRAINT auth_memberships_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.auth_roles(id);
+CREATE INDEX IF NOT EXISTS idx_auth_memberships_tenant_id
+    ON public.auth_memberships (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_auth_memberships_role_id
+    ON public.auth_memberships (role_id);
+ALTER SEQUENCE IF EXISTS public.auth_memberships_id_seq OWNED BY public.auth_memberships.legacy_id;

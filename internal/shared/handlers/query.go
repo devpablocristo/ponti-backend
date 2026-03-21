@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 // ParseOptionalInt64Query parsea un query param opcional a int64.

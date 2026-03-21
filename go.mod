@@ -5,7 +5,8 @@ go 1.26.1
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
 	firebase.google.com/go/v4 v4.19.0
-	github.com/devpablocristo/core/saas/go v0.1.0
+	github.com/devpablocristo/core/authn/go v0.1.0
+	github.com/devpablocristo/core/backend/go v0.1.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/golang-migrate/migrate/v4 v4.18.3
@@ -23,6 +24,16 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )
+
+replace github.com/devpablocristo/core/authn/go => ../../core/authn/go
+
+replace github.com/devpablocristo/core/backend/go => ../../core/backend/go
+
+replace github.com/devpablocristo/core/saas/go => ../../core/saas/go
+
+replace github.com/devpablocristo/core/authz/go => ../../core/authz/go
+
+replace github.com/devpablocristo/core/notifications/go => ../../core/notifications/go
 
 require github.com/golang-jwt/jwt/v5 v5.3.1
 
@@ -124,6 +135,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

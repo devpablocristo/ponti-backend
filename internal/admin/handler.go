@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/contextkeys"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 

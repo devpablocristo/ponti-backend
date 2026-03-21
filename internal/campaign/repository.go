@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"

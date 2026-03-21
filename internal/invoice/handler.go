@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"

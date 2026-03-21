@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
-	"github.com/devpablocristo/core/saas/go/shared/httperr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/backend/go/httperr"
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"

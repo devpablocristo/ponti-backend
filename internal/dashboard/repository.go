@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 
 	models "github.com/devpablocristo/ponti-backend/internal/dashboard/repository/models"

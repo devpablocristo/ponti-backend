@@ -3,7 +3,7 @@ package sharedrepo
 import (
 	"fmt"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 // ValidateEntity valida que el payload no sea nil.

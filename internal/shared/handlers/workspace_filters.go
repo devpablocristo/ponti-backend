@@ -4,7 +4,7 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 
 	filters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )

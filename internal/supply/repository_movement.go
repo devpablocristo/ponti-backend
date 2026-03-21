@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"

@@ -5,7 +5,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )

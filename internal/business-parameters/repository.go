@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
 

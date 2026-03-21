@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
+	"github.com/devpablocristo/core/backend/go/contextkeys"
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
