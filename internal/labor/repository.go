@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/shopspring/decimal"
 )
 

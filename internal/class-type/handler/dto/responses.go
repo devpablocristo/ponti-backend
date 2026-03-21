@@ -2,7 +2,7 @@ package dto
 
 import (
 	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 type ClassTypeResponse struct {

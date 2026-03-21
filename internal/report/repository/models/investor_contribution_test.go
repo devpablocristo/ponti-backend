@@ -372,11 +372,11 @@ func TestContributionCategory_AdministrationUsesAgreedPct(t *testing.T) {
 	coty := category.Investors[0]
 	assert.Equal(t, int64(5), *coty.InvestorID)
 	assert.Equal(t, "COTY", *coty.InvestorName)
-	
+
 	cotyPct := coty.SharePct
 	assert.True(t, cotyPct.Equal(decimal.NewFromInt(50)),
 		"COTY debe tener share_pct = 50 (acordado), got %v", cotyPct)
-	
+
 	cotyAmount := coty.AmountUsd
 	assert.True(t, cotyAmount.Equal(decimal.NewFromInt(3700)),
 		"COTY debe tener amount_usd = 3700 (50%% de 7400), got %v", cotyAmount)
@@ -385,11 +385,11 @@ func TestContributionCategory_AdministrationUsesAgreedPct(t *testing.T) {
 	soalen := category.Investors[1]
 	assert.Equal(t, int64(11), *soalen.InvestorID)
 	assert.Equal(t, "SOALEN SRL", *soalen.InvestorName)
-	
+
 	soalenPct := soalen.SharePct
 	assert.True(t, soalenPct.Equal(decimal.NewFromInt(50)),
 		"SOALEN SRL debe tener share_pct = 50 (acordado), got %v", soalenPct)
-	
+
 	soalenAmount := soalen.AmountUsd
 	assert.True(t, soalenAmount.Equal(decimal.NewFromInt(3700)),
 		"SOALEN SRL debe tener amount_usd = 3700 (50%% de 7400), got %v", soalenAmount)
@@ -456,10 +456,10 @@ func TestContributionCategory_OtherCategoriesUseRealPct(t *testing.T) {
 	// Para Seeds, el % debe ser basado en aportes reales
 	coty := category.Investors[0]
 	cotyPct := coty.SharePct
-	
+
 	// Calcular % real esperado: 1305 / 5034 * 100 = 25.92%
 	expectedCotyPct := coty.AmountUsd.Div(decimal.NewFromInt(5034)).Mul(decimal.NewFromInt(100))
-	
+
 	diff := cotyPct.Sub(expectedCotyPct).Abs()
 	assert.True(t, diff.LessThan(decimal.NewFromFloat(0.1)),
 		"Seeds debe usar % real (basado en aportes), esperado ~25.92%%, got %v", cotyPct)
@@ -485,16 +485,16 @@ func TestInvestorContributionComparisonModel_JSONMapping(t *testing.T) {
 	// Verificar que todos los campos se mapean correctamente
 	assert.Equal(t, int64(5), *comparison.InvestorID)
 	assert.Equal(t, "COTY", *comparison.InvestorName)
-	
+
 	assert.True(t, comparison.AgreedSharePct.Equal(decimal.NewFromInt(50)),
 		"agreed_share_pct debe mapearse correctamente, got %v", comparison.AgreedSharePct)
-	
+
 	assert.True(t, comparison.AgreedUsd.Equal(decimal.NewFromFloat(14386.275)),
 		"agreed_usd debe mapearse correctamente, got %v", comparison.AgreedUsd)
-	
+
 	assert.True(t, comparison.ActualUsd.Equal(decimal.NewFromFloat(17021.785)),
 		"actual_usd debe mapearse correctamente, got %v", comparison.ActualUsd)
-	
+
 	assert.True(t, comparison.AdjustmentUsd.Equal(decimal.NewFromFloat(2635.51)),
 		"adjustment_usd debe mapearse correctamente, got %v", comparison.AdjustmentUsd)
 }
@@ -553,16 +553,16 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 	coty := report.Comparison[0]
 	assert.Equal(t, int64(5), *coty.InvestorID)
 	assert.Equal(t, "COTY", *coty.InvestorName)
-	
+
 	assert.True(t, coty.AgreedSharePct.Equal(decimal.NewFromInt(50)),
 		"COTY debe tener agreed_share_pct = 50, got %v", coty.AgreedSharePct)
-	
+
 	assert.True(t, coty.AgreedUsd.Equal(decimal.NewFromFloat(14386.275)),
 		"COTY debe tener agreed_usd = 14386.275, got %v", coty.AgreedUsd)
-	
+
 	assert.True(t, coty.ActualUsd.Equal(decimal.NewFromFloat(17021.785)),
 		"COTY debe tener actual_usd = 17021.785, got %v", coty.ActualUsd)
-	
+
 	assert.True(t, coty.AdjustmentUsd.Equal(decimal.NewFromFloat(2635.51)),
 		"COTY debe tener adjustment_usd = 2635.51, got %v", coty.AdjustmentUsd)
 
@@ -570,13 +570,13 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 	soalen := report.Comparison[1]
 	assert.Equal(t, int64(11), *soalen.InvestorID)
 	assert.Equal(t, "SOALEN SRL", *soalen.InvestorName)
-	
+
 	assert.True(t, soalen.AgreedSharePct.Equal(decimal.NewFromInt(50)),
 		"SOALEN SRL debe tener agreed_share_pct = 50, got %v", soalen.AgreedSharePct)
-	
+
 	assert.True(t, soalen.AgreedUsd.Equal(decimal.NewFromFloat(14386.275)),
 		"SOALEN SRL debe tener agreed_usd = 14386.275, got %v", soalen.AgreedUsd)
-	
+
 	// Verificar que el ajuste sea negativo (aportó menos de lo acordado)
 	assert.True(t, soalen.AdjustmentUsd.LessThan(decimal.Zero),
 		"SOALEN SRL debe tener adjustment_usd negativo (aportó menos), got %v", soalen.AdjustmentUsd)
@@ -586,27 +586,27 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 // de cálculo sea correcta: adjustment = actual - agreed
 func TestInvestorContributionComparison_CalculationLogic(t *testing.T) {
 	tests := []struct {
-		name              string
-		agreedUsd         decimal.Decimal
-		actualUsd         decimal.Decimal
+		name               string
+		agreedUsd          decimal.Decimal
+		actualUsd          decimal.Decimal
 		expectedAdjustment decimal.Decimal
 	}{
 		{
-			name:              "Aportó más de lo acordado (positivo)",
-			agreedUsd:         decimal.NewFromInt(10000),
-			actualUsd:         decimal.NewFromInt(12000),
+			name:               "Aportó más de lo acordado (positivo)",
+			agreedUsd:          decimal.NewFromInt(10000),
+			actualUsd:          decimal.NewFromInt(12000),
 			expectedAdjustment: decimal.NewFromInt(2000),
 		},
 		{
-			name:              "Aportó menos de lo acordado (negativo)",
-			agreedUsd:         decimal.NewFromInt(10000),
-			actualUsd:         decimal.NewFromInt(8000),
+			name:               "Aportó menos de lo acordado (negativo)",
+			agreedUsd:          decimal.NewFromInt(10000),
+			actualUsd:          decimal.NewFromInt(8000),
 			expectedAdjustment: decimal.NewFromInt(-2000),
 		},
 		{
-			name:              "Aportó exactamente lo acordado (cero)",
-			agreedUsd:         decimal.NewFromInt(10000),
-			actualUsd:         decimal.NewFromInt(10000),
+			name:               "Aportó exactamente lo acordado (cero)",
+			agreedUsd:          decimal.NewFromInt(10000),
+			actualUsd:          decimal.NewFromInt(10000),
 			expectedAdjustment: decimal.Zero,
 		},
 	}
@@ -668,4 +668,3 @@ func TestGeneralProjectData_AdminPerHaCalculation(t *testing.T) {
 		})
 	}
 }
-

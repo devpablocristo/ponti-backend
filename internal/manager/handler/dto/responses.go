@@ -4,7 +4,7 @@ import (
 	"time"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // ManagerResponse es el DTO de salida para un manager individual.

@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 
 	"github.com/devpablocristo/ponti-backend/cmd/config"
+	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 	"github.com/devpablocristo/ponti-backend/internal/project"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
-	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
-	pkgexcel "github.com/devpablocristo/ponti-backend/pkg/files-io/excel/excelize"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 
 	"github.com/google/wire"
 )

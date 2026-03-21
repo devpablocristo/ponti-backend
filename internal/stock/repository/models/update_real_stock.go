@@ -7,7 +7,7 @@ import (
 
 type StockUpdateRealUnits struct {
 	RealStockUnits decimal.Decimal `gorm:"column:real_stock_units"`
-	UpdatedBy      string `gorm:"column:updated_by"`
+	UpdatedBy      string          `gorm:"column:updated_by"`
 }
 
 func StockUpdateRealUnitsFromDomain(d *domain.Stock) *StockUpdateRealUnits {
@@ -16,4 +16,3 @@ func StockUpdateRealUnitsFromDomain(d *domain.Stock) *StockUpdateRealUnits {
 		UpdatedBy:      *d.UpdatedBy,
 	}
 }
-

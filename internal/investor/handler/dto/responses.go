@@ -4,7 +4,7 @@ import (
 	"time"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // InvestorResponse es el DTO de salida para un inversor individual.

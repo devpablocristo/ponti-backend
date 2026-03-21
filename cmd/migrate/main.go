@@ -7,7 +7,7 @@ import (
 	"time"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
-	gormRepo "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	gormRepo "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"

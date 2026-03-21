@@ -5,9 +5,9 @@ import (
 
 	cfg "github.com/devpablocristo/ponti-backend/cmd/config"
 	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
-	gormpkg "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	gormpkg "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 )
 
 // ProvideBusinessParametersGormEnginePort ...

@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"time"
 
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/gin-gonic/gin"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	wire "github.com/devpablocristo/ponti-backend/wire"

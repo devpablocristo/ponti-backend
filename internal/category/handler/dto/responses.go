@@ -2,7 +2,7 @@ package dto
 
 import (
 	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // CategoryResponse es el DTO de salida para una categoría individual.

@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
 	"github.com/devpablocristo/ponti-backend/internal/labor/handler/dto"

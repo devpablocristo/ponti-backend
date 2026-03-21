@@ -13,7 +13,7 @@ import (
 
 	// pkg
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	// excel
 	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"

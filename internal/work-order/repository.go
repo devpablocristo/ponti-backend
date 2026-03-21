@@ -16,9 +16,9 @@ import (
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type GormEngine interface {

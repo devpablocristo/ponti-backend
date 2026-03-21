@@ -56,8 +56,8 @@ func (f *fakeUseCases) DeleteProject(context.Context, int64) error  { return nil
 
 type fakeGinEngine struct{ r *gin.Engine }
 
-func (f *fakeGinEngine) GetRouter() *gin.Engine           { return f.r }
-func (f *fakeGinEngine) RunServer(context.Context) error  { return nil }
+func (f *fakeGinEngine) GetRouter() *gin.Engine          { return f.r }
+func (f *fakeGinEngine) RunServer(context.Context) error { return nil }
 
 type fakeConfig struct{}
 

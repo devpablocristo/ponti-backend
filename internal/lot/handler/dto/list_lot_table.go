@@ -7,7 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	"github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )

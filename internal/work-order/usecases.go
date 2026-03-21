@@ -7,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 
 type RepositoryPort interface {

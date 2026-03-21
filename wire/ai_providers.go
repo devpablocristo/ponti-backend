@@ -4,8 +4,8 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	aiusecases "github.com/devpablocristo/ponti-backend/internal/ai/usecases"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	"github.com/google/wire"
 )
 

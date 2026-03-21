@@ -40,4 +40,3 @@ func FromDomain(d domain.Labor) *Labor {
 		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
 }
-

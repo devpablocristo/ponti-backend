@@ -8,7 +8,7 @@ type ExcelTableDto struct {
 	Name           string  `excel:"NOMBRE"`
 	CategoryName   string  `excel:"CATEGORÍA"`
 	Price          float64 `excel:"PRECIO"`
-	PriceStatus	   string  `excel:"ESTADO_PRECIO"`
+	PriceStatus    string  `excel:"ESTADO_PRECIO"`
 	ContractorName string  `excel:"CONTRATISTA"`
 }
 

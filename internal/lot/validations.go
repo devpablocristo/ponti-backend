@@ -15,7 +15,7 @@ import (
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/devpablocristo/ponti-backend/pkg/validations"
+	"github.com/devpablocristo/ponti-backend/internal/shared/validations"
 )
 
 // ValidationError representa un error de validación específico

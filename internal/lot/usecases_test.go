@@ -9,7 +9,7 @@ package lot
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	mock_lot "github.com/devpablocristo/ponti-backend/internal/lot/usecases/mocks"
 )

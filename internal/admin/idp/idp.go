@@ -9,4 +9,3 @@ type AdminClient interface {
 	GetUserUIDByEmail(ctx context.Context, email string) (uid string, err error)
 	GeneratePasswordResetLink(ctx context.Context, email string) (string, error)
 }
-

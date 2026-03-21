@@ -21,7 +21,7 @@ type InsightTrigger struct {
 	httpClient *http.Client
 	throttle   sync.Map      // projectID -> time.Time
 	cooldown   time.Duration // mínimo entre disparos por proyecto
-	sem        chan struct{}  // semáforo para limitar goroutines concurrentes
+	sem        chan struct{} // semáforo para limitar goroutines concurrentes
 }
 
 // NewInsightTrigger crea un trigger con cooldown configurable.

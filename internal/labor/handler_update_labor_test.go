@@ -12,7 +12,7 @@ import (
 	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 type laborHandlerUseCasesStub struct {

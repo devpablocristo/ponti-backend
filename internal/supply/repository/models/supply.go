@@ -14,11 +14,11 @@ import (
 
 // Modelo principal de Supply
 type Supply struct {
-	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID int64           `gorm:"not null;index"`
-	Name      string          `gorm:"type:varchar(100);not null"`
-	Price     decimal.Decimal `gorm:"not null"`
-	IsPartialPrice bool `gorm:"not null;default:false;column:is_partial_price"`
+	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID      int64           `gorm:"not null;index"`
+	Name           string          `gorm:"type:varchar(100);not null"`
+	Price          decimal.Decimal `gorm:"not null"`
+	IsPartialPrice bool            `gorm:"not null;default:false;column:is_partial_price"`
 
 	UnitID int64
 
@@ -37,11 +37,11 @@ func (m *Supply) ToDomain() *domain.Supply {
 	unitName := m.getUnitName()
 
 	return &domain.Supply{
-		ID:        m.ID,
-		ProjectID: m.ProjectID,
-		Name:      m.Name,
-		UnitID:    int64(m.UnitID),
-		Price:     m.Price,
+		ID:             m.ID,
+		ProjectID:      m.ProjectID,
+		Name:           m.Name,
+		UnitID:         int64(m.UnitID),
+		Price:          m.Price,
 		IsPartialPrice: m.IsPartialPrice,
 		CategoryID:     int64(m.CategoryID),
 		CategoryName:   m.Category.Name,
@@ -61,10 +61,10 @@ func (m *Supply) ToDomain() *domain.Supply {
 
 func FromDomain(d *domain.Supply) *Supply {
 	return &Supply{
-		ID:        d.ID,
-		ProjectID: d.ProjectID,
-		Name:      d.Name,
-		Price:     d.Price,
+		ID:             d.ID,
+		ProjectID:      d.ProjectID,
+		Name:           d.Name,
+		Price:          d.Price,
 		IsPartialPrice: d.IsPartialPrice,
 		UnitID:         int64(d.UnitID),
 		CategoryID:     int64(d.CategoryID),

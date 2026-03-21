@@ -80,15 +80,15 @@ type Field struct {
 // UnmarshalJSON tolera lease_type_percent/value como null, "", número o string numérico.
 func (f *Field) UnmarshalJSON(data []byte) error {
 	type fieldAlias struct {
-		ID               int64            `json:"id,omitempty"`
-		ProjectID        int64            `json:"project_id,omitempty"`
-		Name             string           `json:"name"`
-		LeaseTypeName    string           `json:"lease_type_name"`
-		LeaseTypeID      int64            `json:"lease_type_id"`
-		LeaseTypePercent json.RawMessage  `json:"lease_type_percent"`
-		LeaseTypeValue   json.RawMessage  `json:"lease_type_value"`
-		Investors        []Investor       `json:"investors"`
-		Lots             []Lot            `json:"lots"`
+		ID               int64           `json:"id,omitempty"`
+		ProjectID        int64           `json:"project_id,omitempty"`
+		Name             string          `json:"name"`
+		LeaseTypeName    string          `json:"lease_type_name"`
+		LeaseTypeID      int64           `json:"lease_type_id"`
+		LeaseTypePercent json.RawMessage `json:"lease_type_percent"`
+		LeaseTypeValue   json.RawMessage `json:"lease_type_value"`
+		Investors        []Investor      `json:"investors"`
+		Lots             []Lot           `json:"lots"`
 	}
 
 	var aux fieldAlias

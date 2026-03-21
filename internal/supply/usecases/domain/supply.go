@@ -19,13 +19,13 @@ type SupplyOrigin struct {
 }
 
 type Supply struct {
-	ID        int64
-	ProjectID int64
-	Name      string
-	UnitID    int64
-	UnitName  string
-	Price     decimal.Decimal
-	Quantity  decimal.Decimal // Cantidad total de stock (suma de movimientos de entrada)
+	ID             int64
+	ProjectID      int64
+	Name           string
+	UnitID         int64
+	UnitName       string
+	Price          decimal.Decimal
+	Quantity       decimal.Decimal // Cantidad total de stock (suma de movimientos de entrada)
 	IsPartialPrice bool
 	CategoryID     int64
 	CategoryName   string

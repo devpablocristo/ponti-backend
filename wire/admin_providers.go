@@ -9,7 +9,7 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	admin "github.com/devpablocristo/ponti-backend/internal/admin"
 	adminidp "github.com/devpablocristo/ponti-backend/internal/admin/idp"
-	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 )
 
 func ProvideFirebaseApp(cfg *config.Config) (*firebase.App, error) {
@@ -45,4 +45,3 @@ var AdminSet = wire.NewSet(
 	ProvideIdentityAdmin,
 	ProvideAdminHandler,
 )
-

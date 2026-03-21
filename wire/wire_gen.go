@@ -27,16 +27,16 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/lease-type"
 	"github.com/devpablocristo/ponti-backend/internal/lot"
 	"github.com/devpablocristo/ponti-backend/internal/manager"
+	"github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	"github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	"github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
+	"github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 	"github.com/devpablocristo/ponti-backend/internal/project"
 	"github.com/devpablocristo/ponti-backend/internal/provider"
 	"github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
-	"github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
-	"github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	"github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
-	"github.com/devpablocristo/ponti-backend/pkg/words-suggesters/trigram-search"
 )
 
 // Injectors from wire.go:

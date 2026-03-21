@@ -4,8 +4,8 @@ import (
 	"github.com/google/wire"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 
 	dashboard "github.com/devpablocristo/ponti-backend/internal/dashboard"
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"

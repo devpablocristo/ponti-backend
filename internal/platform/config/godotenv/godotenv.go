@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	pkgutils "github.com/devpablocristo/ponti-backend/pkg/utils"
+	pkgutils "github.com/devpablocristo/ponti-backend/internal/shared/utils"
 	"github.com/joho/godotenv"
 )
 

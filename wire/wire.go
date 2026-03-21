@@ -4,12 +4,14 @@
 package wire
 
 import (
-	gorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	gin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
-	sug "github.com/devpablocristo/ponti-backend/pkg/words-suggesters/trigram-search"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	gin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	gorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
+	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	admin "github.com/devpablocristo/ponti-backend/internal/admin"
+	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
 	campaign "github.com/devpablocristo/ponti-backend/internal/campaign"
 	category "github.com/devpablocristo/ponti-backend/internal/category"
@@ -19,7 +21,6 @@ import (
 	customer "github.com/devpablocristo/ponti-backend/internal/customer"
 	dashboard "github.com/devpablocristo/ponti-backend/internal/dashboard"
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
-	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	dollar "github.com/devpablocristo/ponti-backend/internal/dollar"
 	field "github.com/devpablocristo/ponti-backend/internal/field"
 	investor "github.com/devpablocristo/ponti-backend/internal/investor"
@@ -28,13 +29,12 @@ import (
 	leasetype "github.com/devpablocristo/ponti-backend/internal/lease-type"
 	lot "github.com/devpablocristo/ponti-backend/internal/lot"
 	manager "github.com/devpablocristo/ponti-backend/internal/manager"
-	provider "github.com/devpablocristo/ponti-backend/internal/provider"
 	project "github.com/devpablocristo/ponti-backend/internal/project"
+	provider "github.com/devpablocristo/ponti-backend/internal/provider"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
 	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
-	admin "github.com/devpablocristo/ponti-backend/internal/admin"
 	"github.com/google/wire"
 )
 

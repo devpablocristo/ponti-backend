@@ -10,7 +10,7 @@ import (
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/core/saas/go/shared/httperr"
 
-	pkgutils "github.com/devpablocristo/ponti-backend/pkg/utils"
+	pkgutils "github.com/devpablocristo/ponti-backend/internal/shared/utils"
 )
 
 // RequireJWT valida el token JWT en la solicitud.

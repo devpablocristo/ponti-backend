@@ -6,7 +6,7 @@ import (
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/core/saas/go/shared/httperr"
 
-	pkgtypes "github.com/devpablocristo/ponti-backend/pkg/types"
+	pkgtypes "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // RequireCredentials valida el payload de login para la autenticación del usuario.

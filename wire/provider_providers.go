@@ -4,10 +4,10 @@ import (
 	"github.com/google/wire"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 	provider "github.com/devpablocristo/ponti-backend/internal/provider"
-	pgorm "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/devpablocristo/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/devpablocristo/ponti-backend/pkg/http/servers/gin"
 )
 
 // ProvideProviderRepository crea la implementación concreta de provider.Repository.

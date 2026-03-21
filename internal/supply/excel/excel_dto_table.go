@@ -3,12 +3,12 @@ package excel
 import "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 
 type SupplyTableDTO struct {
-	Name     string  `excel:"NOMBRE"`
-	UnitName string  `excel:"UNIDAD"`
-	Price    float64 `excel:"PRECIO"`
-	PriceStatus  string `excel:"ESTADO PRECIO"`
-	CategoryName string `excel:"RUBRO"`
-	TypeName     string `excel:"TIPO/CLASE"`
+	Name         string  `excel:"NOMBRE"`
+	UnitName     string  `excel:"UNIDAD"`
+	Price        float64 `excel:"PRECIO"`
+	PriceStatus  string  `excel:"ESTADO PRECIO"`
+	CategoryName string  `excel:"RUBRO"`
+	TypeName     string  `excel:"TIPO/CLASE"`
 }
 
 func BuildDTO(items []domain.Supply) []SupplyTableDTO {

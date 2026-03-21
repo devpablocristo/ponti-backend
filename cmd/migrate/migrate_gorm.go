@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	gormRepo "github.com/devpablocristo/ponti-backend/pkg/databases/sql/gorm"
+	gormRepo "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 
 	businessparametermodels "github.com/devpablocristo/ponti-backend/internal/business-parameters/repository/models"
 	campaignmodels "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"

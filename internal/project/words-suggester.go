@@ -3,7 +3,7 @@ package project
 import (
 	"context"
 
-	pgs "github.com/devpablocristo/ponti-backend/pkg/words-suggesters/trigram-search"
+	pgs "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 

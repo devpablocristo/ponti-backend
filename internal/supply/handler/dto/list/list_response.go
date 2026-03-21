@@ -7,16 +7,16 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // Estructura de supply para listados con información completa
 type ListedSupply struct {
-	ID    int64           `json:"id"`
-	Name  string          `json:"name"`
-	Price decimal.Decimal `json:"price"` // Precio U$
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Price          decimal.Decimal `json:"price"` // Precio U$
 	IsPartialPrice bool            `json:"is_partial_price"`
 	TotalUSD       decimal.Decimal `json:"total_usd"`     // Total U$
 	UnitID         int64           `json:"unit_id"`       // Unidad ID

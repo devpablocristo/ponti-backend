@@ -8,7 +8,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/core/saas/go/shared/domainerr"
-	types "github.com/devpablocristo/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	dto "github.com/devpablocristo/ponti-backend/internal/project/handler/dto"
