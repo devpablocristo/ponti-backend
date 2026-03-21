@@ -17,7 +17,7 @@ TLDR:
 - Usamos **un solo** archivo `.env` para local.
 - No hay configuración por ambiente dentro del código.
 - Ejemplo base en `.env.example`.
-- Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar `github.com/devpablocristo/core/saas/go`.
+- Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar los módulos privados de `github.com/devpablocristo/core/*`.
 
 ```bash
 cp .env.example .env

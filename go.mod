@@ -25,16 +25,6 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
-replace github.com/devpablocristo/core/authn/go => ../../core/authn/go
-
-replace github.com/devpablocristo/core/backend/go => ../../core/backend/go
-
-replace github.com/devpablocristo/core/saas/go => ../../core/saas/go
-
-replace github.com/devpablocristo/core/authz/go => ../../core/authz/go
-
-replace github.com/devpablocristo/core/notifications/go => ../../core/notifications/go
-
 require github.com/golang-jwt/jwt/v5 v5.3.1
 
 // Dependencias para testing
