@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	// pkg
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	// excel

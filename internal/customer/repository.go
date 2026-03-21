@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
 )
 

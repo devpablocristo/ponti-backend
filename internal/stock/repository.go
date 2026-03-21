@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

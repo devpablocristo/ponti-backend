@@ -3,7 +3,7 @@ package commercialization
 import (
 	"context"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 )

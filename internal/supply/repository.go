@@ -9,6 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
@@ -20,7 +21,6 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"gorm.io/gorm"
 )
 

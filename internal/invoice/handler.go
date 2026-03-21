@@ -4,10 +4,10 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/gin-gonic/gin"
 )
 
@@ -190,4 +190,3 @@ func (h *Handler) DeleteInvoice(c *gin.Context) {
 
 	sharedhandlers.RespondNoContent(c)
 }
-

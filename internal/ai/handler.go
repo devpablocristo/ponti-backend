@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	dto "github.com/devpablocristo/ponti-backend/internal/ai/handler/dto"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type UseCasesPort interface {

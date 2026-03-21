@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Migración: auth tables int64 → UUID + created_by/updated_by → text
--- Prepara ponti para integración con saas-core (que usa uuid.UUID)
+-- Prepara ponti para integración con core/saas/go (que usa uuid.UUID)
 -- =============================================================================
 -- NOTA: sin BEGIN/COMMIT explícito — golang-migrate maneja la transacción.
 

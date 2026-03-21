@@ -1,7 +1,7 @@
 package create
 
 import (
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"

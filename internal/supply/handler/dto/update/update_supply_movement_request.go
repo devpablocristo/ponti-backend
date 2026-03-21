@@ -3,7 +3,7 @@ package update
 import (
 	"time"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"

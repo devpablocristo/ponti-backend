@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )

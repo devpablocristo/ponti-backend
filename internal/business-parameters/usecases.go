@@ -3,8 +3,8 @@ package bparams
 import (
 	"context"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type RepositoryPort interface {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
-	"github.com/devpablocristo/saas-core/shared/httperr"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/httperr"
 )
 
 // RequireUserIDHeader asegura que un header de ID de usuario valido este presente.

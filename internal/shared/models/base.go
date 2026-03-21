@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type Base struct {
 	DeletedBy *string        `gorm:"column:deleted_by"`
 }
 
-// ActorFromContext extrae el actor (email/sub) del contexto de saas-core.
+// ActorFromContext extrae el actor (email/sub) del contexto de core/saas/go.
 func ActorFromContext(ctx context.Context) (string, error) {
 	v := ctx.Value(ctxkeys.Actor)
 	if s, ok := v.(string); ok && s != "" {

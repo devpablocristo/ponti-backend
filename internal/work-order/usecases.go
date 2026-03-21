@@ -6,8 +6,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 

@@ -14,10 +14,10 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/saas-core/identity/executor/jwks"
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
-	"github.com/devpablocristo/saas-core/shared/httperr"
+	"github.com/devpablocristo/core/saas/go/identity/executor/jwks"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/httperr"
 )
 
 const (
@@ -130,7 +130,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			scopes = append(scopes, p)
 		}
 
-		// Inject saas-core context keys.
+		// Inject core/saas/go context keys.
 		ctx := c.Request.Context()
 		ctx = context.WithValue(ctx, ctxkeys.Actor, claims.Subject)
 		ctx = context.WithValue(ctx, ctxkeys.OrgID, membership.TenantID)

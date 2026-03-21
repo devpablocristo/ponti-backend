@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"

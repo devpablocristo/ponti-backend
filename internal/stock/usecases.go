@@ -5,10 +5,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/shopspring/decimal"
 )
 

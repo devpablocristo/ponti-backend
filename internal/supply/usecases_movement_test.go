@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"

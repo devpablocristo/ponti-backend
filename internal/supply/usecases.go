@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type RepositoryPort interface {

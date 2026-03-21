@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"gorm.io/gorm"
 
 	models "github.com/devpablocristo/ponti-backend/internal/dollar/repository/models"

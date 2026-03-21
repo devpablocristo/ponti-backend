@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
@@ -17,7 +18,6 @@ import (
 	listDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/list"
 	updateDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/update"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 type UseCasesPort interface {

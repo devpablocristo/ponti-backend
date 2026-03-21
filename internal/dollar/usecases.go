@@ -3,7 +3,7 @@ package dollar
 import (
 	"context"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 

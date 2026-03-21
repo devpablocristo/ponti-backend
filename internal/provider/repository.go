@@ -3,9 +3,9 @@ package provider
 import (
 	"context"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"gorm.io/gorm"
 )
 

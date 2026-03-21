@@ -10,14 +10,14 @@ import (
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
-	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 	"github.com/shopspring/decimal"
 )

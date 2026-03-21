@@ -9,7 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
@@ -21,8 +21,8 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {

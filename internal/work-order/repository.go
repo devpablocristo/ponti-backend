@@ -11,13 +11,13 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 

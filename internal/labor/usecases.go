@@ -3,9 +3,9 @@ package labor
 import (
 	"context"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 )
 

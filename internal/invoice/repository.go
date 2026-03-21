@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"gorm.io/gorm"
 )
 

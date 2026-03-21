@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"

@@ -5,7 +5,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )

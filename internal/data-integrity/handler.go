@@ -7,10 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // UseCasesPort define la interfaz para los casos de uso

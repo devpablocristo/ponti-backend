@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 
 	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"

@@ -7,8 +7,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 )
 
 // TestUseCases_DeleteSupplyMovement tests para la eliminación de movimientos de suministro

@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/saas-core/shared/domainerr"
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	types "github.com/devpablocristo/ponti-backend/pkg/types"
 
 	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
@@ -428,4 +428,3 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
-

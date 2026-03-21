@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/devpablocristo/core/saas/go/shared/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	"github.com/devpablocristo/saas-core/shared/domainerr"
 	"gorm.io/gorm"
 )
 
