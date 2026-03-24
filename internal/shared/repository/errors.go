@@ -1,17 +1,15 @@
 package sharedrepo
 
 import (
-	"errors"
 	"fmt"
 
-	"gorm.io/gorm"
-
 	"github.com/devpablocristo/core/backend/go/domainerr"
+	gormdb "github.com/devpablocristo/core/databases/gorm/go"
 )
 
 // HandleGormError centraliza el manejo de ErrRecordNotFound y errores internos.
 func HandleGormError(err error, entity string, id int64) error {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if gormdb.IsNotFound(err) {
 		return domainerr.NotFound(fmt.Sprintf("%s %d not found", entity, id))
 	}
 	return domainerr.Internal(fmt.Sprintf("failed to get %s", entity))

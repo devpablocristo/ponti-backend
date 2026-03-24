@@ -1,13 +1,14 @@
 package pkgutils
 
 import (
-	"regexp"
 	"strings"
 	"unicode"
 
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
+
+	"github.com/devpablocristo/core/backend/go/stringutil"
 )
 
 // IsNumeric returns true if the string contains only digits.
@@ -23,6 +24,7 @@ func IsNumeric(s string) bool {
 }
 
 // NormalizeString lowercases and removes accents from a string.
+// Usa golang.org/x/text para normalización Unicode precisa (no delegada a core).
 func NormalizeString(input string) string {
 	input = strings.ToLower(strings.TrimSpace(input))
 	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
@@ -37,8 +39,7 @@ func NormalizeString(input string) string {
 	return string(clean)
 }
 
-// BasicInputSanitizer trims and removes all HTML/XML tags.
+// BasicInputSanitizer delega al helper estándar de core.
 func BasicInputSanitizer(input string) string {
-	input = strings.TrimSpace(input)
-	return regexp.MustCompile(`<[^>]*>`).ReplaceAllString(input, "")
+	return stringutil.BasicInputSanitizer(input)
 }

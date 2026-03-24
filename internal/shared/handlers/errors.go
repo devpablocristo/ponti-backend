@@ -1,26 +1,19 @@
 package sharedhandlers
 
 import (
-	"errors"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
 	"github.com/devpablocristo/core/backend/go/httperr"
 )
 
-// RespondError responde errores de dominio usando el helper estándar.
+// RespondError delega al helper estándar de core.
 func RespondError(c *gin.Context, err error) {
-	status, apiErr := httperr.Normalize(err)
-	c.JSON(status, apiErr)
+	ginmw.Respond(c, err)
 }
 
-// ErrorMessage extracts the human-readable message from a domainerr.Error,
-// falling back to err.Error() for other error types.
+// ErrorMessage extrae el mensaje user-facing de un error normalizado.
 func ErrorMessage(err error) string {
-	var de domainerr.Error
-	if errors.As(err, &de) {
-		return de.Message()
-	}
-	return err.Error()
+	_, apiErr := httperr.Normalize(err)
+	return apiErr.Message
 }

@@ -11,10 +11,10 @@ import (
 	"cloud.google.com/go/cloudsqlconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	gormdb "github.com/devpablocristo/core/databases/gorm/go"
 )
 
 // ConfigPort es la interfaz para manejar configuraciones del cliente GORM
@@ -55,12 +55,18 @@ func (r *Repository) Connect(config ConfigPort) error {
 		return fmt.Errorf("failed to create database: %w", err)
 	}
 
-	dialector, err := getDialector(config)
-	if err != nil {
-		return err
-	}
+	// Usar core/databases/gorm/go para la conexión
+	dsn := buildDSN(config)
+	driver := mapDriver(config.GetDBType())
 
-	db, err := gorm.Open(dialector, &gorm.Config{})
+	db, err := gormdb.Open(dsn, gormdb.Config{
+		Driver:  driver,
+		LogMode: gormdb.DefaultConfig().LogMode,
+		MaxOpenConns: gormdb.DefaultConfig().MaxOpenConns,
+		MaxIdleConns: gormdb.DefaultConfig().MaxIdleConns,
+		ConnMaxLifetime: gormdb.DefaultConfig().ConnMaxLifetime,
+		ConnMaxIdleTime: gormdb.DefaultConfig().ConnMaxIdleTime,
+	})
 	if err != nil {
 		return err
 	}
@@ -83,32 +89,34 @@ func (r *Repository) Connect(config ConfigPort) error {
 	return nil
 }
 
-func getDialector(config ConfigPort) (gorm.Dialector, error) {
-	// if os.Getenv("K_SERVICE") != "" {
-	//	return connectWithConnectorIAMAuthN(config)
-	//}
-
-	var dialector gorm.Dialector
+func buildDSN(config ConfigPort) string {
 	switch config.GetDBType() {
 	case Postgres:
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
-			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetDBName(), config.GetPort(), config.GetSSLMode())
-		dialector = postgres.Open(dsn)
-
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d",
+			config.GetHost(), config.GetUser(), config.GetPassword(), config.GetDBName(), config.GetPort())
+		if ssl := config.GetSSLMode(); ssl != "" {
+			dsn += " sslmode=" + ssl
+		}
+		return dsn
 	case MySQL:
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 			config.GetUser(), config.GetPassword(), config.GetHost(), config.GetPort(), config.GetDBName())
-		dialector = mysql.Open(dsn)
-
 	case SQLite:
-		dsn := config.GetSQLitePath()
-		dialector = sqlite.Open(dsn)
-
+		return config.GetSQLitePath()
 	default:
-		return dialector, fmt.Errorf("unsupported database type: %s", config.GetDBType())
+		return ""
 	}
+}
 
-	return dialector, nil
+func mapDriver(t DBType) gormdb.DriverType {
+	switch t {
+	case MySQL:
+		return gormdb.DriverMySQL
+	case SQLite:
+		return gormdb.DriverSQLite
+	default:
+		return gormdb.DriverPostgres
+	}
 }
 
 // connectWithConnectorIAMAuthN conecta a Cloud SQL con IAM auth (usado en Cloud Run).
@@ -189,13 +197,12 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 			config.GetHost(), config.GetUser(), config.GetPassword(),
 			config.GetPort(), config.GetSSLMode(),
 		)
-		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
+		db, err := gormdb.Open(dsn, gormdb.Config{
+			Driver: gormdb.DriverPostgres,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to open sql.DB: %w", err)
 		}
-
 		sqlDB, err := db.DB()
 		if err != nil {
 			return fmt.Errorf("failed to get sql.DB: %w", err)
@@ -206,7 +213,6 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		if err := db.Raw("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = ?)", config.GetDBName()).Scan(&exists).Error; err != nil {
 			return fmt.Errorf("failed to check if database exists: %w", err)
 		}
-
 		if !exists {
 			if err := db.Exec(fmt.Sprintf("CREATE DATABASE \"%s\"", config.GetDBName())).Error; err != nil {
 				return fmt.Errorf("failed to create database: %w", err)
@@ -218,13 +224,12 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 			config.GetUser(), config.GetPassword(),
 			config.GetHost(), config.GetPort(),
 		)
-		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
+		db, err := gormdb.Open(dsn, gormdb.Config{
+			Driver: gormdb.DriverMySQL,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to connect to MySQL server: %w", err)
 		}
-
 		sqlDB, err := db.DB()
 		if err != nil {
 			return fmt.Errorf("failed to get sql.DB: %w", err)
@@ -237,12 +242,12 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 		}
 	case SQLite:
 		if _, err := os.Stat(config.GetSQLitePath()); os.IsNotExist(err) {
-			fmt.Println("Automatically created by SQLite")
+			f, err := os.Create(config.GetSQLitePath())
+			if err != nil {
+				return fmt.Errorf("failed to create SQLite file: %w", err)
+			}
+			_ = f.Close()
 		}
-		return nil
-
-	default:
-		return fmt.Errorf("unsupported database type: %s", config.GetDBType())
 	}
 
 	return nil
