@@ -9,7 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/backend/go/httpclient"
+	"github.com/devpablocristo/core/http/go/httpclient"
 )
 
 // Client maneja llamadas al AI Copilot Service.

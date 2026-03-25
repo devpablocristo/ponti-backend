@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/contextkeys"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 // RequireLocalDevAuthz is a lightweight auth middleware intended for local development.

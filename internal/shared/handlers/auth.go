@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/contextkeys"
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )

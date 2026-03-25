@@ -17,7 +17,7 @@ import (
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/shopspring/decimal"
 )

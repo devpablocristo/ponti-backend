@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
-	"github.com/devpablocristo/core/backend/go/httperr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
 )
 
 // RequireAPIKey asegura que el request tenga un API key válido en el header.

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	"gorm.io/gorm"

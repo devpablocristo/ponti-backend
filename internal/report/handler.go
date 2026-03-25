@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"

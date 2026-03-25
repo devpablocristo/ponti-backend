@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"

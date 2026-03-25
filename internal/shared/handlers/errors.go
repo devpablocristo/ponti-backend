@@ -3,8 +3,8 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
-	"github.com/devpablocristo/core/backend/go/httperr"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
+	"github.com/devpablocristo/core/http/go/httperr"
 )
 
 // RespondError delega al helper estándar de core.

@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
-	"github.com/devpablocristo/core/backend/go/httperr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
 
 	pkgutils "github.com/devpablocristo/ponti-backend/internal/shared/utils"
 )

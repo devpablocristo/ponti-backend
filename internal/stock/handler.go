@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"

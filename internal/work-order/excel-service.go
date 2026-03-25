@@ -6,7 +6,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )

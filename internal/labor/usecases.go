@@ -3,7 +3,7 @@ package labor
 import (
 	"context"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"

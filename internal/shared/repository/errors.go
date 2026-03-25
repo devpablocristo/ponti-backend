@@ -3,7 +3,7 @@ package sharedrepo
 import (
 	"fmt"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	gormdb "github.com/devpablocristo/core/databases/gorm/go"
 )
 

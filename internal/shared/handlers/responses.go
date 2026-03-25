@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
 )
 
 // CreateResponse es la respuesta canónica para operaciones de creación.

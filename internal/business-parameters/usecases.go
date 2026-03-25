@@ -3,7 +3,7 @@ package bparams
 import (
 	"context"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
 

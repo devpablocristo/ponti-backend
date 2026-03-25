@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/authn/go/jwks"
-	"github.com/devpablocristo/core/backend/go/contextkeys"
-	"github.com/devpablocristo/core/backend/go/domainerr"
-	"github.com/devpablocristo/core/backend/go/httperr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
 )
 
 const (

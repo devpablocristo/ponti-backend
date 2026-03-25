@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	dto "github.com/devpablocristo/ponti-backend/internal/ai/handler/dto"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )

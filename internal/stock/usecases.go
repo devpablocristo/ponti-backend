@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
