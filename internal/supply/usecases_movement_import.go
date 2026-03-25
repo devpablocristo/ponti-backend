@@ -211,8 +211,12 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		requestDuplicateKey := fmt.Sprintf("%d|%s|%d", movement.ProjectId, reference, movement.Supply.ID)
+		requestDuplicateKey := fmt.Sprintf("%d|%s|%s|%d", movement.ProjectId, movement.MovementType, reference, movement.Supply.ID)
 		if _, exists := requestDuplicates[requestDuplicateKey]; exists {
+			supplyLabel := fmt.Sprintf("%d", movement.Supply.ID)
+			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
+				supplyLabel = strings.TrimSpace(movement.Supply.Name)
+			}
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -220,7 +224,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "duplicate_request",
-				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %d dentro del request", reference, movement.Supply.ID),
+				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %s dentro del request", reference, supplyLabel),
 			})
 			continue
 		}
@@ -298,12 +302,18 @@ func (u *UseCases) resolveImportProvider(ctx context.Context, provider *provider
 
 func validateImportMovementType(movementType string) error {
 	switch movementType {
-	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK:
+	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
 		return nil
 	default:
 		return types.NewError(
 			types.ErrValidation,
-			fmt.Sprintf("must be a valid type [%s, %s, %s]", domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK),
+			fmt.Sprintf(
+				"must be a valid type [%s, %s, %s, %s]",
+				domain.INTERNAL_MOVEMENT,
+				domain.OFFICIAL_INVOICE,
+				domain.STOCK,
+				domain.RETURN_MOVEMENT,
+			),
 			nil,
 		)
 	}

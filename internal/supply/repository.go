@@ -179,6 +179,45 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
 	return count > 0, nil
 }
 
+func (r *Repository) ExistsSupplyMovementByProjectReferenceAndType(
+	ctx context.Context,
+	projectID int64,
+	reference string,
+	movementType string,
+) (bool, error) {
+	var count int64
+	if err := r.getDB(ctx).
+		Model(&models.SupplyMovement{}).
+		Where("project_id = ? AND reference_number = ? AND movement_type = ?", projectID, reference, movementType).
+		Count(&count).Error; err != nil {
+		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type", err)
+	}
+	return count > 0, nil
+}
+
+func (r *Repository) ExistsSupplyMovementByProjectReferenceSupplyAndType(
+	ctx context.Context,
+	projectID int64,
+	reference string,
+	supplyID int64,
+	movementType string,
+) (bool, error) {
+	var count int64
+	if err := r.getDB(ctx).
+		Model(&models.SupplyMovement{}).
+		Where(
+			"project_id = ? AND reference_number = ? AND supply_id = ? AND movement_type = ?",
+			projectID,
+			reference,
+			supplyID,
+			movementType,
+		).
+		Count(&count).Error; err != nil {
+		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type and supply", err)
+	}
+	return count > 0, nil
+}
+
 // --- UPDATE ---
 func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	if err := sharedrepo.ValidateID(s.ID, "supply"); err != nil {
