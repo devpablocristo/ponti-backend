@@ -33,6 +33,7 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/internal/stock"
 	"github.com/alphacodinggroup/ponti-backend/internal/supply"
 	"github.com/alphacodinggroup/ponti-backend/internal/work-order"
+	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft"
 	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
@@ -323,6 +324,16 @@ func Initialize() (*Dependencies, error) {
 	api := ProvideConfigAPI(config)
 	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
 	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
+	workorderdraftGinEnginePort := ProvideWorkOrderDraftGinEnginePort(server)
+	workorderdraftGormEngine := ProvideWorkOrderDraftGormEnginePort(repository)
+	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)
+	workorderdraftRepositoryPort := ProvideWorkOrderDraftRepositoryPort(workorderdraftRepository)
+	publisherPort := ProvideWorkOrderDraftPublisherPort(workorderRepositoryPort)
+	workorderdraftUseCases := ProvideWorkOrderDraftUseCases(workorderdraftRepositoryPort, publisherPort)
+	workorderdraftUseCasesPort := ProvideWorkOrderDraftUseCasesPort(workorderdraftUseCases)
+	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)
+	workorderdraftMiddlewaresEnginePort := ProvideWorkOrderDraftMiddlewaresEnginePort(middlewares)
+	workorderdraftHandler := ProvideWorkOrderDraftHandler(workorderdraftGinEnginePort, workorderdraftUseCasesPort, workorderdraftConfigAPIPort, workorderdraftMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -354,6 +365,7 @@ func Initialize() (*Dependencies, error) {
 		StockHandler:              stockHandler,
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
+		WorkOrderDraftHandler:     workorderdraftHandler,
 	}
 	return dependencies, nil
 }
@@ -391,4 +403,5 @@ type Dependencies struct {
 	StockHandler              *stock.Handler
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
+	WorkOrderDraftHandler     *workorderdraft.Handler
 }

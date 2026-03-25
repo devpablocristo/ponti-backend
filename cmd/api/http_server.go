@@ -101,6 +101,7 @@ func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.ClassTypeHandler.Routes()
 	deps.BusinessParametersHandler.Routes()
 	deps.WorkOrderHandler.Routes()
+	deps.WorkOrderDraftHandler.Routes()
 	deps.DollarHandler.Routes()
 	deps.LaborHandler.Routes()
 	deps.StockHandler.Routes()

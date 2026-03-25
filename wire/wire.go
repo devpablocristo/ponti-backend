@@ -36,6 +36,7 @@ import (
 	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
 	admin "github.com/alphacodinggroup/ponti-backend/internal/admin"
 	"github.com/google/wire"
+	workorderdraft "github.com/alphacodinggroup/ponti-backend/internal/work-order-draft"
 )
 
 type Dependencies struct {
@@ -69,6 +70,7 @@ type Dependencies struct {
 	StockHandler              *stock.Handler
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
+	WorkOrderDraftHandler     *workorderdraft.Handler
 }
 
 func Initialize() (*Dependencies, error) {
@@ -99,6 +101,7 @@ func Initialize() (*Dependencies, error) {
 		ClassTypeSet,
 		DollarSet,
 		WorkOrderSet,
+		WorkOrderDraftSet,
 		LaborSet,
 		StockSet,
 		InvoiceSet,
