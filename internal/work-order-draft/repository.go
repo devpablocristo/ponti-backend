@@ -211,7 +211,7 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 			"updated_by":     model.UpdatedBy,
 		}
 
-		updateTx := tx.Model(&orig).Updates(updates)
+		updateTx := tx.Model(&models.WorkOrderDraft{}).Where("id = ?", model.ID).Updates(updates)
 		if updateTx.Error != nil {
 			return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
 		}
