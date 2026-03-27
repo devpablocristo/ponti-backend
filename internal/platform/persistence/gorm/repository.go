@@ -14,7 +14,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/gorm/go"
+	gormdb "github.com/devpablocristo/core/databases/postgres/go"
 )
 
 // ConfigPort es la interfaz para manejar configuraciones del cliente GORM
@@ -55,18 +55,13 @@ func (r *Repository) Connect(config ConfigPort) error {
 		return fmt.Errorf("failed to create database: %w", err)
 	}
 
-	// Usar core/databases/gorm/go para la conexión
+	// Usar core/databases/postgres/go para la conexión GORM.
 	dsn := buildDSN(config)
 	driver := mapDriver(config.GetDBType())
+	gormCfg := gormdb.DefaultGormConfig()
+	gormCfg.Driver = driver
 
-	db, err := gormdb.Open(dsn, gormdb.Config{
-		Driver:  driver,
-		LogMode: gormdb.DefaultConfig().LogMode,
-		MaxOpenConns: gormdb.DefaultConfig().MaxOpenConns,
-		MaxIdleConns: gormdb.DefaultConfig().MaxIdleConns,
-		ConnMaxLifetime: gormdb.DefaultConfig().ConnMaxLifetime,
-		ConnMaxIdleTime: gormdb.DefaultConfig().ConnMaxIdleTime,
-	})
+	db, err := gormdb.OpenGorm(dsn, gormCfg)
 	if err != nil {
 		return err
 	}
@@ -197,9 +192,9 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 			config.GetHost(), config.GetUser(), config.GetPassword(),
 			config.GetPort(), config.GetSSLMode(),
 		)
-		db, err := gormdb.Open(dsn, gormdb.Config{
-			Driver: gormdb.DriverPostgres,
-		})
+		gormCfg := gormdb.DefaultGormConfig()
+		gormCfg.Driver = gormdb.DriverPostgres
+		db, err := gormdb.OpenGorm(dsn, gormCfg)
 		if err != nil {
 			return fmt.Errorf("failed to open sql.DB: %w", err)
 		}
@@ -224,9 +219,9 @@ func (r *Repository) createDatabaseIfNotExists(config ConfigPort) error {
 			config.GetUser(), config.GetPassword(),
 			config.GetHost(), config.GetPort(),
 		)
-		db, err := gormdb.Open(dsn, gormdb.Config{
-			Driver: gormdb.DriverMySQL,
-		})
+		gormCfg := gormdb.DefaultGormConfig()
+		gormCfg.Driver = gormdb.DriverMySQL
+		db, err := gormdb.OpenGorm(dsn, gormCfg)
 		if err != nil {
 			return fmt.Errorf("failed to connect to MySQL server: %w", err)
 		}

@@ -192,7 +192,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndType(
 		Model(&models.SupplyMovement{}).
 		Where("project_id = ? AND reference_number = ? AND movement_type = ?", projectID, reference, movementType).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type", err)
+		return false, domainerr.Internal("failed to check duplicate supply movement by type")
 	}
 	return count > 0, nil
 }
@@ -215,7 +215,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceSupplyAndType(
 			movementType,
 		).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type and supply", err)
+		return false, domainerr.Internal("failed to check duplicate supply movement by type and supply")
 	}
 	return count > 0, nil
 }

@@ -3,7 +3,7 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/go/gin"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
 // ParseOptionalInt64Query delega al helper estándar de core.

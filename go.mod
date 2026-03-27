@@ -6,10 +6,10 @@ require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
 	firebase.google.com/go/v4 v4.19.0
 	github.com/devpablocristo/core/authn/go v0.1.0
-	github.com/devpablocristo/core/databases/gorm/go v0.0.0
+	github.com/devpablocristo/core/databases/postgres/go v0.0.0
 	github.com/devpablocristo/core/errors/go v0.0.0
+	github.com/devpablocristo/core/http/gin/go v0.0.0
 	github.com/devpablocristo/core/http/go v0.0.0
-	github.com/devpablocristo/core/http/go/gin v0.0.0
 	github.com/devpablocristo/core/security/go v0.0.0
 	github.com/devpablocristo/core/utils/go v0.0.0
 	github.com/devpablocristo/core/validate/go v0.0.0
@@ -90,13 +90,8 @@ require (
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-<<<<<<< HEAD
 	github.com/jackc/pgtype v1.14.4 // indirect
-	github.com/jackc/pgx/v5 v5.7.5
-=======
-	github.com/jackc/pgtype v1.14.0 // indirect
-	github.com/jackc/pgx/v5 v5.7.5 // indirect
->>>>>>> origin/develop
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -148,13 +143,13 @@ require (
 
 replace github.com/devpablocristo/core/authn/go => ../../core/authn/go
 
-replace github.com/devpablocristo/core/databases/gorm/go => ../../core/databases/gorm/go
+replace github.com/devpablocristo/core/databases/postgres/go => ../../core/databases/postgres/go
 
 replace github.com/devpablocristo/core/errors/go => ../../core/errors/go
 
 replace github.com/devpablocristo/core/http/go => ../../core/http/go
 
-replace github.com/devpablocristo/core/http/go/gin => ../../core/http/go/gin
+replace github.com/devpablocristo/core/http/gin/go => ../../core/http/gin/go
 
 replace github.com/devpablocristo/core/security/go => ../../core/security/go
 

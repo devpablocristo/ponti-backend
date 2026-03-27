@@ -113,7 +113,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyID:        movement.Supply.ID,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -156,21 +156,6 @@ func (u *UseCases) validateSupplyMovementImport(
 		}
 		movement.ReferenceNumber = reference
 
-<<<<<<< HEAD
-		if err := validateImportMovementType(movement.MovementType); err != nil {
-			failures = append(failures, SupplyMovementImportFailure{
-				Index:           i,
-				RowIndex:        importRowIndex(i),
-				SupplyID:        movement.Supply.ID,
-				ReferenceNumber: movement.ReferenceNumber,
-				Code:            "validation_error",
-				Message:         errorMessage(err),
-			})
-			continue
-		}
-
-=======
->>>>>>> origin/develop
 		supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 		if err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
@@ -336,21 +321,12 @@ func validateImportMovementType(movementType string) error {
 	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
 		return nil
 	default:
-<<<<<<< HEAD
 		return domainerr.Newf(domainerr.KindValidation,
-			"must be a valid type [%s, %s, %s]", domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK,
-=======
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf(
-				"must be a valid type [%s, %s, %s, %s]",
-				domain.INTERNAL_MOVEMENT,
-				domain.OFFICIAL_INVOICE,
-				domain.STOCK,
-				domain.RETURN_MOVEMENT,
-			),
-			nil,
->>>>>>> origin/develop
+			"must be a valid type [%s, %s, %s, %s]",
+			domain.INTERNAL_MOVEMENT,
+			domain.OFFICIAL_INVOICE,
+			domain.STOCK,
+			domain.RETURN_MOVEMENT,
 		)
 	}
 }

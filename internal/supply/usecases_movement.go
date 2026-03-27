@@ -40,12 +40,12 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return 0, types.NewError(types.ErrValidation, "No hay stock suficiente para devolver la cantidad solicitada.", nil)
+			return 0, domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return 0, types.NewError(types.ErrValidation, "La devolución supera el stock disponible del insumo.", nil)
+			return 0, domainerr.Validation("La devolución supera el stock disponible del insumo.")
 		}
 
 		movement.StockId = stock.ID
@@ -146,12 +146,12 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return types.NewError(types.ErrValidation, "No hay stock suficiente para devolver la cantidad solicitada.", nil)
+			return domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return types.NewError(types.ErrValidation, "La devolución supera el stock disponible del insumo.", nil)
+			return domainerr.Validation("La devolución supera el stock disponible del insumo.")
 		}
 	}
 
@@ -184,11 +184,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 				supplyLabel = strings.TrimSpace(movement.Supply.Name)
 			}
-			return types.NewError(
-				types.ErrConflict,
-				fmt.Sprintf("La devolución %s ya tiene el insumo %s cargado", reference, supplyLabel),
-				nil,
-			)
+			return domainerr.Newf(domainerr.KindConflict, "La devolución %s ya tiene el insumo %s cargado", reference, supplyLabel)
 		}
 		return nil
 	}
@@ -198,20 +194,11 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 		return err
 	}
 	if exists {
-<<<<<<< HEAD
-		return domainerr.Newf(domainerr.KindConflict,
-			"El remito %s ya tiene el insumo %d cargado", reference, movement.Supply.ID,
-=======
 		supplyLabel := fmt.Sprintf("%d", movement.Supply.ID)
 		if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 			supplyLabel = strings.TrimSpace(movement.Supply.Name)
 		}
-		return types.NewError(
-			types.ErrConflict,
-			fmt.Sprintf("El remito %s ya tiene el insumo %s cargado", reference, supplyLabel),
-			nil,
->>>>>>> origin/develop
-		)
+		return domainerr.Newf(domainerr.KindConflict, "El remito %s ya tiene el insumo %s cargado", reference, supplyLabel)
 	}
 
 	return nil
@@ -219,16 +206,16 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 
 func (u *UseCases) resolveMovementReferences(ctx context.Context, movement *domain.SupplyMovement) error {
 	if movement == nil {
-		return types.NewError(types.ErrValidation, "invalid supply movement", nil)
+		return domainerr.Validation("invalid supply movement")
 	}
 	if movement.Supply == nil || movement.Supply.ID <= 0 {
-		return types.NewError(types.ErrValidation, "invalid supply_id", nil)
+		return domainerr.Validation("invalid supply_id")
 	}
 	if movement.Investor == nil || movement.Investor.ID <= 0 {
-		return types.NewError(types.ErrValidation, "invalid investor_id", nil)
+		return domainerr.Validation("invalid investor_id")
 	}
 	if movement.Provider == nil {
-		return types.NewMissingFieldError("provider")
+		return domainerr.Validation("The field 'provider' is required")
 	}
 
 	supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
@@ -236,32 +223,20 @@ func (u *UseCases) resolveMovementReferences(ctx context.Context, movement *doma
 		return err
 	}
 	if supply.ProjectID != movement.ProjectId {
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf("El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId),
-			nil,
-		)
+		return domainerr.Newf(domainerr.KindValidation, "El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId)
 	}
 	movement.Supply = supply
 
 	investor, err := u.repo.GetInvestor(ctx, movement.Investor.ID)
 	if err != nil {
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf("El inversor %d no existe", movement.Investor.ID),
-			err,
-		)
+		return domainerr.Newf(domainerr.KindValidation, "El inversor %d no existe", movement.Investor.ID)
 	}
 	movement.Investor = investor
 
 	if movement.Provider.ID > 0 {
 		provider, err := u.repo.GetProvider(ctx, movement.Provider.ID)
 		if err != nil {
-			return types.NewError(
-				types.ErrValidation,
-				fmt.Sprintf("El proveedor %d no existe", movement.Provider.ID),
-				err,
-			)
+			return domainerr.Newf(domainerr.KindValidation, "El proveedor %d no existe", movement.Provider.ID)
 		}
 		movement.Provider = provider
 		return nil
@@ -269,7 +244,7 @@ func (u *UseCases) resolveMovementReferences(ctx context.Context, movement *doma
 
 	movement.Provider.Name = strings.TrimSpace(movement.Provider.Name)
 	if movement.Provider.Name == "" {
-		return types.NewMissingFieldError("provider_name")
+		return domainerr.Validation("The field 'provider_name' is required")
 	}
 
 	return nil
