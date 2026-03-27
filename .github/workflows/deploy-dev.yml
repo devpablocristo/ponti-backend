@@ -56,6 +56,13 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.ref_name }}
 
+      - name: Checkout core repo
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: core
+
       - name: Auth GCP
         uses: google-github-actions/auth@v2
         with:

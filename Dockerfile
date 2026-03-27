@@ -19,6 +19,8 @@ RUN if [ -n "$GO_MODULES_TOKEN" ]; then \
 
 WORKDIR /app
 
+COPY core /core
+
 COPY . .
 
 WORKDIR /app
