@@ -17,6 +17,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout core repo
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: core-repo
+
+      - name: Link core repo for replace directives
+        run: |
+          EXPECTED_CORE_PATH="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/core"
+          mkdir -p "$(dirname "$EXPECTED_CORE_PATH")"
+          rm -rf "$EXPECTED_CORE_PATH"
+          ln -s "$GITHUB_WORKSPACE/core-repo" "$EXPECTED_CORE_PATH"
+
       - name: Configure private Go modules
         run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
@@ -37,6 +51,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout core repo
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: core-repo
+
+      - name: Link core repo for replace directives
+        run: |
+          EXPECTED_CORE_PATH="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/core"
+          mkdir -p "$(dirname "$EXPECTED_CORE_PATH")"
+          rm -rf "$EXPECTED_CORE_PATH"
+          ln -s "$GITHUB_WORKSPACE/core-repo" "$EXPECTED_CORE_PATH"
+
       - name: Configure private Go modules
         run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
@@ -53,6 +81,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout core repo
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: core-repo
+
+      - name: Link core repo for replace directives
+        run: |
+          EXPECTED_CORE_PATH="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/core"
+          mkdir -p "$(dirname "$EXPECTED_CORE_PATH")"
+          rm -rf "$EXPECTED_CORE_PATH"
+          ln -s "$GITHUB_WORKSPACE/core-repo" "$EXPECTED_CORE_PATH"
 
       - name: Configure private Go modules
         run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
@@ -72,6 +114,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout core repo
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: core-repo
+
+      - name: Link core repo for replace directives
+        run: |
+          EXPECTED_CORE_PATH="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/core"
+          mkdir -p "$(dirname "$EXPECTED_CORE_PATH")"
+          rm -rf "$EXPECTED_CORE_PATH"
+          ln -s "$GITHUB_WORKSPACE/core-repo" "$EXPECTED_CORE_PATH"
 
       - name: Configure private Go modules
         run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
