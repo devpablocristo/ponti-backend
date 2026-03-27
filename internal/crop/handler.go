@@ -3,6 +3,7 @@ package crop
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/crop/handler/dto"
@@ -95,7 +96,7 @@ func (h *Handler) ListCrops(c *gin.Context) {
 }
 
 func (h *Handler) GetCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -109,7 +110,7 @@ func (h *Handler) GetCrop(c *gin.Context) {
 }
 
 func (h *Handler) UpdateCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -126,7 +127,7 @@ func (h *Handler) UpdateCrop(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

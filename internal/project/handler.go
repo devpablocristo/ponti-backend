@@ -4,6 +4,7 @@ package project
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
@@ -190,7 +191,7 @@ func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 
 // ListProjectsByCustomerID maneja GET /projects/customers/:customer_id con paginación ligera
 func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
-	customerID, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	customerID, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

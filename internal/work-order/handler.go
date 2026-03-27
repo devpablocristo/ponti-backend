@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -97,7 +98,7 @@ func (h *Handler) CreateWorkOrder(c *gin.Context) {
 
 // GetWorkOrderByID obtiene una orden por ID.
 func (h *Handler) GetWorkOrderByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -132,7 +133,7 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -147,7 +148,7 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 
 // DeleteWorkOrderByID elimina una orden de trabajo.
 func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -232,7 +233,7 @@ func (h *Handler) ExportWorkOrders(c *gin.Context) {
 
 // ArchiveWorkOrder ejecuta soft delete (archivado) de la work order.
 func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -246,7 +247,7 @@ func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
 
 // RestoreWorkOrder restaura una work order archivada.
 func (h *Handler) RestoreWorkOrder(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

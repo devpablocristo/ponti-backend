@@ -3,6 +3,7 @@ package classtype
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/class-type/handler/dto"
@@ -92,7 +93,7 @@ func (h *Handler) ListClassTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -106,7 +107,7 @@ func (h *Handler) GetClassType(c *gin.Context) {
 }
 
 func (h *Handler) UpdateClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -123,7 +124,7 @@ func (h *Handler) UpdateClassType(c *gin.Context) {
 }
 
 func (h *Handler) DeleteClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

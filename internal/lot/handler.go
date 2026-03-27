@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	// third-party
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
@@ -152,7 +153,7 @@ func (h *Handler) ListLots(c *gin.Context) {
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -166,7 +167,7 @@ func (h *Handler) GetLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -204,7 +205,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -221,7 +222,7 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

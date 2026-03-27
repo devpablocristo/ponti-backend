@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -113,7 +114,7 @@ func (h *Handler) Routes() {
 		supplyMovements.GET("", h.GetSupplyMovementsByProjectID)
 		supplyMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		supplyMovements.GET("/providers", h.GetProviders)
-		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementById)
+		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementByID)
 		supplyMovements.DELETE("/:supply_movement_id", h.DeleteSupplyMovement)
 	}
 
@@ -124,7 +125,7 @@ func (h *Handler) Routes() {
 		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
 		stockMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		stockMovements.GET("/providers", h.GetProviders)
-		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementById)
+		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementByID)
 		stockMovements.DELETE("/:stock_movement_id", h.DeleteSupplyMovement)
 	}
 }
@@ -185,7 +186,7 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -199,7 +200,7 @@ func (h *Handler) GetSupply(c *gin.Context) {
 }
 
 func (h *Handler) UpdateSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -226,7 +227,7 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -239,7 +240,7 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -252,7 +253,7 @@ func (h *Handler) ArchiveSupply(c *gin.Context) {
 }
 
 func (h *Handler) RestoreSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -265,7 +266,7 @@ func (h *Handler) RestoreSupply(c *gin.Context) {
 }
 
 func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -729,13 +730,13 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
+	supplyMovementID, err := sharedhandlers.ParseMovementIDParam(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementId)
+	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -744,7 +745,7 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
+func (h *Handler) UpdateSupplyMovementByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req updateDto.UpdateSupplyMovementEntryRequest
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
@@ -757,7 +758,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
+	supplyMovementID, err := sharedhandlers.ParseMovementIDParam(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -769,7 +770,7 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementId)
+	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

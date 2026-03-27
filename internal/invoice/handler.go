@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
@@ -70,7 +71,7 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -88,7 +89,7 @@ func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
 }
 
 func (h *Handler) CreateInvoice(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -122,7 +123,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 }
 
 func (h *Handler) UpdateInvoice(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -177,7 +178,7 @@ func (h *Handler) ListInvoices(c *gin.Context) {
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

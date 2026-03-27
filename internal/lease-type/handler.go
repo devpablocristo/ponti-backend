@@ -3,6 +3,7 @@ package leasetype
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/lease-type/handler/dto"
@@ -92,7 +93,7 @@ func (h *Handler) ListLeaseTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetLeaseType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
+	id, err := ginmw.ParseParamID(c, "lease_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -106,7 +107,7 @@ func (h *Handler) GetLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLeaseType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
+	id, err := ginmw.ParseParamID(c, "lease_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -123,7 +124,7 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lease_type_id"), "lease_type_id")
+	id, err := ginmw.ParseParamID(c, "lease_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

@@ -4,6 +4,7 @@ package bparams
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -138,7 +139,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 }
 
 func (h *Handler) UpdateParameter(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
+	id, err := ginmw.ParseParamID(c, "parameter_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -160,7 +161,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 }
 
 func (h *Handler) DeleteParameter(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
+	id, err := ginmw.ParseParamID(c, "parameter_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

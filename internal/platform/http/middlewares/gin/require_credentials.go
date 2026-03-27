@@ -1,6 +1,7 @@
 package pkgmwr
 
 import (
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -14,10 +15,8 @@ func RequireCredentials() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var credentials pkgtypes.LoginCredentials
 
-		if err := ctx.ShouldBindJSON(&credentials); err != nil {
-			domErr := domainerr.Validation("invalid request payload")
-			status, apiErr := httperr.Normalize(domErr)
-			ctx.AbortWithStatusJSON(status, apiErr)
+		if err := ginmw.BindJSON(ctx, &credentials); err != nil {
+			ctx.Abort()
 			return
 		}
 		if credentials.Username == "" && credentials.Email == "" {

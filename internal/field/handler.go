@@ -3,6 +3,7 @@ package field
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/field/handler/dto"
@@ -96,7 +97,7 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -110,7 +111,7 @@ func (h *Handler) GetField(c *gin.Context) {
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -127,7 +128,7 @@ func (h *Handler) UpdateField(c *gin.Context) {
 }
 
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -140,7 +141,7 @@ func (h *Handler) DeleteField(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -153,7 +154,7 @@ func (h *Handler) ArchiveField(c *gin.Context) {
 }
 
 func (h *Handler) RestoreField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

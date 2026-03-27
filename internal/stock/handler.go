@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
@@ -185,8 +186,6 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 func (h *Handler) UpdateRealStock(c *gin.Context) {
 	ctx := c.Request.Context()
-	stockIDStr := c.Param("stock_id")
-
 	var req dto.UpdateRealStockRequest
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
@@ -198,7 +197,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	stockID, err := sharedhandlers.ParseParamID(stockIDStr, "stock_id")
+	stockID, err := ginmw.ParseParamID(c, "stock_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
