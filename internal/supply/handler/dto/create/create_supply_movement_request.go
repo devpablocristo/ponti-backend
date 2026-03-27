@@ -38,6 +38,9 @@ func (csmr *CreateSupplyMovementEntryRequest) Validate() error {
 	if err = validateMovementType(csmr.MovementType); err != nil {
 		return err
 	}
+	if err = validateQuantity(csmr.Quantity, csmr.MovementType); err != nil {
+		return err
+	}
 	if err = validateProjectDestinationId(csmr.ProjectDestinationId, csmr.MovementType); err != nil {
 		return err
 	}
@@ -83,13 +86,43 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *str
 }
 
 func validateMovementType(movementType string) error {
+<<<<<<< HEAD
 	if movementType != domain.INTERNAL_MOVEMENT && movementType != domain.OFFICIAL_INVOICE && movementType != domain.STOCK {
 		return domainerr.Newf(domainerr.KindValidation,
 			"must be a valid type [%s, %s, %s]",
 			domain.INTERNAL_MOVEMENT,
 			domain.OFFICIAL_INVOICE,
 			domain.STOCK,
+=======
+	if movementType != domain.INTERNAL_MOVEMENT &&
+		movementType != domain.OFFICIAL_INVOICE &&
+		movementType != domain.STOCK &&
+		movementType != domain.RETURN_MOVEMENT {
+		return types.NewError(
+			types.ErrValidation,
+			fmt.Sprintf(
+				"must be a valid type [%s, %s, %s, %s]",
+				domain.INTERNAL_MOVEMENT,
+				domain.OFFICIAL_INVOICE,
+				domain.STOCK,
+				domain.RETURN_MOVEMENT,
+			),
+			nil,
+>>>>>>> origin/develop
 		)
+	}
+	return nil
+}
+
+func validateQuantity(quantity decimal.Decimal, movementType string) error {
+	if movementType == domain.STOCK {
+		if quantity.LessThan(decimal.Zero) {
+			return types.NewError(types.ErrValidation, "quantity must be greater than or equal to 0", nil)
+		}
+		return nil
+	}
+	if quantity.LessThanOrEqual(decimal.Zero) {
+		return types.NewError(types.ErrValidation, "quantity must be greater than 0", nil)
 	}
 	return nil
 }

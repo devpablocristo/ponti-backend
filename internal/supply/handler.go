@@ -398,6 +398,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	skipped := make([]createDto.SupplyMovementSkipped, 0)
 	domainMovements := make([]*domain.SupplyMovement, 0, total)
 	validIndexes := make([]int, 0, total)
+	requestReturnSupplyKeys := make(map[string]int)
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
@@ -412,6 +413,28 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(message))
 			continue
 		}
+
+		if item.MovementType == domain.RETURN_MOVEMENT {
+			returnSupplyKey := fmt.Sprintf("%s|%s|%d", item.MovementType, strings.TrimSpace(item.Reference), item.SupplyID)
+			if _, exists := requestReturnSupplyKeys[returnSupplyKey]; exists {
+				message := fmt.Sprintf(
+					"El remito de devolución %s ya contiene el insumo %d dentro del request",
+					strings.TrimSpace(item.Reference),
+					item.SupplyID,
+				)
+				failures = append(failures, createDto.SupplyMovementFailure{
+					Index:    i,
+					RowIndex: i + 2,
+					SupplyID: item.SupplyID,
+					Code:     "duplicate_request",
+					Message:  message,
+				})
+				supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(message))
+				continue
+			}
+			requestReturnSupplyKeys[returnSupplyKey] = i
+		}
+
 		domainMovements = append(domainMovements, item.ToDomain(projectID, &userID))
 		validIndexes = append(validIndexes, i)
 		supplyMovementsResponse = append(supplyMovementsResponse, createDto.CreateSupplyMovementResponse{})

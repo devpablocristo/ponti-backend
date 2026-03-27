@@ -106,7 +106,31 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		if movement.Quantity.LessThanOrEqual(decimal.Zero) {
+		if err := validateImportMovementType(movement.MovementType); err != nil {
+			failures = append(failures, SupplyMovementImportFailure{
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         types.ErrorMessage(err),
+			})
+			continue
+		}
+
+		if movement.MovementType == domain.STOCK {
+			if movement.Quantity.LessThan(decimal.Zero) {
+				failures = append(failures, SupplyMovementImportFailure{
+					Index:           i,
+					RowIndex:        importRowIndex(i),
+					SupplyID:        movement.Supply.ID,
+					ReferenceNumber: movement.ReferenceNumber,
+					Code:            "validation_error",
+					Message:         "quantity must be greater than or equal to 0",
+				})
+				continue
+			}
+		} else if movement.Quantity.LessThanOrEqual(decimal.Zero) {
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -132,6 +156,7 @@ func (u *UseCases) validateSupplyMovementImport(
 		}
 		movement.ReferenceNumber = reference
 
+<<<<<<< HEAD
 		if err := validateImportMovementType(movement.MovementType); err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
@@ -144,6 +169,8 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
+=======
+>>>>>>> origin/develop
 		supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 		if err != nil {
 			failures = append(failures, SupplyMovementImportFailure{
@@ -212,8 +239,12 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		requestDuplicateKey := fmt.Sprintf("%d|%s|%d", movement.ProjectId, reference, movement.Supply.ID)
+		requestDuplicateKey := fmt.Sprintf("%d|%s|%s|%d", movement.ProjectId, movement.MovementType, reference, movement.Supply.ID)
 		if _, exists := requestDuplicates[requestDuplicateKey]; exists {
+			supplyLabel := fmt.Sprintf("%d", movement.Supply.ID)
+			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
+				supplyLabel = strings.TrimSpace(movement.Supply.Name)
+			}
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -221,7 +252,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "duplicate_request",
-				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %d dentro del request", reference, movement.Supply.ID),
+				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %s dentro del request", reference, supplyLabel),
 			})
 			continue
 		}
@@ -266,7 +297,10 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 		}
 		return nil
 	default:
-		return u.ValidateSupplyMovement(ctx, movement)
+		if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+			return err
+		}
+		return u.validateSupplyMovementResolved(ctx, movement)
 	}
 }
 
@@ -299,11 +333,24 @@ func (u *UseCases) resolveImportProvider(ctx context.Context, provider *provider
 
 func validateImportMovementType(movementType string) error {
 	switch movementType {
-	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK:
+	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
 		return nil
 	default:
+<<<<<<< HEAD
 		return domainerr.Newf(domainerr.KindValidation,
 			"must be a valid type [%s, %s, %s]", domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK,
+=======
+		return types.NewError(
+			types.ErrValidation,
+			fmt.Sprintf(
+				"must be a valid type [%s, %s, %s, %s]",
+				domain.INTERNAL_MOVEMENT,
+				domain.OFFICIAL_INVOICE,
+				domain.STOCK,
+				domain.RETURN_MOVEMENT,
+			),
+			nil,
+>>>>>>> origin/develop
 		)
 	}
 }
