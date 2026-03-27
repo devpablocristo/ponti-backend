@@ -1,11 +1,11 @@
 package create
 
 import (
-	domainclasstype "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	domainclasstype "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	"time"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	decimal "github.com/shopspring/decimal"
 )
 
@@ -24,8 +24,8 @@ type SupplyRequest struct {
 	// Audit fields opcionales
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	CreatedBy *int64    `json:"created_by,omitempty"`
-	UpdatedBy *int64    `json:"updated_by,omitempty"`
+	CreatedBy *string   `json:"created_by,omitempty"`
+	UpdatedBy *string   `json:"updated_by,omitempty"`
 }
 
 // Para entrada (request): solo mapear IDs

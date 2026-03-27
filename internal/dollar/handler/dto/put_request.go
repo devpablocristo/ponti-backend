@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

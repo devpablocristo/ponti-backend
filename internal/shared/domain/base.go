@@ -8,6 +8,6 @@ import (
 type Base struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	CreatedBy *int64
-	UpdatedBy *int64
+	CreatedBy *string
+	UpdatedBy *string
 }

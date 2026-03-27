@@ -4,10 +4,9 @@ package sharedmodels
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 	"gorm.io/gorm"
 )
 
@@ -15,20 +14,16 @@ type Base struct {
 	CreatedAt time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `gorm:"index"`
-	CreatedBy *int64         `gorm:"column:created_by"`
-	UpdatedBy *int64         `gorm:"column:updated_by"`
-	DeletedBy *int64         `gorm:"column:deleted_by"`
+	CreatedBy *string        `gorm:"column:created_by"`
+	UpdatedBy *string        `gorm:"column:updated_by"`
+	DeletedBy *string        `gorm:"column:deleted_by"`
 }
 
-// ConvertStringToID convierte el user_id del contexto a int64.
-func ConvertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserIDKey)
-	if s, ok := userID.(string); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i, nil
-		} else {
-			return 0, fmt.Errorf("failed to parse user ID: %w", err)
-		}
+// ActorFromContext extrae el actor (email/sub) del contexto de core/saas/go.
+func ActorFromContext(ctx context.Context) (string, error) {
+	v := ctx.Value(ctxkeys.Actor)
+	if s, ok := v.(string); ok && s != "" {
+		return s, nil
 	}
-	return 0, fmt.Errorf("user ID is not a string")
+	return "", fmt.Errorf("actor not found in context")
 }

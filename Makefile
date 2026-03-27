@@ -5,6 +5,7 @@ ROOT_DIR           := $(shell pwd)
 VERSION            := 1.0
 BUILD_DIR          := $(ROOT_DIR)/bin
 DOCKER_COMPOSE_YML := $(ROOT_DIR)/docker-compose.yml
+GO_MODULES_TOKEN   ?=
 
 # Recomiendo usar variables de entorno para la base de datos
 DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}
@@ -16,6 +17,10 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
         run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
+
+define compose_cmd
+GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
+endef
 
 # Crea una nueva migración usando la variable NAME
 migrate-create:
@@ -132,31 +137,33 @@ db-gcp-reset-and-load-local:
 # --------------------------------------------------
 dev:
 	@echo "Starting dev environment with hot reload (Air)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) up --build -d ponti-db
+	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/core/*."; fi
+	$(compose_cmd) up --build -d ponti-db
 	@echo "Waiting for DB to be healthy..."
-	@until docker compose -f $(DOCKER_COMPOSE_YML) exec ponti-db pg_isready -U $${DB_USER:-admin} -q 2>/dev/null; do sleep 1; done
-	docker compose -f $(DOCKER_COMPOSE_YML) up --build ponti-api
+	@until $(compose_cmd) exec ponti-db pg_isready -U $${DB_USER:-admin} -q 2>/dev/null; do sleep 1; done
+	$(compose_cmd) up --build ponti-api
 
 dev-logs:
-	docker compose -f $(DOCKER_COMPOSE_YML) logs -f ponti-api
+	$(compose_cmd) logs -f ponti-api
 
 # --------------------------------------------------
 # Docker Compose
 # --------------------------------------------------
 up:
-	@echo "Starting services (compose up)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) up
+	@echo "Starting services in background (compose up -d)..."
+	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/core/*."; fi
+	$(compose_cmd) up -d
 
 down:
 	@echo "Stopping services (compose down)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) down --remove-orphans
+	$(compose_cmd) down --remove-orphans
 
 reset: down up
 	@echo "Reset done (down & up)."
 
 build:
-	@echo "Building services (compose up --build)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) up --build
+	@echo "Building services images (compose build)..."
+	$(compose_cmd) build
 
 clean:
 	@echo "Cleaning: stopping services, removing containers, volumes, networks and build artifacts..."
@@ -170,7 +177,7 @@ rebuild: clean build
 
 logs:
 	@echo "Tailing logs (compose logs -f)..."
-	docker compose -f $(DOCKER_COMPOSE_YML) logs -f
+	$(compose_cmd) logs -f
 
 # Limpieza total de Docker (interactivo, requiere confirmación). Usa scripts/docker_cleanup.sh.
 docker-cleanup:

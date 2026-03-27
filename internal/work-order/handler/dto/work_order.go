@@ -7,7 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type WorkOrderItem struct {

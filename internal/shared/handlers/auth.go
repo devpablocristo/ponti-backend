@@ -2,34 +2,41 @@ package sharedhandlers
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
-// ParseUserID extrae y valida el user_id desde el contexto.
-func ParseUserID(c *gin.Context) (int64, error) {
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+// ParseActor extrae el actor (email/sub) desde el contexto.
+func ParseActor(c *gin.Context) (string, error) {
+	actor, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
-		return 0, types.NewError(types.ErrAuthorization, "invalid user_id", err)
+		return "", domainerr.Forbidden("invalid actor")
 	}
-	return userID, nil
+	return actor, nil
 }
 
-func ParseTenantID(c *gin.Context) (int64, error) {
-	raw := c.Request.Context().Value(pkgmwr.ContextTenantIDKey)
-	str, ok := raw.(string)
-	if !ok || str == "" {
-		return 0, types.NewError(types.ErrAuthorization, "invalid tenant_id", fmt.Errorf("tenant_id missing in context"))
+// ParseOrgID extrae el org_id (uuid) desde el contexto.
+func ParseOrgID(c *gin.Context) (uuid.UUID, error) {
+	v := c.Request.Context().Value(ctxkeys.OrgID)
+	if v == nil {
+		return uuid.Nil, domainerr.Forbidden(fmt.Sprintf("invalid org_id: %s", "org_id missing in context"))
 	}
-
-	id, err := strconv.ParseInt(str, 10, 64)
-	if err != nil {
-		return 0, types.NewError(types.ErrAuthorization, "invalid tenant_id", err)
+	id, ok := v.(uuid.UUID)
+	if !ok || id == uuid.Nil {
+		return uuid.Nil, domainerr.Forbidden(fmt.Sprintf("invalid org_id: %s", "org_id is not a valid uuid"))
 	}
 	return id, nil
+}
+
+// ParseUserID es un alias temporal de ParseActor para backward compatibility.
+// Retorna el actor como string. Los callers que necesitan int64 deben migrar.
+// Deprecated: usar ParseActor.
+func ParseUserID(c *gin.Context) (string, error) {
+	return ParseActor(c)
 }

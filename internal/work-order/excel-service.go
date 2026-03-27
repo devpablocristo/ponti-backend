@@ -6,9 +6,9 @@ import (
 	"context"
 	"io"
 
-	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type XLSXEnginePort interface {
@@ -27,7 +27,7 @@ func NewExcelExporter(eng XLSXEnginePort) *ExcelExporter {
 func (e *ExcelExporter) Export(ctx context.Context, items []domain.WorkOrderListElement) ([]byte, error) {
 	_ = ctx
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	rows := workOrderExcel.BuildWorkOrderExcelDTO(items)

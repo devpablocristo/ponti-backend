@@ -3,9 +3,9 @@ package models
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type Invoice struct {

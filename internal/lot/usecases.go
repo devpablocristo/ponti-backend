@@ -10,8 +10,8 @@ import (
 
 	// project
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 type RepositoryPort interface {
@@ -95,16 +95,16 @@ func (u *UseCases) ListLots(
 
 func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, _, _, _, err := u.ListLots(ctx, filter, page, pageSize)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list lots", err)
+		return nil, domainerr.Internal("list lots")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)

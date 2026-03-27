@@ -3,7 +3,7 @@ package crop
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
 )
 
 type RepositoryPort interface {

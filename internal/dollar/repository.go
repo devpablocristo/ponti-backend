@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/dollar/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	models "github.com/devpablocristo/ponti-backend/internal/dollar/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 
 type GormEnginePort interface {
@@ -32,7 +32,7 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 
 	var rows []models.ProjectDollarValue
 	if err := tx.Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list project dollar values", err)
+		return nil, domainerr.Internal("failed to list project dollar values")
 	}
 
 	out := make([]domain.DollarAverage, len(rows))
@@ -45,23 +45,23 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 func (r *Repository) Create(ctx context.Context, item *domain.DollarAverage) (int64, error) {
 	m := models.FromDomain(item)
 	if err := r.db.Client().WithContext(ctx).Create(m).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create dollar value", err)
+		return 0, domainerr.Internal("failed to create dollar value")
 	}
 	return m.ID, nil
 }
 
 func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) error {
 	if item.ID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid id", nil)
+		return domainerr.Validation("invalid id")
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.ProjectDollarValue{}).Where("id = ?", item.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check existence", err)
+			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, "project dollar value not found", nil)
+			return domainerr.NotFound("project dollar value not found")
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
@@ -76,7 +76,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 				"average_value": item.AvgValue,
 				"updated_at":    time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to update project dollar value", err)
+			return domainerr.Internal("failed to update project dollar value")
 		}
 		return nil
 	})
@@ -92,7 +92,7 @@ func (r *Repository) GetByComposite(ctx context.Context, projectID, year int64, 
 		return nil, nil
 	}
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to query by composite key", err)
+		return nil, domainerr.Internal("failed to query by composite key")
 	}
 	return m.ToDomain(), nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/kelseyhightower/envconfig"
 
-	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
+	envvars "github.com/devpablocristo/ponti-backend/internal/platform/config/godotenv"
 )
 
 // Config agrupa todas las configuraciones de la aplicación.

@@ -3,10 +3,10 @@ package dto
 import (
 	"github.com/shopspring/decimal"
 
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	fielddom "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	leasetypedom "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
-	lotdom "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	leasetypedom "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	lotdom "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
 type LotInput struct {

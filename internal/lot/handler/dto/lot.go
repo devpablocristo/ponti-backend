@@ -5,9 +5,9 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type Lot struct {
@@ -27,8 +27,8 @@ type Lot struct {
 	// Campos de auditoría
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	CreatedBy *int64    `json:"created_by,omitempty"`
-	UpdatedBy *int64    `json:"updated_by,omitempty"`
+	CreatedBy *string   `json:"created_by,omitempty"`
+	UpdatedBy *string   `json:"updated_by,omitempty"`
 }
 
 type LotDates struct {

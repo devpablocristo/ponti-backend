@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // TestCreateStockDiference valida que la función calcula correctamente las diferencias de stock
@@ -609,7 +609,7 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 			Return(originSupply, nil),
 		mockRepo.EXPECT().
 			GetSupplyByProjectAndName(gomock.Any(), destProjectID, "ACEITE VERSION").
-			Return(nil, types.NewError(types.ErrNotFound, "supply not found", nil)),
+			Return(nil, domainerr.NotFound("supply not found")),
 		mockRepo.EXPECT().
 			CreateSupply(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, s *domain.Supply) (int64, error) {
@@ -1151,10 +1151,10 @@ func TestValidateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	var domainErr *types.Error
+	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
-		assert.Equal(t, types.ErrConflict, domainErr.Type)
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message)
+		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
+		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
 	}
 }
 
@@ -1184,10 +1184,10 @@ func TestCreateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 
 	assert.Equal(t, int64(0), id)
 	assert.Error(t, err)
-	var domainErr *types.Error
+	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
-		assert.Equal(t, types.ErrConflict, domainErr.Type)
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message)
+		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
+		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
 	}
 }
 

@@ -7,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 func TestSupplyRequest_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {
@@ -117,5 +117,5 @@ func TestCreateSupplyMovementEntryRequest_Validate_RejectsZeroQuantityForReturn(
 
 	err := req.Validate()
 
-	assert.Equal(t, "quantity must be greater than 0", types.ErrorMessage(err))
+	assert.Equal(t, "quantity must be greater than 0", sharedhandlers.ErrorMessage(err))
 }

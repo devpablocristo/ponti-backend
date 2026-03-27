@@ -37,8 +37,10 @@ services:
       - HTTP_SERVER_HOST=0.0.0.0
       - DB_HOST=ponti-db
       - DB_PORT=5432
+      - GO_MODULES_TOKEN=${GO_MODULES_TOKEN:-}
     volumes:
       - .:/app
+      - ../../core:/core
       - go-modules:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
     networks:

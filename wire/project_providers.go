@@ -3,13 +3,13 @@ package wire
 import (
 	"github.com/google/wire"
 
-	gormpkg "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	gormpkg "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
+	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 
-	cfg "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	project "github.com/alphacodinggroup/ponti-backend/internal/project"
+	cfg "github.com/devpablocristo/ponti-backend/cmd/config"
+	project "github.com/devpablocristo/ponti-backend/internal/project"
 )
 
 // ProvideProjectGormEnginePort ...

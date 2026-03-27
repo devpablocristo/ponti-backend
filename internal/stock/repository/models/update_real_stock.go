@@ -1,13 +1,13 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
 type StockUpdateRealUnits struct {
 	RealStockUnits decimal.Decimal `gorm:"column:real_stock_units"`
-	UpdatedBy      int64 `gorm:"column:updated_by"`
+	UpdatedBy      string          `gorm:"column:updated_by"`
 }
 
 func StockUpdateRealUnitsFromDomain(d *domain.Stock) *StockUpdateRealUnits {
@@ -16,4 +16,3 @@ func StockUpdateRealUnitsFromDomain(d *domain.Stock) *StockUpdateRealUnits {
 		UpdatedBy:      *d.UpdatedBy,
 	}
 }
-

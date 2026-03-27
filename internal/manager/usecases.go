@@ -3,7 +3,7 @@ package manager
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 )
 
 type RepositoryPort interface {

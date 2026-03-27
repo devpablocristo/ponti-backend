@@ -3,7 +3,7 @@ package investor
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 )
 
 type RepositoryPort interface {

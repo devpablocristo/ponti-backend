@@ -3,9 +3,9 @@ package dto
 import (
 	"time"
 
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -26,7 +26,7 @@ type LotUpdate struct {
 
 	// Campos de auditoría
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	UpdatedBy *int64    `json:"updated_by,omitempty"`
+	UpdatedBy *string   `json:"updated_by,omitempty"`
 }
 
 // ToDomain convierte el DTO de actualización al dominio

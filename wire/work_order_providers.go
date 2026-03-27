@@ -6,14 +6,14 @@ import (
 
 	"github.com/google/wire"
 
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
-	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
 )
 
 // ProvideWorkOrderRepository crea la implementación concreta de workorder.Repository.

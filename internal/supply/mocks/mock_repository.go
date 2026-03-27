@@ -8,10 +8,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	domain2 "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	domain0 "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	domain1 "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	domain2 "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	domain0 "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	domain1 "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 )
 

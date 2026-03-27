@@ -1,8 +1,8 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/commercialization/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	decimal "github.com/shopspring/decimal"
 )
 
@@ -18,7 +18,7 @@ type BulkCommercializationRequest struct {
 	Values []CropCommercialization `json:"values" binding:"required,dive"`
 }
 
-func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID int64) []domain.CropCommercialization {
+func (b *BulkCommercializationRequest) ToDomainSlice(projecID int64, userID string) []domain.CropCommercialization {
 	out := make([]domain.CropCommercialization, len(b.Values))
 	for i, item := range b.Values {
 		out[i] = domain.CropCommercialization{

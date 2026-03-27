@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	providermodel "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	stockmodel "github.com/alphacodinggroup/ponti-backend/internal/stock/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +38,7 @@ func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomai
 	provider.Name = strings.TrimSpace(provider.Name)
 
 	if provider.Name == "" {
-		return 0, types.NewError(types.ErrValidation, "provider name is empty", nil)
+		return 0, domainerr.Validation("provider name is empty")
 	}
 
 	model := providermodel.FromDomain(provider)
@@ -92,7 +92,7 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 		Where("is_entry = TRUE").
 		Find(&modelSupplyMovements).
 		Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list supplyEntriesMovement", err)
+		return nil, domainerr.Internal("failed to list supplyEntriesMovement")
 	}
 
 	domainSupplyMovements := make([]*domain.SupplyMovement, len(modelSupplyMovements))
@@ -166,7 +166,7 @@ func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*
 
 	var rows []movementOriginRow
 	if err := r.getDB(ctx).Raw(query, ids).Scan(&rows).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to resolve origin project for supply movements", err)
+		return domainerr.Internal("failed to resolve origin project for supply movements")
 	}
 
 	originsByMovementID := make(map[int64]movementOriginRow, len(rows))
@@ -251,7 +251,7 @@ func (r *Repository) getDestinationProjectMetadata(
 
 	var rows []destinationProjectMetadataRow
 	if err := r.getDB(ctx).Raw(query, projectIDs).Scan(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to resolve destination project metadata", err)
+		return nil, domainerr.Internal("failed to resolve destination project metadata")
 	}
 
 	out := make(map[int64]destinationProjectMetadata, len(rows))
@@ -281,9 +281,9 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 		Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "supply movement not found", err)
+			return nil, domainerr.NotFound("supply movement not found")
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get supply movement", err)
+		return nil, domainerr.Internal("failed to get supply movement")
 	}
 
 	return modelSupplyMovement.ToDomain(), nil
@@ -302,7 +302,7 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 		Updates(model).
 		Error; err != nil {
 
-		return types.NewError(types.ErrInternal, "failed to update supply movement", err)
+		return domainerr.Internal("failed to update supply movement")
 	}
 
 	return nil
@@ -320,7 +320,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			First(&supplyModel).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "supply movement not found", nil)
+				return domainerr.NotFound("supply movement not found")
 			}
 			return err
 		}
@@ -332,7 +332,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			Where("close_date IS NOT NULL").
 			First(&stockModel).Error
 		if err == nil {
-			return types.NewError(types.ErrConflict, "closed stock movement already exists for this supply in the project", nil)
+			return domainerr.Conflict("closed stock movement already exists for this supply in the project")
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -354,7 +354,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				supplyModel.ProviderID).
 				Find(&relatedMovements).Error
 			if err != nil {
-				return types.NewError(types.ErrInternal, "failed to find related movements", err)
+				return domainerr.Internal("failed to find related movements")
 			}
 
 			// Recolectar todos los project_ids y stock_ids afectados
@@ -374,7 +374,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				supplyModel.InvestorID,
 				supplyModel.ProviderID).
 				Delete(&models.SupplyMovement{}).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to delete related supply movements", err)
+				return domainerr.Internal("failed to delete related supply movements")
 			}
 
 			// Eliminar stocks de todos los proyectos afectados solo si no tienen más movimientos.
@@ -385,13 +385,13 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				var remainingMovements []models.SupplyMovement
 				if err := tx.Where("project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).
 					Find(&remainingMovements).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to get remaining movements", err)
+					return domainerr.Internal("failed to get remaining movements")
 				}
 
 				if len(remainingMovements) == 0 {
 					// No quedan movimientos, eliminar el stock
 					if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectIDAffected, supplyModel.SupplyID).Error; err != nil {
-						return types.NewError(types.ErrInternal, "failed to delete stock", err)
+						return domainerr.Internal("failed to delete stock")
 					}
 				}
 			}
@@ -399,20 +399,20 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			// Movimiento normal (no interno)
 			// Primero eliminar el movimiento
 			if err := tx.Delete(&models.SupplyMovement{}, "project_id = ? AND id = ?", projectId, supplyId).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to delete supply movement", err)
+				return domainerr.Internal("failed to delete supply movement")
 			}
 
 			// Obtener movimientos restantes para recalcular el stock
 			var remainingMovements []models.SupplyMovement
 			if err := tx.Where("project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).
 				Find(&remainingMovements).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to get remaining movements", err)
+				return domainerr.Internal("failed to get remaining movements")
 			}
 
 			if len(remainingMovements) == 0 {
 				// No quedan movimientos, eliminar el stock
 				if err := tx.Delete(&stockmodel.Stock{}, "project_id = ? AND supply_id = ?", projectId, supplyModel.SupplyID).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to delete stock", err)
+					return domainerr.Internal("failed to delete stock")
 				}
 			}
 		}
@@ -424,7 +424,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	var providers []providermodel.Provider
 	if err := r.getDB(ctx).Find(&providers).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list providers", err)
+		return nil, domainerr.Internal("failed to list providers")
 	}
 	res := make([]providerdomain.Provider, len(providers))
 	for i := range providers {

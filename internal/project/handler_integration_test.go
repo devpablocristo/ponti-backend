@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 
 type fakeUseCases struct {
@@ -56,8 +56,8 @@ func (f *fakeUseCases) DeleteProject(context.Context, int64) error  { return nil
 
 type fakeGinEngine struct{ r *gin.Engine }
 
-func (f *fakeGinEngine) GetRouter() *gin.Engine           { return f.r }
-func (f *fakeGinEngine) RunServer(context.Context) error  { return nil }
+func (f *fakeGinEngine) GetRouter() *gin.Engine          { return f.r }
+func (f *fakeGinEngine) RunServer(context.Context) error { return nil }
 
 type fakeConfig struct{}
 

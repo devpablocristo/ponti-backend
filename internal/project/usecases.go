@@ -5,10 +5,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 )
 
 type RepositoryPort interface {
@@ -54,7 +54,7 @@ func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64,
 	}
 
 	if exist != nil {
-		return 0, types.NewError(types.ErrConflict, "project already exists", nil)
+		return 0, domainerr.Conflict("project already exists")
 	}
 
 	return u.repo.CreateProject(ctx, p)
@@ -90,7 +90,7 @@ func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 	}
 
 	if exist != nil && exist.ID != p.ID {
-		return types.NewError(types.ErrConflict, "project already exists", nil)
+		return domainerr.Conflict("project already exists")
 	}
 	return u.repo.UpdateProject(ctx, p)
 }

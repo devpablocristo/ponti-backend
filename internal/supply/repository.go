@@ -7,18 +7,20 @@ import (
 	"strings"
 	"time"
 
-	investormodels "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providermodels "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/shopspring/decimal"
+
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 )
 
@@ -46,7 +48,7 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(s)
 		if err := tx.Create(model).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to create supply", err)
+			return domainerr.Internal("failed to create supply")
 		}
 		id = model.ID
 		return nil
@@ -55,7 +57,7 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 }
 
 func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
-	userID, err := sharedmodels.ConvertStringToID(ctx)
+	userID, err := sharedmodels.ActorFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -66,7 +68,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 			modelsSlice[i].CreatedBy = &userID
 		}
 		if err := tx.Create(modelsSlice).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to bulk create supplies", err)
+			return domainerr.Internal("failed to bulk create supplies")
 		}
 		return nil
 	})
@@ -95,7 +97,7 @@ func (r *Repository) GetSuppliesByIDs(ctx context.Context, ids []int64) ([]domai
 		Preload("Type").
 		Where("id IN ?", ids).
 		Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get supplies by ids", err)
+		return nil, domainerr.Internal("failed to get supplies by ids")
 	}
 
 	out := make([]domain.Supply, len(rows))
@@ -108,7 +110,7 @@ func (r *Repository) GetSuppliesByIDs(ctx context.Context, ids []int64) ([]domai
 func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID int64, name string) (*domain.Supply, error) {
 	normalizedName := strings.TrimSpace(name)
 	if normalizedName == "" {
-		return nil, types.NewError(types.ErrValidation, "supply name is empty", nil)
+		return nil, domainerr.Validation("supply name is empty")
 	}
 
 	var m models.Supply
@@ -120,9 +122,9 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 		First(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "supply not found", err)
+			return nil, domainerr.NotFound("supply not found")
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get supply by project and name", err)
+		return nil, domainerr.Internal("failed to get supply by project and name")
 	}
 
 	return m.ToDomain(), nil
@@ -133,9 +135,9 @@ func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain
 	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("investor with id %d not found", id), err)
+			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d not found", id))
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get investor", err)
+		return nil, domainerr.Internal("failed to get investor")
 	}
 	return model.ToDomain(), nil
 }
@@ -145,9 +147,9 @@ func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain
 	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("provider with id %d not found", id), err)
+			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider with id %d not found", id))
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get provider", err)
+		return nil, domainerr.Internal("failed to get provider")
 	}
 	return model.ToDomain(), nil
 }
@@ -158,7 +160,7 @@ func (r *Repository) ProjectExists(ctx context.Context, projectID int64) (bool, 
 		Table("projects").
 		Where("id = ? AND deleted_at IS NULL", projectID).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check destination project", err)
+		return false, domainerr.Internal("failed to check destination project")
 	}
 	return count > 0, nil
 }
@@ -174,7 +176,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
 		Model(&models.SupplyMovement{}).
 		Where("project_id = ? AND reference_number = ? AND supply_id = ?", projectID, reference, supplyID).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement", err)
+		return false, domainerr.Internal("failed to check duplicate supply movement")
 	}
 	return count > 0, nil
 }
@@ -190,7 +192,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndType(
 		Model(&models.SupplyMovement{}).
 		Where("project_id = ? AND reference_number = ? AND movement_type = ?", projectID, reference, movementType).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type", err)
+		return false, domainerr.Internal("failed to check duplicate supply movement by type")
 	}
 	return count > 0, nil
 }
@@ -213,7 +215,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceSupplyAndType(
 			movementType,
 		).
 		Count(&count).Error; err != nil {
-		return false, types.NewError(types.ErrInternal, "failed to check duplicate supply movement by type and supply", err)
+		return false, domainerr.Internal("failed to check duplicate supply movement by type and supply")
 	}
 	return count > 0, nil
 }
@@ -226,10 +228,10 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
+			return domainerr.Internal("failed to check supply existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", s.ID))
 		}
 		updates := map[string]any{
 			"name":             s.Name,
@@ -248,13 +250,13 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		}
 		result := updateTx.Updates(updates)
 		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update supply", result.Error)
+			return domainerr.Internal("failed to update supply")
 		}
 		if result.RowsAffected == 0 {
 			if !s.UpdatedAt.IsZero() {
-				return types.NewError(types.ErrConflict, "supply not found or outdated", nil)
+				return domainerr.Conflict("supply not found or outdated")
 			}
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", s.ID), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", s.ID))
 		}
 		return nil
 	})
@@ -271,7 +273,7 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, types.NewError(types.ErrInternal, "failed to get work order", err)
+		return 0, domainerr.Internal("failed to get work order")
 	}
 	return count, nil
 }
@@ -283,17 +285,17 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Unscoped().Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check supply existence", err)
+			return domainerr.Internal("failed to check supply existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 		}
 		result := tx.Unscoped().Delete(&models.Supply{}, id)
 		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to delete supply", result.Error)
+			return domainerr.Internal("failed to delete supply")
 		}
 		if result.RowsAffected == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 		}
 		return nil
 	})
@@ -307,12 +309,12 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 		var supply models.Supply
 		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), err)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
-			return types.NewError(types.ErrInternal, "failed to get supply", err)
+			return domainerr.Internal("failed to get supply")
 		}
 		if supply.DeletedAt.Valid {
-			return types.NewError(types.ErrConflict, "supply already archived", nil)
+			return domainerr.Conflict("supply already archived")
 		}
 
 		if err := tx.Model(&models.Supply{}).
@@ -320,7 +322,7 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to archive supply", err)
+			return domainerr.Internal("failed to archive supply")
 		}
 		return nil
 	})
@@ -334,12 +336,12 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		var supply models.Supply
 		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", id), err)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
-			return types.NewError(types.ErrInternal, "failed to get supply", err)
+			return domainerr.Internal("failed to get supply")
 		}
 		if !supply.DeletedAt.Valid {
-			return types.NewError(types.ErrConflict, "supply is not archived", nil)
+			return domainerr.Conflict("supply is not archived")
 		}
 
 		if err := tx.Unscoped().Model(&models.Supply{}).
@@ -348,7 +350,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 				"deleted_at": nil,
 				"updated_at": time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore supply", err)
+			return domainerr.Internal("failed to restore supply")
 		}
 		return nil
 	})
@@ -386,12 +388,12 @@ func (r *Repository) ListSuppliesPaginated(
 
 	// Total para paginación
 	if err := db.Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count supplies", err)
+		return nil, 0, domainerr.Internal("failed to count supplies")
 	}
 
 	offset := (page - 1) * perPage
 	if err := db.Offset(offset).Limit(perPage).Order("name").Find(&supplies).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list supplies with filters", err)
+		return nil, 0, domainerr.Internal("failed to list supplies with filters")
 	}
 
 	res := make([]domain.Supply, len(supplies))
@@ -400,6 +402,10 @@ func (r *Repository) ListSuppliesPaginated(
 	}
 
 	if err := r.attachOriginsToSupplies(ctx, res); err != nil {
+		return nil, 0, err
+	}
+
+	if err := r.attachQuantitiesToSupplies(ctx, res); err != nil {
 		return nil, 0, err
 	}
 
@@ -426,13 +432,13 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 			}
 			res := updateTx.Updates(updates)
 			if res.Error != nil {
-				return types.NewError(types.ErrInternal, fmt.Sprintf("failed to update supply id %d", supplies[i].ID), res.Error)
+				return domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to update supply id %d", supplies[i].ID))
 			}
 			if res.RowsAffected == 0 {
 				if !supplies[i].UpdatedAt.IsZero() {
-					return types.NewError(types.ErrConflict, fmt.Sprintf("supply %d not found or outdated", supplies[i].ID), nil)
+					return domainerr.New(domainerr.KindConflict, fmt.Sprintf("supply %d not found or outdated", supplies[i].ID))
 				}
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supplies[i].ID), nil)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", supplies[i].ID))
 			}
 		}
 		return nil
@@ -459,7 +465,7 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count supplies", err)
+		return nil, 0, domainerr.Internal("failed to count supplies")
 	}
 
 	var rows []models.Supply
@@ -469,7 +475,7 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 		Order("name")
 
 	if err := db.Find(&rows).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list all supplies", err)
+		return nil, 0, domainerr.Internal("failed to list all supplies")
 	}
 
 	out := make([]domain.Supply, len(rows))
@@ -478,6 +484,10 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	}
 
 	if err := r.attachOriginsToSupplies(ctx, out); err != nil {
+		return nil, 0, err
+	}
+
+	if err := r.attachQuantitiesToSupplies(ctx, out); err != nil {
 		return nil, 0, err
 	}
 
@@ -551,7 +561,7 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 
 	var rows []supplyOriginRow
 	if err := r.getDB(ctx).Raw(query, supplyIDs).Scan(&rows).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to resolve supply origins", err)
+		return domainerr.Internal("failed to resolve supply origins")
 	}
 
 	originBySupply := make(map[int64]*domain.SupplyOrigin, len(rows))
@@ -577,6 +587,47 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 
 	for i := range supplies {
 		supplies[i].Origin = originBySupply[supplies[i].ID]
+	}
+
+	return nil
+}
+
+type supplyQuantityRow struct {
+	SupplyID int64           `gorm:"column:supply_id"`
+	Total    decimal.Decimal `gorm:"column:total"`
+}
+
+// attachQuantitiesToSupplies calcula la cantidad total por supply sumando los movimientos de entrada.
+func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []domain.Supply) error {
+	if len(supplies) == 0 {
+		return nil
+	}
+
+	supplyIDs := make([]int64, 0, len(supplies))
+	for i := range supplies {
+		supplyIDs = append(supplyIDs, supplies[i].ID)
+	}
+
+	var rows []supplyQuantityRow
+	err := r.getDB(ctx).
+		Table("supply_movements").
+		Select("supply_id, COALESCE(SUM(quantity), 0) AS total").
+		Where("deleted_at IS NULL AND is_entry = TRUE AND supply_id IN ?", supplyIDs).
+		Group("supply_id").
+		Scan(&rows).Error
+	if err != nil {
+		return domainerr.Internal("failed to resolve supply quantities")
+	}
+
+	qtyBySupply := make(map[int64]decimal.Decimal, len(rows))
+	for _, row := range rows {
+		qtyBySupply[row.SupplyID] = row.Total
+	}
+
+	for i := range supplies {
+		if qty, ok := qtyBySupply[supplies[i].ID]; ok {
+			supplies[i].Quantity = qty
+		}
 	}
 
 	return nil

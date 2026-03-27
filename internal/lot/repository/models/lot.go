@@ -3,11 +3,11 @@ package models
 import (
 	"time"
 
-	cropmod "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/shopspring/decimal"
 )
 

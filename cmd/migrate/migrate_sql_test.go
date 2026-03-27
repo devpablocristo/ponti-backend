@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
 )
 
 // TestMigrationLock verifica que el lock de migraciones funciona correctamente.

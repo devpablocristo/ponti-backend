@@ -8,20 +8,22 @@ import (
 	"strconv"
 
 	// third-party
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
 	// pkg
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	// excel
-	lotExcel "github.com/alphacodinggroup/ponti-backend/internal/lot/excel"
+	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
 
 	// project
-	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -98,7 +100,7 @@ func (h *Handler) CreateLot(c *gin.Context) {
 
 	lotDomain, err := req.ToDomain()
 	if err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid domain conversion", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid domain conversion"))
 		return
 	}
 
@@ -120,7 +122,7 @@ func (h *Handler) ListLots(c *gin.Context) {
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, domainerr.Validation("invalid crop_id"))
 			return
 		}
 		cropID = &parsed
@@ -151,7 +153,7 @@ func (h *Handler) ListLots(c *gin.Context) {
 }
 
 func (h *Handler) GetLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -165,7 +167,7 @@ func (h *Handler) GetLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -176,13 +178,13 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 
 	dom, err := req.ToDomain()
 	if err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid domain conversion", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid domain conversion"))
 		return
 	}
 	dom.ID = id
 
 	// Obtener user ID del contexto para campos de auditoría
-	if userID, err := sharedmodels.ConvertStringToID(c.Request.Context()); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(c.Request.Context()); err == nil {
 		dom.UpdatedBy = &userID
 	}
 
@@ -191,7 +193,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 		if cur, getErr := h.ucs.GetLot(c.Request.Context(), id); getErr == nil {
 			dom.FieldID = cur.FieldID
 		} else {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "field_id is required", nil))
+			sharedhandlers.RespondError(c, domainerr.Validation("field_id is required"))
 			return
 		}
 	}
@@ -203,7 +205,7 @@ func (h *Handler) UpdateLot(c *gin.Context) {
 }
 
 func (h *Handler) UpdateLotTons(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -220,7 +222,7 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("lot_id"), "lot_id")
+	id, err := ginmw.ParseParamID(c, "lot_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -237,7 +239,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("project_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid project_id", err))
+			sharedhandlers.RespondError(c, domainerr.Validation("invalid project_id"))
 			return
 		}
 		projectID = parsed
@@ -246,7 +248,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("field_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid field_id", err))
+			sharedhandlers.RespondError(c, domainerr.Validation("invalid field_id"))
 			return
 		}
 		fieldID = parsed
@@ -255,7 +257,7 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, domainerr.Validation("invalid crop_id"))
 			return
 		}
 		cropID = parsed
@@ -282,7 +284,7 @@ func (h *Handler) ExportLots(c *gin.Context) {
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid crop_id", err))
+			sharedhandlers.RespondError(c, domainerr.Validation("invalid crop_id"))
 			return
 		}
 		cropID = &parsed

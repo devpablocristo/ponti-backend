@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/ai/handler/dto"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	dto "github.com/devpablocristo/ponti-backend/internal/ai/handler/dto"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -105,7 +105,7 @@ func (h *Handler) GetInsights(c *gin.Context) {
 func (h *Handler) RecordAction(c *gin.Context) {
 	var req dto.ActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 	insightID := c.Param("insight_id")
@@ -120,7 +120,7 @@ func (h *Handler) RecordAction(c *gin.Context) {
 
 func (h *Handler) respondProxy(c *gin.Context, status int, body []byte, err error) {
 	if err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrUnavailable, "ai service unavailable", err))
+		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
 		return
 	}
 	if status >= http.StatusBadRequest {
@@ -139,10 +139,10 @@ func extractIDs(c *gin.Context) (string, string, error) {
 	userID := strings.TrimSpace(c.GetHeader("X-USER-ID"))
 	projectID := strings.TrimSpace(c.GetHeader("X-PROJECT-ID"))
 	if userID == "" {
-		return "", "", types.NewMissingFieldError("user_id")
+		return "", "", domainerr.Validation("The field 'user_id' is required")
 	}
 	if projectID == "" {
-		return "", "", types.NewMissingFieldError("project_id")
+		return "", "", domainerr.Validation("The field 'project_id' is required")
 	}
 	return userID, projectID, nil
 }

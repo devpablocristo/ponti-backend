@@ -5,9 +5,9 @@ import (
 	"context"
 	"io"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	stockExcel "github.com/alphacodinggroup/ponti-backend/internal/stock/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type XLSXEnginePort interface {
@@ -27,7 +27,7 @@ func (e *ExcelExporter) Export(ctx context.Context, items []*domain.Stock) ([]by
 	_ = ctx
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	rows := stockExcel.BuildExcelDTO(items)

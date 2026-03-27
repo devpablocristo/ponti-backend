@@ -3,8 +3,8 @@ package dto
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // CustomerResponse es el DTO de salida para un customer individual.

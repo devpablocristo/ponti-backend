@@ -6,7 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 )
 
 // Decimal0 es un wrapper de decimal.Decimal que serializa sin decimales (redondeo al entero más cercano).

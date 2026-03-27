@@ -4,33 +4,33 @@ package models
 import (
 	"time"
 
-	investormod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	projmod "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	supplymod "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	supplymovementdomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	projmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	supplymod "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	supplymovementdomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
 type Stock struct {
-	ID              int64                         `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID       int64                         `gorm:"not null;index;column:project_id"`
-	Project         projmod.Project               `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	SupplyID        int64                         `gorm:"not null;index;column:supply_id"`
-	Supply          supplymod.Supply              `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	InvestorID      int64                         `gorm:"not null;index;column:investor_id"`
-	Investor        investormod.Investor          `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	CloseDate       *time.Time                    `gorm:"null;column:close_date"`
+	ID              int64                      `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID       int64                      `gorm:"not null;index;column:project_id"`
+	Project         projmod.Project            `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	SupplyID        int64                      `gorm:"not null;index;column:supply_id"`
+	Supply          supplymod.Supply           `gorm:"foreignKey:SupplyID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	InvestorID      int64                      `gorm:"not null;index;column:investor_id"`
+	Investor        investormod.Investor       `gorm:"foreignKey:InvestorID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	CloseDate       *time.Time                 `gorm:"null;column:close_date"`
 	SupplyMovements []supplymod.SupplyMovement `gorm:"foreignKey:StockId;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
-	InitialStock    decimal.Decimal               `gorm:"not null;column:initial_units"`
-	YearPeriod      int64                         `gorm:"not null;column:year_period"`
-	MonthPeriod     int64                         `gorm:"not null;column:month_period"`
-	UnitsEntered    decimal.Decimal               `gorm:"not null;column:units_entered"`
-	Consumed        decimal.Decimal               `gorm:"-"`
-	UnitsConsumed   decimal.Decimal               `gorm:"not null;column:units_consumed"`
-	RealStockUnits  decimal.Decimal               `gorm:"not null;column:real_stock_units"`
+	InitialStock    decimal.Decimal            `gorm:"not null;column:initial_units"`
+	YearPeriod      int64                      `gorm:"not null;column:year_period"`
+	MonthPeriod     int64                      `gorm:"not null;column:month_period"`
+	UnitsEntered    decimal.Decimal            `gorm:"not null;column:units_entered"`
+	Consumed        decimal.Decimal            `gorm:"-"`
+	UnitsConsumed   decimal.Decimal            `gorm:"not null;column:units_consumed"`
+	RealStockUnits  decimal.Decimal            `gorm:"not null;column:real_stock_units"`
 	sharedmodels.Base
 }
 

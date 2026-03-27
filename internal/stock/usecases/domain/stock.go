@@ -4,10 +4,10 @@ package domain
 import (
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	projdom "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	supplydomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 

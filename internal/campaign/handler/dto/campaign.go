@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 )
 
 type Campaign struct {

@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -20,7 +21,7 @@ func (u *UseCases) ImportSupplyMovements(
 ) ([]int64, []SupplyMovementImportFailure, error) {
 	txRepo, ok := u.repo.(transactionExecutor)
 	if !ok {
-		return nil, nil, types.NewError(types.ErrInternal, "transactions not supported for import mode", nil)
+		return nil, nil, domainerr.Internal("transactions not supported for import mode")
 	}
 
 	var ids []int64
@@ -47,7 +48,7 @@ func (u *UseCases) ImportSupplyMovements(
 					SupplyName:      validated[i].Supply.Name,
 					ReferenceNumber: validated[i].ReferenceNumber,
 					Code:            "apply_error",
-					Message:         types.ErrorMessage(err),
+					Message:         errorMessage(err),
 				}}
 				return errImportValidation
 			}
@@ -112,7 +113,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyID:        movement.Supply.ID,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -204,7 +205,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -244,7 +245,7 @@ func (u *UseCases) validateSupplyMovementImport(
 
 		if err := u.validateImportMovementBusinessRules(ctx, movement); err != nil {
 			code := "validation_error"
-			if types.IsConflict(err) {
+			if errors.Is(err, domainerr.Conflict("")) {
 				code = "duplicate_db"
 			}
 			failures = append(failures, SupplyMovementImportFailure{
@@ -254,7 +255,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            code,
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -277,7 +278,7 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 			return err
 		}
 		if isFirst {
-			return types.NewError(types.ErrBadRequest, "no existe stock para este insumo en el proyecto", nil)
+			return domainerr.Validation("no existe stock para este insumo en el proyecto")
 		}
 		return nil
 	default:
@@ -290,20 +291,20 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 
 func (u *UseCases) resolveImportProvider(ctx context.Context, provider *providerdomain.Provider) (*providerdomain.Provider, error) {
 	if provider == nil {
-		return nil, types.NewMissingFieldError("provider")
+		return nil, domainerr.Validation("The field 'provider' is required")
 	}
 
 	if provider.ID > 0 {
 		resolved, err := u.repo.GetProvider(ctx, provider.ID)
 		if err != nil {
-			return nil, types.NewError(types.ErrValidation, fmt.Sprintf("El proveedor %d no existe", provider.ID), err)
+			return nil, domainerr.New(domainerr.KindValidation, fmt.Sprintf("El proveedor %d no existe", provider.ID))
 		}
 		return resolved, nil
 	}
 
 	name := strings.TrimSpace(provider.Name)
 	if name == "" {
-		return nil, types.NewMissingFieldError("provider_name")
+		return nil, domainerr.Validation("The field 'provider_name' is required")
 	}
 
 	resolved := &providerdomain.Provider{Name: name}
@@ -320,16 +321,12 @@ func validateImportMovementType(movementType string) error {
 	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
 		return nil
 	default:
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf(
-				"must be a valid type [%s, %s, %s, %s]",
-				domain.INTERNAL_MOVEMENT,
-				domain.OFFICIAL_INVOICE,
-				domain.STOCK,
-				domain.RETURN_MOVEMENT,
-			),
-			nil,
+		return domainerr.Newf(domainerr.KindValidation,
+			"must be a valid type [%s, %s, %s, %s]",
+			domain.INTERNAL_MOVEMENT,
+			domain.OFFICIAL_INVOICE,
+			domain.STOCK,
+			domain.RETURN_MOVEMENT,
 		)
 	}
 }
