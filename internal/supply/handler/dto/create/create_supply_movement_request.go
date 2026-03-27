@@ -36,10 +36,10 @@ type ProviderRequest struct {
 
 func (csmr *CreateSupplyMovementEntryRequest) Validate() error {
 	var err error
-	if err = validateQuantity(csmr.Quantity); err != nil {
+	if err = validateMovementType(csmr.MovementType); err != nil {
 		return err
 	}
-	if err = validateMovementType(csmr.MovementType); err != nil {
+	if err = validateQuantity(csmr.Quantity, csmr.MovementType); err != nil {
 		return err
 	}
 	if err = validateProjectDestinationId(csmr.ProjectDestinationId, csmr.MovementType); err != nil {
@@ -106,7 +106,13 @@ func validateMovementType(movementType string) error {
 	return nil
 }
 
-func validateQuantity(quantity decimal.Decimal) error {
+func validateQuantity(quantity decimal.Decimal, movementType string) error {
+	if movementType == domain.STOCK {
+		if quantity.LessThan(decimal.Zero) {
+			return types.NewError(types.ErrValidation, "quantity must be greater than or equal to 0", nil)
+		}
+		return nil
+	}
 	if quantity.LessThanOrEqual(decimal.Zero) {
 		return types.NewError(types.ErrValidation, "quantity must be greater than 0", nil)
 	}

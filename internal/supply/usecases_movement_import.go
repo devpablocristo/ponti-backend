@@ -105,7 +105,31 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		if movement.Quantity.LessThanOrEqual(decimal.Zero) {
+		if err := validateImportMovementType(movement.MovementType); err != nil {
+			failures = append(failures, SupplyMovementImportFailure{
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         types.ErrorMessage(err),
+			})
+			continue
+		}
+
+		if movement.MovementType == domain.STOCK {
+			if movement.Quantity.LessThan(decimal.Zero) {
+				failures = append(failures, SupplyMovementImportFailure{
+					Index:           i,
+					RowIndex:        importRowIndex(i),
+					SupplyID:        movement.Supply.ID,
+					ReferenceNumber: movement.ReferenceNumber,
+					Code:            "validation_error",
+					Message:         "quantity must be greater than or equal to 0",
+				})
+				continue
+			}
+		} else if movement.Quantity.LessThanOrEqual(decimal.Zero) {
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -130,18 +154,6 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 		movement.ReferenceNumber = reference
-
-		if err := validateImportMovementType(movement.MovementType); err != nil {
-			failures = append(failures, SupplyMovementImportFailure{
-				Index:           i,
-				RowIndex:        importRowIndex(i),
-				SupplyID:        movement.Supply.ID,
-				ReferenceNumber: movement.ReferenceNumber,
-				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
-			})
-			continue
-		}
 
 		supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 		if err != nil {
@@ -269,7 +281,10 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 		}
 		return nil
 	default:
-		return u.ValidateSupplyMovement(ctx, movement)
+		if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+			return err
+		}
+		return u.validateSupplyMovementResolved(ctx, movement)
 	}
 }
 
