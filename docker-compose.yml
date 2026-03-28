@@ -40,7 +40,6 @@ services:
       - GO_MODULES_TOKEN=${GO_MODULES_TOKEN:-}
     volumes:
       - .:/app
-      - ../../core:/core
       - go-modules:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
     networks:

@@ -140,19 +140,3 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/devpablocristo/core/authn/go => ../../core/authn/go
-
-replace github.com/devpablocristo/core/databases/postgres/go => ../../core/databases/postgres/go
-
-replace github.com/devpablocristo/core/errors/go => ../../core/errors/go
-
-replace github.com/devpablocristo/core/http/go => ../../core/http/go
-
-replace github.com/devpablocristo/core/http/gin/go => ../../core/http/gin/go
-
-replace github.com/devpablocristo/core/security/go => ../../core/security/go
-
-replace github.com/devpablocristo/core/utils/go => ../../core/utils/go
-
-replace github.com/devpablocristo/core/validate/go => ../../core/validate/go
