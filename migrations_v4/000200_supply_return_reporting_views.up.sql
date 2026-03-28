@@ -368,6 +368,23 @@ SELECT
     COALESCE(rri.rent_real_usd, 0) +
     COALESCE(ia.admin_real_usd, 0)
   )::numeric AS total_real_contribution_usd,
+  ct.total_contributions_usd AS project_total_contributions_usd,
+  CASE
+    WHEN ct.total_contributions_usd > 0
+    THEN (
+      (
+        COALESCE(agro.agrochemicals_real_usd, 0) +
+        COALESCE(fert.fertilizers_real_usd, 0) +
+        COALESCE(seed.seeds_real_usd, 0) +
+        COALESCE(glabor.general_labors_real_usd, 0) +
+        COALESCE(sow.sowing_real_usd, 0) +
+        COALESCE(irrig.irrigation_real_usd, 0) +
+        COALESCE(rri.rent_real_usd, 0) +
+        COALESCE(ia.admin_real_usd, 0)
+      ) / ct.total_contributions_usd * 100
+    )::numeric
+    ELSE 0::numeric
+  END AS contributions_progress_pct,
   (
     COALESCE(agro.agrochemicals_real_usd, 0) - (ct.agrochemicals_total_usd * ib.share_pct_agreed / 100)
   )::numeric AS agrochemicals_diff_usd,
