@@ -24,14 +24,6 @@ COPY . .
 WORKDIR /app
 RUN go mod download && go mod verify
 
-
-WORKDIR /app/pkg
-RUN go mod download && go mod verify
-
-
-WORKDIR /app
-
-
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/prod_binary ./cmd/api/
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/migrate_binary ./cmd/migrate/
 
@@ -47,8 +39,6 @@ ENV TZ=America/Argentina/Buenos_Aires
 
 WORKDIR /app
 
-
-COPY --from=builder /app/pkg /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
 COPY --from=builder /app/migrate_binary /app/migrate_binary
 COPY --from=builder /app/migrations_v4 /app/migrations_v4
