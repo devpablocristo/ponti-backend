@@ -20,7 +20,7 @@ type Config struct {
 	Auth           Auth           // Configuración de autenticación/autorización
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
-	AI             AI             // Configuración del AI Copilot Service
+	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

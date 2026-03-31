@@ -1,4 +1,5 @@
-// Package ai expone endpoints HTTP que proxyean al AI Copilot Service.
+// Package ai expone endpoints HTTP que proxyean a Ponti AI
+// (`InsightService` + `CopilotAgent`).
 package ai
 
 import (
@@ -18,6 +19,7 @@ type UseCasesPort interface {
 	ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error)
 	GetInsights(ctx context.Context, userID, projectID, entityType, entityID string) (int, []byte, error)
 	GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error)
+	ExplainInsight(ctx context.Context, userID, projectID, insightID, mode string) (int, []byte, error)
 	RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error)
 }
 
@@ -67,6 +69,9 @@ func (h *Handler) Routes() {
 		public.GET("/insights/summary", h.GetSummary)
 		public.GET("/insights/:entity_type/:entity_id", h.GetInsights)
 		public.POST("/insights/:insight_id/actions", h.RecordAction)
+		public.GET("/copilot/insights/:insight_id/explain", h.ExplainInsight)
+		public.GET("/copilot/insights/:insight_id/why", h.WhyInsight)
+		public.GET("/copilot/insights/:insight_id/next-steps", h.NextStepsInsight)
 	}
 }
 
@@ -115,6 +120,29 @@ func (h *Handler) RecordAction(c *gin.Context) {
 		return
 	}
 	status, body, err := h.ucs.RecordAction(c.Request.Context(), userID, projectID, insightID, req)
+	h.respondProxy(c, status, body, err)
+}
+
+func (h *Handler) ExplainInsight(c *gin.Context) {
+	h.explainInsight(c, "explain")
+}
+
+func (h *Handler) WhyInsight(c *gin.Context) {
+	h.explainInsight(c, "why")
+}
+
+func (h *Handler) NextStepsInsight(c *gin.Context) {
+	h.explainInsight(c, "next-steps")
+}
+
+func (h *Handler) explainInsight(c *gin.Context, mode string) {
+	insightID := c.Param("insight_id")
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	status, body, err := h.ucs.ExplainInsight(c.Request.Context(), userID, projectID, insightID, mode)
 	h.respondProxy(c, status, body, err)
 }
 

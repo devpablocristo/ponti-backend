@@ -9,7 +9,7 @@ import (
 	"github.com/google/wire"
 )
 
-// ProvideAIClient crea el cliente hacia AI Copilot Service.
+// ProvideAIClient crea el cliente hacia Ponti AI (`InsightService` + `CopilotAgent`).
 func ProvideAIClient(cfg *config.AI) *ai.Client {
 	return ai.NewClient(cfg.ServiceURL, cfg.ServiceKey, cfg.TimeoutMS)
 }

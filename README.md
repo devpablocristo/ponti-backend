@@ -50,19 +50,19 @@ X-API-KEY: <tu_api_key>
 X-USER-ID: 123
 ```
 
-## AI (Copilot + Insights)
+## AI (`InsightService` + `CopilotAgent`)
 Flujo seguro y cerrado:
 ```
 FE (UI)
  → BFF (ponti-frontend/api, valida JWT)
  → Backend Go (proxy seguro)
- → AI Service (FastAPI, READ-ONLY)
+ → Ponti AI (`InsightService` + `CopilotAgent`, READ-ONLY)
 ```
 
 Notas:
 - El FE nunca ve claves.
-- El Backend Go usa `X-SERVICE-KEY` para hablar con AI Service.
-- El AI Service solo lee dominio (SELECT) y solo escribe en tablas `ai_*`.
+- El Backend Go usa `X-SERVICE-KEY` para hablar con Ponti AI.
+- Ponti AI solo lee dominio (SELECT) y solo escribe en tablas `ai_*`.
 
 Doc de features reales:
 - `docs/FEATURE-MAP.md`

@@ -65,6 +65,23 @@ func (u *UseCases) GetSummary(ctx context.Context, userID, projectID string) (in
 	})
 }
 
+func (u *UseCases) ExplainInsight(
+	ctx context.Context,
+	userID, projectID, insightID, mode string,
+) (int, []byte, error) {
+	path := "/v1/copilot/insights/" + insightID + "/" + mode
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+		"insight_id": insightID,
+		"mode":       mode,
+		"explanation": map[string]any{
+			"human_readable":     "AI copilot no configurado",
+			"audit_focused":      "AI copilot no configurado",
+			"what_to_watch_next": "AI copilot no configurado",
+		},
+		"proposal": nil,
+	})
+}
+
 func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error) {
 	path := "/v1/insights/" + insightID + "/actions"
 	return u.dummyOrReal(ctx, "POST", path, body, userID, projectID, map[string]any{

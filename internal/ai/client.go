@@ -10,12 +10,12 @@ import (
 	"github.com/devpablocristo/core/http/go/httpclient"
 )
 
-// Client maneja llamadas al AI Copilot Service.
+// Client maneja llamadas a Ponti AI (`InsightService` + `CopilotAgent`).
 type Client struct {
 	caller *httpclient.Caller
 }
 
-// NewClient crea un cliente de AI Copilot Service.
+// NewClient crea un cliente de Ponti AI.
 func NewClient(baseURL, serviceKey string, timeoutMS int) *Client {
 	if timeoutMS <= 0 {
 		timeoutMS = 10000
