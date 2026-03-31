@@ -12,7 +12,7 @@ TLDR:
 ### Requisitos
 - Docker + Docker Compose
 - Go (para ejecutar la API)
-- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.17.0` para alinear con frontend.
+- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.19.0` para alinear con frontend.
 
 ### Configuración
 - Usamos **un solo** archivo `.env` para local.
