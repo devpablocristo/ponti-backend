@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -292,6 +293,9 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		}
 		result := tx.Unscoped().Delete(&models.Supply{}, id)
 		if result.Error != nil {
+			if isForeignKeyViolation(result.Error) {
+				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
+			}
 			return domainerr.Internal("failed to delete supply")
 		}
 		if result.RowsAffected == 0 {
@@ -299,6 +303,11 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
