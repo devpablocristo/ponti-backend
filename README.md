@@ -12,12 +12,15 @@ TLDR:
 ### Requisitos
 - Docker + Docker Compose
 - Go (para ejecutar la API)
+- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.17.0` para alinear con frontend.
 
 ### Configuración
 - Usamos **un solo** archivo `.env` para local.
 - No hay configuración por ambiente dentro del código.
 - Ejemplo base en `.env.example`.
 - Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar los módulos privados de `github.com/devpablocristo/core/*`.
+- En CI/deploy el token ya no viaja por `ARG`: el build prod consume un secret BuildKit (`go_modules_token`).
+- `.dockerignore` excluye `.env`, artefactos y el árbol `pkg/` legacy del contexto de build prod.
 
 ```bash
 cp .env.example .env
