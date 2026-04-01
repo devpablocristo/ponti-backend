@@ -7,23 +7,26 @@ import (
 )
 
 type LaborListItem struct {
-	WorkOrderID     int64           // id de la orden
-	WorkOrderNumber string          //numero de orden
-	Date            time.Time       // fecha de la orden
-	ProjectName     string          // nombre del proyecto
-	FieldName       string          // nombre del campo
-	CropName        string          // nombre del cultivo
-	LaborName       string          // nombre de la labor
-	Contractor      string          // nombre del contratista
-	SurfaceHa       decimal.Decimal // superficie
-	CostHa          decimal.Decimal // costo por ha
-	CategoryName    string          // rubro
-	InvestorName    string          // nombre del inversor
-	USDAvgValue     decimal.Decimal // valor dolar promedio
-	NetTotal        decimal.Decimal // total neto
-	TotalIVA        decimal.Decimal // total IVA
-	USDCostHa       decimal.Decimal // costo de dolar por ha
-	USDNetTotal     decimal.Decimal // total neto dolar
+	WorkOrderID            int64           // id de la orden
+	WorkOrderNumber        string          //numero de orden
+	Date                   time.Time       // fecha de la orden
+	ProjectName            string          // nombre del proyecto
+	FieldName              string          // nombre del campo
+	CropName               string          // nombre del cultivo
+	LaborName              string          // nombre de la labor
+	Contractor             string          // nombre del contratista
+	SurfaceHa              decimal.Decimal // superficie
+	CostHa                 decimal.Decimal // costo por ha
+	CategoryName           string          // rubro
+	InvestorID             int64           // id del inversor asociado a la fila
+	InvestorName           string          // nombre del inversor
+	InvestorPaymentStatus  string          // estado de pago por inversor/split
+	InvestorPaymentEnabled bool            // true cuando la OT usa investor_splits
+	USDAvgValue            decimal.Decimal // valor dolar promedio
+	NetTotal               decimal.Decimal // total neto
+	TotalIVA               decimal.Decimal // total IVA
+	USDCostHa              decimal.Decimal // costo de dolar por ha
+	USDNetTotal            decimal.Decimal // total neto dolar
 
 	InvoiceID      int64      // id de la factura
 	InvoiceNumber  string     // numero de factura

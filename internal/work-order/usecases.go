@@ -3,6 +3,7 @@ package workorder
 
 import (
 	"context"
+	"strings"
 
 	"github.com/shopspring/decimal"
 
@@ -16,6 +17,7 @@ type RepositoryPort interface {
 	GetWorkOrderByID(ctx context.Context, id int64) (*domain.WorkOrder, error)
 	GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
+	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -64,6 +66,19 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 	return u.repo.UpdateWorkOrderByID(ctx, o)
 }
 
+func (u *UseCases) UpdateInvestorPaymentStatus(
+	ctx context.Context,
+	workOrderID int64,
+	investorID int64,
+	paymentStatus string,
+) error {
+	normalized, err := normalizeInvestorPaymentStatus(paymentStatus, false)
+	if err != nil {
+		return err
+	}
+	return u.repo.UpdateInvestorPaymentStatus(ctx, workOrderID, investorID, normalized)
+}
+
 func validateInvestorSplits(o *domain.WorkOrder) error {
 	if o == nil {
 		return domainerr.Validation("work order is nil")
@@ -84,6 +99,9 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 		if _, ok := seen[s.InvestorID]; ok {
 			return domainerr.Validation("duplicate investor_id in investor_splits")
 		}
+		if _, err := normalizeInvestorPaymentStatus(s.PaymentStatus, true); err != nil {
+			return err
+		}
 		seen[s.InvestorID] = struct{}{}
 		sum = sum.Add(s.Percentage)
 	}
@@ -93,6 +111,22 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 		return domainerr.Validation("investor_splits percentage must sum to 100")
 	}
 	return nil
+}
+
+func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, error) {
+	normalized := strings.TrimSpace(status)
+	if normalized == "" && allowEmpty {
+		return "", nil
+	}
+
+	switch normalized {
+	case "", domain.InvestorPaymentStatusPending:
+		return domain.InvestorPaymentStatusPending, nil
+	case domain.InvestorPaymentStatusPaid:
+		return domain.InvestorPaymentStatusPaid, nil
+	default:
+		return "", domainerr.Validation("invalid investor payment status")
+	}
 }
 
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {

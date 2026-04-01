@@ -94,8 +94,9 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		splits := make([]WorkOrderInvestorSplit, len(o.InvestorSplits))
 		for i, s := range o.InvestorSplits {
 			splits[i] = WorkOrderInvestorSplit{
-				InvestorID: s.InvestorID,
-				Percentage: s.Percentage,
+				InvestorID:    s.InvestorID,
+				Percentage:    s.Percentage,
+				PaymentStatus: s.PaymentStatus,
 			}
 		}
 		w.InvestorSplits = splits
@@ -122,8 +123,9 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 		splits = make([]domain.WorkOrderInvestorSplit, len(m.InvestorSplits))
 		for i, s := range m.InvestorSplits {
 			splits[i] = domain.WorkOrderInvestorSplit{
-				InvestorID: s.InvestorID,
-				Percentage: s.Percentage,
+				InvestorID:    s.InvestorID,
+				Percentage:    s.Percentage,
+				PaymentStatus: s.PaymentStatus,
 			}
 		}
 	}

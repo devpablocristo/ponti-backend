@@ -17,8 +17,9 @@ type WorkOrderItem struct {
 }
 
 type InvestorSplit struct {
-	InvestorID int64           `json:"investor_id" binding:"required"`
-	Percentage decimal.Decimal `json:"percentage" binding:"required"`
+	InvestorID    int64           `json:"investor_id" binding:"required"`
+	Percentage    decimal.Decimal `json:"percentage" binding:"required"`
+	PaymentStatus string          `json:"payment_status,omitempty"`
 }
 
 // MarshalJSON asegura 2 decimales en los campos decimal de salida.
@@ -92,8 +93,9 @@ func (r *WorkOrder) ToDomain() *domain.WorkOrder {
 	splits := make([]domain.WorkOrderInvestorSplit, 0, len(r.InvestorSplits))
 	for _, s := range r.InvestorSplits {
 		splits = append(splits, domain.WorkOrderInvestorSplit{
-			InvestorID: s.InvestorID,
-			Percentage: s.Percentage,
+			InvestorID:    s.InvestorID,
+			Percentage:    s.Percentage,
+			PaymentStatus: s.PaymentStatus,
 		})
 	}
 
@@ -140,8 +142,9 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	splits := make([]InvestorSplit, len(o.InvestorSplits))
 	for i, s := range o.InvestorSplits {
 		splits[i] = InvestorSplit{
-			InvestorID: s.InvestorID,
-			Percentage: s.Percentage,
+			InvestorID:    s.InvestorID,
+			Percentage:    s.Percentage,
+			PaymentStatus: s.PaymentStatus,
 		}
 	}
 

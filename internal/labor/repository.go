@@ -295,6 +295,8 @@ func (r *Repository) ListGroupLabor(
 			v4.usd_net_total,
 			v4.investor_id,
 			COALESCE(v4.investor_name, '') AS investor_name,
+			v4.investor_payment_status,
+			v4.investor_payment_enabled,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
@@ -358,28 +360,31 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		list[i] = domain.LaborListItem{
-			WorkOrderID:     m.WorkOrderID,
-			WorkOrderNumber: m.WorkOrderNumber,
-			Date:            m.Date,
-			ProjectName:     m.ProjectName,
-			FieldName:       m.FieldName,
-			CropName:        safeStringPtr(m.CropName),
-			LaborName:       m.LaborName,
-			Contractor:      m.Contractor,
-			SurfaceHa:       m.SurfaceHa,
-			CostHa:          costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
-			CategoryName:    safeStringPtr(m.LaborCategoryName),
-			InvestorName:    safeStringPtr(m.InvestorName),
-			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        netTotal,    // 10.000 × 100 = 1.000.000
-			TotalIVA:        totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
-			USDCostHa:       usdCostHa,   // 10
-			USDNetTotal:     usdNetTotal, // 1000
-			InvoiceID:       invoiceID,
-			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
-			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
-			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
+			WorkOrderID:            m.WorkOrderID,
+			WorkOrderNumber:        m.WorkOrderNumber,
+			Date:                   m.Date,
+			ProjectName:            m.ProjectName,
+			FieldName:              m.FieldName,
+			CropName:               safeStringPtr(m.CropName),
+			LaborName:              m.LaborName,
+			Contractor:             m.Contractor,
+			SurfaceHa:              m.SurfaceHa,
+			CostHa:                 costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
+			CategoryName:           safeStringPtr(m.LaborCategoryName),
+			InvestorID:             safeInt64Ptr(m.InvestorID),
+			InvestorName:           safeStringPtr(m.InvestorName),
+			InvestorPaymentStatus:  safeStringPtr(m.InvestorPaymentStatus),
+			InvestorPaymentEnabled: m.InvestorPaymentEnabled,
+			USDAvgValue:            m.USDAvgValue,
+			NetTotal:               netTotal,    // 10.000 × 100 = 1.000.000
+			TotalIVA:               totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
+			USDCostHa:              usdCostHa,   // 10
+			USDNetTotal:            usdNetTotal, // 1000
+			InvoiceID:              invoiceID,
+			InvoiceNumber:          safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:         safeStringPtr(m.InvoiceCompany),
+			InvoiceDate:            m.InvoiceDate,
+			InvoiceStatus:          safeStringPtr(m.InvoiceStatus),
 		}
 	}
 
@@ -549,6 +554,13 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 func safeStringPtr(ptr *string) string {
 	if ptr == nil {
 		return ""
+	}
+	return *ptr
+}
+
+func safeInt64Ptr(ptr *int64) int64 {
+	if ptr == nil {
+		return 0
 	}
 	return *ptr
 }

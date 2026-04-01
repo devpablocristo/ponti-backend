@@ -21,6 +21,7 @@ type UseCasesPort interface {
 	GetWorkOrderByID(context.Context, int64) (*domain.WorkOrder, error)
 	DuplicateWorkOrder(context.Context, string) (string, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
+	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -74,6 +75,7 @@ func (h *Handler) Routes() {
 		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
 		grp.POST("/:work_order_id/archive", h.ArchiveWorkOrder)
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
+		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
 		grp.GET("/metrics", h.GetMetrics)
@@ -143,6 +145,37 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) UpdateInvestorPaymentStatus(c *gin.Context) {
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	investorID, err := ginmw.ParseParamID(c, "investor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	var req dto.UpdateInvestorPaymentStatusRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	if err := h.ucs.UpdateInvestorPaymentStatus(
+		c.Request.Context(),
+		workOrderID,
+		investorID,
+		req.PaymentStatus,
+	); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
 	sharedhandlers.RespondNoContent(c)
 }
 

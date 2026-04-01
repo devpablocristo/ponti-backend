@@ -76,6 +76,11 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
 				model.InvestorSplits[i].ID = 0
+				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
+					model.InvestorSplits[i].InvestorID,
+					model.InvestorSplits[i].PaymentStatus,
+					nil,
+				)
 			}
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
 				return domainerr.Internal("failed to create work order investor splits")
@@ -194,9 +199,15 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 
 		// 3.5) Insertar splits nuevos
 		if len(model.InvestorSplits) > 0 {
+			existingStatuses := indexSplitPaymentStatuses(orig.InvestorSplits)
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
 				model.InvestorSplits[i].ID = 0
+				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
+					model.InvestorSplits[i].InvestorID,
+					model.InvestorSplits[i].PaymentStatus,
+					existingStatuses,
+				)
 			}
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
 				return domainerr.Internal("failed to insert new investor splits")
@@ -288,9 +299,74 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 	})
 }
 
+func (r *Repository) UpdateInvestorPaymentStatus(
+	ctx context.Context,
+	workOrderID int64,
+	investorID int64,
+	paymentStatus string,
+) error {
+	if err := sharedrepo.ValidateID(workOrderID, "work order"); err != nil {
+		return err
+	}
+	if err := sharedrepo.ValidateID(investorID, "investor"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var workOrder models.WorkOrder
+		if err := tx.Select("id").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("work order not found")
+			}
+			return domainerr.Internal("failed to find work order")
+		}
+
+		updateTx := tx.Model(&models.WorkOrderInvestorSplit{}).
+			Where("workorder_id = ? AND investor_id = ? AND deleted_at IS NULL", workOrderID, investorID).
+			Update("payment_status", paymentStatus)
+		if updateTx.Error != nil {
+			return domainerr.Internal("failed to update investor payment status")
+		}
+		if updateTx.RowsAffected == 0 {
+			return domainerr.NotFound("investor split not found")
+		}
+
+		return nil
+	})
+}
+
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func indexSplitPaymentStatuses(
+	splits []models.WorkOrderInvestorSplit,
+) map[int64]string {
+	statuses := make(map[int64]string, len(splits))
+	for _, split := range splits {
+		if split.InvestorID <= 0 {
+			continue
+		}
+		statuses[split.InvestorID] = split.PaymentStatus
+	}
+	return statuses
+}
+
+func normalizeSplitPaymentStatus(
+	investorID int64,
+	status string,
+	existingStatuses map[int64]string,
+) string {
+	if status != "" {
+		return status
+	}
+	if existingStatuses != nil {
+		if existingStatus, ok := existingStatuses[investorID]; ok && existingStatus != "" {
+			return existingStatus
+		}
+	}
+	return domain.InvestorPaymentStatusPending
 }
 
 func (r *Repository) ListWorkOrders(
