@@ -4,6 +4,7 @@ package usecases
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -87,5 +88,45 @@ func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightI
 	return u.dummyOrReal(ctx, "POST", path, body, userID, projectID, map[string]any{
 		"request_id": "dummy",
 		"status":     "dummy",
+	})
+}
+
+func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
+	return u.dummyOrReal(ctx, "POST", "/v1/chat", body, userID, projectID, map[string]any{
+		"request_id":            "dummy",
+		"output_kind":           "chat_reply",
+		"content_language":      "es",
+		"chat_id":               "",
+		"reply":                 "Asistente AI no configurado.",
+		"tokens_used":           0,
+		"tool_calls":            []any{},
+		"pending_confirmations": []any{},
+		"blocks":                []any{},
+		"routed_agent":          "general",
+		"routing_source":        "read_fallback",
+	})
+}
+
+func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	path := "/v1/chat/conversations?limit=" + strconv.Itoa(limit)
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+		"items": []any{},
+	})
+}
+
+func (u *UseCases) GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error) {
+	path := "/v1/chat/conversations/" + strings.TrimSpace(conversationID)
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+		"id":         conversationID,
+		"title":      "dummy",
+		"messages":   []any{},
+		"created_at": "",
+		"updated_at": "",
 	})
 }

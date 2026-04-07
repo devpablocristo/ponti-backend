@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,9 @@ type UseCasesPort interface {
 	GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error)
 	ExplainInsight(ctx context.Context, userID, projectID, insightID, mode string) (int, []byte, error)
 	RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error)
+	Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
+	ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error)
+	GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error)
 }
 
 type GinEnginePort interface {
@@ -72,6 +76,9 @@ func (h *Handler) Routes() {
 		public.GET("/copilot/insights/:insight_id/explain", h.ExplainInsight)
 		public.GET("/copilot/insights/:insight_id/why", h.WhyInsight)
 		public.GET("/copilot/insights/:insight_id/next-steps", h.NextStepsInsight)
+		public.POST("/chat", h.Chat)
+		public.GET("/chat/conversations", h.ListChatConversations)
+		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
 	}
 }
 
@@ -133,6 +140,52 @@ func (h *Handler) WhyInsight(c *gin.Context) {
 
 func (h *Handler) NextStepsInsight(c *gin.Context) {
 	h.explainInsight(c, "next-steps")
+}
+
+func (h *Handler) Chat(c *gin.Context) {
+	var body map[string]any
+	if err := c.ShouldBindJSON(&body); err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, projectID, body)
+	h.respondProxy(c, status, raw, err)
+}
+
+func (h *Handler) ListChatConversations(c *gin.Context) {
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	limit := 50
+	if q := strings.TrimSpace(c.Query("limit")); q != "" {
+		if n, convErr := strconv.Atoi(q); convErr == nil && n > 0 {
+			limit = n
+		}
+	}
+	status, raw, err := h.ucs.ListChatConversations(c.Request.Context(), userID, projectID, limit)
+	h.respondProxy(c, status, raw, err)
+}
+
+func (h *Handler) GetChatConversation(c *gin.Context) {
+	conversationID := strings.TrimSpace(c.Param("conversation_id"))
+	if conversationID == "" {
+		sharedhandlers.RespondError(c, domainerr.Validation("conversation_id is required"))
+		return
+	}
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	status, raw, err := h.ucs.GetChatConversation(c.Request.Context(), userID, projectID, conversationID)
+	h.respondProxy(c, status, raw, err)
 }
 
 func (h *Handler) explainInsight(c *gin.Context, mode string) {
