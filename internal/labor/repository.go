@@ -365,6 +365,8 @@ func (r *Repository) ListGroupLabor(
 			Date:                   m.Date,
 			ProjectName:            m.ProjectName,
 			FieldName:              m.FieldName,
+			LotId:                  safeInt64Ptr(m.LotID),
+			LotName:                safeStringPtr(m.LotName),
 			CropName:               safeStringPtr(m.CropName),
 			LaborName:              m.LaborName,
 			Contractor:             m.Contractor,

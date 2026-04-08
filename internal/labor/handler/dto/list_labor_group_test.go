@@ -18,6 +18,8 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 		Date:                   now,
 		ProjectName:            "Test Project",
 		FieldName:              "Test Field",
+		LotID:                  12,
+		LotName:                "Lote 2",
 		CropName:               "Test Crop",
 		LaborName:              "Test Labor",
 		Contractor:             "Test Contractor",
@@ -55,6 +57,8 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 	assert.Equal(t, float64(77), result["investor_id"])
 	assert.Equal(t, "Pagada", result["investor_payment_status"])
 	assert.Equal(t, true, result["investor_payment_enabled"])
+	assert.Equal(t, float64(12), result["lot_id"])
+	assert.Equal(t, "Lote 2", result["lot_name"])
 }
 
 func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
@@ -131,6 +135,8 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 				InvoiceCompany:         "Test",
 				InvoiceDate:            &now,
 				InvoiceStatus:          "paid",
+				LotID:                  12,
+				LotName:                "Lote 2",
 			}
 
 			jsonData, err := json.Marshal(labor)
@@ -174,6 +180,9 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 		InvoiceCompany:         "Test Company",
 		InvoiceDate:            &now,
 		InvoiceStatus:          "paid",
+		LotID:                  12,
+		LotName:                "Lote 2",
+
 	}
 
 	jsonData, err := json.Marshal(labor)

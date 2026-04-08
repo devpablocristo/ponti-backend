@@ -17,6 +17,8 @@ type LaborListItem struct {
 	Date                   time.Time       `json:"date"`
 	ProjectName            string          `json:"project_name"`
 	FieldName              string          `json:"field_name"`
+	LotID                  int64           `json:"lot_id"`
+    LotName                string          `json:"lot_name"`
 	CropName               string          `json:"crop_name"`
 	LaborName              string          `json:"labor_name"`
 	Contractor             string          `json:"contractor"`
@@ -47,6 +49,8 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		Date                   time.Time  `json:"date"`
 		ProjectName            string     `json:"project_name"`
 		FieldName              string     `json:"field_name"`
+		LotID                  int64      `json:"lot_id"`
+		LotName                string     `json:"lot_name"`
 		CropName               string     `json:"crop_name"`
 		LaborName              string     `json:"labor_name"`
 		Contractor             string     `json:"contractor"`
@@ -73,6 +77,8 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		Date:                   l.Date,
 		ProjectName:            l.ProjectName,
 		FieldName:              l.FieldName,
+		LotID:                  l.LotID,
+		LotName:                l.LotName,
 		CropName:               l.CropName,
 		LaborName:              l.LaborName,
 		Contractor:             l.Contractor,
@@ -109,6 +115,8 @@ func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 		Date:                   d.Date,
 		ProjectName:            d.ProjectName,
 		FieldName:              d.FieldName,
+		LotID: 					d.LotId,
+		LotName:				d.LotName,
 		CropName:               d.CropName,
 		LaborName:              d.LaborName,
 		Contractor:             d.Contractor,
