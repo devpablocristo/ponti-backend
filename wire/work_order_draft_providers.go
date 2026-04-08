@@ -9,6 +9,7 @@ import (
 	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	workorder "github.com/alphacodinggroup/ponti-backend/internal/work-order"
+	supply "github.com/alphacodinggroup/ponti-backend/internal/supply"
 )
 
 func ProvideWorkOrderDraftRepository(repo workorderdraft.GormEngine) *workorderdraft.Repository {
@@ -22,15 +23,26 @@ func ProvideWorkOrderDraftRepositoryPort(r *workorderdraft.Repository) workorder
 func ProvideWorkOrderDraftUseCases(
 	repo workorderdraft.RepositoryPort,
 	publisher workorderdraft.PublisherPort,
+	pdfExporter workorderdraft.PDFExporterPort,
+	supplyReader workorderdraft.SupplyReaderPort,
 ) *workorderdraft.UseCases {
-	return workorderdraft.NewUseCases(repo, publisher)
+	return workorderdraft.NewUseCases(repo, publisher, pdfExporter, supplyReader)
 }
+
 
 func ProvideWorkOrderDraftUseCasesPort(uc *workorderdraft.UseCases) workorderdraft.UseCasesPort {
 	return uc
 }
 
 func ProvideWorkOrderDraftPublisherPort(repo workorder.RepositoryPort) workorderdraft.PublisherPort {
+	return repo
+}
+
+func ProvideWorkOrderDraftPDFExporterPort() workorderdraft.PDFExporterPort {
+	return workorderdraft.NewPDFExporter()
+}
+
+func ProvideWorkOrderDraftSupplyReaderPort(repo supply.RepositoryPort) workorderdraft.SupplyReaderPort {
 	return repo
 }
 
@@ -65,9 +77,11 @@ var WorkOrderDraftSet = wire.NewSet(
 	ProvideWorkOrderDraftUseCases,
 	ProvideWorkOrderDraftUseCasesPort,
 	ProvideWorkOrderDraftPublisherPort,
+	ProvideWorkOrderDraftPDFExporterPort,
 	ProvideWorkOrderDraftHandler,
 	ProvideWorkOrderDraftConfigAPI,
 	ProvideWorkOrderDraftGormEnginePort,
 	ProvideWorkOrderDraftGinEnginePort,
 	ProvideWorkOrderDraftMiddlewaresEnginePort,
+	ProvideWorkOrderDraftSupplyReaderPort,
 )

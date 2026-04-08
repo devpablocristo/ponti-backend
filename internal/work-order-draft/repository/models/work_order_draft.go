@@ -43,6 +43,7 @@ type WorkOrderDraft struct {
 	Observations         string                        `gorm:"column:observations"`
 	InvestorID           int64                         `gorm:"column:investor_id;not null"`
 	Investor             investormod.Investor          `gorm:"foreignKey:InvestorID"`
+	IsDigital            bool                          `gorm:"column:is_digital"`
 	Status               string                        `gorm:"column:status;size:30;not null"`
 	ReviewedBy           *int64                        `gorm:"column:reviewed_by"`
 	PublishedWorkOrderID *int64                        `gorm:"column:published_work_order_id"`
@@ -57,12 +58,13 @@ type WorkOrderDraft struct {
 func (WorkOrderDraft) TableName() string { return "work_order_drafts" }
 
 type WorkOrderDraftItem struct {
-	ID        int64            `gorm:"primaryKey;autoIncrement"`
-	DraftID   int64            `gorm:"column:draft_id;index"`
-	SupplyID  int64            `gorm:"column:supply_id;not null"`
-	Supply    supplymod.Supply `gorm:"foreignKey:SupplyID"`
-	TotalUsed decimal.Decimal  `gorm:"column:total_used;not null"`
-	FinalDose decimal.Decimal  `gorm:"column:final_dose;not null"`
+	ID         int64            `gorm:"primaryKey;autoIncrement"`
+	DraftID    int64            `gorm:"column:draft_id;index"`
+	SupplyID   int64            `gorm:"column:supply_id;not null"`
+	SupplyName string           `gorm:"column:supply_name;not null"`
+	Supply     supplymod.Supply `gorm:"foreignKey:SupplyID"`
+	TotalUsed  decimal.Decimal  `gorm:"column:total_used;not null"`
+	FinalDose  decimal.Decimal  `gorm:"column:final_dose;not null"`
 }
 
 func (WorkOrderDraftItem) TableName() string { return "work_order_draft_items" }
@@ -92,6 +94,7 @@ func FromDomain(d *domain.WorkOrderDraft) *WorkOrderDraft {
 		EffectiveArea:        d.EffectiveArea,
 		Observations:         d.Observations,
 		InvestorID:           d.InvestorID,
+		IsDigital:            d.IsDigital,
 		Status:               string(d.Status),
 		ReviewedBy:           d.ReviewedBy,
 		PublishedWorkOrderID: d.PublishedWorkOrderID,
@@ -106,10 +109,11 @@ func FromDomain(d *domain.WorkOrderDraft) *WorkOrderDraft {
 		items := make([]WorkOrderDraftItem, len(d.Items))
 		for i, item := range d.Items {
 			items[i] = WorkOrderDraftItem{
-				SupplyID:  item.SupplyID,
-				TotalUsed: item.TotalUsed,
-				FinalDose: item.FinalDose,
-			}
+	SupplyID:   item.SupplyID,
+	SupplyName: item.SupplyName,
+	TotalUsed:  item.TotalUsed,
+	FinalDose:  item.FinalDose,
+}
 		}
 		model.Items = items
 	}
@@ -132,10 +136,11 @@ func (m *WorkOrderDraft) ToDomain() *domain.WorkOrderDraft {
 	items := make([]domain.WorkOrderDraftItem, len(m.Items))
 	for i, item := range m.Items {
 		items[i] = domain.WorkOrderDraftItem{
-			SupplyID:  item.SupplyID,
-			TotalUsed: item.TotalUsed,
-			FinalDose: item.FinalDose,
-		}
+	SupplyID:   item.SupplyID,
+	SupplyName: item.SupplyName,
+	TotalUsed:  item.TotalUsed,
+	FinalDose:  item.FinalDose,
+}
 	}
 
 	splits := make([]domain.WorkOrderDraftInvestorSplit, len(m.InvestorSplits))
@@ -159,12 +164,16 @@ func (m *WorkOrderDraft) ToDomain() *domain.WorkOrderDraft {
 		FieldID:              m.FieldID,
 		FieldName:            m.Field.Name,
 		LotID:                m.LotID,
+		LotName:              m.Lot.Name,
 		CropID:               m.CropID,
+		CropName:             m.Crop.Name,
 		LaborID:              m.LaborID,
+		LaborName:            m.Labor.Name,
 		Contractor:           m.Contractor,
 		EffectiveArea:        m.EffectiveArea,
 		Observations:         m.Observations,
 		InvestorID:           m.InvestorID,
+		IsDigital:            m.IsDigital,
 		Status:               domain.Status(m.Status),
 		ReviewedBy:           m.ReviewedBy,
 		PublishedWorkOrderID: m.PublishedWorkOrderID,

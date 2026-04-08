@@ -38,9 +38,10 @@ type WorkOrderInvestorSplit struct {
 
 // WorkOrderItem representa un item de la orden de trabajo.
 type WorkOrderItem struct {
-	SupplyID  int64
-	TotalUsed decimal.Decimal
-	FinalDose decimal.Decimal
+	SupplyID   int64
+	SupplyName string
+	TotalUsed  decimal.Decimal
+	FinalDose  decimal.Decimal
 }
 
 // WorkOrderFilter representa filtros para listar órdenes de trabajo.
@@ -49,4 +50,6 @@ type WorkOrderFilter struct {
 	FieldID    *int64
 	CustomerID *int64
 	CampaignID *int64
+	IsDigital  *bool
+	Status     *string
 }

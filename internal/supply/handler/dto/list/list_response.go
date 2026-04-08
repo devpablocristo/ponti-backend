@@ -18,6 +18,7 @@ type ListedSupply struct {
 	Name  string          `json:"name"`
 	Price decimal.Decimal `json:"price"` // Precio U$
 	IsPartialPrice bool            `json:"is_partial_price"`
+	IsPending      bool            `json:"is_pending"`
 	TotalUSD       decimal.Decimal `json:"total_usd"`     // Total U$
 	UnitID         int64           `json:"unit_id"`       // Unidad ID
 	UnitName       string          `json:"unit_name"`     // Nombre de unidad
@@ -45,6 +46,7 @@ func (s ListedSupply) MarshalJSON() ([]byte, error) {
 		Name           string        `json:"name"`
 		Price          string        `json:"price"`
 		IsPartialPrice bool          `json:"is_partial_price"`
+		IsPending      bool          `json:"is_pending"`
 		TotalUSD       string        `json:"total_usd"`
 		UnitID         int64         `json:"unit_id"`
 		UnitName       string        `json:"unit_name"`
@@ -58,6 +60,7 @@ func (s ListedSupply) MarshalJSON() ([]byte, error) {
 		Name:           s.Name,
 		Price:          s.Price.StringFixed(2), // Precio U$: 2 decimales
 		IsPartialPrice: s.IsPartialPrice,
+		IsPending:      s.IsPending,
 		TotalUSD:       s.TotalUSD.StringFixed(0), // Total U$: entero más próximo
 		UnitID:         s.UnitID,
 		UnitName:       s.UnitName,
@@ -118,6 +121,7 @@ func NewListSuppliesResponse(
 			Price: s.Price, // Precio U$
 			// Nuevo: enviamos el estado parcial/final al listado.
 			IsPartialPrice: s.IsPartialPrice,
+			IsPending:      s.IsPending,
 			TotalUSD:       totalUSD,       // Total U$
 			UnitID:         s.UnitID,       // Unidad ID
 			UnitName:       s.UnitName,     // Nombre de unidad

@@ -19,6 +19,7 @@ import (
 	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
 	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
 	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -49,6 +50,47 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 			return types.NewError(types.ErrInternal, "failed to create supply", err)
 		}
 		id = model.ID
+		return nil
+	})
+	return id, err
+}
+
+func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, name string) (int64, error) {
+	type pendingSupplyInsert struct {
+		ID             int64           `gorm:"column:id;primaryKey"`
+		ProjectID      int64           `gorm:"column:project_id"`
+		Name           string          `gorm:"column:name"`
+		Price          decimal.Decimal `gorm:"column:price"`
+		IsPartialPrice bool            `gorm:"column:is_partial_price"`
+		IsPending      bool            `gorm:"column:is_pending"`
+		UnitID         *int64          `gorm:"column:unit_id"`
+		CategoryID     *int64          `gorm:"column:category_id"`
+		TypeID         *int64          `gorm:"column:type_id"`
+		CreatedBy      *int64          `gorm:"column:created_by"`
+		UpdatedBy      *int64          `gorm:"column:updated_by"`
+	}
+
+	var id int64
+	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var userID *int64
+		if parsed, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+			userID = &parsed
+		}
+
+		row := pendingSupplyInsert{
+			ProjectID:      projectID,
+			Name:           name,
+			Price:          decimal.Zero,
+			IsPartialPrice: false,
+			IsPending:      true,
+			CreatedBy:      userID,
+			UpdatedBy:      userID,
+		}
+
+		if err := tx.Table("supplies").Create(&row).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to create pending supply", err)
+		}
+		id = row.ID
 		return nil
 	})
 	return id, err
@@ -201,6 +243,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"type_id":          s.Type.ID,
 			"project_id":       s.ProjectID,
 			"updated_by":       s.UpdatedBy,
+			"is_pending":       s.IsPending,
 		}
 		updateTx := tx.Model(&models.Supply{}).
 			Where("id = ?", s.ID)
@@ -343,6 +386,14 @@ func (r *Repository) ListSuppliesPaginated(
 		db = db.Where("project_id IN ?", projectIDs)
 	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
 		return []domain.Supply{}, 0, nil
+	}
+
+	switch strings.TrimSpace(strings.ToLower(mode)) {
+	case "pending":
+		db = db.Where("is_pending = ?", true)
+	case "all":
+	default:
+		db = db.Where("is_pending = ?", false)
 	}
 
 	// Total para paginación

@@ -8,6 +8,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func ZeroPrice() decimal.Decimal {
+	return decimal.Zero
+}
+
 type SupplyOrigin struct {
 	Type            string
 	SourceProjectID *int64
@@ -26,6 +30,7 @@ type Supply struct {
 	UnitName  string
 	Price     decimal.Decimal
 	IsPartialPrice bool
+	IsPending      bool
 	CategoryID     int64
 	CategoryName   string
 	Type           classdomain.ClassType

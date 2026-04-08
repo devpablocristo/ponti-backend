@@ -30,12 +30,16 @@ type WorkOrderDraft struct {
 	FieldID              int64
 	FieldName            string
 	LotID                int64
+	LotName              string
 	CropID               int64
+	CropName             string
 	LaborID              int64
+	LaborName            string
 	Contractor           string
 	EffectiveArea        decimal.Decimal
 	Observations         string
 	InvestorID           int64
+	IsDigital            bool
 	Status               Status
 	ReviewedBy           *int64
 	PublishedWorkOrderID *int64
@@ -46,9 +50,10 @@ type WorkOrderDraft struct {
 }
 
 type WorkOrderDraftItem struct {
-	SupplyID  int64
-	TotalUsed decimal.Decimal
-	FinalDose decimal.Decimal
+	SupplyID   int64
+	SupplyName string
+	TotalUsed  decimal.Decimal
+	FinalDose  decimal.Decimal
 }
 
 type WorkOrderDraftInvestorSplit struct {
@@ -64,6 +69,41 @@ type WorkOrderDraftListItem struct {
 	ProjectName string
 	FieldID     int64
 	FieldName   string
+	IsDigital   bool
 	Status      Status
 	Base        shareddomain.Base
+}
+
+type WorkOrderDraftBatchLotItem struct {
+	SupplyID  int64
+	TotalUsed decimal.Decimal
+}
+
+type WorkOrderDraftBatchLot struct {
+	LotID         int64
+	EffectiveArea decimal.Decimal
+	Items         []WorkOrderDraftBatchLotItem
+}
+
+type WorkOrderDraftBatchCreate struct {
+	Number         string
+	Date           time.Time
+	CustomerID     int64
+	ProjectID      int64
+	CampaignID     *int64
+	FieldID        int64
+	CropID         int64
+	LaborID        int64
+	Contractor     string
+	Observations   string
+	InvestorID     int64
+	InvestorSplits []WorkOrderDraftInvestorSplit
+	Lots           []WorkOrderDraftBatchLot
+}
+
+type WorkOrderDraftBatchCreateResultItem struct {
+	ID            int64
+	Number        string
+	LotID         int64
+	EffectiveArea decimal.Decimal
 }
