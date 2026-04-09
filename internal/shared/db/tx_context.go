@@ -3,18 +3,16 @@ package db
 import (
 	"context"
 
+	gormdb "github.com/devpablocristo/core/databases/postgres/go"
 	"gorm.io/gorm"
 )
 
-type txContextKey struct{}
-
-// WithTx attaches a gorm transaction to context so repositories can reuse it.
+// WithTx delega al helper estándar de core.
 func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
-	return context.WithValue(ctx, txContextKey{}, tx)
+	return gormdb.WithTx(ctx, tx)
 }
 
-// TxFromContext returns a transaction from context when available.
+// TxFromContext delega al helper estándar de core.
 func TxFromContext(ctx context.Context) *gorm.DB {
-	tx, _ := ctx.Value(txContextKey{}).(*gorm.DB)
-	return tx
+	return gormdb.TxFromContext(ctx)
 }

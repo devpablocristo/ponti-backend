@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 )
 
 // TestBalanceCategorySerialization verifica que BalanceCategory se serialice/deserialice correctamente

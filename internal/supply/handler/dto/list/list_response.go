@@ -7,16 +7,16 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // Estructura de supply para listados con información completa
 type ListedSupply struct {
-	ID    int64           `json:"id"`
-	Name  string          `json:"name"`
-	Price decimal.Decimal `json:"price"` // Precio U$
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Price          decimal.Decimal `json:"price"` // Precio U$
 	IsPartialPrice bool            `json:"is_partial_price"`
 	TotalUSD       decimal.Decimal `json:"total_usd"`     // Total U$
 	UnitID         int64           `json:"unit_id"`       // Unidad ID
@@ -109,8 +109,8 @@ func NewListSuppliesResponse(
 
 	out := make([]ListedSupply, len(items))
 	for i, s := range items {
-		// Calcular Total U$ como precio * cantidad (asumiendo cantidad = 1 por ahora)
-		totalUSD := s.Price // TODO: multiplicar por cantidad real si existe
+		// Calcular Total U$ como precio * cantidad real
+		totalUSD := s.Price.Mul(s.Quantity)
 
 		out[i] = ListedSupply{
 			ID:    s.ID,
@@ -130,9 +130,9 @@ func NewListSuppliesResponse(
 
 		// Acumular métricas según el tipo de unidad
 		if isKG(s.UnitName) {
-			totalKg = totalKg.Add(decimal.NewFromInt(1)) // TODO: usar cantidad real
+			totalKg = totalKg.Add(s.Quantity)
 		} else if isLt(s.UnitName) {
-			totalLts = totalLts.Add(decimal.NewFromInt(1)) // TODO: usar cantidad real
+			totalLts = totalLts.Add(s.Quantity)
 		}
 		totalNetUSD = totalNetUSD.Add(totalUSD)
 	}

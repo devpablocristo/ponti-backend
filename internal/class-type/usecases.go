@@ -3,7 +3,7 @@ package classtype
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 )
 
 type RepositoryPort interface {

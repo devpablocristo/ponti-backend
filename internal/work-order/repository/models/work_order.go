@@ -7,15 +7,15 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	cropmod "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	fieldmod "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
-	labormod "github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	projectmod "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	supplymod "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
+	labormod "github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	supplymod "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 // WorkOrder GORM model con todas las relaciones.
@@ -94,8 +94,9 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		splits := make([]WorkOrderInvestorSplit, len(o.InvestorSplits))
 		for i, s := range o.InvestorSplits {
 			splits[i] = WorkOrderInvestorSplit{
-				InvestorID: s.InvestorID,
-				Percentage: s.Percentage,
+				InvestorID:    s.InvestorID,
+				Percentage:    s.Percentage,
+				PaymentStatus: s.PaymentStatus,
 			}
 		}
 		w.InvestorSplits = splits
@@ -122,8 +123,9 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 		splits = make([]domain.WorkOrderInvestorSplit, len(m.InvestorSplits))
 		for i, s := range m.InvestorSplits {
 			splits[i] = domain.WorkOrderInvestorSplit{
-				InvestorID: s.InvestorID,
-				Percentage: s.Percentage,
+				InvestorID:    s.InvestorID,
+				Percentage:    s.Percentage,
+				PaymentStatus: s.PaymentStatus,
 			}
 		}
 	}

@@ -5,14 +5,15 @@ import (
 	"context"
 	"net/http"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	workOrderExcel "github.com/alphacodinggroup/ponti-backend/internal/work-order/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type UseCasesPort interface {
@@ -20,6 +21,7 @@ type UseCasesPort interface {
 	GetWorkOrderByID(context.Context, int64) (*domain.WorkOrder, error)
 	DuplicateWorkOrder(context.Context, string) (string, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
+	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -73,6 +75,7 @@ func (h *Handler) Routes() {
 		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
 		grp.POST("/:work_order_id/archive", h.ArchiveWorkOrder)
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
+		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
 		grp.GET("/metrics", h.GetMetrics)
@@ -97,7 +100,7 @@ func (h *Handler) CreateWorkOrder(c *gin.Context) {
 
 // GetWorkOrderByID obtiene una orden por ID.
 func (h *Handler) GetWorkOrderByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -116,7 +119,7 @@ func (h *Handler) DuplicateWorkOrder(c *gin.Context) {
 	// orig := c.Param("work_order_number")
 	// newNum, err := h.ucs.DuplicateWorkOrder(c.Request.Context(), orig)
 	// if err != nil {
-	// 	apiErr, status := types.NewAPIError(err)
+	// 	status, apiErr := httperr.Normalize(err)
 	// 	c.JSON(status, apiErr.ToResponse())
 	// 	return
 	// }
@@ -132,7 +135,7 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -145,9 +148,40 @@ func (h *Handler) UpdateWorkOrderByID(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
+func (h *Handler) UpdateInvestorPaymentStatus(c *gin.Context) {
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	investorID, err := ginmw.ParseParamID(c, "investor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	var req dto.UpdateInvestorPaymentStatusRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	if err := h.ucs.UpdateInvestorPaymentStatus(
+		c.Request.Context(),
+		workOrderID,
+		investorID,
+		req.PaymentStatus,
+	); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondNoContent(c)
+}
+
 // DeleteWorkOrderByID elimina una orden de trabajo.
 func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -232,7 +266,7 @@ func (h *Handler) ExportWorkOrders(c *gin.Context) {
 
 // ArchiveWorkOrder ejecuta soft delete (archivado) de la work order.
 func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -246,7 +280,7 @@ func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
 
 // RestoreWorkOrder restaura una work order archivada.
 func (h *Handler) RestoreWorkOrder(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

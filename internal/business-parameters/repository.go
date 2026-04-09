@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
+	models "github.com/devpablocristo/ponti-backend/internal/business-parameters/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
 
 type GormEnginePort interface {
@@ -32,10 +32,10 @@ func (r *Repository) GetByKey(ctx context.Context, key string) (*domain.Business
 		First(&m).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, types.NewError(types.ErrNotFound, "business parameter not found", nil)
+		return nil, domainerr.NotFound("business parameter not found")
 	}
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get business parameter", err)
+		return nil, domainerr.Internal("failed to get business parameter")
 	}
 	return m.ToDomain(), nil
 }
@@ -48,7 +48,7 @@ func (r *Repository) ListByCategory(ctx context.Context, category string) ([]dom
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list business parameters by category", err)
+		return nil, domainerr.Internal("failed to list business parameters by category")
 	}
 
 	out := make([]domain.BusinessParameter, len(rows))
@@ -65,7 +65,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list all business parameters", err)
+		return nil, domainerr.Internal("failed to list all business parameters")
 	}
 
 	out := make([]domain.BusinessParameter, len(rows))
@@ -78,7 +78,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 func (r *Repository) Create(ctx context.Context, item *domain.BusinessParameter) (int64, error) {
 	m := models.FromDomain(item)
 	if err := r.db.Client().WithContext(ctx).Create(m).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create business parameter", err)
+		return 0, domainerr.Internal("failed to create business parameter")
 	}
 	return m.ID, nil
 }
@@ -91,10 +91,10 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.BusinessParameter{}).Where("id = ?", item.ID).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check existence", err)
+			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, "business parameter not found", nil)
+			return domainerr.NotFound("business parameter not found")
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
@@ -111,13 +111,13 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 			"description": item.Description,
 		})
 		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update business parameter", result.Error)
+			return domainerr.Internal("failed to update business parameter")
 		}
 		if result.RowsAffected == 0 {
 			if !item.UpdatedAt.IsZero() {
-				return types.NewError(types.ErrConflict, "business parameter not found or outdated", nil)
+				return domainerr.Conflict("business parameter not found or outdated")
 			}
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("business parameter %d not found", item.ID), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", item.ID))
 		}
 		return nil
 	})
@@ -131,18 +131,18 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.BusinessParameter{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check existence", err)
+			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, "business parameter not found", nil)
+			return domainerr.NotFound("business parameter not found")
 		}
 
 		result := tx.Delete(&models.BusinessParameter{}, id)
 		if result.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to delete business parameter", result.Error)
+			return domainerr.Internal("failed to delete business parameter")
 		}
 		if result.RowsAffected == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("business parameter %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", id))
 		}
 		return nil
 	})

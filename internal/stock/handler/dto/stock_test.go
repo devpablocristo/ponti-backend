@@ -11,7 +11,7 @@ import (
 func TestGetStocksResponse_MarshalJSON_Rounding(t *testing.T) {
 	// Crear una respuesta con valores decimales que necesiten redondeo
 	response := GetStocksResponse{
-		Stocks:         []GetStockSummary{}, // Lista vacía para este test
+		Stocks:         []GetStockSummary{},           // Lista vacía para este test
 		NetTotalUSD:    decimal.NewFromFloat(1234.56), // Debería redondearse a 1235
 		TotalLiters:    decimal.NewFromFloat(567.89),  // Debería redondearse a 568
 		TotalKilograms: decimal.NewFromFloat(901.23),  // Debería redondearse a 901
@@ -27,9 +27,9 @@ func TestGetStocksResponse_MarshalJSON_Rounding(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verificar que los valores estén redondeados al entero más próximo
-	assert.Equal(t, "1235", result["net_total_usd"])    // 1234.56 -> 1235
-	assert.Equal(t, "568", result["total_liters"])      // 567.89 -> 568
-	assert.Equal(t, "901", result["total_kilograms"])   // 901.23 -> 901
+	assert.Equal(t, "1235", result["net_total_usd"])  // 1234.56 -> 1235
+	assert.Equal(t, "568", result["total_liters"])    // 567.89 -> 568
+	assert.Equal(t, "901", result["total_kilograms"]) // 901.23 -> 901
 }
 
 func TestGetStocksResponse_MarshalJSON_RoundingWithDecimals(t *testing.T) {

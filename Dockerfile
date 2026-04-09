@@ -1,5 +1,5 @@
-FROM golang:1.26.1-alpine AS builder
-
+# syntax=docker/dockerfile:1.7
+FROM golang:1.26.2-alpine AS builder
 
 ENV TZ=America/Argentina/Buenos_Aires
 RUN apk add --no-cache \
@@ -10,23 +10,22 @@ RUN apk add --no-cache \
    musl-dev \
    git
 
+# Configurar acceso a repos privados de Go
+ENV GOPRIVATE=github.com/devpablocristo/*
 
 WORKDIR /app
-
 
 COPY . .
 
-
 WORKDIR /app
-RUN go mod download && go mod verify
-
-
-WORKDIR /app/pkg
-RUN go mod download && go mod verify
-
-
-WORKDIR /app
-
+RUN --mount=type=secret,id=go_modules_token,required=false \
+    token="$(cat /run/secrets/go_modules_token 2>/dev/null || true)" && \
+    if [ -n "$token" ]; then \
+      git config --global url."https://${token}@github.com/".insteadOf "https://github.com/"; \
+    fi && \
+    go mod download && \
+    go mod verify && \
+    rm -f /root/.gitconfig
 
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/prod_binary ./cmd/api/
 RUN CGO_ENABLED=1 GOOS=linux go build -o /app/migrate_binary ./cmd/migrate/
@@ -43,8 +42,6 @@ ENV TZ=America/Argentina/Buenos_Aires
 
 WORKDIR /app
 
-
-COPY --from=builder /app/pkg /app/pkg
 COPY --from=builder /app/prod_binary /app/prod_binary
 COPY --from=builder /app/migrate_binary /app/migrate_binary
 COPY --from=builder /app/migrations_v4 /app/migrations_v4
@@ -56,8 +53,6 @@ EXPOSE 8080
 
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-
 
 
 

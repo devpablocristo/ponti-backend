@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/invoice/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	"gorm.io/gorm"
 )
 
@@ -26,15 +26,15 @@ func NewRepository(db GormEnginePort) *Repository {
 
 func (r *Repository) GetByWorkOrderID(ctx context.Context, workOrderID int64) (*domain.Invoice, error) {
 	if workOrderID == 0 {
-		return nil, types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
+		return nil, domainerr.Validation("invalid WorkOrderID")
 	}
 
 	var row models.Invoice
 	if err := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "There is no invoice for this work order", err)
+			return nil, domainerr.NotFound("There is no invoice for this work order")
 		}
-		return nil, types.NewError(types.ErrInternal, "Failed to find invoice", err)
+		return nil, domainerr.Internal("Failed to find invoice")
 
 	}
 	out := row.ToDomain()
@@ -44,19 +44,19 @@ func (r *Repository) GetByWorkOrderID(ctx context.Context, workOrderID int64) (*
 
 func (r *Repository) Create(ctx context.Context, item *domain.Invoice) (int64, error) {
 	if item.WorkOrderID == 0 {
-		return 0, types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
+		return 0, domainerr.Validation("invalid WorkOrderID")
 	}
 
 	m := models.FromDomain(item)
 	if err := r.db.Client().WithContext(ctx).Create(&m).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "fail to create invoice", err)
+		return 0, domainerr.Internal("fail to create invoice")
 	}
 	return m.ID, nil
 }
 
 func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 	if item.WorkOrderID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
+		return domainerr.Validation("invalid WorkOrderID")
 	}
 
 	result := r.db.Client().WithContext(ctx).
@@ -72,26 +72,55 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 		})
 
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update invoice", result.Error)
+		return domainerr.Internal("failed to update invoice")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("invoice for work order %d does not exist", item.WorkOrderID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("invoice for work order %d does not exist", item.WorkOrderID))
 	}
 
 	return nil
 }
 
+func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page, perPage int) ([]domain.Invoice, int64, error) {
+	if projectID == 0 {
+		return nil, 0, domainerr.Validation("invalid projectID")
+	}
+
+	var total int64
+	query := r.db.Client().WithContext(ctx).
+		Model(&models.Invoice{}).
+		Joins("JOIN work_orders ON work_orders.id = invoices.work_order_id").
+		Where("work_orders.project_id = ?", projectID)
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count invoices")
+	}
+
+	var rows []models.Invoice
+	offset := (page - 1) * perPage
+	if err := query.Offset(offset).Limit(perPage).Order("invoices.id DESC").Find(&rows).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list invoices")
+	}
+
+	out := make([]domain.Invoice, len(rows))
+	for i, row := range rows {
+		out[i] = *row.ToDomain()
+	}
+
+	return out, total, nil
+}
+
 func (r *Repository) Delete(ctx context.Context, workOrderID int64) error {
 	if workOrderID == 0 {
-		return types.NewError(types.ErrInvalidID, "invalid WorkOrderID", nil)
+		return domainerr.Validation("invalid WorkOrderID")
 	}
 
 	result := r.db.Client().WithContext(ctx).Where("work_order_id = ?", workOrderID).Delete(&models.Invoice{})
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete invoice", result.Error)
+		return domainerr.Internal("failed to delete invoice")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("invoice for work order %d does not exist", workOrderID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("invoice for work order %d does not exist", workOrderID))
 	}
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 	decimal "github.com/shopspring/decimal"
 )

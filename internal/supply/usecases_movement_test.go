@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
-	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	stockdomain "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/mocks"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/mocks"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // TestCreateStockDiference valida que la función calcula correctamente las diferencias de stock
@@ -609,7 +609,7 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 			Return(originSupply, nil),
 		mockRepo.EXPECT().
 			GetSupplyByProjectAndName(gomock.Any(), destProjectID, "ACEITE VERSION").
-			Return(nil, types.NewError(types.ErrNotFound, "supply not found", nil)),
+			Return(nil, domainerr.NotFound("supply not found")),
 		mockRepo.EXPECT().
 			CreateSupply(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, s *domain.Supply) (int64, error) {
@@ -776,7 +776,7 @@ func TestImportSupplyMovements_FailsOnDuplicateInDB(t *testing.T) {
 		assert.Equal(t, 0, failures[0].Index)
 		assert.Equal(t, 2, failures[0].RowIndex)
 		assert.Equal(t, "duplicate_db", failures[0].Code)
-		assert.Equal(t, "El remito REM-123 ya tiene el insumo 10 cargado", failures[0].Message)
+		assert.Equal(t, "El remito REM-123 ya tiene el insumo Urea cargado", failures[0].Message)
 	}
 }
 
@@ -1151,10 +1151,10 @@ func TestValidateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	var domainErr *types.Error
+	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
-		assert.Equal(t, types.ErrConflict, domainErr.Type)
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message)
+		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
+		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
 	}
 }
 
@@ -1184,11 +1184,139 @@ func TestCreateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 
 	assert.Equal(t, int64(0), id)
 	assert.Error(t, err)
-	var domainErr *types.Error
+	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
-		assert.Equal(t, types.ErrConflict, domainErr.Type)
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message)
+		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
+		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
 	}
+}
+
+func TestCreateSupplyMovement_ReturnMovement_CreatesNegativeEntry(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(18)
+	supplyID := int64(157)
+	investorID := int64(11)
+	providerID := int64(5)
+	stockID := int64(41)
+	date := mustTime(t, "2026-03-05T00:00:00Z")
+
+	mockRepo.EXPECT().
+		ExistsSupplyMovementByProjectReferenceSupplyAndType(
+			gomock.Any(),
+			projectID,
+			"DEV-001",
+			supplyID,
+			domain.RETURN_MOVEMENT,
+		).
+		Return(false, nil)
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(&stockdomain.Stock{
+			ID:              stockID,
+			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
+			Consumed:        decimal.Zero,
+		}, false, nil)
+
+	var created *domain.SupplyMovement
+	mockRepo.EXPECT().
+		CreateSupplyMovement(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, movement *domain.SupplyMovement) (int64, error) {
+			created = movement
+			return 501, nil
+		})
+
+	id, err := u.CreateSupplyMovement(context.Background(), &domain.SupplyMovement{
+		ProjectId:       projectID,
+		Quantity:        decimal.NewFromInt(3),
+		MovementType:    domain.RETURN_MOVEMENT,
+		MovementDate:    &date,
+		ReferenceNumber: "DEV-001",
+		Supply:          &domain.Supply{ID: supplyID},
+		Investor:        &investordomain.Investor{ID: investorID},
+		Provider:        &providerdomain.Provider{ID: providerID},
+		IsEntry:         true,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(501), id)
+	if assert.NotNil(t, created) {
+		assert.Equal(t, stockID, created.StockId)
+		assert.True(t, created.Quantity.Equal(decimal.NewFromInt(-3)))
+		assert.True(t, created.IsEntry)
+	}
+}
+
+func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(44)
+	supplyID := int64(10)
+	investorID := int64(5)
+	providerID := int64(7)
+	stockID := int64(99)
+	date := mustTime(t, "2026-03-06T00:00:00Z")
+
+	mockRepo.EXPECT().
+		ExecuteInTransaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(&stockdomain.Stock{ID: stockID, RealStockUnits: decimal.NewFromInt(4)}, false, nil).
+		Times(2)
+	mockStock.EXPECT().
+		UpdateRealStockUnits(gomock.Any(), stockID, gomock.Any()).
+		DoAndReturn(func(_ context.Context, id int64, stock *stockdomain.Stock) error {
+			assert.Equal(t, stockID, id)
+			assert.True(t, stock.RealStockUnits.Equal(decimal.Zero))
+			return nil
+		})
+
+	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{{
+		ProjectId:       projectID,
+		Quantity:        decimal.Zero,
+		MovementType:    domain.STOCK,
+		MovementDate:    &date,
+		ReferenceNumber: "STK-200",
+		Supply:          &domain.Supply{ID: supplyID},
+		Investor:        &investordomain.Investor{ID: investorID},
+		Provider:        &providerdomain.Provider{ID: providerID},
+		IsEntry:         true,
+	}})
+
+	assert.NoError(t, err)
+	assert.Nil(t, failures)
+	assert.Equal(t, []int64{0}, ids)
 }
 
 func mustTime(t *testing.T, value string) time.Time {

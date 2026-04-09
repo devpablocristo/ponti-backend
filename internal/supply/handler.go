@@ -7,17 +7,18 @@ import (
 	"strconv"
 	"strings"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	supplyExcel "github.com/alphacodinggroup/ponti-backend/internal/supply/excel"
-	createDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/create"
-	getDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/get"
-	listDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/list"
-	updateDto "github.com/alphacodinggroup/ponti-backend/internal/supply/handler/dto/update"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
+	createDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/create"
+	getDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/get"
+	listDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/list"
+	updateDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/update"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 type UseCasesPort interface {
@@ -113,7 +114,7 @@ func (h *Handler) Routes() {
 		supplyMovements.GET("", h.GetSupplyMovementsByProjectID)
 		supplyMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		supplyMovements.GET("/providers", h.GetProviders)
-		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementById)
+		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementByID)
 		supplyMovements.DELETE("/:supply_movement_id", h.DeleteSupplyMovement)
 	}
 
@@ -124,7 +125,7 @@ func (h *Handler) Routes() {
 		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
 		stockMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		stockMovements.GET("/providers", h.GetProviders)
-		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementById)
+		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementByID)
 		stockMovements.DELETE("/:stock_movement_id", h.DeleteSupplyMovement)
 	}
 }
@@ -185,7 +186,7 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 }
 
 func (h *Handler) GetSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -199,7 +200,7 @@ func (h *Handler) GetSupply(c *gin.Context) {
 }
 
 func (h *Handler) UpdateSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -226,7 +227,7 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -239,7 +240,7 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -252,7 +253,7 @@ func (h *Handler) ArchiveSupply(c *gin.Context) {
 }
 
 func (h *Handler) RestoreSupply(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -265,7 +266,7 @@ func (h *Handler) RestoreSupply(c *gin.Context) {
 }
 
 func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -313,7 +314,7 @@ func (h *Handler) UpdateSuppliesBulk(c *gin.Context) {
 		if req[i].IsPartialPrice == nil && supply.ID != 0 {
 			currentSupply, ok := currentSuppliesByID[supply.ID]
 			if !ok {
-				sharedhandlers.RespondError(c, types.NewError(types.ErrNotFound, fmt.Sprintf("supply %d not found", supply.ID), nil))
+				sharedhandlers.RespondError(c, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", supply.ID)))
 				return
 			}
 			supply.IsPartialPrice = currentSupply.IsPartialPrice
@@ -357,7 +358,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -378,7 +379,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 		mode = "strict"
 	}
 	if mode != "partial" && mode != "strict" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "mode must be one of [partial, strict]", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("mode must be one of [partial, strict]"))
 		return
 	}
 
@@ -398,10 +399,11 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	skipped := make([]createDto.SupplyMovementSkipped, 0)
 	domainMovements := make([]*domain.SupplyMovement, 0, total)
 	validIndexes := make([]int, 0, total)
+	requestReturnSupplyKeys := make(map[string]int)
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := types.ErrorMessage(err)
+			message := sharedhandlers.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -412,6 +414,28 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(message))
 			continue
 		}
+
+		if item.MovementType == domain.RETURN_MOVEMENT {
+			returnSupplyKey := fmt.Sprintf("%s|%s|%d", item.MovementType, strings.TrimSpace(item.Reference), item.SupplyID)
+			if _, exists := requestReturnSupplyKeys[returnSupplyKey]; exists {
+				message := fmt.Sprintf(
+					"El remito de devolución %s ya contiene el insumo %d dentro del request",
+					strings.TrimSpace(item.Reference),
+					item.SupplyID,
+				)
+				failures = append(failures, createDto.SupplyMovementFailure{
+					Index:    i,
+					RowIndex: i + 2,
+					SupplyID: item.SupplyID,
+					Code:     "duplicate_request",
+					Message:  message,
+				})
+				supplyMovementsResponse = append(supplyMovementsResponse, createDto.NewErrorCreateSupplyMovementResponse(message))
+				continue
+			}
+			requestReturnSupplyKeys[returnSupplyKey] = i
+		}
+
 		domainMovements = append(domainMovements, item.ToDomain(projectID, &userID))
 		validIndexes = append(validIndexes, i)
 		supplyMovementsResponse = append(supplyMovementsResponse, createDto.CreateSupplyMovementResponse{})
@@ -423,7 +447,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			for i, movement := range domainMovements {
 				if err := h.ucs.ValidateSupplyMovement(ctx, movement); err != nil {
 					itemIndex := validIndexes[i]
-					message := types.ErrorMessage(err)
+					message := sharedhandlers.ErrorMessage(err)
 					prevalidationFailedIndexes[itemIndex] = true
 					failures = append(failures, createDto.SupplyMovementFailure{
 						Index:    itemIndex,
@@ -455,7 +479,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 				ids, err := h.ucs.CreateSupplyMovementsStrict(ctx, domainMovements)
 				if err != nil {
 					failedValidPos := -1
-					msg := types.ErrorMessage(err)
+					msg := sharedhandlers.ErrorMessage(err)
 					if strings.HasPrefix(msg, "item ") {
 						parts := strings.SplitN(msg, ": ", 2)
 						if len(parts) == 2 {
@@ -524,7 +548,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			}
 			supplyMovementID, err := h.ucs.CreateSupplyMovement(ctx, domainMovements[validPos])
 			if err != nil {
-				message := types.ErrorMessage(err)
+				message := sharedhandlers.ErrorMessage(err)
 				failures = append(failures, createDto.SupplyMovementFailure{
 					Index:    i,
 					RowIndex: i + 2,
@@ -567,7 +591,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -586,7 +610,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	total := len(req.SupplyMovements)
 	const maxImportItems = 500
 	if total > maxImportItems {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total), nil))
+		sharedhandlers.RespondError(c, domainerr.New(domainerr.KindValidation, fmt.Sprintf("el máximo de items por importación es %d, se recibieron %d", maxImportItems, total)))
 		return
 	}
 
@@ -596,7 +620,7 @@ func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 
 	for i, item := range req.SupplyMovements {
 		if err := item.Validate(); err != nil {
-			message := types.ErrorMessage(err)
+			message := sharedhandlers.ErrorMessage(err)
 			failures = append(failures, createDto.SupplyMovementFailure{
 				Index:    i,
 				RowIndex: i + 2,
@@ -706,13 +730,13 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
+	supplyMovementID, err := sharedhandlers.ParseMovementIDParam(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementId)
+	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -721,7 +745,7 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
+func (h *Handler) UpdateSupplyMovementByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	var req updateDto.UpdateSupplyMovementEntryRequest
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
@@ -734,19 +758,19 @@ func (h *Handler) UpdateSupplyMovementById(c *gin.Context) {
 		return
 	}
 
-	supplyMovementId, err := sharedhandlers.ParseMovementIDParam(c)
+	supplyMovementID, err := sharedhandlers.ParseMovementIDParam(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementId)
+	supplyMovement, err := h.ucs.GetSupplyMovementByID(ctx, supplyMovementID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

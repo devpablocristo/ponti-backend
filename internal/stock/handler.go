@@ -7,16 +7,17 @@ import (
 	"strconv"
 	"time"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	stockExcel "github.com/alphacodinggroup/ponti-backend/internal/stock/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
+	"github.com/devpablocristo/ponti-backend/internal/stock/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type UseCasesPort interface {
@@ -150,7 +151,7 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
-	userID, err := sharedmodels.ConvertStringToID(ctx)
+	userID, err := sharedmodels.ActorFromContext(ctx)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -185,20 +186,18 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 
 func (h *Handler) UpdateRealStock(c *gin.Context) {
 	ctx := c.Request.Context()
-	stockIDStr := c.Param("stock_id")
-
 	var req dto.UpdateRealStockRequest
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(ctx)
+	userID, err := sharedmodels.ActorFromContext(ctx)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	stockID, err := sharedhandlers.ParseParamID(stockIDStr, "stock_id")
+	stockID, err := ginmw.ParseParamID(c, "stock_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -227,11 +226,11 @@ func getMonthPeriodOrDefault(c *gin.Context) (int64, error) {
 	}
 	monthPeriod, err := strconv.ParseInt(monthPeriodStr, 10, 64)
 	if err != nil {
-		return 0, types.NewError(types.ErrValidation, "Month period is in invalid format", nil)
+		return 0, domainerr.Validation("Month period is in invalid format")
 	}
 
 	if monthPeriod < 1 || monthPeriod > 12 {
-		return 0, types.NewError(types.ErrValidation, "Month period must be between 1 and 12", nil)
+		return 0, domainerr.Validation("Month period must be between 1 and 12")
 	}
 	return monthPeriod, nil
 }
@@ -247,7 +246,7 @@ func getYearPeriodOrDefault(c *gin.Context) (int64, error) {
 	}
 
 	if yearPeriod < 0 {
-		return 0, types.NewError(types.ErrValidation, "Year period must be greater than 0", nil)
+		return 0, domainerr.Validation("Year period must be greater than 0")
 	}
 
 	return yearPeriod, nil
@@ -257,7 +256,7 @@ func getMonthPeriod(c *gin.Context) (int64, error) {
 	monthPeriodStr := c.Query("month_period")
 
 	if monthPeriodStr == "" {
-		return 0, types.NewMissingFieldError("month_period")
+		return 0, domainerr.Validation("The field 'month_period' is required")
 	}
 	return getMonthPeriodOrDefault(c)
 }
@@ -266,7 +265,7 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 	yearPeriodStr := c.Query("year_period")
 
 	if yearPeriodStr == "" {
-		return 0, types.NewMissingFieldError("year_period")
+		return 0, domainerr.Validation("The field 'year_period' is required")
 	}
 	return getYearPeriodOrDefault(c)
 }

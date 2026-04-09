@@ -13,28 +13,33 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 	now := time.Now()
 	// Crear labor con valores decimales
 	labor := LaborListItem{
-		WorkOrderID:     1,
-		WorkOrderNumber: "WO-001",
-		Date:            now,
-		ProjectName:     "Test Project",
-		FieldName:       "Test Field",
-		CropName:        "Test Crop",
-		LaborName:       "Test Labor",
-		Contractor:      "Test Contractor",
-		SurfaceHa:       decimal.NewFromFloat(10.5),
-		CostHa:          decimal.NewFromFloat(100.5),
-		CategoryName:    "Test Category",
-		InvestorName:    "Test Investor",
-		USDAvgValue:     decimal.NewFromFloat(50.5),
-		NetTotal:        decimal.NewFromFloat(1234.56), // Debería redondearse a 1235 (entero)
-		TotalIVA:        decimal.NewFromFloat(259.26),  // Debería redondearse a 259 (entero)
-		USDCostHa:       decimal.NewFromFloat(75.5),
-		USDNetTotal:     decimal.NewFromFloat(500.5),
-		InvoiceID:       1,
-		InvoiceNumber:   "INV-001",
-		InvoiceCompany:  "Test Company",
-		InvoiceDate:     &now,
-		InvoiceStatus:   "paid",
+		WorkOrderID:            1,
+		WorkOrderNumber:        "WO-001",
+		Date:                   now,
+		ProjectName:            "Test Project",
+		FieldName:              "Test Field",
+		LotID:                  12,
+		LotName:                "Lote 2",
+		CropName:               "Test Crop",
+		LaborName:              "Test Labor",
+		Contractor:             "Test Contractor",
+		SurfaceHa:              decimal.NewFromFloat(10.5),
+		CostHa:                 decimal.NewFromFloat(100.5),
+		CategoryName:           "Test Category",
+		InvestorID:             77,
+		InvestorName:           "Test Investor",
+		InvestorPaymentStatus:  "Pagada",
+		InvestorPaymentEnabled: true,
+		USDAvgValue:            decimal.NewFromFloat(50.5),
+		NetTotal:               decimal.NewFromFloat(1234.56), // Debería redondearse a 1235 (entero)
+		TotalIVA:               decimal.NewFromFloat(259.26),  // Debería redondearse a 259 (entero)
+		USDCostHa:              decimal.NewFromFloat(75.5),
+		USDNetTotal:            decimal.NewFromFloat(500.5),
+		InvoiceID:              1,
+		InvoiceNumber:          "INV-001",
+		InvoiceCompany:         "Test Company",
+		InvoiceDate:            &now,
+		InvoiceStatus:          "paid",
 	}
 
 	// Serializar a JSON
@@ -49,6 +54,11 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 	// Verificar redondeo
 	assert.Equal(t, "1235", result["net_total"]) // Total $ Neto: entero más próximo
 	assert.Equal(t, "259", result["total_iva"])  // Total $ IVA: entero más próximo
+	assert.Equal(t, float64(77), result["investor_id"])
+	assert.Equal(t, "Pagada", result["investor_payment_status"])
+	assert.Equal(t, true, result["investor_payment_enabled"])
+	assert.Equal(t, float64(12), result["lot_id"])
+	assert.Equal(t, "Lote 2", result["lot_name"])
 }
 
 func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
@@ -100,28 +110,33 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			labor := LaborListItem{
-				WorkOrderID:     1,
-				WorkOrderNumber: "WO-001",
-				Date:            now,
-				ProjectName:     "Test",
-				FieldName:       "Test",
-				CropName:        "Test",
-				LaborName:       "Test",
-				Contractor:      "Test",
-				SurfaceHa:       decimal.NewFromFloat(10.0),
-				CostHa:          decimal.NewFromFloat(100.0),
-				CategoryName:    "Test",
-				InvestorName:    "Test",
-				USDAvgValue:     decimal.NewFromFloat(50.0),
-				NetTotal:        decimal.NewFromFloat(tt.netTotal),
-				TotalIVA:        decimal.NewFromFloat(tt.totalIVA),
-				USDCostHa:       decimal.NewFromFloat(75.0),
-				USDNetTotal:     decimal.NewFromFloat(500.0),
-				InvoiceID:       1,
-				InvoiceNumber:   "INV-001",
-				InvoiceCompany:  "Test",
-				InvoiceDate:     &now,
-				InvoiceStatus:   "paid",
+				WorkOrderID:            1,
+				WorkOrderNumber:        "WO-001",
+				Date:                   now,
+				ProjectName:            "Test",
+				FieldName:              "Test",
+				CropName:               "Test",
+				LaborName:              "Test",
+				Contractor:             "Test",
+				SurfaceHa:              decimal.NewFromFloat(10.0),
+				CostHa:                 decimal.NewFromFloat(100.0),
+				CategoryName:           "Test",
+				InvestorID:             44,
+				InvestorName:           "Test",
+				InvestorPaymentStatus:  "Pendiente",
+				InvestorPaymentEnabled: true,
+				USDAvgValue:            decimal.NewFromFloat(50.0),
+				NetTotal:               decimal.NewFromFloat(tt.netTotal),
+				TotalIVA:               decimal.NewFromFloat(tt.totalIVA),
+				USDCostHa:              decimal.NewFromFloat(75.0),
+				USDNetTotal:            decimal.NewFromFloat(500.0),
+				InvoiceID:              1,
+				InvoiceNumber:          "INV-001",
+				InvoiceCompany:         "Test",
+				InvoiceDate:            &now,
+				InvoiceStatus:          "paid",
+				LotID:                  12,
+				LotName:                "Lote 2",
 			}
 
 			jsonData, err := json.Marshal(labor)
@@ -140,28 +155,34 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	now := time.Now()
 	labor := LaborListItem{
-		WorkOrderID:     1,
-		WorkOrderNumber: "WO-001",
-		Date:            now,
-		ProjectName:     "Test Project",
-		FieldName:       "Test Field",
-		CropName:        "Test Crop",
-		LaborName:       "Test Labor",
-		Contractor:      "Test Contractor",
-		SurfaceHa:       decimal.NewFromFloat(10.123),
-		CostHa:          decimal.NewFromFloat(100.456),
-		CategoryName:    "Test Category",
-		InvestorName:    "Test Investor",
-		USDAvgValue:     decimal.NewFromFloat(50.789),
-		NetTotal:        decimal.NewFromFloat(1234.56),
-		TotalIVA:        decimal.NewFromFloat(259.26),
-		USDCostHa:       decimal.NewFromFloat(75.321),
-		USDNetTotal:     decimal.NewFromFloat(500.654),
-		InvoiceID:       1,
-		InvoiceNumber:   "INV-001",
-		InvoiceCompany:  "Test Company",
-		InvoiceDate:     &now,
-		InvoiceStatus:   "paid",
+		WorkOrderID:            1,
+		WorkOrderNumber:        "WO-001",
+		Date:                   now,
+		ProjectName:            "Test Project",
+		FieldName:              "Test Field",
+		CropName:               "Test Crop",
+		LaborName:              "Test Labor",
+		Contractor:             "Test Contractor",
+		SurfaceHa:              decimal.NewFromFloat(10.123),
+		CostHa:                 decimal.NewFromFloat(100.456),
+		CategoryName:           "Test Category",
+		InvestorID:             11,
+		InvestorName:           "Test Investor",
+		InvestorPaymentStatus:  "Pendiente",
+		InvestorPaymentEnabled: true,
+		USDAvgValue:            decimal.NewFromFloat(50.789),
+		NetTotal:               decimal.NewFromFloat(1234.56),
+		TotalIVA:               decimal.NewFromFloat(259.26),
+		USDCostHa:              decimal.NewFromFloat(75.321),
+		USDNetTotal:            decimal.NewFromFloat(500.654),
+		InvoiceID:              1,
+		InvoiceNumber:          "INV-001",
+		InvoiceCompany:         "Test Company",
+		InvoiceDate:            &now,
+		InvoiceStatus:          "paid",
+		LotID:                  12,
+		LotName:                "Lote 2",
+
 	}
 
 	jsonData, err := json.Marshal(labor)
@@ -181,4 +202,7 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	// Verificar que NetTotal y TotalIVA son enteros
 	assert.Equal(t, "1235", result["net_total"])
 	assert.Equal(t, "259", result["total_iva"])
+	assert.Equal(t, float64(11), result["investor_id"])
+	assert.Equal(t, "Pendiente", result["investor_payment_status"])
+	assert.Equal(t, true, result["investor_payment_enabled"])
 }

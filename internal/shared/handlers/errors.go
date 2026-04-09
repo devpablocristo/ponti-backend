@@ -3,12 +3,17 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/core/http/go/httperr"
 )
 
-// RespondError responde errores de dominio usando el helper estándar.
+// RespondError delega al helper estándar de core.
 func RespondError(c *gin.Context, err error) {
-	apiErr, status := types.NewAPIError(err)
-	c.JSON(status, apiErr.ToResponse())
+	ginmw.Respond(c, err)
 }
 
+// ErrorMessage extrae el mensaje user-facing de un error normalizado.
+func ErrorMessage(err error) string {
+	_, apiErr := httperr.Normalize(err)
+	return apiErr.Message
+}

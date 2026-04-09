@@ -1,10 +1,10 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
-	projectmod "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type Manager struct {

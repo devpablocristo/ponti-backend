@@ -4,16 +4,18 @@ package project
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	dto "github.com/alphacodinggroup/ponti-backend/internal/project/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	dto "github.com/devpablocristo/ponti-backend/internal/project/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -189,7 +191,7 @@ func (h *Handler) ListProjectsDropdown(c *gin.Context) {
 
 // ListProjectsByCustomerID maneja GET /projects/customers/:customer_id con paginación ligera
 func (h *Handler) ListProjectsByCustomerID(c *gin.Context) {
-	customerID, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	customerID, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -233,7 +235,7 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		return
 	}
 	if req.UpdatedAt == nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "updated_at is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("updated_at is required"))
 		return
 	}
 	dom := req.ToDomain()

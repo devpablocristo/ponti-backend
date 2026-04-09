@@ -2,11 +2,13 @@ package create
 
 import (
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 func TestSupplyRequest_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {
@@ -81,4 +83,39 @@ func TestFromDomain_IsPartialPrice_AlwaysSetsPointer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateSupplyMovementEntryRequest_Validate_AllowsZeroQuantityForStock(t *testing.T) {
+	movementDate := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
+	req := &CreateSupplyMovementEntryRequest{
+		Quantity:     decimal.Zero,
+		MovementType: domain.STOCK,
+		MovementDate: &movementDate,
+		Reference:    "STK-001",
+		SupplyID:     10,
+		InvestorID:   11,
+		Provider: ProviderRequest{
+			Name: "Proveedor",
+		},
+	}
+
+	err := req.Validate()
+
+	assert.NoError(t, err)
+}
+
+func TestCreateSupplyMovementEntryRequest_Validate_RejectsZeroQuantityForReturn(t *testing.T) {
+	movementDate := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
+	req := &CreateSupplyMovementEntryRequest{
+		Quantity:     decimal.Zero,
+		MovementType: domain.RETURN_MOVEMENT,
+		MovementDate: &movementDate,
+		Reference:    "DEV-001",
+		SupplyID:     10,
+		InvestorID:   11,
+	}
+
+	err := req.Validate()
+
+	assert.Equal(t, "quantity must be greater than 0", sharedhandlers.ErrorMessage(err))
 }

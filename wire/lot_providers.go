@@ -6,15 +6,15 @@ import (
 
 	"github.com/google/wire"
 
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pkgexcel "github.com/alphacodinggroup/ponti-backend/pkg/files-io/excel/excelize"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
 
-	lot "github.com/alphacodinggroup/ponti-backend/internal/lot"
-	lotExcel "github.com/alphacodinggroup/ponti-backend/internal/lot/excel"
+	lot "github.com/devpablocristo/ponti-backend/internal/lot"
+	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
 )
 
 // ProvideLotRepository crea la implementación concreta de lot.Repository.

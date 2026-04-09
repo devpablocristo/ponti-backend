@@ -3,8 +3,8 @@ package dto
 import (
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type Labor struct {
@@ -16,7 +16,7 @@ type Labor struct {
 	CategoryId     int64           `json:"category_id"`
 }
 
-func (l Labor) ToDomain(projectId int64, userId int64) *domain.Labor {
+func (l Labor) ToDomain(projectId int64, userId string) *domain.Labor {
 	return &domain.Labor{
 		ID:             l.ID,
 		Name:           l.Name,
@@ -40,4 +40,3 @@ func FromDomain(d domain.Labor) *Labor {
 		IsPartialPrice: boolPtr(d.IsPartialPrice),
 	}
 }
-

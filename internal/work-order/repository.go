@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type GormEngine interface {
@@ -38,7 +39,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.CreatedBy = &userID
 		model.UpdatedBy = &userID
 	}
@@ -51,13 +52,11 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 		// terminar en violación de PK (duplicate key) como "pk_workorder_items".
 		if err := tx.Omit("Items", "InvestorSplits").Create(&model).Error; err != nil {
 			if isUniqueViolation(err) {
-				return types.NewError(
-					types.ErrConflict,
-					fmt.Sprintf("work order already exists for number %s and project %d", o.Number, o.ProjectID),
-					err,
+				return domainerr.Newf(domainerr.KindConflict,
+					"work order already exists for number %s and project %d", o.Number, o.ProjectID,
 				)
 			}
-			return types.NewError(types.ErrInternal, "failed to create work order header", err)
+			return domainerr.Internal("failed to create work order header")
 		}
 
 		// 3.2) insertar los items explícitamente asignando WorkOrderID
@@ -68,7 +67,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 				model.Items[i].ID = 0
 			}
 			if err := tx.Create(&model.Items).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to create work order items", err)
+				return domainerr.Internal("failed to create work order items")
 			}
 		}
 
@@ -77,9 +76,14 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
 				model.InvestorSplits[i].ID = 0
+				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
+					model.InvestorSplits[i].InvestorID,
+					model.InvestorSplits[i].PaymentStatus,
+					nil,
+				)
 			}
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to create work order investor splits", err)
+				return domainerr.Internal("failed to create work order investor splits")
 			}
 		}
 
@@ -101,9 +105,9 @@ func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.Wo
 		First(&m).Error; err != nil {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, "work order not found", err)
+			return nil, domainerr.NotFound("work order not found")
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get work order", err)
+		return nil, domainerr.Internal("failed to get work order")
 	}
 	return m.ToDomain(), nil
 }
@@ -117,7 +121,7 @@ func (r *Repository) GetWorkOrderByNumberAndProjectID(ctx context.Context, numbe
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, types.NewError(types.ErrInternal, "failed to get work order", err)
+		return nil, domainerr.Internal("failed to get work order")
 	}
 	return m.ToDomain(), nil
 }
@@ -134,7 +138,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	model.ID = o.ID
 
 	// 2) Poblar UpdatedBy si hay usuario en contexto
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.UpdatedBy = &userID
 	}
 
@@ -148,25 +152,25 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		if err := query.First(&orig).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				if !o.Base.UpdatedAt.IsZero() {
-					return types.NewError(types.ErrConflict, "work order not found or outdated", err)
+					return domainerr.Conflict("work order not found or outdated")
 				}
-				return types.NewError(types.ErrNotFound, "work order not found", err)
+				return domainerr.NotFound("work order not found")
 			}
-			return types.NewError(types.ErrInternal, "failed to find work order before update", err)
+			return domainerr.Internal("failed to find work order before update")
 		}
 
 		// 3.2) Eliminar todos los items antiguos
 		if err := tx.
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderItem{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old items", err)
+			return domainerr.Internal("failed to delete old items")
 		}
 
 		// 3.2b) Eliminar splits antiguos
 		if err := tx.
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old investor splits", err)
+			return domainerr.Internal("failed to delete old investor splits")
 		}
 
 		// 3.3) Actualizar sólo la cabecera, omitiendo campos de auditoría y la asociación Items
@@ -177,10 +181,10 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		}
 		updateTx = updateTx.Updates(model)
 		if updateTx.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update work order header", updateTx.Error)
+			return domainerr.Internal("failed to update work order header")
 		}
 		if updateTx.RowsAffected == 0 {
-			return types.NewError(types.ErrConflict, "work order not found or outdated", nil)
+			return domainerr.Conflict("work order not found or outdated")
 		}
 
 		// 3.4) Insertar los items nuevos, asignando WorkOrderID
@@ -189,18 +193,24 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		}
 		if len(model.Items) > 0 {
 			if err := tx.Create(&model.Items).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new items", err)
+				return domainerr.Internal("failed to insert new items")
 			}
 		}
 
 		// 3.5) Insertar splits nuevos
 		if len(model.InvestorSplits) > 0 {
+			existingStatuses := indexSplitPaymentStatuses(orig.InvestorSplits)
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
 				model.InvestorSplits[i].ID = 0
+				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
+					model.InvestorSplits[i].InvestorID,
+					model.InvestorSplits[i].PaymentStatus,
+					existingStatuses,
+				)
 			}
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new investor splits", err)
+				return domainerr.Internal("failed to insert new investor splits")
 			}
 		}
 
@@ -215,20 +225,20 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Unscoped().Model(&models.WorkOrder{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check work order existence", err)
+			return domainerr.Internal("failed to check work order existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, "work order not found", nil)
+			return domainerr.NotFound("work order not found")
 		}
 
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete work order items", err)
+			return domainerr.Internal("failed to delete work order items")
 		}
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete work order investor splits", err)
+			return domainerr.Internal("failed to delete work order investor splits")
 		}
 		if err := tx.Unscoped().Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete work order", err)
+			return domainerr.Internal("failed to hard delete work order")
 		}
 		return nil
 	})
@@ -242,12 +252,12 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 		var wo models.WorkOrder
 		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "work order not found", err)
+				return domainerr.NotFound("work order not found")
 			}
-			return types.NewError(types.ErrInternal, "failed to get work order", err)
+			return domainerr.Internal("failed to get work order")
 		}
 		if wo.DeletedAt.Valid {
-			return types.NewError(types.ErrConflict, "work order already archived", nil)
+			return domainerr.Conflict("work order already archived")
 		}
 
 		if err := tx.Model(&models.WorkOrder{}).
@@ -255,7 +265,7 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to archive work order", err)
+			return domainerr.Internal("failed to archive work order")
 		}
 		return nil
 	})
@@ -269,12 +279,12 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		var wo models.WorkOrder
 		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "work order not found", err)
+				return domainerr.NotFound("work order not found")
 			}
-			return types.NewError(types.ErrInternal, "failed to get work order", err)
+			return domainerr.Internal("failed to get work order")
 		}
 		if !wo.DeletedAt.Valid {
-			return types.NewError(types.ErrConflict, "work order is not archived", nil)
+			return domainerr.Conflict("work order is not archived")
 		}
 
 		if err := tx.Unscoped().Model(&models.WorkOrder{}).
@@ -283,8 +293,44 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 				"deleted_at": nil,
 				"updated_at": time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore work order", err)
+			return domainerr.Internal("failed to restore work order")
 		}
+		return nil
+	})
+}
+
+func (r *Repository) UpdateInvestorPaymentStatus(
+	ctx context.Context,
+	workOrderID int64,
+	investorID int64,
+	paymentStatus string,
+) error {
+	if err := sharedrepo.ValidateID(workOrderID, "work order"); err != nil {
+		return err
+	}
+	if err := sharedrepo.ValidateID(investorID, "investor"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var workOrder models.WorkOrder
+		if err := tx.Select("id").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("work order not found")
+			}
+			return domainerr.Internal("failed to find work order")
+		}
+
+		updateTx := tx.Model(&models.WorkOrderInvestorSplit{}).
+			Where("workorder_id = ? AND investor_id = ? AND deleted_at IS NULL", workOrderID, investorID).
+			Update("payment_status", paymentStatus)
+		if updateTx.Error != nil {
+			return domainerr.Internal("failed to update investor payment status")
+		}
+		if updateTx.RowsAffected == 0 {
+			return domainerr.NotFound("investor split not found")
+		}
+
 		return nil
 	})
 }
@@ -292,6 +338,35 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func indexSplitPaymentStatuses(
+	splits []models.WorkOrderInvestorSplit,
+) map[int64]string {
+	statuses := make(map[int64]string, len(splits))
+	for _, split := range splits {
+		if split.InvestorID <= 0 {
+			continue
+		}
+		statuses[split.InvestorID] = split.PaymentStatus
+	}
+	return statuses
+}
+
+func normalizeSplitPaymentStatus(
+	investorID int64,
+	status string,
+	existingStatuses map[int64]string,
+) string {
+	if status != "" {
+		return status
+	}
+	if existingStatuses != nil {
+		if existingStatus, ok := existingStatuses[investorID]; ok && existingStatus != "" {
+			return existingStatus
+		}
+	}
+	return domain.InvestorPaymentStatusPending
 }
 
 func (r *Repository) ListWorkOrders(
@@ -330,8 +405,8 @@ func (r *Repository) ListWorkOrders(
 	var total int64
 	if err := base.
 		Count(&total).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to count work orders", err)
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to count work orders")
 	}
 
 	// 5) Paginación
@@ -344,8 +419,8 @@ func (r *Repository) ListWorkOrders(
 		Offset(offset).
 		Order("number desc").
 		Find(&rows).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to list work orders", err)
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to list work orders")
 	}
 
 	// 7) Mapear a dominio
@@ -427,7 +502,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 	}
 
 	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to get metrics", err)
+		return nil, domainerr.Internal("failed to get metrics")
 	}
 
 	return &domain.WorkOrderMetrics{
@@ -483,7 +558,7 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 
 	var totalCost decimal.Decimal
 	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&totalCost).Error; err != nil {
-		return decimal.Zero, types.NewError(types.ErrInternal, "failed to get raw direct cost", err)
+		return decimal.Zero, domainerr.Internal("failed to get raw direct cost")
 	}
 
 	return totalCost, nil

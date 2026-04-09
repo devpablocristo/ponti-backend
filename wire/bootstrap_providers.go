@@ -9,10 +9,10 @@ import (
 	"github.com/google/wire"
 	"gorm.io/gorm"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	sug "github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
+	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 )
 
 // --- GORM ----

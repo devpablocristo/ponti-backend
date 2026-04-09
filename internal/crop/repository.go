@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	models "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {
@@ -35,7 +35,7 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create crop", err)
+		return 0, domainerr.Internal("failed to create crop")
 	}
 	return model.ID, nil
 }
@@ -43,7 +43,7 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.Crop{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count crops", err)
+		return nil, 0, domainerr.Internal("failed to count crops")
 	}
 
 	var list []models.Crop
@@ -54,7 +54,7 @@ func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list crops", err)
+		return nil, 0, domainerr.Internal("failed to list crops")
 	}
 
 	result := make([]domain.Crop, 0, len(list))
@@ -90,13 +90,13 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	}
 	result := updateTx.Updates(models.FromDomainCrop(c))
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update crop", result.Error)
+		return domainerr.Internal("failed to update crop")
 	}
 	if result.RowsAffected == 0 {
 		if !c.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "crop not found or outdated", nil)
+			return domainerr.Conflict("crop not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("crop with id %d does not exist", c.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop with id %d does not exist", c.ID))
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Crop{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete crop", result.Error)
+		return domainerr.Internal("failed to delete crop")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("crop with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop with id %d does not exist", id))
 	}
 	return nil
 }

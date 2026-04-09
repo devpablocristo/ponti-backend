@@ -1,4 +1,5 @@
-// Package ai expone endpoints HTTP que proxyean al AI Copilot Service.
+// Package ai expone endpoints HTTP que proxyean a Ponti AI
+// (`InsightService` + `CopilotAgent`).
 package ai
 
 import (
@@ -9,15 +10,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/ai/handler/dto"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	dto "github.com/devpablocristo/ponti-backend/internal/ai/handler/dto"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
 	ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error)
 	GetInsights(ctx context.Context, userID, projectID, entityType, entityID string) (int, []byte, error)
 	GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error)
+	ExplainInsight(ctx context.Context, userID, projectID, insightID, mode string) (int, []byte, error)
 	RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error)
 }
 
@@ -67,6 +69,9 @@ func (h *Handler) Routes() {
 		public.GET("/insights/summary", h.GetSummary)
 		public.GET("/insights/:entity_type/:entity_id", h.GetInsights)
 		public.POST("/insights/:insight_id/actions", h.RecordAction)
+		public.GET("/copilot/insights/:insight_id/explain", h.ExplainInsight)
+		public.GET("/copilot/insights/:insight_id/why", h.WhyInsight)
+		public.GET("/copilot/insights/:insight_id/next-steps", h.NextStepsInsight)
 	}
 }
 
@@ -105,7 +110,7 @@ func (h *Handler) GetInsights(c *gin.Context) {
 func (h *Handler) RecordAction(c *gin.Context) {
 	var req dto.ActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 	insightID := c.Param("insight_id")
@@ -118,9 +123,32 @@ func (h *Handler) RecordAction(c *gin.Context) {
 	h.respondProxy(c, status, body, err)
 }
 
+func (h *Handler) ExplainInsight(c *gin.Context) {
+	h.explainInsight(c, "explain")
+}
+
+func (h *Handler) WhyInsight(c *gin.Context) {
+	h.explainInsight(c, "why")
+}
+
+func (h *Handler) NextStepsInsight(c *gin.Context) {
+	h.explainInsight(c, "next-steps")
+}
+
+func (h *Handler) explainInsight(c *gin.Context, mode string) {
+	insightID := c.Param("insight_id")
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	status, body, err := h.ucs.ExplainInsight(c.Request.Context(), userID, projectID, insightID, mode)
+	h.respondProxy(c, status, body, err)
+}
+
 func (h *Handler) respondProxy(c *gin.Context, status int, body []byte, err error) {
 	if err != nil {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrUnavailable, "ai service unavailable", err))
+		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
 		return
 	}
 	if status >= http.StatusBadRequest {
@@ -139,10 +167,10 @@ func extractIDs(c *gin.Context) (string, string, error) {
 	userID := strings.TrimSpace(c.GetHeader("X-USER-ID"))
 	projectID := strings.TrimSpace(c.GetHeader("X-PROJECT-ID"))
 	if userID == "" {
-		return "", "", types.NewMissingFieldError("user_id")
+		return "", "", domainerr.Validation("The field 'user_id' is required")
 	}
 	if projectID == "" {
-		return "", "", types.NewMissingFieldError("project_id")
+		return "", "", domainerr.Validation("The field 'project_id' is required")
 	}
 	return userID, projectID, nil
 }

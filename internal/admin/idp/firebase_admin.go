@@ -38,4 +38,3 @@ func (a *FirebaseAdmin) GetUserUIDByEmail(ctx context.Context, email string) (st
 func (a *FirebaseAdmin) GeneratePasswordResetLink(ctx context.Context, email string) (string, error) {
 	return a.client.PasswordResetLink(ctx, email)
 }
-

@@ -5,13 +5,13 @@ import (
 
 	"gorm.io/gorm"
 
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/campaign/usecases/domain"
-	projectmod "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
+	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type GormEnginePort interface {
@@ -42,7 +42,7 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 		WithContext(ctx).
 		Create(model).
 		Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create campaign", err)
+		return 0, domainerr.Internal("failed to create campaign")
 	}
 
 	return model.ID, nil
@@ -65,7 +65,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			Where("name = ?", projectName).
 			Scan(&filter).
 			Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to list by project filter", err)
+			return nil, domainerr.Internal("failed to list by project filter")
 		}
 	}
 
@@ -79,7 +79,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			mapProject[f.CampaignID] = f.ProjectID
 		}
 		if err := db.Where("id IN ?", ids).Find(&raw).Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to fetch filtered campaigns", err)
+			return nil, domainerr.Internal("failed to fetch filtered campaigns")
 		}
 
 		out := make([]domain.Campaign, 0, len(raw))
@@ -93,7 +93,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 
 	// Sin filtro
 	if err := db.Find(&raw).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list campaigns", err)
+		return nil, domainerr.Internal("failed to list campaigns")
 	}
 	out := make([]domain.Campaign, len(raw))
 	for i, m := range raw {

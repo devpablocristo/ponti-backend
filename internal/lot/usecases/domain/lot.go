@@ -3,8 +3,8 @@ package domain
 import (
 	"time"
 
-	cropdom "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 

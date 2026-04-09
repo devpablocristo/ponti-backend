@@ -6,7 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 // WorkOrder representa una orden de trabajo.
@@ -31,9 +31,15 @@ type WorkOrder struct {
 	Base shareddomain.Base
 }
 
+const (
+	InvestorPaymentStatusPending = "Pendiente"
+	InvestorPaymentStatusPaid    = "Pagada"
+)
+
 type WorkOrderInvestorSplit struct {
-	InvestorID int64
-	Percentage decimal.Decimal
+	InvestorID    int64
+	Percentage    decimal.Decimal
+	PaymentStatus string
 }
 
 // WorkOrderItem representa un item de la orden de trabajo.

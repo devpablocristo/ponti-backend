@@ -7,7 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 type GetEntrySupplyMovementsResponse struct {

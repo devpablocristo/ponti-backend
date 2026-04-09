@@ -1,6 +1,6 @@
 package dto
 
-import "github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+import "github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 
 type LaborCategory struct {
 	ID   int64  `json:"id"`

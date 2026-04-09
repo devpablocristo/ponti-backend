@@ -1,14 +1,14 @@
 package excel
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
 
 type ExcelTableDto struct {
 	Name           string  `excel:"NOMBRE"`
 	CategoryName   string  `excel:"CATEGORÍA"`
 	Price          float64 `excel:"PRECIO"`
-	PriceStatus	   string  `excel:"ESTADO_PRECIO"`
+	PriceStatus    string  `excel:"ESTADO_PRECIO"`
 	ContractorName string  `excel:"CONTRATISTA"`
 }
 

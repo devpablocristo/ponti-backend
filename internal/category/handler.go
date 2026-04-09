@@ -3,11 +3,12 @@ package category
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/category/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/category/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/category/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -95,7 +96,7 @@ func (h *Handler) ListCategories(c *gin.Context) {
 }
 
 func (h *Handler) GetCategory(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
+	id, err := ginmw.ParseParamID(c, "category_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -109,7 +110,7 @@ func (h *Handler) GetCategory(c *gin.Context) {
 }
 
 func (h *Handler) UpdateCategory(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
+	id, err := ginmw.ParseParamID(c, "category_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -126,7 +127,7 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("category_id"), "category_id")
+	id, err := ginmw.ParseParamID(c, "category_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

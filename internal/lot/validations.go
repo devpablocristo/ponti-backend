@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/lot/handler/dto"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/pkg/validations"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
+	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/core/validate/go"
 )
 
 // ValidationError representa un error de validación específico
@@ -58,24 +58,24 @@ func ValidateCropName(name string) error {
 // ValidateNameExtended valida nombres con soporte extendido de caracteres para entidades del negocio
 func ValidateNameExtended(name, fieldName string, minLen, maxLen int) error {
 	if strings.TrimSpace(name) == "" {
-		return validations.Err(fieldName, "cannot be empty")
+		return validate.Err(fieldName, "cannot be empty")
 	}
 
 	if len(strings.TrimSpace(name)) < minLen {
-		return validations.Err(fieldName, fmt.Sprintf("must have at least %d characters", minLen))
+		return validate.Err(fieldName, fmt.Sprintf("must have at least %d characters", minLen))
 	}
 
 	if len(name) > maxLen {
-		return validations.Err(fieldName, fmt.Sprintf("cannot exceed %d characters", maxLen))
+		return validate.Err(fieldName, fmt.Sprintf("cannot exceed %d characters", maxLen))
 	}
 
 	if strings.Contains(name, "  ") {
-		return validations.Err(fieldName, "cannot contain consecutive spaces")
+		return validate.Err(fieldName, "cannot contain consecutive spaces")
 	}
 
 	// Validar que solo contenga caracteres válidos
 	if !isValidBusinessName(name) {
-		return validations.Err(fieldName, "contains invalid characters")
+		return validate.Err(fieldName, "contains invalid characters")
 	}
 
 	return nil
@@ -94,26 +94,26 @@ func ValidateNonEmptyCollection(collection any, fieldName string) error {
 	switch v := collection.(type) {
 	case []any:
 		if len(v) == 0 {
-			return validations.Err(fieldName, "cannot be empty")
+			return validate.Err(fieldName, "cannot be empty")
 		}
 	case []string:
 		if len(v) == 0 {
-			return validations.Err(fieldName, "cannot be empty")
+			return validate.Err(fieldName, "cannot be empty")
 		}
 	case []int:
 		if len(v) == 0 {
-			return validations.Err(fieldName, "cannot be empty")
+			return validate.Err(fieldName, "cannot be empty")
 		}
 	case []int64:
 		if len(v) == 0 {
-			return validations.Err(fieldName, "cannot be empty")
+			return validate.Err(fieldName, "cannot be empty")
 		}
 	case []dto.LotDates:
 		if len(v) == 0 {
-			return validations.Err(fieldName, "cannot be empty")
+			return validate.Err(fieldName, "cannot be empty")
 		}
 	default:
-		return validations.Err(fieldName, "unsupported collection type")
+		return validate.Err(fieldName, "unsupported collection type")
 	}
 	return nil
 }
@@ -121,13 +121,13 @@ func ValidateNonEmptyCollection(collection any, fieldName string) error {
 // ValidateHectares valida valores de hectáreas
 func ValidateHectares(hectares decimal.Decimal, fieldName string) error {
 	if hectares.LessThanOrEqual(decimal.Zero) {
-		return validations.Err(fieldName, "must be greater than 0")
+		return validate.Err(fieldName, "must be greater than 0")
 	}
 
 	// Opcional: Agregar validación de límite máximo
 	maxHectares := decimal.NewFromFloat(10000.0) // 10,000 hectares as example limit
 	if hectares.GreaterThan(maxHectares) {
-		return validations.Err(fieldName, "exceeds maximum allowed hectares")
+		return validate.Err(fieldName, "exceeds maximum allowed hectares")
 	}
 
 	return nil
@@ -136,13 +136,13 @@ func ValidateHectares(hectares decimal.Decimal, fieldName string) error {
 // ValidateTons valida valores de toneladas
 func ValidateTons(tons decimal.Decimal, fieldName string) error {
 	if tons.IsNegative() {
-		return validations.Err(fieldName, "must be greater than or equal to 0")
+		return validate.Err(fieldName, "must be greater than or equal to 0")
 	}
 
 	// Límite máximo razonable de toneladas por lote
 	maxTons := decimal.NewFromFloat(10000.0)
 	if tons.GreaterThan(maxTons) {
-		return validations.Err(fieldName, "exceeds maximum allowed tons")
+		return validate.Err(fieldName, "exceeds maximum allowed tons")
 	}
 
 	return nil
@@ -151,14 +151,14 @@ func ValidateTons(tons decimal.Decimal, fieldName string) error {
 // ValidateSeason valida el campo temporada
 func ValidateSeason(season string, fieldName string) error {
 	if strings.TrimSpace(season) == "" {
-		return validations.Err(fieldName, "cannot be empty")
+		return validate.Err(fieldName, "cannot be empty")
 	}
 
 	// Validar formato de temporada (ej: "2024-2025", "2025")
 	seasonPattern := `^(\d{4}(-\d{4})?)$`
 	matched, _ := regexp.MatchString(seasonPattern, season)
 	if !matched {
-		return validations.Err(fieldName, "invalid season format. Use format: YYYY or YYYY-YYYY")
+		return validate.Err(fieldName, "invalid season format. Use format: YYYY or YYYY-YYYY")
 	}
 
 	return nil
@@ -167,7 +167,7 @@ func ValidateSeason(season string, fieldName string) error {
 // ValidateCropID valida IDs de cultivos
 func ValidateCropID(cropID int64, fieldName string) error {
 	if cropID <= 0 {
-		return validations.Err(fieldName, "must be greater than 0")
+		return validate.Err(fieldName, "must be greater than 0")
 	}
 	return nil
 }
@@ -175,7 +175,7 @@ func ValidateCropID(cropID int64, fieldName string) error {
 // ValidateFieldID valida IDs de campos
 func ValidateFieldID(fieldID int64, fieldName string) error {
 	if fieldID <= 0 {
-		return validations.Err(fieldName, "must be greater than 0")
+		return validate.Err(fieldName, "must be greater than 0")
 	}
 	return nil
 }
@@ -275,7 +275,7 @@ func validateLotDates(dates []dto.LotDates, errors *ValidationErrors) {
 func validateLotDate(date dto.LotDates, errors *ValidationErrors, index int) {
 	// Validar fecha de siembra si se proporciona
 	if date.SowingDate != "" {
-		if _, err := validations.ValidateISODate(fmt.Sprintf("dates[%d].sowing_date", index), date.SowingDate); err != nil {
+		if _, err := validate.ValidateISODate(fmt.Sprintf("dates[%d].sowing_date", index), date.SowingDate); err != nil {
 			errors.Errors = append(errors.Errors, ValidationError{
 				Field:   fmt.Sprintf("dates[%d].sowing_date", index),
 				Message: err.Error(),
@@ -286,7 +286,7 @@ func validateLotDate(date dto.LotDates, errors *ValidationErrors, index int) {
 
 	// Validar fecha de cosecha si se proporciona
 	if date.HarvestDate != "" {
-		if _, err := validations.ValidateISODate(fmt.Sprintf("dates[%d].harvest_date", index), date.HarvestDate); err != nil {
+		if _, err := validate.ValidateISODate(fmt.Sprintf("dates[%d].harvest_date", index), date.HarvestDate); err != nil {
 			errors.Errors = append(errors.Errors, ValidationError{
 				Field:   fmt.Sprintf("dates[%d].harvest_date", index),
 				Message: err.Error(),
@@ -311,9 +311,9 @@ func ValidateLotRequest() gin.HandlerFunc {
 		var req dto.Lot
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -325,15 +325,10 @@ func ValidateLotRequest() gin.HandlerFunc {
 			return
 		}
 
-		// Establecer ID de usuario desde el contexto
-		userID := c.Value(pkgmwr.ContextUserIDKey)
-		if userID != nil {
-			if s, ok := userID.(string); ok {
-				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-					req.CreatedBy = &i
-					req.UpdatedBy = &i
-				}
-			}
+		// Establecer actor desde el contexto
+		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
+			req.CreatedBy = &actor
+			req.UpdatedBy = &actor
 		}
 
 		// Validar los campos del Base
@@ -366,9 +361,9 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		var req dto.LotUpdate
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -408,14 +403,9 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		// 	return
 		// }
 
-		// Set user ID from context
-		userID := c.Value(pkgmwr.ContextUserIDKey)
-		if userID != nil {
-			if s, ok := userID.(string); ok {
-				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-					req.UpdatedBy = &i
-				}
-			}
+		// Set actor from context
+		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
+			req.UpdatedBy = &actor
 		}
 
 		// Establecer timestamp actual para UpdatedAt
@@ -442,9 +432,9 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid request payload", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid request payload")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -452,18 +442,18 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 		// Validar formato de toneladas
 		tons, err := decimal.NewFromString(req.Tons)
 		if err != nil {
-			domErr := types.NewError(types.ErrBadRequest, "invalid tons format", err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation("invalid tons format")
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
 
 		// Validar valor de toneladas
 		if err := ValidateTons(tons, "tons"); err != nil {
-			domErr := types.NewError(types.ErrBadRequest, err.Error(), err)
-			apiErr, status := types.NewAPIError(domErr)
-			c.JSON(status, apiErr.ToResponse())
+			domErr := domainerr.Validation(err.Error())
+			status, apiErr := httperr.Normalize(domErr)
+			c.JSON(status, apiErr)
 			c.Abort()
 			return
 		}
@@ -478,7 +468,7 @@ func ValidateLotTonsUpdate() gin.HandlerFunc {
 func validateLotBase(base *shareddomain.Base, errors *ValidationErrors) {
 	// Validar que CreatedAt no sea en el futuro
 	createdAtStr := base.CreatedAt.Format("2006-01-02")
-	if _, err := validations.ValidateISODate("created_at", createdAtStr); err != nil {
+	if _, err := validate.ValidateISODate("created_at", createdAtStr); err != nil {
 		errors.Errors = append(errors.Errors, ValidationError{
 			Field:   "created_at",
 			Message: err.Error(),
@@ -488,7 +478,7 @@ func validateLotBase(base *shareddomain.Base, errors *ValidationErrors) {
 
 	// Validar que UpdatedAt no sea en el futuro
 	updatedAtStr := base.UpdatedAt.Format("2006-01-02")
-	if _, err := validations.ValidateISODate("updated_at", updatedAtStr); err != nil {
+	if _, err := validate.ValidateISODate("updated_at", updatedAtStr); err != nil {
 		errors.Errors = append(errors.Errors, ValidationError{
 			Field:   "updated_at",
 			Message: err.Error(),

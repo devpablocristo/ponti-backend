@@ -36,9 +36,17 @@ Cada módulo debe indicar si:
 - `internal/report/*`: SQL directo.
 - `internal/customer/*`: GORM CRUD.
 
-## AI (Copilot + Insights)
-- Flujo: FE → BFF → Backend Go → AI Service.
+## AI (`InsightService` + `CopilotAgent`)
+- Flujo: FE → BFF → Backend Go → Ponti AI.
 - El FE no conoce claves; el Backend Go usa `X-SERVICE-KEY`.
-- El AI Service es READ-ONLY sobre dominio y solo escribe en `ai_*`.
-- SQL en AI usa allowlist con `project_id` y `LIMIT` obligatorios.
+- Ponti AI es READ-ONLY sobre dominio y solo escribe en `ai_*`.
+- SQL en Ponti AI usa allowlist con `project_id` y `LIMIT` obligatorios.
+- El backend expone proxy HTTP para:
+  - `POST /api/v1/ai/insights/compute`
+  - `GET /api/v1/ai/insights/summary`
+  - `GET /api/v1/ai/insights/{entity_type}/{entity_id}`
+  - `POST /api/v1/ai/insights/{insight_id}/actions`
+  - `GET /api/v1/ai/copilot/insights/{insight_id}/explain`
+  - `GET /api/v1/ai/copilot/insights/{insight_id}/why`
+  - `GET /api/v1/ai/copilot/insights/{insight_id}/next-steps`
 

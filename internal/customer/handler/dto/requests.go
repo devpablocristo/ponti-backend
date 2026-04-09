@@ -1,7 +1,7 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 )
 
 // CreateCustomerRequest es el DTO de entrada para crear un customer.

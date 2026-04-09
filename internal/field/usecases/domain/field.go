@@ -5,10 +5,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	invdom "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	leasetypedom "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
-	lotdom "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	invdom "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	leasetypedom "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	lotdom "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type Field struct {

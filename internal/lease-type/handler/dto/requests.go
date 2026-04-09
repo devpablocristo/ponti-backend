@@ -1,6 +1,6 @@
 package dto
 
-import domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
+import domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
 
 type CreateLeaseTypeRequest struct {
 	Name string `json:"name" binding:"required"`

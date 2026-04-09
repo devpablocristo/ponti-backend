@@ -5,18 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/shopspring/decimal"
 )
 
@@ -39,9 +41,33 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	}
 	model := models.FromDomain(labor)
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create labor", err)
+		return 0, domainerr.Internal("failed to create labor")
 	}
 	return model.ID, nil
+}
+
+func (r *Repository) ExistsLaborByProjectAndName(ctx context.Context, projectID int64, name string) (bool, error) {
+	var count int64
+	err := r.db.Client().WithContext(ctx).
+		Model(&models.Labor{}).
+		Where("project_id = ? AND deleted_at IS NULL AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, name).
+		Count(&count).Error
+	if err != nil {
+		return false, domainerr.Internal("failed to check labor duplicate")
+	}
+	return count > 0, nil
+}
+
+func (r *Repository) ExistsOtherLaborByProjectAndName(ctx context.Context, projectID int64, name string, laborID int64) (bool, error) {
+	var count int64
+	err := r.db.Client().WithContext(ctx).
+		Model(&models.Labor{}).
+		Where("project_id = ? AND deleted_at IS NULL AND id <> ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, laborID, name).
+		Count(&count).Error
+	if err != nil {
+		return false, domainerr.Internal("failed to check labor duplicate")
+	}
+	return count > 0, nil
 }
 
 func (r *Repository) GetLabor(ctx context.Context, laborID int64) (*domain.Labor, error) {
@@ -64,7 +90,7 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, types.NewError(types.ErrInternal, "failed to get work order", err)
+		return 0, domainerr.Internal("failed to get work order")
 	}
 	return count, nil
 }
@@ -73,10 +99,10 @@ func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.Labor{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete labor", result.Error)
+		return domainerr.Internal("failed to delete labor")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("labor with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", id))
 	}
 	return nil
 }
@@ -102,10 +128,10 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 		Updates(updates)
 
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update labor", result.Error)
+		return domainerr.Internal("failed to update labor")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("labor with id %d does not exist", labor.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", labor.ID))
 	}
 	return nil
 }
@@ -120,7 +146,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 
 	// Conteo total filtrado por proyecto
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count labors", err)
+		return nil, 0, domainerr.Internal("failed to count labors")
 	}
 
 	if err := base.
@@ -129,7 +155,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list labor", err)
+		return nil, 0, domainerr.Internal("failed to list labor")
 	}
 
 	// Mapear a dominio ligero
@@ -159,7 +185,7 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 		Where("type_id = ?", typeID)
 
 	if err := db0.Find(&laborCategoriesModels).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list labor categories", err)
+		return nil, domainerr.Internal("failed to list labor categories")
 	}
 
 	laborCategories := make([]domain.LaborCategory, len(laborCategoriesModels))
@@ -207,7 +233,7 @@ func (r *Repository) ListByWorkOrder(ctx context.Context, workOrderID int64) ([]
 
 	err := r.db.Client().WithContext(ctx).Raw(query, workOrderID).Scan(&v4Models).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list labors by work order", err)
+		return nil, domainerr.Internal("failed to list labors by work order")
 	}
 
 	// Convertir a LaborRawItem para mantener compatibilidad
@@ -261,7 +287,7 @@ func (r *Repository) ListGroupLabor(
 		where = append(where, "v4.project_id = ?")
 		args = append(args, projectID)
 	} else {
-		return nil, types.PageInfo{}, types.NewError(types.ErrValidation, "fieldID or projectID is required", nil)
+		return nil, types.PageInfo{}, domainerr.Validation("fieldID or projectID is required")
 	}
 	whereSQL := strings.Join(where, " AND ")
 	view := shareddb.ReportView("labor_list")
@@ -293,6 +319,8 @@ func (r *Repository) ListGroupLabor(
 			v4.usd_net_total,
 			v4.investor_id,
 			COALESCE(v4.investor_name, '') AS investor_name,
+			v4.investor_payment_status,
+			v4.investor_payment_enabled,
 			i.id AS invoice_id,
 			i.number AS invoice_number,
 			i.company AS invoice_company,
@@ -309,7 +337,7 @@ func (r *Repository) ListGroupLabor(
 		WHERE %s
 	`, view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count labors for work order", err)
+		return nil, types.PageInfo{}, domainerr.Internal("failed to count labors for work order")
 	}
 
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
@@ -326,7 +354,7 @@ func (r *Repository) ListGroupLabor(
 	`, selectCols, view, whereSQL)
 	dataArgs := append(append([]any{}, args...), int(inp.PageSize), offset)
 	if err := r.db.Client().WithContext(ctx).Raw(dataQuery, dataArgs...).Scan(&rows).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list grouped labors", err)
+		return nil, types.PageInfo{}, domainerr.Internal("failed to list grouped labors")
 	}
 
 	// IVA (tasa 0.105; si viene 1.105 se normaliza en getIVAPercentage)
@@ -356,28 +384,33 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		list[i] = domain.LaborListItem{
-			WorkOrderID:     m.WorkOrderID,
-			WorkOrderNumber: m.WorkOrderNumber,
-			Date:            m.Date,
-			ProjectName:     m.ProjectName,
-			FieldName:       m.FieldName,
-			CropName:        safeStringPtr(m.CropName),
-			LaborName:       m.LaborName,
-			Contractor:      m.Contractor,
-			SurfaceHa:       m.SurfaceHa,
-			CostHa:          costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
-			CategoryName:    safeStringPtr(m.LaborCategoryName),
-			InvestorName:    safeStringPtr(m.InvestorName),
-			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        netTotal,    // 10.000 × 100 = 1.000.000
-			TotalIVA:        totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
-			USDCostHa:       usdCostHa,   // 10
-			USDNetTotal:     usdNetTotal, // 1000
-			InvoiceID:       invoiceID,
-			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
-			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
-			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
+			WorkOrderID:            m.WorkOrderID,
+			WorkOrderNumber:        m.WorkOrderNumber,
+			Date:                   m.Date,
+			ProjectName:            m.ProjectName,
+			FieldName:              m.FieldName,
+			LotId:                  safeInt64Ptr(m.LotID),
+			LotName:                safeStringPtr(m.LotName),
+			CropName:               safeStringPtr(m.CropName),
+			LaborName:              m.LaborName,
+			Contractor:             m.Contractor,
+			SurfaceHa:              m.SurfaceHa,
+			CostHa:                 costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
+			CategoryName:           safeStringPtr(m.LaborCategoryName),
+			InvestorID:             safeInt64Ptr(m.InvestorID),
+			InvestorName:           safeStringPtr(m.InvestorName),
+			InvestorPaymentStatus:  safeStringPtr(m.InvestorPaymentStatus),
+			InvestorPaymentEnabled: m.InvestorPaymentEnabled,
+			USDAvgValue:            m.USDAvgValue,
+			NetTotal:               netTotal,    // 10.000 × 100 = 1.000.000
+			TotalIVA:               totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
+			USDCostHa:              usdCostHa,   // 10
+			USDNetTotal:            usdNetTotal, // 1000
+			InvoiceID:              invoiceID,
+			InvoiceNumber:          safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:         safeStringPtr(m.InvoiceCompany),
+			InvoiceDate:            m.InvoiceDate,
+			InvoiceStatus:          safeStringPtr(m.InvoiceStatus),
 		}
 	}
 
@@ -395,10 +428,14 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 		Where("key = ? AND deleted_at IS NULL", "iva_percentage").
 		Scan(&value).Error
 	if err != nil || value == "" {
+		slog.Warn("IVA percentage not found in business_parameters, using fallback 0.105",
+			"error", err, "key", "iva_percentage")
 		return decimal.NewFromFloat(0.105), nil
 	}
 	v, err := decimal.NewFromString(value)
 	if err != nil {
+		slog.Warn("IVA percentage value is not a valid decimal, using fallback 0.105",
+			"error", err, "raw_value", value)
 		return decimal.NewFromFloat(0.105), nil
 	}
 	if v.GreaterThan(decimal.NewFromInt(1)) {
@@ -423,8 +460,8 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		where = append(where, "v4.project_id = ?")
 		args = append(args, projectID)
 	} else {
-		return nil, types.PageInfo{}, types.NewError(types.ErrValidation,
-			"fieldID or projectID is required", nil)
+		return nil, types.PageInfo{}, domainerr.Validation(
+			"fieldID or projectID is required")
 	}
 	whereSQL := strings.Join(where, " AND ")
 	view := shareddb.ReportView("labor_list")
@@ -463,8 +500,8 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		WHERE %s
 	`, view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to count labors for work order", err)
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to count labors for work order")
 	}
 
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
@@ -482,8 +519,8 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 	`, selectCols, view, whereSQL)
 	dataArgs := append(append([]any{}, args...), int(inp.PageSize), offset)
 	if err := r.db.Client().WithContext(ctx).Raw(dataQuery, dataArgs...).Scan(&rows).Error; err != nil {
-		return nil, types.PageInfo{}, types.NewError(types.ErrInternal,
-			"failed to list grouped labors", err)
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to list grouped labors")
 	}
 
 	list := make([]domain.LaborRawItem, len(rows))
@@ -494,9 +531,9 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 		// Obtener porcentaje de IVA dinámicamente desde bparams
 		ivaPercentage, err := r.getIVAPercentage(ctx)
 		if err != nil {
-			// Si hay error, usar valor por defecto y logear el error
-			// TODO: Implementar logging apropiado
-			ivaPercentage = decimal.NewFromFloat(1.105) // 10.5%
+			slog.Warn("failed to get IVA percentage from bparams, using fallback 0.105",
+				"error", err)
+			ivaPercentage = decimal.NewFromFloat(0.105)
 		}
 		totalIVA := netTotal.Mul(ivaPercentage)
 
@@ -519,14 +556,14 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 			LaborName:       m.LaborName,
 			Contractor:      m.Contractor,
 			SurfaceHa:       m.SurfaceHa,
-			CostHa:          usdCostHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
+			CostHa:          m.CostPerHa,
 			CategoryName:    safeStringPtr(m.LaborCategoryName),
 			InvestorName:    safeStringPtr(m.InvestorName),
 			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        usdNetTotal, // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
+			NetTotal:        netTotal,
 			TotalIVA:        totalIVA,
-			USDCostHa:       m.CostPerHa, // TODO: invertir los nombres de las variables, se invirtio USDCostHA por CostHA
-			USDNetTotal:     netTotal,    // TODO: invertir los nombres de las variables, se invirtio usdNetTotal por netTotal
+			USDCostHa:       usdCostHa,
+			USDNetTotal:     usdNetTotal,
 			InvoiceID:       invoiceID,
 			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
 			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
@@ -543,6 +580,13 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 func safeStringPtr(ptr *string) string {
 	if ptr == nil {
 		return ""
+	}
+	return *ptr
+}
+
+func safeInt64Ptr(ptr *int64) int64 {
+	if ptr == nil {
+		return 0
 	}
 	return *ptr
 }
@@ -582,7 +626,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 			WHERE project_id IN ? AND field_id = ?
 		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs, *f.FieldID).Scan(&row).Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+			return nil, domainerr.Internal("failed to get labor metrics")
 		}
 
 		return &domain.LaborMetrics{
@@ -607,7 +651,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 			WHERE project_id IN ?
 		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs).Scan(&row).Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+			return nil, domainerr.Internal("failed to get labor metrics")
 		}
 
 		return &domain.LaborMetrics{
@@ -628,7 +672,7 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 			WHERE field_id = ?
 		`, shareddb.ReportView("labor_metrics"))
 		if err := r.db.Client().WithContext(ctx).Raw(q, *f.FieldID).Scan(&row).Error; err != nil {
-			return nil, types.NewError(types.ErrInternal, "failed to get labor metrics", err)
+			return nil, domainerr.Internal("failed to get labor metrics")
 		}
 
 		return &domain.LaborMetrics{
@@ -679,7 +723,7 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 	var rows []models.LaborListItem
 
 	if err := base.Order("v4.workorder_number DESC").Scan(&rows).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list grouped labors", err)
+		return nil, domainerr.Internal("failed to list grouped labors")
 	}
 
 	list := make([]domain.LaborRawItem, len(rows))
@@ -687,9 +731,13 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		// Calcular valores de USD dinámicamente
 		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
 
-		// Usar porcentaje de IVA por defecto (10.5%)
-		// TODO: Implementar obtención dinámica desde bparams
-		ivaPercentage := decimal.NewFromFloat(0.105) // 10.5%
+		// Obtener porcentaje de IVA dinámicamente desde bparams
+		ivaPercentage, err := r.getIVAPercentage(ctx)
+		if err != nil {
+			slog.Warn("failed to get IVA percentage from bparams, using fallback 0.105",
+				"error", err)
+			ivaPercentage = decimal.NewFromFloat(0.105)
+		}
 		totalIVA := netTotal.Mul(ivaPercentage)
 
 		usd := m.USDAvgValue

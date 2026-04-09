@@ -1,7 +1,7 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 )
 
 // CreateManagerRequest es el DTO de entrada para crear un manager.

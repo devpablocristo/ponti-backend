@@ -3,15 +3,15 @@ package dto
 import (
 	"github.com/shopspring/decimal"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type UpdateRealStockRequest struct {
 	RealStockUnits decimal.Decimal `json:"real_stock_units"`
 }
 
-func (r *UpdateRealStockRequest) ToDomain(updatedBy *int64) *domain.Stock {
+func (r *UpdateRealStockRequest) ToDomain(updatedBy *string) *domain.Stock {
 	return &domain.Stock{
 		RealStockUnits: r.RealStockUnits,
 		Base: shareddomain.Base{

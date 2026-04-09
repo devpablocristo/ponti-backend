@@ -3,11 +3,13 @@ package workorder
 
 import (
 	"context"
+	"strings"
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type RepositoryPort interface {
@@ -15,6 +17,7 @@ type RepositoryPort interface {
 	GetWorkOrderByID(ctx context.Context, id int64) (*domain.WorkOrder, error)
 	GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
+	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -40,9 +43,12 @@ func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
 
 func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
 	if o == nil {
-		return 0, types.NewError(types.ErrValidation, "work order is nil", nil)
+		return 0, domainerr.Validation("work order is nil")
 	}
 	if err := validateInvestorSplits(o); err != nil {
+		return 0, err
+	}
+	if err := validateUniqueSupplyItems(o); err != nil {
 		return 0, err
 	}
 	return u.repo.CreateWorkOrder(ctx, o)
@@ -60,12 +66,28 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 	if err := validateInvestorSplits(o); err != nil {
 		return err
 	}
+	if err := validateUniqueSupplyItems(o); err != nil {
+		return err
+	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
+}
+
+func (u *UseCases) UpdateInvestorPaymentStatus(
+	ctx context.Context,
+	workOrderID int64,
+	investorID int64,
+	paymentStatus string,
+) error {
+	normalized, err := normalizeInvestorPaymentStatus(paymentStatus, false)
+	if err != nil {
+		return err
+	}
+	return u.repo.UpdateInvestorPaymentStatus(ctx, workOrderID, investorID, normalized)
 }
 
 func validateInvestorSplits(o *domain.WorkOrder) error {
 	if o == nil {
-		return types.NewError(types.ErrValidation, "work order is nil", nil)
+		return domainerr.Validation("work order is nil")
 	}
 	if len(o.InvestorSplits) == 0 {
 		return nil
@@ -75,13 +97,16 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 	sum := decimal.Zero
 	for _, s := range o.InvestorSplits {
 		if s.InvestorID <= 0 {
-			return types.NewError(types.ErrValidation, "invalid investor_id in investor_splits", nil)
+			return domainerr.Validation("invalid investor_id in investor_splits")
 		}
 		if s.Percentage.LessThanOrEqual(decimal.Zero) {
-			return types.NewError(types.ErrValidation, "invalid percentage in investor_splits", nil)
+			return domainerr.Validation("invalid percentage in investor_splits")
 		}
 		if _, ok := seen[s.InvestorID]; ok {
-			return types.NewError(types.ErrValidation, "duplicate investor_id in investor_splits", nil)
+			return domainerr.Validation("duplicate investor_id in investor_splits")
+		}
+		if _, err := normalizeInvestorPaymentStatus(s.PaymentStatus, true); err != nil {
+			return err
 		}
 		seen[s.InvestorID] = struct{}{}
 		sum = sum.Add(s.Percentage)
@@ -89,9 +114,50 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 
 	// Permitir un margen mínimo por decimales.
 	if sum.Sub(decimal.NewFromInt(100)).Abs().GreaterThan(decimal.NewFromFloat(0.001)) {
-		return types.NewError(types.ErrValidation, "investor_splits percentage must sum to 100", nil)
+		return domainerr.Validation("investor_splits percentage must sum to 100")
 	}
 	return nil
+}
+
+func validateUniqueSupplyItems(o *domain.WorkOrder) error {
+	if o == nil {
+		return domainerr.Validation("work order is nil")
+	}
+
+	if len(o.Items) == 0 {
+		return nil
+	}
+
+	seen := map[int64]struct{}{}
+	for _, item := range o.Items {
+		if item.SupplyID <= 0 {
+			return domainerr.Validation("invalid supply_id in items")
+		}
+
+		if _, ok := seen[item.SupplyID]; ok {
+			return domainerr.Validation("duplicate supply_id in items")
+		}
+
+		seen[item.SupplyID] = struct{}{}
+	}
+
+	return nil
+}
+
+func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, error) {
+	normalized := strings.TrimSpace(status)
+	if normalized == "" && allowEmpty {
+		return "", nil
+	}
+
+	switch normalized {
+	case "", domain.InvestorPaymentStatusPending:
+		return domain.InvestorPaymentStatusPending, nil
+	case domain.InvestorPaymentStatusPaid:
+		return domain.InvestorPaymentStatusPaid, nil
+	default:
+		return "", domainerr.Validation("invalid investor payment status")
+	}
 }
 
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
@@ -122,16 +188,16 @@ func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkOrderFilter) (*d
 
 func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFilter, inp types.Input) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	items, _, err := u.ListWorkOrders(ctx, filt, inp)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list work orders", err)
+		return nil, domainerr.Internal("list work orders")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)

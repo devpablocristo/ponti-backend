@@ -3,7 +3,7 @@ package dto
 import (
 	"testing"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
 
 func TestLabor_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {
@@ -15,7 +15,7 @@ func TestLabor_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) 
 		// IsPartialPrice: nil
 	}
 
-	got := req.ToDomain(99, 123)
+	got := req.ToDomain(99, "test@example.com")
 
 	if got.IsPartialPrice != false {
 		t.Fatalf("expected IsPartialPrice=false when omitted, got %v", got.IsPartialPrice)
@@ -42,7 +42,7 @@ func TestLabor_ToDomain_IsPartialPrice_UsesProvidedValue(t *testing.T) {
 				IsPartialPrice: &v,
 			}
 
-			got := req.ToDomain(77, 456)
+			got := req.ToDomain(77, "test@example.com")
 
 			if got.IsPartialPrice != tc.value {
 				t.Fatalf("expected IsPartialPrice=%v, got %v", tc.value, got.IsPartialPrice)

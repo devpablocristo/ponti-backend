@@ -78,9 +78,10 @@ jobs:
       - name: Build y push imagen
         env:
           IMAGE_TAG: ${{ github.sha }}
+          GO_MODULES_TOKEN: ${{ secrets.CORE_REPO_READ_TOKEN }}
         run: |
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -t "$image_uri" .
+          docker build --secret id=go_modules_token,env=GO_MODULES_TOKEN -t "$image_uri" .
           docker push "$image_uri"
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
 

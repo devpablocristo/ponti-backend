@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/commercialization/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/commercialization/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/commercialization/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasePort interface {
@@ -91,7 +91,7 @@ func (h *Handler) CreateOrUpdateBulk(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	userID, err := sharedhandlers.ParseUserID(c)
+	userID, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

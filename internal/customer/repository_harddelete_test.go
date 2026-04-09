@@ -14,8 +14,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
-	prjmodels "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
+	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
+	prjmodels "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 )
 
 // TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects verifica que DeleteCustomer (hard)

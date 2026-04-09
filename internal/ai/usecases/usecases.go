@@ -59,9 +59,26 @@ func (u *UseCases) GetInsights(ctx context.Context, userID, projectID, entityTyp
 
 func (u *UseCases) GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error) {
 	return u.dummyOrReal(ctx, "GET", "/v1/insights/summary", nil, userID, projectID, map[string]any{
-		"new_count_total":        0,
+		"new_count_total":         0,
 		"new_count_high_severity": 0,
 		"top_insights":            []any{},
+	})
+}
+
+func (u *UseCases) ExplainInsight(
+	ctx context.Context,
+	userID, projectID, insightID, mode string,
+) (int, []byte, error) {
+	path := "/v1/copilot/insights/" + insightID + "/" + mode
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+		"insight_id": insightID,
+		"mode":       mode,
+		"explanation": map[string]any{
+			"human_readable":     "AI copilot no configurado",
+			"audit_focused":      "AI copilot no configurado",
+			"what_to_watch_next": "AI copilot no configurado",
+		},
+		"proposal": nil,
 	})
 }
 
@@ -72,4 +89,3 @@ func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightI
 		"status":     "dummy",
 	})
 }
-

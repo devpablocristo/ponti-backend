@@ -3,8 +3,8 @@ package dollar
 import (
 	"context"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 )
 
 type RepositoryPort interface {
@@ -24,14 +24,14 @@ func NewUseCases(repo RepositoryPort) *UseCases {
 
 func (u *UseCases) ListByProject(ctx context.Context, projectID int64) ([]domain.DollarAverage, error) {
 	if projectID == 0 {
-		return nil, types.NewError(types.ErrInvalidID, "projectID is required", nil)
+		return nil, domainerr.Validation("projectID is required")
 	}
 	return u.repo.ListByProject(ctx, projectID)
 }
 
 func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.DollarAverage) error {
 	if len(items) == 0 {
-		return types.NewError(types.ErrInternal, "no values provided", nil)
+		return domainerr.Internal("no values provided")
 	}
 
 	base := items[0]
@@ -39,28 +39,28 @@ func (u *UseCases) CreateOrUpdateBulk(ctx context.Context, items []domain.Dollar
 
 	for _, d := range items {
 		if d.ProjectID != base.ProjectID || d.Year != base.Year {
-			return types.NewError(types.ErrBadRequest, "all items must share projectID and year", nil)
+			return domainerr.Validation("all items must share projectID and year")
 		}
 		if seen[d.Month] {
-			return types.NewError(types.ErrValidation, "duplicate month", nil)
+			return domainerr.Validation("duplicate month")
 		}
 		seen[d.Month] = true
 
 		existing, err := u.repo.GetByComposite(ctx, d.ProjectID, d.Year, d.Month)
 		if err != nil {
-			return types.NewError(types.ErrInternal, "error checking existence for month", err)
+			return domainerr.Internal("error checking existence for month")
 		}
 
 		if existing == nil {
 			id, err := u.repo.Create(ctx, &d)
 			if err != nil {
-				return types.NewError(types.ErrInternal, "error creating month", err)
+				return domainerr.Internal("error creating month")
 			}
 			d.ID = id
 		} else {
 			d.ID = existing.ID
 			if err := u.repo.Update(ctx, &d); err != nil {
-				return types.NewError(types.ErrInternal, "error updating month", err)
+				return domainerr.Internal("error updating month")
 			}
 		}
 	}

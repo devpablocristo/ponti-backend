@@ -2,29 +2,25 @@ package ai
 
 import (
 	"context"
-	"io"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/httpclient"
 	"github.com/gin-gonic/gin"
 )
 
 // InsightTrigger dispara cómputo de insights de forma asíncrona y throttleada.
-// Después de una mutación exitosa en el backend, notifica a ponti-ai para que
-// recalcule insights del proyecto afectado.
 type InsightTrigger struct {
-	baseURL    string
-	serviceKey string
-	httpClient *http.Client
-	throttle   sync.Map      // projectID -> time.Time
-	cooldown   time.Duration // mínimo entre disparos por proyecto
+	caller   *httpclient.Caller
+	throttle sync.Map
+	cooldown time.Duration
+	sem      chan struct{}
 }
 
 // NewInsightTrigger crea un trigger con cooldown configurable.
-// Si cooldownSec <= 0, usa 300s (5 minutos) como default.
 func NewInsightTrigger(baseURL, serviceKey string, timeoutMS, cooldownSec int) *InsightTrigger {
 	if cooldownSec <= 0 {
 		cooldownSec = 300
@@ -32,22 +28,25 @@ func NewInsightTrigger(baseURL, serviceKey string, timeoutMS, cooldownSec int) *
 	if timeoutMS <= 0 {
 		timeoutMS = 10000
 	}
+	h := make(http.Header)
+	h.Set("X-SERVICE-KEY", strings.TrimSpace(serviceKey))
 	return &InsightTrigger{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		serviceKey: serviceKey,
-		httpClient: &http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond},
-		cooldown:   time.Duration(cooldownSec) * time.Second,
+		caller: &httpclient.Caller{
+			BaseURL: strings.TrimRight(baseURL, "/"),
+			Header:  h,
+			HTTP:    &http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond},
+		},
+		cooldown: time.Duration(cooldownSec) * time.Second,
+		sem:      make(chan struct{}, 32),
 	}
 }
 
-// NotifyDataChange dispara un cómputo de insights async si el proyecto no fue
-// computado recientemente (throttle por cooldown).
+// NotifyDataChange dispara un cómputo de insights async con throttle por proyecto.
 func (t *InsightTrigger) NotifyDataChange(projectID, userID string) {
-	if t.baseURL == "" || t.serviceKey == "" {
-		return // AI service no configurado
+	if t.caller.BaseURL == "" {
+		return
 	}
 
-	// Throttle: saltar si se disparó recientemente para este proyecto
 	now := time.Now()
 	if last, ok := t.throttle.Load(projectID); ok {
 		if now.Sub(last.(time.Time)) < t.cooldown {
@@ -56,47 +55,39 @@ func (t *InsightTrigger) NotifyDataChange(projectID, userID string) {
 	}
 	t.throttle.Store(projectID, now)
 
-	// Fire and forget
+	select {
+	case t.sem <- struct{}{}:
+	default:
+		log.Printf("[ai-trigger] semáforo lleno, descartando trigger para proyecto %s", projectID)
+		return
+	}
 	go func() {
+		defer func() { <-t.sem }()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.baseURL+"/v1/insights/compute", nil)
-		if err != nil {
-			log.Printf("[ai-trigger] error creando request para proyecto %s: %v", projectID, err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-SERVICE-KEY", t.serviceKey)
-		req.Header.Set("X-USER-ID", userID)
-		req.Header.Set("X-PROJECT-ID", projectID)
-
-		resp, err := t.httpClient.Do(req)
+		st, _, err := t.caller.DoJSON(ctx, http.MethodPost, "/v1/insights/compute", nil,
+			httpclient.WithHeader("X-USER-ID", userID),
+			httpclient.WithHeader("X-PROJECT-ID", projectID),
+		)
 		if err != nil {
 			log.Printf("[ai-trigger] error computando insights para proyecto %s: %v", projectID, err)
 			return
 		}
-		defer func() { _ = resp.Body.Close() }()
-		_, _ = io.Copy(io.Discard, resp.Body)
-
-		if resp.StatusCode >= 300 {
-			log.Printf("[ai-trigger] insights compute retornó %d para proyecto %s", resp.StatusCode, projectID)
+		if st >= 300 {
+			log.Printf("[ai-trigger] insights compute retornó %d para proyecto %s", st, projectID)
 		} else {
-			log.Printf("[ai-trigger] insights computados para proyecto %s (status %d)", projectID, resp.StatusCode)
+			log.Printf("[ai-trigger] insights computados para proyecto %s (status %d)", projectID, st)
 		}
 	}()
 }
 
 // InsightTriggerMiddleware crea un middleware Gin que dispara cómputo de insights
 // después de mutaciones exitosas (POST/PUT/PATCH/DELETE con respuesta 2xx).
-//
-// Extrae project_id del path param `:project_id`. Si no existe, no dispara.
-// Ignora rutas de AI para evitar triggers recursivos.
 func InsightTriggerMiddleware(trigger *InsightTrigger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Next() // Ejecutar handler primero
+		c.Next()
 
-		// Solo disparar en mutaciones exitosas
 		method := c.Request.Method
 		if method != http.MethodPost && method != http.MethodPut &&
 			method != http.MethodPatch && method != http.MethodDelete {
@@ -108,12 +99,10 @@ func InsightTriggerMiddleware(trigger *InsightTrigger) gin.HandlerFunc {
 			return
 		}
 
-		// Ignorar rutas de AI para evitar recursión
 		if strings.Contains(c.Request.URL.Path, "/ai/") {
 			return
 		}
 
-		// Intentar obtener project_id del path
 		projectID := c.Param("project_id")
 		if projectID == "" {
 			return

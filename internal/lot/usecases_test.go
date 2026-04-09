@@ -9,9 +9,9 @@ package lot
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	mock_lot "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/mocks"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	mock_lot "github.com/devpablocristo/ponti-backend/internal/lot/usecases/mocks"
 )
 
 func TestUseCases_CreateLot(t *testing.T) {
