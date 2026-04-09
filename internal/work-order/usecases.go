@@ -48,6 +48,9 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 	if err := validateInvestorSplits(o); err != nil {
 		return 0, err
 	}
+	if err := validateUniqueSupplyItems(o); err != nil {
+		return 0, err
+	}
 	return u.repo.CreateWorkOrder(ctx, o)
 }
 
@@ -61,6 +64,9 @@ func (u *UseCases) DuplicateWorkOrder(ctx context.Context, number string) (strin
 
 func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
 	if err := validateInvestorSplits(o); err != nil {
+		return err
+	}
+	if err := validateUniqueSupplyItems(o); err != nil {
 		return err
 	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
@@ -110,6 +116,31 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 	if sum.Sub(decimal.NewFromInt(100)).Abs().GreaterThan(decimal.NewFromFloat(0.001)) {
 		return domainerr.Validation("investor_splits percentage must sum to 100")
 	}
+	return nil
+}
+
+func validateUniqueSupplyItems(o *domain.WorkOrder) error {
+	if o == nil {
+		return domainerr.Validation("work order is nil")
+	}
+
+	if len(o.Items) == 0 {
+		return nil
+	}
+
+	seen := map[int64]struct{}{}
+	for _, item := range o.Items {
+		if item.SupplyID <= 0 {
+			return domainerr.Validation("invalid supply_id in items")
+		}
+
+		if _, ok := seen[item.SupplyID]; ok {
+			return domainerr.Validation("duplicate supply_id in items")
+		}
+
+		seen[item.SupplyID] = struct{}{}
+	}
+
 	return nil
 }
 

@@ -46,6 +46,30 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	return model.ID, nil
 }
 
+func (r *Repository) ExistsLaborByProjectAndName(ctx context.Context, projectID int64, name string) (bool, error) {
+	var count int64
+	err := r.db.Client().WithContext(ctx).
+		Model(&models.Labor{}).
+		Where("project_id = ? AND deleted_at IS NULL AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, name).
+		Count(&count).Error
+	if err != nil {
+		return false, domainerr.Internal("failed to check labor duplicate")
+	}
+	return count > 0, nil
+}
+
+func (r *Repository) ExistsOtherLaborByProjectAndName(ctx context.Context, projectID int64, name string, laborID int64) (bool, error) {
+	var count int64
+	err := r.db.Client().WithContext(ctx).
+		Model(&models.Labor{}).
+		Where("project_id = ? AND deleted_at IS NULL AND id <> ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, laborID, name).
+		Count(&count).Error
+	if err != nil {
+		return false, domainerr.Internal("failed to check labor duplicate")
+	}
+	return count > 0, nil
+}
+
 func (r *Repository) GetLabor(ctx context.Context, laborID int64) (*domain.Labor, error) {
 	var m models.Labor
 	if err := r.db.Client().WithContext(ctx).
