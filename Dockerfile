@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.1-alpine AS builder
+FROM golang:1.26.2-alpine AS builder
 
 ENV TZ=America/Argentina/Buenos_Aires
 RUN apk add --no-cache \
