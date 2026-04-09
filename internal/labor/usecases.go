@@ -2,6 +2,7 @@ package labor
 
 import (
 	"context"
+	"strings"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
@@ -21,6 +22,8 @@ type RepositoryPort interface {
 	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 	GetLabor(context.Context, int64) (*domain.Labor, error)
+	ExistsLaborByProjectAndName(context.Context, int64, string) (bool, error)
+	ExistsOtherLaborByProjectAndName(context.Context, int64, string, int64) (bool, error)
 }
 
 type ExporterAdapterPort interface {
@@ -43,6 +46,8 @@ func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC Proje
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
 }
 
+
+
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {
 		return 0, domainerr.Validation("labor is required")
@@ -50,13 +55,25 @@ func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64,
 	if labor.ProjectId == 0 {
 		return 0, domainerr.Validation("project_id is required")
 	}
+	if strings.TrimSpace(labor.Name) == "" {
+		return 0, domainerr.Validation("name is required")
+	}
 	if u.projectUC == nil {
 		return 0, domainerr.Internal("project usecases not configured")
 	}
-	// Validar que el proyecto exista antes de crear labor
+
 	if _, err := u.projectUC.GetProject(ctx, labor.ProjectId); err != nil {
 		return 0, err
 	}
+
+	exists, err := u.repo.ExistsLaborByProjectAndName(ctx, labor.ProjectId, labor.Name)
+	if err != nil {
+		return 0, err
+	}
+	if exists {
+		return 0, domainerr.Conflict("labor already exists in this project")
+	}
+
 	return u.repo.CreateLabor(ctx, labor)
 }
 
@@ -77,6 +94,27 @@ func (u *UseCases) CountWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 }
 
 func (u *UseCases) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
+	if labor == nil {
+		return domainerr.Validation("labor is required")
+	}
+	if labor.ID == 0 {
+		return domainerr.Validation("labor_id is required")
+	}
+	if labor.ProjectId == 0 {
+		return domainerr.Validation("project_id is required")
+	}
+	if strings.TrimSpace(labor.Name) == "" {
+		return domainerr.Validation("name is required")
+	}
+
+	exists, err := u.repo.ExistsOtherLaborByProjectAndName(ctx, labor.ProjectId, labor.Name, labor.ID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return domainerr.Conflict("labor already exists in this project")
+	}
+
 	return u.repo.UpdateLabor(ctx, labor)
 }
 
