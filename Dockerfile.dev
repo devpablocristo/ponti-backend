@@ -1,4 +1,4 @@
-FROM golang:1.26.1-alpine
+FROM golang:1.26.2-alpine
 
 ENV GOPRIVATE=github.com/devpablocristo/*
 ENV TZ=America/Argentina/Buenos_Aires

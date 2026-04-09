@@ -168,6 +168,20 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			return domainerr.Conflict("concurrent update conflict - lot was modified by another user")
 		}
 
+		// Si cambió el cultivo actual del lote, sincronizar las workorders activas de ese lote
+		// para que el listado de órdenes refleje el mismo cultivo.
+		if l.CurrentCrop.ID > 0 {
+			if err := tx.Table("workorders").
+				Where("lot_id = ? AND deleted_at IS NULL", l.ID).
+				Updates(map[string]any{
+					"crop_id":    l.CurrentCrop.ID,
+					"updated_at": nowTS,
+					"updated_by": &userID,
+				}).Error; err != nil {
+				return domainerr.Internal("failed to sync work order crops after lot update")
+			}
+		}
+
 		// Upsert de fechas por secuencia.
 		// No dependemos de ON CONFLICT porque algunos entornos no tienen
 		// unique index (lot_id, sequence) en lot_dates.
