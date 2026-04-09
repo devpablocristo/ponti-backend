@@ -4,12 +4,16 @@ package usecases
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 )
 
 type ClientPort interface {
 	Do(ctx context.Context, method, path string, body any, userID, projectID string) (int, []byte, error)
+	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, projectID string) (*http.Response, error)
 }
 
 type UseCases struct {
@@ -89,6 +93,31 @@ func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightI
 		"request_id": "dummy",
 		"status":     "dummy",
 	})
+}
+
+// ChatStream proxea POST /v1/chat/stream hacia ponti-ai (SSE); escribe headers y cuerpo en w.
+func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error {
+	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, projectID)
+	if err != nil {
+		if isAIServiceNotConfigured(err) {
+			w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("X-Accel-Buffering", "no")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "event: error\ndata: {\"message\":\"ai_not_configured\"}\n\n")
+			return nil
+		}
+		return err
+	}
+	defer resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	return err
 }
 
 func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {

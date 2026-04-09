@@ -5,6 +5,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ type UseCasesPort interface {
 	Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
 	ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error)
 	GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error)
+	ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error
 }
 
 type GinEnginePort interface {
@@ -77,6 +79,7 @@ func (h *Handler) Routes() {
 		public.GET("/copilot/insights/:insight_id/why", h.WhyInsight)
 		public.GET("/copilot/insights/:insight_id/next-steps", h.NextStepsInsight)
 		public.POST("/chat", h.Chat)
+		public.POST("/chat/stream", h.ChatStream)
 		public.GET("/chat/conversations", h.ListChatConversations)
 		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
 	}
@@ -155,6 +158,22 @@ func (h *Handler) Chat(c *gin.Context) {
 	}
 	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, projectID, body)
 	h.respondProxy(c, status, raw, err)
+}
+
+func (h *Handler) ChatStream(c *gin.Context) {
+	if c.Request.Body == nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	userID, projectID, err := extractIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	if err := h.ucs.ChatStream(c.Request.Context(), userID, projectID, c.Request.Body, c.Writer); err != nil && !c.Writer.Written() {
+		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
+	}
 }
 
 func (h *Handler) ListChatConversations(c *gin.Context) {

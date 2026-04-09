@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -48,4 +49,40 @@ func (c *Client) Do(
 		httpclient.WithHeader("X-USER-ID", userID),
 		httpclient.WithHeader("X-PROJECT-ID", projectID),
 	)
+}
+
+// DoStream reenvía el body tal cual (p. ej. JSON del chat) y devuelve la respuesta sin tope de timeout (SSE).
+func (c *Client) DoStream(
+	ctx context.Context,
+	method string,
+	path string,
+	body io.Reader,
+	contentType string,
+	userID string,
+	projectID string,
+) (*http.Response, error) {
+	if c.caller.BaseURL == "" {
+		return nil, fmt.Errorf("ai service url not configured")
+	}
+	u := strings.TrimSuffix(c.caller.BaseURL, "/")
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	u += path
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
+	if err != nil {
+		return nil, err
+	}
+	for k, vals := range c.caller.Header {
+		for _, v := range vals {
+			req.Header.Add(k, v)
+		}
+	}
+	req.Header.Set("X-USER-ID", userID)
+	req.Header.Set("X-PROJECT-ID", projectID)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	cli := &http.Client{Timeout: 0}
+	return cli.Do(req)
 }
