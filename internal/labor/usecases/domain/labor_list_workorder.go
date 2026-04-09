@@ -12,6 +12,8 @@ type LaborListItem struct {
 	Date                   time.Time       // fecha de la orden
 	ProjectName            string          // nombre del proyecto
 	FieldName              string          // nombre del campo
+	LotId				   int64           // id del lote
+	LotName				   string          // nombre del lote
 	CropName               string          // nombre del cultivo
 	LaborName              string          // nombre de la labor
 	Contractor             string          // nombre del contratista
