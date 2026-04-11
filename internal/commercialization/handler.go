@@ -51,11 +51,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.cfg.APIBaseURL() + "/projects/:project_id/commercializations"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListByProject)
 		public.POST("", h.CreateOrUpdateBulk)

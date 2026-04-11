@@ -61,11 +61,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/managers"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	group := r.Group(baseURL)
+	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.POST("", h.CreateManager)
 		group.GET("", h.ListManagers)

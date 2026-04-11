@@ -56,11 +56,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.cfg.APIBaseURL() + "/invoices"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListInvoices)
 		public.GET("/:work_order_id", h.GetInvoiceByWorkOrder)

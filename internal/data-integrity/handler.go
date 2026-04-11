@@ -55,11 +55,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/data-integrity"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(base)
+	public := r.Group(base, h.mws.GetValidation()...)
 	{
 		public.GET("/costs-check", h.CheckCostsCoherence)
 	}

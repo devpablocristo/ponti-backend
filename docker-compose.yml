@@ -42,6 +42,8 @@ services:
       - .:/app
       - go-modules:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app-network
     restart: unless-stopped

@@ -3,6 +3,7 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -65,19 +66,15 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/ai"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("/insights/compute", h.ComputeInsights)
 		public.GET("/insights/summary", h.GetSummary)
 		public.GET("/insights/:entity_type/:entity_id", h.GetInsights)
 		public.POST("/insights/:insight_id/actions", h.RecordAction)
-		public.GET("/copilot/insights/:insight_id/explain", h.ExplainInsight)
-		public.GET("/copilot/insights/:insight_id/why", h.WhyInsight)
-		public.GET("/copilot/insights/:insight_id/next-steps", h.NextStepsInsight)
+		public.GET("/insight-chat/insights/:insight_id/explain", h.ExplainInsight)
+		public.GET("/insight-chat/insights/:insight_id/why", h.WhyInsight)
+		public.GET("/insight-chat/insights/:insight_id/next-steps", h.NextStepsInsight)
 		public.POST("/chat", h.Chat)
 		public.POST("/chat/stream", h.ChatStream)
 		public.GET("/chat/conversations", h.ListChatConversations)
@@ -170,8 +167,21 @@ func (h *Handler) ChatStream(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	// Leer el body completo antes de proxear: pasar c.Request.Body directo a http.Client
+	// puede producir deadlock (el cliente saliente espera leer el body mientras el server
+	// Gin aún no entrega bytes al handler / viceversa) y el cliente ve 0 bytes hasta timeout.
+	const maxChatStreamBody = 1 << 20
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxChatStreamBody+1))
+	if err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	if len(body) > maxChatStreamBody {
+		sharedhandlers.RespondError(c, domainerr.Validation("request body too large"))
+		return
+	}
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	if err := h.ucs.ChatStream(c.Request.Context(), userID, projectID, c.Request.Body, c.Writer); err != nil && !c.Writer.Written() {
+	if err := h.ucs.ChatStream(c.Request.Context(), userID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
 		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
 	}
 }

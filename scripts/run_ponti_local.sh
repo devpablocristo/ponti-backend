@@ -6,6 +6,7 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
 AI_DIR="$ROOT_DIR/ponti-ai"
+LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/../local-infra" 2>/dev/null && pwd || true)"
 
 require_dir() {
   local dir="$1"
@@ -114,11 +115,18 @@ fi
 
 echo "Levantando AI (DB + API) con Docker..."
 # Levantar solo lo necesario (evitar ai-test en local).
-# Ollama solo si el .env indica LLM_PROVIDER=ollama.
+# Ollama corre como servicio compartido en local-infra/ollama.
 ai_services=(ai-db ai-migrate ponti-ai)
 llm_provider="$(grep -E '^LLM_PROVIDER=' "$AI_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]' || true)"
 if [[ "$llm_provider" == "ollama" ]]; then
-  ai_services+=(ollama)
+  ollama_compose="$LOCAL_INFRA_DIR/ollama/docker-compose.yml"
+  if [[ -n "$LOCAL_INFRA_DIR" && -f "$ollama_compose" ]]; then
+    echo "Levantando Ollama compartido (local-infra)..."
+    docker compose -f "$ollama_compose" up -d
+  else
+    echo "ERROR: LLM_PROVIDER=ollama pero no se encontró $ollama_compose" >&2
+    exit 1
+  fi
 fi
 docker compose -f "$AI_DIR/docker-compose.yml" up -d "${ai_services[@]}"
 

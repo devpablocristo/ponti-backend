@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 
@@ -50,11 +50,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/admin"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	admin := r.Group(baseURL)
+	admin := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		admin.GET("/tenants", h.ListTenants)
 		admin.POST("/tenants", h.CreateTenant)
