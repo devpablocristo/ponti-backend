@@ -42,6 +42,13 @@ jobs:
       # Guardrail: hay que setearlo a true para habilitar el flujo.
       SANITIZED_OK: ${{ vars.SANITIZED_OK }}
 
+      # Si se setea, el schema fresco se construye en dos tandas:
+      #   1) migrate goto <N>  -> schema compatible con el dump de PROD
+      #   2) restore datos
+      #   3) migrate up        -> migraciones que convierten los datos (p.ej. 201 uuid)
+      # Dejar vacío para volver al comportamiento original (todas las migraciones antes del restore).
+      RESTORE_SCHEMA_AT_MIGRATION: ${{ vars.RESTORE_SCHEMA_AT_MIGRATION }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -185,16 +192,27 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME"
 
-      - name: Apply migrations on STAGING (fresh schema)
+      - name: Apply migrations on STAGING (pre-restore)
         run: |
           set -euo pipefail
           db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
-          docker run --rm --network host \
-            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
-            migrate/migrate:v4.17.1 \
-            -path /migrations \
-            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_STG}?sslmode=disable" \
-            up
+          if [[ -n "${RESTORE_SCHEMA_AT_MIGRATION:-}" ]]; then
+            echo "Applying migrations up to ${RESTORE_SCHEMA_AT_MIGRATION} (schema compatible with PROD dump)."
+            docker run --rm --network host \
+              -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+              migrate/migrate:v4.17.1 \
+              -path /migrations \
+              -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_STG}?sslmode=disable" \
+              goto "${RESTORE_SCHEMA_AT_MIGRATION}"
+          else
+            echo "Applying ALL migrations (legacy behavior)."
+            docker run --rm --network host \
+              -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+              migrate/migrate:v4.17.1 \
+              -path /migrations \
+              -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_STG}?sslmode=disable" \
+              up
+          fi
 
       - name: Restore data-only into STAGING
         run: |
@@ -295,6 +313,19 @@ jobs:
             END LOOP;
           END $$;
           SQL
+
+      - name: Apply migrations on STAGING (post-restore)
+        if: ${{ env.RESTORE_SCHEMA_AT_MIGRATION != '' }}
+        run: |
+          set -euo pipefail
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          echo "Applying remaining migrations after data restore."
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_STG}?sslmode=disable" \
+            up
 
       - name: Ejecutar sanitizacion (solo STAGING)
         if: ${{ inputs.skip_sanitization != true }}
