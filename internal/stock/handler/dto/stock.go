@@ -35,31 +35,38 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 }
 
 type GetStockSummary struct {
-	ID              int64           `json:"id"`
-	SupplyName      string          `json:"supply_name"`
-	InvestorName    string          `json:"investor_name"`
-	StockUnits      decimal.Decimal `json:"stock_units"`
-	RealStockUnits  decimal.Decimal `json:"real_stock_units"`
-	StockDifference decimal.Decimal `json:"stock_difference"`
-	TotalUSD        decimal.Decimal `json:"total_usd"`
-	ClassType       string          `json:"class_type"`
-	CloseDate       *time.Time      `json:"close_date"`
-	SupplyUnitID    int64           `json:"supply_unit_id"`
-	SupplyUnitPrice decimal.Decimal `json:"supply_unit_price"`
-	EntryStock      decimal.Decimal `json:"entry_stock"`
-	OutStock        decimal.Decimal `json:"out_stock"`
-	Consumed        decimal.Decimal `json:"consumed"`
+	ID              int64            `json:"id"`
+	SupplyName      string           `json:"supply_name"`
+	InvestorName    string           `json:"investor_name"`
+	StockUnits      decimal.Decimal  `json:"stock_units"`
+	RealStockUnits  decimal.Decimal  `json:"real_stock_units"`
+	StockDifference *decimal.Decimal `json:"stock_difference"`
+	TotalUSD        decimal.Decimal  `json:"total_usd"`
+	ClassType       string           `json:"class_type"`
+	CloseDate       *time.Time       `json:"close_date"`
+	SupplyUnitID    int64            `json:"supply_unit_id"`
+	SupplyUnitPrice decimal.Decimal  `json:"supply_unit_price"`
+	EntryStock      decimal.Decimal  `json:"entry_stock"`
+	OutStock        decimal.Decimal  `json:"out_stock"`
+	Consumed        decimal.Decimal  `json:"consumed"`
 }
 
 // MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
 func (s GetStockSummary) MarshalJSON() ([]byte, error) {
+	var stockDifference any
+	if s.StockDifference != nil {
+		stockDifference = s.StockDifference.StringFixed(2)
+	} else {
+		stockDifference = nil
+	}
+
 	aux := struct {
 		ID              int64      `json:"id"`
 		SupplyName      string     `json:"supply_name"`
 		InvestorName    string     `json:"investor_name"`
 		StockUnits      string     `json:"stock_units"`
 		RealStockUnits  string     `json:"real_stock_units"`
-		StockDifference string     `json:"stock_difference"`
+		StockDifference any        `json:"stock_difference"`
 		TotalUSD        string     `json:"total_usd"`
 		ClassType       string     `json:"class_type"`
 		CloseDate       *time.Time `json:"close_date"`
@@ -74,12 +81,12 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		InvestorName:    s.InvestorName,
 		StockUnits:      s.StockUnits.StringFixed(2),
 		RealStockUnits:  s.RealStockUnits.StringFixed(2),
-		StockDifference: s.StockDifference.StringFixed(2),
-		TotalUSD:        s.TotalUSD.StringFixed(2), // Total u$s: 2 decimales
+		StockDifference: stockDifference,
+		TotalUSD:        s.TotalUSD.StringFixed(2),
 		ClassType:       s.ClassType,
 		CloseDate:       s.CloseDate,
 		SupplyUnitID:    s.SupplyUnitID,
-		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2), // Precio u: 2 decimales
+		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2),
 		EntryStock:      s.EntryStock.StringFixed(2),
 		OutStock:        s.OutStock.StringFixed(2),
 		Consumed:        s.Consumed.StringFixed(2),
@@ -89,23 +96,41 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 
 // FromDomain maps domain.Stock to GetStock DTO
 func FromDomain(s *domain.Stock) *GetStockSummary {
-	return &GetStockSummary{
-		ID:              s.ID,
-		InvestorName:    s.Investor.Name,
-		SupplyName:      s.Supply.Name,
-		StockUnits:      s.GetStockUnits(),
-		RealStockUnits:  s.RealStockUnits,
-		TotalUSD:        s.GetTotalUSD(),
-		StockDifference: s.GetStockDifference(),
-		CloseDate:       s.CloseDate,
-		ClassType:       s.Supply.CategoryName, // FIX: usar CategoryName (Herbicidas, Coadyuvantes) en lugar de Type.Name (Agroquímicos)
-		SupplyUnitID:    s.Supply.UnitID,
-		SupplyUnitPrice: s.Supply.Price,
-		EntryStock:      s.GetEntryStock(),
-		OutStock:        s.GetOutStock(),
-		Consumed:        s.Consumed,
+	investorName := ""
+	if s.Investor != nil {
+		investorName = s.Investor.Name
 	}
+
+	classType := ""
+	supplyName := ""
+	supplyUnitID := int64(0)
+	supplyUnitPrice := decimal.Zero
+
+	if s.Supply != nil {
+		classType = s.Supply.CategoryName
+		supplyName = s.Supply.Name
+		supplyUnitID = s.Supply.UnitID
+		supplyUnitPrice = s.Supply.Price
+	}
+
+return &GetStockSummary{
+	ID:              s.ID,
+	InvestorName:    investorName,
+	SupplyName:      supplyName,
+	StockUnits:      s.GetStockUnits(),
+	RealStockUnits:  s.RealStockUnits,
+	TotalUSD:        s.GetTotalUSD(),
+	StockDifference: s.GetStockDifferencePtr(),
+	CloseDate:       s.CloseDate,
+	ClassType:       classType,
+	SupplyUnitID:    supplyUnitID,
+	SupplyUnitPrice: supplyUnitPrice,
+	EntryStock:      s.GetEntryStock(),
+	OutStock:        s.GetOutStock(),
+	Consumed:        s.Consumed,
 }
+}
+
 
 func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 	var netTotalUSD decimal.Decimal

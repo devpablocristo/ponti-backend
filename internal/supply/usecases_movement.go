@@ -64,16 +64,17 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 
 	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
 	if movement.MovementType == domain.STOCK {
-		if isFirst {
-			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
-		}
-		stock.RealStockUnits = movement.Quantity
-		stock.UpdatedBy = movement.UpdatedBy
-		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
-			return 0, err
-		}
-		return 0, nil
+	if isFirst {
+		return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
 	}
+	stock.RealStockUnits = movement.Quantity
+	stock.HasRealStockCount = true
+	stock.UpdatedBy = movement.UpdatedBy
+	if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+		return 0, err
+	}
+	return 0, nil
+}
 
 	if isFirst {
 		stock = createStockDomainFromSupplyMovement(movement)
