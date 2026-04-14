@@ -6,7 +6,8 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
 AI_DIR="$ROOT_DIR/ponti-ai"
-LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/../local-infra" 2>/dev/null && pwd || true)"
+DEFAULT_LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/../local-infra" 2>/dev/null && pwd || true)"
+LOCAL_INFRA_DIR="${LOCAL_INFRA_DIR:-$DEFAULT_LOCAL_INFRA_DIR}"
 
 require_dir() {
   local dir="$1"
@@ -17,6 +18,23 @@ require_dir() {
   fi
 }
 
+resolve_ollama_compose() {
+  local candidates=(
+    "$LOCAL_INFRA_DIR/docker-compose.ollama.yml"
+    "$LOCAL_INFRA_DIR/docker-compose.ollama.yaml"
+    "$LOCAL_INFRA_DIR/ollama/docker-compose.yml"
+    "$LOCAL_INFRA_DIR/ollama/docker-compose.yaml"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 require_dir "$BACKEND_DIR" "backend"
 require_dir "$FRONTEND_DIR" "frontend"
 require_dir "$AI_DIR" "ai"
@@ -24,7 +42,7 @@ require_dir "$AI_DIR" "ai"
 http_ok() {
   local url="$1"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsS "$url" >/dev/null 2>&1
+    curl --connect-timeout 2 --max-time 2 -fsS "$url" >/dev/null 2>&1
     return $?
   fi
   python - <<PY
@@ -119,12 +137,16 @@ echo "Levantando AI (DB + API) con Docker..."
 ai_services=(ai-db ai-migrate ponti-ai)
 llm_provider="$(grep -E '^LLM_PROVIDER=' "$AI_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]' || true)"
 if [[ "$llm_provider" == "ollama" ]]; then
-  ollama_compose="$LOCAL_INFRA_DIR/ollama/docker-compose.yml"
-  if [[ -n "$LOCAL_INFRA_DIR" && -f "$ollama_compose" ]]; then
-    echo "Levantando Ollama compartido (local-infra)..."
+  if [[ -z "$LOCAL_INFRA_DIR" || ! -d "$LOCAL_INFRA_DIR" ]]; then
+    echo "ERROR: LLM_PROVIDER=ollama pero no se encontró LOCAL_INFRA_DIR válido (${LOCAL_INFRA_DIR:-unset})" >&2
+    exit 1
+  fi
+  if ollama_compose="$(resolve_ollama_compose)"; then
+    echo "Levantando Ollama compartido (local-infra) con $ollama_compose..."
     docker compose -f "$ollama_compose" up -d
   else
-    echo "ERROR: LLM_PROVIDER=ollama pero no se encontró $ollama_compose" >&2
+    echo "ERROR: LLM_PROVIDER=ollama pero no se encontró un compose válido en $LOCAL_INFRA_DIR" >&2
+    echo "Busqué en: docker-compose.ollama.yml, docker-compose.ollama.yaml, ollama/docker-compose.yml y ollama/docker-compose.yaml" >&2
     exit 1
   fi
 fi
