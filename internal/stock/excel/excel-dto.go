@@ -27,20 +27,37 @@ func BuildExcelDTO(items []*domain.Stock) []StockExcelDTO {
 	for _, it := range items {
 		entry := it.GetEntryStock()
 		stockUnits := it.GetStockUnits()
-		diff := it.GetStockDifference()
+		diff := decimal.Zero
+if it.HasRealStockCount {
+	diff = it.GetStockDifference()
+}
 		total := it.GetTotalUSD()
 
+		investorName := ""
+		if it.Investor != nil {
+			investorName = it.Investor.Name
+		}
+
+		supplyName := ""
+		classType := ""
+		unitPrice := decimal.Zero
+		if it.Supply != nil {
+			supplyName = it.Supply.Name
+			classType = it.Supply.CategoryName
+			unitPrice = it.Supply.Price
+		}
+
 		out = append(out, StockExcelDTO{
-			SupplyName:      it.Supply.Name,
-			ClassType:       it.Supply.CategoryName, // FIX: usar CategoryName (Herbicidas) en vez de Type.Name (Agroquímicos)
-			InvestorName:    it.Investor.Name,
+			SupplyName:      supplyName,
+			ClassType:       classType,
+			InvestorName:    investorName,
 			EntryStock:      decToFloat(entry, 2),
 			Consumed:        decToFloat(it.Consumed, 2),
 			StockUnits:      decToFloat(stockUnits, 2),
 			RealStockUnits:  decToFloat(it.RealStockUnits, 2),
 			StockDifference: decToFloat(diff, 2),
 			CloseDate:       it.CloseDate,
-			SupplyUnitPrice: decToFloat(it.Supply.Price, 2),
+			SupplyUnitPrice: decToFloat(unitPrice, 2),
 			TotalUSD:        decToFloat(total, 2),
 		})
 	}

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 )
@@ -93,4 +95,55 @@ func TestGetStocksResponse_MarshalJSON_RoundingWithDecimals(t *testing.T) {
 			assert.Equal(t, tt.expectedKG, result["total_kilograms"])
 		})
 	}
+}
+
+func TestFromDomain_MarshalJSON_NullStockDifferenceWhenNoRealCount(t *testing.T) {
+	item := FromDomain(&stockdomain.Stock{
+		Supply: &supplydomain.Supply{
+			Name:         "Urea",
+			CategoryName: "Fertilizantes",
+			UnitID:       2,
+			UnitName:     "Kg",
+			Price:        decimal.NewFromInt(10),
+		},
+		RealStockUnits:    decimal.Zero,
+		Consumed:          decimal.NewFromInt(100),
+		HasRealStockCount: false,
+	})
+
+	payload, err := json.Marshal(item)
+	assert.NoError(t, err)
+
+	var result map[string]any
+	err = json.Unmarshal(payload, &result)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "-100.00", result["stock_units"])
+	assert.Equal(t, nil, result["stock_difference"])
+}
+
+func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenRealCountExists(t *testing.T) {
+	item := FromDomain(&stockdomain.Stock{
+		Supply: &supplydomain.Supply{
+			Name:         "Urea",
+			CategoryName: "Fertilizantes",
+			UnitID:       2,
+			UnitName:     "Kg",
+			Price:        decimal.NewFromInt(10),
+		},
+		RealStockUnits:    decimal.NewFromInt(40),
+		Consumed:          decimal.NewFromInt(2),
+		SupplyMovements:   []supplydomain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(40)}},
+		HasRealStockCount: true,
+	})
+
+	payload, err := json.Marshal(item)
+	assert.NoError(t, err)
+
+	var result map[string]any
+	err = json.Unmarshal(payload, &result)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "38.00", result["stock_units"])
+	assert.Equal(t, "2.00", result["stock_difference"])
 }
