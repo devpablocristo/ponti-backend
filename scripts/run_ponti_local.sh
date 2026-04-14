@@ -115,7 +115,7 @@ fi
 
 echo "Levantando AI (DB + API) con Docker..."
 # Levantar solo lo necesario (evitar ai-test en local).
-# Ollama corre como servicio compartido en local-infra/ollama.
+# Ollama corre como servicio compartido en local-infra/docker-compose.ollama.yml.
 ai_services=(ai-db ai-migrate ponti-ai)
 llm_provider="$(grep -E '^LLM_PROVIDER=' "$AI_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]' || true)"
 if [[ "$llm_provider" == "ollama" ]]; then
