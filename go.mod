@@ -32,10 +32,6 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
-replace github.com/devpablocristo/core/governance/go => /home/pablo/Projects/Pablo/core/governance/go
-
-replace github.com/devpablocristo/core/notifications/go => /home/pablo/Projects/Pablo/core/notifications/go
-
 require github.com/golang-jwt/jwt/v5 v5.3.1
 
 require (
