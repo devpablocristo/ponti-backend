@@ -25,10 +25,7 @@ type LaborListItem struct {
 	SurfaceHa              decimal.Decimal `json:"surface_ha"`
 	CostHa                 decimal.Decimal `json:"cost_ha"`
 	CategoryName           string          `json:"category_name"`
-	InvestorID             int64           `json:"investor_id"`
 	InvestorName           string          `json:"investor_name"`
-	InvestorPaymentStatus  string          `json:"investor_payment_status"`
-	InvestorPaymentEnabled bool            `json:"investor_payment_enabled"`
 	USDAvgValue            decimal.Decimal `json:"usd_avg_value"`
 	NetTotal               decimal.Decimal `json:"net_total"` // Total $ Neto
 	TotalIVA               decimal.Decimal `json:"total_iva"` // Total $ IVA
@@ -57,10 +54,7 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		SurfaceHa              string     `json:"surface_ha"`
 		CostHa                 string     `json:"cost_ha"`
 		CategoryName           string     `json:"category_name"`
-		InvestorID             int64      `json:"investor_id"`
 		InvestorName           string     `json:"investor_name"`
-		InvestorPaymentStatus  string     `json:"investor_payment_status"`
-		InvestorPaymentEnabled bool       `json:"investor_payment_enabled"`
 		USDAvgValue            string     `json:"usd_avg_value"`
 		NetTotal               string     `json:"net_total"`
 		TotalIVA               string     `json:"total_iva"`
@@ -85,10 +79,7 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		SurfaceHa:              l.SurfaceHa.StringFixed(3),
 		CostHa:                 l.CostHa.StringFixed(3),
 		CategoryName:           l.CategoryName,
-		InvestorID:             l.InvestorID,
 		InvestorName:           l.InvestorName,
-		InvestorPaymentStatus:  l.InvestorPaymentStatus,
-		InvestorPaymentEnabled: l.InvestorPaymentEnabled,
 		USDAvgValue:            l.USDAvgValue.StringFixed(3),
 		NetTotal:               l.NetTotal.StringFixed(0), // Total $ Neto: entero más próximo
 		TotalIVA:               l.TotalIVA.StringFixed(0), // Total $ IVA: entero más próximo
@@ -123,10 +114,7 @@ func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 		SurfaceHa:              d.SurfaceHa.Round(3),
 		CostHa:                 d.CostHa.Round(3),
 		CategoryName:           d.CategoryName,
-		InvestorID:             d.InvestorID,
 		InvestorName:           d.InvestorName,
-		InvestorPaymentStatus:  d.InvestorPaymentStatus,
-		InvestorPaymentEnabled: d.InvestorPaymentEnabled,
 		USDAvgValue:            d.USDAvgValue.Round(3),
 		NetTotal:               d.NetTotal.Round(3),
 		TotalIVA:               d.TotalIVA.Round(3),

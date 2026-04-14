@@ -20,10 +20,7 @@ type LaborListItem struct {
 	SurfaceHa              decimal.Decimal // superficie
 	CostHa                 decimal.Decimal // costo por ha
 	CategoryName           string          // rubro
-	InvestorID             int64           // id del inversor asociado a la fila
 	InvestorName           string          // nombre del inversor
-	InvestorPaymentStatus  string          // estado de pago por inversor/split
-	InvestorPaymentEnabled bool            // true cuando la OT usa investor_splits
 	USDAvgValue            decimal.Decimal // valor dolar promedio
 	NetTotal               decimal.Decimal // total neto
 	TotalIVA               decimal.Decimal // total IVA

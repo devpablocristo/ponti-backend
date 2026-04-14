@@ -26,10 +26,7 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 		SurfaceHa:              decimal.NewFromFloat(10.5),
 		CostHa:                 decimal.NewFromFloat(100.5),
 		CategoryName:           "Test Category",
-		InvestorID:             77,
 		InvestorName:           "Test Investor",
-		InvestorPaymentStatus:  "Pagada",
-		InvestorPaymentEnabled: true,
 		USDAvgValue:            decimal.NewFromFloat(50.5),
 		NetTotal:               decimal.NewFromFloat(1234.56), // Debería redondearse a 1235 (entero)
 		TotalIVA:               decimal.NewFromFloat(259.26),  // Debería redondearse a 259 (entero)
@@ -54,9 +51,6 @@ func TestLaborListItem_MarshalJSON_Rounding(t *testing.T) {
 	// Verificar redondeo
 	assert.Equal(t, "1235", result["net_total"]) // Total $ Neto: entero más próximo
 	assert.Equal(t, "259", result["total_iva"])  // Total $ IVA: entero más próximo
-	assert.Equal(t, float64(77), result["investor_id"])
-	assert.Equal(t, "Pagada", result["investor_payment_status"])
-	assert.Equal(t, true, result["investor_payment_enabled"])
 	assert.Equal(t, float64(12), result["lot_id"])
 	assert.Equal(t, "Lote 2", result["lot_name"])
 }
@@ -121,10 +115,7 @@ func TestLaborListItem_MarshalJSON_RoundingEdgeCases(t *testing.T) {
 				SurfaceHa:              decimal.NewFromFloat(10.0),
 				CostHa:                 decimal.NewFromFloat(100.0),
 				CategoryName:           "Test",
-				InvestorID:             44,
 				InvestorName:           "Test",
-				InvestorPaymentStatus:  "Pendiente",
-				InvestorPaymentEnabled: true,
 				USDAvgValue:            decimal.NewFromFloat(50.0),
 				NetTotal:               decimal.NewFromFloat(tt.netTotal),
 				TotalIVA:               decimal.NewFromFloat(tt.totalIVA),
@@ -166,10 +157,7 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 		SurfaceHa:              decimal.NewFromFloat(10.123),
 		CostHa:                 decimal.NewFromFloat(100.456),
 		CategoryName:           "Test Category",
-		InvestorID:             11,
 		InvestorName:           "Test Investor",
-		InvestorPaymentStatus:  "Pendiente",
-		InvestorPaymentEnabled: true,
 		USDAvgValue:            decimal.NewFromFloat(50.789),
 		NetTotal:               decimal.NewFromFloat(1234.56),
 		TotalIVA:               decimal.NewFromFloat(259.26),
@@ -202,7 +190,4 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	// Verificar que NetTotal y TotalIVA son enteros
 	assert.Equal(t, "1235", result["net_total"])
 	assert.Equal(t, "259", result["total_iva"])
-	assert.Equal(t, float64(11), result["investor_id"])
-	assert.Equal(t, "Pendiente", result["investor_payment_status"])
-	assert.Equal(t, true, result["investor_payment_enabled"])
 }

@@ -35,8 +35,6 @@ type LaborListItem struct {
 	USDNetTotal            decimal.Decimal `gorm:"column:usd_net_total"`
 	InvestorID             *int64          `gorm:"column:investor_id"`
 	InvestorName           *string         `gorm:"column:investor_name"`
-	InvestorPaymentStatus  *string         `gorm:"column:investor_payment_status"`
-	InvestorPaymentEnabled bool            `gorm:"column:investor_payment_enabled"`
 
 	// Campos adicionales de joins
 	InvoiceID      *int64     `gorm:"column:invoice_id"`
