@@ -1299,6 +1299,7 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 		DoAndReturn(func(_ context.Context, id int64, stock *stockdomain.Stock) error {
 			assert.Equal(t, stockID, id)
 			assert.True(t, stock.RealStockUnits.Equal(decimal.Zero))
+			assert.True(t, stock.HasRealStockCount)
 			return nil
 		})
 
