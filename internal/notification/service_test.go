@@ -8,17 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// fakeRepo captures the items passed to UpsertProjectedNotifications.
-type fakeRepo struct {
-	Repository
-	captured []ProjectedNotificationInput
-}
-
-func (f *fakeRepo) upsert(_ context.Context, items []ProjectedNotificationInput) error {
-	f.captured = items
-	return nil
-}
-
 func TestSyncFromSummaryBuildsChatContext(t *testing.T) {
 	t.Parallel()
 

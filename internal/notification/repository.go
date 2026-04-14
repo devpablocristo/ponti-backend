@@ -140,14 +140,7 @@ func (r *Repository) Get(ctx context.Context, orgID uuid.UUID, actor string, id 
 }
 
 func (r *Repository) GetSummary(ctx context.Context, orgID uuid.UUID, actor string, projectID *int64) (Summary, error) {
-	type row struct {
-		Total          int64
-		NewCount       int64
-		ReadCount      int64
-		DismissedCount int64
-		HighSeverity   int64
-	}
-	var out row
+	var out Summary
 	err := r.baseInboxQuery(ctx, orgID, actor, projectID).
 		Select(`
 			COUNT(*) AS total,
@@ -157,13 +150,7 @@ func (r *Repository) GetSummary(ctx context.Context, orgID uuid.UUID, actor stri
 			COUNT(*) FILTER (WHERE severity >= 80 AND status = 'new') AS high_severity
 		`).
 		Scan(&out).Error
-	return Summary{
-		Total:          out.Total,
-		NewCount:       out.NewCount,
-		ReadCount:      out.ReadCount,
-		DismissedCount: out.DismissedCount,
-		HighSeverity:   out.HighSeverity,
-	}, err
+	return out, err
 }
 
 func (r *Repository) MarkStatus(ctx context.Context, orgID uuid.UUID, actor string, id int64, status string) error {

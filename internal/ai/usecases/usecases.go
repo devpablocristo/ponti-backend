@@ -109,7 +109,7 @@ func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, bod
 		}
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if ct := resp.Header.Get("Content-Type"); ct != "" {
 		w.Header().Set("Content-Type", ct)
 	}
