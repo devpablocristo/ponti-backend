@@ -3,14 +3,35 @@ package stock
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	"github.com/shopspring/decimal"
 )
+
+// StockNegativeInput es el payload minimo para emitir/resolver una notificacion
+// de stock negativo.
+type StockNegativeInput struct {
+	ProductID   string
+	ProductName string
+	Quantity    float64
+}
+
+// BusinessInsightsNotifier es el contrato que evalua y dispara notificaciones
+// reactivas cuando el stock real cambia. Opcional: si es nil, las mutaciones
+// siguen funcionando pero no emiten/resuelven notificaciones.
+type BusinessInsightsNotifier interface {
+	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockNegativeInput) error
+	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
+}
 
 type RepositoryPort interface {
 	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
@@ -38,11 +59,19 @@ type UseCases struct {
 	repo      RepositoryPort
 	excel     ExporterAdapterPort
 	projectUC ProjectUseCasesPort
+	notifier  BusinessInsightsNotifier
 }
 
 // NewUseCases crea una instancia de casos de uso para stock.
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+}
+
+// SetBusinessInsightsNotifier conecta el notifier despues de wire (la
+// dependencia se resuelve recien en bootstrap porque businessinsights vive
+// fuera del DI graph de stock).
+func (u *UseCases) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
+	u.notifier = n
 }
 
 func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
@@ -85,8 +114,45 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64
 	return nil
 }
 
+// UpdateRealStockUnits es el punto unico de mutacion del stock real. Persiste
+// el cambio y, si hay notifier configurado, evalua el trigger reactivo:
+//   - qty < 0  -> NotifyStockNegative (abre/refresca candidato de notificacion)
+//   - qty >= 0 -> MaybeResolveStockNegative (cierra candidato si estaba abierto)
+//
+// El error del notifier es loggeado pero no propaga: las notificaciones nunca
+// rompen el flow principal de stock.
 func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
-	return u.repo.UpdateRealStockUnits(ctx, stockID, stock)
+	if err := u.repo.UpdateRealStockUnits(ctx, stockID, stock); err != nil {
+		return err
+	}
+	u.evaluateStockNotification(ctx, stock)
+	return nil
+}
+
+// evaluateStockNotification dispara el notifier apropiado segun el signo del
+// stock. Es no-op si el notifier no esta configurado o si falta info esencial
+// (tenant en ctx, producto en stock).
+func (u *UseCases) evaluateStockNotification(ctx context.Context, s *domain.Stock) {
+	if u.notifier == nil || s == nil || s.Supply == nil {
+		return
+	}
+	orgRaw := ctx.Value(ctxkeys.OrgID)
+	orgID, ok := orgRaw.(uuid.UUID)
+	if !ok || orgID == uuid.Nil {
+		return
+	}
+	productID := strconv.FormatInt(s.Supply.ID, 10)
+	qty, _ := s.RealStockUnits.Float64()
+	if qty < 0 {
+		actor, _ := sharedmodels.ActorFromContext(ctx)
+		_ = u.notifier.NotifyStockNegative(ctx, orgID, actor, StockNegativeInput{
+			ProductID:   productID,
+			ProductName: s.Supply.Name,
+			Quantity:    qty,
+		})
+		return
+	}
+	_ = u.notifier.MaybeResolveStockNegative(ctx, orgID, productID)
 }
 
 func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {

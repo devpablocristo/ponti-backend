@@ -32,21 +32,38 @@ type CandidateRepository interface {
 	MarkNotified(ctx context.Context, tenantID, candidateID string, notifiedAt time.Time) error
 }
 
-// Service aplica reglas de dominio a eventos y crea candidatos de notificacion.
+// ResolverRepository ofrece operaciones de cierre/reapertura por entidad o id.
+type ResolverRepository interface {
+	ResolveByEntity(ctx context.Context, tenantID, eventType, entityType, entityID, actor string, now time.Time) (int64, error)
+	ResolveByID(ctx context.Context, tenantID, candidateID, actor string, now time.Time) error
+	ReopenByID(ctx context.Context, tenantID, candidateID, actor string, now time.Time) error
+}
+
+// ReadRepository es la persistencia per-usuario de "leida".
+type ReadRepository interface {
+	MarkRead(ctx context.Context, tenantID, candidateID, userID string, now time.Time) error
+	MarkUnread(ctx context.Context, tenantID, candidateID, userID string) error
+}
+
+// Service aplica reglas de dominio a eventos y crea/cierra candidatos de notificacion.
 type Service struct {
 	candidates *corecandidates.Usecases
+	resolver   ResolverRepository
+	reads      ReadRepository
 	review     ReviewClient
 	config     Config
 }
 
 // NewService construye un Service. Si review es nil, el Service degrada
 // gracioso (no emite notificaciones).
-func NewService(repo CandidateRepository, review ReviewClient, cfg Config) *Service {
+func NewService(repo CandidateRepository, resolver ResolverRepository, reads ReadRepository, review ReviewClient, cfg Config) *Service {
 	if cfg.NegativeStockDedupWindow <= 0 {
 		cfg.NegativeStockDedupWindow = 6 * time.Hour
 	}
 	return &Service{
 		candidates: corecandidates.NewWriteUsecases(repo, repo),
+		resolver:   resolver,
+		reads:      reads,
 		review:     review,
 		config:     cfg,
 	}
@@ -127,10 +144,75 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
 }
 
-// policyMatched distingue un allow por policy matcheada vs allow default
-// (no policy matched). Nexus serializa la razon como "Policy '<name>'".
+// MaybeResolveStockNegative se llama cuando el stock real de un producto
+// vuelve a ser >= 0; cierra automaticamente cualquier notificacion abierta de
+// "stock negativo" para ese producto en el tenant.
+func (s *Service) MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(productID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.stock.negative",
+		"supply",
+		strings.TrimSpace(productID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// MarkRead persiste que el usuario leyo el candidato.
+func (s *Service) MarkRead(ctx context.Context, tenantID uuid.UUID, candidateID, userID string) error {
+	if s == nil || s.reads == nil {
+		return nil
+	}
+	return s.reads.MarkRead(ctx, tenantID.String(), candidateID, userID, time.Now().UTC())
+}
+
+// MarkUnread borra la marca de lectura del usuario.
+func (s *Service) MarkUnread(ctx context.Context, tenantID uuid.UUID, candidateID, userID string) error {
+	if s == nil || s.reads == nil {
+		return nil
+	}
+	return s.reads.MarkUnread(ctx, tenantID.String(), candidateID, userID)
+}
+
+// ResolveManual marca un candidato como resuelto por un usuario.
+func (s *Service) ResolveManual(ctx context.Context, tenantID uuid.UUID, candidateID, actor string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	return s.resolver.ResolveByID(ctx, tenantID.String(), candidateID, actor, time.Now().UTC())
+}
+
+// Reopen reactiva un candidato resuelto y limpia las marcas de lectura.
+func (s *Service) Reopen(ctx context.Context, tenantID uuid.UUID, candidateID, actor string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	return s.resolver.ReopenByID(ctx, tenantID.String(), candidateID, actor, time.Now().UTC())
+}
+
+// policyMatched indica si Nexus permitio la accion. En la primera respuesta
+// el reason viene como "Policy '<name>'"; en replays idempotentes el reason
+// llega vacio pero el decision/status sigue siendo allow/allowed. Nexus
+// rechaza por default si no matchea policy, asi que `decision=allow` ya es
+// señal suficiente para nuestro caso (1 sola policy por action_type).
 func policyMatched(d reviewclient.SubmitResponse) bool {
-	return d.Decision == "allow" && strings.HasPrefix(d.DecisionReason, "Policy '")
+	if d.Decision != "allow" {
+		return false
+	}
+	if strings.HasPrefix(d.DecisionReason, "Policy '") {
+		return true
+	}
+	// Replay idempotente: Nexus solo devuelve reason vacio si la request
+	// original ya habia sido aprobada por una policy.
+	return d.DecisionReason == ""
 }
 
 // bucketedID genera un fingerprint que agrupa eventos del mismo entity en

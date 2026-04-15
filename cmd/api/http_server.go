@@ -35,8 +35,8 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// porque todavia no tiene consumidores en google/wire.
 	biRepo := businessinsights.NewRepository(deps.GormRepo.Client())
 	biService := buildBusinessInsightsService(deps, biRepo)
-	biHandler := businessinsights.NewHandler(biRepo, deps.GinEngine, &deps.Config.API, deps.Middlewares)
-	deps.StockHandler.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
+	biHandler := businessinsights.NewHandler(biRepo, biService, deps.GinEngine, &deps.Config.API, deps.Middlewares)
+	deps.StockUseCases.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -100,6 +100,13 @@ func (a *stockNegativeAdapter) NotifyStockNegative(ctx context.Context, tenantID
 	})
 }
 
+func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveStockNegative(ctx, tenantID, productID)
+}
+
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.
 // Si REVIEW_URL esta vacio devuelve un Service con review=nil (no-op gracioso).
 func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsights.Repository) *businessinsights.Service {
@@ -108,7 +115,7 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 	if reviewURL != "" {
 		client = reviewproxy.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
 	}
-	return businessinsights.NewService(repo, client, businessinsights.Config{})
+	return businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{})
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.

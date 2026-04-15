@@ -1,4 +1,4 @@
-// Package usecases contiene casos de uso del proxy AI.
+// Package usecases contiene casos de uso del proxy AI (chat con copilot).
 package usecases
 
 import (
@@ -45,54 +45,6 @@ func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body an
 	}
 	b, _ := json.Marshal(dummyResp)
 	return 200, b, nil
-}
-
-func (u *UseCases) ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/insights/compute", nil, userID, projectID, map[string]any{
-		"request_id":       "dummy",
-		"computed":         0,
-		"insights_created": 0,
-	})
-}
-
-func (u *UseCases) GetInsights(ctx context.Context, userID, projectID, entityType, entityID string) (int, []byte, error) {
-	path := "/v1/insights/" + entityType + "/" + entityID
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
-		"insights": []any{},
-	})
-}
-
-func (u *UseCases) GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "GET", "/v1/insights/summary", nil, userID, projectID, map[string]any{
-		"new_count_total":         0,
-		"new_count_high_severity": 0,
-		"top_insights":            []any{},
-	})
-}
-
-func (u *UseCases) ExplainInsight(
-	ctx context.Context,
-	userID, projectID, insightID, mode string,
-) (int, []byte, error) {
-	path := "/v1/insight-chat/insights/" + insightID + "/" + mode
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
-		"insight_id": insightID,
-		"mode":       mode,
-		"explanation": map[string]any{
-			"human_readable":     "AI insight_chat no configurado",
-			"audit_focused":      "AI insight_chat no configurado",
-			"what_to_watch_next": "AI insight_chat no configurado",
-		},
-		"proposal": nil,
-	})
-}
-
-func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error) {
-	path := "/v1/insights/" + insightID + "/actions"
-	return u.dummyOrReal(ctx, "POST", path, body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"status":     "dummy",
-	})
 }
 
 // ChatStream proxea POST /v1/chat/stream hacia ponti-ai (SSE); escribe headers y cuerpo en w.

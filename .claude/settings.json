@@ -15,13 +15,28 @@
       "Read(//home/pablo/Projects/Pablo/ponti/**)",
       "Bash(npx tsc:*)",
       "Bash(go mod:*)",
-      "Bash(GOPRIVATE=github.com/devpablocristo/*)"
+      "Bash(GOPRIVATE=github.com/devpablocristo/*)",
+      "Bash(gh pr:*)",
+      "Bash(docker build:*)",
+      "Read(//home/pablo/go/pkg/mod/github.com/devpablocristo/**)",
+      "Bash(gcloud projects:*)",
+      "Bash(docker rm:*)",
+      "Bash(gcloud ai:*)",
+      "Bash(timeout 300 bash -c 'while ! docker compose logs ponti-ui 2>&1 | grep -q \"Local:\"; do sleep 5; done')",
+      "Bash(gcloud sql:*)",
+      "Bash(gcloud storage:*)",
+      "Bash(python -m py_compile src/main.py src/api/deps.py src/api/router.py src/agents/service.py src/agents/insight_chat_service.py src/insights/repository.py src/insights/service.py src/insights/domain.py src/tools/registry.py)",
+      "Bash(docker restart *)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
       "/home/pablo/Projects/Pablo/saas-core/billing",
       "/home/pablo/Projects/Pablo/saas-core/admin",
-      "/home/pablo/Projects/Pablo/ponti"
+      "/home/pablo/Projects/Pablo/ponti",
+      "/tmp",
+      "/home/pablo/Projects/Pablo/core/ai/python/src/runtime/providers",
+      "/home/pablo/Projects/Pablo/core/ai/python",
+      "/home/pablo/Projects/Pablo/nexus/.github/workflows"
     ]
   }
 }

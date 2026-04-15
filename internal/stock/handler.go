@@ -9,11 +9,9 @@ import (
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
 
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -49,25 +47,11 @@ type MiddlewaresEnginePort interface {
 	GetValidation() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
 }
-// BusinessInsightsNotifier emite notificaciones de stock negativo a la
-// capa de insights. Opcional: si es nil el handler no dispara nada.
-type BusinessInsightsNotifier interface {
-	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockNegativeInput) error
-}
-
-// StockNegativeInput es el payload minimo para el notifier.
-type StockNegativeInput struct {
-	ProductID   string
-	ProductName string
-	Quantity    float64
-}
-
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
 	acf ConfigAPIPort
 	mws MiddlewaresEnginePort
-	bi  BusinessInsightsNotifier
 }
 
 func NewHandler(
@@ -82,12 +66,6 @@ func NewHandler(
 		acf: c,
 		mws: m,
 	}
-}
-
-// SetBusinessInsightsNotifier conecta el notifier despues de wire.
-// No es obligatorio: si no se llama, el handler no emite notificaciones.
-func (h *Handler) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
-	h.bi = n
 }
 
 func (h *Handler) Routes() {
@@ -235,41 +213,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	// Trigger reactivo: si el stock real quedo negativo, abrir candidato
-	// de notificacion (gated por policy en Nexus). Silencioso ante error
-	// para no romper el flow principal.
-	h.maybeNotifyNegativeStock(ctx, stockDomain, userID)
-
 	sharedhandlers.RespondOK(c, dto.NewUpdateRealStockResponse("real stock updated successfully"))
-}
-
-// maybeNotifyNegativeStock dispara NotifyStockNegative si el notifier
-// esta seteado y el stock quedo <0. Errores se loguean pero no propagan.
-func (h *Handler) maybeNotifyNegativeStock(ctx context.Context, s *domain.Stock, actor string) {
-	if h.bi == nil || s == nil {
-		return
-	}
-	qty, _ := s.RealStockUnits.Float64()
-	if qty >= 0 {
-		return
-	}
-	orgRaw := ctx.Value(ctxkeys.OrgID)
-	orgID, ok := orgRaw.(uuid.UUID)
-	if !ok || orgID == uuid.Nil {
-		return
-	}
-	productID := ""
-	productName := ""
-	if s.Supply != nil {
-		productID = strconv.FormatInt(s.Supply.ID, 10)
-		productName = s.Supply.Name
-	}
-	input := StockNegativeInput{
-		ProductID:   productID,
-		ProductName: productName,
-		Quantity:    qty,
-	}
-	_ = h.bi.NotifyStockNegative(ctx, orgID, actor, input)
 }
 
 func getMonthPeriodOrDefault(c *gin.Context) (int64, error) {
