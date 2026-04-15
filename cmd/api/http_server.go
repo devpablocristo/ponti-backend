@@ -6,11 +6,14 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
+	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
@@ -23,6 +26,13 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
+
+	// Service de notificaciones reactivas (stock bajo, etc). El Service es
+	// opcional: si REVIEW_URL no esta seteado, el service degrada gracioso
+	// y los use cases que lo llamen quedan no-op. Wireado manualmente
+	// porque todavia no tiene consumidores en google/wire.
+	biService := buildBusinessInsightsService(deps)
+	_ = biService // disponible como local; se conectara a handlers/use cases en commits siguientes
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -66,6 +76,18 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Iniciar el servidor HTTP (ej: puerto 8080).
 	return deps.GinEngine.RunServer(ctx)
+}
+
+// buildBusinessInsightsService arma el Service para notificaciones reactivas.
+// Si REVIEW_URL esta vacio devuelve un Service con review=nil (no-op gracioso).
+func buildBusinessInsightsService(deps *wire.Dependencies) *businessinsights.Service {
+	repo := businessinsights.NewRepository(deps.GormRepo.Client())
+	reviewURL := strings.TrimSpace(deps.Config.Review.URL)
+	var client businessinsights.ReviewClient
+	if reviewURL != "" {
+		client = reviewproxy.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
+	}
+	return businessinsights.NewService(repo, client, businessinsights.Config{})
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
