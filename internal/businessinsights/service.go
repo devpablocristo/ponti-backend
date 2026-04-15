@@ -1,5 +1,5 @@
 // Package businessinsights genera candidatos de notificacion a partir de
-// eventos de dominio (stock bajo, resultado negativo, etc.). Consulta a
+// eventos de dominio (stock negativo, resultado negativo, etc.). Consulta a
 // Nexus Review para decidir si el evento amerita notificar y, si si,
 // dedupica via core/notifications/go/candidates.
 package businessinsights
@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
 	"github.com/devpablocristo/core/governance/go/reviewclient"
+	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +23,7 @@ type ReviewClient interface {
 
 // Config centraliza thresholds y ventanas de dedup del service.
 type Config struct {
-	LowStockDedupWindow time.Duration
+	NegativeStockDedupWindow time.Duration
 }
 
 // CandidateRepository es la persistencia de candidatos (implementada en repository.go).
@@ -42,8 +42,8 @@ type Service struct {
 // NewService construye un Service. Si review es nil, el Service degrada
 // gracioso (no emite notificaciones).
 func NewService(repo CandidateRepository, review ReviewClient, cfg Config) *Service {
-	if cfg.LowStockDedupWindow <= 0 {
-		cfg.LowStockDedupWindow = 6 * time.Hour
+	if cfg.NegativeStockDedupWindow <= 0 {
+		cfg.NegativeStockDedupWindow = 6 * time.Hour
 	}
 	return &Service{
 		candidates: corecandidates.NewWriteUsecases(repo, repo),
@@ -57,31 +57,32 @@ type StockLevel struct {
 	ProductID   string
 	ProductName string
 	Quantity    float64
-	MinQuantity float64
 }
 
-// NotifyStockLow evalua via Nexus si corresponde notificar stock bajo y, si
-// la policy matchea, upserta el candidato (dedup por fingerprint bucketed).
-// Retorna nil y no hace nada si no hay review client configurado.
-func (s *Service) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level StockLevel) error {
+// NotifyStockNegative evalua via Nexus si corresponde notificar stock
+// negativo y, si la policy matchea, upserta el candidato (dedup por
+// fingerprint bucketed). Retorna nil y no hace nada si el stock no es
+// negativo o si no hay review client configurado.
+func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockLevel) error {
 	if s == nil || s.review == nil {
 		return nil
 	}
-	if !isLowStock(level) {
+	if level.Quantity >= 0 {
 		return nil
 	}
 
 	now := time.Now().UTC()
-	decision, err := s.review.SubmitRequest(ctx, bucketedID("ponti.stock.low", level.ProductID, s.config.LowStockDedupWindow, now), reviewclient.SubmitRequestBody{
+	fingerprint := bucketedID("ponti.stock.negative", level.ProductID, s.config.NegativeStockDedupWindow, now)
+
+	decision, err := s.review.SubmitRequest(ctx, fingerprint, reviewclient.SubmitRequestBody{
 		RequesterType: "service",
 		RequesterID:   "ponti-backend",
-		ActionType:    "ponti.stock.low",
+		ActionType:    "ponti.stock.negative",
 		TargetSystem:  "ponti",
 		Params: map[string]any{
 			"product_id":   level.ProductID,
 			"product_name": level.ProductName,
 			"quantity":     level.Quantity,
-			"min_quantity": level.MinQuantity,
 		},
 	})
 	if err != nil {
@@ -92,29 +93,27 @@ func (s *Service) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor 
 	}
 
 	body := fmt.Sprintf(
-		"%s quedo con stock critico: %s disponibles sobre un minimo de %s. Revisa reposicion y riesgo de quiebre.",
+		"%s quedo con stock negativo: %s unidades. Hay un desvio entre movimientos y consumos que requiere revision.",
 		nonEmpty(level.ProductName, "El insumo"),
 		formatNumber(level.Quantity),
-		formatNumber(level.MinQuantity),
 	)
 
 	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
 		TenantID:    tenantID.String(),
 		Kind:        "insight",
-		EventType:   "ponti.stock.low",
+		EventType:   "ponti.stock.negative",
 		EntityType:  "supply",
 		EntityID:    level.ProductID,
-		Fingerprint: bucketedID("ponti.stock.low", level.ProductID, s.config.LowStockDedupWindow, now),
+		Fingerprint: fingerprint,
 		Severity:    "warning",
-		Title:       "Stock critico",
+		Title:       "Stock negativo",
 		Body:        body,
 		Evidence: map[string]any{
-			"product_id":         level.ProductID,
-			"product_name":       level.ProductName,
-			"quantity":           level.Quantity,
-			"min_quantity":       level.MinQuantity,
-			"review_request_id":  decision.RequestID,
-			"review_policy_hit":  decision.DecisionReason,
+			"product_id":        level.ProductID,
+			"product_name":      level.ProductName,
+			"quantity":          level.Quantity,
+			"review_request_id": decision.RequestID,
+			"review_policy_hit": decision.DecisionReason,
 		},
 		Actor: actor,
 		Now:   now,
@@ -132,10 +131,6 @@ func (s *Service) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor 
 // (no policy matched). Nexus serializa la razon como "Policy '<name>'".
 func policyMatched(d reviewclient.SubmitResponse) bool {
 	return d.Decision == "allow" && strings.HasPrefix(d.DecisionReason, "Policy '")
-}
-
-func isLowStock(level StockLevel) bool {
-	return level.MinQuantity > 0 && level.Quantity < level.MinQuantity
 }
 
 // bucketedID genera un fingerprint que agrupa eventos del mismo entity en

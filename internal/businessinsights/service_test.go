@@ -26,13 +26,13 @@ func (s *stubReview) SubmitRequest(_ context.Context, _ string, body reviewclien
 }
 
 type stubRepo struct {
-	upsertCalls   int
-	markCalls     int
-	shouldNotify  bool
-	upsertErr     error
-	markErr       error
-	lastUpsert    businessinsights.CandidateUpsert
-	lastMark      [2]string // tenantID, candidateID
+	upsertCalls  int
+	markCalls    int
+	shouldNotify bool
+	upsertErr    error
+	markErr      error
+	lastUpsert   businessinsights.CandidateUpsert
+	lastMark     [2]string // tenantID, candidateID
 }
 
 func (s *stubRepo) Upsert(_ context.Context, in businessinsights.CandidateUpsert) (businessinsights.CandidateRecord, bool, error) {
@@ -53,23 +53,22 @@ func (s *stubRepo) MarkNotified(_ context.Context, tenantID, candidateID string,
 	return s.markErr
 }
 
-func TestNotifyStockLow_PolicyMatched_NotifiesOnce(t *testing.T) {
+func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 	repo := &stubRepo{shouldNotify: true}
 	review := &stubReview{response: reviewclient.SubmitResponse{
 		RequestID:      "req-1",
 		Decision:       "allow",
-		DecisionReason: "Policy 'ponti-stock-low-notify'",
+		DecisionReason: "Policy 'ponti-stock-negative-notify'",
 	}}
 	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
 
-	err := svc.NotifyStockLow(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
+	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID:   "p-1",
 		ProductName: "Fertilizante",
-		Quantity:    5,
-		MinQuantity: 10,
+		Quantity:    -3,
 	})
 	if err != nil {
-		t.Fatalf("NotifyStockLow: %v", err)
+		t.Fatalf("NotifyStockNegative: %v", err)
 	}
 	if review.calls != 1 {
 		t.Fatalf("review calls = %d, want 1", review.calls)
@@ -80,12 +79,12 @@ func TestNotifyStockLow_PolicyMatched_NotifiesOnce(t *testing.T) {
 	if repo.markCalls != 1 {
 		t.Fatalf("mark notified calls = %d, want 1", repo.markCalls)
 	}
-	if repo.lastUpsert.EventType != "ponti.stock.low" {
+	if repo.lastUpsert.EventType != "ponti.stock.negative" {
 		t.Fatalf("event_type = %q", repo.lastUpsert.EventType)
 	}
 }
 
-func TestNotifyStockLow_NoPolicyMatch_SkipsUpsert(t *testing.T) {
+func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	repo := &stubRepo{}
 	review := &stubReview{response: reviewclient.SubmitResponse{
 		RequestID:      "req-2",
@@ -94,11 +93,11 @@ func TestNotifyStockLow_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	}}
 	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
 
-	err := svc.NotifyStockLow(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
-		ProductID: "p-1", Quantity: 5, MinQuantity: 10,
+	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
+		ProductID: "p-1", Quantity: -1,
 	})
 	if err != nil {
-		t.Fatalf("NotifyStockLow: %v", err)
+		t.Fatalf("NotifyStockNegative: %v", err)
 	}
 	if review.calls != 1 {
 		t.Fatalf("review calls = %d, want 1", review.calls)
@@ -108,42 +107,42 @@ func TestNotifyStockLow_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	}
 }
 
-func TestNotifyStockLow_NoLowStock_SkipsReview(t *testing.T) {
+func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
 	repo := &stubRepo{}
 	review := &stubReview{}
 	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
 
-	err := svc.NotifyStockLow(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
-		ProductID: "p-1", Quantity: 20, MinQuantity: 10,
+	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
+		ProductID: "p-1", Quantity: 5,
 	})
 	if err != nil {
-		t.Fatalf("NotifyStockLow: %v", err)
+		t.Fatalf("NotifyStockNegative: %v", err)
 	}
 	if review.calls != 0 {
-		t.Fatalf("review calls = %d, want 0 (quantity >= min)", review.calls)
+		t.Fatalf("review calls = %d, want 0 (quantity >= 0)", review.calls)
 	}
 	if repo.upsertCalls != 0 {
 		t.Fatalf("upsert calls = %d, want 0", repo.upsertCalls)
 	}
 }
 
-func TestNotifyStockLow_DedupBucketConsistent(t *testing.T) {
+func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 	repo := &stubRepo{shouldNotify: false} // segunda invocacion: no re-notifica
 	review := &stubReview{response: reviewclient.SubmitResponse{
 		Decision:       "allow",
 		DecisionReason: "Policy 'p'",
 	}}
 	svc := businessinsights.NewService(repo, review, businessinsights.Config{
-		LowStockDedupWindow: 24 * time.Hour,
+		NegativeStockDedupWindow: 24 * time.Hour,
 	})
-	level := businessinsights.StockLevel{ProductID: "p-x", Quantity: 1, MinQuantity: 10}
+	level := businessinsights.StockLevel{ProductID: "p-x", Quantity: -2}
 
-	if err := svc.NotifyStockLow(context.Background(), uuid.New(), "u", level); err != nil {
+	if err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", level); err != nil {
 		t.Fatal(err)
 	}
 	fpFirst := repo.lastUpsert.Fingerprint
 
-	if err := svc.NotifyStockLow(context.Background(), uuid.New(), "u", level); err != nil {
+	if err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", level); err != nil {
 		t.Fatal(err)
 	}
 	fpSecond := repo.lastUpsert.Fingerprint
@@ -156,13 +155,13 @@ func TestNotifyStockLow_DedupBucketConsistent(t *testing.T) {
 	}
 }
 
-func TestNotifyStockLow_ReviewError_PropagatesFailure(t *testing.T) {
+func TestNotifyStockNegative_ReviewError_PropagatesFailure(t *testing.T) {
 	repo := &stubRepo{}
 	review := &stubReview{err: errors.New("network down")}
 	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
 
-	err := svc.NotifyStockLow(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
-		ProductID: "p-1", Quantity: 1, MinQuantity: 10,
+	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
+		ProductID: "p-1", Quantity: -1,
 	})
 	if err == nil {
 		t.Fatal("expected error when review client fails")
@@ -172,15 +171,15 @@ func TestNotifyStockLow_ReviewError_PropagatesFailure(t *testing.T) {
 	}
 }
 
-func TestNotifyStockLow_NilReview_NoOp(t *testing.T) {
+func TestNotifyStockNegative_NilReview_NoOp(t *testing.T) {
 	repo := &stubRepo{}
 	svc := businessinsights.NewService(repo, nil, businessinsights.Config{})
 
-	err := svc.NotifyStockLow(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
-		ProductID: "p-1", Quantity: 1, MinQuantity: 10,
+	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
+		ProductID: "p-1", Quantity: -1,
 	})
 	if err != nil {
-		t.Fatalf("NotifyStockLow should no-op silently when review is nil, got: %v", err)
+		t.Fatalf("NotifyStockNegative should no-op silently when review is nil, got: %v", err)
 	}
 	if repo.upsertCalls != 0 {
 		t.Fatalf("upsert should not be called when review is nil")

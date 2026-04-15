@@ -11,9 +11,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
+	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
@@ -33,8 +35,8 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// porque todavia no tiene consumidores en google/wire.
 	biRepo := businessinsights.NewRepository(deps.GormRepo.Client())
 	biService := buildBusinessInsightsService(deps, biRepo)
-	_ = biService // disponible como local; se conectara a use cases en commits siguientes
 	biHandler := businessinsights.NewHandler(biRepo, deps.GinEngine, &deps.Config.API, deps.Middlewares)
+	deps.StockHandler.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -78,6 +80,24 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Iniciar el servidor HTTP (ej: puerto 8080).
 	return deps.GinEngine.RunServer(ctx)
+}
+
+// stockNegativeAdapter traduce el StockNegativeInput del stock.Handler al
+// StockLevel del businessinsights.Service, manteniendo desacoplados los
+// tipos de los paquetes (stock no importa businessinsights y viceversa).
+type stockNegativeAdapter struct {
+	svc *businessinsights.Service
+}
+
+func (a *stockNegativeAdapter) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockNegativeInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.NotifyStockNegative(ctx, tenantID, actor, businessinsights.StockLevel{
+		ProductID:   in.ProductID,
+		ProductName: in.ProductName,
+		Quantity:    in.Quantity,
+	})
 }
 
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.
