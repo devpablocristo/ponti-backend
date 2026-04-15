@@ -15,7 +15,8 @@
       "Read(//home/pablo/Projects/Pablo/ponti/**)",
       "Bash(npx tsc:*)",
       "Bash(go mod:*)",
-      "Bash(GOPRIVATE=github.com/devpablocristo/*)"
+      "Bash(GOPRIVATE=github.com/devpablocristo/*)",
+      "Bash(psql --version)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
