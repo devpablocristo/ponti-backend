@@ -88,11 +88,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	supplies := r.Group(baseURL + "/supplies")
+	supplies := r.Group(baseURL+"/supplies", h.mws.GetValidation()...)
 	{
 		supplies.POST("", h.CreateSupply)
 		supplies.POST("/bulk", h.CreateSuppliesBulk)

@@ -352,6 +352,7 @@ func Initialize() (*Dependencies, error) {
 		InvoiceHandler:            invoiceHandler,
 		CommercializationHandler:  commercializationHandler,
 		StockHandler:              stockHandler,
+		StockUseCases:             stockUseCases,
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
 	}
@@ -389,6 +390,7 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	StockUseCases             *stock.UseCases
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 }

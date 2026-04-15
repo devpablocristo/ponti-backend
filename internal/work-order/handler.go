@@ -63,11 +63,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/work-orders"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	grp := r.Group(base)
+	grp := r.Group(base, h.mws.GetValidation()...)
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("/:work_order_id", h.GetWorkOrderByID)
