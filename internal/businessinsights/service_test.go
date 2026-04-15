@@ -60,7 +60,7 @@ func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 		Decision:       "allow",
 		DecisionReason: "Policy 'ponti-stock-negative-notify'",
 	}}
-	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID:   "p-1",
@@ -91,7 +91,7 @@ func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 		Decision:       "allow",
 		DecisionReason: "No policy matched; default for risk low",
 	}}
-	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: -1,
@@ -110,7 +110,7 @@ func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
 	repo := &stubRepo{}
 	review := &stubReview{}
-	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: 5,
@@ -132,7 +132,7 @@ func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 		Decision:       "allow",
 		DecisionReason: "Policy 'p'",
 	}}
-	svc := businessinsights.NewService(repo, review, businessinsights.Config{
+	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{
 		NegativeStockDedupWindow: 24 * time.Hour,
 	})
 	level := businessinsights.StockLevel{ProductID: "p-x", Quantity: -2}
@@ -158,7 +158,7 @@ func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 func TestNotifyStockNegative_ReviewError_PropagatesFailure(t *testing.T) {
 	repo := &stubRepo{}
 	review := &stubReview{err: errors.New("network down")}
-	svc := businessinsights.NewService(repo, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: -1,
@@ -173,7 +173,7 @@ func TestNotifyStockNegative_ReviewError_PropagatesFailure(t *testing.T) {
 
 func TestNotifyStockNegative_NilReview_NoOp(t *testing.T) {
 	repo := &stubRepo{}
-	svc := businessinsights.NewService(repo, nil, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, nil, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: -1,
