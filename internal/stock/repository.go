@@ -95,6 +95,52 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		stockBySupplyID[stock.SupplyID] = stock
 	}
 
+	// Para supplies sin stock activo (close_date IS NULL), traer el último stock cerrado
+	// con sus movimientos y tratarlo como activo. Así los ingresos ya cargados no se pierden
+	// cuando el cierre de período deja pares (supply, investor) sin stock activo nuevo.
+	if closeDate == zeroTime {
+		missing := make([]int64, 0, len(supplies))
+		for _, supply := range supplies {
+			if _, ok := stockBySupplyID[supply.ID]; !ok {
+				missing = append(missing, supply.ID)
+			}
+		}
+
+		if len(missing) > 0 {
+			var latestClosedIDs []int64
+			distinctQuery := `
+				SELECT DISTINCT ON (supply_id) id
+				FROM stocks
+				WHERE project_id = ? AND supply_id IN ? AND close_date IS NOT NULL
+				ORDER BY supply_id, close_date DESC
+			`
+			if err := gormDB.Raw(distinctQuery, projectID, missing).Scan(&latestClosedIDs).Error; err != nil {
+				return nil, err
+			}
+
+			if len(latestClosedIDs) > 0 {
+				var latestClosed []models.Stock
+				if err := gormDB.
+					Preload("Project").
+					Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+					Preload("Supply.Type").
+					Preload("Supply.Category").
+					Preload("Investor").
+					Preload("SupplyMovements").
+					Where("id IN ?", latestClosedIDs).
+					Find(&latestClosed).Error; err != nil {
+					return nil, err
+				}
+
+				for _, stock := range latestClosed {
+					stock.Consumed = consumedBySupplyID[stock.SupplyID]
+					stock.CloseDate = nil // mostrar como activo en la UI
+					stockBySupplyID[stock.SupplyID] = stock
+				}
+			}
+		}
+	}
+
 	stocks := make([]*domain.Stock, 0, len(supplies))
 	for _, supply := range supplies {
 		if stockModel, ok := stockBySupplyID[supply.ID]; ok {
@@ -103,12 +149,12 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		}
 
 		virtualStock := &domain.Stock{
-	Supply:            supply.ToDomain(),
-	SupplyMovements:   []supplymovementdomain.SupplyMovement{},
-	RealStockUnits:    decimal.Zero,
-	Consumed:          consumedBySupplyID[supply.ID],
-	HasRealStockCount: false,
-}
+			Supply:            supply.ToDomain(),
+			SupplyMovements:   []supplymovementdomain.SupplyMovement{},
+			RealStockUnits:    decimal.Zero,
+			Consumed:          consumedBySupplyID[supply.ID],
+			HasRealStockCount: false,
+		}
 
 		if closeDate != zeroTime {
 			cd := closeDate
@@ -121,6 +167,29 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	return stocks, nil
 }
 
+
+// GetActiveStocksByProjectID retorna todos los stocks con close_date IS NULL
+// de un proyecto, con sus relaciones precargadas. Se usa para replicar cada
+// (supply, investor) activo al cerrar un período.
+func (r *Repository) GetActiveStocksByProjectID(ctx context.Context, projectID int64) ([]*domain.Stock, error) {
+	var stockModels []models.Stock
+	if err := r.getDB(ctx).
+		Preload("Project").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Where("project_id = ? AND close_date IS NULL", projectID).
+		Find(&stockModels).Error; err != nil {
+		return nil, err
+	}
+
+	stocks := make([]*domain.Stock, 0, len(stockModels))
+	for i := range stockModels {
+		stocks = append(stocks, stockModels[i].ToDomain())
+	}
+	return stocks, nil
+}
 
 func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
 	var rawPeriods []time.Time
