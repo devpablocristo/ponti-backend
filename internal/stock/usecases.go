@@ -35,6 +35,7 @@ type BusinessInsightsNotifier interface {
 
 type RepositoryPort interface {
 	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
+	GetActiveStocksByProjectID(context.Context, int64) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
@@ -44,6 +45,7 @@ type RepositoryPort interface {
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
+	ExecuteInTransaction(context.Context, func(context.Context) error) error
 }
 
 type ExporterAdapterPort interface {
@@ -96,22 +98,27 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64
 	if err := u.validateProject(ctx, projectID); err != nil {
 		return err
 	}
-	stockFromDb, err := u.repo.GetStockByPeriodAndProjectID(ctx, projectID)
+
+	activeStocks, err := u.repo.GetActiveStocksByProjectID(ctx, projectID)
 	if err != nil {
 		return err
+	}
+	if len(activeStocks) == 0 {
+		return domainerr.NotFound("no active stocks to close for project")
 	}
 
-	err = u.repo.UpdateCloseDateByProject(ctx, projectID, stock)
-	if err != nil {
-		return err
-	}
-
-	newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, stockFromDb)
-	_, err = u.repo.CreateStock(ctx, &newStock)
-	if err != nil {
-		return err
-	}
-	return nil
+	return u.repo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.UpdateCloseDateByProject(txCtx, projectID, stock); err != nil {
+			return err
+		}
+		for _, active := range activeStocks {
+			newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, active)
+			if _, err := u.repo.CreateStock(txCtx, &newStock); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // UpdateRealStockUnits es el punto unico de mutacion del stock real. Persiste
