@@ -6,15 +6,11 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
-	ai "github.com/devpablocristo/ponti-backend/internal/ai"
-	notification "github.com/devpablocristo/ponti-backend/internal/notification"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
@@ -27,16 +23,6 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
-
-	// Middleware: auto-trigger de insights después de mutaciones exitosas.
-	// Dispara cómputo async y throttleado en ponti-ai cuando una ruta con
-	// :project_id en el path responde 2xx a POST/PUT/PATCH/DELETE.
-	aiClient := ai.NewClient(deps.Config.AI.ServiceURL, deps.Config.AI.ServiceKey, deps.Config.AI.TimeoutMS)
-	notificationsRepo := notification.NewRepository(deps.GormRepo.Client())
-	notificationsSync := notification.NewInsightSyncService(notificationsRepo)
-	trigger := ai.NewInsightTrigger(aiClient, notificationsSync, deps.Config.AI.ComputeThrottleSec)
-	deps.GinEngine.GetRouter().Use(ai.InsightTriggerMiddleware(trigger))
-	approvalsSync := buildApprovalSyncService(deps, notificationsRepo)
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -70,8 +56,7 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Registrar todas las rutas de la aplicación.
 	// Cada handler aplica sus middlewares de validación específicos.
-	notificationsHandler := notification.NewHandler(deps.GormRepo.Client(), approvalsSync, deps.GinEngine, &deps.Config.API, deps.Middlewares)
-	registerHTTPRoutes(deps, notificationsHandler)
+	registerHTTPRoutes(deps)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
 	log.Println("Version: ", deps.Config.Service.Version)
@@ -83,18 +68,8 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	return deps.GinEngine.RunServer(ctx)
 }
 
-func buildApprovalSyncService(deps *wire.Dependencies, repo *notification.Repository) *notification.ApprovalSyncService {
-	reviewURL := strings.TrimSpace(deps.Config.Review.URL)
-	if reviewURL == "" {
-		return nil
-	}
-	reviewClient := reviewclient.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
-	source := notification.NewReviewPendingApprovalSource(reviewClient)
-	return notification.NewApprovalSyncService(repo, source, deps.Config.Review.SyncCooldownSec)
-}
-
 // registerHTTPRoutes registra todas las rutas en el router Gin.
-func registerHTTPRoutes(deps *wire.Dependencies, notificationsHandler *notification.Handler) {
+func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
@@ -120,5 +95,4 @@ func registerHTTPRoutes(deps *wire.Dependencies, notificationsHandler *notificat
 	deps.CommercializationHandler.Routes()
 	deps.AIHandler.Routes()
 	deps.AdminHandler.Routes()
-	notificationsHandler.Routes()
 }
