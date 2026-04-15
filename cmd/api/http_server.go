@@ -31,8 +31,10 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// opcional: si REVIEW_URL no esta seteado, el service degrada gracioso
 	// y los use cases que lo llamen quedan no-op. Wireado manualmente
 	// porque todavia no tiene consumidores en google/wire.
-	biService := buildBusinessInsightsService(deps)
-	_ = biService // disponible como local; se conectara a handlers/use cases en commits siguientes
+	biRepo := businessinsights.NewRepository(deps.GormRepo.Client())
+	biService := buildBusinessInsightsService(deps, biRepo)
+	_ = biService // disponible como local; se conectara a use cases en commits siguientes
+	biHandler := businessinsights.NewHandler(biRepo, deps.GinEngine, &deps.Config.API, deps.Middlewares)
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -66,7 +68,7 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Registrar todas las rutas de la aplicación.
 	// Cada handler aplica sus middlewares de validación específicos.
-	registerHTTPRoutes(deps)
+	registerHTTPRoutes(deps, biHandler)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
 	log.Println("Version: ", deps.Config.Service.Version)
@@ -80,8 +82,7 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.
 // Si REVIEW_URL esta vacio devuelve un Service con review=nil (no-op gracioso).
-func buildBusinessInsightsService(deps *wire.Dependencies) *businessinsights.Service {
-	repo := businessinsights.NewRepository(deps.GormRepo.Client())
+func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsights.Repository) *businessinsights.Service {
 	reviewURL := strings.TrimSpace(deps.Config.Review.URL)
 	var client businessinsights.ReviewClient
 	if reviewURL != "" {
@@ -91,7 +92,7 @@ func buildBusinessInsightsService(deps *wire.Dependencies) *businessinsights.Ser
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
-func registerHTTPRoutes(deps *wire.Dependencies) {
+func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
@@ -117,4 +118,5 @@ func registerHTTPRoutes(deps *wire.Dependencies) {
 	deps.CommercializationHandler.Routes()
 	deps.AIHandler.Routes()
 	deps.AdminHandler.Routes()
+	biHandler.Routes()
 }

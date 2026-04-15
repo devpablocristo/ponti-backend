@@ -94,6 +94,31 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	return toCandidateRecord(row), shouldNotify, nil
 }
 
+// ListByTenant devuelve los candidatos del tenant ordenados por ultima aparicion
+// (mas recientes primero). Limit se clampa a [1, 200].
+func (r *Repository) ListByTenant(ctx context.Context, tenantID string, limit int) ([]CandidateRecord, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	tID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("parse tenant_id: %w", err)
+	}
+	var rows []models.CandidateModel
+	if err := r.db.WithContext(ctx).
+		Where("tenant_id = ?", tID).
+		Order("last_seen_at DESC").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]CandidateRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toCandidateRecord(row))
+	}
+	return out, nil
+}
+
 func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID string, notifiedAt time.Time) error {
 	if notifiedAt.IsZero() {
 		notifiedAt = time.Now().UTC()
