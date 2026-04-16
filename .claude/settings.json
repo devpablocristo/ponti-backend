@@ -28,7 +28,8 @@
       "Bash(python -m py_compile src/main.py src/api/deps.py src/api/router.py src/agents/service.py src/agents/insight_chat_service.py src/insights/repository.py src/insights/service.py src/insights/domain.py src/tools/registry.py)",
       "Bash(docker restart *)",
       "Bash(psql --version)",
-      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -c ' *)"
+      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -c ' *)",
+      "Bash(~/bin/cloud-sql-proxy new-ponti-dev:us-central1:new-ponti-db-dev --port 5434)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
