@@ -10,11 +10,10 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
-	workorderdomain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	supplydomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
+	workorderdomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type RepositoryPort interface {
@@ -105,7 +104,7 @@ func (u *UseCases) CreateDigitalWorkOrderDraft(ctx context.Context, d *domain.Wo
 	}
 	d.Number = number
 
-		if err := u.hydrateDraftSupplyNames(ctx, d); err != nil {
+	if err := u.hydrateDraftSupplyNames(ctx, d); err != nil {
 		return 0, err
 	}
 
@@ -190,7 +189,7 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			InvestorSplits: b.InvestorSplits,
 		}
 
-				if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
+		if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
 			return nil, err
 		}
 
@@ -344,7 +343,7 @@ func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkO
 		d.Number = number
 	}
 
-		if err := u.hydrateDraftSupplyNames(ctx, d); err != nil {
+	if err := u.hydrateDraftSupplyNames(ctx, d); err != nil {
 		return err
 	}
 
@@ -381,12 +380,12 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 	if err != nil {
 		return 0, err
 	}
-    // Publicar equivale a cerrar la orden digital y crear la workorder real.
+	// Publicar equivale a cerrar la orden digital y crear la workorder real.
 	if draft.Status == domain.StatusPublished {
 		return 0, types.NewError(types.ErrConflict, "work order draft is already published", nil)
 	}
 
-		if err := validateDraft(draft); err != nil {
+	if err := validateDraft(draft); err != nil {
 		return 0, err
 	}
 
@@ -417,13 +416,13 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 	}
 
 	for i, item := range draft.Items {
-	workOrder.Items[i] = workorderdomain.WorkOrderItem{
-		SupplyID:   item.SupplyID,
-		SupplyName: item.SupplyName,
-		TotalUsed:  item.TotalUsed,
-		FinalDose:  item.FinalDose,
+		workOrder.Items[i] = workorderdomain.WorkOrderItem{
+			SupplyID:   item.SupplyID,
+			SupplyName: item.SupplyName,
+			TotalUsed:  item.TotalUsed,
+			FinalDose:  item.FinalDose,
+		}
 	}
-}
 
 	for i, split := range draft.InvestorSplits {
 		workOrder.InvestorSplits[i] = workorderdomain.WorkOrderInvestorSplit{

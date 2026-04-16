@@ -35,8 +35,8 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
 	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
+	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 	"github.com/google/wire"
-	workorderdraft "github.com/alphacodinggroup/ponti-backend/internal/work-order-draft"
 )
 
 type Dependencies struct {

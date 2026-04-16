@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )

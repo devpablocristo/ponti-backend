@@ -7,39 +7,6 @@
 package wire
 
 import (
-<<<<<<< HEAD
-	"github.com/alphacodinggroup/ponti-backend/cmd/config"
-	"github.com/alphacodinggroup/ponti-backend/internal/admin"
-	"github.com/alphacodinggroup/ponti-backend/internal/ai"
-	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters"
-	"github.com/alphacodinggroup/ponti-backend/internal/campaign"
-	"github.com/alphacodinggroup/ponti-backend/internal/category"
-	"github.com/alphacodinggroup/ponti-backend/internal/class-type"
-	"github.com/alphacodinggroup/ponti-backend/internal/commercialization"
-	"github.com/alphacodinggroup/ponti-backend/internal/crop"
-	"github.com/alphacodinggroup/ponti-backend/internal/customer"
-	"github.com/alphacodinggroup/ponti-backend/internal/dashboard"
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity"
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar"
-	"github.com/alphacodinggroup/ponti-backend/internal/field"
-	"github.com/alphacodinggroup/ponti-backend/internal/investor"
-	"github.com/alphacodinggroup/ponti-backend/internal/invoice"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor"
-	"github.com/alphacodinggroup/ponti-backend/internal/lease-type"
-	"github.com/alphacodinggroup/ponti-backend/internal/lot"
-	"github.com/alphacodinggroup/ponti-backend/internal/manager"
-	"github.com/alphacodinggroup/ponti-backend/internal/project"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider"
-	"github.com/alphacodinggroup/ponti-backend/internal/report"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft"
-	"github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
-	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
-=======
 	"github.com/devpablocristo/ponti-backend/cmd/config"
 	"github.com/devpablocristo/ponti-backend/internal/admin"
 	"github.com/devpablocristo/ponti-backend/internal/ai"
@@ -70,7 +37,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
->>>>>>> origin/develop
+	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 )
 
 // Injectors from wire.go:

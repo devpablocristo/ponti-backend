@@ -7,21 +7,6 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
-	investormodels "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providermodels "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	shareddb "github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	models "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	workOrderModels "github.com/alphacodinggroup/ponti-backend/internal/work-order/repository/models"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-	"github.com/shopspring/decimal"
-=======
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
@@ -34,10 +19,10 @@ import (
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
->>>>>>> origin/develop
 	"gorm.io/gorm"
 )
 
@@ -84,15 +69,15 @@ func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, n
 		UnitID         *int64          `gorm:"column:unit_id"`
 		CategoryID     *int64          `gorm:"column:category_id"`
 		TypeID         *int64          `gorm:"column:type_id"`
-		CreatedBy      *int64          `gorm:"column:created_by"`
-		UpdatedBy      *int64          `gorm:"column:updated_by"`
+		CreatedBy      *string         `gorm:"column:created_by"`
+		UpdatedBy      *string         `gorm:"column:updated_by"`
 	}
 
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
-		var userID *int64
-		if parsed, err := sharedmodels.ConvertStringToID(ctx); err == nil {
-			userID = &parsed
+		var userID *string
+		if actor, err := sharedmodels.ActorFromContext(ctx); err == nil {
+			userID = &actor
 		}
 
 		row := pendingSupplyInsert{

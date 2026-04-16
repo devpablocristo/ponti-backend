@@ -10,8 +10,8 @@ import (
 	"github.com/jung-kurt/gofpdf"
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
 )
 
 type PDFExporterAdapterPort interface {
@@ -33,21 +33,21 @@ type pdfItemLine struct {
 }
 
 type pdfDocumentData struct {
-	Title         string
-	Number        string
-	Date          string
-	CustomerName  string
-	ProjectName   string
-	CampaignName  string
-	FieldName     string
-	LotsLabel     string
-	CropName      string
-	SurfaceLabel  string
-	LaborName     string
-	Contractor    string
-	Observations  string
-	Lots          []pdfLotLine
-	Items         []pdfItemLine
+	Title        string
+	Number       string
+	Date         string
+	CustomerName string
+	ProjectName  string
+	CampaignName string
+	FieldName    string
+	LotsLabel    string
+	CropName     string
+	SurfaceLabel string
+	LaborName    string
+	Contractor   string
+	Observations string
+	Lots         []pdfLotLine
+	Items        []pdfItemLine
 }
 
 func NewPDFExporter() *PDFExporter {
@@ -156,14 +156,14 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 			}
 
 			if _, exists := bySupply[key]; !exists {
-								bySupply[key] = &aggregated{
+				bySupply[key] = &aggregated{
 					Name:      safeValue(item.SupplyName),
 					TotalUsed: decimal.Zero,
 				}
 
 			}
 
-						bySupply[key].TotalUsed = bySupply[key].TotalUsed.Add(item.TotalUsed)
+			bySupply[key].TotalUsed = bySupply[key].TotalUsed.Add(item.TotalUsed)
 
 		}
 	}
@@ -178,7 +178,7 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 	}
 	sort.Strings(keys)
 
-		items := make([]pdfItemLine, 0, len(keys))
+	items := make([]pdfItemLine, 0, len(keys))
 	for _, key := range keys {
 		row := bySupply[key]
 
@@ -290,7 +290,7 @@ func drawInfoGrid(pdf *gofpdf.Fpdf, data pdfDocumentData) {
 	left, _, right, _ := pdf.GetMargins()
 	contentWidth := pageWidth - left - right
 
-		colGap := 3.0
+	colGap := 3.0
 	cardW := (contentWidth - (2 * colGap)) / 3
 	cardH := 18.0
 	rowGap := 2.5
@@ -313,7 +313,7 @@ func drawInfoCard(pdf *gofpdf.Fpdf, x, y, w, h float64, label, value string) {
 	pdf.SetDrawColor(229, 233, 240)
 	pdf.RoundedRect(x, y, w, h, 2.5, "1234", "FD")
 
-		pdf.SetXY(x+4, y+3)
+	pdf.SetXY(x+4, y+3)
 	pdf.SetTextColor(120, 129, 146)
 	pdf.SetFont("Arial", "B", 6.5)
 	pdf.CellFormat(w-8, 3, pdfText(pdf, label), "", 1, "L", false, 0, "")
@@ -387,7 +387,7 @@ func drawItemsTable(pdf *gofpdf.Fpdf, data pdfDocumentData) {
 		pdf.CellFormat(colDose, 8, formatDose(item.FinalDose), "1", 1, "C", fill, 0, "")
 	}
 
-		pdf.Ln(4)
+	pdf.Ln(4)
 
 	if strings.TrimSpace(data.Observations) != "" {
 		pdf.SetTextColor(34, 46, 66)
@@ -406,7 +406,6 @@ func drawItemsTable(pdf *gofpdf.Fpdf, data pdfDocumentData) {
 		pdf.SetTextColor(42, 52, 67)
 		pdf.SetFont("Arial", "", 9)
 		pdf.MultiCell(boxW-8, 4, pdfText(pdf, data.Observations), "", "L", false)
-
 
 		pdf.SetY(startY + boxH + 4)
 	}

@@ -6,9 +6,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
 )
 
 const dateLayout = "2006-01-02"
@@ -49,24 +48,24 @@ type WorkOrderDraftBatchLotItem struct {
 }
 
 type WorkOrderDraftBatchLot struct {
-	LotID         int64                   `json:"lot_id" binding:"required"`
-	EffectiveArea decimal.Decimal         `json:"effective_area" binding:"required"`
+	LotID         int64                        `json:"lot_id" binding:"required"`
+	EffectiveArea decimal.Decimal              `json:"effective_area" binding:"required"`
 	Items         []WorkOrderDraftBatchLotItem `json:"items" binding:"required"`
 }
 
 type WorkOrderDraftBatchCreateRequest struct {
-	Number         string                  `json:"number"`
-	Date           string                  `json:"date" binding:"required"`
-	CustomerID     int64                   `json:"customer_id" binding:"required"`
-	ProjectID      int64                   `json:"project_id" binding:"required"`
-	CampaignID     *int64                  `json:"campaign_id"`
-	FieldID        int64                   `json:"field_id" binding:"required"`
-	CropID         int64                   `json:"crop_id" binding:"required"`
-	LaborID        int64                   `json:"labor_id" binding:"required"`
-	Contractor     string                  `json:"contractor" binding:"required"`
-	Observations   string                  `json:"observations"`
-	InvestorID     int64                   `json:"investor_id"`
-	InvestorSplits []InvestorSplit         `json:"investor_splits,omitempty"`
+	Number         string                   `json:"number"`
+	Date           string                   `json:"date" binding:"required"`
+	CustomerID     int64                    `json:"customer_id" binding:"required"`
+	ProjectID      int64                    `json:"project_id" binding:"required"`
+	CampaignID     *int64                   `json:"campaign_id"`
+	FieldID        int64                    `json:"field_id" binding:"required"`
+	CropID         int64                    `json:"crop_id" binding:"required"`
+	LaborID        int64                    `json:"labor_id" binding:"required"`
+	Contractor     string                   `json:"contractor" binding:"required"`
+	Observations   string                   `json:"observations"`
+	InvestorID     int64                    `json:"investor_id"`
+	InvestorSplits []InvestorSplit          `json:"investor_splits,omitempty"`
 	Lots           []WorkOrderDraftBatchLot `json:"lots" binding:"required"`
 }
 
@@ -237,7 +236,7 @@ type WorkOrderDraftListItem struct {
 }
 
 type WorkOrderDraftListResponse struct {
-	PageInfo types.PageInfo       `json:"page_info"`
+	PageInfo types.PageInfo           `json:"page_info"`
 	Data     []WorkOrderDraftListItem `json:"data"`
 }
 

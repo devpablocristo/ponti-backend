@@ -14,20 +14,12 @@ import (
 
 // Modelo principal de Supply
 type Supply struct {
-<<<<<<< HEAD
-	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	ProjectID int64           `gorm:"not null;index"`
-	Name      string          `gorm:"type:varchar(100);not null"`
-	Price     decimal.Decimal `gorm:"not null"`
-	IsPartialPrice bool `gorm:"not null;default:false;column:is_partial_price"`
-	IsPending      bool `gorm:"not null;default:false;column:is_pending"`
-=======
 	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
 	ProjectID      int64           `gorm:"not null;index"`
 	Name           string          `gorm:"type:varchar(100);not null"`
 	Price          decimal.Decimal `gorm:"not null"`
 	IsPartialPrice bool            `gorm:"not null;default:false;column:is_partial_price"`
->>>>>>> origin/develop
+	IsPending      bool            `gorm:"not null;default:false;column:is_pending"`
 
 	UnitID int64
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type Status string

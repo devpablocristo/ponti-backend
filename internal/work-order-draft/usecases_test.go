@@ -8,11 +8,10 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
-	workorderdomain "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
-	supplydomain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
+	workorderdomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
 type testDraftRepo struct {
@@ -191,8 +190,6 @@ func TestCreateDigitalWorkOrderDraft_AssignsSplitNumberWhenBaseExists(t *testing
 
 	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
 
-
-
 	draft := validDraft()
 	draft.Number = "D-41"
 
@@ -224,7 +221,6 @@ func TestUpdateWorkOrderDraftByID_RevalidatesDigitalNumberExcludingSelf(t *testi
 	}
 
 	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
-
 
 	draft := validDraft()
 	draft.ID = 15
@@ -264,7 +260,6 @@ func TestPublishWorkOrderDraft_FailsWhenNumberAlreadyPublished(t *testing.T) {
 
 	uc := NewUseCases(repo, pub, &testPDFExporter{}, &testSupplyReader{})
 
-
 	_, err := uc.PublishWorkOrderDraft(context.Background(), 77)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "work order already exists for number D-41 and project 10")
@@ -295,7 +290,6 @@ func TestPublishWorkOrderDraft_FailsWhenSupplyIsPending(t *testing.T) {
 	}
 
 	uc := NewUseCases(repo, pub, &testPDFExporter{}, &testSupplyReader{})
-
 
 	_, err := uc.PublishWorkOrderDraft(context.Background(), 88)
 	require.Error(t, err)

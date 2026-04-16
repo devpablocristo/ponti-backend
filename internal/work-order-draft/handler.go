@@ -7,11 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
-
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
 )
 
 type UseCasesPort interface {
@@ -66,11 +65,10 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/work-order-drafts"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
 	grp := r.Group(base)
+	for _, mw := range h.mws.GetValidation() {
+		grp.Use(mw)
+	}
 	{
 		grp.POST("", h.CreateWorkOrderDraft)
 		grp.POST("/digital", h.CreateDigitalWorkOrderDraft)
@@ -297,7 +295,7 @@ func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
 func (h *Handler) ListWorkOrderDrafts(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
 
-		items, pageInfo, err := h.ucs.ListWorkOrderDrafts(
+	items, pageInfo, err := h.ucs.ListWorkOrderDrafts(
 		c.Request.Context(),
 		c.Query("number"),
 		c.Query("status"),
@@ -317,7 +315,7 @@ func (h *Handler) ListWorkOrderDrafts(c *gin.Context) {
 func (h *Handler) ListDigitalWorkOrderDrafts(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
 
-		items, pageInfo, err := h.ucs.ListDigitalWorkOrderDrafts(
+	items, pageInfo, err := h.ucs.ListDigitalWorkOrderDrafts(
 		c.Request.Context(),
 		c.Query("number"),
 		c.Query("status"),

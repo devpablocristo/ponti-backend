@@ -8,12 +8,12 @@ import (
 
 	"gorm.io/gorm"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
 )
 
 type GormEngine interface {
@@ -31,7 +31,7 @@ func NewRepository(db GormEngine) *Repository {
 func (r *Repository) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
 	model := models.FromDomain(d)
 
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.CreatedBy = &userID
 		model.UpdatedBy = &userID
 	}
@@ -78,7 +78,7 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 	modelsToCreate := make([]*models.WorkOrderDraft, len(drafts))
 	for i, d := range drafts {
 		model := models.FromDomain(d)
-		if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+		if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 			model.CreatedBy = &userID
 			model.UpdatedBy = &userID
 		}
@@ -354,7 +354,7 @@ func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, sta
 		Joins("join projects p on p.id = wod.project_id").
 		Joins("join fields f on f.id = wod.field_id")
 
-		if strings.TrimSpace(number) != "" {
+	if strings.TrimSpace(number) != "" {
 		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
 	}
 
@@ -427,7 +427,7 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 	model := models.FromDomain(d)
 	model.ID = d.ID
 
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.UpdatedBy = &userID
 	}
 
@@ -545,7 +545,7 @@ func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID 
 		"published_work_order_id": workOrderID,
 	}
 
-	if userID, err := sharedmodels.ConvertStringToID(ctx); err == nil {
+	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		updates["updated_by"] = userID
 	}
 

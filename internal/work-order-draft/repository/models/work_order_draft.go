@@ -6,18 +6,18 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	campaignmod "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
-	cropmod "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	customermod "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
-	fieldmod "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
-	investormod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	labormod "github.com/alphacodinggroup/ponti-backend/internal/labor/repository/models"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	projectmod "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	supplymod "github.com/alphacodinggroup/ponti-backend/internal/supply/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/work-order-draft/usecases/domain"
+	campaignmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
+	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	customermod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
+	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
+	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	labormod "github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	supplymod "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
 )
 
 type WorkOrderDraft struct {
@@ -109,11 +109,11 @@ func FromDomain(d *domain.WorkOrderDraft) *WorkOrderDraft {
 		items := make([]WorkOrderDraftItem, len(d.Items))
 		for i, item := range d.Items {
 			items[i] = WorkOrderDraftItem{
-	SupplyID:   item.SupplyID,
-	SupplyName: item.SupplyName,
-	TotalUsed:  item.TotalUsed,
-	FinalDose:  item.FinalDose,
-}
+				SupplyID:   item.SupplyID,
+				SupplyName: item.SupplyName,
+				TotalUsed:  item.TotalUsed,
+				FinalDose:  item.FinalDose,
+			}
 		}
 		model.Items = items
 	}
@@ -136,11 +136,11 @@ func (m *WorkOrderDraft) ToDomain() *domain.WorkOrderDraft {
 	items := make([]domain.WorkOrderDraftItem, len(m.Items))
 	for i, item := range m.Items {
 		items[i] = domain.WorkOrderDraftItem{
-	SupplyID:   item.SupplyID,
-	SupplyName: item.SupplyName,
-	TotalUsed:  item.TotalUsed,
-	FinalDose:  item.FinalDose,
-}
+			SupplyID:   item.SupplyID,
+			SupplyName: item.SupplyName,
+			TotalUsed:  item.TotalUsed,
+			FinalDose:  item.FinalDose,
+		}
 	}
 
 	splits := make([]domain.WorkOrderDraftInvestorSplit, len(m.InvestorSplits))

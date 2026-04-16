@@ -125,7 +125,6 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 	return nil
 }
 
-<<<<<<< HEAD
 func validateItems(o *domain.WorkOrder) error {
 	if o == nil {
 		return types.NewError(types.ErrValidation, "work order is nil", nil)
@@ -147,7 +146,11 @@ func validateItems(o *domain.WorkOrder) error {
 			return types.NewError(types.ErrValidation, "duplicate supply_id in items", nil)
 		}
 		seenSupplyIDs[item.SupplyID] = struct{}{}
-=======
+	}
+
+	return nil
+}
+
 func validateUniqueSupplyItems(o *domain.WorkOrder) error {
 	if o == nil {
 		return domainerr.Validation("work order is nil")
@@ -168,14 +171,11 @@ func validateUniqueSupplyItems(o *domain.WorkOrder) error {
 		}
 
 		seen[item.SupplyID] = struct{}{}
->>>>>>> origin/develop
 	}
 
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, error) {
 	normalized := strings.TrimSpace(status)
 	if normalized == "" && allowEmpty {
@@ -191,8 +191,6 @@ func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, err
 		return "", domainerr.Validation("invalid investor payment status")
 	}
 }
-
->>>>>>> origin/develop
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
 }
