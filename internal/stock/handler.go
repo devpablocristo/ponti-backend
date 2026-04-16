@@ -205,6 +205,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	}
 
 	stockDomain.RealStockUnits = req.RealStockUnits
+	stockDomain.HasRealStockCount = true
 	stockDomain.UpdatedBy = &userID
 
 	err = h.ucs.UpdateRealStockUnits(ctx, stockID, stockDomain)
