@@ -44,7 +44,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		Preload("SupplyMovements").
 		Where("stocks.project_id = ?", projectID)
 
-	if closeDate != zeroTime {
+	if !closeDate.Equal(zeroTime) {
 		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
 	} else {
 		stockQuery = stockQuery.Where("stocks.close_date IS NULL")

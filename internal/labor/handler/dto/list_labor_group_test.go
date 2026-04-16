@@ -191,3 +191,39 @@ func TestLaborListItem_MarshalJSON_OtherFieldsPreserved(t *testing.T) {
 	assert.Equal(t, "1235", result["net_total"])
 	assert.Equal(t, "259", result["total_iva"])
 }
+
+func TestLaborListItem_MarshalJSON_IncludesInvestorID(t *testing.T) {
+	now := time.Now()
+	labor := LaborListItem{
+		WorkOrderID:     1,
+		WorkOrderNumber: "WO-001",
+		Date:            now,
+		ProjectName:     "Test Project",
+		FieldName:       "Test Field",
+		LotID:           12,
+		LotName:         "Lote 2",
+		CropName:        "Test Crop",
+		LaborName:       "Test Labor",
+		Contractor:      "Test Contractor",
+		SurfaceHa:       decimal.NewFromFloat(10.5),
+		CostHa:          decimal.NewFromFloat(100.5),
+		CategoryName:    "Test Category",
+		InvestorID:      7,
+		InvestorName:    "Laguna Blanca",
+		USDAvgValue:     decimal.NewFromFloat(50.5),
+		NetTotal:        decimal.NewFromFloat(1234.56),
+		TotalIVA:        decimal.NewFromFloat(259.26),
+		USDCostHa:       decimal.NewFromFloat(75.5),
+		USDNetTotal:     decimal.NewFromFloat(500.5),
+	}
+
+	jsonData, err := json.Marshal(labor)
+	assert.NoError(t, err)
+
+	var result map[string]interface{}
+	err = json.Unmarshal(jsonData, &result)
+	assert.NoError(t, err)
+
+	assert.Equal(t, float64(7), result["investor_id"])
+	assert.Equal(t, "Laguna Blanca", result["investor_name"])
+}

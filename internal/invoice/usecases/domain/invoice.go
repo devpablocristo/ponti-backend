@@ -7,12 +7,13 @@ import (
 )
 
 type Invoice struct {
-	ID          int64     // ID de cada registro
-	WorkOrderID int64     // ID de ordenes de trabajo
-	Number      string    // Nro de factura
-	Company     string    // Nombre de la empresa
-	Date        time.Time // Fecha De Emision
-	Status      string    // Estado
+	ID          int64
+	WorkOrderID int64
+	InvestorID  int64
+	Number      string
+	Company     string
+	Date        time.Time
+	Status      string
 
 	shareddomain.Base
 }
