@@ -18,17 +18,18 @@ type LaborListItem struct {
 	ProjectName            string          `json:"project_name"`
 	FieldName              string          `json:"field_name"`
 	LotID                  int64           `json:"lot_id"`
-    LotName                string          `json:"lot_name"`
+	LotName                string          `json:"lot_name"`
 	CropName               string          `json:"crop_name"`
 	LaborName              string          `json:"labor_name"`
 	Contractor             string          `json:"contractor"`
 	SurfaceHa              decimal.Decimal `json:"surface_ha"`
 	CostHa                 decimal.Decimal `json:"cost_ha"`
 	CategoryName           string          `json:"category_name"`
+	InvestorID             int64           `json:"investor_id"`
 	InvestorName           string          `json:"investor_name"`
 	USDAvgValue            decimal.Decimal `json:"usd_avg_value"`
-	NetTotal               decimal.Decimal `json:"net_total"` // Total $ Neto
-	TotalIVA               decimal.Decimal `json:"total_iva"` // Total $ IVA
+	NetTotal               decimal.Decimal `json:"net_total"`
+	TotalIVA               decimal.Decimal `json:"total_iva"`
 	USDCostHa              decimal.Decimal `json:"usd_cost_ha"`
 	USDNetTotal            decimal.Decimal `json:"usd_net_total"`
 	InvoiceID              int64           `json:"invoice_id"`
@@ -54,6 +55,7 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		SurfaceHa              string     `json:"surface_ha"`
 		CostHa                 string     `json:"cost_ha"`
 		CategoryName           string     `json:"category_name"`
+		InvestorID             int64      `json:"investor_id"`
 		InvestorName           string     `json:"investor_name"`
 		USDAvgValue            string     `json:"usd_avg_value"`
 		NetTotal               string     `json:"net_total"`
@@ -79,6 +81,7 @@ func (l LaborListItem) MarshalJSON() ([]byte, error) {
 		SurfaceHa:              l.SurfaceHa.StringFixed(3),
 		CostHa:                 l.CostHa.StringFixed(3),
 		CategoryName:           l.CategoryName,
+		InvestorID:             l.InvestorID,
 		InvestorName:           l.InvestorName,
 		USDAvgValue:            l.USDAvgValue.StringFixed(3),
 		NetTotal:               l.NetTotal.StringFixed(0), // Total $ Neto: entero más próximo
@@ -114,6 +117,7 @@ func FromDomainListGroup(d *domain.LaborListItem) *LaborListItem {
 		SurfaceHa:              d.SurfaceHa.Round(3),
 		CostHa:                 d.CostHa.Round(3),
 		CategoryName:           d.CategoryName,
+		InvestorID:             d.InvestorID,
 		InvestorName:           d.InvestorName,
 		USDAvgValue:            d.USDAvgValue.Round(3),
 		NetTotal:               d.NetTotal.Round(3),

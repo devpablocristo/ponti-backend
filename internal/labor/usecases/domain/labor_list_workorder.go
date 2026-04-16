@@ -7,31 +7,32 @@ import (
 )
 
 type LaborListItem struct {
-	WorkOrderID            int64           // id de la orden
-	WorkOrderNumber        string          //numero de orden
-	Date                   time.Time       // fecha de la orden
-	ProjectName            string          // nombre del proyecto
-	FieldName              string          // nombre del campo
-	LotId				   int64           // id del lote
-	LotName				   string          // nombre del lote
-	CropName               string          // nombre del cultivo
-	LaborName              string          // nombre de la labor
-	Contractor             string          // nombre del contratista
-	SurfaceHa              decimal.Decimal // superficie
-	CostHa                 decimal.Decimal // costo por ha
-	CategoryName           string          // rubro
-	InvestorName           string          // nombre del inversor
-	USDAvgValue            decimal.Decimal // valor dolar promedio
-	NetTotal               decimal.Decimal // total neto
-	TotalIVA               decimal.Decimal // total IVA
-	USDCostHa              decimal.Decimal // costo de dolar por ha
-	USDNetTotal            decimal.Decimal // total neto dolar
+	WorkOrderID            int64
+	WorkOrderNumber        string
+	Date                   time.Time
+	ProjectName            string
+	FieldName              string
+	LotId                  int64
+	LotName                string
+	CropName               string
+	LaborName              string
+	Contractor             string
+	SurfaceHa              decimal.Decimal
+	CostHa                 decimal.Decimal
+	CategoryName           string
+	InvestorID             int64
+	InvestorName           string
+	USDAvgValue            decimal.Decimal
+	NetTotal               decimal.Decimal
+	TotalIVA               decimal.Decimal
+	USDCostHa              decimal.Decimal
+	USDNetTotal            decimal.Decimal
 
-	InvoiceID      int64      // id de la factura
-	InvoiceNumber  string     // numero de factura
-	InvoiceCompany string     // empresa de la factura
-	InvoiceDate    *time.Time // fecha de factura
-	InvoiceStatus  string     // estado de factura
+	InvoiceID      int64
+	InvoiceNumber  string
+	InvoiceCompany string
+	InvoiceDate    *time.Time
+	InvoiceStatus  string
 }
 
 type LaborRawItem struct {
@@ -46,6 +47,7 @@ type LaborRawItem struct {
 	SurfaceHa       decimal.Decimal
 	CostHa          decimal.Decimal
 	CategoryName    string
+	InvestorID      int64
 	InvestorName    string
 	USDAvgValue     decimal.Decimal
 

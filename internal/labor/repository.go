@@ -227,7 +227,21 @@ func (r *Repository) ListByWorkOrder(ctx context.Context, workOrderID int64) ([]
 			i.date AS invoice_date,
 			i.status AS invoice_status
 		FROM %s AS v4
-		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true
 		WHERE v4.workorder_id = ?
 	`, shareddb.ReportView("labor_list"))
 
@@ -331,7 +345,23 @@ func (r *Repository) ListGroupLabor(
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
 		FROM %s AS v4
-		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true
+
+
 		WHERE %s
 	`, view, whereSQL)
 	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
@@ -345,7 +375,23 @@ func (r *Repository) ListGroupLabor(
 	dataQuery := fmt.Sprintf(`
 		SELECT %s
 		FROM %s AS v4
-		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true
+
+
 		WHERE %s
 		ORDER BY v4.workorder_number DESC
 		LIMIT ? OFFSET ?
@@ -381,31 +427,37 @@ func (r *Repository) ListGroupLabor(
 			invoiceID = *m.InvoiceID
 		}
 
+		var investorID int64
+if m.InvestorID != nil {
+	investorID = *m.InvestorID
+}
+
 		list[i] = domain.LaborListItem{
-			WorkOrderID:            m.WorkOrderID,
-			WorkOrderNumber:        m.WorkOrderNumber,
-			Date:                   m.Date,
-			ProjectName:            m.ProjectName,
-			FieldName:              m.FieldName,
-			LotId:                  safeInt64Ptr(m.LotID),
-			LotName:                safeStringPtr(m.LotName),
-			CropName:               safeStringPtr(m.CropName),
-			LaborName:              m.LaborName,
-			Contractor:             m.Contractor,
-			SurfaceHa:              m.SurfaceHa,
-			CostHa:                 costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
-			CategoryName:           safeStringPtr(m.LaborCategoryName),
-			InvestorName:           safeStringPtr(m.InvestorName),
-			USDAvgValue:            m.USDAvgValue,
-			NetTotal:               netTotal,    // 10.000 × 100 = 1.000.000
-			TotalIVA:               totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
-			USDCostHa:              usdCostHa,   // 10
-			USDNetTotal:            usdNetTotal, // 1000
-			InvoiceID:              invoiceID,
-			InvoiceNumber:          safeStringPtr(m.InvoiceNumber),
-			InvoiceCompany:         safeStringPtr(m.InvoiceCompany),
-			InvoiceDate:            m.InvoiceDate,
-			InvoiceStatus:          safeStringPtr(m.InvoiceStatus),
+			WorkOrderID:     m.WorkOrderID,
+			WorkOrderNumber: m.WorkOrderNumber,
+			Date:            m.Date,
+			ProjectName:     m.ProjectName,
+			FieldName:       m.FieldName,
+			LotId:           safeInt64Ptr(m.LotID),
+			LotName:         safeStringPtr(m.LotName),
+			CropName:        safeStringPtr(m.CropName),
+			LaborName:       m.LaborName,
+			Contractor:      m.Contractor,
+			SurfaceHa:       m.SurfaceHa,
+			CostHa:          costHaARS, // ARS/ha SIN IVA (10 × 1000 = 10.000)
+			CategoryName:    safeStringPtr(m.LaborCategoryName),
+			InvestorID:      investorID,
+			InvestorName:    safeStringPtr(m.InvestorName),
+			USDAvgValue:     m.USDAvgValue,
+			NetTotal:        netTotal,    // 10.000 × 100 = 1.000.000
+			TotalIVA:        totalConIVA, // MOSTRAMOS TOTAL CON IVA: 1.000.000 × 1.105 = 1.105.000
+			USDCostHa:       usdCostHa,   // 10
+			USDNetTotal:     usdNetTotal, // 1000
+			InvoiceID:       invoiceID,
+			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
+			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
+			InvoiceDate:     m.InvoiceDate,
+			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
 		}
 	}
 
@@ -489,7 +541,23 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
 		FROM %s AS v4
-		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true
+
+
 		INNER JOIN project_dollar_values pdv
 			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
 		WHERE %s
@@ -505,7 +573,23 @@ func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, pro
 	dataQuery := fmt.Sprintf(`
 		SELECT %s
 		FROM %s AS v4
-		LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id
+		LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true
+
+
 		INNER JOIN project_dollar_values pdv
 			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
 		WHERE %s
@@ -713,8 +797,21 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 			i.date AS invoice_date,
 			i.status AS invoice_status
         `).
-		Joins(`LEFT JOIN invoices i ON i.work_order_id = v4.workorder_id AND i.deleted_at IS NULL`)
-
+		Joins(`LEFT JOIN LATERAL (
+    SELECT i.*
+    FROM invoices i
+    WHERE i.work_order_id = v4.workorder_id
+      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
+      AND i.deleted_at IS NULL
+    ORDER BY
+      CASE
+        WHEN i.investor_id = v4.investor_id THEN 0
+        WHEN i.investor_id IS NULL THEN 1
+        ELSE 2
+      END,
+      i.id DESC
+    LIMIT 1
+) i ON true`)
 	var rows []models.LaborListItem
 
 	if err := base.Order("v4.workorder_number DESC").Scan(&rows).Error; err != nil {

@@ -10,7 +10,8 @@ import (
 
 type Invoice struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	WorkOrderID int64     `gorm:"not null;uniqueIndex;column:work_order_id"`
+	WorkOrderID int64     `gorm:"not null;uniqueIndex:uq_invoices_work_order_investor;column:work_order_id"`
+	InvestorID  int64     `gorm:"not null;uniqueIndex:uq_invoices_work_order_investor;index;column:investor_id"`
 	Number      string    `gorm:"not null;column:number"`
 	Company     string    `gorm:"varchar(100);not null;column:company"`
 	Date        time.Time `gorm:"not null;column:date"`
@@ -27,6 +28,7 @@ func FromDomain(i *domain.Invoice) *Invoice {
 	return &Invoice{
 		ID:          i.ID,
 		WorkOrderID: i.WorkOrderID,
+		InvestorID:  i.InvestorID,
 		Number:      i.Number,
 		Company:     i.Company,
 		Date:        i.Date,
@@ -42,6 +44,7 @@ func (im *Invoice) ToDomain() *domain.Invoice {
 	return &domain.Invoice{
 		ID:          im.ID,
 		WorkOrderID: im.WorkOrderID,
+		InvestorID:  im.InvestorID,
 		Number:      im.Number,
 		Company:     im.Company,
 		Date:        im.Date,
