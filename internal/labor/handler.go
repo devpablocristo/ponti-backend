@@ -70,12 +70,8 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
 	// Endpoints de labores asociados a un proyecto específico
-	projectLaborsGroup := r.Group(baseURL + "/projects/:project_id/labors")
+	projectLaborsGroup := r.Group(baseURL+"/projects/:project_id/labors", h.mws.GetValidation()...)
 	{
 		projectLaborsGroup.POST("", h.CreateLabor)
 		projectLaborsGroup.GET("", h.ListLabor)
@@ -87,7 +83,7 @@ func (h *Handler) Routes() {
 	}
 
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
-	workOrderLaborsGroup := r.Group(baseURL + "/labors")
+	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
 		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
 		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)

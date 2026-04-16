@@ -72,11 +72,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL + "/projects/:project_id/stocks")
+	public := r.Group(baseURL+"/projects/:project_id/stocks", h.mws.GetValidation()...)
 	{
 		public.GET("/summary", h.getStocksSummary)
 		public.GET("/periods", h.getStocksPeriods)
@@ -216,6 +212,7 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+
 	sharedhandlers.RespondOK(c, dto.NewUpdateRealStockResponse("real stock updated successfully"))
 }
 

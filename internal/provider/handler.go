@@ -37,11 +37,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	publicGroup := r.Group(baseURL + "/providers")
+	publicGroup := r.Group(baseURL+"/providers", h.mws.GetValidation()...)
 	{
 		publicGroup.GET("", h.GetProviders)
 	}

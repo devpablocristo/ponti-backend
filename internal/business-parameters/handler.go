@@ -59,11 +59,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/business-parameters"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	group := r.Group(baseURL)
+	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.GET("", h.GetAllParameters)
 		group.GET("/category/:category", h.GetParametersByCategory)

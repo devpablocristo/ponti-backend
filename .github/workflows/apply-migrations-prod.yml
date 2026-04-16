@@ -1,0 +1,184 @@
+name: Apply DB migrations (PROD)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: true
+      confirm_apply:
+        description: "Marcar para aplicar (sino corre en dry-run: version actual + pendientes)."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: apply-migrations-prod
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      # La instancia Cloud SQL es unificada y vive en el proyecto DEV.
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      DB_USER: ${{ vars.DB_USER_DEV }}
+      SECRET_DB_PASSWORD_NAME: db-password-dev
+      CLOUDSQL_PROXY_PORT: "55434"
+      DB_INSTANCE_NAME: ${{ vars.DB_INSTANCE_NAME_DEV }}
+      DB_NAME_PROD: ${{ vars.DB_NAME_PROD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guardrails
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DB_INSTANCE_NAME:-}" ]]; then
+            echo "::error::Falta DB_INSTANCE_NAME"
+            exit 1
+          fi
+          if [[ -z "${DB_NAME_PROD:-}" ]]; then
+            echo "::error::Falta DB_NAME_PROD"
+            exit 1
+          fi
+          if [[ -z "${DB_USER:-}" ]]; then
+            echo "::error::Falta DB_USER"
+            exit 1
+          fi
+
+          # La instancia es unificada (vive en DEV) pero la DB debe ser la de prod.
+          prod_lower="$(printf '%s' "$DB_NAME_PROD" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$prod_lower" != *prod* ]]; then
+            echo "::error::DB_NAME_PROD no contiene 'prod': '$DB_NAME_PROD'"
+            exit 1
+          fi
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Backup manual pre-migration
+        if: ${{ inputs.confirm_apply == true }}
+        run: |
+          set -euo pipefail
+          desc="pre-migration $(date +%Y-%m-%dT%H:%M:%S) reason=${{ inputs.reason }}"
+          echo "Creating manual backup: $desc"
+          gcloud sql backups create \
+            --instance="$DB_INSTANCE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --description="$desc"
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Resolve DB password
+        run: |
+          set -euo pipefail
+          db_password="${DB_PASSWORD:-}"
+          if [[ -z "$db_password" ]]; then
+            db_password="$(gcloud secrets versions access latest \
+              --project="$GCP_PROJECT_ID" \
+              --secret="$SECRET_DB_PASSWORD_NAME" 2>/dev/null || true)"
+          fi
+          if [[ -z "$db_password" ]]; then
+            echo "::error::No se pudo resolver DB_PASSWORD desde Secret Manager."
+            exit 1
+          fi
+          echo "::add-mask::$db_password"
+          echo "DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          set -euo pipefail
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-migrate-prod >/dev/null 2>&1 || true
+          docker run -d --name cloudsql-proxy-migrate-prod \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 \
+            --port 5432 \
+            --token "$token" \
+            "${GCP_PROJECT_ID}:${GCP_REGION}:${DB_INSTANCE_NAME}" >/dev/null
+
+          for i in {1..30}; do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Cloud SQL Proxy no quedó listo."
+          exit 1
+
+      - name: Current migration version (PROD)
+        run: |
+          set -euo pipefail
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          echo "=== golang-migrate version on PROD ==="
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_PROD}?sslmode=disable" \
+            version || true
+
+          echo "=== Available migrations in repo ==="
+          ls migrations_v4/ | grep '\.up\.sql$' | sort
+
+      - name: Apply migrations (PROD)
+        if: ${{ inputs.confirm_apply == true }}
+        run: |
+          set -euo pipefail
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          echo "Applying pending migrations to PROD (reason: ${{ inputs.reason }})..."
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_PROD}?sslmode=disable" \
+            up
+
+      - name: Dry-run notice
+        if: ${{ inputs.confirm_apply != true }}
+        run: |
+          echo "::notice::Dry-run: no se aplicaron migraciones. Para ejecutar, relanzar con confirm_apply=true."
+
+      - name: Final migration version (PROD)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if ! docker ps --format '{{.Names}}' | grep -q '^cloudsql-proxy-migrate-prod$'; then
+            echo "(proxy down, skipping)"
+            exit 0
+          fi
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_PROD}?sslmode=disable" \
+            version || true
+
+      - name: Stop Cloud SQL Proxy
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-migrate-prod >/dev/null 2>&1 || true

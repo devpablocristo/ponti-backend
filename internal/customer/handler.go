@@ -59,11 +59,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/customers"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.CreateCustomer)
 		public.GET("", h.ListCustomers)

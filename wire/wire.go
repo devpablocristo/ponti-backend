@@ -67,6 +67,7 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	StockUseCases             *stock.UseCases
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 }
