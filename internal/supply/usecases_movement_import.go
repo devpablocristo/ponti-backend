@@ -273,7 +273,7 @@ func (u *UseCases) validateSupplyMovementImport(
 func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, movement *domain.SupplyMovement) error {
 	switch movement.MovementType {
 	case domain.STOCK:
-		_, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+		_, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 		if err != nil {
 			return err
 		}

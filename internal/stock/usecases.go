@@ -41,6 +41,7 @@ type RepositoryPort interface {
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockByID(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetLastStockByProjectInvestorID(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
@@ -171,6 +172,10 @@ func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Sto
 
 func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
 	return u.repo.GetLastStockByProjectID(ctx, projectID, supplyID)
+}
+
+func (u *UseCases) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastStockByProjectInvestorID(ctx, projectID, supplyID, investorID)
 }
 
 func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {

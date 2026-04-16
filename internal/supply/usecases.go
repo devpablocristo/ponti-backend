@@ -49,6 +49,7 @@ type ExporterAdapterPort interface {
 
 type StockUseCasesPort interface {
 	GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*stockdomain.Stock, bool, error)
+	GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*stockdomain.Stock, bool, error)
 	CreateStock(ctx context.Context, s *stockdomain.Stock) (int64, error)
 	UpdateRealStockUnits(ctx context.Context, stockID int64, stock *stockdomain.Stock) error
 }

@@ -33,7 +33,7 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 // createSupplyMovementInternal crea el movimiento sin chequear duplicados
 // (para uso en flujos que ya validaron previamente, ej. import).
 func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
-	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -64,17 +64,17 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 
 	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
 	if movement.MovementType == domain.STOCK {
-	if isFirst {
-		return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+		if isFirst {
+			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+		}
+		stock.RealStockUnits = movement.Quantity
+		stock.HasRealStockCount = true
+		stock.UpdatedBy = movement.UpdatedBy
+		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+			return 0, err
+		}
+		return 0, nil
 	}
-	stock.RealStockUnits = movement.Quantity
-	stock.HasRealStockCount = true
-	stock.UpdatedBy = movement.UpdatedBy
-	if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
-		return 0, err
-	}
-	return 0, nil
-}
 
 	if isFirst {
 		stock = createStockDomainFromSupplyMovement(movement)
@@ -132,7 +132,7 @@ func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.
 }
 
 func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement *domain.SupplyMovement) error {
-	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 	if err != nil {
 		return err
 	}
@@ -280,6 +280,43 @@ func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, pro
 }
 
 func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
+	if supplyMovement == nil {
+		return domainerr.Validation("invalid supply movement")
+	}
+
+	if supplyMovement.MovementType == domain.INTERNAL_MOVEMENT || supplyMovement.MovementType == domain.INTERNAL_MOVEMENT_IN {
+		return domainerr.Validation("no se permite editar movimientos internos")
+	}
+	if supplyMovement.MovementType == domain.STOCK {
+		return domainerr.Validation("no se permite editar movimientos de stock")
+	}
+
+	if err := u.resolveMovementReferences(ctx, supplyMovement); err != nil {
+		return err
+	}
+
+	if supplyMovement.Provider != nil && supplyMovement.Provider.ID == 0 {
+		providerID, err := u.repo.CreateProvider(ctx, supplyMovement.Provider)
+		if err != nil {
+			return err
+		}
+		supplyMovement.Provider.ID = providerID
+	}
+
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(
+		ctx,
+		supplyMovement.ProjectId,
+		supplyMovement.Supply.ID,
+		supplyMovement.Investor.ID,
+	)
+	if err != nil {
+		return err
+	}
+	if isFirst {
+		return domainerr.Validation("no existe stock para este insumo en el proyecto")
+	}
+
+	supplyMovement.StockId = stock.ID
 	return u.repo.UpdateSupplyMovement(ctx, supplyMovement)
 }
 
@@ -384,7 +421,7 @@ func (u *UseCases) handleMovementInternalMovementOut(ctx context.Context, moveme
 	movementIn.Supply = &domain.Supply{ID: destSupplyID, Name: destSupplyName}
 
 	// Buscar o crear el stock en el proyecto destino
-	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectID(ctx, movementIn.ProjectId, destSupplyID)
+	stockDest, isFirstDest, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movementIn.ProjectId, destSupplyID, movementIn.Investor.ID)
 	if err != nil {
 		return fmt.Errorf("error getting destination stock: %w", err)
 	}
