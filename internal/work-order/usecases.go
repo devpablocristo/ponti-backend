@@ -45,6 +45,9 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 	if o == nil {
 		return 0, domainerr.Validation("work order is nil")
 	}
+	if err := validateItems(o); err != nil {
+		return 0, err
+	}
 	if err := validateInvestorSplits(o); err != nil {
 		return 0, err
 	}
@@ -63,6 +66,9 @@ func (u *UseCases) DuplicateWorkOrder(ctx context.Context, number string) (strin
 }
 
 func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
+	if err := validateItems(o); err != nil {
+		return err
+	}
 	if err := validateInvestorSplits(o); err != nil {
 		return err
 	}
@@ -119,6 +125,32 @@ func validateInvestorSplits(o *domain.WorkOrder) error {
 	return nil
 }
 
+func validateItems(o *domain.WorkOrder) error {
+	if o == nil {
+		return types.NewError(types.ErrValidation, "work order is nil", nil)
+	}
+
+	seenSupplyIDs := make(map[int64]struct{})
+
+	for _, item := range o.Items {
+		if item.SupplyID <= 0 {
+			return types.NewError(types.ErrValidation, "item supply_id must be greater than 0", nil)
+		}
+		if item.TotalUsed.LessThanOrEqual(decimal.Zero) {
+			return types.NewError(types.ErrValidation, "item total_used must be greater than 0", nil)
+		}
+		if item.FinalDose.LessThanOrEqual(decimal.Zero) {
+			return types.NewError(types.ErrValidation, "item final_dose must be greater than 0", nil)
+		}
+		if _, exists := seenSupplyIDs[item.SupplyID]; exists {
+			return types.NewError(types.ErrValidation, "duplicate supply_id in items", nil)
+		}
+		seenSupplyIDs[item.SupplyID] = struct{}{}
+	}
+
+	return nil
+}
+
 func validateUniqueSupplyItems(o *domain.WorkOrder) error {
 	if o == nil {
 		return domainerr.Validation("work order is nil")
@@ -159,7 +191,6 @@ func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, err
 		return "", domainerr.Validation("invalid investor payment status")
 	}
 }
-
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
 }

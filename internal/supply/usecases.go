@@ -4,16 +4,19 @@ package supply
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 type RepositoryPort interface {
 	CreateSupply(context.Context, *domain.Supply) (int64, error)
+	CreatePendingSupply(context.Context, int64, string) (int64, error)
 	CreateSuppliesBulk(context.Context, []domain.Supply) error
 	GetSupply(context.Context, int64) (*domain.Supply, error)
 	GetSuppliesByIDs(context.Context, []int64) ([]domain.Supply, error)
@@ -82,7 +85,44 @@ func (u *UseCases) CreateSupply(ctx context.Context, s *domain.Supply) (int64, e
 	if s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 		return 0, domainerr.Validation("missing required fields")
 	}
+	s.IsPending = false
 	return u.repo.CreateSupply(ctx, s)
+}
+
+func (u *UseCases) CreatePendingSupply(ctx context.Context, projectID int64, name string) (*domain.Supply, bool, error) {
+	name = normalizeSupplyName(name)
+	if projectID <= 0 || name == "" {
+		return nil, false, types.NewError(types.ErrInvalidInput, "project_id and name are required", nil)
+	}
+
+	exists, err := u.repo.ProjectExists(ctx, projectID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !exists {
+		return nil, false, types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", projectID), nil)
+	}
+
+	existing, err := u.repo.GetSupplyByProjectAndName(ctx, projectID, name)
+	if err == nil {
+		return existing, false, nil
+	}
+	if errType, ok := types.GetErrorType(err); !ok || errType != types.ErrNotFound {
+		return nil, false, err
+	}
+
+	id, err := u.repo.CreatePendingSupply(ctx, projectID, name)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &domain.Supply{
+		ID:        id,
+		ProjectID: projectID,
+		Name:      name,
+		Price:     domain.ZeroPrice(),
+		IsPending: true,
+	}, true, nil
 }
 
 func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
@@ -105,6 +145,10 @@ func (u *UseCases) CreateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 		if s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("missing fields in supply: %s", s.Name))
 		}
+	}
+
+	for i := range supplies {
+		supplies[i].IsPending = false
 	}
 
 	// Chequeo adicional: podés optimizarlo usando un repo más específico
@@ -150,6 +194,25 @@ func (u *UseCases) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	if s.ID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
 		return domainerr.Validation("missing required fields")
 	}
+	s.IsPending = false
+	return u.repo.UpdateSupply(ctx, s)
+}
+
+func (u *UseCases) CompletePendingSupply(ctx context.Context, s *domain.Supply) error {
+	if s.ID == 0 || s.ProjectID == 0 || s.Name == "" || s.UnitID == 0 || s.CategoryID == 0 || s.Type.ID == 0 {
+		return types.NewError(types.ErrInvalidInput, "missing required fields", nil)
+	}
+
+	current, err := u.repo.GetSupply(ctx, s.ID)
+	if err != nil {
+		return err
+	}
+	if !current.IsPending {
+		return types.NewError(types.ErrConflict, "supply is not pending", nil)
+	}
+
+	s.Name = normalizeSupplyName(s.Name)
+	s.IsPending = false
 	return u.repo.UpdateSupply(ctx, s)
 }
 
@@ -184,6 +247,10 @@ func (u *UseCases) ListSuppliesPaginated(
 	return u.repo.ListSuppliesPaginated(ctx, filter, mode, page, perPage)
 }
 
+func normalizeSupplyName(name string) string {
+	return strings.Join(strings.Fields(name), " ")
+}
+
 func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
 	if len(supplies) == 0 {
 		return domainerr.Validation("no supplies provided")
@@ -197,6 +264,9 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 			return domainerr.New(domainerr.KindValidation, fmt.Sprintf("duplicate supply id in request: %d", s.ID))
 		}
 		seen[s.ID] = true
+	}
+	for i := range supplies {
+		supplies[i].IsPending = false
 	}
 	return u.repo.UpdateSuppliesBulk(ctx, supplies)
 }

@@ -400,6 +400,12 @@ func (r *Repository) ListWorkOrders(
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
+	if filt.IsDigital != nil {
+		base = base.Where("is_digital = ?", *filt.IsDigital)
+	}
+	if filt.Status != nil && *filt.Status != "" {
+		base = base.Where("status = ?", *filt.Status)
+	}
 
 	// 4) Contar total
 	var total int64
@@ -417,7 +423,7 @@ func (r *Repository) ListWorkOrders(
 	if err := base.
 		Limit(int(inp.PageSize)).
 		Offset(offset).
-		Order("number desc").
+		Order("date desc, id desc, number desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, domainerr.Internal(
 			"failed to list work orders")
@@ -446,6 +452,8 @@ func (r *Repository) ListWorkOrders(
 			CostPerHa:         m.CostPerHa,
 			UnitPrice:         m.UnitPrice,
 			TotalCost:         m.TotalCost,
+			IsDigital:         m.IsDigital,
+			Status:            m.Status,
 		}
 	}
 

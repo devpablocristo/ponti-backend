@@ -11,9 +11,10 @@ import (
 )
 
 type WorkOrderItem struct {
-	SupplyID  int64           `json:"supply_id" binding:"required"`
-	TotalUsed decimal.Decimal `json:"total_used" binding:"required"`
-	FinalDose decimal.Decimal `json:"final_dose" binding:"required"`
+	SupplyID   int64           `json:"supply_id" binding:"required"`
+	SupplyName string          `json:"supply_name"`
+	TotalUsed  decimal.Decimal `json:"total_used" binding:"required"`
+	FinalDose  decimal.Decimal `json:"final_dose" binding:"required"`
 }
 
 type InvestorSplit struct {
@@ -25,13 +26,15 @@ type InvestorSplit struct {
 // MarshalJSON asegura 2 decimales en los campos decimal de salida.
 func (w WorkOrderItem) MarshalJSON() ([]byte, error) {
 	aux := struct {
-		SupplyID  int64           `json:"supply_id"`
-		TotalUsed decimal.Decimal `json:"total_used"`
-		FinalDose decimal.Decimal `json:"final_dose"`
+		SupplyID   int64           `json:"supply_id"`
+		SupplyName string          `json:"supply_name"`
+		TotalUsed  decimal.Decimal `json:"total_used"`
+		FinalDose  decimal.Decimal `json:"final_dose"`
 	}{
-		SupplyID:  w.SupplyID,
-		TotalUsed: w.TotalUsed,
-		FinalDose: w.FinalDose,
+		SupplyID:   w.SupplyID,
+		SupplyName: w.SupplyName,
+		TotalUsed:  w.TotalUsed,
+		FinalDose:  w.FinalDose,
 	}
 	return json.Marshal(aux)
 }
@@ -121,9 +124,10 @@ func toDomainItems(items []WorkOrderItem) []domain.WorkOrderItem {
 	out := make([]domain.WorkOrderItem, len(items))
 	for i, it := range items {
 		out[i] = domain.WorkOrderItem{
-			SupplyID:  it.SupplyID,
-			TotalUsed: it.TotalUsed,
-			FinalDose: it.FinalDose,
+			SupplyID:   it.SupplyID,
+			SupplyName: it.SupplyName,
+			TotalUsed:  it.TotalUsed,
+			FinalDose:  it.FinalDose,
 		}
 	}
 	return out
@@ -133,9 +137,10 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	items := make([]WorkOrderItem, len(o.Items))
 	for i, it := range o.Items {
 		items[i] = WorkOrderItem{
-			SupplyID:  it.SupplyID,
-			TotalUsed: it.TotalUsed,
-			FinalDose: it.FinalDose,
+			SupplyID:   it.SupplyID,
+			SupplyName: it.SupplyName,
+			TotalUsed:  it.TotalUsed,
+			FinalDose:  it.FinalDose,
 		}
 	}
 

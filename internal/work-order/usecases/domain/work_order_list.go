@@ -28,6 +28,8 @@ type WorkOrderListElement struct {
 	CostPerHa         decimal.Decimal
 	UnitPrice         decimal.Decimal
 	TotalCost         decimal.Decimal
+	IsDigital         bool
+	Status            string
 }
 
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.

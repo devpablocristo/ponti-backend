@@ -82,6 +82,21 @@ func (mr *MockRepositoryPortMockRecorder) CreateSupply(arg0, arg1 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSupply", reflect.TypeOf((*MockRepositoryPort)(nil).CreateSupply), arg0, arg1)
 }
 
+// CreatePendingSupply mocks base method.
+func (m *MockRepositoryPort) CreatePendingSupply(arg0 context.Context, arg1 int64, arg2 string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreatePendingSupply", arg0, arg1, arg2)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreatePendingSupply indicates an expected call of CreatePendingSupply.
+func (mr *MockRepositoryPortMockRecorder) CreatePendingSupply(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePendingSupply", reflect.TypeOf((*MockRepositoryPort)(nil).CreatePendingSupply), arg0, arg1, arg2)
+}
+
 // CreateSupplyMovement mocks base method.
 func (m *MockRepositoryPort) CreateSupplyMovement(arg0 context.Context, arg1 *domain1.SupplyMovement) (int64, error) {
 	m.ctrl.T.Helper()

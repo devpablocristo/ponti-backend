@@ -19,6 +19,7 @@ type Supply struct {
 	Name           string          `gorm:"type:varchar(100);not null"`
 	Price          decimal.Decimal `gorm:"not null"`
 	IsPartialPrice bool            `gorm:"not null;default:false;column:is_partial_price"`
+	IsPending      bool            `gorm:"not null;default:false;column:is_pending"`
 
 	UnitID int64
 
@@ -43,6 +44,7 @@ func (m *Supply) ToDomain() *domain.Supply {
 		UnitID:         int64(m.UnitID),
 		Price:          m.Price,
 		IsPartialPrice: m.IsPartialPrice,
+		IsPending:      m.IsPending,
 		CategoryID:     int64(m.CategoryID),
 		CategoryName:   m.Category.Name,
 		Type: classdomain.ClassType{
@@ -66,6 +68,7 @@ func FromDomain(d *domain.Supply) *Supply {
 		Name:           d.Name,
 		Price:          d.Price,
 		IsPartialPrice: d.IsPartialPrice,
+		IsPending:      d.IsPending,
 		UnitID:         int64(d.UnitID),
 		CategoryID:     int64(d.CategoryID),
 		TypeID:         int64(d.Type.ID),
