@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -148,4 +149,52 @@ func TestRepository_InvestorBelongsToWorkOrder_UsesWorkOrderInvestorWhenNoSplits
 	ok, err = repo.InvestorBelongsToWorkOrder(ctx, 40, 12)
 	assert.NoError(t, err)
 	assert.False(t, ok)
+}
+
+func TestRepository_Update_UpgradesLegacyInvoiceToInvestorSpecific(t *testing.T) {
+	repo := newInvoiceTestRepo(t)
+	ctx := context.Background()
+	db := repo.db.Client()
+	now := time.Now()
+
+	assert.NoError(t, db.Exec(
+		`INSERT INTO invoices (work_order_id, investor_id, number, company, date, status) VALUES (?, NULL, ?, ?, ?, ?)`,
+		50, "LEG-50", "Legacy SA", now, "Pendiente",
+	).Error)
+
+	err := repo.Update(ctx, &domain.Invoice{
+		WorkOrderID: 50,
+		InvestorID:  8,
+		Number:      "INV-50",
+		Company:     "Nueva SA",
+		Date:        now.Add(24 * time.Hour),
+		Status:      "Pagada",
+	})
+	assert.NoError(t, err)
+
+	var row models.Invoice
+	assert.NoError(t, db.Where("work_order_id = ?", 50).First(&row).Error)
+	assert.Equal(t, int64(8), row.InvestorID)
+	assert.Equal(t, "INV-50", row.Number)
+	assert.Equal(t, "Nueva SA", row.Company)
+	assert.Equal(t, "Pagada", row.Status)
+}
+
+func TestRepository_Delete_RemovesLegacyInvoiceForInvestorFallback(t *testing.T) {
+	repo := newInvoiceTestRepo(t)
+	ctx := context.Background()
+	db := repo.db.Client()
+	now := time.Now()
+
+	assert.NoError(t, db.Exec(
+		`INSERT INTO invoices (work_order_id, investor_id, number, company, date, status) VALUES (?, NULL, ?, ?, ?, ?)`,
+		60, "LEG-60", "Legacy SA", now, "Pendiente",
+	).Error)
+
+	err := repo.Delete(ctx, 60, 9)
+	assert.NoError(t, err)
+
+	var count int64
+	assert.NoError(t, db.Model(&models.Invoice{}).Where("work_order_id = ?", 60).Count(&count).Error)
+	assert.Equal(t, int64(0), count)
 }

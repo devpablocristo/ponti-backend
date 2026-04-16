@@ -1,5 +1,5 @@
-DROP INDEX IF EXISTS public.uq_invoices_work_order_investor;
-DROP INDEX IF EXISTS public.idx_invoices_investor_id;
+DROP INDEX IF EXISTS uq_invoices_work_order_investor;
+DROP INDEX IF EXISTS idx_invoices_investor_id;
 
 ALTER TABLE ONLY public.invoices
 DROP CONSTRAINT IF EXISTS fk_invoices_investor;

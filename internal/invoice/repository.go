@@ -34,9 +34,9 @@ func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID 
 
 	var row models.Invoice
 	if err := r.db.Client().WithContext(ctx).
-	Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
-	Order(fmt.Sprintf("CASE WHEN investor_id = %d THEN 0 ELSE 1 END, id DESC", investorID)).
-	First(&row).Error; err != nil {
+		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
+		Order(fmt.Sprintf("CASE WHEN investor_id = %d THEN 0 ELSE 1 END, id DESC", investorID)).
+		First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerr.NotFound("There is no invoice for this work order and investor")
 		}
@@ -70,15 +70,16 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 	}
 
 	result := r.db.Client().WithContext(ctx).
-		Where("work_order_id = ? AND investor_id = ?", item.WorkOrderID, item.InvestorID).
+		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", item.WorkOrderID, item.InvestorID).
 		Model(models.Invoice{}).
 		Updates(map[string]any{
-			"number":     item.Number,
-			"company":    item.Company,
-			"date":       item.Date,
-			"status":     item.Status,
-			"updated_at": time.Now(),
-			"updated_by": item.UpdatedBy,
+			"investor_id": item.InvestorID,
+			"number":      item.Number,
+			"company":     item.Company,
+			"date":        item.Date,
+			"status":      item.Status,
+			"updated_at":  time.Now(),
+			"updated_by":  item.UpdatedBy,
 		})
 
 	if result.Error != nil {
@@ -132,7 +133,7 @@ func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID i
 	}
 
 	result := r.db.Client().WithContext(ctx).
-		Where("work_order_id = ? AND investor_id = ?", workOrderID, investorID).
+		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
 		Delete(&models.Invoice{})
 
 	if result.Error != nil {
@@ -193,4 +194,3 @@ func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID
 
 	return row.IsValid, nil
 }
-

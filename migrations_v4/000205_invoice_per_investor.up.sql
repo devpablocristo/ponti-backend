@@ -1,6 +1,12 @@
 ALTER TABLE public.invoices
 ADD COLUMN investor_id bigint;
 
+UPDATE public.invoices i
+SET investor_id = w.investor_id
+FROM public.workorders w
+WHERE w.id = i.work_order_id
+  AND i.investor_id IS NULL;
+
 ALTER TABLE ONLY public.invoices
 DROP CONSTRAINT IF EXISTS uq_invoices_work_order;
 

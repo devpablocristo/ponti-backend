@@ -156,7 +156,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 			HasRealStockCount: false,
 		}
 
-		if closeDate.Equal(zeroTime) {
+		if !closeDate.Equal(zeroTime) {
 			cd := closeDate
 			virtualStock.CloseDate = &cd
 		}
@@ -166,7 +166,6 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 
 	return stocks, nil
 }
-
 
 // GetActiveStocksByProjectID retorna todos los stocks con close_date IS NULL
 // de un proyecto, con sus relaciones precargadas. Se usa para replicar cada
