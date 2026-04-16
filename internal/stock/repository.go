@@ -156,7 +156,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 			HasRealStockCount: false,
 		}
 
-		if closeDate != zeroTime {
+		if closeDate.Equal(zeroTime) {
 			cd := closeDate
 			virtualStock.CloseDate = &cd
 		}
