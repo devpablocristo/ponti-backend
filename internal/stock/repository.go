@@ -10,9 +10,9 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplymodels "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	supplymovementdomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -46,7 +46,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		Preload("SupplyMovements").
 		Where("stocks.project_id = ?", projectID)
 
-	if closeDate != zeroTime {
+	if !closeDate.Equal(zeroTime) {
 		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
 	} else {
 		stockQuery = stockQuery.Where("stocks.close_date IS NULL")
@@ -69,8 +69,8 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	}
 
 	type consumedRow struct {
-		SupplyID  int64           `gorm:"column:supply_id"`
-		Consumed  decimal.Decimal `gorm:"column:consumed"`
+		SupplyID int64           `gorm:"column:supply_id"`
+		Consumed decimal.Decimal `gorm:"column:consumed"`
 	}
 
 	var consumedResults []consumedRow
@@ -103,12 +103,12 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		}
 
 		virtualStock := &domain.Stock{
-	Supply:            supply.ToDomain(),
-	SupplyMovements:   []supplymovementdomain.SupplyMovement{},
-	RealStockUnits:    decimal.Zero,
-	Consumed:          consumedBySupplyID[supply.ID],
-	HasRealStockCount: false,
-}
+			Supply:            supply.ToDomain(),
+			SupplyMovements:   []supplymovementdomain.SupplyMovement{},
+			RealStockUnits:    decimal.Zero,
+			Consumed:          consumedBySupplyID[supply.ID],
+			HasRealStockCount: false,
+		}
 
 		if closeDate != zeroTime {
 			cd := closeDate
@@ -120,7 +120,6 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 
 	return stocks, nil
 }
-
 
 func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
 	var rawPeriods []time.Time
