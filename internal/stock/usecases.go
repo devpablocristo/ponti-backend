@@ -3,26 +3,50 @@ package stock
 
 import (
 	"context"
+	"strconv"
 	"time"
 
-	projectdomain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
+
+// StockNegativeInput es el payload minimo para emitir/resolver una notificacion
+// de stock negativo.
+type StockNegativeInput struct {
+	ProductID   string
+	ProductName string
+	Quantity    float64
+}
+
+// BusinessInsightsNotifier es el contrato que evalua y dispara notificaciones
+// reactivas cuando el stock real cambia. Opcional: si es nil, las mutaciones
+// siguen funcionando pero no emiten/resuelven notificaciones.
+type BusinessInsightsNotifier interface {
+	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockNegativeInput) error
+	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
+}
 
 type RepositoryPort interface {
 	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
+	GetActiveStocksByProjectID(context.Context, int64) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockByID(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetLastStockByProjectInvestorID(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
+	ExecuteInTransaction(context.Context, func(context.Context) error) error
 }
 
 type ExporterAdapterPort interface {
@@ -38,11 +62,19 @@ type UseCases struct {
 	repo      RepositoryPort
 	excel     ExporterAdapterPort
 	projectUC ProjectUseCasesPort
+	notifier  BusinessInsightsNotifier
 }
 
 // NewUseCases crea una instancia de casos de uso para stock.
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+}
+
+// SetBusinessInsightsNotifier conecta el notifier despues de wire (la
+// dependencia se resuelve recien en bootstrap porque businessinsights vive
+// fuera del DI graph de stock).
+func (u *UseCases) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
+	u.notifier = n
 }
 
 func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
@@ -67,31 +99,73 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64
 	if err := u.validateProject(ctx, projectID); err != nil {
 		return err
 	}
-	stockFromDb, err := u.repo.GetStockByPeriodAndProjectID(ctx, projectID)
+
+	activeStocks, err := u.repo.GetActiveStocksByProjectID(ctx, projectID)
 	if err != nil {
 		return err
+	}
+	if len(activeStocks) == 0 {
+		return domainerr.NotFound("no active stocks to close for project")
 	}
 
-	err = u.repo.UpdateCloseDateByProject(ctx, projectID, stock)
-	if err != nil {
-		return err
-	}
+	return u.repo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.UpdateCloseDateByProject(txCtx, projectID, stock); err != nil {
+			return err
+		}
+		for _, active := range activeStocks {
+			newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, active)
+			if _, err := u.repo.CreateStock(txCtx, &newStock); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
 
-	newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, stockFromDb)
-	_, err = u.repo.CreateStock(ctx, &newStock)
-	if err != nil {
+// UpdateRealStockUnits es el punto unico de mutacion del stock real. Persiste
+// el cambio y, si hay notifier configurado, evalua el trigger reactivo:
+//   - qty < 0  -> NotifyStockNegative (abre/refresca candidato de notificacion)
+//   - qty >= 0 -> MaybeResolveStockNegative (cierra candidato si estaba abierto)
+//
+// El error del notifier es loggeado pero no propaga: las notificaciones nunca
+// rompen el flow principal de stock.
+func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
+	if err := u.repo.UpdateRealStockUnits(ctx, stockID, stock); err != nil {
 		return err
 	}
+	u.evaluateStockNotification(ctx, stock)
 	return nil
 }
 
-func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
-	return u.repo.UpdateRealStockUnits(ctx, stockID, stock)
+// evaluateStockNotification dispara el notifier apropiado segun el signo del
+// stock. Es no-op si el notifier no esta configurado o si falta info esencial
+// (tenant en ctx, producto en stock).
+func (u *UseCases) evaluateStockNotification(ctx context.Context, s *domain.Stock) {
+	if u.notifier == nil || s == nil || s.Supply == nil {
+		return
+	}
+	orgRaw := ctx.Value(ctxkeys.OrgID)
+	orgID, ok := orgRaw.(uuid.UUID)
+	if !ok || orgID == uuid.Nil {
+		return
+	}
+	productID := strconv.FormatInt(s.Supply.ID, 10)
+	qty, _ := s.RealStockUnits.Float64()
+	if qty < 0 {
+		actor, _ := sharedmodels.ActorFromContext(ctx)
+		_ = u.notifier.NotifyStockNegative(ctx, orgID, actor, StockNegativeInput{
+			ProductID:   productID,
+			ProductName: s.Supply.Name,
+			Quantity:    qty,
+		})
+		return
+	}
+	_ = u.notifier.MaybeResolveStockNegative(ctx, orgID, productID)
 }
 
 func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
 	if stockID <= 0 {
-		return nil, types.NewError(types.ErrInvalidInput, "stock_id must be greater than 0", nil)
+		return nil, domainerr.Validation("stock_id must be greater than 0")
 	}
 	return u.repo.GetStockByID(ctx, stockID)
 }
@@ -100,11 +174,15 @@ func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64,
 	return u.repo.GetLastStockByProjectID(ctx, projectID, supplyID)
 }
 
+func (u *UseCases) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastStockByProjectInvestorID(ctx, projectID, supplyID, investorID)
+}
+
 func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
 	return u.repo.UpdateUnitsConsumed(ctx, stockDomain, quantity)
 }
 
-func createNewStockPeriod(userID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
+func createNewStockPeriod(userID string, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
 	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
 	newStock := domain.Stock{
 		Project:     stock.Project,
@@ -142,7 +220,7 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 // ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
 func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
-		return nil, types.NewError(types.ErrInternal, "exporter not configured", nil)
+		return nil, domainerr.Internal("exporter not configured")
 	}
 
 	// Usar GetStocks con tiempo vacío para obtener stocks activos del proyecto
@@ -152,11 +230,11 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 	}
 	items, err := u.repo.GetStocks(ctx, projectID, emptyTime)
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, "list Stocks", err)
+		return nil, domainerr.Internal("list Stocks")
 	}
 
 	if len(items) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "there is no data to export", nil)
+		return nil, domainerr.NotFound("there is no data to export")
 	}
 
 	return u.excel.Export(ctx, items)
@@ -164,10 +242,10 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 
 func (u *UseCases) validateProject(ctx context.Context, projectID int64) error {
 	if projectID <= 0 {
-		return types.NewError(types.ErrInvalidInput, "project_id must be greater than 0", nil)
+		return domainerr.Validation("project_id must be greater than 0")
 	}
 	if u.projectUC == nil {
-		return types.NewError(types.ErrInternal, "project usecases not configured", nil)
+		return domainerr.Internal("project usecases not configured")
 	}
 	_, err := u.projectUC.GetProject(ctx, projectID)
 	return err

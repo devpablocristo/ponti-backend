@@ -3,11 +3,11 @@ package models
 import (
 	"time"
 
-	investormod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	provmod "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	provmod "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -15,7 +15,7 @@ type SupplyMovement struct {
 	ID                   int64           `gorm:"primaryKey;autoIncrement;column:id"`
 	StockId              int64           `gorm:"not null;column:stock_id"`
 	Quantity             decimal.Decimal `gorm:"not null;column:quantity"`
-	MovementType         string          `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial', 'Movimiento interno entrada');not null;column:movement_type"`
+	MovementType         string          `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial', 'Movimiento interno entrada', 'Devolución');not null;column:movement_type"`
 	MovementDate         *time.Time      `gorm:"not null;column:movement_date"`
 	ReferenceNumber      string          `gorm:"not null;column:reference_number"`
 	ProjectId            int64           `gorm:"not null;column:project_id"`

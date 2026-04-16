@@ -1,23 +1,33 @@
 package models
 
 import (
-	catmod "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
-	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
-	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	"log/slog"
+
+	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
+	classtype "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
+	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
 // Modelo principal de Supply
 type Supply struct {
+<<<<<<< HEAD
 	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
 	ProjectID int64           `gorm:"not null;index"`
 	Name      string          `gorm:"type:varchar(100);not null"`
 	Price     decimal.Decimal `gorm:"not null"`
 	IsPartialPrice bool `gorm:"not null;default:false;column:is_partial_price"`
 	IsPending      bool `gorm:"not null;default:false;column:is_pending"`
+=======
+	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID      int64           `gorm:"not null;index"`
+	Name           string          `gorm:"type:varchar(100);not null"`
+	Price          decimal.Decimal `gorm:"not null"`
+	IsPartialPrice bool            `gorm:"not null;default:false;column:is_partial_price"`
+>>>>>>> origin/develop
 
 	UnitID int64
 
@@ -36,11 +46,11 @@ func (m *Supply) ToDomain() *domain.Supply {
 	unitName := m.getUnitName()
 
 	return &domain.Supply{
-		ID:        m.ID,
-		ProjectID: m.ProjectID,
-		Name:      m.Name,
-		UnitID:    int64(m.UnitID),
-		Price:     m.Price,
+		ID:             m.ID,
+		ProjectID:      m.ProjectID,
+		Name:           m.Name,
+		UnitID:         int64(m.UnitID),
+		Price:          m.Price,
 		IsPartialPrice: m.IsPartialPrice,
 		IsPending:      m.IsPending,
 		CategoryID:     int64(m.CategoryID),
@@ -61,10 +71,10 @@ func (m *Supply) ToDomain() *domain.Supply {
 
 func FromDomain(d *domain.Supply) *Supply {
 	return &Supply{
-		ID:        d.ID,
-		ProjectID: d.ProjectID,
-		Name:      d.Name,
-		Price:     d.Price,
+		ID:             d.ID,
+		ProjectID:      d.ProjectID,
+		Name:           d.Name,
+		Price:          d.Price,
 		IsPartialPrice: d.IsPartialPrice,
 		IsPending:      d.IsPending,
 		UnitID:         int64(d.UnitID),
@@ -77,10 +87,11 @@ func FromDomain(d *domain.Supply) *Supply {
 	}
 }
 
-// getUnitName obtiene el nombre de la unidad desde bparams
+// getUnitName obtiene el nombre de la unidad.
+// Mapeo hardcodeado porque business_parameters no almacena nombres de unidades
+// por ID — solo almacena claves como "iva_percentage". Cuando se agregue una
+// tabla "units" o se extienda bparams con unit_id → name, reemplazar este switch.
 func (m *Supply) getUnitName() string {
-	// Mapeo temporal hasta que se implemente la consulta a bparams
-	// TODO: Implementar consulta real a bparams
 	switch m.UnitID {
 	case 1:
 		return "Lt" // unit_liters
@@ -89,6 +100,8 @@ func (m *Supply) getUnitName() string {
 	case 3:
 		return "Bags" // unit_bags
 	default:
+		slog.Warn("unknown unit ID in supply, returning 'Unknown'",
+			"unit_id", m.UnitID, "supply_id", m.ID)
 		return "Unknown"
 	}
 }

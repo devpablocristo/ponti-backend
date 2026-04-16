@@ -3,11 +3,12 @@ package classtype
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/class-type/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/class-type/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -54,11 +55,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/types"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	group := r.Group(baseURL)
+	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.POST("", h.CreateClassType)
 		group.GET("", h.ListClassTypes)
@@ -92,7 +89,7 @@ func (h *Handler) ListClassTypes(c *gin.Context) {
 }
 
 func (h *Handler) GetClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -106,7 +103,7 @@ func (h *Handler) GetClassType(c *gin.Context) {
 }
 
 func (h *Handler) UpdateClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -123,7 +120,7 @@ func (h *Handler) UpdateClassType(c *gin.Context) {
 }
 
 func (h *Handler) DeleteClassType(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("class_type_id"), "class_type_id")
+	id, err := ginmw.ParseParamID(c, "class_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

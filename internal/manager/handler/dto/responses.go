@@ -3,8 +3,8 @@ package dto
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 // ManagerResponse es el DTO de salida para un manager individual.

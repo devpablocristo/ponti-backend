@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/commercialization/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 )
 
 type CommercializationResponse struct {

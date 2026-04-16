@@ -3,12 +3,12 @@ package wire
 import (
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pgin "github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 
-	manager "github.com/alphacodinggroup/ponti-backend/internal/manager"
+	manager "github.com/devpablocristo/ponti-backend/internal/manager"
 )
 
 // ProvideManagerRepository crea la implementación concreta de manager.Repository.

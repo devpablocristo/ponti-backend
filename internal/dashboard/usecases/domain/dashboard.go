@@ -3,7 +3,7 @@ package domain
 import (
 	"time"
 
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 

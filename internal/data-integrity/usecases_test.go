@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dashboardDomain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
-	lotDomain "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	reportDomain "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
+	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 )
 
 func TestUseCases_control1LotesVsDashboard(t *testing.T) {

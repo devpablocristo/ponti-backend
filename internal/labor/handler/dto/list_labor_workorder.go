@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
 
 type LaborRawItem struct {

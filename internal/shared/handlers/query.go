@@ -1,22 +1,12 @@
 package sharedhandlers
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
-// ParseOptionalInt64Query parsea un query param opcional a int64.
+// ParseOptionalInt64Query delega al helper estándar de core.
 func ParseOptionalInt64Query(c *gin.Context, key string) (*int64, error) {
-	raw := c.Query(key)
-	if raw == "" {
-		return nil, nil
-	}
-	val, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || val <= 0 {
-		return nil, types.NewError(types.ErrInvalidID, "invalid "+key, err)
-	}
-	return &val, nil
+	return ginmw.ParseOptionalInt64Query(c, key)
 }

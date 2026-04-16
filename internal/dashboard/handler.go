@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/dashboard/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/dashboard/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -55,11 +55,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/dashboard"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.GetDashboard)
 	}

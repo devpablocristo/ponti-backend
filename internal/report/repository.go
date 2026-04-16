@@ -9,10 +9,10 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/report/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/shared/db"
-	sharedfilters "github.com/alphacodinggroup/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/db"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
 
 // GormEnginePort define la interfaz para el motor GORM.

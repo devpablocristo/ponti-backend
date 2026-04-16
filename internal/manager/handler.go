@@ -4,11 +4,12 @@ package manager
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/manager/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/manager/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/manager/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -60,11 +61,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/managers"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	group := r.Group(baseURL)
+	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.POST("", h.CreateManager)
 		group.GET("", h.ListManagers)
@@ -100,7 +97,7 @@ func (h *Handler) ListManagers(c *gin.Context) {
 }
 
 func (h *Handler) GetManager(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -114,7 +111,7 @@ func (h *Handler) GetManager(c *gin.Context) {
 }
 
 func (h *Handler) UpdateManager(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -131,7 +128,7 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 }
 
 func (h *Handler) DeleteManager(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -144,7 +141,7 @@ func (h *Handler) DeleteManager(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveManager(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -157,7 +154,7 @@ func (h *Handler) ArchiveManager(c *gin.Context) {
 }
 
 func (h *Handler) RestoreManager(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("manager_id"), "manager_id")
+	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

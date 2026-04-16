@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	gormRepo "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	gormRepo "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 )
 
 func main() {

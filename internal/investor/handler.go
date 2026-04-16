@@ -3,11 +3,12 @@ package investor
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/investor/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/investor/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -56,11 +57,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/investors"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.CreateInvestor)
 		public.GET("", h.ListInvestors)
@@ -96,7 +93,7 @@ func (h *Handler) ListInvestors(c *gin.Context) {
 }
 
 func (h *Handler) GetInvestor(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	id, err := ginmw.ParseParamID(c, "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -110,7 +107,7 @@ func (h *Handler) GetInvestor(c *gin.Context) {
 }
 
 func (h *Handler) UpdateInvestor(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	id, err := ginmw.ParseParamID(c, "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -127,7 +124,7 @@ func (h *Handler) UpdateInvestor(c *gin.Context) {
 }
 
 func (h *Handler) DeleteInvestor(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	id, err := ginmw.ParseParamID(c, "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -140,7 +137,7 @@ func (h *Handler) DeleteInvestor(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveInvestor(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	id, err := ginmw.ParseParamID(c, "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -153,7 +150,7 @@ func (h *Handler) ArchiveInvestor(c *gin.Context) {
 }
 
 func (h *Handler) RestoreInvestor(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("investor_id"), "investor_id")
+	id, err := ginmw.ParseParamID(c, "investor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

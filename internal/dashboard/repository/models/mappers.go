@@ -1,7 +1,7 @@
 package models
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -330,7 +330,7 @@ func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel
 			ID:           model.CropID,
 			Name:         model.Name,
 			Hectares:     model.Hectares,
-			RotationPct:  decimal.Zero, // TODO: Implementar cuando se requiera
+			RotationPct:  model.IncidencePct,
 			CostUSDPerHa: model.CostPerHa,
 			IncidencePct: model.IncidencePct,
 		}

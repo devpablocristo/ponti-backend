@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
 // CreateResponse es la respuesta canónica para operaciones de creación.
@@ -14,15 +16,15 @@ type CreateResponse struct {
 
 // RespondCreated responde con 201 Created y el ID del recurso creado.
 func RespondCreated(c *gin.Context, id int64) {
-	c.JSON(http.StatusCreated, CreateResponse{ID: id})
+	ginmw.WriteCreated(c, CreateResponse{ID: id})
 }
 
 // RespondNoContent responde con 204 No Content (update, delete, archive, restore).
 func RespondNoContent(c *gin.Context) {
-	c.Status(http.StatusNoContent)
+	ginmw.WriteNoContent(c)
 }
 
 // RespondOK responde con 200 OK y el payload dado.
 func RespondOK(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, data)
+	ginmw.WriteJSON(c, http.StatusOK, data)
 }

@@ -3,11 +3,12 @@ package crop
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/crop/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/crop/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/crop/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -57,11 +58,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/crops"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.CreateCrop)
 		public.GET("", h.ListCrops)
@@ -95,7 +92,7 @@ func (h *Handler) ListCrops(c *gin.Context) {
 }
 
 func (h *Handler) GetCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -109,7 +106,7 @@ func (h *Handler) GetCrop(c *gin.Context) {
 }
 
 func (h *Handler) UpdateCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -126,7 +123,7 @@ func (h *Handler) UpdateCrop(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCrop(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("crop_id"), "crop_id")
+	id, err := ginmw.ParseParamID(c, "crop_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

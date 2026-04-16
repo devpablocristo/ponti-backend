@@ -3,11 +3,12 @@ package field
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/field/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/field/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -56,11 +57,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/fields"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.CreateField)
 		public.GET("", h.ListFields)
@@ -96,7 +93,7 @@ func (h *Handler) ListFields(c *gin.Context) {
 }
 
 func (h *Handler) GetField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -110,7 +107,7 @@ func (h *Handler) GetField(c *gin.Context) {
 }
 
 func (h *Handler) UpdateField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -127,7 +124,7 @@ func (h *Handler) UpdateField(c *gin.Context) {
 }
 
 func (h *Handler) DeleteField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -140,7 +137,7 @@ func (h *Handler) DeleteField(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -153,7 +150,7 @@ func (h *Handler) ArchiveField(c *gin.Context) {
 }
 
 func (h *Handler) RestoreField(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("field_id"), "field_id")
+	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

@@ -3,9 +3,9 @@ package domain
 import (
 	"time"
 
-	investordomain "github.com/alphacodinggroup/ponti-backend/internal/investor/usecases/domain"
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/shopspring/decimal"
 )
 

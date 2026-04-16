@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 )
 
 type LaborMetrics struct {

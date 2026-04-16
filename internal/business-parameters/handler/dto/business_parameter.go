@@ -1,7 +1,7 @@
 package dto
 
 import (
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
 
 type BusinessParameterResponse struct {

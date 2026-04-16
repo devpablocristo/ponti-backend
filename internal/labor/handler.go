@@ -5,15 +5,17 @@ import (
 	"net/http"
 	"strconv"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	labexcel "github.com/alphacodinggroup/ponti-backend/internal/labor/excel"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
+	"github.com/devpablocristo/ponti-backend/internal/labor/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -68,12 +70,8 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
 	// Endpoints de labores asociados a un proyecto específico
-	projectLaborsGroup := r.Group(baseURL + "/projects/:project_id/labors")
+	projectLaborsGroup := r.Group(baseURL+"/projects/:project_id/labors", h.mws.GetValidation()...)
 	{
 		projectLaborsGroup.POST("", h.CreateLabor)
 		projectLaborsGroup.GET("", h.ListLabor)
@@ -85,7 +83,7 @@ func (h *Handler) Routes() {
 	}
 
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
-	workOrderLaborsGroup := r.Group(baseURL + "/labors")
+	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
 		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
 		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
@@ -104,7 +102,7 @@ func (h *Handler) CreateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -173,13 +171,13 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 		return
 	}
 
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
+	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -213,7 +211,7 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
+	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -226,7 +224,7 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 }
 
 func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
+	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -240,7 +238,7 @@ func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("labor_id"), "labor_id")
+	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -258,7 +256,7 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 		return
 	}
 
-	id, err := sharedhandlers.ParseParamID(c.Param("type_id"), "type_id")
+	id, err := ginmw.ParseParamID(c, "type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -275,7 +273,7 @@ func (h *Handler) ListLaborCategories(c *gin.Context) {
 }
 
 func (h *Handler) ListLaborByWorkOrder(c *gin.Context) {
-	workOrderID, err := sharedhandlers.ParseParamID(c.Param("work_order_id"), "work_order_id")
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -300,18 +298,19 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		domErr := domainerr.Validation("field_id or project_id is required")
 		sharedhandlers.RespondError(c, domErr)
 		return
 	}
 
 	var fieldID int64
 	if fieldIDParam != "" {
-		fieldID, err = sharedhandlers.ParseParamID(fieldIDParam, "field_id")
+		parsedFieldID, err := ginmw.ParseOptionalInt64Query(c, "field_id")
 		if err != nil {
 			sharedhandlers.RespondError(c, err)
 			return
 		}
+		fieldID = *parsedFieldID
 	}
 
 	input := types.NewInput(c.Request)
@@ -336,18 +335,19 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 
 	fieldIDParam := c.Query("field_id")
 	if fieldIDParam == "" && projectID == 0 {
-		domErr := types.NewError(types.ErrBadRequest, "field_id or project_id is required", nil)
+		domErr := domainerr.Validation("field_id or project_id is required")
 		sharedhandlers.RespondError(c, domErr)
 		return
 	}
 
 	var fieldID int64
 	if fieldIDParam != "" {
-		fieldID, err = sharedhandlers.ParseParamID(fieldIDParam, "field_id")
+		parsedFieldID, err := ginmw.ParseOptionalInt64Query(c, "field_id")
 		if err != nil {
 			sharedhandlers.RespondError(c, err)
 			return
 		}
+		fieldID = *parsedFieldID
 	}
 
 	// Para exportación, usar un page_size muy grande para obtener todos los registros
@@ -409,11 +409,16 @@ func (h *Handler) ExportProjectLabors(c *gin.Context) {
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
-	projectID, err := sharedhandlers.ParseParamID(c.Query("project_id"), "project_id")
+	projectIDPtr, err := ginmw.ParseOptionalInt64Query(c, "project_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	if projectIDPtr == nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("project_id is required"))
+		return
+	}
+	projectID := *projectIDPtr
 
 	data, err := h.ucs.ExportAllGroupLabors(c.Request.Context(), projectID)
 	if err != nil {
@@ -427,4 +432,3 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
-

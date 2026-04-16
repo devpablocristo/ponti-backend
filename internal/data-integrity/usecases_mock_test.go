@@ -9,11 +9,11 @@ import (
 	reflect "reflect"
 	time "time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
-	domain0 "github.com/alphacodinggroup/ponti-backend/internal/lot/usecases/domain"
-	domain1 "github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	domain2 "github.com/alphacodinggroup/ponti-backend/internal/stock/usecases/domain"
-	domain3 "github.com/alphacodinggroup/ponti-backend/internal/work-order/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	domain0 "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	domain1 "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	domain2 "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	domain3 "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 	decimal "github.com/shopspring/decimal"
 )

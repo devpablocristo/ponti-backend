@@ -21,4 +21,3 @@ func (n *NoopAdmin) GetUserUIDByEmail(ctx context.Context, email string) (string
 func (n *NoopAdmin) GeneratePasswordResetLink(ctx context.Context, email string) (string, error) {
 	return "", errNoop
 }
-

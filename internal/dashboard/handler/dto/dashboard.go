@@ -6,7 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/dashboard/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 )
 
 // ===== REQUEST DTOs =====

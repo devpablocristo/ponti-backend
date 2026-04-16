@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/lease-type/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/lease-type/usecases/domain"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	models "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {
@@ -35,7 +35,7 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		UpdatedBy: lt.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, types.NewError(types.ErrInternal, "failed to create lease type", err)
+		return 0, domainerr.Internal("failed to create lease type")
 	}
 	return model.ID, nil
 }
@@ -43,7 +43,7 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
 	var total int64
 	if err := r.db.Client().WithContext(ctx).Model(&models.LeaseType{}).Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count lease types", err)
+		return nil, 0, domainerr.Internal("failed to count lease types")
 	}
 
 	var list []models.LeaseType
@@ -54,7 +54,7 @@ func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]d
 		Order("id ASC").
 		Find(&list).Error
 	if err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list lease types", err)
+		return nil, 0, domainerr.Internal("failed to list lease types")
 	}
 
 	result := make([]domain.LeaseType, 0, len(list))
@@ -90,13 +90,13 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	}
 	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to update lease type", result.Error)
+		return domainerr.Internal("failed to update lease type")
 	}
 	if result.RowsAffected == 0 {
 		if !lt.UpdatedAt.IsZero() {
-			return types.NewError(types.ErrConflict, "lease type not found or outdated", nil)
+			return domainerr.Conflict("lease type not found or outdated")
 		}
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("lease type with id %d does not exist", lt.ID), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type with id %d does not exist", lt.ID))
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
 		Delete(&models.LeaseType{}, "id = ?", id)
 	if result.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete lease type", result.Error)
+		return domainerr.Internal("failed to delete lease type")
 	}
 	if result.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, fmt.Sprintf("lease type with id %d does not exist", id), nil)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type with id %d does not exist", id))
 	}
 	return nil
 }

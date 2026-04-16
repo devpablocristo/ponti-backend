@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 type repo struct {
@@ -18,21 +19,21 @@ type repo struct {
 func newRepo(db *gorm.DB) *repo { return &repo{db: db} }
 
 type localUser struct {
-	ID       int64  `json:"id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	IDPSub   string `json:"idp_sub"`
+	ID       uuid.UUID `json:"id"`
+	Email    string    `json:"email"`
+	Username string    `json:"username"`
+	IDPSub   string    `json:"idp_sub"`
 }
 
 func (r *repo) ensureLocalUserByIDPSub(ctx context.Context, idpSub, email string) (*localUser, error) {
 	idpSub = strings.TrimSpace(idpSub)
 	email = strings.TrimSpace(email)
 	if idpSub == "" {
-		return nil, pkgtypes.NewError(pkgtypes.ErrBadRequest, "missing idp_sub", nil)
+		return nil, domainerr.Validation("missing idp_sub")
 	}
 
 	type row struct {
-		ID       int64
+		ID       uuid.UUID
 		Email    string
 		Username string
 		IDPSub   string `gorm:"column:idp_sub"`
@@ -99,12 +100,12 @@ func (r *repo) ensureLocalUserByIDPSub(ctx context.Context, idpSub, email string
 	return &localUser{ID: created.ID, Email: created.Email, Username: created.Username, IDPSub: created.IDPSub}, nil
 }
 
-func (r *repo) ensureTenantByName(ctx context.Context, name string) (int64, error) {
+func (r *repo) ensureTenantByName(ctx context.Context, name string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "default"
 	}
-	type row struct{ ID int64 }
+	type row struct{ ID uuid.UUID }
 	var existing row
 	err := r.db.WithContext(ctx).
 		Table("auth_tenants").
@@ -116,7 +117,7 @@ func (r *repo) ensureTenantByName(ctx context.Context, name string) (int64, erro
 		return existing.ID, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, err
+		return uuid.Nil, err
 	}
 
 	now := time.Now().UTC()
@@ -134,7 +135,7 @@ func (r *repo) ensureTenantByName(ctx context.Context, name string) (int64, erro
 			Take(&existing).Error; err2 == nil {
 			return existing.ID, nil
 		}
-		return 0, err
+		return uuid.Nil, err
 	}
 	if err := r.db.WithContext(ctx).
 		Table("auth_tenants").
@@ -142,17 +143,17 @@ func (r *repo) ensureTenantByName(ctx context.Context, name string) (int64, erro
 		Where("name = ?", name).
 		Limit(1).
 		Take(&existing).Error; err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
 	return existing.ID, nil
 }
 
-func (r *repo) roleIDByName(ctx context.Context, name string) (int64, error) {
+func (r *repo) roleIDByName(ctx context.Context, name string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "viewer"
 	}
-	type row struct{ ID int64 }
+	type row struct{ ID uuid.UUID }
 	var out row
 	if err := r.db.WithContext(ctx).
 		Table("auth_roles").
@@ -160,12 +161,12 @@ func (r *repo) roleIDByName(ctx context.Context, name string) (int64, error) {
 		Where("name = ?", name).
 		Limit(1).
 		Take(&out).Error; err != nil {
-		return 0, err
+		return uuid.Nil, err
 	}
 	return out.ID, nil
 }
 
-func (r *repo) upsertMembership(ctx context.Context, userID, tenantID, roleID int64) error {
+func (r *repo) upsertMembership(ctx context.Context, userID, tenantID, roleID uuid.UUID) error {
 	now := time.Now().UTC()
 	payload := map[string]any{
 		"user_id":    userID,
@@ -190,8 +191,8 @@ func (r *repo) upsertMembership(ctx context.Context, userID, tenantID, roleID in
 }
 
 type tenantDTO struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 func (r *repo) listTenants(ctx context.Context) ([]tenantDTO, error) {
@@ -207,16 +208,16 @@ func (r *repo) listTenants(ctx context.Context) ([]tenantDTO, error) {
 }
 
 type userMembershipDTO struct {
-	UserID   int64  `json:"user_id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	IDPSub   string `json:"idp_sub" gorm:"column:idp_sub"`
-	TenantID int64  `json:"tenant_id"`
-	Tenant   string `json:"tenant"`
-	Role     string `json:"role"`
+	UserID   uuid.UUID `json:"user_id"`
+	Email    string    `json:"email"`
+	Username string    `json:"username"`
+	IDPSub   string    `json:"idp_sub" gorm:"column:idp_sub"`
+	TenantID uuid.UUID `json:"tenant_id"`
+	Tenant   string    `json:"tenant"`
+	Role     string    `json:"role"`
 }
 
-func (r *repo) listUsersForTenant(ctx context.Context, tenantID int64) ([]userMembershipDTO, error) {
+func (r *repo) listUsersForTenant(ctx context.Context, tenantID uuid.UUID) ([]userMembershipDTO, error) {
 	var rows []userMembershipDTO
 	if err := r.db.WithContext(ctx).
 		Table("auth_memberships m").
@@ -231,4 +232,3 @@ func (r *repo) listUsersForTenant(ctx context.Context, tenantID int64) ([]userMe
 	}
 	return rows, nil
 }
-

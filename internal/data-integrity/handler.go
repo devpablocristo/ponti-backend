@@ -7,10 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 // UseCasesPort define la interfaz para los casos de uso
@@ -55,11 +55,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/data-integrity"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(base)
+	public := r.Group(base, h.mws.GetValidation()...)
 	{
 		public.GET("/costs-check", h.CheckCostsCoherence)
 	}
@@ -73,8 +69,8 @@ func (h *Handler) Routes() {
 // @Produce json
 // @Param project_id query int true "Project ID"
 // @Success 200 {object} dto.IntegrityReportResponse
-// @Failure 400 {object} types.ErrorResponse
-// @Failure 500 {object} types.ErrorResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
 // @Router /data-integrity/costs-check [get]
 func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Parsear query params
@@ -86,10 +82,8 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 		return
 	}
 	if projectID == nil {
-		sharedhandlers.RespondError(c, types.NewError(
-			types.ErrBadRequest,
+		sharedhandlers.RespondError(c, domainerr.Validation(
 			"missing required query param: project_id",
-			nil,
 		))
 		return
 	}

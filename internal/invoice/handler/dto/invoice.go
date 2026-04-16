@@ -3,12 +3,13 @@ package dto
 import (
 	"time"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/invoice/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 )
 
 type InvoiceResponse struct {
 	ID          int64     `json:"id"`
 	WorkOrderID int64     `json:"work_order_id"`
+	InvestorID  int64     `json:"investor_id"`
 	Number      string    `json:"number"`
 	Company     string    `json:"company"`
 	Date        time.Time `json:"date"`
@@ -22,6 +23,7 @@ func FromDomain(d *domain.Invoice) InvoiceResponse {
 	return InvoiceResponse{
 		ID:          d.ID,
 		WorkOrderID: d.WorkOrderID,
+		InvestorID:  d.InvestorID,
 		Number:      d.Number,
 		Company:     d.Company,
 		Date:        d.Date,

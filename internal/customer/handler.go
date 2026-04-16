@@ -4,11 +4,12 @@ package customer
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	dto "github.com/alphacodinggroup/ponti-backend/internal/customer/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	dto "github.com/devpablocristo/ponti-backend/internal/customer/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -58,11 +59,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/customers"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.CreateCustomer)
 		public.GET("", h.ListCustomers)
@@ -142,7 +139,7 @@ func (h *Handler) listAll(c *gin.Context, page, perPage int) {
 }
 
 func (h *Handler) GetCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -156,7 +153,7 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 }
 
 func (h *Handler) UpdateCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -174,7 +171,7 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 
 // DeleteCustomer ejecuta hard delete del customer.
 func (h *Handler) DeleteCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -188,7 +185,7 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 
 // ArchiveCustomer ejecuta soft delete (archivado) del customer.
 func (h *Handler) ArchiveCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -201,7 +198,7 @@ func (h *Handler) ArchiveCustomer(c *gin.Context) {
 }
 
 func (h *Handler) RestoreCustomer(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("customer_id"), "customer_id")
+	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

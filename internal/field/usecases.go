@@ -3,7 +3,7 @@ package field
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 )
 
 type RepositoryPort interface {

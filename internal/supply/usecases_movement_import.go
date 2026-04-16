@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	providerdomain "github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -20,7 +21,7 @@ func (u *UseCases) ImportSupplyMovements(
 ) ([]int64, []SupplyMovementImportFailure, error) {
 	txRepo, ok := u.repo.(transactionExecutor)
 	if !ok {
-		return nil, nil, types.NewError(types.ErrInternal, "transactions not supported for import mode", nil)
+		return nil, nil, domainerr.Internal("transactions not supported for import mode")
 	}
 
 	var ids []int64
@@ -47,7 +48,7 @@ func (u *UseCases) ImportSupplyMovements(
 					SupplyName:      validated[i].Supply.Name,
 					ReferenceNumber: validated[i].ReferenceNumber,
 					Code:            "apply_error",
-					Message:         types.ErrorMessage(err),
+					Message:         errorMessage(err),
 				}}
 				return errImportValidation
 			}
@@ -105,7 +106,31 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		if movement.Quantity.LessThanOrEqual(decimal.Zero) {
+		if err := validateImportMovementType(movement.MovementType); err != nil {
+			failures = append(failures, SupplyMovementImportFailure{
+				Index:           i,
+				RowIndex:        importRowIndex(i),
+				SupplyID:        movement.Supply.ID,
+				ReferenceNumber: movement.ReferenceNumber,
+				Code:            "validation_error",
+				Message:         errorMessage(err),
+			})
+			continue
+		}
+
+		if movement.MovementType == domain.STOCK {
+			if movement.Quantity.LessThan(decimal.Zero) {
+				failures = append(failures, SupplyMovementImportFailure{
+					Index:           i,
+					RowIndex:        importRowIndex(i),
+					SupplyID:        movement.Supply.ID,
+					ReferenceNumber: movement.ReferenceNumber,
+					Code:            "validation_error",
+					Message:         "quantity must be greater than or equal to 0",
+				})
+				continue
+			}
+		} else if movement.Quantity.LessThanOrEqual(decimal.Zero) {
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -130,18 +155,6 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 		movement.ReferenceNumber = reference
-
-		if err := validateImportMovementType(movement.MovementType); err != nil {
-			failures = append(failures, SupplyMovementImportFailure{
-				Index:           i,
-				RowIndex:        importRowIndex(i),
-				SupplyID:        movement.Supply.ID,
-				ReferenceNumber: movement.ReferenceNumber,
-				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
-			})
-			continue
-		}
 
 		supply, err := u.repo.GetSupply(ctx, movement.Supply.ID)
 		if err != nil {
@@ -192,7 +205,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -211,8 +224,12 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		requestDuplicateKey := fmt.Sprintf("%d|%s|%d", movement.ProjectId, reference, movement.Supply.ID)
+		requestDuplicateKey := fmt.Sprintf("%d|%s|%s|%d", movement.ProjectId, movement.MovementType, reference, movement.Supply.ID)
 		if _, exists := requestDuplicates[requestDuplicateKey]; exists {
+			supplyLabel := fmt.Sprintf("%d", movement.Supply.ID)
+			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
+				supplyLabel = strings.TrimSpace(movement.Supply.Name)
+			}
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -220,7 +237,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "duplicate_request",
-				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %d dentro del request", reference, movement.Supply.ID),
+				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %s dentro del request", reference, supplyLabel),
 			})
 			continue
 		}
@@ -228,7 +245,7 @@ func (u *UseCases) validateSupplyMovementImport(
 
 		if err := u.validateImportMovementBusinessRules(ctx, movement); err != nil {
 			code := "validation_error"
-			if types.IsConflict(err) {
+			if errors.Is(err, domainerr.Conflict("")) {
 				code = "duplicate_db"
 			}
 			failures = append(failures, SupplyMovementImportFailure{
@@ -238,7 +255,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            code,
-				Message:         types.ErrorMessage(err),
+				Message:         errorMessage(err),
 			})
 			continue
 		}
@@ -256,35 +273,38 @@ func (u *UseCases) validateSupplyMovementImport(
 func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, movement *domain.SupplyMovement) error {
 	switch movement.MovementType {
 	case domain.STOCK:
-		_, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+		_, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 		if err != nil {
 			return err
 		}
 		if isFirst {
-			return types.NewError(types.ErrBadRequest, "no existe stock para este insumo en el proyecto", nil)
+			return domainerr.Validation("no existe stock para este insumo en el proyecto")
 		}
 		return nil
 	default:
-		return u.ValidateSupplyMovement(ctx, movement)
+		if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+			return err
+		}
+		return u.validateSupplyMovementResolved(ctx, movement)
 	}
 }
 
 func (u *UseCases) resolveImportProvider(ctx context.Context, provider *providerdomain.Provider) (*providerdomain.Provider, error) {
 	if provider == nil {
-		return nil, types.NewMissingFieldError("provider")
+		return nil, domainerr.Validation("The field 'provider' is required")
 	}
 
 	if provider.ID > 0 {
 		resolved, err := u.repo.GetProvider(ctx, provider.ID)
 		if err != nil {
-			return nil, types.NewError(types.ErrValidation, fmt.Sprintf("El proveedor %d no existe", provider.ID), err)
+			return nil, domainerr.New(domainerr.KindValidation, fmt.Sprintf("El proveedor %d no existe", provider.ID))
 		}
 		return resolved, nil
 	}
 
 	name := strings.TrimSpace(provider.Name)
 	if name == "" {
-		return nil, types.NewMissingFieldError("provider_name")
+		return nil, domainerr.Validation("The field 'provider_name' is required")
 	}
 
 	resolved := &providerdomain.Provider{Name: name}
@@ -298,13 +318,15 @@ func (u *UseCases) resolveImportProvider(ctx context.Context, provider *provider
 
 func validateImportMovementType(movementType string) error {
 	switch movementType {
-	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK:
+	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
 		return nil
 	default:
-		return types.NewError(
-			types.ErrValidation,
-			fmt.Sprintf("must be a valid type [%s, %s, %s]", domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK),
-			nil,
+		return domainerr.Newf(domainerr.KindValidation,
+			"must be a valid type [%s, %s, %s, %s]",
+			domain.INTERNAL_MOVEMENT,
+			domain.OFFICIAL_INVOICE,
+			domain.STOCK,
+			domain.RETURN_MOVEMENT,
 		)
 	}
 }

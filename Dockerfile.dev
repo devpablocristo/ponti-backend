@@ -1,5 +1,6 @@
-FROM golang:1.26.1-alpine
+FROM golang:1.26.2-alpine
 
+ENV GOPRIVATE=github.com/devpablocristo/*
 ENV TZ=America/Argentina/Buenos_Aires
 RUN apk add --no-cache \
    tzdata \
@@ -13,9 +14,8 @@ RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
-
+# En dev, go.mod y el código se montan como volumen.
+# go mod download se ejecuta al iniciar el container, no en build.
 EXPOSE 8080
 
-CMD ["sh", "-c", "CGO_ENABLED=1 go build -buildvcs=false -o /tmp/migrate_binary ./cmd/migrate/ && /tmp/migrate_binary && air -c .air.toml"]
+CMD ["sh", "-c", "if [ -n \"$GO_MODULES_TOKEN\" ]; then git config --global url.\"https://${GO_MODULES_TOKEN}@github.com/\".insteadOf \"https://github.com/\"; fi && go mod download && CGO_ENABLED=1 go build -buildvcs=false -o /tmp/migrate_binary ./cmd/migrate/ && /tmp/migrate_binary && air -c .air.toml"]

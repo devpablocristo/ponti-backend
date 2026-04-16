@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	config "github.com/alphacodinggroup/ponti-backend/cmd/config"
-	pgorm "github.com/alphacodinggroup/ponti-backend/pkg/databases/sql/gorm"
-	mwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
+	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 )
 
 type MiddlewaresEnginePort interface {
@@ -32,13 +32,13 @@ func ProvideMiddlewares(cfg *config.Config, repo *pgorm.Repository) *mwr.Middlew
 	return mwr.NewDefaultMiddlewares(mwr.BuildConfig{
 		DB: repo.Client(),
 		Auth: mwr.IdentityAuthConfig{
-			Enabled:      cfg.Auth.Enabled,
-			ProjectID:    cfg.Auth.IdentityProjectID,
-			Issuer:       issuer,
-			Audience:     audience,
-			JWKSURL:      cfg.Auth.IdentityJWKSURL,
-			CacheTTL:     time.Duration(cfg.Auth.IdentityJWKSCacheTTL) * time.Second,
-			TenantHeader: cfg.Auth.TenantHeader,
+			Enabled:       cfg.Auth.Enabled,
+			ProjectID:     cfg.Auth.IdentityProjectID,
+			Issuer:        issuer,
+			Audience:      audience,
+			JWKSURL:       cfg.Auth.IdentityJWKSURL,
+			CacheTTL:      time.Duration(cfg.Auth.IdentityJWKSCacheTTL) * time.Second,
+			TenantHeader:  cfg.Auth.TenantHeader,
 			AutoProvision: cfg.Auth.AutoProvision,
 			DefaultTenant: cfg.Auth.DefaultTenantName,
 			DefaultRole:   cfg.Auth.DefaultRoleName,

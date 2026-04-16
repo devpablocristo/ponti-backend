@@ -3,8 +3,8 @@ package dto
 import (
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/labor/usecases/domain"
-	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
 type CreateLaborRequest struct {
@@ -13,7 +13,7 @@ type CreateLaborRequest struct {
 	Price          decimal.Decimal `json:"price"`
 	IsPartialPrice *bool           `json:"is_partial_price"`
 	CategoryId     int64           `json:"category_id"`
-	CreatedBy      int64           `json:"created_by"`
+	CreatedBy      string          `json:"created_by"`
 }
 
 type CreateLaborsResponse struct {
@@ -32,7 +32,7 @@ type LaborList struct {
 	Labors []CreateLaborRequest `json:"labors"`
 }
 
-func (l CreateLaborRequest) ToDomain(projectId int64, userId int64) *domain.Labor {
+func (l CreateLaborRequest) ToDomain(projectId int64, userId string) *domain.Labor {
 	return &domain.Labor{
 		Name:           l.Name,
 		ContractorName: l.ContractorName,

@@ -1,14 +1,19 @@
-// Package usecases contiene casos de uso del proxy AI.
+// Package usecases contiene casos de uso del proxy AI (chat con copilot).
 package usecases
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
 	"strings"
 )
 
 type ClientPort interface {
 	Do(ctx context.Context, method, path string, body any, userID, projectID string) (int, []byte, error)
+	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, projectID string) (*http.Response, error)
 }
 
 type UseCases struct {
@@ -42,34 +47,67 @@ func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body an
 	return 200, b, nil
 }
 
-func (u *UseCases) ComputeInsights(ctx context.Context, userID, projectID string) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/insights/compute", nil, userID, projectID, map[string]any{
-		"request_id":       "dummy",
-		"computed":         0,
-		"insights_created": 0,
+// ChatStream proxea POST /v1/chat/stream hacia ponti-ai (SSE); escribe headers y cuerpo en w.
+func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error {
+	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, projectID)
+	if err != nil {
+		if isAIServiceNotConfigured(err) {
+			w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("X-Accel-Buffering", "no")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "event: error\ndata: {\"message\":\"ai_not_configured\"}\n\n")
+			return nil
+		}
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	return err
+}
+
+func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
+	return u.dummyOrReal(ctx, "POST", "/v1/chat", body, userID, projectID, map[string]any{
+		"request_id":            "dummy",
+		"output_kind":           "chat_reply",
+		"content_language":      "es",
+		"chat_id":               "",
+		"reply":                 "Asistente AI no configurado.",
+		"tokens_used":           0,
+		"tool_calls":            []any{},
+		"pending_confirmations": []any{},
+		"blocks":                []any{},
+		"routed_agent":          "general",
+		"routing_source":        "read_fallback",
 	})
 }
 
-func (u *UseCases) GetInsights(ctx context.Context, userID, projectID, entityType, entityID string) (int, []byte, error) {
-	path := "/v1/insights/" + entityType + "/" + entityID
+func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	path := "/v1/chat/conversations?limit=" + strconv.Itoa(limit)
 	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
-		"insights": []any{},
+		"items": []any{},
 	})
 }
 
-func (u *UseCases) GetSummary(ctx context.Context, userID, projectID string) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "GET", "/v1/insights/summary", nil, userID, projectID, map[string]any{
-		"new_count_total":        0,
-		"new_count_high_severity": 0,
-		"top_insights":            []any{},
+func (u *UseCases) GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error) {
+	path := "/v1/chat/conversations/" + strings.TrimSpace(conversationID)
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+		"id":         conversationID,
+		"title":      "dummy",
+		"messages":   []any{},
+		"created_at": "",
+		"updated_at": "",
 	})
 }
-
-func (u *UseCases) RecordAction(ctx context.Context, userID, projectID, insightID string, body any) (int, []byte, error) {
-	path := "/v1/insights/" + insightID + "/actions"
-	return u.dummyOrReal(ctx, "POST", path, body, userID, projectID, map[string]any{
-		"request_id": "dummy",
-		"status":     "dummy",
-	})
-}
-

@@ -2,7 +2,7 @@
 package dto
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 )
 
 /* =========================

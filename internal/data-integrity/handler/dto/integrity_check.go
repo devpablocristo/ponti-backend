@@ -3,7 +3,7 @@ package dto
 import (
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 )
 
 // IntegrityReportResponse representa la respuesta del endpoint de integridad (9 controles)

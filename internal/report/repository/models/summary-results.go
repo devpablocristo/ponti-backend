@@ -2,8 +2,8 @@
 package models
 
 import (
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
-	"github.com/alphacodinggroup/ponti-backend/internal/shared/db"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/db"
 	"github.com/shopspring/decimal"
 )
 

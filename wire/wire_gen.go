@@ -7,6 +7,7 @@
 package wire
 
 import (
+<<<<<<< HEAD
 	"github.com/alphacodinggroup/ponti-backend/cmd/config"
 	"github.com/alphacodinggroup/ponti-backend/internal/admin"
 	"github.com/alphacodinggroup/ponti-backend/internal/ai"
@@ -38,6 +39,38 @@ import (
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/http/servers/gin"
 	"github.com/alphacodinggroup/ponti-backend/pkg/words-suggesters/trigram-search"
+=======
+	"github.com/devpablocristo/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/internal/admin"
+	"github.com/devpablocristo/ponti-backend/internal/ai"
+	"github.com/devpablocristo/ponti-backend/internal/business-parameters"
+	"github.com/devpablocristo/ponti-backend/internal/campaign"
+	"github.com/devpablocristo/ponti-backend/internal/category"
+	"github.com/devpablocristo/ponti-backend/internal/class-type"
+	"github.com/devpablocristo/ponti-backend/internal/commercialization"
+	"github.com/devpablocristo/ponti-backend/internal/crop"
+	"github.com/devpablocristo/ponti-backend/internal/customer"
+	"github.com/devpablocristo/ponti-backend/internal/dashboard"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity"
+	"github.com/devpablocristo/ponti-backend/internal/dollar"
+	"github.com/devpablocristo/ponti-backend/internal/field"
+	"github.com/devpablocristo/ponti-backend/internal/investor"
+	"github.com/devpablocristo/ponti-backend/internal/invoice"
+	"github.com/devpablocristo/ponti-backend/internal/labor"
+	"github.com/devpablocristo/ponti-backend/internal/lease-type"
+	"github.com/devpablocristo/ponti-backend/internal/lot"
+	"github.com/devpablocristo/ponti-backend/internal/manager"
+	"github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
+	"github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	"github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
+	"github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
+	"github.com/devpablocristo/ponti-backend/internal/project"
+	"github.com/devpablocristo/ponti-backend/internal/provider"
+	"github.com/devpablocristo/ponti-backend/internal/report"
+	"github.com/devpablocristo/ponti-backend/internal/stock"
+	"github.com/devpablocristo/ponti-backend/internal/supply"
+	"github.com/devpablocristo/ponti-backend/internal/work-order"
+>>>>>>> origin/develop
 )
 
 // Injectors from wire.go:
@@ -365,6 +398,7 @@ func Initialize() (*Dependencies, error) {
 		InvoiceHandler:            invoiceHandler,
 		CommercializationHandler:  commercializationHandler,
 		StockHandler:              stockHandler,
+		StockUseCases:             stockUseCases,
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
 		WorkOrderDraftHandler:     workorderdraftHandler,
@@ -403,6 +437,7 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	StockUseCases             *stock.UseCases
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 	WorkOrderDraftHandler     *workorderdraft.Handler

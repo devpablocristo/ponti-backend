@@ -1,6 +1,6 @@
 package domain
 
-import sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+import sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 
 type LaborCategory struct {
 	ID          int64

@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/dollar/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/dollar/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	"github.com/devpablocristo/ponti-backend/internal/dollar/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasePort interface {
@@ -51,11 +51,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.cfg.APIBaseURL() + "/projects/:project_id/dollar-values"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListByProject)
 		public.PUT("", h.CreateorUpdateBulk)

@@ -4,7 +4,7 @@ package customer
 import (
 	"context"
 
-	domain "github.com/alphacodinggroup/ponti-backend/internal/customer/usecases/domain"
+	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 )
 
 type RepositoryPort interface {

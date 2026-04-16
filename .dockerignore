@@ -8,7 +8,8 @@ Dockerfile*
 docker-compose*.yml
 
 # Environment and secrets
-; .env*
+.env
+.env.*
 secrets.dev.yaml
 values.dev.yaml
 
@@ -28,7 +29,8 @@ obj/
 dist/
 build/
 out/
-; pkg/
+# El build prod ya no usa el árbol legacy `pkg/`.
+pkg/
 */bin/
 
 # Dependencies

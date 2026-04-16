@@ -1,6 +1,6 @@
 package dto
 
-import domain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+import domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 
 type CreateClassTypeRequest struct {
 	Name string `json:"name" binding:"required"`

@@ -4,13 +4,14 @@ package bparams
 import (
 	"context"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/business-parameters/handler/dto"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/business-parameters/usecases/domain"
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/ponti-backend/internal/business-parameters/handler/dto"
+	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 type UseCasesPort interface {
@@ -58,11 +59,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/business-parameters"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	group := r.Group(baseURL)
+	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.GET("", h.GetAllParameters)
 		group.GET("/category/:category", h.GetParametersByCategory)
@@ -76,7 +73,7 @@ func (h *Handler) Routes() {
 func (h *Handler) GetParameter(c *gin.Context) {
 	key := c.Param("parameter_key")
 	if key == "" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "parameter_key is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("parameter_key is required"))
 		return
 	}
 	param, err := h.ucs.GetParameter(c.Request.Context(), key)
@@ -90,7 +87,7 @@ func (h *Handler) GetParameter(c *gin.Context) {
 func (h *Handler) GetParametersByCategory(c *gin.Context) {
 	category := c.Param("category")
 	if category == "" {
-		sharedhandlers.RespondError(c, types.NewError(types.ErrBadRequest, "category is required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("category is required"))
 		return
 	}
 	params, err := h.ucs.GetParametersByCategory(c.Request.Context(), category)
@@ -124,7 +121,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 		return
 	}
 	param := req.ToDomain()
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err == nil {
 		param.CreatedBy = &userID
 		param.UpdatedBy = &userID
@@ -138,7 +135,7 @@ func (h *Handler) CreateParameter(c *gin.Context) {
 }
 
 func (h *Handler) UpdateParameter(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
+	id, err := ginmw.ParseParamID(c, "parameter_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -148,7 +145,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 		return
 	}
 	param := req.ToDomain(id)
-	userID, err := sharedmodels.ConvertStringToID(c.Request.Context())
+	userID, err := sharedmodels.ActorFromContext(c.Request.Context())
 	if err == nil {
 		param.UpdatedBy = &userID
 	}
@@ -160,7 +157,7 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 }
 
 func (h *Handler) DeleteParameter(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("parameter_id"), "parameter_id")
+	id, err := ginmw.ParseParamID(c, "parameter_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

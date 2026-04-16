@@ -4,7 +4,7 @@ package mappers
 import (
 	"github.com/shopspring/decimal"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 )
 
 // SummaryResponseMapper maneja el mapeo de respuestas de resumen

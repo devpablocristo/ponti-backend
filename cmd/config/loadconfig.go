@@ -8,7 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/kelseyhightower/envconfig"
 
-	envvars "github.com/alphacodinggroup/ponti-backend/pkg/config/godotenv"
+	envvars "github.com/devpablocristo/ponti-backend/internal/platform/config/godotenv"
 )
 
 // Config agrupa todas las configuraciones de la aplicación.
@@ -20,7 +20,8 @@ type Config struct {
 	Auth           Auth           // Configuración de autenticación/autorización
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
-	AI             AI             // Configuración del AI Copilot Service
+	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
+	Review         Review         // Configuración de Nexus Review / approvals
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

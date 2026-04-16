@@ -4,27 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
-	casmod "github.com/alphacodinggroup/ponti-backend/internal/campaign/repository/models"
-	cropmod "github.com/alphacodinggroup/ponti-backend/internal/crop/repository/models"
-	cusmod "github.com/alphacodinggroup/ponti-backend/internal/customer/repository/models"
-	fieldmod "github.com/alphacodinggroup/ponti-backend/internal/field/repository/models"
-	domainField "github.com/alphacodinggroup/ponti-backend/internal/field/usecases/domain"
-	invmod "github.com/alphacodinggroup/ponti-backend/internal/investor/repository/models"
-	lotmod "github.com/alphacodinggroup/ponti-backend/internal/lot/repository/models"
-	manmod "github.com/alphacodinggroup/ponti-backend/internal/manager/repository/models"
-	models "github.com/alphacodinggroup/ponti-backend/internal/project/repository/models"
-	domain "github.com/alphacodinggroup/ponti-backend/internal/project/usecases/domain"
-	sharedrepo "github.com/alphacodinggroup/ponti-backend/internal/shared/repository"
-	base "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
+	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
+	cusmod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
+	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
+	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	invmod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
+	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
+	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
 type GormEnginePort interface {
@@ -43,7 +41,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 	var projectID int64
 
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		userID, err := convertStringToID(ctx)
+		userID, err := actorFromContext(ctx)
 		if err != nil {
 			return err
 		}
@@ -195,7 +193,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Where("deleted_at IS NULL")
 
 	if err := db0.Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
+		return nil, 0, domainerr.Internal("failed to count projects")
 	}
 
 	if err := db0.
@@ -205,7 +203,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
+		return nil, 0, domainerr.Internal("failed to list projects")
 	}
 
 	return projects, total, nil
@@ -243,7 +241,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 
 	if err := baseClient.
 		Count(&total).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to count projects", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to count projects")
 	}
 
 	var totalHectares decimal.Decimal
@@ -253,7 +251,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to calculate total hectares")
 	}
 
 	if err := baseClient.
@@ -265,7 +263,7 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&projects).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to list projects", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to list projects")
 	}
 
 	var projectList []domain.Project
@@ -299,7 +297,7 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Where("projects.deleted_at IS NOT NULL")
 
 	if err := baseClient.Count(&total).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to count archived projects", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to count archived projects")
 	}
 
 	var totalHectares decimal.Decimal
@@ -308,7 +306,7 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to calculate total hectares for archived projects", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to calculate total hectares for archived projects")
 	}
 
 	if err := baseClient.
@@ -320,7 +318,7 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&projects).Error; err != nil {
-		return nil, decimal.Zero, 0, types.NewError(types.ErrInternal, "failed to list archived projects", err)
+		return nil, decimal.Zero, 0, domainerr.Internal("failed to list archived projects")
 	}
 
 	var projectList []domain.Project
@@ -352,7 +350,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	}
 
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to count projects by customer", err)
+		return nil, 0, domainerr.Internal("failed to count projects by customer")
 	}
 
 	if err := base.
@@ -362,7 +360,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
-		return nil, 0, types.NewError(types.ErrInternal, "failed to list projects by customer", err)
+		return nil, 0, domainerr.Internal("failed to list projects by customer")
 	}
 
 	return projects, total, nil
@@ -394,9 +392,9 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		First(&m, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 		}
-		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get project %d", id), err)
+		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get project %d", id))
 	}
 
 	return m.ToDomain(), nil
@@ -413,7 +411,7 @@ func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name str
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get project %s", name), err)
+		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get project %s", name))
 	}
 
 	return m.ToDomain(), nil
@@ -425,7 +423,7 @@ func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) 
 		Where("project_id = ?", projectID).
 		Find(&fields).Error
 	if err != nil {
-		return nil, types.NewError(types.ErrInternal, fmt.Sprintf("failed to get fields for project %d", projectID), err)
+		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get fields for project %d", projectID))
 	}
 
 	var fieldList []domainField.Field
@@ -442,7 +440,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		return err
 	}
 
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -463,10 +461,10 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
 			First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return types.NewError(types.ErrNotFound, "project not found or outdated", nil)
+			return domainerr.NotFound("project not found or outdated")
 		}
 		if err != nil {
-			return types.NewError(types.ErrInternal, "failed to find project", err)
+			return domainerr.Internal("failed to find project")
 		}
 
 		d.CreatedBy = existing.CreatedBy
@@ -525,11 +523,11 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 				Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
 				Updates(updates)
 			if result.Error != nil {
-				return types.NewError(types.ErrInternal, "failed to update project", result.Error)
+				return domainerr.Internal("failed to update project")
 			}
 
 			if result.RowsAffected == 0 {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", d.ID), nil)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", d.ID))
 			}
 		}
 
@@ -563,28 +561,28 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		return err
 	}
 
-	userID, err := convertStringToID(ctx)
+	userID, err := actorFromContext(ctx)
 	if err != nil {
 		return err
 	}
-	var deletedBy *int64
+	var deletedBy *string
 	deletedBy = &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var project models.Project
 		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
-			return types.NewError(types.ErrInternal, "failed to load project", err)
+			return domainerr.Internal("failed to load project")
 		}
 
 		var count int64
 		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check project existence", err)
+			return domainerr.Internal("failed to check project existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 		}
 
 		if deletedBy != nil {
@@ -592,7 +590,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			if err := tx.Table("users").
 				Where("id = ?", *deletedBy).
 				Count(&userCount).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to validate deleted_by", err)
+				return domainerr.Internal("failed to validate deleted_by")
 			}
 			if userCount == 0 {
 				deletedBy = nil
@@ -601,7 +599,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 
 		// clear managers
 		if err := tx.Exec("UPDATE project_managers SET deleted_at = ?, deleted_by = ? WHERE project_id = ?", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear managers", err)
+			return domainerr.Internal("failed to clear managers")
 		}
 
 		// clear investors
@@ -609,7 +607,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			"deleted_at": time.Now(),
 			"deleted_by": deletedBy,
 		}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to clear investors", err)
+			return domainerr.Internal("failed to clear investors")
 		}
 
 		// clear fields
@@ -617,7 +615,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		if err := tx.Model(&fieldmod.Field{}).
 			Where("project_id = ?", id).
 			Pluck("id", &fieldIDs).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to get field ids", err)
+			return domainerr.Internal("failed to get field ids")
 		}
 
 		if len(fieldIDs) > 0 {
@@ -627,38 +625,38 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 					"deleted_at": time.Now(),
 					"deleted_by": deletedBy,
 				}).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to soft delete lots", err)
+				return domainerr.Internal("failed to soft delete lots")
 			}
 		}
 
 		// clear workorders
 		if err := tx.Exec("UPDATE workorders SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete workorders", err)
+			return domainerr.Internal("failed to soft delete workorders")
 		}
 
 		// clear supply_movements
 		if err := tx.Exec("UPDATE supply_movements SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete supply_movements", err)
+			return domainerr.Internal("failed to soft delete supply_movements")
 		}
 
 		// clear stocks
 		if err := tx.Exec("UPDATE stocks SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete stocks", err)
+			return domainerr.Internal("failed to soft delete stocks")
 		}
 
 		// clear crop_commercializations
 		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete commercializations", err)
+			return domainerr.Internal("failed to soft delete commercializations")
 		}
 
 		// clear project_dollar_values
 		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete dollar values", err)
+			return domainerr.Internal("failed to soft delete dollar values")
 		}
 
 		// clear admin_cost_investors
 		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete admin cost investors", err)
+			return domainerr.Internal("failed to soft delete admin cost investors")
 		}
 
 		if err := tx.Model(&fieldmod.Field{}).
@@ -667,7 +665,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 				"deleted_at": time.Now(),
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to soft delete fields", err)
+			return domainerr.Internal("failed to soft delete fields")
 		}
 
 		// delete project
@@ -675,7 +673,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			"deleted_at": time.Now(),
 			"deleted_by": deletedBy,
 		}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete project", err)
+			return domainerr.Internal("failed to delete project")
 		}
 
 		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
@@ -697,13 +695,13 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		var project models.Project
 		if err := tx.Unscoped().Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
-			return types.NewError(types.ErrInternal, "failed to check project", err)
+			return domainerr.Internal("failed to check project")
 		}
 
 		if !project.DeletedAt.Valid {
-			return types.NewError(types.ErrValidation, "project is not deleted, cannot restore", nil)
+			return domainerr.Validation("project is not deleted, cannot restore")
 		}
 
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)
@@ -711,17 +709,17 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			"deleted_at": nil,
 			"updated_at": time.Now(),
 		}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore project", err)
+			return domainerr.Internal("failed to restore project")
 		}
 
 		// Restaurar managers
 		if err := tx.Exec("UPDATE project_managers SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore managers", err)
+			return domainerr.Internal("failed to restore managers")
 		}
 
 		// Restaurar investors
 		if err := tx.Exec("UPDATE project_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore investors", err)
+			return domainerr.Internal("failed to restore investors")
 		}
 
 		// Restaurar fields (obtener IDs primero)
@@ -729,53 +727,53 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		if err := tx.Unscoped().Model(&fieldmod.Field{}).
 			Where("project_id = ? AND deleted_at IS NOT NULL", id).
 			Pluck("id", &fieldIDs).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to get field ids", err)
+			return domainerr.Internal("failed to get field ids")
 		}
 
 		// Restaurar fields
 		if err := tx.Exec("UPDATE fields SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore fields", err)
+			return domainerr.Internal("failed to restore fields")
 		}
 
 		// Restaurar lots (solo los que pertenecen a los fields de este proyecto)
 		if len(fieldIDs) > 0 {
 			if err := tx.Exec("UPDATE lots SET deleted_at = NULL, updated_at = ? WHERE field_id IN ? AND deleted_at IS NOT NULL", time.Now(), fieldIDs).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to restore lots", err)
+				return domainerr.Internal("failed to restore lots")
 			}
 		}
 
 		// Restaurar workorders
 		if err := tx.Exec("UPDATE workorders SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore workorders", err)
+			return domainerr.Internal("failed to restore workorders")
 		}
 
 		// Restaurar supply_movements
 		if err := tx.Exec("UPDATE supply_movements SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore supply_movements", err)
+			return domainerr.Internal("failed to restore supply_movements")
 		}
 
 		// Restaurar stocks
 		if err := tx.Exec("UPDATE stocks SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore stocks", err)
+			return domainerr.Internal("failed to restore stocks")
 		}
 
 		// Restaurar crop_commercializations
 		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore commercializations", err)
+			return domainerr.Internal("failed to restore commercializations")
 		}
 
 		// Restaurar project_dollar_values
 		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore dollar values", err)
+			return domainerr.Internal("failed to restore dollar values")
 		}
 
 		// Restaurar admin_cost_investors
 		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore admin cost investors", err)
+			return domainerr.Internal("failed to restore admin cost investors")
 		}
 
-		var deletedBy *int64
-		if userID, err := convertStringToID(ctx); err == nil {
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
 			deletedBy = &userID
 		}
 		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
@@ -797,17 +795,17 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		var project models.Project
 		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), err)
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
-			return types.NewError(types.ErrInternal, "failed to load project", err)
+			return domainerr.Internal("failed to load project")
 		}
 
 		var count int64
 		if err := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to check project existence", err)
+			return domainerr.Internal("failed to check project existence")
 		}
 		if count == 0 {
-			return types.NewError(types.ErrNotFound, fmt.Sprintf("project %d not found", id), nil)
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 		}
 
 		// Obtener field IDs antes de eliminar
@@ -815,7 +813,7 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		if err := tx.Unscoped().Model(&fieldmod.Field{}).
 			Where("project_id = ?", id).
 			Pluck("id", &fieldIDs).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to get field ids", err)
+			return domainerr.Internal("failed to get field ids")
 		}
 
 		// Eliminar workorder_items primero (dependen de workorders)
@@ -825,75 +823,75 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 				SELECT id FROM workorders WHERE project_id = ?
 			)
 		`, id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete workorder_items", err)
+			return domainerr.Internal("failed to hard delete workorder_items")
 		}
 
 		// Eliminar workorders
 		if err := tx.Exec("DELETE FROM workorders WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete workorders", err)
+			return domainerr.Internal("failed to hard delete workorders")
 		}
 
 		// Eliminar supply_movements (tiene RESTRICT, debe eliminarse antes)
 		if err := tx.Exec("DELETE FROM supply_movements WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete supply_movements", err)
+			return domainerr.Internal("failed to hard delete supply_movements")
 		}
 
 		// Eliminar stocks (tiene RESTRICT, debe eliminarse antes)
 		if err := tx.Exec("DELETE FROM stocks WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete stocks", err)
+			return domainerr.Internal("failed to hard delete stocks")
 		}
 
 		// Eliminar crop_commercializations
 		if err := tx.Exec("DELETE FROM crop_commercializations WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete commercializations", err)
+			return domainerr.Internal("failed to hard delete commercializations")
 		}
 
 		// Eliminar project_dollar_values (tiene RESTRICT, debe eliminarse antes)
 		if err := tx.Exec("DELETE FROM project_dollar_values WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete dollar values", err)
+			return domainerr.Internal("failed to hard delete dollar values")
 		}
 
 		// Eliminar field_investors (tiene CASCADE pero lo hacemos explícitamente)
 		if len(fieldIDs) > 0 {
 			if err := tx.Exec("DELETE FROM field_investors WHERE field_id IN ?", fieldIDs).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to hard delete field_investors", err)
+				return domainerr.Internal("failed to hard delete field_investors")
 			}
 		}
 
 		// Eliminar lots (dependen de fields)
 		if len(fieldIDs) > 0 {
 			if err := tx.Exec("DELETE FROM lots WHERE field_id IN ?", fieldIDs).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to hard delete lots", err)
+				return domainerr.Internal("failed to hard delete lots")
 			}
 		}
 
 		// Eliminar fields
 		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete fields", err)
+			return domainerr.Internal("failed to hard delete fields")
 		}
 
 		// Eliminar project_managers (tabla many-to-many)
 		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete project_managers", err)
+			return domainerr.Internal("failed to hard delete project_managers")
 		}
 
 		// Eliminar project_investors (tiene CASCADE pero lo hacemos explícitamente)
 		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete project_investors", err)
+			return domainerr.Internal("failed to hard delete project_investors")
 		}
 
 		// Eliminar admin_cost_investors (tiene CASCADE pero lo hacemos explícitamente)
 		if err := tx.Exec("DELETE FROM admin_cost_investors WHERE project_id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete admin_cost_investors", err)
+			return domainerr.Internal("failed to hard delete admin_cost_investors")
 		}
 
 		// Finalmente eliminar el proyecto
 		if err := tx.Unscoped().Exec("DELETE FROM projects WHERE id = ?", id).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to hard delete project", err)
+			return domainerr.Internal("failed to hard delete project")
 		}
 
-		var deletedBy *int64
-		if userID, err := convertStringToID(ctx); err == nil {
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
 			deletedBy = &userID
 		}
 		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
@@ -1021,19 +1019,11 @@ func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
 	return c.ID, nil
 }
 
-func convertStringToID(ctx context.Context) (int64, error) {
-	userID := ctx.Value(pkgmwr.ContextUserIDKey)
-	if s, ok := userID.(string); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i, nil
-		} else {
-			return 0, fmt.Errorf("failed to parse user ID: %w", err)
-		}
-	}
-	return 0, fmt.Errorf("user ID is not a string")
+func actorFromContext(ctx context.Context) (string, error) {
+	return base.ActorFromContext(ctx)
 }
 
-func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) error {
+func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *string) error {
 	if customerID == 0 {
 		return nil
 	}
@@ -1042,7 +1032,7 @@ func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) e
 	if err := tx.Model(&models.Project{}).
 		Where("customer_id = ? AND deleted_at IS NULL", customerID).
 		Count(&activeProjects).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to check active projects for customer", err)
+		return domainerr.Internal("failed to check active projects for customer")
 	}
 
 	if activeProjects > 0 {
@@ -1053,7 +1043,7 @@ func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) e
 				"deleted_by": nil,
 				"updated_at": time.Now(),
 			}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to restore customer", err)
+			return domainerr.Internal("failed to restore customer")
 		}
 		return nil
 	}
@@ -1071,7 +1061,7 @@ func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *int64) e
 	if err := tx.Unscoped().Model(&cusmod.Customer{}).
 		Where("id = ? AND deleted_at IS NULL", customerID).
 		Updates(updates).Error; err != nil {
-		return types.NewError(types.ErrInternal, "failed to archive customer", err)
+		return domainerr.Internal("failed to archive customer")
 	}
 	return nil
 }
@@ -1109,7 +1099,7 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 				"INSERT INTO project_managers (project_id, manager_id, created_by, updated_by) VALUES (?, ?, ?, ?)",
 				d.ID, m.ID, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add manager", err)
+				return domainerr.Internal("failed to add manager")
 			}
 		}
 	}
@@ -1120,7 +1110,7 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 				"DELETE FROM project_managers WHERE project_id = ? AND manager_id = ?",
 				d.ID, m.ID,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove manager", err)
+				return domainerr.Internal("failed to remove manager")
 			}
 		}
 	}
@@ -1162,7 +1152,7 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 				"INSERT INTO project_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
 				d.ID, i.ID, i.Percentage, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add investor", err)
+				return domainerr.Internal("failed to add investor")
 			}
 		} else if pct, ok := existingInvestorPct[i.ID]; ok && pct != i.Percentage {
 			// Actualizar porcentaje si el inversor ya existe
@@ -1170,7 +1160,7 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 				"UPDATE project_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
 				i.Percentage, d.UpdatedBy, d.ID, i.ID,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to update investor percentage", err)
+				return domainerr.Internal("failed to update investor percentage")
 			}
 		}
 	}
@@ -1181,7 +1171,7 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 				"DELETE FROM project_investors WHERE project_id = ? AND investor_id = ?",
 				d.ID, i.InvestorID,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove investor", err)
+				return domainerr.Internal("failed to remove investor")
 			}
 		}
 	}
@@ -1202,7 +1192,7 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 		} else {
 			f.ProjectID = existing.ID
 			if err := tx.Create(&f).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add field", err)
+				return domainerr.Internal("failed to add field")
 			}
 			newFieldMap[f.ID] = f
 			fields[i] = f
@@ -1233,7 +1223,7 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 				if err := tx.Model(&fieldmod.Field{}).
 					Where("id = ?", f.ID).
 					Updates(updates).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to update field", err)
+					return domainerr.Internal("failed to update field")
 				}
 			}
 			if err := relinkLots(tx, ef, f); err != nil {
@@ -1245,10 +1235,10 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 	for _, ef := range existing.Fields {
 		if _, exists := newFieldMap[ef.ID]; !exists {
 			if err := tx.Where("field_id = ?", ef.ID).Delete(&lotmod.Lot{}).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove lots", err)
+				return domainerr.Internal("failed to remove lots")
 			}
 			if err := tx.Delete(&fieldmod.Field{}, ef.ID).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove field", err)
+				return domainerr.Internal("failed to remove field")
 			}
 		}
 	}
@@ -1295,7 +1285,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 				},
 			}
 			if err := tx.Create(&lot).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add lot", err)
+				return domainerr.Internal("failed to add lot")
 			}
 			newLotIDs[lot.ID] = struct{}{}
 			newField.Lots[i] = lot
@@ -1341,7 +1331,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 				if err := tx.Model(&lotmod.Lot{}).
 					Where("id = ?", l.ID).
 					Updates(updates).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to update lot", err)
+					return domainerr.Internal("failed to update lot")
 				}
 			}
 		}
@@ -1350,7 +1340,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 	for _, l := range existingField.Lots {
 		if _, exists := newLotIDs[l.ID]; !exists {
 			if err := tx.Exec("DELETE FROM lots WHERE id = ?", l.ID).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove lot", err)
+				return domainerr.Internal("failed to remove lot")
 			}
 		}
 	}
@@ -1389,14 +1379,14 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 				"INSERT INTO admin_cost_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
 				d.ID, aci.ID, aci.Percentage, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to add admin cost investor", err)
+				return domainerr.Internal("failed to add admin cost investor")
 			}
 		} else {
 			if err := tx.Exec(
 				"UPDATE admin_cost_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
 				aci.Percentage, d.UpdatedBy, d.ID, aci.ID,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to update admin cost investor", err)
+				return domainerr.Internal("failed to update admin cost investor")
 			}
 		}
 	}
@@ -1407,7 +1397,7 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 				"DELETE FROM admin_cost_investors WHERE project_id = ? AND investor_id = ?",
 				d.ID, aci.InvestorID,
 			).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to remove investor", err)
+				return domainerr.Internal("failed to remove investor")
 			}
 		}
 	}
@@ -1461,14 +1451,14 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					 VALUES (?, ?, ?, ?, ?)`,
 					ef.ID, inv.ID, inv.Percentage, d.UpdatedBy, d.UpdatedBy,
 				).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to add field investor", err)
+					return domainerr.Internal("failed to add field investor")
 				}
 			} else {
 				if err := tx.Exec(
 					"UPDATE field_investors SET percentage = ?, updated_by = ? WHERE field_id = ? AND investor_id = ?",
 					inv.Percentage, d.UpdatedBy, ef.ID, inv.ID,
 				).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to update admin cost investor", err)
+					return domainerr.Internal("failed to update admin cost investor")
 				}
 			}
 		}
@@ -1479,7 +1469,7 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					`DELETE FROM field_investors WHERE field_id = ? AND investor_id = ?`,
 					ef.ID, invID,
 				).Error; err != nil {
-					return types.NewError(types.ErrInternal, "failed to remove field investor", err)
+					return domainerr.Internal("failed to remove field investor")
 				}
 			}
 		}

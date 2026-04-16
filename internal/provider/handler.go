@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/handler/dto"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/provider/handler/dto"
+	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
@@ -37,11 +37,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	publicGroup := r.Group(baseURL + "/providers")
+	publicGroup := r.Group(baseURL+"/providers", h.mws.GetValidation()...)
 	{
 		publicGroup.GET("", h.GetProviders)
 	}

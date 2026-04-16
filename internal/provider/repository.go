@@ -3,9 +3,9 @@ package provider
 import (
 	"context"
 
-	models "github.com/alphacodinggroup/ponti-backend/internal/provider/repository/models"
-	"github.com/alphacodinggroup/ponti-backend/internal/provider/usecases/domain"
-	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error) {
 	var providers []models.Provider
 	if err := r.db.Client().WithContext(ctx).Find(&providers).Error; err != nil {
-		return nil, types.NewError(types.ErrInternal, "failed to list providers", err)
+		return nil, domainerr.Internal("failed to list providers")
 	}
 	res := make([]domain.Provider, len(providers))
 	for i := range providers {

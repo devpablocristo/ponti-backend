@@ -7,13 +7,15 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
-	pkgmwr "github.com/alphacodinggroup/ponti-backend/pkg/http/middlewares/gin"
-	pkgtypes "github.com/alphacodinggroup/ponti-backend/pkg/types"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 
-	"github.com/alphacodinggroup/ponti-backend/internal/admin/idp"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+
+	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
 )
 
 type GinEnginePort interface {
@@ -48,11 +50,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/admin"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	admin := r.Group(baseURL)
+	admin := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		admin.GET("/tenants", h.ListTenants)
 		admin.POST("/tenants", h.CreateTenant)
@@ -65,14 +63,9 @@ func (h *Handler) Routes() {
 }
 
 func requireAdmin(c *gin.Context) bool {
-	raw, ok := c.Get(pkgmwr.ContextRoles)
-	if !ok {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrAuthorization, "admin role required", nil))
-		return false
-	}
-	roles, ok := raw.([]string)
-	if !ok || len(roles) == 0 || roles[0] != "admin" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrAuthorization, "admin role required", nil))
+	role, _ := c.Request.Context().Value(ctxkeys.Role).(string)
+	if role != "admin" {
+		sharedhandlers.RespondError(c, domainerr.Forbidden("admin role required"))
 		return false
 	}
 	return true
@@ -101,7 +94,7 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 	}
 	var req createTenantReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 	rp := newRepo(h.db)
@@ -114,17 +107,17 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 }
 
 type createUserReq struct {
-	Email          string `json:"email"`
-	Username       string `json:"username"`
-	Password       string `json:"password"`
-	TenantName     string `json:"tenant_name"`
-	RoleName       string `json:"role_name"`
-	SendResetLink  bool   `json:"send_reset_link"`
+	Email         string `json:"email"`
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	TenantName    string `json:"tenant_name"`
+	RoleName      string `json:"role_name"`
+	SendResetLink bool   `json:"send_reset_link"`
 }
 
 type createUserResp struct {
 	User      *localUser `json:"user"`
-	TenantID  int64      `json:"tenant_id"`
+	TenantID  uuid.UUID  `json:"tenant_id"`
 	RoleName  string     `json:"role_name"`
 	ResetLink string     `json:"reset_link,omitempty"`
 }
@@ -146,7 +139,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 	var req createUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 
@@ -156,7 +149,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 	password := strings.TrimSpace(req.Password)
 	if email == "" || password == "" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "email and password required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("email and password required"))
 		return
 	}
 
@@ -171,7 +164,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		}
 	}
 	if err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "unable to create identity user", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("unable to create identity user"))
 		return
 	}
 
@@ -218,13 +211,13 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	tenantID, err := sharedhandlers.ParseTenantID(c)
+	orgID, err := sharedhandlers.ParseOrgID(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 	rp := newRepo(h.db)
-	rows, err := rp.listUsersForTenant(c.Request.Context(), tenantID)
+	rows, err := rp.listUsersForTenant(c.Request.Context(), orgID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -245,7 +238,7 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 	}
 	var req upsertMembershipReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "invalid request payload", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
 
@@ -254,14 +247,14 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		email = usernameToEmail(req.Username)
 	}
 	if email == "" {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "email required", nil))
+		sharedhandlers.RespondError(c, domainerr.Validation("email required"))
 		return
 	}
 
 	ctx := c.Request.Context()
 	uid, err := h.idp.GetUserUIDByEmail(ctx, email)
 	if err != nil {
-		sharedhandlers.RespondError(c, pkgtypes.NewError(pkgtypes.ErrBadRequest, "identity user not found", err))
+		sharedhandlers.RespondError(c, domainerr.Validation("identity user not found"))
 		return
 	}
 
@@ -287,4 +280,3 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"user_id": u.ID, "tenant_id": tenantID}})
 }
-
