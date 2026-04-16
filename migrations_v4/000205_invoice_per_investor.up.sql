@@ -7,6 +7,9 @@ FROM public.workorders w
 WHERE w.id = i.work_order_id
   AND i.investor_id IS NULL;
 
+ALTER TABLE public.invoices
+ALTER COLUMN investor_id SET NOT NULL;
+
 ALTER TABLE ONLY public.invoices
 DROP CONSTRAINT IF EXISTS uq_invoices_work_order;
 
