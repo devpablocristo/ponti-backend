@@ -193,7 +193,26 @@ if [[ -z "${labor_id}" ]]; then
 fi
 
 order_number="SMOKE-$(date +%s)"
-vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv7                      njm                                                        {"investor_id": int(os.environ["INVESTOR_B"]), "percentage": 40}
+today="$(date +%F)"
+payload="$(PROJECT_ID="${project_id}" FIELD_ID="${field_id}" LOT_ID="${lot_id}" CROP_ID="${crop_id}" LABOR_ID="${labor_id}" CONTRACTOR="${contractor}" INVESTOR_A="${investor_a}" INVESTOR_B="${investor_b}" ORDER_NUMBER="${order_number}" TODAY="${today}" python3 - <<'PY'
+import json
+import os
+print(json.dumps({
+  "number": os.environ["ORDER_NUMBER"],
+  "project_id": int(os.environ["PROJECT_ID"]),
+  "field_id": int(os.environ["FIELD_ID"]),
+  "lot_id": int(os.environ["LOT_ID"]),
+  "crop_id": int(os.environ["CROP_ID"]),
+  "labor_id": int(os.environ["LABOR_ID"]),
+  "contractor": os.environ.get("CONTRACTOR", ""),
+  "observations": "Smoke deploy validation",
+  "date": f'{os.environ["TODAY"]}T00:00:00Z',
+  "investor_id": int(os.environ["INVESTOR_A"]),
+  "effective_area": 100,
+  "items": [],
+  "investor_splits": [
+    {"investor_id": int(os.environ["INVESTOR_A"]), "percentage": 60},
+    {"investor_id": int(os.environ["INVESTOR_B"]), "percentage": 40}
   ]
 }))
 PY
