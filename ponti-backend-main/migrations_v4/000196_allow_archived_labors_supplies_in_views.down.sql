@@ -1,2 +1,0 @@
--- DOWN: revert to previous versions (re-run 000192, 000194, 000130, 000120, 000110)
--- No-op: las migraciones anteriores se pueden re-aplicar manualmente si se necesita rollback.
