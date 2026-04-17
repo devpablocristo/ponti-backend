@@ -149,15 +149,6 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'fk_work_order_drafts_reviewed_by'
-    ) THEN
-        ALTER TABLE public.work_order_drafts
-            ADD CONSTRAINT fk_work_order_drafts_reviewed_by
-            FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
-            ON UPDATE CASCADE ON DELETE RESTRICT;
-    END IF;
-
-    IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'fk_work_order_drafts_published_work_order'
     ) THEN
         ALTER TABLE public.work_order_drafts
