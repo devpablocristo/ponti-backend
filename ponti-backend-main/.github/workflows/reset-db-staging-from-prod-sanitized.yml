@@ -1,0 +1,307 @@
+name: Reset DB (STAGING) from PROD (sanitized)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: reset-db-staging
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    env:
+      # La instancia Cloud SQL vive en DEV (unificada para ahorrar recursos)
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      DB_USER: ${{ vars.DB_USER_DEV }}
+      SECRET_DB_PASSWORD_NAME: db-password-dev
+      CLOUDSQL_PROXY_PORT: "55433"
+
+      # Instancia + DBs (la instancia suele ser la misma para dev/stg/prod)
+      DB_INSTANCE_NAME: ${{ vars.DB_INSTANCE_NAME_DEV }}
+      DB_NAME_PROD: ${{ vars.DB_NAME_PROD }}
+      DB_NAME_STG: ${{ vars.DB_NAME_STG }}
+
+      # Guardrail: hay que setearlo a true para habilitar el flujo.
+      SANITIZED_OK: ${{ vars.SANITIZED_OK }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth GCP (DEV project - instancia unificada)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Validar config mínima + guardrails
+        run: |
+          set -euo pipefail
+
+          if [ "${SANITIZED_OK:-}" != "true" ]; then
+            echo "::error::SANITIZED_OK debe ser 'true' para ejecutar este workflow."
+            exit 1
+          fi
+
+          if [ -z "${DB_INSTANCE_NAME:-}" ]; then
+            echo "::error::Falta DB_INSTANCE_NAME"
+            exit 1
+          fi
+          if [ -z "${DB_NAME_PROD:-}" ]; then
+            echo "::error::Falta DB_NAME_PROD"
+            exit 1
+          fi
+          if [ -z "${DB_NAME_STG:-}" ]; then
+            echo "::error::Falta DB_NAME_STG"
+            exit 1
+          fi
+          if [ -z "${DB_USER:-}" ]; then
+            echo "::error::Falta DB_USER"
+            exit 1
+          fi
+
+          inst_lower="$(printf '%s' "$DB_INSTANCE_NAME" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$inst_lower" == *prod* ]]; then
+            echo "::error::DB_INSTANCE_NAME contiene 'prod': '$DB_INSTANCE_NAME' (instancia debe ser la unificada en dev)"
+            exit 1
+          fi
+
+          stg_lower="$(printf '%s' "$DB_NAME_STG" | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$stg_lower" =~ (_stg|-stg|_staging|-staging)$ ]]; then
+            echo "::error::DB_NAME_STG debe terminar en _stg, -stg, _staging o -staging: '$DB_NAME_STG'"
+            exit 1
+          fi
+
+          prod_lower="$(printf '%s' "$DB_NAME_PROD" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$prod_lower" != *prod* ]]; then
+            echo "::warning::DB_NAME_PROD no contiene 'prod': '$DB_NAME_PROD' (verificar)"
+          fi
+
+      - name: Resolve DB password
+        run: |
+          set -euo pipefail
+          db_password="${DB_PASSWORD:-}"
+          if [[ -z "$db_password" ]]; then
+            db_password="$(gcloud secrets versions access latest \
+              --project="$GCP_PROJECT_ID" \
+              --secret="$SECRET_DB_PASSWORD_NAME" 2>/dev/null || true)"
+          fi
+          if [[ -z "$db_password" ]]; then
+            echo "::error::No se pudo resolver DB_PASSWORD desde Secret Manager."
+            exit 1
+          fi
+          echo "::add-mask::$db_password"
+          echo "DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          set -euo pipefail
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-reset-stg >/dev/null 2>&1 || true
+          docker run -d --name cloudsql-proxy-reset-stg \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 \
+            --port 5432 \
+            --token "$token" \
+            "${GCP_PROJECT_ID}:${GCP_REGION}:${DB_INSTANCE_NAME}" >/dev/null
+
+          for i in {1..30}; do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Cloud SQL Proxy no quedó listo."
+          exit 1
+
+      - name: Dump PROD data-only
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" pg_dump \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_PROD" \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            --data-only \
+            --exclude-table=schema_migrations \
+            --exclude-table=schema_migrations_lock \
+            --file=/tmp/prod_data.dump
+
+      - name: Reset STAGING DB (drop + create)
+        run: |
+          set -euo pipefail
+
+          delete_stderr="$(mktemp)"
+          if ! gcloud sql databases delete "$DB_NAME_STG" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$DB_INSTANCE_NAME" \
+            --quiet 2>"$delete_stderr"; then
+            msg="$(tr '\n' ' ' <"$delete_stderr")"
+            msg_lower="$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]')"
+            if echo "$msg_lower" | grep -Eq "not found|does not exist"; then
+              echo "DB '$DB_NAME_STG' no existe; continuo."
+            else
+              echo "::error::Fallo al borrar DB '$DB_NAME_STG': $msg"
+              exit 1
+            fi
+          fi
+          rm -f "$delete_stderr"
+
+          gcloud sql databases create "$DB_NAME_STG" \
+            --project="$GCP_PROJECT_ID" \
+            --instance="$DB_INSTANCE_NAME"
+
+      - name: Apply migrations on STAGING (fresh schema)
+        run: |
+          set -euo pipefail
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_STG}?sslmode=disable" \
+            up
+
+      - name: Restore data-only into STAGING
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            r record;
+          BEGIN
+            FOR r IN
+              SELECT tablename
+              FROM pg_tables
+              WHERE schemaname = 'public'
+                AND tablename NOT IN ('schema_migrations', 'schema_migrations_lock')
+            LOOP
+              EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE', r.tablename);
+            END LOOP;
+          END $$;
+          SQL
+
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -At -c "SELECT tablename FROM pg_tables WHERE schemaname='public'" > /tmp/stg_tables.txt
+
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -At -c "SELECT sequencename FROM pg_sequences WHERE schemaname='public'" > /tmp/stg_sequences.txt
+
+          pg_restore -l /tmp/prod_data.dump > /tmp/prod_data.list
+          python3 - <<'PY'
+          import pathlib
+          tables = {x.strip() for x in pathlib.Path('/tmp/stg_tables.txt').read_text().splitlines() if x.strip()}
+          seqs = {x.strip() for x in pathlib.Path('/tmp/stg_sequences.txt').read_text().splitlines() if x.strip()}
+          out = []
+          for line in pathlib.Path('/tmp/prod_data.list').read_text().splitlines():
+            if " TABLE DATA public " in line:
+              table = line.split(" TABLE DATA public ", 1)[1].split()[0]
+              if table not in tables:
+                continue
+            if " SEQUENCE SET public " in line:
+              seq = line.split(" SEQUENCE SET public ", 1)[1].split()[0]
+              if seq not in seqs:
+                continue
+            out.append(line)
+          pathlib.Path('/tmp/prod_data.filtered.list').write_text("\n".join(out) + "\n")
+          PY
+
+          PGPASSWORD="$DB_PASSWORD" pg_restore \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            --no-owner \
+            --no-acl \
+            --data-only \
+            --exit-on-error \
+            --use-list=/tmp/prod_data.filtered.list \
+            /tmp/prod_data.dump
+
+      - name: Sync sequences after restore
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            seq_record RECORD;
+            max_id BIGINT;
+          BEGIN
+            FOR seq_record IN
+              SELECT
+                seq.relname AS seq_name,
+                t.relname AS table_name,
+                a.attname AS column_name
+              FROM pg_class seq
+              JOIN pg_depend d ON d.objid = seq.oid
+              JOIN pg_class t ON d.refobjid = t.oid
+              JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+              WHERE seq.relkind = 'S'
+            LOOP
+              EXECUTE format('SELECT COALESCE(MAX(%I), 0) FROM %I', seq_record.column_name, seq_record.table_name) INTO max_id;
+              EXECUTE format('SELECT setval(%L, %s + 1, false)', seq_record.seq_name, max_id);
+            END LOOP;
+          END $$;
+          SQL
+
+      - name: Ejecutar sanitizacion (solo STAGING)
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            -v ON_ERROR_STOP=1 \
+            -f scripts/db/sanitize_prod_to_staging.sql
+
+      - name: Stop Cloud SQL Proxy
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-reset-stg >/dev/null 2>&1 || true

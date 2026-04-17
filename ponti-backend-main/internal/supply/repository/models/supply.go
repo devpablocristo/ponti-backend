@@ -1,0 +1,91 @@
+package models
+
+import (
+	catmod "github.com/alphacodinggroup/ponti-backend/internal/category/repository/models"
+	classtype "github.com/alphacodinggroup/ponti-backend/internal/class-type/repository/models"
+	classdomain "github.com/alphacodinggroup/ponti-backend/internal/class-type/usecases/domain"
+	shareddomain "github.com/alphacodinggroup/ponti-backend/internal/shared/domain"
+	sharedmodels "github.com/alphacodinggroup/ponti-backend/internal/shared/models"
+	domain "github.com/alphacodinggroup/ponti-backend/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
+)
+
+// Modelo principal de Supply
+type Supply struct {
+	ID        int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	ProjectID int64           `gorm:"not null;index"`
+	Name      string          `gorm:"type:varchar(100);not null"`
+	Price     decimal.Decimal `gorm:"not null"`
+	IsPartialPrice bool `gorm:"not null;default:false;column:is_partial_price"`
+
+	UnitID int64
+
+	CategoryID int64
+	Category   catmod.Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+
+	TypeID int64
+	Type   classtype.ClassType `gorm:"foreignKey:TypeID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+
+	sharedmodels.Base // Campos de auditoría (CreatedAt, UpdatedAt, etc)
+}
+
+// De persistencia (models.Supply) → dominio (domain.Supply)
+func (m *Supply) ToDomain() *domain.Supply {
+	// Obtener nombre de unidad desde bparams
+	unitName := m.getUnitName()
+
+	return &domain.Supply{
+		ID:        m.ID,
+		ProjectID: m.ProjectID,
+		Name:      m.Name,
+		UnitID:    int64(m.UnitID),
+		Price:     m.Price,
+		IsPartialPrice: m.IsPartialPrice,
+		CategoryID:     int64(m.CategoryID),
+		CategoryName:   m.Category.Name,
+		Type: classdomain.ClassType{
+			ID:   int64(m.TypeID),
+			Name: m.Type.Name,
+		},
+		UnitName: unitName,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
+		},
+	}
+}
+
+func FromDomain(d *domain.Supply) *Supply {
+	return &Supply{
+		ID:        d.ID,
+		ProjectID: d.ProjectID,
+		Name:      d.Name,
+		Price:     d.Price,
+		IsPartialPrice: d.IsPartialPrice,
+		UnitID:         int64(d.UnitID),
+		CategoryID:     int64(d.CategoryID),
+		TypeID:         int64(d.Type.ID),
+		Base: sharedmodels.Base{
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
+	}
+}
+
+// getUnitName obtiene el nombre de la unidad desde bparams
+func (m *Supply) getUnitName() string {
+	// Mapeo temporal hasta que se implemente la consulta a bparams
+	// TODO: Implementar consulta real a bparams
+	switch m.UnitID {
+	case 1:
+		return "Lt" // unit_liters
+	case 2:
+		return "Kg" // unit_kilos
+	case 3:
+		return "Bags" // unit_bags
+	default:
+		return "Unknown"
+	}
+}

@@ -1,0 +1,112 @@
+package dataintegrity
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/handler/dto"
+	"github.com/alphacodinggroup/ponti-backend/internal/data-integrity/usecases/domain"
+	sharedhandlers "github.com/alphacodinggroup/ponti-backend/internal/shared/handlers"
+	types "github.com/alphacodinggroup/ponti-backend/pkg/types"
+)
+
+// UseCasesPort define la interfaz para los casos de uso
+type UseCasesPort interface {
+	CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error)
+}
+
+// GinEnginePort define la interfaz para el servidor Gin
+type GinEnginePort interface {
+	GetRouter() *gin.Engine
+	RunServer(ctx context.Context) error
+}
+
+// ConfigAPIPort define la interfaz para la configuración de la API
+type ConfigAPIPort interface {
+	APIVersion() string
+	APIBaseURL() string
+}
+
+// MiddlewaresEnginePort define la interfaz para los middlewares
+type MiddlewaresEnginePort interface {
+	GetGlobal() []gin.HandlerFunc
+	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
+}
+
+// Handler maneja las peticiones HTTP del módulo dataintegrity
+type Handler struct {
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
+}
+
+// NewHandler crea una nueva instancia del handler
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
+}
+
+// Routes registra las rutas del módulo
+func (h *Handler) Routes() {
+	r := h.gsv.GetRouter()
+	base := h.acf.APIBaseURL() + "/data-integrity"
+
+	for _, mw := range h.mws.GetValidation() {
+		r.Use(mw)
+	}
+
+	public := r.Group(base)
+	{
+		public.GET("/costs-check", h.CheckCostsCoherence)
+	}
+}
+
+// CheckCostsCoherence valida la coherencia de costos directos totales
+// @Summary Validar coherencia de costos directos
+// @Description Valida que el valor de costos directos totales sea consistente en todos los módulos
+// @Tags data-integrity
+// @Accept json
+// @Produce json
+// @Param project_id query int true "Project ID"
+// @Success 200 {object} dto.IntegrityReportResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /data-integrity/costs-check [get]
+func (h *Handler) CheckCostsCoherence(c *gin.Context) {
+	// Parsear query params
+	var filter domain.CostsCheckFilter
+
+	projectID, err := sharedhandlers.ParseOptionalInt64Query(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if projectID == nil {
+		sharedhandlers.RespondError(c, types.NewError(
+			types.ErrBadRequest,
+			"missing required query param: project_id",
+			nil,
+		))
+		return
+	}
+	filter.ProjectID = projectID
+
+	// Timeout 8 min para permitir completar los 14 controles (optimizados con cache)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Minute)
+	defer cancel()
+
+	// Ejecutar caso de uso
+	report, err := h.ucs.CheckCostsCoherence(ctx, filter)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	// Convertir a DTO y retornar
+	response := dto.ToIntegrityReportResponse(report)
+	c.JSON(http.StatusOK, response)
+}

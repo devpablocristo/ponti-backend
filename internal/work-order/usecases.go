@@ -4,6 +4,7 @@ package workorder
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -45,6 +46,9 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 	if o == nil {
 		return 0, domainerr.Validation("work order is nil")
 	}
+	if err := validateDate(o); err != nil {
+		return 0, err
+	}
 	if err := validateItems(o); err != nil {
 		return 0, err
 	}
@@ -66,6 +70,9 @@ func (u *UseCases) DuplicateWorkOrder(ctx context.Context, number string) (strin
 }
 
 func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
+	if err := validateDate(o); err != nil {
+		return err
+	}
 	if err := validateItems(o); err != nil {
 		return err
 	}
@@ -76,6 +83,20 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 		return err
 	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
+}
+
+func validateDate(o *domain.WorkOrder) error {
+	if o == nil {
+		return nil
+	}
+	if o.Date.IsZero() {
+		return nil
+	}
+	today := time.Now().Truncate(24 * time.Hour)
+	if o.Date.After(today) {
+		return domainerr.Validation("la fecha de la orden de trabajo no puede ser futura")
+	}
+	return nil
 }
 
 func (u *UseCases) UpdateInvestorPaymentStatus(
