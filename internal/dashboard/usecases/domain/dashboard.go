@@ -139,6 +139,9 @@ type DashboardBalanceSummary struct {
 	FertilizantesInvertidosUSD decimal.Decimal
 	FertilizantesStockUSD      decimal.Decimal
 	LaboresInvertidosUSD       decimal.Decimal
+	LaboresStockUSD            decimal.Decimal
+	ArriendoStockUSD           decimal.Decimal
+	EstructuraStockUSD         decimal.Decimal
 }
 
 // DashboardBalanceBreakdown representa el desglose del balance por categoría

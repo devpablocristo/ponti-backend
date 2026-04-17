@@ -307,7 +307,7 @@ func (r *Repository) getManagementBalance(ctx context.Context, projectIDs []int6
 		{Category: "Semillas", ExecutedUSD: summary.SemillaCostUSD, InvestedUSD: summary.SemillasInvertidosUSD, StockUSD: summary.SemillasStockUSD},
 		{Category: "Agroquímicos", ExecutedUSD: summary.InsumosCostUSD, InvestedUSD: summary.AgroquimicosInvertidosUSD, StockUSD: summary.AgroquimicosStockUSD},
 		{Category: "Fertilizantes", ExecutedUSD: summary.FertilizantesCostUSD, InvestedUSD: summary.FertilizantesInvertidosUSD, StockUSD: summary.FertilizantesStockUSD},
-		{Category: "Labores", ExecutedUSD: summary.LaboresCostUSD, InvestedUSD: summary.LaboresInvertidosUSD, StockUSD: decimal.Zero},
+		{Category: "Labores", ExecutedUSD: summary.LaboresCostUSD, InvestedUSD: summary.LaboresInvertidosUSD, StockUSD: summary.LaboresStockUSD},
 	}
 
 	return &models.ManagementBalanceModel{

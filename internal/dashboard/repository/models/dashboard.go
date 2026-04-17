@@ -163,6 +163,9 @@ type ManagementBalanceSummary struct {
 	FertilizantesInvertidosUSD decimal.Decimal `gorm:"column:fertilizantes_invertidos_usd"`
 	FertilizantesStockUSD      decimal.Decimal `gorm:"column:fertilizantes_stock_usd"`
 	LaboresInvertidosUSD       decimal.Decimal `gorm:"column:labores_invertidos_usd"`
+	LaboresStockUSD            decimal.Decimal `gorm:"column:labores_stock_usd"`
+	ArriendoStockUSD           decimal.Decimal `gorm:"column:arriendo_stock_usd"`
+	EstructuraStockUSD         decimal.Decimal `gorm:"column:estructura_stock_usd"`
 }
 
 // ManagementBalanceBreakdown representa el desglose del balance por categoría
