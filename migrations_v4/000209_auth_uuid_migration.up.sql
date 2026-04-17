@@ -46,6 +46,8 @@ ALTER TABLE public.project_investors DROP CONSTRAINT IF EXISTS fk_project_invest
 ALTER TABLE public.project_investors DROP CONSTRAINT IF EXISTS fk_project_investors_updated_by;
 ALTER TABLE public.project_investors DROP CONSTRAINT IF EXISTS fk_project_investors_deleted_by;
 
+ALTER TABLE public.work_order_drafts DROP CONSTRAINT IF EXISTS fk_work_order_drafts_reviewed_by;
+
 -- =============================================================================
 -- 2. Convert actor columns to text
 -- =============================================================================
@@ -136,6 +138,8 @@ ALTER TABLE public.business_parameters ALTER COLUMN deleted_by TYPE text USING d
 ALTER TABLE public.invoices ALTER COLUMN created_by TYPE text USING created_by::text;
 ALTER TABLE public.invoices ALTER COLUMN updated_by TYPE text USING updated_by::text;
 ALTER TABLE public.invoices ALTER COLUMN deleted_by TYPE text USING deleted_by::text;
+
+ALTER TABLE public.work_order_drafts ALTER COLUMN reviewed_by TYPE text USING reviewed_by::text;
 
 ALTER TABLE public.crop_commercializations ALTER COLUMN created_by TYPE text USING created_by::text;
 ALTER TABLE public.crop_commercializations ALTER COLUMN updated_by TYPE text USING updated_by::text;
