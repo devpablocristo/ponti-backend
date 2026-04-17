@@ -33,7 +33,8 @@
       "Bash(git mv *)",
       "Bash(bash scripts/db/db_migrate_up.sh)",
       "Bash(psql -h 127.0.0.1 -p 5434 -U soalen-db-v3 -d new_ponti_db_dev -tAc ' *)",
-      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -tAc ' *)"
+      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -tAc ' *)",
+      "Bash(psql -h 127.0.0.1 -p 5434 -U soalen-db-v3 -d new_ponti_db_dev -c ' *)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
