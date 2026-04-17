@@ -1,0 +1,128 @@
+name: Clone STAGING to DEV (schema + data)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: clone-staging-to-dev
+  cancel-in-progress: false
+
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      DB_USER: ${{ vars.DB_USER_DEV }}
+      SECRET_DB_PASSWORD_NAME: db-password-dev
+      CLOUDSQL_PROXY_PORT: "55432"
+      EXPECTED_GCP_PROJECT_ID: new-ponti-dev
+      EXPECTED_DB_INSTANCE_NAME_DEV: new-ponti-db-dev
+      EXPECTED_DEV_DB_NAME: new_ponti_db_dev
+      EXPECTED_STG_DB_NAME: new_ponti_db_staging
+      DB_INSTANCE_NAME_DEV: ${{ vars.DB_INSTANCE_NAME_DEV }}
+      DB_NAME_DEV: ${{ vars.DB_NAME_DEV }}
+      DB_NAME_STG: ${{ vars.DB_NAME_STG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Guardrails
+        run: |
+          set -euo pipefail
+          [[ "$GCP_PROJECT_ID" == "$EXPECTED_GCP_PROJECT_ID" ]] || { echo "::error::GCP_PROJECT_ID inesperado"; exit 1; }
+          [[ "$DB_INSTANCE_NAME_DEV" == "$EXPECTED_DB_INSTANCE_NAME_DEV" ]] || { echo "::error::DB_INSTANCE_NAME_DEV inesperado"; exit 1; }
+          [[ "$DB_NAME_DEV" == "$EXPECTED_DEV_DB_NAME" ]] || { echo "::error::DB_NAME_DEV inesperado"; exit 1; }
+          [[ "$DB_NAME_STG" == "$EXPECTED_STG_DB_NAME" ]] || { echo "::error::DB_NAME_STG inesperado"; exit 1; }
+          [[ "$DB_NAME_DEV" != "$DB_NAME_STG" ]] || { echo "::error::DEV y STG son iguales"; exit 1; }
+          db_lower="$(printf '%s' "$DB_NAME_DEV" | tr '[:upper:]' '[:lower:]')"
+          [[ "$db_lower" != *prod* && "$db_lower" != *stg* && "$db_lower" != *staging* ]] || { echo "::error::DB_NAME_DEV peligroso"; exit 1; }
+
+      - name: Resolve DB password
+        run: |
+          set -euo pipefail
+          db_password="$(gcloud secrets versions access latest --project="$GCP_PROJECT_ID" --secret="$SECRET_DB_PASSWORD_NAME")"
+          echo "::add-mask::$db_password"
+          echo "DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          set -euo pipefail
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-clone >/dev/null 2>&1 || true
+          docker run -d --name cloudsql-proxy-clone \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 --port 5432 --token "$token" \
+            "${GCP_PROJECT_ID}:${GCP_REGION}:${DB_INSTANCE_NAME_DEV}" >/dev/null
+
+          for i in {1..30}; do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Proxy no listo"; exit 1
+
+      - name: Dump STAGING (schema + data)
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" pg_dump \
+            -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" \
+            -d "$DB_NAME_STG" \
+            --format=custom --no-owner --no-acl \
+            --file=/tmp/staging_full.dump
+
+      - name: Drop + recreate DEV
+        run: |
+          set -euo pipefail
+          gcloud sql databases delete "$DB_NAME_DEV" \
+            --project="$GCP_PROJECT_ID" --instance="$DB_INSTANCE_NAME_DEV" --quiet || true
+          gcloud sql databases create "$DB_NAME_DEV" \
+            --project="$GCP_PROJECT_ID" --instance="$DB_INSTANCE_NAME_DEV"
+
+      - name: Restore staging into DEV (schema + data)
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" pg_restore \
+            -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            --no-owner --no-acl \
+            --exit-on-error \
+            /tmp/staging_full.dump
+
+      - name: Show migration version
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -c "SELECT version, dirty FROM schema_migrations;"
+
+      - name: Stop Cloud SQL Proxy
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-clone >/dev/null 2>&1 || true
