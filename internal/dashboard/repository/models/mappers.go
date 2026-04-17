@@ -432,6 +432,9 @@ func (m *DashboardModelMapper) managementBalanceSummaryToDomain(model *Managemen
 		FertilizantesInvertidosUSD: model.FertilizantesInvertidosUSD,
 		FertilizantesStockUSD:      model.FertilizantesStockUSD,
 		LaboresInvertidosUSD:       model.LaboresInvertidosUSD,
+		LaboresStockUSD:            model.LaboresStockUSD,
+		ArriendoStockUSD:           model.ArriendoStockUSD,
+		EstructuraStockUSD:         model.EstructuraStockUSD,
 	}
 }
 
