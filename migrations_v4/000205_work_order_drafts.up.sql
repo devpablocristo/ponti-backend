@@ -114,11 +114,6 @@ ALTER TABLE public.work_order_drafts
     ON UPDATE CASCADE ON DELETE RESTRICT;
 
 ALTER TABLE public.work_order_drafts
-    ADD CONSTRAINT fk_work_order_drafts_reviewed_by
-    FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
-    ON UPDATE CASCADE ON DELETE RESTRICT;
-
-ALTER TABLE public.work_order_drafts
     ADD CONSTRAINT fk_work_order_drafts_published_work_order
     FOREIGN KEY (published_work_order_id) REFERENCES public.workorders(id)
     ON UPDATE CASCADE ON DELETE RESTRICT;
