@@ -136,6 +136,7 @@ Desktop.ini
 
 # Debugging binaries
 __debug_bin*
+*.test
 
 *.code-workspace
 *.dump
