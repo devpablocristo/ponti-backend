@@ -15,10 +15,17 @@ import (
 // ParseActor extrae el actor (email/sub) desde el contexto.
 func ParseActor(c *gin.Context) (string, error) {
 	actor, err := sharedmodels.ActorFromContext(c.Request.Context())
-	if err != nil {
-		return "", domainerr.Forbidden("invalid actor")
+	if err == nil && actor != "" {
+		return actor, nil
 	}
-	return actor, nil
+
+	if v, exists := c.Get(string(ctxkeys.Actor)); exists {
+		if s, ok := v.(string); ok && s != "" {
+			return s, nil
+		}
+	}
+
+	return "", domainerr.Forbidden("invalid actor")
 }
 
 // ParseOrgID extrae el org_id (uuid) desde el contexto.

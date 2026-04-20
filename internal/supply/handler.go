@@ -108,7 +108,7 @@ func (h *Handler) Routes() {
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
-	supplyMovements := r.Group(baseURL + "/projects/:project_id/supply-movements")
+	supplyMovements := r.Group(baseURL+"/projects/:project_id/supply-movements", h.mws.GetValidation()...)
 	{
 		supplyMovements.POST("", h.CreateSupplyMovement)
 		supplyMovements.POST("/import", h.ImportSupplyMovements)
@@ -120,7 +120,7 @@ func (h *Handler) Routes() {
 	}
 
 	// Editor de stock: mismas rutas que supply-movements, semántica para vista Stock
-	stockMovements := r.Group(baseURL + "/projects/:project_id/stock-movements")
+	stockMovements := r.Group(baseURL+"/projects/:project_id/stock-movements", h.mws.GetValidation()...)
 	{
 		stockMovements.POST("", h.CreateSupplyMovement)
 		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
