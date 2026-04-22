@@ -3,26 +3,24 @@ set -euo pipefail
 
 # Reset de DB local en contenedor
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
-COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 
-set -a
-source "${ENV_FILE}"
-set +a
+# shellcheck disable=SC1091
+source "${ROOT_DIR}/scripts/lib/backend_env.sh"
+load_backend_env "${ROOT_DIR}"
 
 echo "Levantando DB..."
-docker compose -f "${COMPOSE_FILE}" up -d ponti-db
+"${ROOT_DIR}/scripts/compose_with_env.sh" up -d ponti-db
 
 echo "Esperando DB disponible..."
 for i in {1..30}; do
-  if docker compose -f "${COMPOSE_FILE}" exec -T ponti-db pg_isready -U "${DB_USER}" -d "postgres" -p 5432 >/dev/null 2>&1; then
+  if "${ROOT_DIR}/scripts/compose_with_env.sh" exec -T ponti-db pg_isready -U "${DB_USER}" -d "postgres" -p 5432 >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
 echo "Recreando base de datos ${DB_NAME}..."
-docker compose -f "${COMPOSE_FILE}" exec -T ponti-db psql -U "${DB_USER}" -d "postgres" -v ON_ERROR_STOP=1 <<SQL
+"${ROOT_DIR}/scripts/compose_with_env.sh" exec -T ponti-db psql -U "${DB_USER}" -d "postgres" -v ON_ERROR_STOP=1 <<SQL
 -- Evitar "database is being accessed by other users" cuando quedó alguna sesión colgada
 -- (ej. backend local, UI, pgadmin, etc.).
 SELECT pg_terminate_backend(pid)

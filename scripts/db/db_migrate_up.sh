@@ -3,12 +3,10 @@ set -euo pipefail
 
 # Ejecuta migraciones v2 usando contenedor migrate
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
-COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 
-set -a
-source "${ENV_FILE}"
-set +a
+# shellcheck disable=SC1091
+source "${ROOT_DIR}/scripts/lib/backend_env.sh"
+load_backend_env "${ROOT_DIR}"
 
 MIGRATIONS_PATH="${ROOT_DIR}/migrations_v4"
 MIGRATIONS_RUN_PATH="$(mktemp -d)"
@@ -18,6 +16,7 @@ rm -f "${MIGRATIONS_RUN_PATH}/000000_baseline_schema.up.sql" \
       "${MIGRATIONS_RUN_PATH}/000000_baseline_schema.down.sql"
 
 echo "Aplicando migraciones v4..."
+"${ROOT_DIR}/scripts/db/db_ensure_exists.sh" >/dev/null
 docker run --rm \
   --network "${ROOT_DIR##*/}_app-network" \
   -v "${MIGRATIONS_RUN_PATH}:/migrations" \

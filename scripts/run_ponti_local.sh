@@ -61,12 +61,9 @@ ensure_env_file "$BACKEND_DIR"
 ensure_env_file "$FRONTEND_DIR/api"
 ensure_env_file "$AI_DIR"
 
-# Importante: este script NO setea defaults de infraestructura ni modifica .env.
-# La configuración debe vivir en los archivos `.env` de cada servicio (local)
-# o en las variables de entorno del ambiente (dev/staging/prod).
-set -a
-source "$BACKEND_DIR/.env"
-set +a
+# shellcheck disable=SC1091
+source "$BACKEND_DIR/scripts/lib/backend_env.sh"
+load_backend_env "$BACKEND_DIR"
 
 # Si DB_PORT=5432 pero el 5432 está ocupado, fallar con instrucción clara.
 if [[ "${DB_PORT:-5432}" == "5432" ]]; then
@@ -86,7 +83,7 @@ if ! grep -qE '^IDENTITY_PLATFORM_PROJECT_ID=' "$FRONTEND_DIR/api/.env" 2>/dev/n
 fi
 
 echo "Bajando contenedores antes de levantar..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
+"$BACKEND_DIR/scripts/compose_with_env.sh" down --remove-orphans
 docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans -v
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
   # A veces Vite/Yarn se quedan colgados y el stop falla; hacer down "best effort".
@@ -99,10 +96,11 @@ echo "Verificando conflictos de puerto PostgreSQL..."
 stop_system_postgres
 
 echo "Levantando backend (DB + migraciones) con Docker..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d ponti-db
+"$BACKEND_DIR/scripts/compose_with_env.sh" up -d ponti-db
+"$BACKEND_DIR/scripts/db/db_ensure_exists.sh"
 
 echo "Levantando backend API (docker)..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d --build ponti-api
+"$BACKEND_DIR/scripts/compose_with_env.sh" up -d --build ponti-api
 
 if ! http_ok "http://localhost:8080/ping"; then
   echo "WARN: backend API aún no responde en :8080 (puede tardar por build/migrate inicial)." >&2
@@ -131,7 +129,7 @@ else
 fi
 
 echo "Todos los servicios fueron lanzados. Mostrando logs (Ctrl+C para salir)..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" logs -f &
+"$BACKEND_DIR/scripts/compose_with_env.sh" logs -f &
 docker compose -f "$AI_DIR/docker-compose.yml" logs -f &
 docker compose -f "$FRONTEND_DIR/docker-compose.yml" logs -f &
 wait

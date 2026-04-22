@@ -3908,12 +3908,18 @@ CREATE VIEW v4_report.dashboard_metrics_field AS
 CREATE VIEW v4_report.dashboard_operational_indicators AS
  SELECT id AS project_id,
     v4_ssot.first_workorder_date_for_project(id) AS start_date,
-    v4_ssot.last_workorder_date_for_project(id) AS end_date,
+    lw.date AS end_date,
     v4_core.calculate_campaign_closing_date(v4_ssot.last_workorder_date_for_project(id)) AS campaign_closing_date,
     v4_ssot.first_workorder_number_for_project(id) AS first_workorder_id,
-    v4_ssot.last_workorder_number_for_project(id) AS last_workorder_id,
+    (lw.number)::text AS last_workorder_id,
     v4_ssot.last_stock_count_date_for_project(id) AS last_stock_count_date
-   FROM public.projects p
+   FROM (public.projects p
+     LEFT JOIN LATERAL ( SELECT w.date,
+            w.number
+           FROM public.workorders w
+          WHERE ((w.project_id = p.id) AND (w.deleted_at IS NULL))
+          ORDER BY w.created_at DESC, w.id DESC
+         LIMIT 1) lw ON (true))
   WHERE (deleted_at IS NULL);
 
 
@@ -3926,17 +3932,33 @@ CREATE VIEW v4_report.dashboard_operational_indicators_field AS
     p.customer_id,
     p.campaign_id,
     f.id AS field_id,
-    min(w.date) AS start_date,
-    max(w.date) AS end_date,
-    v4_core.calculate_campaign_closing_date(max(w.date)) AS campaign_closing_date,
-    min((w.number)::text) AS first_workorder_id,
-    max((w.number)::text) AS last_workorder_id,
+    ( SELECT w2.date
+           FROM public.workorders w2
+          WHERE ((w2.field_id = f.id) AND (w2.deleted_at IS NULL))
+          ORDER BY w2.date ASC, w2.id ASC
+         LIMIT 1) AS start_date,
+    lw.date AS end_date,
+    v4_core.calculate_campaign_closing_date(( SELECT w2.date
+           FROM public.workorders w2
+          WHERE ((w2.field_id = f.id) AND (w2.deleted_at IS NULL))
+          ORDER BY w2.date DESC, w2.id DESC
+         LIMIT 1)) AS campaign_closing_date,
+    ( SELECT (w2.number)::text
+           FROM public.workorders w2
+          WHERE ((w2.field_id = f.id) AND (w2.deleted_at IS NULL))
+          ORDER BY w2.date ASC, w2.id ASC
+         LIMIT 1) AS first_workorder_id,
+    (lw.number)::text AS last_workorder_id,
     v4_ssot.last_stock_count_date_for_project(p.id) AS last_stock_count_date
    FROM ((public.projects p
      JOIN public.fields f ON (((f.project_id = p.id) AND (f.deleted_at IS NULL))))
-     LEFT JOIN public.workorders w ON (((w.field_id = f.id) AND (w.deleted_at IS NULL))))
-  WHERE (p.deleted_at IS NULL)
-  GROUP BY p.id, p.customer_id, p.campaign_id, f.id;
+     LEFT JOIN LATERAL ( SELECT w2.date,
+            w2.number
+           FROM public.workorders w2
+          WHERE ((w2.field_id = f.id) AND (w2.deleted_at IS NULL))
+          ORDER BY w2.created_at DESC, w2.id DESC
+         LIMIT 1) lw ON (true))
+  WHERE (p.deleted_at IS NULL);
 
 
 --
@@ -6585,5 +6607,3 @@ ALTER TABLE ONLY public.workorders
 --
 -- PostgreSQL database dump complete
 --
-
-

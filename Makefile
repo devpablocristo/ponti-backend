@@ -6,6 +6,8 @@ VERSION            := 1.0
 BUILD_DIR          := $(ROOT_DIR)/bin
 DOCKER_COMPOSE_YML := $(ROOT_DIR)/docker-compose.yml
 GO_MODULES_TOKEN   ?=
+PONTI_ENV_FILE     ?=
+PONTI_LOCAL_ENV    ?=
 
 # Recomiendo usar variables de entorno para la base de datos
 DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}
@@ -14,12 +16,12 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
-        run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
+        dev-main dev-develop run-api up-ponti-local up-ponti-stg-local up-ponti-dev-local down-ponti-local seed seed-dashboard db-staging-to-local db-staging-to-main-local db-reset-from-staging db-main-reset-from-staging db-reset-main db-reset-develop db-migrate-up-main db-migrate-up-develop db-copy-current-dev-to-develop-local staging-db-2-dev-db e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
 
 define compose_cmd
-GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
+PONTI_ENV_FILE="$(PONTI_ENV_FILE)" PONTI_LOCAL_ENV="$(PONTI_LOCAL_ENV)" GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" $(ROOT_DIR)/scripts/compose_with_env.sh
 endef
 
 # Crea una nueva migración usando la variable NAME
@@ -62,7 +64,13 @@ run-api:
 
 up-ponti-local:
 	@echo "Starting full local stack (backend + frontend + ai)..."
-	@if [ -f ./scripts/run-ponti-local.sh ]; then bash ./scripts/run-ponti-local.sh; else bash ./scripts/run_ponti_local.sh; fi
+	@if [ -f ./scripts/run-ponti-local.sh ]; then PONTI_ENV_FILE="$(PONTI_ENV_FILE)" PONTI_LOCAL_ENV="$(PONTI_LOCAL_ENV)" bash ./scripts/run-ponti-local.sh; else PONTI_ENV_FILE="$(PONTI_ENV_FILE)" PONTI_LOCAL_ENV="$(PONTI_LOCAL_ENV)" bash ./scripts/run_ponti_local.sh; fi
+
+up-ponti-stg-local:
+	@PONTI_LOCAL_ENV=stg $(MAKE) up-ponti-local
+
+up-ponti-dev-local:
+	@PONTI_LOCAL_ENV=dev $(MAKE) up-ponti-local
 
 down-ponti-local:
 	@echo "Stopping full local stack (backend + frontend + ai)..."
@@ -83,12 +91,21 @@ db-staging-to-local:
 	@echo "Downloading GCP STAGING and restoring data-only to local..."
 	@echo "Asegurando que la DB local esté levantada..."
 	@echo "Tip: si no seteás SRC_PASS, el script intenta leer db-password-dev desde Secret Manager (requiere gcloud auth)."
-	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
+	@PONTI_ENV_FILE="$(PONTI_ENV_FILE)" $(ROOT_DIR)/scripts/compose_with_env.sh up -d ponti-db 2>/dev/null || true
 	@bash ./scripts/db/db_staging_to_local.sh
+
+db-staging-to-main-local:
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-staging-to-local
 
 # Reset local DB + migraciones + carga data-only desde STAGING
 db-reset-from-staging: db-reset db-migrate-up db-staging-to-local
 	@echo "Local DB reset + migrate + staging data-only restore completed."
+
+db-main-reset-from-staging:
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-reset
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-migrate-up
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-staging-to-local
+	@echo "Main/stg local DB reset + migrate + staging data-only restore completed."
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:
@@ -141,10 +158,32 @@ dev:
 	$(compose_cmd) up --build -d ponti-db
 	@echo "Waiting for DB to be healthy..."
 	@until $(compose_cmd) exec ponti-db pg_isready -U $${DB_USER:-admin} -q 2>/dev/null; do sleep 1; done
+	@PONTI_ENV_FILE="$(PONTI_ENV_FILE)" bash ./scripts/db/db_ensure_exists.sh
 	$(compose_cmd) up --build ponti-api
+
+dev-main:
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) dev
+
+dev-develop:
+	@PONTI_ENV_FILE=.env.develop.local $(MAKE) dev
 
 dev-logs:
 	$(compose_cmd) logs -f ponti-api
+
+db-reset-main:
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-reset
+
+db-reset-develop:
+	@PONTI_ENV_FILE=.env.develop.local $(MAKE) db-reset
+
+db-migrate-up-main:
+	@PONTI_ENV_FILE=.env.main.local $(MAKE) db-migrate-up
+
+db-migrate-up-develop:
+	@PONTI_ENV_FILE=.env.develop.local $(MAKE) db-migrate-up
+
+db-copy-current-dev-to-develop-local:
+	@bash ./scripts/db/db_copy_local.sh new_ponti_db_dev new_ponti_db_develop_local
 
 # --------------------------------------------------
 # Docker Compose
