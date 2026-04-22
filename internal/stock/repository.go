@@ -3,7 +3,6 @@ package stock
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -95,13 +94,6 @@ func cutoffDateParam(cutoffDate time.Time) any {
 		return nil
 	}
 	return cutoffDate.Format("2006-01-02")
-}
-
-func getNotFoundOrInternal(err error, notFoundMsg, internalMsg string) error {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return domainerr.NotFound(notFoundMsg)
-	}
-	return domainerr.Internal(internalMsg)
 }
 
 func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(context.Context) error) error {
