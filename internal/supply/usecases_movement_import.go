@@ -118,19 +118,7 @@ func (u *UseCases) validateSupplyMovementImport(
 			continue
 		}
 
-		if movement.MovementType == domain.STOCK {
-			if movement.Quantity.LessThan(decimal.Zero) {
-				failures = append(failures, SupplyMovementImportFailure{
-					Index:           i,
-					RowIndex:        importRowIndex(i),
-					SupplyID:        movement.Supply.ID,
-					ReferenceNumber: movement.ReferenceNumber,
-					Code:            "validation_error",
-					Message:         "quantity must be greater than or equal to 0",
-				})
-				continue
-			}
-		} else if movement.Quantity.LessThanOrEqual(decimal.Zero) {
+		if movement.Quantity.LessThanOrEqual(decimal.Zero) {
 			failures = append(failures, SupplyMovementImportFailure{
 				Index:           i,
 				RowIndex:        importRowIndex(i),
@@ -271,22 +259,10 @@ func (u *UseCases) validateSupplyMovementImport(
 }
 
 func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, movement *domain.SupplyMovement) error {
-	switch movement.MovementType {
-	case domain.STOCK:
-		_, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
-		if err != nil {
-			return err
-		}
-		if isFirst {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
-		}
-		return nil
-	default:
-		if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
-			return err
-		}
-		return u.validateSupplyMovementResolved(ctx, movement)
+	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
+		return err
 	}
+	return u.validateSupplyMovementResolved(ctx, movement)
 }
 
 func (u *UseCases) resolveImportProvider(ctx context.Context, provider *providerdomain.Provider) (*providerdomain.Provider, error) {
@@ -318,14 +294,13 @@ func (u *UseCases) resolveImportProvider(ctx context.Context, provider *provider
 
 func validateImportMovementType(movementType string) error {
 	switch movementType {
-	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.STOCK, domain.RETURN_MOVEMENT:
+	case domain.INTERNAL_MOVEMENT, domain.OFFICIAL_INVOICE, domain.RETURN_MOVEMENT:
 		return nil
 	default:
 		return domainerr.Newf(domainerr.KindValidation,
-			"must be a valid type [%s, %s, %s, %s]",
+			"must be a valid type [%s, %s, %s]",
 			domain.INTERNAL_MOVEMENT,
 			domain.OFFICIAL_INVOICE,
-			domain.STOCK,
 			domain.RETURN_MOVEMENT,
 		)
 	}

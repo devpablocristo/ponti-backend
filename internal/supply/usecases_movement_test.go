@@ -536,10 +536,6 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 			return 101, nil
 		})
 
-	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), destinationProjectID, destSupplyID, int64(11)).
-		Return(&stockdomain.Stock{ID: 202, RealStockUnits: decimal.NewFromInt(3)}, false, nil)
-
 	mockRepo.EXPECT().
 		CreateSupplyMovement(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
@@ -626,16 +622,6 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 			DoAndReturn(func(_ context.Context, m *domain.SupplyMovement) (int64, error) {
 				outMovementCreated = m
 				return 101, nil
-			}),
-		mockStock.EXPECT().
-			GetLastStockByProjectInvestorID(gomock.Any(), destProjectID, destSupplyID, int64(11)).
-			Return(nil, true, nil),
-		mockStock.EXPECT().
-			CreateStock(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, s *stockdomain.Stock) (int64, error) {
-				assert.Equal(t, destProjectID, s.Project.ID)
-				assert.Equal(t, destSupplyID, s.Supply.ID)
-				return 202, nil
 			}),
 		mockRepo.EXPECT().
 			CreateSupplyMovement(gomock.Any(), gomock.Any()).
@@ -1255,13 +1241,13 @@ func TestCreateSupplyMovement_ReturnMovement_CreatesNegativeEntry(t *testing.T) 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(501), id)
 	if assert.NotNil(t, created) {
-		assert.Equal(t, stockID, created.StockId)
+		assert.Equal(t, int64(0), created.StockId)
 		assert.True(t, created.Quantity.Equal(decimal.NewFromInt(-3)))
 		assert.True(t, created.IsEntry)
 	}
 }
 
-func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
+func TestImportSupplyMovements_RejectsLegacyStockMovementType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
@@ -1273,34 +1259,12 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 	supplyID := int64(10)
 	investorID := int64(5)
 	providerID := int64(7)
-	stockID := int64(99)
 	date := mustTime(t, "2026-03-06T00:00:00Z")
 
 	mockRepo.EXPECT().
 		ExecuteInTransaction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
 			return fn(ctx)
-		})
-	mockRepo.EXPECT().
-		GetSupply(gomock.Any(), supplyID).
-		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
-	mockRepo.EXPECT().
-		GetInvestor(gomock.Any(), investorID).
-		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
-	mockRepo.EXPECT().
-		GetProvider(gomock.Any(), providerID).
-		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
-	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
-		Return(&stockdomain.Stock{ID: stockID, RealStockUnits: decimal.NewFromInt(4)}, false, nil).
-		Times(2)
-	mockStock.EXPECT().
-		UpdateRealStockUnits(gomock.Any(), stockID, gomock.Any()).
-		DoAndReturn(func(_ context.Context, id int64, stock *stockdomain.Stock) error {
-			assert.Equal(t, stockID, id)
-			assert.True(t, stock.RealStockUnits.Equal(decimal.Zero))
-			assert.True(t, stock.HasRealStockCount)
-			return nil
 		})
 
 	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{{
@@ -1316,8 +1280,11 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 	}})
 
 	assert.NoError(t, err)
-	assert.Nil(t, failures)
-	assert.Equal(t, []int64{0}, ids)
+	assert.Nil(t, ids)
+	if assert.Len(t, failures, 1) {
+		assert.Equal(t, "validation_error", failures[0].Code)
+		assert.Contains(t, failures[0].Message, "must be a valid type")
+	}
 }
 
 func TestUpdateSupplyMovement_ReassignsStockByInvestor(t *testing.T) {
@@ -1349,7 +1316,7 @@ func TestUpdateSupplyMovement_ReassignsStockByInvestor(t *testing.T) {
 	mockRepo.EXPECT().
 		UpdateSupplyMovement(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, movement *domain.SupplyMovement) error {
-			assert.Equal(t, targetStockID, movement.StockId)
+			assert.Equal(t, int64(0), movement.StockId)
 			assert.Equal(t, supplyID, movement.Supply.ID)
 			assert.Equal(t, investorID, movement.Investor.ID)
 			return nil

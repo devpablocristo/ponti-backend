@@ -118,17 +118,6 @@ func (h *Handler) Routes() {
 		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementByID)
 		supplyMovements.DELETE("/:supply_movement_id", h.DeleteSupplyMovement)
 	}
-
-	// Editor de stock: mismas rutas que supply-movements, semántica para vista Stock
-	stockMovements := r.Group(baseURL+"/projects/:project_id/stock-movements", h.mws.GetValidation()...)
-	{
-		stockMovements.POST("", h.CreateSupplyMovement)
-		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
-		stockMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
-		stockMovements.GET("/providers", h.GetProviders)
-		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementByID)
-		stockMovements.DELETE("/:stock_movement_id", h.DeleteSupplyMovement)
-	}
 }
 
 func (h *Handler) CreateSupply(c *gin.Context) {

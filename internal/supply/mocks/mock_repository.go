@@ -7,6 +7,7 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	domain2 "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
@@ -570,6 +571,21 @@ func (m *MockStockUseCasesPort) GetLastStockByProjectID(ctx context.Context, pro
 func (mr *MockStockUseCasesPortMockRecorder) GetLastStockByProjectID(ctx, projectId, supplyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastStockByProjectID), ctx, projectId, supplyId)
+}
+
+// GetStockBySupplyID mocks base method.
+func (m *MockStockUseCasesPort) GetStockBySupplyID(ctx context.Context, projectId, supplyId int64, cutoffDate time.Time) (*domain0.Stock, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStockBySupplyID", ctx, projectId, supplyId, cutoffDate)
+	ret0, _ := ret[0].(*domain0.Stock)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStockBySupplyID indicates an expected call of GetStockBySupplyID.
+func (mr *MockStockUseCasesPortMockRecorder) GetStockBySupplyID(ctx, projectId, supplyId, cutoffDate interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStockBySupplyID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetStockBySupplyID), ctx, projectId, supplyId, cutoffDate)
 }
 
 // UpdateRealStockUnits mocks base method.

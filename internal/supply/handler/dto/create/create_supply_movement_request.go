@@ -88,14 +88,12 @@ func (r *CreateSupplyMovementEntryRequest) ToDomain(projectId int64, userId *str
 func validateMovementType(movementType string) error {
 	if movementType != domain.INTERNAL_MOVEMENT &&
 		movementType != domain.OFFICIAL_INVOICE &&
-		movementType != domain.STOCK &&
 		movementType != domain.RETURN_MOVEMENT {
 		return domainerr.Newf(
 			domainerr.KindValidation,
-			"must be a valid type [%s, %s, %s, %s]",
+			"must be a valid type [%s, %s, %s]",
 			domain.INTERNAL_MOVEMENT,
 			domain.OFFICIAL_INVOICE,
-			domain.STOCK,
 			domain.RETURN_MOVEMENT,
 		)
 	}
@@ -103,12 +101,6 @@ func validateMovementType(movementType string) error {
 }
 
 func validateQuantity(quantity decimal.Decimal, movementType string) error {
-	if movementType == domain.STOCK {
-		if quantity.LessThan(decimal.Zero) {
-			return domainerr.Validation("quantity must be greater than or equal to 0")
-		}
-		return nil
-	}
 	if quantity.LessThanOrEqual(decimal.Zero) {
 		return domainerr.Validation("quantity must be greater than 0")
 	}
@@ -153,13 +145,11 @@ func validateProjectDestinationId(projectDestinationId int64, movementType strin
 }
 
 func validateProvider(provider ProviderRequest, movementType string) error {
-	if movementType == domain.STOCK {
-		if provider.ID < 0 {
-			return domainerr.Validation("invalid provider_id")
-		}
-		if provider.Name == "" {
-			return domainerr.Validation("The field 'provider_name' is required")
-		}
+	if provider.ID < 0 {
+		return domainerr.Validation("invalid provider_id")
+	}
+	if provider.ID == 0 && provider.Name == "" {
+		return domainerr.Validation("The field 'provider_name' is required")
 	}
 
 	return nil

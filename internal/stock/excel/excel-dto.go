@@ -10,13 +10,13 @@ import (
 type StockExcelDTO struct {
 	SupplyName      string     `excel:"INSUMO"`
 	ClassType       string     `excel:"RUBRO"`
-	InvestorName    string     `excel:"INVERSOR"`
 	EntryStock      float64    `excel:"INGRESADOS"`
+	OutStock        float64    `excel:"SALIDOS"`
 	Consumed        float64    `excel:"CONSUMIDOS"`
-	StockUnits      float64    `excel:"STOCK"`
-	RealStockUnits  float64    `excel:"STOCK REAL"`
+	StockUnits      float64    `excel:"STOCK SISTEMA"`
+	RealStockUnits  float64    `excel:"STOCK FISICO"`
 	StockDifference float64    `excel:"DIFERENCIA"`
-	CloseDate       *time.Time `excel:"FECHA DE CIERRE"`
+	LastCountAt     *time.Time `excel:"ULTIMO CONTEO"`
 	SupplyUnitPrice float64    `excel:"PRECIO U."`
 	TotalUSD        float64    `excel:"TOTAL U$"`
 }
@@ -25,18 +25,11 @@ func BuildExcelDTO(items []*domain.Stock) []StockExcelDTO {
 	out := make([]StockExcelDTO, 0, len(items))
 
 	for _, it := range items {
-		entry := it.GetEntryStock()
-		stockUnits := it.GetStockUnits()
 		diff := decimal.Zero
-if it.HasRealStockCount {
-	diff = it.GetStockDifference()
-}
-		total := it.GetTotalUSD()
-
-		investorName := ""
-		if it.Investor != nil {
-			investorName = it.Investor.Name
+		if it.HasRealStockCount {
+			diff = it.GetStockDifference()
 		}
+		total := it.GetTotalUSD()
 
 		supplyName := ""
 		classType := ""
@@ -50,13 +43,13 @@ if it.HasRealStockCount {
 		out = append(out, StockExcelDTO{
 			SupplyName:      supplyName,
 			ClassType:       classType,
-			InvestorName:    investorName,
-			EntryStock:      decToFloat(entry, 2),
+			EntryStock:      decToFloat(it.EntryStock, 2),
+			OutStock:        decToFloat(it.OutStock, 2),
 			Consumed:        decToFloat(it.Consumed, 2),
-			StockUnits:      decToFloat(stockUnits, 2),
+			StockUnits:      decToFloat(it.GetStockUnits(), 2),
 			RealStockUnits:  decToFloat(it.RealStockUnits, 2),
 			StockDifference: decToFloat(diff, 2),
-			CloseDate:       it.CloseDate,
+			LastCountAt:     it.LastCountAt,
 			SupplyUnitPrice: decToFloat(unitPrice, 2),
 			TotalUSD:        decToFloat(total, 2),
 		})

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
@@ -15,26 +16,27 @@ func TestGetStockDifferencePtr_ReturnsNilWhenNoRealCount(t *testing.T) {
 			UnitName: "Lt",
 			Price:    decimal.NewFromFloat(4.6),
 		},
-		Consumed:          decimal.NewFromInt(100),
+		StockUnits:        decimal.NewFromInt(100),
 		RealStockUnits:    decimal.Zero,
 		HasRealStockCount: false,
 	}
 
-	assert.Equal(t, decimal.NewFromInt(-100), stock.GetStockUnits())
+	assert.True(t, stock.GetStockUnits().Equal(decimal.NewFromInt(100)))
 	assert.Nil(t, stock.GetStockDifferencePtr())
 }
 
 func TestGetStockDifferencePtr_ReturnsDifferenceWhenRealCountExists(t *testing.T) {
+	now := time.Now().UTC()
 	stock := &Stock{
 		Supply: &supplydomain.Supply{
 			Name:     "Urea",
 			UnitName: "Kg",
 			Price:    decimal.NewFromInt(10),
 		},
-		SupplyMovements:   []supplydomain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(40)}},
-		Consumed:          decimal.NewFromInt(2),
+		StockUnits:        decimal.NewFromInt(38),
 		RealStockUnits:    decimal.NewFromInt(40),
 		HasRealStockCount: true,
+		LastCountAt:       &now,
 	}
 
 	diff := stock.GetStockDifferencePtr()

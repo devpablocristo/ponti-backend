@@ -10,7 +10,6 @@ import (
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"gorm.io/gorm"
@@ -86,9 +85,7 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 		Preload("Supply.Category").
 		Preload("Investor").
 		Preload("Provider").
-		Joins("JOIN stocks ON supply_movements.stock_id = stocks.id").
-		Joins("JOIN projects ON projects.id = stocks.project_id").
-		Where("projects.id = ?", projectId).
+		Where("supply_movements.project_id = ?", projectId).
 		Where("is_entry = TRUE").
 		Find(&modelSupplyMovements).
 		Error; err != nil {
@@ -324,10 +321,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			return err
 		}
 
-		if err := ensureOpenStockTriplet(tx, supplyModel.ProjectId, supplyModel.SupplyID, supplyModel.InvestorID); err != nil {
-			return err
-		}
-
 		// Verificar si es un movimiento interno
 		isInternalMovement := supplyModel.MovementType == "Movimiento interno" ||
 			supplyModel.MovementType == "Movimiento interno entrada"
@@ -347,17 +340,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				return domainerr.Internal("failed to find related movements")
 			}
 
-			// Recolectar todos los stock_ids afectados y validar que ninguno tenga un período cerrado.
-			affectedStocks := make(map[int64]bool)
-
-			for _, mov := range relatedMovements {
-				if err := ensureOpenStockTriplet(tx, mov.ProjectId, mov.SupplyID, mov.InvestorID); err != nil {
-					return err
-				}
-				affectedStocks[mov.StockId] = true
-			}
-
-			// Eliminar todos los registros relacionados
 			if err := tx.Where("movement_date = ? AND reference_number = ? AND supply_id = ? AND investor_id = ? AND provider_id = ?",
 				supplyModel.MovementDate,
 				supplyModel.ReferenceNumber,
@@ -368,61 +350,16 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				return domainerr.Internal("failed to delete related supply movements")
 			}
 
-			// Eliminar stocks afectados solo si no tienen más movimientos.
-			// Nota: `real_stock_units` representa "stock de campo" (recuento manual) y NO se recalcula
-			// automáticamente a partir de movimientos.
-			for stockID := range affectedStocks {
-				var remainingMovements []models.SupplyMovement
-				if err := tx.Where("stock_id = ?", stockID).
-					Find(&remainingMovements).Error; err != nil {
-					return domainerr.Internal("failed to get remaining movements")
-				}
-
-				if len(remainingMovements) == 0 {
-					if err := tx.Delete(&stockmodel.Stock{}, "id = ?", stockID).Error; err != nil {
-						return domainerr.Internal("failed to delete stock")
-					}
-				}
-			}
 		} else {
 			// Movimiento normal (no interno)
 			// Primero eliminar el movimiento
 			if err := tx.Delete(&models.SupplyMovement{}, "project_id = ? AND id = ?", projectId, supplyId).Error; err != nil {
 				return domainerr.Internal("failed to delete supply movement")
 			}
-
-			var remainingMovements []models.SupplyMovement
-			if err := tx.Where("stock_id = ?", supplyModel.StockId).
-				Find(&remainingMovements).Error; err != nil {
-				return domainerr.Internal("failed to get remaining movements")
-			}
-
-			if len(remainingMovements) == 0 {
-				if err := tx.Delete(&stockmodel.Stock{}, "id = ?", supplyModel.StockId).Error; err != nil {
-					return domainerr.Internal("failed to delete stock")
-				}
-			}
 		}
 
 		return nil
 	})
-}
-
-func ensureOpenStockTriplet(tx *gorm.DB, projectID, supplyID, investorID int64) error {
-	var stockModel stockmodel.Stock
-	err := tx.
-		Where("project_id = ?", projectID).
-		Where("supply_id = ?", supplyID).
-		Where("investor_id = ?", investorID).
-		Where("close_date IS NOT NULL").
-		First(&stockModel).Error
-	if err == nil {
-		return domainerr.Conflict("closed stock movement already exists for this supply in the project")
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	return nil
 }
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

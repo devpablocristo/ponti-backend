@@ -165,7 +165,7 @@ func TestDeleteSupply_ReturnsConflictWhenHistoricalReferencesExist(t *testing.T)
 	movement := &models.SupplyMovement{
 		StockId:              stock.ID,
 		Quantity:             decimal.NewFromInt(1),
-		MovementType:         "Stock",
+		MovementType:         "Remito oficial",
 		MovementDate:         &movementDate,
 		ReferenceNumber:      fmt.Sprintf("TEST-REF-%d", suffix),
 		ProjectId:            project.ID,

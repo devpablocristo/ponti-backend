@@ -82,12 +82,12 @@ func (usmer *UpdateSupplyMovementEntryRequest) ToDomain(projectId int64, userId 
 func validateMovementType(movementType *string) error {
 	if movementType != nil {
 		movementTypeS := *movementType
-		if movementTypeS != domain.INTERNAL_MOVEMENT && movementTypeS != domain.OFFICIAL_INVOICE && movementTypeS != domain.STOCK {
+		if movementTypeS != domain.INTERNAL_MOVEMENT && movementTypeS != domain.OFFICIAL_INVOICE && movementTypeS != domain.RETURN_MOVEMENT {
 			return domainerr.Newf(domainerr.KindValidation,
 				"must be a valid type [%s, %s, %s]",
 				domain.INTERNAL_MOVEMENT,
 				domain.OFFICIAL_INVOICE,
-				domain.STOCK,
+				domain.RETURN_MOVEMENT,
 			)
 
 		}
@@ -136,20 +136,13 @@ func validateProjectDestinationId(projectDestinationId *int64, movementType *str
 }
 
 func validateProvider(provider *ProviderRequest, movementType *string) error {
-	if provider != nil && movementType == nil {
-		return domainerr.Validation("movementType must be  " + domain.STOCK)
-	}
-
-	if provider != nil && movementType != nil {
-		movementTypeU := *movementType
+	if provider != nil {
 		providerU := *provider
-		if movementTypeU == domain.STOCK {
-			if *providerU.ID <= 0 {
-				return domainerr.Validation("invalid provider_id")
-			}
-			if *providerU.Name == "" {
-				return domainerr.Validation("The field 'provider_name' is required")
-			}
+		if providerU.ID != nil && *providerU.ID < 0 {
+			return domainerr.Validation("invalid provider_id")
+		}
+		if providerU.ID != nil && *providerU.ID == 0 && providerU.Name != nil && *providerU.Name == "" {
+			return domainerr.Validation("The field 'provider_name' is required")
 		}
 	}
 

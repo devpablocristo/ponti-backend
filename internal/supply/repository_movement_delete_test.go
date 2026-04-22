@@ -20,7 +20,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 )
 
-func TestDeleteSupplyMovement_DeletesOnlyMatchingInvestorStock(t *testing.T) {
+func TestDeleteSupplyMovement_LeavesLegacyStocksUntouched(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 
@@ -33,14 +33,14 @@ func TestDeleteSupplyMovement_DeletesOnlyMatchingInvestorStock(t *testing.T) {
 
 	var activeStockACount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", fixture.stockA.ID).Count(&activeStockACount).Error)
-	assert.Equal(t, int64(0), activeStockACount)
+	assert.Equal(t, int64(1), activeStockACount)
 
 	var activeStockBCount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", fixture.stockB.ID).Count(&activeStockBCount).Error)
 	assert.Equal(t, int64(1), activeStockBCount)
 }
 
-func TestDeleteSupplyMovement_ClosedStockCheckIsInvestorAware(t *testing.T) {
+func TestDeleteSupplyMovement_IgnoresClosedLegacyStocks(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 
@@ -65,7 +65,7 @@ func TestDeleteSupplyMovement_ClosedStockCheckIsInvestorAware(t *testing.T) {
 
 	var activeStockACount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", fixture.stockA.ID).Count(&activeStockACount).Error)
-	assert.Equal(t, int64(0), activeStockACount)
+	assert.Equal(t, int64(1), activeStockACount)
 
 	var closedStockCount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", closedStockOtherInvestor.ID).Count(&closedStockCount).Error)

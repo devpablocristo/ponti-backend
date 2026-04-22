@@ -46,6 +46,10 @@ func TestMigrationLock(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = sqlDB.Close() }()
 
+	secondDB, err := sql.Open("postgres", dsn)
+	require.NoError(t, err)
+	defer func() { _ = secondDB.Close() }()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -56,7 +60,7 @@ func TestMigrationLock(t *testing.T) {
 	// Intentar adquirir el mismo lock desde otra "conexión" (debería fallar)
 	lockID := hashDatabaseName(dbConfig.Name)
 	var acquired bool
-	err = sqlDB.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired)
+	err = secondDB.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired)
 	require.NoError(t, err)
 	assert.False(t, acquired, "Second lock attempt should fail (lock already held)")
 

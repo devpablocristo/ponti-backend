@@ -1,4 +1,4 @@
-// Package stock contiene casos de uso para stock.
+// Package stock contiene casos de uso para stock continuo por proyecto.
 package stock
 
 import (
@@ -12,7 +12,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
@@ -35,18 +34,8 @@ type BusinessInsightsNotifier interface {
 
 type RepositoryPort interface {
 	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
-	GetActiveStocksByProjectID(context.Context, int64) ([]*domain.Stock, error)
-	CreateStock(context.Context, *domain.Stock) (int64, error)
-	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
-	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
-	GetStockByID(context.Context, int64) (*domain.Stock, error)
-	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
-	GetLastStockByProjectInvestorID(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
-	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
-	GetStocksPeriods(context.Context, int64) ([]string, error)
-	ListAllStocks(context.Context) ([]*domain.Stock, error)
-	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
-	ExecuteInTransaction(context.Context, func(context.Context) error) error
+	GetStockBySupplyID(context.Context, int64, int64, time.Time) (*domain.Stock, error)
+	CreateStockCount(context.Context, *domain.StockCount) (int64, error)
 }
 
 type ExporterAdapterPort interface {
@@ -77,64 +66,103 @@ func (u *UseCases) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
 	u.notifier = n
 }
 
-func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
+func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, cutoffDate time.Time) ([]*domain.Stock, error) {
 	if err := u.validateProject(ctx, projectID); err != nil {
 		return nil, err
 	}
-	return u.repo.GetStocks(ctx, projectID, closeDate)
+	return u.repo.GetStocks(ctx, projectID, cutoffDate)
 }
 
-func (u *UseCases) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
+func (u *UseCases) GetStockBySupplyID(
+	ctx context.Context,
+	projectID int64,
+	supplyID int64,
+	cutoffDate time.Time,
+) (*domain.Stock, error) {
 	if err := u.validateProject(ctx, projectID); err != nil {
 		return nil, err
 	}
-	return u.repo.GetStocksPeriods(ctx, projectID)
-}
-
-func (u *UseCases) CreateStock(ctx context.Context, s *domain.Stock) (int64, error) {
-	return u.repo.CreateStock(ctx, s)
-}
-
-func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64, monthPeriod int64, yearPeriod int64, stock *domain.Stock) error {
-	if err := u.validateProject(ctx, projectID); err != nil {
-		return err
+	if supplyID <= 0 {
+		return nil, domainerr.Validation("supply_id must be greater than 0")
 	}
+	return u.repo.GetStockBySupplyID(ctx, projectID, supplyID, cutoffDate)
+}
 
-	activeStocks, err := u.repo.GetActiveStocksByProjectID(ctx, projectID)
+func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
+	stock, err := u.GetStockBySupplyID(ctx, projectID, supplyID, time.Time{})
 	if err != nil {
-		return err
-	}
-	if len(activeStocks) == 0 {
-		return domainerr.NotFound("no active stocks to close for project")
-	}
-
-	return u.repo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
-		if err := u.repo.UpdateCloseDateByProject(txCtx, projectID, stock); err != nil {
-			return err
+		if domainerr.IsNotFound(err) {
+			return nil, true, nil
 		}
-		for _, active := range activeStocks {
-			newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, active)
-			if _, err := u.repo.CreateStock(txCtx, &newStock); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+		return nil, false, err
+	}
+	return stock, false, nil
 }
 
-// UpdateRealStockUnits es el punto unico de mutacion del stock real. Persiste
-// el cambio y, si hay notifier configurado, evalua el trigger reactivo:
-//   - qty < 0  -> NotifyStockNegative (abre/refresca candidato de notificacion)
-//   - qty >= 0 -> MaybeResolveStockNegative (cierra candidato si estaba abierto)
-//
-// El error del notifier es loggeado pero no propaga: las notificaciones nunca
-// rompen el flow principal de stock.
-func (u *UseCases) UpdateRealStockUnits(ctx context.Context, stockID int64, stock *domain.Stock) error {
-	if err := u.repo.UpdateRealStockUnits(ctx, stockID, stock); err != nil {
-		return err
+func (u *UseCases) GetLastStockByProjectInvestorID(
+	ctx context.Context,
+	projectID int64,
+	supplyID int64,
+	_ int64,
+) (*domain.Stock, bool, error) {
+	return u.GetLastStockByProjectID(ctx, projectID, supplyID)
+}
+
+func (u *UseCases) CreateStock(context.Context, *domain.Stock) (int64, error) {
+	return 0, domainerr.Validation("legacy stock rows are disabled; use supply movements and stock counts")
+}
+
+func (u *UseCases) UpdateRealStockUnits(context.Context, int64, *domain.Stock) error {
+	return domainerr.Validation("legacy stock updates are disabled; use stock counts")
+}
+
+func (u *UseCases) CreateStockCount(
+	ctx context.Context,
+	projectID int64,
+	supplyID int64,
+	count *domain.StockCount,
+) (int64, error) {
+	if err := u.validateProject(ctx, projectID); err != nil {
+		return 0, err
 	}
-	u.evaluateStockNotification(ctx, stock)
-	return nil
+	if count == nil {
+		return 0, domainerr.Validation("stock count is nil")
+	}
+	if supplyID <= 0 {
+		return 0, domainerr.Validation("supply_id must be greater than 0")
+	}
+	if count.CountedAt.IsZero() {
+		return 0, domainerr.Validation("counted_at is required")
+	}
+	if count.CountedUnits.LessThan(decimal.Zero) {
+		return 0, domainerr.Validation("counted_units must be greater than or equal to 0")
+	}
+
+	stockSummary, err := u.repo.GetStockBySupplyID(ctx, projectID, supplyID, count.CountedAt)
+	if err != nil {
+		return 0, err
+	}
+
+	now := time.Now().UTC()
+	count.SupplyID = supplyID
+	if count.CreatedAt.IsZero() {
+		count.CreatedAt = now
+	}
+	if count.UpdatedAt.IsZero() {
+		count.UpdatedAt = now
+	}
+
+	id, err := u.repo.CreateStockCount(ctx, count)
+	if err != nil {
+		return 0, err
+	}
+
+	stockSummary.RealStockUnits = count.CountedUnits
+	stockSummary.HasRealStockCount = true
+	stockSummary.LastCountAt = &count.CountedAt
+	u.evaluateStockNotification(ctx, stockSummary)
+
+	return id, nil
 }
 
 // evaluateStockNotification dispara el notifier apropiado segun el signo del
@@ -163,80 +191,22 @@ func (u *UseCases) evaluateStockNotification(ctx context.Context, s *domain.Stoc
 	_ = u.notifier.MaybeResolveStockNegative(ctx, orgID, productID)
 }
 
-func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
-	if stockID <= 0 {
-		return nil, domainerr.Validation("stock_id must be greater than 0")
-	}
-	return u.repo.GetStockByID(ctx, stockID)
-}
-
-func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
-	return u.repo.GetLastStockByProjectID(ctx, projectID, supplyID)
-}
-
-func (u *UseCases) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
-	return u.repo.GetLastStockByProjectInvestorID(ctx, projectID, supplyID, investorID)
-}
-
-func (u *UseCases) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
-	return u.repo.UpdateUnitsConsumed(ctx, stockDomain, quantity)
-}
-
-func createNewStockPeriod(userID string, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
-	newMonthPeriod, newYearPeriod := startNewStockPeriod(monthPeriod, yearPeriod)
-	newStock := domain.Stock{
-		Project:     stock.Project,
-		YearPeriod:  newYearPeriod,
-		MonthPeriod: newMonthPeriod,
-		Supply:      stock.Supply,
-		Investor:    stock.Investor,
-		// "Stock de campo" es recuento manual, por default arranca en 0 en cada periodo.
-		InitialStock:   decimal.Zero,
-		RealStockUnits: decimal.Zero,
-		Base: shareddomain.Base{
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			CreatedBy: &userID,
-			UpdatedBy: &userID,
-		},
-	}
-	return newStock
-}
-
-func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
-	var newMonthPeriod int64
-	var newYearPeriod int64
-
-	if monthPeriod == 12 {
-		newMonthPeriod = 1
-		newYearPeriod = yearPeriod + 1
-	} else {
-		newMonthPeriod = monthPeriod + 1
-		newYearPeriod = yearPeriod
-	}
-	return newMonthPeriod, newYearPeriod
-}
-
-// ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
+// ExportStocksByProject exporta stocks filtrados por proyecto.
 func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
 	if u.excel == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
-	// Usar GetStocks con tiempo vacío para obtener stocks activos del proyecto
-	var emptyTime time.Time
 	if err := u.validateProject(ctx, projectID); err != nil {
 		return nil, err
 	}
-	items, err := u.repo.GetStocks(ctx, projectID, emptyTime)
+	items, err := u.repo.GetStocks(ctx, projectID, time.Time{})
 	if err != nil {
-		return nil, domainerr.Internal("list Stocks")
+		return nil, domainerr.Internal("list stocks")
 	}
-
 	if len(items) == 0 {
 		return nil, domainerr.NotFound("there is no data to export")
 	}
-
 	return u.excel.Export(ctx, items)
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
@@ -51,6 +52,7 @@ type ExporterAdapterPort interface {
 }
 
 type StockUseCasesPort interface {
+	GetStockBySupplyID(ctx context.Context, projectID int64, supplyID int64, cutoffDate time.Time) (*stockdomain.Stock, error)
 	GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*stockdomain.Stock, bool, error)
 	GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*stockdomain.Stock, bool, error)
 	CreateStock(ctx context.Context, s *stockdomain.Stock) (int64, error)

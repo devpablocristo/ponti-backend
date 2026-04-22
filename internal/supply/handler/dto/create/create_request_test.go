@@ -7,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 func TestSupplyRequest_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {
@@ -85,7 +85,7 @@ func TestFromDomain_IsPartialPrice_AlwaysSetsPointer(t *testing.T) {
 	}
 }
 
-func TestCreateSupplyMovementEntryRequest_Validate_AllowsZeroQuantityForStock(t *testing.T) {
+func TestCreateSupplyMovementEntryRequest_Validate_RejectsLegacyStockMovementType(t *testing.T) {
 	movementDate := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
 	req := &CreateSupplyMovementEntryRequest{
 		Quantity:     decimal.Zero,
@@ -101,7 +101,7 @@ func TestCreateSupplyMovementEntryRequest_Validate_AllowsZeroQuantityForStock(t 
 
 	err := req.Validate()
 
-	assert.NoError(t, err)
+	assert.Equal(t, "must be a valid type [Movimiento interno, Remito oficial, Devolución]", sharedhandlers.ErrorMessage(err))
 }
 
 func TestCreateSupplyMovementEntryRequest_Validate_RejectsZeroQuantityForReturn(t *testing.T) {

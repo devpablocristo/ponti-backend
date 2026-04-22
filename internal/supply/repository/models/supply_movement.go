@@ -13,9 +13,9 @@ import (
 
 type SupplyMovement struct {
 	ID                   int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	StockId              int64           `gorm:"not null;column:stock_id"`
+	StockId              int64           `gorm:"column:stock_id"`
 	Quantity             decimal.Decimal `gorm:"not null;column:quantity"`
-	MovementType         string          `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial', 'Movimiento interno entrada', 'Devolución');not null;column:movement_type"`
+	MovementType         string          `gorm:"type:text;check:movement_type IN ('Movimiento interno','Remito oficial', 'Movimiento interno entrada', 'Devolución');not null;column:movement_type"`
 	MovementDate         *time.Time      `gorm:"not null;column:movement_date"`
 	ReferenceNumber      string          `gorm:"not null;column:reference_number"`
 	ProjectId            int64           `gorm:"not null;column:project_id"`

@@ -144,6 +144,21 @@ func (mr *MockUseCasesPortMockRecorder) GetStocksSummary(arg0, arg1, arg2 interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStocksSummary", reflect.TypeOf((*MockUseCasesPort)(nil).GetStocksSummary), arg0, arg1, arg2)
 }
 
+// GetStockBySupplyID mocks base method.
+func (m *MockUseCasesPort) GetStockBySupplyID(arg0 context.Context, arg1, arg2 int64, arg3 time.Time) (*domain.Stock, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStockBySupplyID", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*domain.Stock)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStockBySupplyID indicates an expected call of GetStockBySupplyID.
+func (mr *MockUseCasesPortMockRecorder) GetStockBySupplyID(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStockBySupplyID", reflect.TypeOf((*MockUseCasesPort)(nil).GetStockBySupplyID), arg0, arg1, arg2, arg3)
+}
+
 // UpdateCloseDateByProject mocks base method.
 func (m *MockUseCasesPort) UpdateCloseDateByProject(arg0 context.Context, arg1, arg2, arg3 int64, arg4 *domain.Stock) error {
 	m.ctrl.T.Helper()

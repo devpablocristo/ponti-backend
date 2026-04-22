@@ -10,7 +10,6 @@ import (
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplymod "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
-	supplymovementdomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -37,55 +36,45 @@ type Stock struct {
 
 // ToDomain convierte el modelo Stock a la entidad de dominio
 func (m *Stock) ToDomain() *domain.Stock {
-
-	supplyMovementsDomains := make([]supplymovementdomain.SupplyMovement, len(m.SupplyMovements))
-
-	for i, supplyMovement := range m.SupplyMovements {
-		supplyMovementsDomains[i] = *supplyMovement.ToDomain()
-	}
-
 	return &domain.Stock{
-	ID:                m.ID,
-	Project:           m.Project.ToDomain(),
-	Supply:            m.Supply.ToDomain(),
-	CloseDate:         m.CloseDate,
-	RealStockUnits:    m.RealStockUnits,
-	YearPeriod:        m.YearPeriod,
-	MonthPeriod:       m.MonthPeriod,
-	Investor:          m.Investor.ToDomain(),
-	SupplyMovements:   supplyMovementsDomains,
-	Consumed:          m.Consumed,
-	UnitsTransferred:  m.UnitsConsumed,
-	HasRealStockCount: m.HasRealStockCount,
-	Base: shareddomain.Base{
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
-		CreatedBy: m.CreatedBy,
-		UpdatedBy: m.UpdatedBy,
-	},
-}
+		ID:                m.SupplyID,
+		ProjectID:         m.ProjectID,
+		Supply:            m.Supply.ToDomain(),
+		EntryStock:        m.UnitsEntered,
+		Consumed:          m.Consumed,
+		StockUnits:        m.UnitsEntered.Sub(m.Consumed),
+		RealStockUnits:    m.RealStockUnits,
+		HasRealStockCount: m.HasRealStockCount,
+		Base: shareddomain.Base{
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			CreatedBy: m.CreatedBy,
+			UpdatedBy: m.UpdatedBy,
+		},
+	}
 }
 
 // FromDomain convierte la entidad de dominio Stock al modelo de persistencia
 func FromDomain(d *domain.Stock) *Stock {
+	investorID := int64(0)
 	return &Stock{
-	ID:                d.ID,
-	ProjectID:         d.Project.ID,
-	SupplyID:          d.Supply.ID,
-	InvestorID:        d.Investor.ID,
-	RealStockUnits:    d.RealStockUnits,
-	HasRealStockCount: d.HasRealStockCount,
-	YearPeriod:        d.YearPeriod,
-	MonthPeriod:       d.MonthPeriod,
-	InitialStock:      d.InitialStock,
-	CloseDate:         d.CloseDate,
-	SupplyMovements:   []supplymod.SupplyMovement{},
-	Base: sharedmodels.Base{
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
-		CreatedBy: d.CreatedBy,
-		UpdatedBy: d.UpdatedBy,
-	},
-}
+		ID:                d.ID,
+		ProjectID:         d.ProjectID,
+		SupplyID:          d.Supply.ID,
+		InvestorID:        investorID,
+		RealStockUnits:    d.RealStockUnits,
+		HasRealStockCount: d.HasRealStockCount,
+		YearPeriod:        0,
+		MonthPeriod:       0,
+		InitialStock:      decimal.Zero,
+		CloseDate:         nil,
+		SupplyMovements:   []supplymod.SupplyMovement{},
+		Base: sharedmodels.Base{
+			CreatedAt: d.CreatedAt,
+			UpdatedAt: d.UpdatedAt,
+			CreatedBy: d.CreatedBy,
+			UpdatedBy: d.UpdatedBy,
+		},
+	}
 
 }
