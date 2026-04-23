@@ -346,6 +346,12 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 	return stockModel.ToDomain(), false, nil
 }
 
+// Compatibilidad temporal: el stock canónico hoy es por proyecto+insumo.
+// El parámetro investorID se ignora y se delega al lookup project-level.
+func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
+	return r.GetLastStockByProjectID(ctx, projectID, supplyID)
+}
+
 func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
