@@ -23,7 +23,14 @@ RUN --mount=type=secret,id=go_modules_token,required=false \
     if [ -n "$token" ]; then \
       git config --global url."https://${token}@github.com/".insteadOf "https://github.com/"; \
     fi && \
-    go mod download && \
+    git config --global http.version HTTP/1.1 && \
+    i=0 && \
+    until [ "$i" -ge 3 ]; do \
+      go mod download && break; \
+      i=$((i+1)); \
+      echo "go mod download failed, retry $i/3" >&2; \
+      sleep 2; \
+    done && \
     go mod verify && \
     rm -f /root/.gitconfig
 
@@ -53,7 +60,6 @@ EXPOSE 8080
 
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-
 
 
 

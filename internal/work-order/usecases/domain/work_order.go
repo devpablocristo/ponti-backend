@@ -21,6 +21,7 @@ type WorkOrder struct {
 	Contractor    string
 	Observations  string
 	Date          time.Time
+	SequenceDay   int64
 	InvestorID    int64
 	EffectiveArea decimal.Decimal
 	Items         []WorkOrderItem

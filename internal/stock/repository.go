@@ -11,6 +11,8 @@ import (
 	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	supplymodels "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	supplymovementdomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -44,27 +46,125 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		Preload("SupplyMovements").
 		Where("stocks.project_id = ?", projectID)
 
-	if !closeDate.Equal(zeroTime) {
+	if closeDate != zeroTime {
 		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
 	} else {
 		stockQuery = stockQuery.Where("stocks.close_date IS NULL")
 	}
 
 	var stockModels []models.Stock
-	if err := stockQuery.Order("stocks.id DESC").Find(&stockModels).Error; err != nil {
+	if err := stockQuery.Find(&stockModels).Error; err != nil {
 		return nil, err
 	}
 
-	if len(stockModels) == 0 {
-		return []*domain.Stock{}, nil
-	}
-
-	consumedBySupplyID, err := r.loadConsumedBySupplyID(gormDB, projectID, collectStockSupplyIDs(stockModels))
-	if err != nil {
+	var supplies []supplymodels.Supply
+	if err := gormDB.
+		Model(&supplymodels.Supply{}).
+		Preload("Category").
+		Preload("Type").
+		Where("project_id = ?", projectID).
+		Order("LOWER(name) ASC").
+		Find(&supplies).Error; err != nil {
 		return nil, err
 	}
 
-	return mapStockModelsToDomain(stockModels, consumedBySupplyID), nil
+	type consumedRow struct {
+		SupplyID int64           `gorm:"column:supply_id"`
+		Consumed decimal.Decimal `gorm:"column:consumed"`
+	}
+
+	var consumedResults []consumedRow
+	consumedQuery := fmt.Sprintf(`
+		SELECT supply_id, consumed
+		FROM %s
+		WHERE project_id = ?
+	`, reportdb.ReportView("stock_consumed_by_supply"))
+
+	if err := gormDB.Raw(consumedQuery, projectID).Scan(&consumedResults).Error; err != nil {
+		return nil, err
+	}
+
+	consumedBySupplyID := make(map[int64]decimal.Decimal, len(consumedResults))
+	for _, row := range consumedResults {
+		consumedBySupplyID[row.SupplyID] = row.Consumed
+	}
+
+	stockBySupplyID := make(map[int64]models.Stock, len(stockModels))
+	for _, stock := range stockModels {
+		stock.Consumed = consumedBySupplyID[stock.SupplyID]
+		stockBySupplyID[stock.SupplyID] = stock
+	}
+
+	// Para supplies sin stock activo (close_date IS NULL), traer el último stock cerrado
+	// con sus movimientos y tratarlo como activo. Así los ingresos ya cargados no se pierden
+	// cuando el cierre de período deja pares (supply, investor) sin stock activo nuevo.
+	if closeDate == zeroTime {
+		missing := make([]int64, 0, len(supplies))
+		for _, supply := range supplies {
+			if _, ok := stockBySupplyID[supply.ID]; !ok {
+				missing = append(missing, supply.ID)
+			}
+		}
+
+		if len(missing) > 0 {
+			var latestClosedIDs []int64
+			distinctQuery := `
+				SELECT DISTINCT ON (supply_id) id
+				FROM stocks
+				WHERE project_id = ? AND supply_id IN ? AND close_date IS NOT NULL
+				ORDER BY supply_id, close_date DESC
+			`
+			if err := gormDB.Raw(distinctQuery, projectID, missing).Scan(&latestClosedIDs).Error; err != nil {
+				return nil, err
+			}
+
+			if len(latestClosedIDs) > 0 {
+				var latestClosed []models.Stock
+				if err := gormDB.
+					Preload("Project").
+					Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+					Preload("Supply.Type").
+					Preload("Supply.Category").
+					Preload("Investor").
+					Preload("SupplyMovements").
+					Where("id IN ?", latestClosedIDs).
+					Find(&latestClosed).Error; err != nil {
+					return nil, err
+				}
+
+				for _, stock := range latestClosed {
+					stock.Consumed = consumedBySupplyID[stock.SupplyID]
+					stock.CloseDate = nil // mostrar como activo en la UI
+					stockBySupplyID[stock.SupplyID] = stock
+				}
+			}
+		}
+	}
+
+	stocks := make([]*domain.Stock, 0, len(supplies))
+	for _, supply := range supplies {
+		if stockModel, ok := stockBySupplyID[supply.ID]; ok {
+			stocks = append(stocks, stockModel.ToDomain())
+			continue
+		}
+
+		virtualStock := &domain.Stock{
+			Supply:            supply.ToDomain(),
+			SupplyMovements:   []supplymovementdomain.SupplyMovement{},
+			RealStockUnits:    decimal.Zero,
+			Consumed:          consumedBySupplyID[supply.ID],
+			HasRealStockCount: false,
+		}
+
+		if closeDate != zeroTime {
+			cd := closeDate
+			virtualStock.CloseDate = &cd
+		}
+
+		stocks = append(stocks, virtualStock)
+	}
+
+	return stocks, nil
 }
 
 // GetActiveStocksByProjectID retorna todos los stocks con close_date IS NULL
@@ -147,10 +247,11 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 		updateTx = updateTx.Where("updated_at = ?", stock.UpdatedAt)
 	}
 
+	newUpdatedAt := time.Now().UTC()
 	values := map[string]any{
 		"real_stock_units":     stock.RealStockUnits,
 		"has_real_stock_count": stock.HasRealStockCount,
-		"updated_at":           stock.UpdatedAt,
+		"updated_at":           newUpdatedAt,
 		"updated_by":           stock.UpdatedBy,
 	}
 
@@ -206,17 +307,9 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 }
 
 func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
-	return r.getLastStock(ctx, projectID, supplyID, nil)
-}
-
-func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
-	return r.getLastStock(ctx, projectID, supplyID, &investorID)
-}
-
-func (r *Repository) getLastStock(ctx context.Context, projectID int64, supplyID int64, investorID *int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
-	query := gormDB.
+	err := gormDB.
 		Preload("Project").
 		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
@@ -225,13 +318,8 @@ func (r *Repository) getLastStock(ctx context.Context, projectID int64, supplyID
 		Preload("SupplyMovements").
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
-		Where("close_date is null")
-
-	if investorID != nil {
-		query = query.Where("investor_id = ?", *investorID)
-	}
-
-	err := query.Order("id DESC").First(&stockModel).Error
+		Where("close_date is null").
+		First(&stockModel).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, true, nil
@@ -245,12 +333,12 @@ func (r *Repository) getLastStock(ctx context.Context, projectID int64, supplyID
 	var consumedResult struct {
 		Consumed decimal.Decimal `gorm:"column:consumed"`
 	}
-	consumedQuery := fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		SELECT consumed
 		FROM %s
 		WHERE project_id = ? AND supply_id = ?
 	`, reportdb.ReportView("stock_consumed_by_supply"))
-	if err := gormDB.Raw(consumedQuery, projectID, supplyID).Scan(&consumedResult).Error; err != nil {
+	if err := gormDB.Raw(query, projectID, supplyID).Scan(&consumedResult).Error; err != nil {
 		return nil, false, domainerr.Internal("failed to load stock consumed")
 	}
 	stockModel.Consumed = consumedResult.Consumed
@@ -342,55 +430,4 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 		out = append(out, stockModel[i].ToDomain())
 	}
 	return out, nil
-}
-
-func collectStockSupplyIDs(stockModels []models.Stock) []int64 {
-	supplyIDs := make([]int64, 0, len(stockModels))
-	seen := make(map[int64]struct{}, len(stockModels))
-	for _, stock := range stockModels {
-		if _, ok := seen[stock.SupplyID]; ok {
-			continue
-		}
-		seen[stock.SupplyID] = struct{}{}
-		supplyIDs = append(supplyIDs, stock.SupplyID)
-	}
-	return supplyIDs
-}
-
-func (r *Repository) loadConsumedBySupplyID(gormDB *gorm.DB, projectID int64, supplyIDs []int64) (map[int64]decimal.Decimal, error) {
-	if len(supplyIDs) == 0 {
-		return map[int64]decimal.Decimal{}, nil
-	}
-
-	type consumedRow struct {
-		SupplyID int64           `gorm:"column:supply_id"`
-		Consumed decimal.Decimal `gorm:"column:consumed"`
-	}
-
-	var consumedResults []consumedRow
-	query := fmt.Sprintf(`
-		SELECT supply_id, consumed
-		FROM %s
-		WHERE project_id = ? AND supply_id IN ?
-	`, reportdb.ReportView("stock_consumed_by_supply"))
-
-	if err := gormDB.Raw(query, projectID, supplyIDs).Scan(&consumedResults).Error; err != nil {
-		return nil, err
-	}
-
-	consumedBySupplyID := make(map[int64]decimal.Decimal, len(consumedResults))
-	for _, row := range consumedResults {
-		consumedBySupplyID[row.SupplyID] = row.Consumed
-	}
-
-	return consumedBySupplyID, nil
-}
-
-func mapStockModelsToDomain(stockModels []models.Stock, consumedBySupplyID map[int64]decimal.Decimal) []*domain.Stock {
-	stocks := make([]*domain.Stock, 0, len(stockModels))
-	for i := range stockModels {
-		stockModels[i].Consumed = consumedBySupplyID[stockModels[i].SupplyID]
-		stocks = append(stocks, stockModels[i].ToDomain())
-	}
-	return stocks
 }

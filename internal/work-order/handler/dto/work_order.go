@@ -50,6 +50,7 @@ type WorkOrder struct {
 	Contractor     string          `json:"contractor"`
 	Observations   string          `json:"observations"`
 	Date           time.Time       `json:"date" binding:"required"`
+	SequenceDay    int64           `json:"sequence_day,omitempty"`
 	InvestorID     int64           `json:"investor_id" binding:"required"`
 	InvestorSplits []InvestorSplit `json:"investor_splits,omitempty"`
 	EffectiveArea  decimal.Decimal `json:"effective_area" binding:"required"`
@@ -69,6 +70,7 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 		Contractor     string          `json:"contractor"`
 		Observations   string          `json:"observations"`
 		Date           time.Time       `json:"date"`
+		SequenceDay    int64           `json:"sequence_day,omitempty"`
 		InvestorID     int64           `json:"investor_id"`
 		InvestorSplits []InvestorSplit `json:"investor_splits,omitempty"`
 		EffectiveArea  decimal.Decimal `json:"effective_area"`
@@ -84,6 +86,7 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 		Contractor:     r.Contractor,
 		Observations:   r.Observations,
 		Date:           r.Date,
+		SequenceDay:    r.SequenceDay,
 		InvestorID:     r.InvestorID,
 		InvestorSplits: r.InvestorSplits,
 		EffectiveArea:  r.EffectiveArea.Round(3),
@@ -113,6 +116,7 @@ func (r *WorkOrder) ToDomain() *domain.WorkOrder {
 		Contractor:     r.Contractor,
 		Observations:   r.Observations,
 		Date:           r.Date,
+		SequenceDay:    r.SequenceDay,
 		InvestorID:     r.InvestorID,
 		EffectiveArea:  r.EffectiveArea,
 		Items:          toDomainItems(r.Items),
@@ -164,6 +168,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		Contractor:     o.Contractor,
 		Observations:   o.Observations,
 		Date:           o.Date,
+		SequenceDay:    o.SequenceDay,
 		InvestorID:     o.InvestorID,
 		InvestorSplits: splits,
 		EffectiveArea:  o.EffectiveArea,
