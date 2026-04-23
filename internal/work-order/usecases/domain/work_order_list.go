@@ -15,6 +15,7 @@ type WorkOrderListElement struct {
 	FieldName         string
 	LotName           string
 	Date              time.Time
+	SequenceDay       int64
 	CropName          string
 	LaborName         string
 	LaborCategoryName string

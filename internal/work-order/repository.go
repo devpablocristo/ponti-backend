@@ -417,7 +417,7 @@ func (r *Repository) ListWorkOrders(
 	if err := base.
 		Limit(int(inp.PageSize)).
 		Offset(offset).
-		Order("id desc").
+		Order("date desc, sequence_day desc, id desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, domainerr.Internal(
 			"failed to list work orders")
@@ -433,6 +433,7 @@ func (r *Repository) ListWorkOrders(
 			FieldName:         m.FieldName,
 			LotName:           m.LotName,
 			Date:              m.Date,
+			SequenceDay:       m.SequenceDay,
 			CropName:          m.CropName,
 			LaborName:         m.LaborName,
 			LaborCategoryName: m.LaborCategoryName,

@@ -18,6 +18,7 @@ type WorkOrderListElement struct {
 	FieldName         string          `json:"field_name"`
 	LotName           string          `json:"lot_name"`
 	Date              time.Time       `json:"date"`
+	SequenceDay       int64           `json:"sequence_day,omitempty"`
 	CropName          string          `json:"crop_name"`
 	LaborName         string          `json:"labor_name"`
 	LaborCategoryName string          `json:"labor_category_name"`
@@ -42,6 +43,7 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		FieldName         string    `json:"field_name"`
 		LotName           string    `json:"lot_name"`
 		Date              time.Time `json:"date"`
+		SequenceDay       int64     `json:"sequence_day,omitempty"`
 		CropName          string    `json:"crop_name"`
 		LaborName         string    `json:"labor_name"`
 		LaborCategoryName string    `json:"labor_category_name"`
@@ -62,6 +64,7 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		FieldName:         w.FieldName,
 		LotName:           w.LotName,
 		Date:              w.Date,
+		SequenceDay:       w.SequenceDay,
 		CropName:          w.CropName,
 		LaborName:         w.LaborName,
 		LaborCategoryName: w.LaborCategoryName,
@@ -92,6 +95,7 @@ func FromDomainListElement(d *domain.WorkOrderListElement) *WorkOrderListElement
 		FieldName:         d.FieldName,
 		LotName:           d.LotName,
 		Date:              d.Date,
+		SequenceDay:       d.SequenceDay,
 		CropName:          d.CropName,
 		LaborName:         d.LaborName,
 		LaborCategoryName: d.LaborCategoryName,
