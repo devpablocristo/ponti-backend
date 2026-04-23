@@ -88,7 +88,9 @@ FROM public.projects p
 JOIN public.fields f ON f.project_id = p.id AND f.deleted_at IS NULL
 WHERE p.deleted_at IS NULL;
 
-CREATE OR REPLACE VIEW v4_report.workorder_list AS
+DROP VIEW IF EXISTS v4_report.workorder_list;
+
+CREATE VIEW v4_report.workorder_list AS
 SELECT
   w.id,
   w.number,

@@ -164,7 +164,12 @@ FROM public.projects p
 JOIN public.fields f ON f.project_id = p.id AND f.deleted_at IS NULL
 WHERE p.deleted_at IS NULL;
 
-CREATE OR REPLACE VIEW v4_report.workorder_list AS
+-- La vista puede venir de ramas con columnas extra (por ejemplo is_digital/status).
+-- CREATE OR REPLACE VIEW no permite "reducir" la forma de una vista existente,
+-- así que la recreamos explícitamente para mantener el mismo estado final.
+DROP VIEW IF EXISTS v4_report.workorder_list;
+
+CREATE VIEW v4_report.workorder_list AS
 SELECT
   w.id,
   w.number,
