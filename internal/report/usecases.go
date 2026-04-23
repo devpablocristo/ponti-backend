@@ -78,8 +78,8 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 
 // GetSummaryResultsReport obtiene el reporte de resumen de resultados.
 func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
-	// Validar que al menos un filtro esté presente
-	if err := uc.validator.ValidateAtLeastOneFilter(filters); err != nil {
+	// Validar workspace completo: customer_id + project_id + campaign_id
+	if err := uc.validator.ValidateRequiredWorkspaceFilter(filters); err != nil {
 		return nil, err
 	}
 

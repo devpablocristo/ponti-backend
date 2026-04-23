@@ -138,6 +138,9 @@ func (h *ReportHandler) parseReportFilters(c *gin.Context) (domain.ReportFilter,
 	if err != nil {
 		return filters, err
 	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
+		return filters, err
+	}
 	filters.CustomerID = workspaceFilter.CustomerID
 	filters.ProjectID = workspaceFilter.ProjectID
 	filters.CampaignID = workspaceFilter.CampaignID
@@ -151,7 +154,11 @@ func (h *ReportHandler) parseSummaryFilters(c *gin.Context) (domain.SummaryResul
 	if err := c.ShouldBindQuery(&request); err != nil {
 		return domain.SummaryResultsFilter{}, domainerr.Validation("invalid summary filters")
 	}
-	return dto.ToDomainSummaryResultsFilter(request), nil
+	filter := dto.ToDomainSummaryResultsFilter(request)
+	if filter.CustomerID == nil || filter.ProjectID == nil || filter.CampaignID == nil {
+		return domain.SummaryResultsFilter{}, domainerr.Validation("customer_id, project_id and campaign_id are required")
+	}
+	return filter, nil
 }
 
 // buildReportByType construye el reporte según el tipo.
