@@ -41,6 +41,15 @@ func ParseWorkspaceFilter(c *gin.Context) (filters.WorkspaceFilter, error) {
 	return out, nil
 }
 
+// ValidateRequiredWorkspaceFilter exige customer_id, project_id y campaign_id;
+// field_id sigue siendo opcional y su ausencia representa "todos los campos".
+func ValidateRequiredWorkspaceFilter(f filters.WorkspaceFilter) error {
+	if f.CustomerID == nil || f.ProjectID == nil || f.CampaignID == nil {
+		return domainerr.Validation("customer_id, project_id and campaign_id are required")
+	}
+	return nil
+}
+
 // ParseProjectIDParam valida el project_id de path contra la query si existe.
 func ParseProjectIDParam(c *gin.Context, paramName string) (int64, error) {
 	projectID, err := ginmw.ParseParamID(c, paramName)

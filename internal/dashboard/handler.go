@@ -69,6 +69,10 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 
 	filter := domain.DashboardFilter{
 		CustomerID: workspaceFilter.CustomerID,
