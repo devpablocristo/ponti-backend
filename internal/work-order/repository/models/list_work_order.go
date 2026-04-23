@@ -15,6 +15,7 @@ type WorkOrderListElement struct {
 	FieldName         string          `gorm:"column:field_name"`
 	LotName           string          `gorm:"column:lot_name"`
 	Date              time.Time       `gorm:"column:date"`
+	SequenceDay       int64           `gorm:"column:sequence_day"`
 	CropName          string          `gorm:"column:crop_name"`
 	LaborName         string          `gorm:"column:labor_name"`
 	LaborCategoryName string          `gorm:"column:labor_category_name"`

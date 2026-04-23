@@ -38,13 +38,14 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 			number TEXT,
 			project_id INTEGER,
 			field_id INTEGER,
-			date DATETIME
+			date DATETIME,
+			sequence_day INTEGER
 		);`,
 		`INSERT INTO projects (id, deleted_at) VALUES (30, NULL);`,
-		`INSERT INTO v4_report.workorder_list (id, number, project_id, field_id, date) VALUES
-			(10, '2000', 30, 40, '2026-04-23T00:00:00Z'),
-			(11, '1862', 30, 40, '2026-03-29T00:00:00Z'),
-			(12, '1706', 30, 40, '2026-04-23T00:00:00Z');`,
+		`INSERT INTO v4_report.workorder_list (id, number, project_id, field_id, date, sequence_day) VALUES
+			(10, '2000', 30, 40, '2026-04-23T00:00:00Z', 1),
+			(11, '1862', 30, 40, '2026-03-29T00:00:00Z', 1),
+			(12, '1706', 30, 40, '2026-04-23T00:00:00Z', 2);`,
 	}
 
 	for _, stmt := range statements {
@@ -77,10 +78,10 @@ func TestRepository_ListWorkOrders_OrdersByLatestDateFirst(t *testing.T) {
 		t.Fatalf("expected 3 rows, got %d", len(rows))
 	}
 	if rows[0].ID != 12 || rows[0].Number != "1706" {
-		t.Fatalf("expected latest date work order first with id tiebreak, got id=%d number=%q", rows[0].ID, rows[0].Number)
+		t.Fatalf("expected latest date work order first with highest sequence, got id=%d number=%q", rows[0].ID, rows[0].Number)
 	}
 	if rows[1].ID != 10 || rows[1].Number != "2000" {
-		t.Fatalf("expected same-date lower id second, got id=%d number=%q", rows[1].ID, rows[1].Number)
+		t.Fatalf("expected same-date lower sequence second, got id=%d number=%q", rows[1].ID, rows[1].Number)
 	}
 	if rows[2].ID != 11 || rows[2].Number != "1862" {
 		t.Fatalf("expected oldest date last, got id=%d number=%q", rows[2].ID, rows[2].Number)

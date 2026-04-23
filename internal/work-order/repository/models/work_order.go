@@ -35,6 +35,7 @@ type WorkOrder struct {
 	Contractor     string                   `gorm:"size:100"`
 	Observations   string                   `gorm:"size:1000"`
 	Date           time.Time                `gorm:"type:date;not null"`
+	SequenceDay    int64                    `gorm:"column:sequence_day"`
 	InvestorID     int64                    `gorm:"not null"`
 	EffectiveArea  decimal.Decimal          `gorm:"not null"`
 	DeletedAt      gorm.DeletedAt           `gorm:"index"`
@@ -69,6 +70,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
 		Date:          o.Date,
+		SequenceDay:   o.SequenceDay,
 		InvestorID:    o.InvestorID,
 		EffectiveArea: o.EffectiveArea,
 	}
@@ -140,6 +142,7 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 		Contractor:     m.Contractor,
 		Observations:   m.Observations,
 		Date:           m.Date,
+		SequenceDay:    m.SequenceDay,
 		InvestorID:     m.InvestorID,
 		EffectiveArea:  m.EffectiveArea,
 		Items:          items,
