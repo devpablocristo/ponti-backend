@@ -3,6 +3,7 @@ package workorder
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +38,8 @@ type UseCases struct {
 	excel ExporterAdapterPort
 }
 
+var workOrderNumberPattern = regexp.MustCompile(`^\d+$`)
+
 // NewUseCases crea una instancia de casos de uso para work orders.
 func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
 	return &UseCases{repo: r, excel: excel}
@@ -50,6 +53,12 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 		return 0, err
 	}
 	if err := validateItems(o); err != nil {
+		return 0, err
+	}
+	if err := validateWorkOrderNumberForCreate(o); err != nil {
+		return 0, err
+	}
+	if err := ensureWorkOrderNumberIsUnique(ctx, u.repo, o.Number, o.ProjectID, 0); err != nil {
 		return 0, err
 	}
 	if err := validateInvestorSplits(o); err != nil {
@@ -70,10 +79,26 @@ func (u *UseCases) DuplicateWorkOrder(ctx context.Context, number string) (strin
 }
 
 func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder) error {
+	if o == nil {
+		return domainerr.Validation("work order is nil")
+	}
 	if err := validateDate(o); err != nil {
 		return err
 	}
 	if err := validateItems(o); err != nil {
+		return err
+	}
+	existing, err := u.repo.GetWorkOrderByID(ctx, o.ID)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return domainerr.NotFound("work order not found")
+	}
+	if err := validateWorkOrderNumberForUpdate(existing, o); err != nil {
+		return err
+	}
+	if err := ensureWorkOrderNumberIsUnique(ctx, u.repo, o.Number, o.ProjectID, o.ID); err != nil {
 		return err
 	}
 	if err := validateInvestorSplits(o); err != nil {
@@ -83,6 +108,74 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 		return err
 	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
+}
+
+func ensureWorkOrderNumberIsUnique(
+	ctx context.Context,
+	repo RepositoryPort,
+	number string,
+	projectID int64,
+	currentID int64,
+) error {
+	existing, err := repo.GetWorkOrderByNumberAndProjectID(ctx, number, projectID)
+	if err != nil {
+		return err
+	}
+	if existing != nil && existing.ID != currentID {
+		return domainerr.Conflict("work order number already exists in this project")
+	}
+	return nil
+}
+
+func validateWorkOrderNumberForCreate(o *domain.WorkOrder) error {
+	if o == nil {
+		return domainerr.Validation("work order is nil")
+	}
+
+	o.Number = normalizeWorkOrderNumber(o.Number)
+	if o.Number == "" {
+		return domainerr.Validation("work order number is required")
+	}
+	if !isOfficialWorkOrderNumber(o.Number) {
+		return domainerr.Validation("work order number must contain digits only")
+	}
+
+	return nil
+}
+
+func validateWorkOrderNumberForUpdate(existing, incoming *domain.WorkOrder) error {
+	if existing == nil || incoming == nil {
+		return domainerr.Validation("work order is nil")
+	}
+
+	incoming.Number = normalizeWorkOrderNumber(incoming.Number)
+	if incoming.Number == "" {
+		return domainerr.Validation("work order number is required")
+	}
+
+	currentOfficialNumber := normalizeWorkOrderNumber(existing.Number)
+	if incoming.Number == currentOfficialNumber {
+		return nil
+	}
+
+	if existing.LegacyNumber != nil && incoming.Number == normalizeWorkOrderNumber(*existing.LegacyNumber) {
+		incoming.Number = currentOfficialNumber
+		return nil
+	}
+
+	if !isOfficialWorkOrderNumber(incoming.Number) {
+		return domainerr.Validation("work order number must contain digits only")
+	}
+
+	return nil
+}
+
+func normalizeWorkOrderNumber(number string) string {
+	return strings.TrimSpace(number)
+}
+
+func isOfficialWorkOrderNumber(number string) bool {
+	return workOrderNumberPattern.MatchString(number)
 }
 
 func validateDate(o *domain.WorkOrder) error {
@@ -212,6 +305,7 @@ func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, err
 		return "", domainerr.Validation("invalid investor payment status")
 	}
 }
+
 func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
 }

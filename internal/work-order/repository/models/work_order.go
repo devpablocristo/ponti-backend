@@ -21,7 +21,8 @@ import (
 // WorkOrder GORM model con todas las relaciones.
 type WorkOrder struct {
 	ID             int64                    `gorm:"primaryKey;column:id"`
-	Number         string                   `gorm:"column:number;uniqueIndex"`
+	Number         string                   `gorm:"column:number"`
+	LegacyNumber   *string                  `gorm:"column:legacy_number;size:100"`
 	ProjectID      int64                    `gorm:"not null"`
 	Project        projectmod.Project       `gorm:"foreignKey:ProjectID"`
 	FieldID        int64                    `gorm:"not null"`
@@ -62,6 +63,7 @@ func (WorkOrderItem) TableName() string { return "workorder_items" }
 func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	w := &WorkOrder{
 		Number:        o.Number,
+		LegacyNumber:  o.LegacyNumber,
 		ProjectID:     o.ProjectID,
 		FieldID:       o.FieldID,
 		LotID:         o.LotID,
@@ -82,12 +84,12 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	if len(o.Items) > 0 {
 		items := make([]WorkOrderItem, len(o.Items))
 		for i, it := range o.Items {
-				items[i] = WorkOrderItem{
-					SupplyID:   it.SupplyID,
-					SupplyName: it.SupplyName,
-					TotalUsed:  it.TotalUsed,
-					FinalDose:  it.FinalDose,
-				}
+			items[i] = WorkOrderItem{
+				SupplyID:   it.SupplyID,
+				SupplyName: it.SupplyName,
+				TotalUsed:  it.TotalUsed,
+				FinalDose:  it.FinalDose,
+			}
 		}
 		w.Items = items
 	}
@@ -135,6 +137,7 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 	return &domain.WorkOrder{
 		ID:             m.ID,
 		Number:         m.Number,
+		LegacyNumber:   m.LegacyNumber,
 		ProjectID:      m.ProjectID,
 		FieldID:        m.FieldID,
 		LotID:          m.LotID,

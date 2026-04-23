@@ -181,6 +181,11 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		}
 		updateTx = updateTx.Updates(model)
 		if updateTx.Error != nil {
+			if isUniqueViolation(updateTx.Error) {
+				return domainerr.Newf(domainerr.KindConflict,
+					"work order already exists for number %s and project %d", o.Number, o.ProjectID,
+				)
+			}
 			return domainerr.Internal("failed to update work order header")
 		}
 		if updateTx.RowsAffected == 0 {
@@ -423,7 +428,7 @@ func (r *Repository) ListWorkOrders(
 	if err := base.
 		Limit(int(inp.PageSize)).
 		Offset(offset).
-		Order("date desc, id desc, number desc").
+		Order("number desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, domainerr.Internal(
 			"failed to list work orders")

@@ -13,6 +13,7 @@ import (
 type WorkOrder struct {
 	ID            int64
 	Number        string
+	LegacyNumber  *string
 	ProjectID     int64
 	FieldID       int64
 	LotID         int64
