@@ -10,9 +10,9 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	reportdb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplymodels "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	supplymovementdomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
-	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -69,8 +69,8 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	}
 
 	type consumedRow struct {
-		SupplyID  int64           `gorm:"column:supply_id"`
-		Consumed  decimal.Decimal `gorm:"column:consumed"`
+		SupplyID int64           `gorm:"column:supply_id"`
+		Consumed decimal.Decimal `gorm:"column:consumed"`
 	}
 
 	var consumedResults []consumedRow
@@ -167,7 +167,6 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	return stocks, nil
 }
 
-
 // GetActiveStocksByProjectID retorna todos los stocks con close_date IS NULL
 // de un proyecto, con sus relaciones precargadas. Se usa para replicar cada
 // (supply, investor) activo al cerrar un período.
@@ -248,10 +247,11 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 		updateTx = updateTx.Where("updated_at = ?", stock.UpdatedAt)
 	}
 
+	newUpdatedAt := time.Now().UTC()
 	values := map[string]any{
 		"real_stock_units":     stock.RealStockUnits,
 		"has_real_stock_count": stock.HasRealStockCount,
-		"updated_at":           stock.UpdatedAt,
+		"updated_at":           newUpdatedAt,
 		"updated_by":           stock.UpdatedBy,
 	}
 
