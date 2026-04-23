@@ -22,7 +22,6 @@ import (
 type WorkOrder struct {
 	ID             int64                    `gorm:"primaryKey;column:id"`
 	Number         string                   `gorm:"column:number"`
-	LegacyNumber   *string                  `gorm:"column:legacy_number;size:100"`
 	ProjectID      int64                    `gorm:"not null"`
 	Project        projectmod.Project       `gorm:"foreignKey:ProjectID"`
 	FieldID        int64                    `gorm:"not null"`
@@ -63,7 +62,6 @@ func (WorkOrderItem) TableName() string { return "workorder_items" }
 func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	w := &WorkOrder{
 		Number:        o.Number,
-		LegacyNumber:  o.LegacyNumber,
 		ProjectID:     o.ProjectID,
 		FieldID:       o.FieldID,
 		LotID:         o.LotID,
@@ -137,7 +135,6 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 	return &domain.WorkOrder{
 		ID:             m.ID,
 		Number:         m.Number,
-		LegacyNumber:   m.LegacyNumber,
 		ProjectID:      m.ProjectID,
 		FieldID:        m.FieldID,
 		LotID:          m.LotID,

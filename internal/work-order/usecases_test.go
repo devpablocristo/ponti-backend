@@ -186,13 +186,13 @@ func TestCreateWorkOrderTrimsAndPersistsOfficialNumber(t *testing.T) {
 	}
 }
 
-func TestUpdateWorkOrderAllowsUnchangedHistoricalInvalidNumber(t *testing.T) {
+func TestUpdateWorkOrderAllowsUnchangedOfficialNumber(t *testing.T) {
 	t.Parallel()
 
 	var updated *domain.WorkOrder
 	ucs := NewUseCases(&workOrderRepoStub{
 		getByIDFn: func(context.Context, int64) (*domain.WorkOrder, error) {
-			return &domain.WorkOrder{ID: 10, Number: "1861.1", ProjectID: 30}, nil
+			return &domain.WorkOrder{ID: 10, Number: "1901", ProjectID: 30}, nil
 		},
 		updateFn: func(_ context.Context, wo *domain.WorkOrder) error {
 			updated = wo
@@ -202,14 +202,14 @@ func TestUpdateWorkOrderAllowsUnchangedHistoricalInvalidNumber(t *testing.T) {
 
 	err := ucs.UpdateWorkOrderByID(context.Background(), &domain.WorkOrder{
 		ID:        10,
-		Number:    "1861.1",
+		Number:    "1901",
 		ProjectID: 30,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if updated == nil || updated.Number != "1861.1" {
-		t.Fatalf("expected unchanged historical number, got %+v", updated)
+	if updated == nil || updated.Number != "1901" {
+		t.Fatalf("expected unchanged official number, got %+v", updated)
 	}
 }
 
@@ -218,7 +218,7 @@ func TestUpdateWorkOrderRejectsChangedInvalidNumber(t *testing.T) {
 
 	ucs := NewUseCases(&workOrderRepoStub{
 		getByIDFn: func(context.Context, int64) (*domain.WorkOrder, error) {
-			return &domain.WorkOrder{ID: 10, Number: "1861.1", ProjectID: 30}, nil
+			return &domain.WorkOrder{ID: 10, Number: "1901", ProjectID: 30}, nil
 		},
 	}, workOrderExporterStub{})
 
@@ -229,33 +229,5 @@ func TestUpdateWorkOrderRejectsChangedInvalidNumber(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected validation error for changed invalid number")
-	}
-}
-
-func TestUpdateWorkOrderMapsLegacyDisplayNumberBackToOfficialNumber(t *testing.T) {
-	t.Parallel()
-
-	legacy := "1861.1"
-	var updated *domain.WorkOrder
-	ucs := NewUseCases(&workOrderRepoStub{
-		getByIDFn: func(context.Context, int64) (*domain.WorkOrder, error) {
-			return &domain.WorkOrder{ID: 10, Number: "1901", LegacyNumber: &legacy, ProjectID: 30}, nil
-		},
-		updateFn: func(_ context.Context, wo *domain.WorkOrder) error {
-			updated = wo
-			return nil
-		},
-	}, workOrderExporterStub{})
-
-	err := ucs.UpdateWorkOrderByID(context.Background(), &domain.WorkOrder{
-		ID:        10,
-		Number:    "1861.1",
-		ProjectID: 30,
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if updated == nil || updated.Number != "1901" {
-		t.Fatalf("expected official number 1901, got %+v", updated)
 	}
 }

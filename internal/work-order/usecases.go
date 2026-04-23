@@ -158,11 +158,6 @@ func validateWorkOrderNumberForUpdate(existing, incoming *domain.WorkOrder) erro
 		return nil
 	}
 
-	if existing.LegacyNumber != nil && incoming.Number == normalizeWorkOrderNumber(*existing.LegacyNumber) {
-		incoming.Number = currentOfficialNumber
-		return nil
-	}
-
 	if !isOfficialWorkOrderNumber(incoming.Number) {
 		return domainerr.Validation("work order number must contain digits only")
 	}

@@ -6,6 +6,9 @@
 
 BEGIN;
 
+ALTER TABLE public.workorders
+  ADD COLUMN IF NOT EXISTS legacy_number character varying(100);
+
 DROP TRIGGER IF EXISTS trg_enforce_workorders_number_strict ON public.workorders;
 DROP FUNCTION IF EXISTS public.enforce_workorder_number_strict();
 
@@ -44,5 +47,27 @@ ALTER TABLE public.workorders
 
 ALTER TABLE public.workorders
   ALTER COLUMN number DROP NOT NULL;
+
+CREATE OR REPLACE FUNCTION v4_ssot.first_workorder_number_for_project(p_project_id bigint)
+RETURNS text
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(NULLIF(btrim(legacy_number), ''), number)::text
+  FROM public.workorders
+  WHERE project_id = p_project_id
+    AND deleted_at IS NULL
+  ORDER BY date ASC, id ASC
+  LIMIT 1
+$$;
+
+CREATE OR REPLACE FUNCTION v4_ssot.last_workorder_number_for_project(p_project_id bigint)
+RETURNS text
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(NULLIF(btrim(legacy_number), ''), number)::text
+  FROM public.workorders
+  WHERE project_id = p_project_id
+    AND deleted_at IS NULL
+  ORDER BY date DESC, id DESC
+  LIMIT 1
+$$;
 
 COMMIT;

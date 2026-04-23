@@ -3,7 +3,6 @@ package dto
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -43,8 +42,6 @@ func (w WorkOrderItem) MarshalJSON() ([]byte, error) {
 type WorkOrder struct {
 	ID             int64           `json:"id"`
 	Number         string          `json:"number" binding:"required"`
-	OfficialNumber string          `json:"official_number,omitempty"`
-	LegacyNumber   *string         `json:"legacy_number,omitempty"`
 	ProjectID      int64           `json:"project_id" binding:"required"`
 	FieldID        int64           `json:"field_id" binding:"required"`
 	LotID          int64           `json:"lot_id" binding:"required"`
@@ -64,8 +61,6 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 	aux := struct {
 		ID             int64           `json:"id"`
 		Number         string          `json:"number"`
-		OfficialNumber string          `json:"official_number,omitempty"`
-		LegacyNumber   *string         `json:"legacy_number,omitempty"`
 		ProjectID      int64           `json:"project_id"`
 		FieldID        int64           `json:"field_id"`
 		LotID          int64           `json:"lot_id"`
@@ -81,8 +76,6 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 	}{
 		ID:             r.ID,
 		Number:         r.Number,
-		OfficialNumber: r.OfficialNumber,
-		LegacyNumber:   r.LegacyNumber,
 		ProjectID:      r.ProjectID,
 		FieldID:        r.FieldID,
 		LotID:          r.LotID,
@@ -162,9 +155,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 
 	return &WorkOrder{
 		ID:             o.ID,
-		Number:         displayWorkOrderNumber(o.Number, o.LegacyNumber),
-		OfficialNumber: o.Number,
-		LegacyNumber:   o.LegacyNumber,
+		Number:         o.Number,
 		ProjectID:      o.ProjectID,
 		FieldID:        o.FieldID,
 		LotID:          o.LotID,
@@ -178,19 +169,6 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		EffectiveArea:  o.EffectiveArea,
 		Items:          items,
 	}
-}
-
-func displayWorkOrderNumber(number string, legacyNumber *string) string {
-	if legacyNumber == nil {
-		return number
-	}
-
-	display := strings.TrimSpace(*legacyNumber)
-	if display == "" {
-		return number
-	}
-
-	return display
 }
 
 type WorkOrderResponse struct {
