@@ -37,12 +37,14 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 			id INTEGER,
 			number TEXT,
 			project_id INTEGER,
-			field_id INTEGER
+			field_id INTEGER,
+			date DATETIME
 		);`,
 		`INSERT INTO projects (id, deleted_at) VALUES (30, NULL);`,
-		`INSERT INTO v4_report.workorder_list (id, number, project_id, field_id) VALUES
-			(10, '2000', 30, 40),
-			(11, '1862', 30, 40);`,
+		`INSERT INTO v4_report.workorder_list (id, number, project_id, field_id, date) VALUES
+			(10, '2000', 30, 40, '2026-04-23T00:00:00Z'),
+			(11, '1862', 30, 40, '2026-03-29T00:00:00Z'),
+			(12, '1706', 30, 40, '2026-04-23T00:00:00Z');`,
 	}
 
 	for _, stmt := range statements {
@@ -54,7 +56,7 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestRepository_ListWorkOrders_OrdersByLatestCreatedFirst(t *testing.T) {
+func TestRepository_ListWorkOrders_OrdersByLatestDateFirst(t *testing.T) {
 	db := newListWorkOrdersTestDB(t)
 	repo := NewRepository(&listTestGormEngine{client: db})
 
@@ -68,16 +70,19 @@ func TestRepository_ListWorkOrders_OrdersByLatestCreatedFirst(t *testing.T) {
 		t.Fatalf("list work orders: %v", err)
 	}
 
-	if pageInfo.Total != 2 {
-		t.Fatalf("expected total 2, got %d", pageInfo.Total)
+	if pageInfo.Total != 3 {
+		t.Fatalf("expected total 3, got %d", pageInfo.Total)
 	}
-	if len(rows) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(rows))
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(rows))
 	}
-	if rows[0].ID != 11 || rows[0].Number != "1862" {
-		t.Fatalf("expected latest created work order first, got id=%d number=%q", rows[0].ID, rows[0].Number)
+	if rows[0].ID != 12 || rows[0].Number != "1706" {
+		t.Fatalf("expected latest date work order first with id tiebreak, got id=%d number=%q", rows[0].ID, rows[0].Number)
 	}
 	if rows[1].ID != 10 || rows[1].Number != "2000" {
-		t.Fatalf("expected older work order second, got id=%d number=%q", rows[1].ID, rows[1].Number)
+		t.Fatalf("expected same-date lower id second, got id=%d number=%q", rows[1].ID, rows[1].Number)
+	}
+	if rows[2].ID != 11 || rows[2].Number != "1862" {
+		t.Fatalf("expected oldest date last, got id=%d number=%q", rows[2].ID, rows[2].Number)
 	}
 }
