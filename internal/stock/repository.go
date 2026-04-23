@@ -437,3 +437,17 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 	}
 	return out, nil
 }
+
+func mapStockModelsToDomain(stockModels []models.Stock, consumedBySupplyID map[int64]decimal.Decimal) []*domain.Stock {
+	stocks := make([]*domain.Stock, 0, len(stockModels))
+	for i := range stockModels {
+		stockModel := stockModels[i]
+		if consumed, exists := consumedBySupplyID[stockModel.SupplyID]; exists {
+			stockModel.Consumed = consumed
+		} else {
+			stockModel.Consumed = decimal.Zero
+		}
+		stocks = append(stocks, stockModel.ToDomain())
+	}
+	return stocks
+}
