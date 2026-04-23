@@ -72,6 +72,130 @@ func TestDeleteSupplyMovement_IgnoresClosedLegacyStocks(t *testing.T) {
 	assert.Equal(t, int64(1), closedStockCount)
 }
 
+func TestDeleteSupplyMovement_DeletesBothSidesOfInternalMovementAcrossDifferentSupplies(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+
+	customer := &projectmodels.Customer{Name: "customer"}
+	require.NoError(t, db.Create(customer).Error)
+	campaign := &projectmodels.Campaign{Name: "campaign"}
+	require.NoError(t, db.Create(campaign).Error)
+
+	sourceProject := &projectmodels.Project{
+		Name:        "source",
+		CustomerID:  customer.ID,
+		CampaignID:  campaign.ID,
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+	}
+	require.NoError(t, db.Create(sourceProject).Error)
+	destinationProject := &projectmodels.Project{
+		Name:        "destination",
+		CustomerID:  customer.ID,
+		CampaignID:  campaign.ID,
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+	}
+	require.NoError(t, db.Create(destinationProject).Error)
+
+	investor := &investormodels.Investor{Name: "investor"}
+	require.NoError(t, db.Create(investor).Error)
+	provider := &providermodels.Provider{Name: "provider"}
+	require.NoError(t, db.Create(provider).Error)
+
+	classType := &classtypemodels.ClassType{Name: "type"}
+	require.NoError(t, db.Create(classType).Error)
+	category := &categorymodels.Category{Name: "category", TypeID: classType.ID}
+	require.NoError(t, db.Create(category).Error)
+
+	originSupply := &models.Supply{
+		ProjectID:  sourceProject.ID,
+		Name:       "origin",
+		Price:      decimal.NewFromInt(10),
+		UnitID:     1,
+		CategoryID: category.ID,
+		TypeID:     classType.ID,
+	}
+	require.NoError(t, db.Create(originSupply).Error)
+
+	destinationSupply := &models.Supply{
+		ProjectID:  destinationProject.ID,
+		Name:       "destination",
+		Price:      decimal.NewFromInt(10),
+		UnitID:     1,
+		CategoryID: category.ID,
+		TypeID:     classType.ID,
+	}
+	require.NoError(t, db.Create(destinationSupply).Error)
+
+	originStock := &stockmodels.Stock{
+		ProjectID:         sourceProject.ID,
+		SupplyID:          originSupply.ID,
+		InvestorID:        investor.ID,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(originStock).Error)
+
+	destinationStock := &stockmodels.Stock{
+		ProjectID:         destinationProject.ID,
+		SupplyID:          destinationSupply.ID,
+		InvestorID:        investor.ID,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(destinationStock).Error)
+
+	movementDate := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
+	outMovement := &models.SupplyMovement{
+		StockId:              originStock.ID,
+		Quantity:             decimal.NewFromInt(-5),
+		MovementType:         "Movimiento interno",
+		MovementDate:         &movementDate,
+		ReferenceNumber:      "INT-DEL-1",
+		ProjectId:            sourceProject.ID,
+		ProjectDestinationId: destinationProject.ID,
+		SupplyID:             originSupply.ID,
+		InvestorID:           investor.ID,
+		ProviderID:           provider.ID,
+		IsEntry:              true,
+	}
+	require.NoError(t, db.Create(outMovement).Error)
+
+	inMovement := &models.SupplyMovement{
+		StockId:              destinationStock.ID,
+		Quantity:             decimal.NewFromInt(5),
+		MovementType:         "Movimiento interno entrada",
+		MovementDate:         &movementDate,
+		ReferenceNumber:      "INT-DEL-1",
+		ProjectId:            destinationProject.ID,
+		ProjectDestinationId: sourceProject.ID,
+		SupplyID:             destinationSupply.ID,
+		InvestorID:           investor.ID,
+		ProviderID:           provider.ID,
+		IsEntry:              true,
+	}
+	require.NoError(t, db.Create(inMovement).Error)
+
+	err := repo.DeleteSupplyMovement(context.Background(), sourceProject.ID, outMovement.ID)
+	require.NoError(t, err)
+
+	var remaining int64
+	require.NoError(t, db.Model(&models.SupplyMovement{}).
+		Where("reference_number = ?", "INT-DEL-1").
+		Count(&remaining).Error)
+	assert.Equal(t, int64(0), remaining)
+}
+
 type deleteMovementFixture struct {
 	project   *projectmodels.Project
 	supply    *models.Supply

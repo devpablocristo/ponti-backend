@@ -35,7 +35,7 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 		return 0, domainerr.Validation("movement_type Stock is no longer supported; use stock counts")
 	}
 
-	currentStock, _, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
+	currentStock, _, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -60,6 +60,9 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 	}
 
 	if movement.MovementType == domain.INTERNAL_MOVEMENT {
+		if err := ensureAvailableStockForInternalMovement(currentStock, movement); err != nil {
+			return 0, err
+		}
 		if _, _, err := u.validateInternalMovementOut(ctx, movement, *currentStock); err != nil {
 			return 0, err
 		}
@@ -110,12 +113,15 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 		return domainerr.Validation("movement_type Stock is no longer supported; use stock counts")
 	}
 
-	currentStock, _, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
+	currentStock, _, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 	if err != nil {
 		return err
 	}
 
 	if movement.MovementType == domain.INTERNAL_MOVEMENT {
+		if err := ensureAvailableStockForInternalMovement(currentStock, movement); err != nil {
+			return err
+		}
 		_, _, err := u.validateInternalMovementOut(ctx, movement, *currentStock)
 		return err
 	}
@@ -134,6 +140,17 @@ func ensureAvailableStock(currentStock *stockdomain.Stock, movement *domain.Supp
 	available := currentStock.GetStockUnits()
 	if available.LessThan(movement.Quantity) {
 		return domainerr.Validation("La devolución supera el stock disponible del insumo.")
+	}
+	return nil
+}
+
+func ensureAvailableStockForInternalMovement(currentStock *stockdomain.Stock, movement *domain.SupplyMovement) error {
+	if currentStock == nil {
+		return domainerr.Validation("No hay stock disponible del insumo.")
+	}
+	available := currentStock.GetStockUnits()
+	if available.LessThan(movement.Quantity) {
+		return domainerr.Validation("La cantidad a transferir supera el stock disponible del insumo.")
 	}
 	return nil
 }
@@ -347,7 +364,7 @@ func (u *UseCases) handleMovementInternalMovementOut(
 	movementOut.Quantity = movement.Quantity.Neg()
 	movementOut.MovementType = domain.INTERNAL_MOVEMENT
 	movementOut.IsEntry = true
-	movementOut.ProjectDestinationId = 0
+	movementOut.ProjectDestinationId = movement.ProjectDestinationId
 	movementOut.StockId = 0
 
 	if _, err = u.repo.CreateSupplyMovement(ctx, &movementOut); err != nil {
@@ -358,7 +375,7 @@ func (u *UseCases) handleMovementInternalMovementOut(
 	movementIn.ProjectId = movement.ProjectDestinationId
 	movementIn.MovementType = domain.INTERNAL_MOVEMENT_IN
 	movementIn.IsEntry = true
-	movementIn.ProjectDestinationId = 0
+	movementIn.ProjectDestinationId = movement.ProjectId
 	movementIn.Supply = &domain.Supply{ID: destSupplyID, Name: destSupplyName}
 	movementIn.StockId = 0
 

@@ -550,6 +550,8 @@ func TestHandleMovementInternalMovementOut_ReusesSupplyWhenAlreadyExistsInDestin
 	assert.Equal(t, originSupplyID, outMovementCreated.Supply.ID)
 	assert.Equal(t, destSupplyID, inMovementCreated.Supply.ID)
 	assert.True(t, inMovementCreated.Quantity.Equal(decimal.NewFromInt(10)))
+	assert.Equal(t, destinationProjectID, outMovementCreated.ProjectDestinationId)
+	assert.Equal(t, int64(20), inMovementCreated.ProjectDestinationId)
 }
 
 func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t *testing.T) {
@@ -637,9 +639,56 @@ func TestHandleMovementInternalMovementOut_CreatesSupplyInDestinationAndUsesIt(t
 	assert.NotNil(t, inMovementCreated)
 	assert.Equal(t, originSupplyID, outMovementCreated.Supply.ID)
 	assert.True(t, outMovementCreated.Quantity.Equal(decimal.NewFromInt(-10)))
+	assert.Equal(t, destProjectID, outMovementCreated.ProjectDestinationId)
 	assert.Equal(t, destSupplyID, inMovementCreated.Supply.ID)
 	assert.True(t, inMovementCreated.Quantity.Equal(decimal.NewFromInt(10)))
 	assert.Equal(t, domain.INTERNAL_MOVEMENT_IN, inMovementCreated.MovementType)
+	assert.Equal(t, originProjectID, inMovementCreated.ProjectDestinationId)
+}
+
+func TestCreateSupplyMovement_InternalMovementWithoutStock_ReturnsValidation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(18)
+	supplyID := int64(157)
+	investorID := int64(11)
+	providerID := int64(5)
+
+	mockRepo.EXPECT().
+		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "INT-NIL", supplyID).
+		Return(false, nil)
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(nil, true, nil)
+
+	id, err := u.CreateSupplyMovement(context.Background(), &domain.SupplyMovement{
+		ProjectId:            projectID,
+		ProjectDestinationId: 99,
+		Quantity:             decimal.NewFromInt(2),
+		MovementType:         domain.INTERNAL_MOVEMENT,
+		ReferenceNumber:      "INT-NIL",
+		Supply:               &domain.Supply{ID: supplyID},
+		Investor:             &investordomain.Investor{ID: investorID},
+		Provider:             &providerdomain.Provider{ID: providerID},
+	})
+
+	assert.Equal(t, int64(0), id)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "No hay stock disponible del insumo")
 }
 
 func TestImportSupplyMovements_FailsOnDuplicateInRequest(t *testing.T) {
@@ -677,7 +726,7 @@ func TestImportSupplyMovements_FailsOnDuplicateInRequest(t *testing.T) {
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-123", supplyID).
 		Return(false, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{}, false, nil)
 
 	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{
@@ -809,11 +858,11 @@ func TestImportSupplyMovements_AllowsMultipleLogicalGroupsInSameRequest(t *testi
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-101", supplyB).
 		Return(false, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyA, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyA).
 		Return(&stockdomain.Stock{}, false, nil).
 		Times(2)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyB, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyB).
 		Return(&stockdomain.Stock{}, false, nil).
 		Times(2)
 	mockRepo.EXPECT().
@@ -961,7 +1010,7 @@ func TestImportSupplyMovements_CreatesProviderByName(t *testing.T) {
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "REM-202", supplyID).
 		Return(false, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{}, false, nil).
 		Times(2)
 	mockRepo.EXPECT().
@@ -1019,7 +1068,7 @@ func TestImportSupplyMovements_InternalMovementFailsWhenDestinationEqualsOrigin(
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "INT-001", supplyID).
 		Return(false, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{
 			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
 			Consumed:        decimal.Zero,
@@ -1081,7 +1130,7 @@ func TestImportSupplyMovements_InternalMovementFailsWhenDestinationProjectDoesNo
 		ExistsSupplyMovementByProjectReferenceAndSupply(gomock.Any(), projectID, "INT-002", supplyID).
 		Return(false, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{
 			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
 			Consumed:        decimal.Zero,
@@ -1211,7 +1260,7 @@ func TestCreateSupplyMovement_ReturnMovement_CreatesNegativeEntry(t *testing.T) 
 		GetProvider(gomock.Any(), providerID).
 		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{
 			ID:              stockID,
 			SupplyMovements: []domain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(10)}},
@@ -1311,7 +1360,7 @@ func TestUpdateSupplyMovement_ReassignsStockByInvestor(t *testing.T) {
 		GetProvider(gomock.Any(), providerID).
 		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{ID: targetStockID}, false, nil)
 	mockRepo.EXPECT().
 		UpdateSupplyMovement(gomock.Any(), gomock.Any()).

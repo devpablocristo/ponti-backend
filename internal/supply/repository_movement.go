@@ -326,27 +326,17 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			supplyModel.MovementType == "Movimiento interno entrada"
 
 		if isInternalMovement {
-			// Buscar todos los registros relacionados del movimiento interno
-			// Los registros relacionados comparten: movement_date, reference_number, supply_id, investor_id, provider_id
-			var relatedMovements []models.SupplyMovement
-			err := tx.Where("movement_date = ? AND reference_number = ? AND supply_id = ? AND investor_id = ? AND provider_id = ?",
-				supplyModel.MovementDate,
-				supplyModel.ReferenceNumber,
-				supplyModel.SupplyID,
-				supplyModel.InvestorID,
-				supplyModel.ProviderID).
-				Find(&relatedMovements).Error
+			idsToDelete := []int64{supplyModel.ID}
+
+			counterpart, err := r.findInternalMovementCounterpart(tx, &supplyModel)
 			if err != nil {
-				return domainerr.Internal("failed to find related movements")
+				return err
+			}
+			if counterpart != nil {
+				idsToDelete = append(idsToDelete, counterpart.ID)
 			}
 
-			if err := tx.Where("movement_date = ? AND reference_number = ? AND supply_id = ? AND investor_id = ? AND provider_id = ?",
-				supplyModel.MovementDate,
-				supplyModel.ReferenceNumber,
-				supplyModel.SupplyID,
-				supplyModel.InvestorID,
-				supplyModel.ProviderID).
-				Delete(&models.SupplyMovement{}).Error; err != nil {
+			if err := tx.Where("id IN ?", idsToDelete).Delete(&models.SupplyMovement{}).Error; err != nil {
 				return domainerr.Internal("failed to delete related supply movements")
 			}
 
@@ -360,6 +350,45 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 		return nil
 	})
+}
+
+func (r *Repository) findInternalMovementCounterpart(tx *gorm.DB, movement *models.SupplyMovement) (*models.SupplyMovement, error) {
+	if movement == nil {
+		return nil, domainerr.Validation("supply movement is nil")
+	}
+
+	counterpartType := "Movimiento interno"
+	if movement.MovementType == "Movimiento interno" {
+		counterpartType = "Movimiento interno entrada"
+	}
+
+	query := tx.Model(&models.SupplyMovement{}).
+		Where("deleted_at IS NULL").
+		Where("id <> ?", movement.ID).
+		Where("movement_type = ?", counterpartType).
+		Where("reference_number = ?", movement.ReferenceNumber).
+		Where("movement_date = ?", movement.MovementDate).
+		Where("investor_id = ?", movement.InvestorID).
+		Where("provider_id = ?", movement.ProviderID).
+		Where("quantity = ?", movement.Quantity.Neg())
+
+	if movement.ProjectDestinationId != 0 {
+		query = query.Where("project_id = ?", movement.ProjectDestinationId).
+			Where("project_destination_id = ?", movement.ProjectId)
+	} else {
+		query = query.Where("project_id <> ?", movement.ProjectId)
+	}
+
+	var counterpart models.SupplyMovement
+	err := query.Order("id DESC").First(&counterpart).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, domainerr.Internal("failed to find related movements")
+	}
+
+	return &counterpart, nil
 }
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
