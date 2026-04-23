@@ -46,7 +46,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		Preload("SupplyMovements").
 		Where("stocks.project_id = ?", projectID)
 
-	if closeDate != zeroTime {
+	if !closeDate.Equal(zeroTime) {
 		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
 	} else {
 		stockQuery = stockQuery.Where("stocks.close_date IS NULL")
@@ -98,7 +98,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	// Para supplies sin stock activo (close_date IS NULL), traer el último stock cerrado
 	// con sus movimientos y tratarlo como activo. Así los ingresos ya cargados no se pierden
 	// cuando el cierre de período deja pares (supply, investor) sin stock activo nuevo.
-	if closeDate == zeroTime {
+	if closeDate.Equal(zeroTime) {
 		missing := make([]int64, 0, len(supplies))
 		for _, supply := range supplies {
 			if _, ok := stockBySupplyID[supply.ID]; !ok {
@@ -156,7 +156,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 			HasRealStockCount: false,
 		}
 
-		if closeDate != zeroTime {
+		if !closeDate.Equal(zeroTime) {
 			cd := closeDate
 			virtualStock.CloseDate = &cd
 		}
