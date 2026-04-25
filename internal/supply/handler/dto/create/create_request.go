@@ -16,6 +16,7 @@ type SupplyRequest struct {
 	Name           string          `json:"name"`
 	Price          decimal.Decimal `json:"price"`
 	IsPartialPrice *bool           `json:"is_partial_price"`
+	IsPending      bool            `json:"is_pending,omitempty"`
 
 	UnitID     int64 `json:"unit_id"`
 	CategoryID int64 `json:"category_id"`
@@ -36,6 +37,7 @@ func (d *SupplyRequest) ToDomain() *domain.Supply {
 		Name:           d.Name,
 		Price:          d.Price,
 		IsPartialPrice: boolOrDefault(d.IsPartialPrice, false),
+		IsPending:      d.IsPending,
 		UnitID:         d.UnitID,
 		CategoryID:     d.CategoryID,
 		Type: domainclasstype.ClassType{
@@ -56,6 +58,7 @@ func FromDomain(s *domain.Supply) *SupplyRequest {
 		Name:           s.Name,
 		Price:          s.Price,
 		IsPartialPrice: boolPtr(s.IsPartialPrice),
+		IsPending:      s.IsPending,
 		UnitID:         s.UnitID,
 		CategoryID:     s.CategoryID,
 		TypeID:         s.Type.ID,

@@ -730,7 +730,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Label:       "Labores",
 			ExecutedUSD: balance.Summary.LaboresCostUSD,
 			InvestedUSD: balance.Summary.LaboresInvertidosUSD,
-			StockUSD:    &decimal.Zero,
+			StockUSD:    &balance.Summary.LaboresStockUSD,
 			Order:       4,
 		},
 		{
@@ -738,6 +738,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Label:       "Arriendo",
 			ExecutedUSD: leaseExecutedUSD,
 			InvestedUSD: leaseInvestedUSD,
+			StockUSD:    &balance.Summary.ArriendoStockUSD,
 			Difference:  decimalPtr(leaseExecutedUSD.Sub(leaseInvestedUSD)),
 			Order:       5,
 		},
@@ -746,6 +747,7 @@ func convertManagementBalance(balance *domain.DashboardManagementBalance) Manage
 			Label:       "Estructura",
 			ExecutedUSD: balance.Summary.StructureExecutedUSD,
 			InvestedUSD: balance.Summary.StructureUSD,
+			StockUSD:    &balance.Summary.EstructuraStockUSD,
 			Order:       6,
 		},
 	}

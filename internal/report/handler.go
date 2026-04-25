@@ -63,11 +63,7 @@ func (h *ReportHandler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/reports"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	reports := r.Group(baseURL)
+	reports := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		// Handler genérico para todos los reportes
 		reports.GET("/:type", h.GetReport)

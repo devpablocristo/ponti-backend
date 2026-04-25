@@ -23,10 +23,12 @@ import (
 
 type UseCasesPort interface {
 	CreateSupply(ctx context.Context, s *domain.Supply) (int64, error)
+	CreatePendingSupply(ctx context.Context, projectID int64, name string) (*domain.Supply, bool, error)
 	CreateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error
 	GetSupply(ctx context.Context, id int64) (*domain.Supply, error)
 	GetSuppliesByIDs(ctx context.Context, ids []int64) (map[int64]domain.Supply, error)
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
+	CompletePendingSupply(ctx context.Context, s *domain.Supply) error
 	DeleteSupply(ctx context.Context, id int64) error
 	CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	ListSuppliesPaginated(
@@ -88,18 +90,17 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	supplies := r.Group(baseURL + "/supplies")
+	supplies := r.Group(baseURL+"/supplies", h.mws.GetValidation()...)
 	{
 		supplies.POST("", h.CreateSupply)
+		supplies.POST("/pending", h.CreatePendingSupply)
 		supplies.POST("/bulk", h.CreateSuppliesBulk)
 		supplies.GET("", h.ListSupplies)
+		supplies.GET("/pending", h.ListPendingSupplies)
 		supplies.GET("/export/all", h.ExportTableSupplies)
 		supplies.PUT("/bulk", h.UpdateSuppliesBulk)
 		supplies.GET("/:supply_id", h.GetSupply)
+		supplies.PUT("/pending/:supply_id/complete", h.CompletePendingSupply)
 		supplies.PUT("/:supply_id", h.UpdateSupply)
 		supplies.DELETE("/:supply_id", h.DeleteSupply)
 		supplies.POST("/:supply_id/archive", h.ArchiveSupply)
@@ -107,7 +108,7 @@ func (h *Handler) Routes() {
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
-	supplyMovements := r.Group(baseURL + "/projects/:project_id/supply-movements")
+	supplyMovements := r.Group(baseURL+"/projects/:project_id/supply-movements", h.mws.GetValidation()...)
 	{
 		supplyMovements.POST("", h.CreateSupplyMovement)
 		supplyMovements.POST("/import", h.ImportSupplyMovements)
@@ -119,7 +120,7 @@ func (h *Handler) Routes() {
 	}
 
 	// Editor de stock: mismas rutas que supply-movements, semántica para vista Stock
-	stockMovements := r.Group(baseURL + "/projects/:project_id/stock-movements")
+	stockMovements := r.Group(baseURL+"/projects/:project_id/stock-movements", h.mws.GetValidation()...)
 	{
 		stockMovements.POST("", h.CreateSupplyMovement)
 		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
@@ -141,6 +142,31 @@ func (h *Handler) CreateSupply(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondCreated(c, newID)
+}
+
+func (h *Handler) CreatePendingSupply(c *gin.Context) {
+	var req createDto.PendingSupplyRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	supply, created, err := h.ucs.CreatePendingSupply(c.Request.Context(), req.ProjectID, req.Name)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	statusCode := http.StatusOK
+	if created {
+		statusCode = http.StatusCreated
+	}
+
+	c.JSON(statusCode, createDto.PendingSupplyResponse{
+		ID:        supply.ID,
+		Name:      supply.Name,
+		IsPending: supply.IsPending,
+		Created:   created,
+	})
 }
 
 func (h *Handler) CreateSuppliesBulk(c *gin.Context) {
@@ -185,6 +211,13 @@ func (h *Handler) ListSupplies(c *gin.Context) {
 	sharedhandlers.RespondOK(c, resp)
 }
 
+func (h *Handler) ListPendingSupplies(c *gin.Context) {
+	query := c.Request.URL.Query()
+	query.Set("mode", "pending")
+	c.Request.URL.RawQuery = query.Encode()
+	h.ListSupplies(c)
+}
+
 func (h *Handler) GetSupply(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "supply_id")
 	if err != nil {
@@ -223,6 +256,37 @@ func (h *Handler) UpdateSupply(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) CompletePendingSupply(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("supply_id"), "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	var req createDto.SupplyRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	dom := req.ToDomain()
+	dom.ID = id
+	if req.IsPartialPrice == nil {
+		currentSupply, err := h.ucs.GetSupply(c.Request.Context(), id)
+		if err != nil {
+			sharedhandlers.RespondError(c, err)
+			return
+		}
+		dom.IsPartialPrice = currentSupply.IsPartialPrice
+	}
+
+	if err := h.ucs.CompletePendingSupply(c.Request.Context(), dom); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
 	sharedhandlers.RespondNoContent(c)
 }
 

@@ -40,8 +40,12 @@ services:
       - GO_MODULES_TOKEN=${GO_MODULES_TOKEN:-}
     volumes:
       - .:/app
+      # Monta el repo core en la misma ruta absoluta que usan los replace locales de go.mod.
+      - ${CORE_REPO_DIR:-/home/pablo/Projects/Pablo/core}:/home/pablo/Projects/Pablo/core
       - go-modules:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app-network
     restart: unless-stopped

@@ -13,10 +13,10 @@ import (
 )
 
 type UseCasePort interface {
-	GetInvoiceByWorkOrder(context.Context, int64) (*domain.Invoice, error)
+	GetInvoiceByWorkOrder(context.Context, int64, int64) (*domain.Invoice, error)
 	CreateInvoice(context.Context, *domain.Invoice) (int64, error)
 	UpdateInvoice(context.Context, *domain.Invoice) error
-	DeleteInvoice(context.Context, int64) error
+	DeleteInvoice(context.Context, int64, int64) error
 	ListInvoices(context.Context, int64, int, int) ([]domain.Invoice, int64, error)
 }
 
@@ -56,11 +56,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.cfg.APIBaseURL() + "/invoices"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	public := r.Group(baseURL)
+	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListInvoices)
 		public.GET("/:work_order_id", h.GetInvoiceByWorkOrder)
@@ -71,25 +67,36 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) GetInvoiceByWorkOrder(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	item, err := h.ucs.GetInvoiceByWorkOrder(c.Request.Context(), id)
+	investorID, err := parseInvestorIDQuery(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	item, err := h.ucs.GetInvoiceByWorkOrder(c.Request.Context(), workOrderID, investorID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	resp := dto.FromDomain(item)
-
 	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) CreateInvoice(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	investorID, err := parseInvestorIDQuery(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -111,7 +118,7 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 		return
 	}
 
-	item := body.ToDomain(id, userID)
+	item := body.ToDomain(workOrderID, investorID, userID)
 
 	newID, err := h.ucs.CreateInvoice(c.Request.Context(), item)
 	if err != nil {
@@ -123,7 +130,13 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 }
 
 func (h *Handler) UpdateInvoice(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	investorID, err := parseInvestorIDQuery(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -140,8 +153,8 @@ func (h *Handler) UpdateInvoice(c *gin.Context) {
 		return
 	}
 
-	item := body.ToDomain(id, userID)
-	item.ID = id
+	item := body.ToDomain(workOrderID, investorID, userID)
+	item.ID = workOrderID
 
 	if err := h.ucs.UpdateInvoice(c.Request.Context(), item); err != nil {
 		sharedhandlers.RespondError(c, err)
@@ -178,16 +191,36 @@ func (h *Handler) ListInvoices(c *gin.Context) {
 }
 
 func (h *Handler) DeleteInvoice(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
+	workOrderID, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	if err := h.ucs.DeleteInvoice(c.Request.Context(), id); err != nil {
+	investorID, err := parseInvestorIDQuery(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	if err := h.ucs.DeleteInvoice(c.Request.Context(), workOrderID, investorID); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
 	sharedhandlers.RespondNoContent(c)
+}
+
+func parseInvestorIDQuery(c *gin.Context) (int64, error) {
+	value := c.Query("investor_id")
+	if value == "" {
+		return 0, domainerr.Validation("investor_id is required")
+	}
+
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, domainerr.Validation("investor_id is required")
+	}
+
+	return id, nil
 }

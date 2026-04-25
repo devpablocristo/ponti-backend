@@ -37,6 +37,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
+	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 )
 
 // Injectors from wire.go:
@@ -323,6 +324,18 @@ func Initialize() (*Dependencies, error) {
 	api := ProvideConfigAPI(config)
 	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
 	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
+	workorderdraftGinEnginePort := ProvideWorkOrderDraftGinEnginePort(server)
+	workorderdraftGormEngine := ProvideWorkOrderDraftGormEnginePort(repository)
+	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)
+	workorderdraftRepositoryPort := ProvideWorkOrderDraftRepositoryPort(workorderdraftRepository)
+	publisherPort := ProvideWorkOrderDraftPublisherPort(workorderRepositoryPort)
+	pdfExporterPort := ProvideWorkOrderDraftPDFExporterPort()
+	supplyReaderPort := ProvideWorkOrderDraftSupplyReaderPort(supplyRepositoryPort)
+	workorderdraftUseCases := ProvideWorkOrderDraftUseCases(workorderdraftRepositoryPort, publisherPort, pdfExporterPort, supplyReaderPort)
+	workorderdraftUseCasesPort := ProvideWorkOrderDraftUseCasesPort(workorderdraftUseCases)
+	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)
+	workorderdraftMiddlewaresEnginePort := ProvideWorkOrderDraftMiddlewaresEnginePort(middlewares)
+	workorderdraftHandler := ProvideWorkOrderDraftHandler(workorderdraftGinEnginePort, workorderdraftUseCasesPort, workorderdraftConfigAPIPort, workorderdraftMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -352,8 +365,10 @@ func Initialize() (*Dependencies, error) {
 		InvoiceHandler:            invoiceHandler,
 		CommercializationHandler:  commercializationHandler,
 		StockHandler:              stockHandler,
+		StockUseCases:             stockUseCases,
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
+		WorkOrderDraftHandler:     workorderdraftHandler,
 	}
 	return dependencies, nil
 }
@@ -389,6 +404,8 @@ type Dependencies struct {
 	InvoiceHandler            *invoice.Handler
 	CommercializationHandler  *commercialization.Handler
 	StockHandler              *stock.Handler
+	StockUseCases             *stock.UseCases
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
+	WorkOrderDraftHandler     *workorderdraft.Handler
 }

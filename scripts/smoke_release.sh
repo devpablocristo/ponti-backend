@@ -128,6 +128,20 @@ if [[ -z "${investor_a}" || -z "${investor_b}" ]]; then
   exit 1
 fi
 
+readarray -t workspace_ids < <(json_extract "${detail_body}" '
+data=obj.get("data",obj)
+customer=(data.get("customer") or {}).get("id","")
+campaign=(data.get("campaign") or {}).get("id","")
+print(customer)
+print(campaign)
+')
+customer_id="${workspace_ids[0]:-}"
+campaign_id="${workspace_ids[1]:-}"
+if [[ -z "${customer_id}" || -z "${campaign_id}" ]]; then
+  echo "ERROR: El proyecto ${project_id} no expone customer_id/campaign_id válidos para el workspace requerido." >&2
+  exit 1
+fi
+
 readarray -t lot_data < <(json_extract "${detail_body}" '
 data=obj.get("data",obj)
 fields=data.get("fields") or []
@@ -208,7 +222,7 @@ print(json.dumps({
   "observations": "Smoke deploy validation",
   "date": f'{os.environ["TODAY"]}T00:00:00Z',
   "investor_id": int(os.environ["INVESTOR_A"]),
-  "effective_area": 1,
+  "effective_area": 100,
   "items": [],
   "investor_splits": [
     {"investor_id": int(os.environ["INVESTOR_A"]), "percentage": 60},
@@ -219,7 +233,7 @@ PY
 )"
 
 echo "[smoke] Snapshot report before split..."
-resp="$(request GET "$(api_url "/reports/investor-contribution?project_id=${project_id}")")"
+resp="$(request GET "$(api_url "/reports/investor-contribution?customer_id=${customer_id}&project_id=${project_id}&campaign_id=${campaign_id}")")"
 before_report_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
 before_report_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
 expect_status "200" "${before_report_status}" "No se pudo obtener reporte previo de aportes"
@@ -283,7 +297,7 @@ print("ok")
 ' >/dev/null
 
 echo "[smoke] Validate investor-contribution report endpoint..."
-resp="$(request GET "$(api_url "/reports/investor-contribution?project_id=${project_id}")")"
+resp="$(request GET "$(api_url "/reports/investor-contribution?customer_id=${customer_id}&project_id=${project_id}&campaign_id=${campaign_id}")")"
 report_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
 report_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
 expect_status "200" "${report_status}" "Reporte de aporte por inversor no disponible"

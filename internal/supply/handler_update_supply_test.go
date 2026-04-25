@@ -37,6 +37,10 @@ func (s *handlerUseCasesStub) CreateSupply(context.Context, *domain.Supply) (int
 	return 0, nil
 }
 
+func (s *handlerUseCasesStub) CreatePendingSupply(context.Context, int64, string) (*domain.Supply, bool, error) {
+	return nil, false, nil
+}
+
 func (s *handlerUseCasesStub) CreateSuppliesBulk(context.Context, []domain.Supply) error {
 	return nil
 }
@@ -64,6 +68,10 @@ func (s *handlerUseCasesStub) UpdateSupply(ctx context.Context, supply *domain.S
 		return s.updateSupplyFn(ctx, supply)
 	}
 	return nil
+}
+
+func (s *handlerUseCasesStub) CompletePendingSupply(ctx context.Context, supply *domain.Supply) error {
+	return s.UpdateSupply(ctx, supply)
 }
 
 func (s *handlerUseCasesStub) DeleteSupply(context.Context, int64) error {

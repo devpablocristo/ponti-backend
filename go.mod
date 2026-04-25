@@ -8,8 +8,10 @@ require (
 	github.com/devpablocristo/core/authn/go v0.2.1
 	github.com/devpablocristo/core/databases/postgres/go v0.1.0
 	github.com/devpablocristo/core/errors/go v0.1.0
+	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
 	github.com/devpablocristo/core/http/gin/go v0.1.0
 	github.com/devpablocristo/core/http/go v0.1.1
+	github.com/devpablocristo/core/notifications/go v0.3.0
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
 	github.com/gin-gonic/gin v1.12.0
@@ -18,6 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/shopspring/decimal v1.2.0

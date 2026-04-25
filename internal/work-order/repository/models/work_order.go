@@ -52,6 +52,7 @@ type WorkOrderItem struct {
 	ID          int64            `gorm:"primaryKey;autoIncrement"`
 	WorkOrderID int64            `gorm:"column:workorder_id;index"`
 	SupplyID    int64            `gorm:"not null"`
+	SupplyName  string           `gorm:"column:supply_name;not null"`
 	Supply      supplymod.Supply `gorm:"foreignKey:SupplyID"`
 	TotalUsed   decimal.Decimal  `gorm:"not null"`
 	FinalDose   decimal.Decimal  `gorm:"not null"`
@@ -83,11 +84,12 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	if len(o.Items) > 0 {
 		items := make([]WorkOrderItem, len(o.Items))
 		for i, it := range o.Items {
-			items[i] = WorkOrderItem{
-				SupplyID:  it.SupplyID,
-				TotalUsed: it.TotalUsed,
-				FinalDose: it.FinalDose,
-			}
+				items[i] = WorkOrderItem{
+					SupplyID:   it.SupplyID,
+					SupplyName: it.SupplyName,
+					TotalUsed:  it.TotalUsed,
+					FinalDose:  it.FinalDose,
+				}
 		}
 		w.Items = items
 	}
@@ -113,9 +115,10 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 		items = make([]domain.WorkOrderItem, len(m.Items))
 		for i, it := range m.Items {
 			items[i] = domain.WorkOrderItem{
-				SupplyID:  it.SupplyID,
-				TotalUsed: it.TotalUsed,
-				FinalDose: it.FinalDose,
+				SupplyID:   it.SupplyID,
+				SupplyName: it.SupplyName,
+				TotalUsed:  it.TotalUsed,
+				FinalDose:  it.FinalDose,
 			}
 		}
 	}

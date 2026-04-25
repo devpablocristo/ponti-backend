@@ -63,11 +63,7 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	base := h.acf.APIBaseURL() + "/work-orders"
 
-	for _, mw := range h.mws.GetValidation() {
-		r.Use(mw)
-	}
-
-	grp := r.Group(base)
+	grp := r.Group(base, h.mws.GetValidation()...)
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("/:work_order_id", h.GetWorkOrderByID)
@@ -212,14 +208,33 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 // parseFilters extrae project_id, field_id, customer_id y campaign_id.
 func parseFilters(c *gin.Context) domain.WorkOrderFilter {
 	f := domain.WorkOrderFilter{}
+
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		return f
 	}
+
 	f.ProjectID = workspaceFilter.ProjectID
 	f.FieldID = workspaceFilter.FieldID
 	f.CustomerID = workspaceFilter.CustomerID
 	f.CampaignID = workspaceFilter.CampaignID
+
+	if raw := c.Query("is_digital"); raw != "" {
+		switch raw {
+		case "true":
+			value := true
+			f.IsDigital = &value
+		case "false":
+			value := false
+			f.IsDigital = &value
+		}
+	}
+
+	if raw := c.Query("status"); raw != "" {
+		value := raw
+		f.Status = &value
+	}
+
 	return f
 }
 

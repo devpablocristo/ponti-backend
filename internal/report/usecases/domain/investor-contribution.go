@@ -36,7 +36,7 @@ type InvestorRef struct {
 // La UI usa esta lista para mostrar las cabeceras sobre las columnas de inversores.
 type InvestorHeader struct {
 	InvestorRef
-	SharePct decimal.Decimal // Porcentaje global acordado (0..100) que se muestra en la cabecera.
+	SharePct decimal.Decimal // Porcentaje que se muestra en la cabecera (0..100).
 }
 
 // InvestorShare asignación monetaria por inversor dentro de una fila/categoría.
@@ -97,10 +97,11 @@ type PreHarvestTotals struct {
 // Se usa para renderizar "Aporte acordado" y "Ajuste de aporte" por inversor.
 type InvestorContributionComparison struct {
 	InvestorRef
-	AgreedSharePct decimal.Decimal // % acordado global (0..100) para el inversor.
-	AgreedUsd      decimal.Decimal // Monto acordado total (USD).
-	ActualUsd      decimal.Decimal // Monto efectivamente aportado (USD).
-	AdjustmentUsd  decimal.Decimal // Diferencia: AgreedUsd - ActualUsd (positivo => debe aportar).
+	AgreedSharePct decimal.Decimal  // % acordado global (0..100) para el inversor.
+	ActualSharePct *decimal.Decimal // % real aportado (0..100), equivalente al avance del dashboard.
+	AgreedUsd      decimal.Decimal  // Monto acordado total (USD).
+	ActualUsd      decimal.Decimal  // Monto efectivamente aportado (USD).
+	AdjustmentUsd  decimal.Decimal  // Diferencia: ActualUsd - AgreedUsd.
 }
 
 // =====================================================================================

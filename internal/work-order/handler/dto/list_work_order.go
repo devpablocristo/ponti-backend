@@ -32,7 +32,10 @@ type WorkOrderListElement struct {
 	CostPerHa         decimal.Decimal `json:"cost_per_ha"`
 	UnitPrice         decimal.Decimal `json:"unit_price"`
 	TotalCost         decimal.Decimal `json:"total_cost"`
+	IsDigital         bool            `json:"is_digital"`
+	Status            string          `json:"status"`
 }
+
 
 // MarshalJSON asegura 2 decimales en todos los campos decimal de salida.
 func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
@@ -57,6 +60,8 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		CostPerHa         string    `json:"cost_per_ha"`
 		UnitPrice         string    `json:"unit_price"`
 		TotalCost         string    `json:"total_cost"`
+		IsDigital         bool      `json:"is_digital"`
+		Status            string    `json:"status"`
 	}{
 		ID:                w.ID,
 		Number:            w.Number,
@@ -70,15 +75,18 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		LaborCategoryName: w.LaborCategoryName,
 		TypeName:          w.TypeName,
 		Contractor:        w.Contractor,
-		SurfaceHa:         w.SurfaceHa.StringFixed(2), // Superficie: 2 decimales
+		SurfaceHa:         w.SurfaceHa.StringFixed(2),
 		SupplyName:        w.SupplyName,
-		Consumption:       w.Consumption.StringFixed(2), // 2 decimales
+		Consumption:       w.Consumption.StringFixed(2),
 		CategoryName:      w.CategoryName,
-		Dose:              w.Dose.StringFixed(2),         // Dosis: 2 decimales
-		CostPerHa:         w.CostPerHa.StringFixed(2),    // Costo/ha: 2 decimales
-		UnitPrice:         w.UnitPrice.StringFixed(2),    // Precio/ha: 2 decimales
-		TotalCost:         w.TotalCost.Round(0).String(), // Total costo: sin decimales
+		Dose:              w.Dose.StringFixed(2),
+		CostPerHa:         w.CostPerHa.StringFixed(2),
+		UnitPrice:         w.UnitPrice.StringFixed(2),
+		TotalCost:         w.TotalCost.Round(0).String(),
+		IsDigital:         w.IsDigital,
+		Status:            w.Status,
 	}
+
 	return json.Marshal(aux)
 }
 
@@ -109,6 +117,8 @@ func FromDomainListElement(d *domain.WorkOrderListElement) *WorkOrderListElement
 		CostPerHa:         d.CostPerHa,
 		UnitPrice:         d.UnitPrice,
 		TotalCost:         d.TotalCost,
+		IsDigital:         d.IsDigital,
+		Status:            d.Status,
 	}
 }
 

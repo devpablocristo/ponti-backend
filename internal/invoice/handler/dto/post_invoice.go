@@ -34,9 +34,10 @@ func (ir *InvoiceRequest) Validate() error {
 	return nil
 }
 
-func (ir *InvoiceRequest) ToDomain(workOrderID int64, userID string) *domain.Invoice {
+func (ir *InvoiceRequest) ToDomain(workOrderID int64, investorID int64, userID string) *domain.Invoice {
 	return &domain.Invoice{
 		WorkOrderID: workOrderID,
+		InvestorID:  investorID,
 		Number:      ir.Number,
 		Company:     ir.Company,
 		Date:        ir.Date,
@@ -47,3 +48,4 @@ func (ir *InvoiceRequest) ToDomain(workOrderID int64, userID string) *domain.Inv
 		},
 	}
 }
+

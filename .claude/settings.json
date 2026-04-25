@@ -16,13 +16,35 @@
       "Bash(npx tsc:*)",
       "Bash(go mod:*)",
       "Bash(GOPRIVATE=github.com/devpablocristo/*)",
-      "Bash(psql --version)"
+      "Bash(gh pr:*)",
+      "Bash(docker build:*)",
+      "Read(//home/pablo/go/pkg/mod/github.com/devpablocristo/**)",
+      "Bash(gcloud projects:*)",
+      "Bash(docker rm:*)",
+      "Bash(gcloud ai:*)",
+      "Bash(timeout 300 bash -c 'while ! docker compose logs ponti-ui 2>&1 | grep -q \"Local:\"; do sleep 5; done')",
+      "Bash(gcloud sql:*)",
+      "Bash(gcloud storage:*)",
+      "Bash(python -m py_compile src/main.py src/api/deps.py src/api/router.py src/agents/service.py src/agents/insight_chat_service.py src/insights/repository.py src/insights/service.py src/insights/domain.py src/tools/registry.py)",
+      "Bash(docker restart *)",
+      "Bash(psql --version)",
+      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -c ' *)",
+      "Bash(~/bin/cloud-sql-proxy new-ponti-dev:us-central1:new-ponti-db-dev --port 5434)",
+      "Bash(git mv *)",
+      "Bash(bash scripts/db/db_migrate_up.sh)",
+      "Bash(psql -h 127.0.0.1 -p 5434 -U soalen-db-v3 -d new_ponti_db_dev -tAc ' *)",
+      "Bash(psql -h 127.0.0.1 -p 5433 -U admin -d new_ponti_db_dev -tAc ' *)",
+      "Bash(psql -h 127.0.0.1 -p 5434 -U soalen-db-v3 -d new_ponti_db_dev -c ' *)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/org",
       "/home/pablo/Projects/Pablo/saas-core/billing",
       "/home/pablo/Projects/Pablo/saas-core/admin",
-      "/home/pablo/Projects/Pablo/ponti"
+      "/home/pablo/Projects/Pablo/ponti",
+      "/tmp",
+      "/home/pablo/Projects/Pablo/core/ai/python/src/runtime/providers",
+      "/home/pablo/Projects/Pablo/core/ai/python",
+      "/home/pablo/Projects/Pablo/nexus/.github/workflows"
     ]
   }
 }
