@@ -203,7 +203,7 @@ func TestInvestorContributionDataModel_ToDomainInvestorContributionReport_EmptyG
 }
 
 // TestInvestorHeaderModel_SharePct verifica que los headers de inversores
-// contienen el share_pct acordado correctamente
+// mapean share_pct correctamente.
 func TestInvestorHeaderModel_SharePct(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -335,6 +335,82 @@ func TestInvestorContributionDataModel_InvestorHeaders(t *testing.T) {
 	totalPct := report.InvestorHeaders[0].SharePct.Add(report.InvestorHeaders[1].SharePct)
 	assert.True(t, decimal.NewFromInt(100).Equal(totalPct),
 		"La suma de porcentajes debe ser 100%%, got %v", totalPct)
+}
+
+func TestInvestorContributionDataModel_InvestorHeadersUseActualSharePctFromComparison(t *testing.T) {
+	model := &InvestorContributionDataModel{
+		ProjectID:    42,
+		ProjectName:  "JULUY",
+		CustomerID:   7,
+		CustomerName: "MEALLA",
+		CampaignID:   4,
+		CampaignName: "2025-2026",
+		InvestorHeadersJSON: `[
+			{"investor_id": 1, "investor_name": "OLEGA SA", "share_pct": 63},
+			{"investor_id": 2, "investor_name": "E.VEDOYA", "share_pct": 7},
+			{"investor_id": 3, "investor_name": "AGRO LAJITAS SA", "share_pct": 30}
+		]`,
+		GeneralProjectDataJSON: `{
+			"surface_total_ha": 1748,
+			"lease_fixed_total_usd": 0,
+			"lease_is_fixed": false,
+			"admin_per_ha_usd": 50,
+			"admin_total_usd": 87400
+		}`,
+		ContributionCategoriesJSON: "[]",
+		InvestorContributionComparisonJSON: `[
+			{
+				"investor_id": 1,
+				"investor_name": "OLEGA SA",
+				"agreed_share_pct": 63,
+				"share_pct": 58,
+				"agreed_usd": 612005,
+				"actual_usd": 575027,
+				"adjustment_usd": -36978
+			},
+			{
+				"investor_id": 2,
+				"investor_name": "E.VEDOYA",
+				"agreed_share_pct": 7,
+				"share_pct": 7,
+				"agreed_usd": 68000,
+				"actual_usd": 71889,
+				"adjustment_usd": 3889
+			},
+			{
+				"investor_id": 3,
+				"investor_name": "AGRO LAJITAS SA",
+				"agreed_share_pct": 30,
+				"share_pct": 35,
+				"agreed_usd": 291431,
+				"actual_usd": 324520,
+				"adjustment_usd": 33089
+			}
+		]`,
+		HarvestSettlementJSON: `{"rows": [], "footer_payment_agreed": [], "footer_payment_adjustment": []}`,
+	}
+
+	report, err := model.ToDomainInvestorContributionReport()
+
+	require.NoError(t, err)
+	require.NotNil(t, report)
+	require.Len(t, report.InvestorHeaders, 3)
+	require.Len(t, report.Comparison, 3)
+
+	assert.True(t, decimal.NewFromInt(58).Equal(report.InvestorHeaders[0].SharePct),
+		"OLEGA debe mostrar aporte actual 58%% en la cabecera, got %v", report.InvestorHeaders[0].SharePct)
+	assert.True(t, decimal.NewFromInt(7).Equal(report.InvestorHeaders[1].SharePct),
+		"E.VEDOYA debe mostrar aporte actual 7%% en la cabecera, got %v", report.InvestorHeaders[1].SharePct)
+	assert.True(t, decimal.NewFromInt(35).Equal(report.InvestorHeaders[2].SharePct),
+		"AGRO LAJITAS debe mostrar aporte actual 35%% en la cabecera, got %v", report.InvestorHeaders[2].SharePct)
+
+	assert.True(t, decimal.NewFromInt(63).Equal(report.Comparison[0].AgreedSharePct),
+		"OLEGA debe conservar aporte acordado 63%%, got %v", report.Comparison[0].AgreedSharePct)
+	assert.True(t, decimal.NewFromInt(30).Equal(report.Comparison[2].AgreedSharePct),
+		"AGRO LAJITAS debe conservar aporte acordado 30%%, got %v", report.Comparison[2].AgreedSharePct)
+	require.NotNil(t, report.Comparison[0].ActualSharePct)
+	assert.True(t, decimal.NewFromInt(58).Equal(*report.Comparison[0].ActualSharePct),
+		"OLEGA debe mapear share_pct real 58%%, got %v", report.Comparison[0].ActualSharePct)
 }
 
 // Helper functions
@@ -473,6 +549,7 @@ func TestInvestorContributionComparisonModel_JSONMapping(t *testing.T) {
 		"investor_id": 5,
 		"investor_name": "COTY",
 		"agreed_share_pct": 50,
+		"share_pct": 59,
 		"agreed_usd": 14386.275,
 		"actual_usd": 17021.785,
 		"adjustment_usd": 2635.51
@@ -488,6 +565,10 @@ func TestInvestorContributionComparisonModel_JSONMapping(t *testing.T) {
 
 	assert.True(t, comparison.AgreedSharePct.Equal(decimal.NewFromInt(50)),
 		"agreed_share_pct debe mapearse correctamente, got %v", comparison.AgreedSharePct)
+
+	require.NotNil(t, comparison.SharePct)
+	assert.True(t, comparison.SharePct.Equal(decimal.NewFromInt(59)),
+		"share_pct debe mapearse correctamente, got %v", comparison.SharePct)
 
 	assert.True(t, comparison.AgreedUsd.Equal(decimal.NewFromFloat(14386.275)),
 		"agreed_usd debe mapearse correctamente, got %v", comparison.AgreedUsd)
@@ -526,6 +607,7 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 				"investor_id": 5,
 				"investor_name": "COTY",
 				"agreed_share_pct": 50,
+				"share_pct": 59,
 				"agreed_usd": 14386.275,
 				"actual_usd": 17021.785,
 				"adjustment_usd": 2635.51
@@ -534,6 +616,7 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 				"investor_id": 11,
 				"investor_name": "SOALEN SRL",
 				"agreed_share_pct": 50,
+				"share_pct": 41,
 				"agreed_usd": 14386.275,
 				"actual_usd": 11578.765,
 				"adjustment_usd": -2807.51
@@ -556,6 +639,10 @@ func TestInvestorContributionDataModel_Comparison(t *testing.T) {
 
 	assert.True(t, coty.AgreedSharePct.Equal(decimal.NewFromInt(50)),
 		"COTY debe tener agreed_share_pct = 50, got %v", coty.AgreedSharePct)
+
+	require.NotNil(t, coty.ActualSharePct)
+	assert.True(t, coty.ActualSharePct.Equal(decimal.NewFromInt(59)),
+		"COTY debe tener share_pct = 59, got %v", coty.ActualSharePct)
 
 	assert.True(t, coty.AgreedUsd.Equal(decimal.NewFromFloat(14386.275)),
 		"COTY debe tener agreed_usd = 14386.275, got %v", coty.AgreedUsd)

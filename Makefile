@@ -12,11 +12,15 @@ DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}
 MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
+LOCAL_STG_ENV      := .env.main.local
+LOCAL_DEV_ENV      := .env.develop.local
+
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
         run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
-        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local
+        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local \
+        select-ponti-stg-local select-ponti-dev-local up-ponti-stg-local up-ponti-dev-local
 
 define compose_cmd
 GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
@@ -67,6 +71,23 @@ up-ponti-local:
 down-ponti-local:
 	@echo "Stopping full local stack (backend + frontend + ai)..."
 	@bash ./scripts/down_ponti_local.sh
+
+# --------------------------------------------------
+# Selección de entorno local (copia .env.*.local → .env)
+# --------------------------------------------------
+select-ponti-stg-local:
+	@test -f $(LOCAL_STG_ENV) || (echo "ERROR: falta $(LOCAL_STG_ENV)" >&2; exit 1)
+	@cp $(LOCAL_STG_ENV) .env
+	@echo "Backend local env activo: $(LOCAL_STG_ENV)"
+
+select-ponti-dev-local:
+	@test -f $(LOCAL_DEV_ENV) || (echo "ERROR: falta $(LOCAL_DEV_ENV)" >&2; exit 1)
+	@cp $(LOCAL_DEV_ENV) .env
+	@echo "Backend local env activo: $(LOCAL_DEV_ENV)"
+
+up-ponti-stg-local: select-ponti-stg-local up-ponti-local
+
+up-ponti-dev-local: select-ponti-dev-local up-ponti-local
 
 seed:
 	@echo "Seeding database..."

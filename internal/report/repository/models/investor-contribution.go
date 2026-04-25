@@ -76,10 +76,11 @@ type PreHarvestTotalsModel struct {
 type InvestorContributionComparisonModel struct {
 	InvestorID     *int64          `json:"investor_id,omitempty"`
 	InvestorName   *string         `json:"investor_name,omitempty"`
-	AgreedSharePct decimal.Decimal `json:"agreed_share_pct"` // FIX 000172: Corregido para coincidir con vista SQL
-	AgreedUsd      decimal.Decimal `json:"agreed_usd"`       // FIX 000172: Corregido para coincidir con vista SQL
-	ActualUsd      decimal.Decimal `json:"actual_usd"`       // FIX 000172: Corregido para coincidir con vista SQL
-	AdjustmentUsd  decimal.Decimal `json:"adjustment_usd"`
+	AgreedSharePct decimal.Decimal  `json:"agreed_share_pct"`    // FIX 000172: Corregido para coincidir con vista SQL
+	SharePct       *decimal.Decimal `json:"share_pct,omitempty"` // % real aportado, igual al avance de aportes del dashboard
+	AgreedUsd      decimal.Decimal  `json:"agreed_usd"`          // FIX 000172: Corregido para coincidir con vista SQL
+	ActualUsd      decimal.Decimal  `json:"actual_usd"`          // FIX 000172: Corregido para coincidir con vista SQL
+	AdjustmentUsd  decimal.Decimal  `json:"adjustment_usd"`
 }
 
 // HarvestRowModel modelo para filas de cosecha
@@ -171,6 +172,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 			return nil, fmt.Errorf("error deserializando investor_contribution_comparison: %w", err)
 		}
 		report.Comparison = m.mapComparisonsToDomain(comparisons)
+		applyActualSharePctToHeaders(report.InvestorHeaders, comparisons)
 	}
 
 	// Parsear harvest desde JSONB
@@ -229,12 +231,47 @@ func (m *InvestorContributionDataModel) mapComparisonsToDomain(comparisons []Inv
 				InvestorName: c.InvestorName,
 			},
 			AgreedSharePct: c.AgreedSharePct,
+			ActualSharePct: c.SharePct,
 			AgreedUsd:      c.AgreedUsd,
 			ActualUsd:      c.ActualUsd,
 			AdjustmentUsd:  c.AdjustmentUsd,
 		}
 	}
 	return domainComparisons
+}
+
+func applyActualSharePctToHeaders(headers []domain.InvestorHeader, comparisons []InvestorContributionComparisonModel) {
+	if len(headers) == 0 || len(comparisons) == 0 {
+		return
+	}
+
+	actualByInvestorID := make(map[int64]decimal.Decimal, len(comparisons))
+	actualByInvestorName := make(map[string]decimal.Decimal, len(comparisons))
+	for _, comparison := range comparisons {
+		if comparison.SharePct == nil {
+			continue
+		}
+		if comparison.InvestorID != nil {
+			actualByInvestorID[*comparison.InvestorID] = *comparison.SharePct
+		}
+		if comparison.InvestorName != nil {
+			actualByInvestorName[*comparison.InvestorName] = *comparison.SharePct
+		}
+	}
+
+	for i := range headers {
+		if headers[i].InvestorID != nil {
+			if actualShare, ok := actualByInvestorID[*headers[i].InvestorID]; ok {
+				headers[i].SharePct = actualShare
+				continue
+			}
+		}
+		if headers[i].InvestorName != nil {
+			if actualShare, ok := actualByInvestorName[*headers[i].InvestorName]; ok {
+				headers[i].SharePct = actualShare
+			}
+		}
+	}
 }
 
 // mapHarvestToDomain mapea harvest del modelo al domain usando helpers (DRY)

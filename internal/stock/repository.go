@@ -35,7 +35,6 @@ func NewRepository(db GormEnginePort) *Repository {
 // GetStocks retorna stocks filtrando por proyecto y opcionalmente por fecha de corte.
 func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
 	gormDB := r.getDB(ctx)
-	var zeroTime time.Time
 
 	stockQuery := gormDB.Model(&models.Stock{}).
 		Preload("Project").
@@ -46,10 +45,10 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		Preload("SupplyMovements").
 		Where("stocks.project_id = ?", projectID)
 
-	if closeDate != zeroTime {
-		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
-	} else {
+	if closeDate.IsZero() {
 		stockQuery = stockQuery.Where("stocks.close_date IS NULL")
+	} else {
+		stockQuery = stockQuery.Where("stocks.close_date = ?", closeDate)
 	}
 
 	var stockModels []models.Stock
@@ -89,19 +88,19 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		consumedBySupplyID[row.SupplyID] = row.Consumed
 	}
 
-	stockBySupplyID := make(map[int64]models.Stock, len(stockModels))
-	for _, stock := range stockModels {
-		stock.Consumed = consumedBySupplyID[stock.SupplyID]
-		stockBySupplyID[stock.SupplyID] = stock
+	stocksBySupplyID := make(map[int64][]models.Stock, len(stockModels))
+	for i := range stockModels {
+		stockModels[i].Consumed = consumedBySupplyID[stockModels[i].SupplyID]
+		stocksBySupplyID[stockModels[i].SupplyID] = append(stocksBySupplyID[stockModels[i].SupplyID], stockModels[i])
 	}
 
 	// Para supplies sin stock activo (close_date IS NULL), traer el último stock cerrado
 	// con sus movimientos y tratarlo como activo. Así los ingresos ya cargados no se pierden
 	// cuando el cierre de período deja pares (supply, investor) sin stock activo nuevo.
-	if closeDate == zeroTime {
+	if closeDate.IsZero() {
 		missing := make([]int64, 0, len(supplies))
 		for _, supply := range supplies {
-			if _, ok := stockBySupplyID[supply.ID]; !ok {
+			if len(stocksBySupplyID[supply.ID]) == 0 {
 				missing = append(missing, supply.ID)
 			}
 		}
@@ -109,10 +108,10 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		if len(missing) > 0 {
 			var latestClosedIDs []int64
 			distinctQuery := `
-				SELECT DISTINCT ON (supply_id) id
+				SELECT DISTINCT ON (supply_id, investor_id) id
 				FROM stocks
 				WHERE project_id = ? AND supply_id IN ? AND close_date IS NOT NULL
-				ORDER BY supply_id, close_date DESC
+				ORDER BY supply_id, investor_id, close_date DESC, id DESC
 			`
 			if err := gormDB.Raw(distinctQuery, projectID, missing).Scan(&latestClosedIDs).Error; err != nil {
 				return nil, err
@@ -135,16 +134,16 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 				for _, stock := range latestClosed {
 					stock.Consumed = consumedBySupplyID[stock.SupplyID]
 					stock.CloseDate = nil // mostrar como activo en la UI
-					stockBySupplyID[stock.SupplyID] = stock
+					stocksBySupplyID[stock.SupplyID] = append(stocksBySupplyID[stock.SupplyID], stock)
 				}
 			}
 		}
 	}
 
-	stocks := make([]*domain.Stock, 0, len(supplies))
+	stocks := make([]*domain.Stock, 0, len(supplies)+len(stockModels))
 	for _, supply := range supplies {
-		if stockModel, ok := stockBySupplyID[supply.ID]; ok {
-			stocks = append(stocks, stockModel.ToDomain())
+		if stockModelsForSupply := stocksBySupplyID[supply.ID]; len(stockModelsForSupply) > 0 {
+			stocks = append(stocks, mapStockModelsToDomain(stockModelsForSupply, consumedBySupplyID)...)
 			continue
 		}
 
@@ -156,7 +155,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 			HasRealStockCount: false,
 		}
 
-		if closeDate != zeroTime {
+		if !closeDate.IsZero() {
 			cd := closeDate
 			virtualStock.CloseDate = &cd
 		}
@@ -165,6 +164,15 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	}
 
 	return stocks, nil
+}
+
+func mapStockModelsToDomain(stockModels []models.Stock, consumedBySupplyID map[int64]decimal.Decimal) []*domain.Stock {
+	stocks := make([]*domain.Stock, 0, len(stockModels))
+	for i := range stockModels {
+		stockModels[i].Consumed = consumedBySupplyID[stockModels[i].SupplyID]
+		stocks = append(stocks, stockModels[i].ToDomain())
+	}
+	return stocks
 }
 
 // GetActiveStocksByProjectID retorna todos los stocks con close_date IS NULL

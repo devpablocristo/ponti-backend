@@ -82,7 +82,7 @@ err(){ echo -e "\n[ERROR] $*" >&2; }
 need(){ command -v "$1" >/dev/null 2>&1 || { err "No se encontró '$1' en PATH"; exit 1; }; }
 # Filtra warnings conocidos sin ocultar errores reales
 filter_pg_stderr() {
-  python - <<'PY'
+  python3 - <<'PY'
 import sys
 for line in sys.stdin:
     if "transaction_timeout" in line:
@@ -113,7 +113,7 @@ run_pg_cmd() {
     return 0
   fi
   local code=$?
-  if python - "$tmp" <<'PY'
+  if python3 - "$tmp" <<'PY'
 import sys
 path = sys.argv[1]
 had = False
@@ -379,7 +379,7 @@ LIST_FILE_FILTERED="$(mktemp)"
 
 log "Generando lista filtrada (sin schema_migrations)…"
 run_pg_cmd pg_restore -l "$DUMP_FILE" > "$LIST_FILE" || true
-python - "$LIST_FILE" "$LIST_FILE_FILTERED" <<'PY'
+python3 - "$LIST_FILE" "$LIST_FILE_FILTERED" <<'PY'
 import sys
 
 src, dst = sys.argv[1:]
