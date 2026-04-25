@@ -3,6 +3,7 @@ package dto
 
 import (
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 // Nota: Decimal3 está definido en summary-results.go para evitar duplicación.
@@ -20,7 +21,7 @@ type InvestorRef struct {
 // InvestorHeader es la chapita de cabecera (ej: "Agrolaits 50%").
 type InvestorHeader struct {
 	InvestorRef
-	SharePct Decimal0 `json:"share_pct"` // % global acordado - sin decimales
+	SharePct Decimal0 `json:"share_pct"` // % mostrado en la cabecera - sin decimales
 }
 
 // InvestorShare representa una celda por inversor en una fila.
@@ -83,10 +84,11 @@ type PreHarvestTotals struct {
 // -------------------------------------------------
 type InvestorContributionComparison struct {
 	InvestorRef
-	AgreedSharePct Decimal0 `json:"agreed_share_pct"` // Sin decimales
-	AgreedUsd      Decimal0 `json:"agreed_usd"`       // Sin decimales
-	ActualUsd      Decimal0 `json:"actual_usd"`       // Sin decimales
-	AdjustmentUsd  Decimal0 `json:"adjustment_usd"`   // Sin decimales
+	AgreedSharePct Decimal0  `json:"agreed_share_pct"`    // Sin decimales
+	SharePct       *Decimal0 `json:"share_pct,omitempty"` // % real aportado - sin decimales
+	AgreedUsd      Decimal0  `json:"agreed_usd"`          // Sin decimales
+	ActualUsd      Decimal0  `json:"actual_usd"`          // Sin decimales
+	AdjustmentUsd  Decimal0  `json:"adjustment_usd"`      // Sin decimales
 }
 
 // -------------------------------
@@ -222,12 +224,21 @@ func fromDomainInvestorContributionComparisons(domainComparisons []domain.Invest
 				InvestorName: c.InvestorName,
 			},
 			AgreedSharePct: NewDecimal0(c.AgreedSharePct), // Sin decimales
+			SharePct:       newOptionalDecimal0(c.ActualSharePct),
 			AgreedUsd:      NewDecimal0(c.AgreedUsd),      // Sin decimales
 			ActualUsd:      NewDecimal0(c.ActualUsd),      // Sin decimales
 			AdjustmentUsd:  NewDecimal0(c.AdjustmentUsd),  // Sin decimales
 		}
 	}
 	return comparisons
+}
+
+func newOptionalDecimal0(value *decimal.Decimal) *Decimal0 {
+	if value == nil {
+		return nil
+	}
+	formatted := NewDecimal0(*value)
+	return &formatted
 }
 
 // fromDomainHarvestSettlement mapea liquidación de cosecha
