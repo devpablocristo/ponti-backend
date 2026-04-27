@@ -61,8 +61,19 @@ jobs:
       SERVICE_ENV_MAX_RETRIES: ${{ vars.SERVICE_MAX_RETRIES_ENV }}
 
     steps:
-      - name: Checkout (solo para metadata)
+      - name: Validate staging SHA input
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          if [[ ! "$STAGING_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: staging_sha debe ser un SHA completo de 40 caracteres hexadecimales."
+            exit 1
+          fi
+
+      - name: Checkout staging ref (metadata + smoke scripts)
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.staging_sha }}
 
       - name: Auth GCP (STAGING - pull Artifact)
         uses: google-github-actions/auth@v3
