@@ -29,6 +29,8 @@ type WorkOrderListElement struct {
 	CostPerHa         decimal.Decimal `gorm:"column:supply_cost_per_ha"`
 	UnitPrice         decimal.Decimal `gorm:"column:unit_price"`
 	TotalCost         decimal.Decimal `gorm:"column:supply_total_cost"`
+	IsDigital         bool            `gorm:"column:is_digital"`
+	Status            string          `gorm:"column:status"`
 }
 
 // TableName apunta a la vista.

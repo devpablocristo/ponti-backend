@@ -400,6 +400,12 @@ func (r *Repository) ListWorkOrders(
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
+	if filt.IsDigital != nil {
+		base = base.Where("is_digital = ?", *filt.IsDigital)
+	}
+	if filt.Status != nil {
+		base = base.Where("status = ?", *filt.Status)
+	}
 
 	// 4) Contar total
 	var total int64
@@ -447,6 +453,8 @@ func (r *Repository) ListWorkOrders(
 			CostPerHa:         m.CostPerHa,
 			UnitPrice:         m.UnitPrice,
 			TotalCost:         m.TotalCost,
+			IsDigital:         m.IsDigital,
+			Status:            m.Status,
 		}
 	}
 
