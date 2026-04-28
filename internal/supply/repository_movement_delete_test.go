@@ -16,8 +16,10 @@ import (
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	projectmodels "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
+	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	stockmodels "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
+	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 func TestDeleteSupplyMovement_DeletesOnlyMatchingInvestorStock(t *testing.T) {
@@ -70,6 +72,103 @@ func TestDeleteSupplyMovement_ClosedStockCheckIsInvestorAware(t *testing.T) {
 	var closedStockCount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", closedStockOtherInvestor.ID).Count(&closedStockCount).Error)
 	assert.Equal(t, int64(1), closedStockCount)
+}
+
+func TestDeleteSupplyMovement_AllowsActiveMovementWhenSameTripletHasClosedStock(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+
+	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
+	closedStockSameTriplet := &stockmodels.Stock{
+		ProjectID:         fixture.project.ID,
+		SupplyID:          fixture.supply.ID,
+		InvestorID:        fixture.investorA.ID,
+		CloseDate:         &closedAt,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(closedStockSameTriplet).Error)
+
+	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	require.NoError(t, err)
+
+	var activeMovementCount int64
+	require.NoError(t, db.Model(&models.SupplyMovement{}).Where("id = ?", fixture.movementA.ID).Count(&activeMovementCount).Error)
+	assert.Equal(t, int64(0), activeMovementCount)
+
+	var closedStockCount int64
+	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", closedStockSameTriplet.ID).Count(&closedStockCount).Error)
+	assert.Equal(t, int64(1), closedStockCount)
+}
+
+func TestDeleteSupplyMovement_RejectsMovementFromClosedStock(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
+
+	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, closedMovement.ID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "closed stock movement")
+
+	var movementCount int64
+	require.NoError(t, db.Model(&models.SupplyMovement{}).Where("id = ?", closedMovement.ID).Count(&movementCount).Error)
+	assert.Equal(t, int64(1), movementCount)
+}
+
+func TestDeleteSupplyMovement_RejectsInternalMovementWhenRelatedStockIsClosed(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+	closedStock, relatedMovement := seedClosedStockAndMovement(t, db, fixture)
+
+	fixture.movementA.MovementType = "Movimiento interno"
+	fixture.movementA.ReferenceNumber = relatedMovement.ReferenceNumber
+	fixture.movementA.MovementDate = relatedMovement.MovementDate
+	require.NoError(t, db.Save(fixture.movementA).Error)
+
+	relatedMovement.MovementType = "Movimiento interno entrada"
+	require.NoError(t, db.Save(relatedMovement).Error)
+
+	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "closed stock movement")
+
+	var closedStockCount int64
+	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", closedStock.ID).Count(&closedStockCount).Error)
+	assert.Equal(t, int64(1), closedStockCount)
+}
+
+func TestUpdateSupplyMovement_RejectsMovementFromClosedStock(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
+
+	newDate := time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
+	err := repo.UpdateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+		ID:                   closedMovement.ID,
+		StockId:              fixture.stockA.ID,
+		Quantity:             decimal.NewFromInt(9),
+		MovementType:         "Remito oficial",
+		MovementDate:         &newDate,
+		ReferenceNumber:      "REF-UPDATED",
+		ProjectId:            fixture.project.ID,
+		ProjectDestinationId: 0,
+		Supply:               fixture.supply.ToDomain(),
+		Investor:             fixture.investorA.ToDomain(),
+		Provider:             &providerdomain.Provider{ID: closedMovement.ProviderID},
+		IsEntry:              true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "closed stock movement")
+
+	var persisted models.SupplyMovement
+	require.NoError(t, db.First(&persisted, closedMovement.ID).Error)
+	assert.Equal(t, closedMovement.StockId, persisted.StockId)
+	assert.Equal(t, closedMovement.ReferenceNumber, persisted.ReferenceNumber)
 }
 
 type deleteMovementFixture struct {
@@ -201,4 +300,42 @@ func seedDeleteMovementFixture(t *testing.T, db *gorm.DB) *deleteMovementFixture
 		stockB:    stockB,
 		movementA: movementA,
 	}
+}
+
+func seedClosedStockAndMovement(t *testing.T, db *gorm.DB, fixture *deleteMovementFixture) (*stockmodels.Stock, *models.SupplyMovement) {
+	t.Helper()
+
+	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
+	closedStock := &stockmodels.Stock{
+		ProjectID:         fixture.project.ID,
+		SupplyID:          fixture.supply.ID,
+		InvestorID:        fixture.investorA.ID,
+		CloseDate:         &closedAt,
+		InitialStock:      decimal.NewFromInt(4),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(4),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(4),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(closedStock).Error)
+
+	movementDate := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
+	closedMovement := &models.SupplyMovement{
+		StockId:              closedStock.ID,
+		Quantity:             decimal.NewFromInt(2),
+		MovementType:         "Remito oficial",
+		MovementDate:         &movementDate,
+		ReferenceNumber:      "REF-CLOSED",
+		ProjectId:            fixture.project.ID,
+		ProjectDestinationId: 0,
+		SupplyID:             fixture.supply.ID,
+		InvestorID:           fixture.investorA.ID,
+		ProviderID:           fixture.movementA.ProviderID,
+		IsEntry:              true,
+	}
+	require.NoError(t, db.Create(closedMovement).Error)
+
+	return closedStock, closedMovement
 }

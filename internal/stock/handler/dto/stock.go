@@ -49,6 +49,7 @@ type GetStockSummary struct {
 	EntryStock      decimal.Decimal  `json:"entry_stock"`
 	OutStock        decimal.Decimal  `json:"out_stock"`
 	Consumed        decimal.Decimal  `json:"consumed"`
+	UpdatedAt       *time.Time       `json:"updated_at,omitempty"`
 }
 
 // MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
@@ -75,6 +76,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		EntryStock      string     `json:"entry_stock"`
 		OutStock        string     `json:"out_stock"`
 		Consumed        string     `json:"consumed"`
+		UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 	}{
 		ID:              s.ID,
 		SupplyName:      s.SupplyName,
@@ -90,6 +92,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		EntryStock:      s.EntryStock.StringFixed(2),
 		OutStock:        s.OutStock.StringFixed(2),
 		Consumed:        s.Consumed.StringFixed(2),
+		UpdatedAt:       s.UpdatedAt,
 	}
 	return json.Marshal(aux)
 }
@@ -113,24 +116,31 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		supplyUnitPrice = s.Supply.Price
 	}
 
-return &GetStockSummary{
-	ID:              s.ID,
-	InvestorName:    investorName,
-	SupplyName:      supplyName,
-	StockUnits:      s.GetStockUnits(),
-	RealStockUnits:  s.RealStockUnits,
-	TotalUSD:        s.GetTotalUSD(),
-	StockDifference: s.GetStockDifferencePtr(),
-	CloseDate:       s.CloseDate,
-	ClassType:       classType,
-	SupplyUnitID:    supplyUnitID,
-	SupplyUnitPrice: supplyUnitPrice,
-	EntryStock:      s.GetEntryStock(),
-	OutStock:        s.GetOutStock(),
-	Consumed:        s.Consumed,
-}
+	return &GetStockSummary{
+		ID:              s.ID,
+		InvestorName:    investorName,
+		SupplyName:      supplyName,
+		StockUnits:      s.GetStockUnits(),
+		RealStockUnits:  s.RealStockUnits,
+		TotalUSD:        s.GetTotalUSD(),
+		StockDifference: s.GetStockDifferencePtr(),
+		CloseDate:       s.CloseDate,
+		ClassType:       classType,
+		SupplyUnitID:    supplyUnitID,
+		SupplyUnitPrice: supplyUnitPrice,
+		EntryStock:      s.GetEntryStock(),
+		OutStock:        s.GetOutStock(),
+		Consumed:        s.Consumed,
+		UpdatedAt:       timePtrIfNotZero(s.UpdatedAt),
+	}
 }
 
+func timePtrIfNotZero(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
 
 func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 	var netTotalUSD decimal.Decimal

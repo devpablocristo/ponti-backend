@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -9,15 +11,20 @@ import (
 
 type UpdateRealStockRequest struct {
 	RealStockUnits decimal.Decimal `json:"real_stock_units"`
+	UpdatedAt      *time.Time      `json:"updated_at,omitempty"`
 }
 
 func (r *UpdateRealStockRequest) ToDomain(updatedBy *string) *domain.Stock {
-	return &domain.Stock{
+	stock := &domain.Stock{
 		RealStockUnits: r.RealStockUnits,
 		Base: shareddomain.Base{
 			UpdatedBy: updatedBy,
 		},
 	}
+	if r.UpdatedAt != nil {
+		stock.UpdatedAt = *r.UpdatedAt
+	}
+	return stock
 }
 
 type UpdateRealStockResponse struct {
