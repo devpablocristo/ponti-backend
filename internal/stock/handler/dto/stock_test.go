@@ -99,7 +99,7 @@ func TestGetStocksResponse_MarshalJSON_RoundingWithDecimals(t *testing.T) {
 	}
 }
 
-func TestFromDomain_MarshalJSON_NullStockDifferenceWhenNoRealCount(t *testing.T) {
+func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenNoRealCount(t *testing.T) {
 	item := FromDomain(&stockdomain.Stock{
 		Supply: &supplydomain.Supply{
 			Name:         "Urea",
@@ -121,7 +121,7 @@ func TestFromDomain_MarshalJSON_NullStockDifferenceWhenNoRealCount(t *testing.T)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "-100.00", result["stock_units"])
-	assert.Equal(t, nil, result["stock_difference"])
+	assert.Equal(t, "100.00", result["stock_difference"])
 }
 
 func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenRealCountExists(t *testing.T) {

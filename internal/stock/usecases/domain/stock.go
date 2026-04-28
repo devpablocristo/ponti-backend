@@ -41,9 +41,6 @@ func (s *Stock) GetStockDifference() decimal.Decimal {
 }
 
 func (s *Stock) GetStockDifferencePtr() *decimal.Decimal {
-	if !s.HasRealStockCount {
-		return nil
-	}
 	diff := s.GetStockDifference()
 	return &diff
 }

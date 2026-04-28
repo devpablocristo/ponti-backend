@@ -298,10 +298,6 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	db := r.getDB(ctx)
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := ensureMovementStockIsOpen(tx, movement.ID); err != nil {
-			return err
-		}
-
 		if err := tx.Model(&models.SupplyMovement{}).
 			Where("id = ?", movement.ID).
 			Updates(model).
@@ -330,10 +326,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			return err
 		}
 
-		if err := ensureStockIsOpen(tx, supplyModel.StockId); err != nil {
-			return err
-		}
-
 		// Verificar si es un movimiento interno
 		isInternalMovement := supplyModel.MovementType == "Movimiento interno" ||
 			supplyModel.MovementType == "Movimiento interno entrada"
@@ -353,13 +345,10 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 				return domainerr.Internal("failed to find related movements")
 			}
 
-			// Recolectar todos los stock_ids afectados y validar que ninguno tenga un período cerrado.
+			// Recolectar todos los stock_ids afectados.
 			affectedStocks := make(map[int64]bool)
 
 			for _, mov := range relatedMovements {
-				if err := ensureStockIsOpen(tx, mov.StockId); err != nil {
-					return err
-				}
 				affectedStocks[mov.StockId] = true
 			}
 
@@ -412,36 +401,6 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 		return nil
 	})
-}
-
-func ensureMovementStockIsOpen(tx *gorm.DB, movementID int64) error {
-	var movement models.SupplyMovement
-	err := tx.
-		Select("id", "stock_id").
-		Where("id = ?", movementID).
-		First(&movement).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domainerr.NotFound("supply movement not found")
-		}
-		return err
-	}
-	return ensureStockIsOpen(tx, movement.StockId)
-}
-
-func ensureStockIsOpen(tx *gorm.DB, stockID int64) error {
-	var stockModel stockmodel.Stock
-	err := tx.
-		Where("id = ?", stockID).
-		Where("close_date IS NOT NULL").
-		First(&stockModel).Error
-	if err == nil {
-		return domainerr.Conflict("closed stock movement already exists for this supply in the project")
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-	return nil
 }
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

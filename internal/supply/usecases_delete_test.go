@@ -46,16 +46,16 @@ func TestUseCases_DeleteSupplyMovement(t *testing.T) {
 			description:   "Error cuando el movimiento no existe",
 		},
 		{
-			name:      "error de stock cerrado",
+			name:      "error de conflicto del repository",
 			projectID: 1,
 			supplyID:  200,
 			setupMock: func(mockRepo *mocks.MockRepositoryPort) {
 				mockRepo.EXPECT().
 					DeleteSupplyMovement(gomock.Any(), int64(1), int64(200)).
-					Return(domainerr.Conflict("closed stock movement already exists for this supply in the project"))
+					Return(domainerr.Conflict("supply movement cannot be deleted"))
 			},
-			expectedError: domainerr.Conflict("closed stock movement already exists for this supply in the project"),
-			description:   "No se puede eliminar si el stock está cerrado",
+			expectedError: domainerr.Conflict("supply movement cannot be deleted"),
+			description:   "Error de conflicto del repository se propaga correctamente",
 		},
 		{
 			name:      "🔥 eliminación exitosa de movimiento interno",

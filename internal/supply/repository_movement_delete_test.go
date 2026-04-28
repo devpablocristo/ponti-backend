@@ -106,21 +106,139 @@ func TestDeleteSupplyMovement_AllowsActiveMovementWhenSameTripletHasClosedStock(
 	assert.Equal(t, int64(1), closedStockCount)
 }
 
-func TestDeleteSupplyMovement_RejectsMovementFromClosedStock(t *testing.T) {
+func TestCreateSupplyMovement_AllowsBackdatedMovementIntoClosedPeriod(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+
+	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
+	closedStockSameTriplet := &stockmodels.Stock{
+		ProjectID:         fixture.project.ID,
+		SupplyID:          fixture.supply.ID,
+		InvestorID:        fixture.investorA.ID,
+		CloseDate:         &closedAt,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(closedStockSameTriplet).Error)
+
+	backdated := time.Date(2026, 4, 15, 18, 30, 0, 0, time.UTC)
+	_, err := repo.CreateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+		StockId:              fixture.stockA.ID,
+		Quantity:             decimal.NewFromInt(9),
+		MovementType:         "Remito oficial",
+		MovementDate:         &backdated,
+		ReferenceNumber:      "REF-BACKDATED",
+		ProjectId:            fixture.project.ID,
+		ProjectDestinationId: 0,
+		Supply:               fixture.supply.ToDomain(),
+		Investor:             fixture.investorA.ToDomain(),
+		Provider:             &providerdomain.Provider{ID: fixture.movementA.ProviderID},
+		IsEntry:              true,
+	})
+
+	require.NoError(t, err)
+
+	var movementCount int64
+	require.NoError(t, db.Model(&models.SupplyMovement{}).Where("reference_number = ?", "REF-BACKDATED").Count(&movementCount).Error)
+	assert.Equal(t, int64(1), movementCount)
+}
+
+func TestUpdateSupplyMovement_AllowsMovingActiveMovementIntoClosedPeriod(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+
+	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
+	closedStockSameTriplet := &stockmodels.Stock{
+		ProjectID:         fixture.project.ID,
+		SupplyID:          fixture.supply.ID,
+		InvestorID:        fixture.investorA.ID,
+		CloseDate:         &closedAt,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(closedStockSameTriplet).Error)
+
+	backdated := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
+	err := repo.UpdateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+		ID:                   fixture.movementA.ID,
+		StockId:              fixture.stockA.ID,
+		Quantity:             decimal.NewFromInt(9),
+		MovementType:         "Remito oficial",
+		MovementDate:         &backdated,
+		ReferenceNumber:      "REF-UPDATED",
+		ProjectId:            fixture.project.ID,
+		ProjectDestinationId: 0,
+		Supply:               fixture.supply.ToDomain(),
+		Investor:             fixture.investorA.ToDomain(),
+		Provider:             &providerdomain.Provider{ID: fixture.movementA.ProviderID},
+		IsEntry:              true,
+	})
+
+	require.NoError(t, err)
+
+	var persisted models.SupplyMovement
+	require.NoError(t, db.First(&persisted, fixture.movementA.ID).Error)
+	assert.Equal(t, "REF-UPDATED", persisted.ReferenceNumber)
+	assert.Equal(t, backdated, *persisted.MovementDate)
+}
+
+func TestDeleteSupplyMovement_AllowsActiveMovementInsideClosedPeriod(t *testing.T) {
+	repo, db := newSQLiteSupplyRepository(t)
+	fixture := seedDeleteMovementFixture(t, db)
+
+	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
+	closedStockSameTriplet := &stockmodels.Stock{
+		ProjectID:         fixture.project.ID,
+		SupplyID:          fixture.supply.ID,
+		InvestorID:        fixture.investorA.ID,
+		CloseDate:         &closedAt,
+		InitialStock:      decimal.NewFromInt(5),
+		YearPeriod:        2026,
+		MonthPeriod:       4,
+		UnitsEntered:      decimal.NewFromInt(5),
+		UnitsConsumed:     decimal.Zero,
+		RealStockUnits:    decimal.NewFromInt(5),
+		HasRealStockCount: true,
+	}
+	require.NoError(t, db.Create(closedStockSameTriplet).Error)
+
+	backdated := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
+	fixture.movementA.MovementDate = &backdated
+	require.NoError(t, db.Save(fixture.movementA).Error)
+
+	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+
+	require.NoError(t, err)
+
+	var activeMovementCount int64
+	require.NoError(t, db.Model(&models.SupplyMovement{}).Where("id = ?", fixture.movementA.ID).Count(&activeMovementCount).Error)
+	assert.Equal(t, int64(0), activeMovementCount)
+}
+
+func TestDeleteSupplyMovement_AllowsMovementFromClosedStock(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
 
 	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, closedMovement.ID)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "closed stock movement")
+	require.NoError(t, err)
 
 	var movementCount int64
 	require.NoError(t, db.Model(&models.SupplyMovement{}).Where("id = ?", closedMovement.ID).Count(&movementCount).Error)
-	assert.Equal(t, int64(1), movementCount)
+	assert.Equal(t, int64(0), movementCount)
 }
 
-func TestDeleteSupplyMovement_RejectsInternalMovementWhenRelatedStockIsClosed(t *testing.T) {
+func TestDeleteSupplyMovement_AllowsInternalMovementWhenRelatedStockIsClosed(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 	closedStock, relatedMovement := seedClosedStockAndMovement(t, db, fixture)
@@ -134,15 +252,14 @@ func TestDeleteSupplyMovement_RejectsInternalMovementWhenRelatedStockIsClosed(t 
 	require.NoError(t, db.Save(relatedMovement).Error)
 
 	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "closed stock movement")
+	require.NoError(t, err)
 
 	var closedStockCount int64
 	require.NoError(t, db.Model(&stockmodels.Stock{}).Where("id = ?", closedStock.ID).Count(&closedStockCount).Error)
-	assert.Equal(t, int64(1), closedStockCount)
+	assert.Equal(t, int64(0), closedStockCount)
 }
 
-func TestUpdateSupplyMovement_RejectsMovementFromClosedStock(t *testing.T) {
+func TestUpdateSupplyMovement_AllowsMovementFromClosedStock(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
@@ -162,13 +279,12 @@ func TestUpdateSupplyMovement_RejectsMovementFromClosedStock(t *testing.T) {
 		Provider:             &providerdomain.Provider{ID: closedMovement.ProviderID},
 		IsEntry:              true,
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "closed stock movement")
+	require.NoError(t, err)
 
 	var persisted models.SupplyMovement
 	require.NoError(t, db.First(&persisted, closedMovement.ID).Error)
-	assert.Equal(t, closedMovement.StockId, persisted.StockId)
-	assert.Equal(t, closedMovement.ReferenceNumber, persisted.ReferenceNumber)
+	assert.Equal(t, fixture.stockA.ID, persisted.StockId)
+	assert.Equal(t, "REF-UPDATED", persisted.ReferenceNumber)
 }
 
 type deleteMovementFixture struct {
