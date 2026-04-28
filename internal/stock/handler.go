@@ -193,6 +193,12 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
 	stockID, err := ginmw.ParseParamID(c, "stock_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
@@ -203,10 +209,18 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	if stockDomain.Project == nil || stockDomain.Project.ID != projectID {
+		sharedhandlers.RespondError(c, domainerr.NotFound("stock not found"))
+		return
+	}
 
 	stockDomain.RealStockUnits = req.RealStockUnits
 	stockDomain.HasRealStockCount = true
 	stockDomain.UpdatedBy = &userID
+	stockDomain.UpdatedAt = time.Time{}
+	if req.UpdatedAt != nil {
+		stockDomain.UpdatedAt = *req.UpdatedAt
+	}
 
 	err = h.ucs.UpdateRealStockUnits(ctx, stockID, stockDomain)
 	if err != nil {

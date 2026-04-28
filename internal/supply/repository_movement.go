@@ -297,15 +297,21 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	model := models.SupplyMovementFromDomain(movement)
 	db := r.getDB(ctx)
 
-	if err := db.Model(&models.SupplyMovement{}).
-		Where("id = ?", movement.ID).
-		Updates(model).
-		Error; err != nil {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureMovementStockIsOpen(tx, movement.ID); err != nil {
+			return err
+		}
 
-		return domainerr.Internal("failed to update supply movement")
-	}
+		if err := tx.Model(&models.SupplyMovement{}).
+			Where("id = ?", movement.ID).
+			Updates(model).
+			Error; err != nil {
 
-	return nil
+			return domainerr.Internal("failed to update supply movement")
+		}
+
+		return nil
+	})
 }
 
 func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
@@ -324,7 +330,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			return err
 		}
 
-		if err := ensureOpenStockTriplet(tx, supplyModel.ProjectId, supplyModel.SupplyID, supplyModel.InvestorID); err != nil {
+		if err := ensureStockIsOpen(tx, supplyModel.StockId); err != nil {
 			return err
 		}
 
@@ -351,7 +357,7 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 			affectedStocks := make(map[int64]bool)
 
 			for _, mov := range relatedMovements {
-				if err := ensureOpenStockTriplet(tx, mov.ProjectId, mov.SupplyID, mov.InvestorID); err != nil {
+				if err := ensureStockIsOpen(tx, mov.StockId); err != nil {
 					return err
 				}
 				affectedStocks[mov.StockId] = true
@@ -408,12 +414,25 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 	})
 }
 
-func ensureOpenStockTriplet(tx *gorm.DB, projectID, supplyID, investorID int64) error {
+func ensureMovementStockIsOpen(tx *gorm.DB, movementID int64) error {
+	var movement models.SupplyMovement
+	err := tx.
+		Select("id", "stock_id").
+		Where("id = ?", movementID).
+		First(&movement).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFound("supply movement not found")
+		}
+		return err
+	}
+	return ensureStockIsOpen(tx, movement.StockId)
+}
+
+func ensureStockIsOpen(tx *gorm.DB, stockID int64) error {
 	var stockModel stockmodel.Stock
 	err := tx.
-		Where("project_id = ?", projectID).
-		Where("supply_id = ?", supplyID).
-		Where("investor_id = ?", investorID).
+		Where("id = ?", stockID).
 		Where("close_date IS NOT NULL").
 		First(&stockModel).Error
 	if err == nil {
