@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetStockDifferencePtr_ReturnsNilWhenNoRealCount(t *testing.T) {
+func TestGetStockDifferencePtr_ReturnsDifferenceWhenNoRealCount(t *testing.T) {
 	stock := &Stock{
 		Supply: &supplydomain.Supply{
 			Name:     "2-4D",
@@ -21,7 +21,10 @@ func TestGetStockDifferencePtr_ReturnsNilWhenNoRealCount(t *testing.T) {
 	}
 
 	assert.Equal(t, decimal.NewFromInt(-100), stock.GetStockUnits())
-	assert.Nil(t, stock.GetStockDifferencePtr())
+	diff := stock.GetStockDifferencePtr()
+	if assert.NotNil(t, diff) {
+		assert.True(t, diff.Equal(decimal.NewFromInt(100)))
+	}
 }
 
 func TestGetStockDifferencePtr_ReturnsDifferenceWhenRealCountExists(t *testing.T) {

@@ -223,12 +223,12 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Unscoped().Model(&models.WorkOrder{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		var wo models.WorkOrder
+		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("work order not found")
+			}
 			return domainerr.Internal("failed to check work order existence")
-		}
-		if count == 0 {
-			return domainerr.NotFound("work order not found")
 		}
 
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
@@ -250,7 +250,7 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
+		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -277,7 +277,7 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Where("id = ?", id).First(&wo).Error; err != nil {
+		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
