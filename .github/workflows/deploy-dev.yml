@@ -3,6 +3,14 @@ name: Deploy DEV (Cloud Run)
 on:
   push:
     branches: [develop]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "migrations_v4/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - ".github/workflows/deploy-dev.yml"
   workflow_dispatch:
     inputs:
       ref:
@@ -57,7 +65,7 @@ jobs:
       SERVICE_ENV_MAX_RETRIES: ${{ vars.SERVICE_MAX_RETRIES_ENV }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref || github.ref_name }}
 
