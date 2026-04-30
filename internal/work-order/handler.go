@@ -27,6 +27,7 @@ type UseCasesPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	ExportWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]byte, error)
 }
@@ -67,6 +68,10 @@ func (h *Handler) Routes() {
 	grp := r.Group(base, h.mws.GetValidation()...)
 	{
 		grp.POST("", h.CreateWorkOrder)
+		grp.GET("", h.ListWorkOrders)
+		grp.GET("/filter-rows", h.ListWorkOrderFilterRows)
+		grp.GET("/metrics", h.GetMetrics)
+		grp.GET("/export", h.ExportWorkOrders)
 		grp.GET("/:work_order_id", h.GetWorkOrderByID)
 		grp.PUT("/:work_order_id", h.UpdateWorkOrderByID)
 		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
@@ -74,9 +79,6 @@ func (h *Handler) Routes() {
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
 		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
-		grp.GET("", h.ListWorkOrders)
-		grp.GET("/metrics", h.GetMetrics)
-		grp.GET("/export", h.ExportWorkOrders)
 	}
 }
 
@@ -204,6 +206,18 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
+}
+
+func (h *Handler) ListWorkOrderFilterRows(c *gin.Context) {
+	filt := parseFilters(c)
+
+	rows, err := h.ucs.ListWorkOrderFilterRows(c.Request.Context(), filt)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.FromDomainFilterRows(rows))
 }
 
 // parseFilters extrae project_id, field_id, customer_id y campaign_id.
