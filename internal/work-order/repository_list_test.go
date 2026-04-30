@@ -180,3 +180,24 @@ func TestRepository_ListWorkOrders_FiltersSupplyForPublishedAndDigitalDrafts(t *
 		t.Fatalf("expected digital draft and published order for supply filter, got ids=%d,%d", rows[0].ID, rows[1].ID)
 	}
 }
+
+func TestRepository_ListWorkOrderFilterRows_ReturnsAllRowsWithoutPagination(t *testing.T) {
+	db := newListWorkOrdersTestDB(t)
+	repo := NewRepository(&listTestGormEngine{client: db})
+
+	projectID := int64(30)
+	rows, err := repo.ListWorkOrderFilterRows(
+		context.Background(),
+		domain.WorkOrderFilter{ProjectID: &projectID},
+	)
+	if err != nil {
+		t.Fatalf("list work order filter rows: %v", err)
+	}
+
+	if len(rows) != 4 {
+		t.Fatalf("expected all 4 rows for filter source, got %d", len(rows))
+	}
+	if rows[0].ID != -20 || rows[3].ID != 11 {
+		t.Fatalf("expected filter rows to preserve work order ordering, got first=%d last=%d", rows[0].ID, rows[3].ID)
+	}
+}

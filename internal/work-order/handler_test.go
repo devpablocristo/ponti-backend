@@ -67,6 +67,9 @@ func (s *workOrderHandlerUseCasesStub) RestoreWorkOrder(context.Context, int64) 
 func (s *workOrderHandlerUseCasesStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
 }
+func (s *workOrderHandlerUseCasesStub) ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	return nil, nil
+}
 func (s *workOrderHandlerUseCasesStub) GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
 	return nil, nil
 }

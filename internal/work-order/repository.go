@@ -374,12 +374,67 @@ func (r *Repository) ListWorkOrders(
 	filt domain.WorkOrderFilter,
 	inp types.Input,
 ) ([]domain.WorkOrderListElement, types.PageInfo, error) {
-	// 1) Base del query: vinculada a la vista
+	base, empty, err := r.workOrderListBaseQuery(ctx, filt)
+	if err != nil {
+		return nil, types.PageInfo{}, err
+	}
+	if empty {
+		return []domain.WorkOrderListElement{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+	}
+
+	var total int64
+	if err := base.
+		Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to count work orders")
+	}
+
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
+	var rows []models.WorkOrderListElement
+	if err := base.
+		Limit(int(inp.PageSize)).
+		Offset(offset).
+		Order("date desc, sequence_day desc, id desc").
+		Find(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to list work orders")
+	}
+
+	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
+	return mapWorkOrderListRows(rows), pageInfo, nil
+}
+
+func (r *Repository) ListWorkOrderFilterRows(
+	ctx context.Context,
+	filt domain.WorkOrderFilter,
+) ([]domain.WorkOrderListElement, error) {
+	base, empty, err := r.workOrderListBaseQuery(ctx, filt)
+	if err != nil {
+		return nil, err
+	}
+	if empty {
+		return []domain.WorkOrderListElement{}, nil
+	}
+
+	var rows []models.WorkOrderListElement
+	if err := base.
+		Order("date desc, sequence_day desc, id desc").
+		Find(&rows).Error; err != nil {
+		return nil, domainerr.Internal("failed to list work order filter rows")
+	}
+
+	return mapWorkOrderListRows(rows), nil
+}
+
+func (r *Repository) workOrderListBaseQuery(
+	ctx context.Context,
+	filt domain.WorkOrderFilter,
+) (*gorm.DB, bool, error) {
 	base := r.db.Client().
 		WithContext(ctx).
 		Model(&models.WorkOrderListElement{})
 
-	// 2) Resolver filtros de proyecto (customer/campaign/field)
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
 		CustomerID: filt.CustomerID,
 		ProjectID:  filt.ProjectID,
@@ -387,16 +442,14 @@ func (r *Repository) ListWorkOrders(
 		FieldID:    filt.FieldID,
 	})
 	if err != nil {
-		return nil, types.PageInfo{}, err
+		return nil, false, err
 	}
 	if len(projectIDs) > 0 {
 		base = base.Where("project_id IN ?", projectIDs)
 	} else if filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil {
-		// filtros presentes pero sin resultados: devolver vacío
-		return []domain.WorkOrderListElement{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+		return base, true, nil
 	}
 
-	// 3) Aplicar filtros directos
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
@@ -439,29 +492,10 @@ func (r *Repository) ListWorkOrders(
 		`, *filt.SupplyID, *filt.SupplyID, *filt.SupplyID)
 	}
 
-	// 4) Contar total
-	var total int64
-	if err := base.
-		Count(&total).Error; err != nil {
-		return nil, types.PageInfo{}, domainerr.Internal(
-			"failed to count work orders")
-	}
+	return base, false, nil
+}
 
-	// 5) Paginación
-	offset := (int(inp.Page) - 1) * int(inp.PageSize)
-
-	// 6) Recuperar filas paginadas (reutiliza 'base' con filtros)
-	var rows []models.WorkOrderListElement
-	if err := base.
-		Limit(int(inp.PageSize)).
-		Offset(offset).
-		Order("date desc, sequence_day desc, id desc").
-		Find(&rows).Error; err != nil {
-		return nil, types.PageInfo{}, domainerr.Internal(
-			"failed to list work orders")
-	}
-
-	// 7) Mapear a dominio
+func mapWorkOrderListRows(rows []models.WorkOrderListElement) []domain.WorkOrderListElement {
 	list := make([]domain.WorkOrderListElement, len(rows))
 	for i, m := range rows {
 		list[i] = domain.WorkOrderListElement{
@@ -489,10 +523,7 @@ func (r *Repository) ListWorkOrders(
 			Status:            m.Status,
 		}
 	}
-
-	// 8) Construir PageInfo y devolver
-	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
-	return list, pageInfo, nil
+	return list
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
