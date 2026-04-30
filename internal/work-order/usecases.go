@@ -235,6 +235,9 @@ func (u *UseCases) ListWorkOrders(
 }
 
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	if filt.ProjectID == nil && filt.FieldID == nil {
+		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
+	}
 	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 
