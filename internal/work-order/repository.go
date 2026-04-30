@@ -400,14 +400,35 @@ func (r *Repository) ListWorkOrders(
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
+	if filt.IsDigital != nil {
+		base = base.Where("is_digital = ?", *filt.IsDigital)
+	}
+	if filt.Status != nil {
+		base = base.Where("status = ?", *filt.Status)
+	}
 	if filt.SupplyID != nil {
 		base = base.Where(`
-			EXISTS (
-				SELECT 1
-				FROM workorder_items wi
-				WHERE wi.workorder_id = v4_report.workorder_list.id
-				  AND wi.supply_id = ?
-				  AND wi.deleted_at IS NULL
+			(
+				(
+					v4_report.workorder_list.is_digital = false
+					AND EXISTS (
+						SELECT 1
+						FROM workorder_items wi
+						WHERE wi.workorder_id = v4_report.workorder_list.id
+						  AND wi.supply_id = ?
+						  AND wi.deleted_at IS NULL
+					)
+				)
+				OR (
+					v4_report.workorder_list.is_digital = true
+					AND EXISTS (
+						SELECT 1
+						FROM work_order_draft_items wodi
+						WHERE wodi.draft_id = -v4_report.workorder_list.id
+						  AND wodi.supply_id = ?
+						  AND wodi.deleted_at IS NULL
+					)
+				)
 			)
 			AND v4_report.workorder_list.supply_name = (
 				SELECT s.name
@@ -415,7 +436,7 @@ func (r *Repository) ListWorkOrders(
 				WHERE s.id = ?
 				  AND s.deleted_at IS NULL
 			)
-		`, *filt.SupplyID, *filt.SupplyID)
+		`, *filt.SupplyID, *filt.SupplyID, *filt.SupplyID)
 	}
 
 	// 4) Contar total
@@ -464,6 +485,8 @@ func (r *Repository) ListWorkOrders(
 			CostPerHa:         m.CostPerHa,
 			UnitPrice:         m.UnitPrice,
 			TotalCost:         m.TotalCost,
+			IsDigital:         m.IsDigital,
+			Status:            m.Status,
 		}
 	}
 

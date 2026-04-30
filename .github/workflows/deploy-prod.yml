@@ -22,6 +22,8 @@ concurrency:
 jobs:
   promote-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: prod
     env:
       GCP_REGION: ${{ vars.GCP_REGION_PROD }}
       ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
