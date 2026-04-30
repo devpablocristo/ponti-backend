@@ -36,6 +36,7 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 
 type GetStockSummary struct {
 	ID              int64            `json:"id"`
+	SupplyID        int64            `json:"supply_id"`
 	SupplyName      string           `json:"supply_name"`
 	InvestorName    string           `json:"investor_name"`
 	StockUnits      decimal.Decimal  `json:"stock_units"`
@@ -63,6 +64,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 
 	aux := struct {
 		ID              int64      `json:"id"`
+		SupplyID        int64      `json:"supply_id"`
 		SupplyName      string     `json:"supply_name"`
 		InvestorName    string     `json:"investor_name"`
 		StockUnits      string     `json:"stock_units"`
@@ -79,6 +81,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 	}{
 		ID:              s.ID,
+		SupplyID:        s.SupplyID,
 		SupplyName:      s.SupplyName,
 		InvestorName:    s.InvestorName,
 		StockUnits:      s.StockUnits.StringFixed(2),
@@ -106,10 +109,12 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 
 	classType := ""
 	supplyName := ""
+	supplyID := int64(0)
 	supplyUnitID := int64(0)
 	supplyUnitPrice := decimal.Zero
 
 	if s.Supply != nil {
+		supplyID = s.Supply.ID
 		classType = s.Supply.CategoryName
 		supplyName = s.Supply.Name
 		supplyUnitID = s.Supply.UnitID
@@ -118,6 +123,7 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 
 	return &GetStockSummary{
 		ID:              s.ID,
+		SupplyID:        supplyID,
 		InvestorName:    investorName,
 		SupplyName:      supplyName,
 		StockUnits:      s.GetStockUnits(),

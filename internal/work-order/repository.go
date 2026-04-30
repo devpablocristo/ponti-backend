@@ -400,6 +400,23 @@ func (r *Repository) ListWorkOrders(
 	if filt.FieldID != nil {
 		base = base.Where("field_id = ?", *filt.FieldID)
 	}
+	if filt.SupplyID != nil {
+		base = base.Where(`
+			EXISTS (
+				SELECT 1
+				FROM workorder_items wi
+				WHERE wi.workorder_id = v4_report.workorder_list.id
+				  AND wi.supply_id = ?
+				  AND wi.deleted_at IS NULL
+			)
+			AND v4_report.workorder_list.supply_name = (
+				SELECT s.name
+				FROM supplies s
+				WHERE s.id = ?
+				  AND s.deleted_at IS NULL
+			)
+		`, *filt.SupplyID, *filt.SupplyID)
+	}
 
 	// 4) Contar total
 	var total int64
@@ -467,11 +484,16 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 	}
 	if len(projectIDs) == 0 && (filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil) {
 		return &domain.WorkOrderMetrics{
-			SurfaceHa:  decimal.Zero,
-			Liters:     decimal.Zero,
-			Kilograms:  decimal.Zero,
-			DirectCost: decimal.Zero,
+			SurfaceHa:   decimal.Zero,
+			Liters:      decimal.Zero,
+			Kilograms:   decimal.Zero,
+			DirectCost:  decimal.Zero,
+			OrdersCount: 0,
 		}, nil
+	}
+
+	if filt.SupplyID != nil {
+		return r.getSupplyFilteredMetrics(ctx, filt, projectIDs)
 	}
 
 	// Construimos el WHERE dinámico según los filtros presentes
@@ -506,11 +528,80 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 		return nil, domainerr.Internal("failed to get metrics")
 	}
 
+	orderCountQuery := r.db.Client().
+		WithContext(ctx).
+		Table("workorders").
+		Where("deleted_at IS NULL")
+	if len(projectIDs) > 0 {
+		orderCountQuery = orderCountQuery.Where("project_id IN ?", projectIDs)
+	}
+	if filt.FieldID != nil {
+		orderCountQuery = orderCountQuery.Where("field_id = ?", *filt.FieldID)
+	}
+
+	var ordersCount int64
+	if err := orderCountQuery.
+		Select("COUNT(DISTINCT split_part(number::text, '.', 1))").
+		Scan(&ordersCount).Error; err != nil {
+		return nil, domainerr.Internal("failed to count work orders")
+	}
+
 	return &domain.WorkOrderMetrics{
-		SurfaceHa:  row.SurfaceHa,
-		Liters:     row.Liters,
-		Kilograms:  row.Kilograms,
-		DirectCost: row.DirectCost,
+		SurfaceHa:   row.SurfaceHa,
+		Liters:      row.Liters,
+		Kilograms:   row.Kilograms,
+		DirectCost:  row.DirectCost,
+		OrdersCount: ordersCount,
+	}, nil
+}
+
+func (r *Repository) getSupplyFilteredMetrics(
+	ctx context.Context,
+	filt domain.WorkOrderFilter,
+	projectIDs []int64,
+) (*domain.WorkOrderMetrics, error) {
+	q := `
+		SELECT
+			COALESCE(SUM(COALESCE(wo.effective_area, 0)), 0) AS surface_ha,
+			COALESCE(SUM(CASE WHEN s.unit_id = 1 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS liters,
+			COALESCE(SUM(CASE WHEN s.unit_id = 2 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS kilograms,
+			COALESCE(SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0)), 0) AS direct_cost,
+			COUNT(DISTINCT split_part(wo.number::text, '.', 1)) AS orders_count
+		FROM workorders wo
+		JOIN workorder_items wi ON wi.workorder_id = wo.id AND wi.deleted_at IS NULL
+		JOIN supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+		WHERE wo.deleted_at IS NULL
+		  AND wi.supply_id = ?
+	`
+	args := []any{*filt.SupplyID}
+
+	if len(projectIDs) > 0 {
+		q += " AND wo.project_id IN ?"
+		args = append(args, projectIDs)
+	}
+	if filt.FieldID != nil {
+		q += " AND wo.field_id = ?"
+		args = append(args, *filt.FieldID)
+	}
+
+	var row struct {
+		SurfaceHa   decimal.Decimal `gorm:"column:surface_ha"`
+		Liters      decimal.Decimal `gorm:"column:liters"`
+		Kilograms   decimal.Decimal `gorm:"column:kilograms"`
+		DirectCost  decimal.Decimal `gorm:"column:direct_cost"`
+		OrdersCount int64           `gorm:"column:orders_count"`
+	}
+
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
+		return nil, domainerr.Internal("failed to get supply filtered metrics")
+	}
+
+	return &domain.WorkOrderMetrics{
+		SurfaceHa:   row.SurfaceHa,
+		Liters:      row.Liters,
+		Kilograms:   row.Kilograms,
+		DirectCost:  row.DirectCost,
+		OrdersCount: row.OrdersCount,
 	}, nil
 }
 

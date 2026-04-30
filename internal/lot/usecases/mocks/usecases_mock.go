@@ -96,9 +96,9 @@ func (mr *MockRepositoryPortMockRecorder) GetMetrics(arg0, arg1, arg2, arg3 any)
 }
 
 // ListLots mocks base method.
-func (m *MockRepositoryPort) ListLots(arg0 context.Context, arg1, arg2, arg3 int64, arg4, arg5 int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
+func (m *MockRepositoryPort) ListLots(arg0 context.Context, arg1 domain.LotListFilter, arg2, arg3 int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListLots", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "ListLots", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]domain.LotTable)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(decimal.Decimal)
@@ -108,9 +108,9 @@ func (m *MockRepositoryPort) ListLots(arg0 context.Context, arg1, arg2, arg3 int
 }
 
 // ListLots indicates an expected call of ListLots.
-func (mr *MockRepositoryPortMockRecorder) ListLots(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
+func (mr *MockRepositoryPortMockRecorder) ListLots(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLots", reflect.TypeOf((*MockRepositoryPort)(nil).ListLots), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLots", reflect.TypeOf((*MockRepositoryPort)(nil).ListLots), arg0, arg1, arg2, arg3)
 }
 
 // ListLotsByField mocks base method.

@@ -4,6 +4,7 @@ package workorder
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
@@ -219,6 +220,12 @@ func parseFilters(c *gin.Context) domain.WorkOrderFilter {
 	f.CustomerID = workspaceFilter.CustomerID
 	f.CampaignID = workspaceFilter.CampaignID
 
+	if raw := c.Query("supply_id"); raw != "" {
+		if value, err := strconv.ParseInt(raw, 10, 64); err == nil && value > 0 {
+			f.SupplyID = &value
+		}
+	}
+
 	if raw := c.Query("is_digital"); raw != "" {
 		switch raw {
 		case "true":
@@ -249,6 +256,11 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	filt.FieldID = workspaceFilter.FieldID
 	filt.CustomerID = workspaceFilter.CustomerID
 	filt.CampaignID = workspaceFilter.CampaignID
+	if raw := c.Query("supply_id"); raw != "" {
+		if value, err := strconv.ParseInt(raw, 10, 64); err == nil && value > 0 {
+			filt.SupplyID = &value
+		}
+	}
 	m, err := h.ucs.GetMetrics(c.Request.Context(), filt)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
