@@ -510,9 +510,9 @@ func (r *Repository) ListLots(
 
 	// Fechas por secuencia (1..3) para todos los lotes
 	domainRows := make([]domain.LotTable, len(rows))
-	total := int64(0)
-	sumSowedArea := decimal.Zero
-	sumCost := decimal.Zero
+	var total int64
+	var sumSowedArea decimal.Decimal
+	var sumCost decimal.Decimal
 	if len(rows) > 0 {
 		total = rows[0].TotalRows
 		sumSowedArea = rows[0].SumSowedArea
@@ -531,7 +531,7 @@ func (r *Repository) ListLots(
 			datesByLot[d.LotID] = append(datesByLot[d.LotID], d)
 		}
 		for i := range rows {
-			domainRows[i] = rows[i].LotTable.ToDomain(datesByLot[rows[i].ID])
+			domainRows[i] = rows[i].ToDomain(datesByLot[rows[i].ID])
 		}
 	} else {
 		totalsQuery := fmt.Sprintf(`
