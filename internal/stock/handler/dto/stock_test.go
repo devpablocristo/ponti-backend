@@ -3,7 +3,9 @@ package dto
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
@@ -97,7 +99,7 @@ func TestGetStocksResponse_MarshalJSON_RoundingWithDecimals(t *testing.T) {
 	}
 }
 
-func TestFromDomain_MarshalJSON_NullStockDifferenceWhenNoRealCount(t *testing.T) {
+func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenNoRealCount(t *testing.T) {
 	item := FromDomain(&stockdomain.Stock{
 		Supply: &supplydomain.Supply{
 			Name:         "Urea",
@@ -119,7 +121,7 @@ func TestFromDomain_MarshalJSON_NullStockDifferenceWhenNoRealCount(t *testing.T)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "-100.00", result["stock_units"])
-	assert.Equal(t, nil, result["stock_difference"])
+	assert.Equal(t, "100.00", result["stock_difference"])
 }
 
 func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenRealCountExists(t *testing.T) {
@@ -146,4 +148,59 @@ func TestFromDomain_MarshalJSON_IncludesStockDifferenceWhenRealCountExists(t *te
 
 	assert.Equal(t, "38.00", result["stock_units"])
 	assert.Equal(t, "2.00", result["stock_difference"])
+}
+
+func TestFromDomain_MarshalJSON_IncludesUpdatedAtWhenPresent(t *testing.T) {
+	updatedAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	item := FromDomain(&stockdomain.Stock{
+		Supply: &supplydomain.Supply{
+			Name:         "Urea",
+			CategoryName: "Fertilizantes",
+			UnitID:       2,
+			UnitName:     "Kg",
+			Price:        decimal.NewFromInt(10),
+		},
+		RealStockUnits:    decimal.NewFromInt(40),
+		Consumed:          decimal.NewFromInt(2),
+		SupplyMovements:   []supplydomain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(40)}},
+		HasRealStockCount: true,
+		Base: shareddomain.Base{
+			UpdatedAt: updatedAt,
+		},
+	})
+
+	payload, err := json.Marshal(item)
+	assert.NoError(t, err)
+
+	var result map[string]any
+	err = json.Unmarshal(payload, &result)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "2026-04-01T12:00:00Z", result["updated_at"])
+}
+
+func TestFromDomain_MarshalJSON_OmitsUpdatedAtWhenZero(t *testing.T) {
+	item := FromDomain(&stockdomain.Stock{
+		Supply: &supplydomain.Supply{
+			Name:         "Urea",
+			CategoryName: "Fertilizantes",
+			UnitID:       2,
+			UnitName:     "Kg",
+			Price:        decimal.NewFromInt(10),
+		},
+		RealStockUnits:    decimal.NewFromInt(40),
+		Consumed:          decimal.NewFromInt(2),
+		SupplyMovements:   []supplydomain.SupplyMovement{{IsEntry: true, Quantity: decimal.NewFromInt(40)}},
+		HasRealStockCount: true,
+	})
+
+	payload, err := json.Marshal(item)
+	assert.NoError(t, err)
+
+	var result map[string]any
+	err = json.Unmarshal(payload, &result)
+	assert.NoError(t, err)
+
+	_, exists := result["updated_at"]
+	assert.False(t, exists)
 }

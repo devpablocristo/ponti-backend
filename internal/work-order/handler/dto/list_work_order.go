@@ -36,7 +36,6 @@ type WorkOrderListElement struct {
 	Status            string          `json:"status"`
 }
 
-
 // MarshalJSON asegura 2 decimales en todos los campos decimal de salida.
 func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 	aux := struct {
@@ -95,6 +94,10 @@ type WorkOrderListResponse struct {
 	Items    []WorkOrderListElement `json:"items"`
 }
 
+type WorkOrderFilterRowsResponse struct {
+	Rows []WorkOrderListElement `json:"rows"`
+}
+
 func FromDomainListElement(d *domain.WorkOrderListElement) *WorkOrderListElement {
 	return &WorkOrderListElement{
 		ID:                d.ID,
@@ -128,4 +131,12 @@ func FromDomainList(pageInfo types.PageInfo, list []domain.WorkOrderListElement)
 		items[i] = *FromDomainListElement(&d)
 	}
 	return WorkOrderListResponse{PageInfo: pageInfo, Items: items}
+}
+
+func FromDomainFilterRows(list []domain.WorkOrderListElement) WorkOrderFilterRowsResponse {
+	rows := make([]WorkOrderListElement, len(list))
+	for i, d := range list {
+		rows[i] = *FromDomainListElement(&d)
+	}
+	return WorkOrderFilterRowsResponse{Rows: rows}
 }

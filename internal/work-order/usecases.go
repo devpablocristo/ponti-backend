@@ -23,6 +23,7 @@ type RepositoryPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
 }
@@ -231,6 +232,13 @@ func (u *UseCases) ListWorkOrders(
 	inp types.Input,
 ) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return u.repo.ListWorkOrders(ctx, filt, inp)
+}
+
+func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	if filt.ProjectID == nil && filt.FieldID == nil {
+		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
+	}
+	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 
 // GetMetrics delega al repositorio.

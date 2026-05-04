@@ -36,6 +36,7 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 
 type GetStockSummary struct {
 	ID              int64            `json:"id"`
+	SupplyID        int64            `json:"supply_id"`
 	SupplyName      string           `json:"supply_name"`
 	InvestorName    string           `json:"investor_name"`
 	StockUnits      decimal.Decimal  `json:"stock_units"`
@@ -49,6 +50,7 @@ type GetStockSummary struct {
 	EntryStock      decimal.Decimal  `json:"entry_stock"`
 	OutStock        decimal.Decimal  `json:"out_stock"`
 	Consumed        decimal.Decimal  `json:"consumed"`
+	UpdatedAt       *time.Time       `json:"updated_at,omitempty"`
 }
 
 // MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
@@ -62,6 +64,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 
 	aux := struct {
 		ID              int64      `json:"id"`
+		SupplyID        int64      `json:"supply_id"`
 		SupplyName      string     `json:"supply_name"`
 		InvestorName    string     `json:"investor_name"`
 		StockUnits      string     `json:"stock_units"`
@@ -75,8 +78,10 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		EntryStock      string     `json:"entry_stock"`
 		OutStock        string     `json:"out_stock"`
 		Consumed        string     `json:"consumed"`
+		UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 	}{
 		ID:              s.ID,
+		SupplyID:        s.SupplyID,
 		SupplyName:      s.SupplyName,
 		InvestorName:    s.InvestorName,
 		StockUnits:      s.StockUnits.StringFixed(2),
@@ -90,6 +95,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		EntryStock:      s.EntryStock.StringFixed(2),
 		OutStock:        s.OutStock.StringFixed(2),
 		Consumed:        s.Consumed.StringFixed(2),
+		UpdatedAt:       s.UpdatedAt,
 	}
 	return json.Marshal(aux)
 }
@@ -103,34 +109,44 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 
 	classType := ""
 	supplyName := ""
+	supplyID := int64(0)
 	supplyUnitID := int64(0)
 	supplyUnitPrice := decimal.Zero
 
 	if s.Supply != nil {
+		supplyID = s.Supply.ID
 		classType = s.Supply.CategoryName
 		supplyName = s.Supply.Name
 		supplyUnitID = s.Supply.UnitID
 		supplyUnitPrice = s.Supply.Price
 	}
 
-return &GetStockSummary{
-	ID:              s.ID,
-	InvestorName:    investorName,
-	SupplyName:      supplyName,
-	StockUnits:      s.GetStockUnits(),
-	RealStockUnits:  s.RealStockUnits,
-	TotalUSD:        s.GetTotalUSD(),
-	StockDifference: s.GetStockDifferencePtr(),
-	CloseDate:       s.CloseDate,
-	ClassType:       classType,
-	SupplyUnitID:    supplyUnitID,
-	SupplyUnitPrice: supplyUnitPrice,
-	EntryStock:      s.GetEntryStock(),
-	OutStock:        s.GetOutStock(),
-	Consumed:        s.Consumed,
-}
+	return &GetStockSummary{
+		ID:              s.ID,
+		SupplyID:        supplyID,
+		InvestorName:    investorName,
+		SupplyName:      supplyName,
+		StockUnits:      s.GetStockUnits(),
+		RealStockUnits:  s.RealStockUnits,
+		TotalUSD:        s.GetTotalUSD(),
+		StockDifference: s.GetStockDifferencePtr(),
+		CloseDate:       s.CloseDate,
+		ClassType:       classType,
+		SupplyUnitID:    supplyUnitID,
+		SupplyUnitPrice: supplyUnitPrice,
+		EntryStock:      s.GetEntryStock(),
+		OutStock:        s.GetOutStock(),
+		Consumed:        s.Consumed,
+		UpdatedAt:       timePtrIfNotZero(s.UpdatedAt),
+	}
 }
 
+func timePtrIfNotZero(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
 
 func NewGetStocksListed(stocks []*domain.Stock) GetStocksResponse {
 	var netTotalUSD decimal.Decimal

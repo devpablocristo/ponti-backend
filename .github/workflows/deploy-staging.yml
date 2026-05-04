@@ -3,6 +3,14 @@ name: Deploy STAGING (Cloud Run)
 on:
   push:
     branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "migrations_v4/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
     inputs:
       ref:

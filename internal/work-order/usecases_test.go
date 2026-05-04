@@ -1,12 +1,53 @@
 package workorder
 
 import (
+	"context"
 	"testing"
 
 	"github.com/shopspring/decimal"
 
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
+
+type useCasesRepoStub struct{}
+
+func (useCasesRepoStub) CreateWorkOrder(context.Context, *domain.WorkOrder) (int64, error) {
+	return 0, nil
+}
+func (useCasesRepoStub) GetWorkOrderByID(context.Context, int64) (*domain.WorkOrder, error) {
+	return nil, nil
+}
+func (useCasesRepoStub) GetWorkOrderByNumberAndProjectID(context.Context, string, int64) (*domain.WorkOrder, error) {
+	return nil, nil
+}
+func (useCasesRepoStub) UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error {
+	return nil
+}
+func (useCasesRepoStub) UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error {
+	return nil
+}
+func (useCasesRepoStub) DeleteWorkOrderByID(context.Context, int64) error {
+	return nil
+}
+func (useCasesRepoStub) ArchiveWorkOrder(context.Context, int64) error {
+	return nil
+}
+func (useCasesRepoStub) RestoreWorkOrder(context.Context, int64) error {
+	return nil
+}
+func (useCasesRepoStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
+	return nil, types.PageInfo{}, nil
+}
+func (useCasesRepoStub) ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	return nil, nil
+}
+func (useCasesRepoStub) GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
+	return nil, nil
+}
+func (useCasesRepoStub) GetRawDirectCost(context.Context, int64) (decimal.Decimal, error) {
+	return decimal.Zero, nil
+}
 
 func TestNormalizeInvestorPaymentStatus(t *testing.T) {
 	t.Parallel()
@@ -81,5 +122,15 @@ func TestValidateInvestorSplitsRejectsInvalidPaymentStatus(t *testing.T) {
 
 	if err := validateInvestorSplits(workOrder); err == nil {
 		t.Fatalf("expected validation error for invalid payment status")
+	}
+}
+
+func TestListWorkOrderFilterRowsRequiresProjectOrFieldScope(t *testing.T) {
+	t.Parallel()
+
+	uc := NewUseCases(useCasesRepoStub{}, nil)
+
+	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err == nil {
+		t.Fatalf("expected validation error for unscoped filter rows request")
 	}
 }

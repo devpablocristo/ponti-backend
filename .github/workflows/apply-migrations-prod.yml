@@ -23,6 +23,8 @@ concurrency:
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    environment:
+      name: prod
     env:
       # La instancia Cloud SQL es unificada y vive en el proyecto DEV.
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}

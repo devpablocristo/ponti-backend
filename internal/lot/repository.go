@@ -358,6 +358,12 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 }
 
 func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
+	if projectID > 0 && fieldID > 0 {
+		if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+			return nil, err
+		}
+	}
+
 	type rowAgg struct {
 		SeededArea      decimal.Decimal `gorm:"column:seeded_area"`
 		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
@@ -367,36 +373,39 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
 	}
 
-	where := []string{"1=1"}
+	view := shareddb.ReportView("lot_metrics")
+	where := []string{"1 = 1"}
 	args := []any{}
-	if projectID > 0 && fieldID > 0 {
-		if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
-			return nil, err
-		}
-	}
 	if fieldID > 0 {
-		where = append(where, "lot_id IN (SELECT id FROM lots WHERE field_id = ? AND deleted_at IS NULL)")
+		where = append(where, "field_id = ?")
 		args = append(args, fieldID)
 	} else if projectID > 0 {
 		where = append(where, "project_id = ?")
 		args = append(args, projectID)
 	}
 	if cropID > 0 {
-		where = append(where, "lot_id IN (SELECT id FROM lots WHERE (current_crop_id = ? OR previous_crop_id = ?) AND deleted_at IS NULL)")
+		where = append(where, `
+			lot_id IN (
+				SELECT id
+				FROM lots
+				WHERE (current_crop_id = ? OR previous_crop_id = ?)
+				  AND deleted_at IS NULL
+			)
+		`)
 		args = append(args, cropID, cropID)
 	}
 
 	query := fmt.Sprintf(`
 		SELECT
-			COALESCE(SUM(sowed_area_ha), 0) AS seeded_area,
+			COALESCE(SUM(seeded_area_ha), 0) AS seeded_area,
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-			COALESCE(SUM(yield_tn_per_ha * sowed_area_ha) / NULLIF(SUM(sowed_area_ha), 0), 0) AS yield_tn_per_ha,
+			COALESCE(SUM(yield_tn_per_ha * seeded_area_ha) / NULLIF(SUM(seeded_area_ha), 0), 0) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
 			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
 			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
 		FROM %s
 		WHERE %s
-	`, shareddb.ReportView("lot_metrics"), strings.Join(where, " AND "))
+	`, view, strings.Join(where, " AND "))
 
 	var row rowAgg
 	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
@@ -422,7 +431,8 @@ func (r *Repository) ListLots(
 	filter domain.LotListFilter,
 	page, pageSize int,
 ) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
-	where := []string{"1=1"}
+	view := shareddb.ReportView("lot_list")
+	where := []string{"1 = 1"}
 	args := []any{}
 	if filter.ProjectID != nil && (filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil) {
 		_, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
@@ -458,32 +468,22 @@ func (r *Repository) ListLots(
 		args = append(args, *filter.CropID, *filter.CropID)
 	}
 	whereSQL := strings.Join(where, " AND ")
-	view := shareddb.ReportView("lot_list")
-
-	// totales
-	var total int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", view, whereSQL)
-	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to count lots")
-	}
-
-	var sumSowedArea decimal.Decimal
-	sumSowedQuery := fmt.Sprintf("SELECT COALESCE(SUM(sowed_area_ha),0) FROM %s WHERE %s", view, whereSQL)
-	if err := r.db.Client().WithContext(ctx).Raw(sumSowedQuery, args...).Scan(&sumSowedArea).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to sum sowed area")
-	}
-
-	// sumCost: promedio ponderado de cost_usd_per_ha por superficie total
-	var sumCost decimal.Decimal
-	sumCostQuery := fmt.Sprintf("SELECT COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares),0), 0) FROM %s WHERE %s", view, whereSQL)
-	if err := r.db.Client().WithContext(ctx).Raw(sumCostQuery, args...).Scan(&sumCost).Error; err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to calculate cost per hectare")
-	}
 
 	// página
 	offset := (page - 1) * pageSize
 
-	var rows []models.LotTable
+	type lotTableRow struct {
+		models.LotTable
+		TotalRows    int64           `gorm:"column:total_rows"`
+		SumSowedArea decimal.Decimal `gorm:"column:sum_sowed_area"`
+		SumCost      decimal.Decimal `gorm:"column:sum_cost"`
+	}
+	type lotTotalsRow struct {
+		TotalRows    int64           `gorm:"column:total_rows"`
+		SumSowedArea decimal.Decimal `gorm:"column:sum_sowed_area"`
+		SumCost      decimal.Decimal `gorm:"column:sum_cost"`
+	}
+	var rows []lotTableRow
 	rowsQuery := fmt.Sprintf(`
 		SELECT
 			project_id, field_id, project_name, field_name,
@@ -494,7 +494,10 @@ func (r *Repository) ListLots(
 			harvested_area_ha AS harvested_area, lot_harvest_date AS harvest_date,
 			cost_usd_per_ha, yield_tn_per_ha,
 			income_net_per_ha_usd AS income_net_per_ha, rent_per_ha_usd AS rent_per_ha,
-			active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha
+			active_total_per_ha_usd AS active_total_per_ha, operating_result_per_ha_usd AS operating_result_per_ha,
+			COUNT(*) OVER () AS total_rows,
+			COALESCE(SUM(sowed_area_ha) OVER (), 0) AS sum_sowed_area,
+			COALESCE(SUM(cost_usd_per_ha * hectares) OVER () / NULLIF(SUM(hectares) OVER (), 0), 0) AS sum_cost
 		FROM %s
 		WHERE %s
 		ORDER BY id DESC
@@ -507,7 +510,13 @@ func (r *Repository) ListLots(
 
 	// Fechas por secuencia (1..3) para todos los lotes
 	domainRows := make([]domain.LotTable, len(rows))
+	var total int64
+	var sumSowedArea decimal.Decimal
+	var sumCost decimal.Decimal
 	if len(rows) > 0 {
+		total = rows[0].TotalRows
+		sumSowedArea = rows[0].SumSowedArea
+		sumCost = rows[0].SumCost
 		lotIDs := make([]int64, len(rows))
 		for i := range rows {
 			lotIDs[i] = rows[i].ID
@@ -524,6 +533,22 @@ func (r *Repository) ListLots(
 		for i := range rows {
 			domainRows[i] = rows[i].ToDomain(datesByLot[rows[i].ID])
 		}
+	} else {
+		totalsQuery := fmt.Sprintf(`
+			SELECT
+				COUNT(*) AS total_rows,
+				COALESCE(SUM(sowed_area_ha), 0) AS sum_sowed_area,
+				COALESCE(SUM(cost_usd_per_ha * hectares) / NULLIF(SUM(hectares), 0), 0) AS sum_cost
+			FROM %s
+			WHERE %s
+		`, view, whereSQL)
+		var totals lotTotalsRow
+		if err := r.db.Client().WithContext(ctx).Raw(totalsQuery, args...).Scan(&totals).Error; err != nil {
+			return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to calculate empty page lot totals")
+		}
+		total = totals.TotalRows
+		sumSowedArea = totals.SumSowedArea
+		sumCost = totals.SumCost
 	}
 
 	return domainRows, int(total), sumSowedArea, sumCost, nil

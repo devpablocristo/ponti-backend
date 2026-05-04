@@ -3,6 +3,14 @@ name: CI PR a develop
 on:
   pull_request:
     branches: [develop]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "migrations_v4/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - ".github/workflows/ci-pr.yml"
 
 concurrency:
   group: ponti-backend-ci-pr-${{ github.event.pull_request.number || github.ref }}
@@ -32,7 +40,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.11.4
           args: --timeout=5m
 
   build:
@@ -87,5 +95,5 @@ jobs:
 
       - name: Govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
           govulncheck ./...

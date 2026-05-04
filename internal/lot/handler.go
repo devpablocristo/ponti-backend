@@ -57,6 +57,8 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
+const maxLotExportPageSize = 1000
+
 type Handler struct {
 	ucs UseCasesPort
 	gsv GinEnginePort
@@ -125,7 +127,6 @@ func (h *Handler) ListLots(c *gin.Context) {
 	}
 
 	page, pageSize := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	// Cap de paginación
 	if pageSize > 1000 {
 		pageSize = 1000
 	}
@@ -286,12 +287,6 @@ func (h *Handler) ExportLots(c *gin.Context) {
 		cropID = &parsed
 	}
 
-	page, pageSize := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	// Cap de paginación
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
 	filter := domain.LotListFilter{
 		CustomerID: workspaceFilter.CustomerID,
 		ProjectID:  workspaceFilter.ProjectID,
@@ -299,7 +294,7 @@ func (h *Handler) ExportLots(c *gin.Context) {
 		FieldID:    workspaceFilter.FieldID,
 		CropID:     cropID,
 	}
-	data, err := h.ucs.ExportLots(c.Request.Context(), filter, page, pageSize)
+	data, err := h.ucs.ExportLots(c.Request.Context(), filter, 1, maxLotExportPageSize)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

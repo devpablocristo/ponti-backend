@@ -57,6 +57,7 @@ type WorkOrderFilter struct {
 	FieldID    *int64
 	CustomerID *int64
 	CampaignID *int64
+	SupplyID   *int64
 	IsDigital  *bool
 	Status     *string
 }
