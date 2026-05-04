@@ -709,3 +709,55 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 
 	return totalCost, nil
 }
+
+func (r *Repository) GetHarvestAreaSnapshot(
+	ctx context.Context,
+	lotID int64,
+	laborID int64,
+	excludeWorkOrderID int64,
+) (bool, decimal.Decimal, decimal.Decimal, error) {
+	type row struct {
+		IsHarvest             bool            `gorm:"column:is_harvest"`
+		LotHectares           decimal.Decimal `gorm:"column:lot_hectares"`
+		ExistingHarvestedArea decimal.Decimal `gorm:"column:existing_harvested_area"`
+	}
+
+	var result row
+
+	err := r.db.Client().WithContext(ctx).Raw(`
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM public.labors lb
+				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
+				WHERE lb.id = ?
+				  AND lb.deleted_at IS NULL
+				  AND cat.type_id = 4
+				  AND LOWER(TRIM(cat.name)) = 'cosecha'
+			) AS is_harvest,
+			COALESCE((
+				SELECT l.hectares
+				FROM public.lots l
+				WHERE l.id = ?
+				  AND l.deleted_at IS NULL
+			), 0)::numeric AS lot_hectares,
+			COALESCE((
+				SELECT SUM(w.effective_area)
+				FROM public.workorders w
+				JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
+				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
+				WHERE w.lot_id = ?
+				  AND w.deleted_at IS NULL
+				  AND w.effective_area > 0
+				  AND cat.type_id = 4
+				  AND LOWER(TRIM(cat.name)) = 'cosecha'
+				  AND (? = 0 OR w.id <> ?)
+			), 0)::numeric AS existing_harvested_area
+	`, laborID, lotID, lotID, excludeWorkOrderID, excludeWorkOrderID).Scan(&result).Error
+
+	if err != nil {
+		return false, decimal.Zero, decimal.Zero, domainerr.Internal("failed to validate harvest area")
+	}
+
+	return result.IsHarvest, result.LotHectares, result.ExistingHarvestedArea, nil
+}

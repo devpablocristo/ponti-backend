@@ -10,7 +10,21 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
-type useCasesRepoStub struct{}
+type useCasesRepoStub struct {
+	getHarvestAreaSnapshotFn func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
+}
+
+func (s useCasesRepoStub) GetHarvestAreaSnapshot(
+	ctx context.Context,
+	lotID int64,
+	laborID int64,
+	excludeWorkOrderID int64,
+) (bool, decimal.Decimal, decimal.Decimal, error) {
+	if s.getHarvestAreaSnapshotFn != nil {
+		return s.getHarvestAreaSnapshotFn(ctx, lotID, laborID, excludeWorkOrderID)
+	}
+	return false, decimal.Zero, decimal.Zero, nil
+}
 
 func (useCasesRepoStub) CreateWorkOrder(context.Context, *domain.WorkOrder) (int64, error) {
 	return 0, nil
@@ -132,5 +146,99 @@ func TestListWorkOrderFilterRowsRequiresProjectOrFieldScope(t *testing.T) {
 
 	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err == nil {
 		t.Fatalf("expected validation error for unscoped filter rows request")
+	}
+}
+
+func TestCreateWorkOrderAllowsPartialHarvestWithinLotArea(t *testing.T) {
+	t.Parallel()
+
+	uc := NewUseCases(useCasesRepoStub{
+		getHarvestAreaSnapshotFn: func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error) {
+			return true, decimal.NewFromInt(100), decimal.NewFromInt(40), nil
+		},
+	}, nil)
+
+	workOrder := validHarvestWorkOrder()
+	workOrder.EffectiveArea = decimal.NewFromInt(30)
+
+	if _, err := uc.CreateWorkOrder(context.Background(), workOrder); err != nil {
+		t.Fatalf("expected partial harvest to be allowed, got %v", err)
+	}
+}
+
+func TestCreateWorkOrderRejectsHarvestAreaOverLotArea(t *testing.T) {
+	t.Parallel()
+
+	uc := NewUseCases(useCasesRepoStub{
+		getHarvestAreaSnapshotFn: func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error) {
+			return true, decimal.NewFromInt(100), decimal.NewFromInt(80), nil
+		},
+	}, nil)
+
+	workOrder := validHarvestWorkOrder()
+	workOrder.EffectiveArea = decimal.NewFromInt(25)
+
+	if _, err := uc.CreateWorkOrder(context.Background(), workOrder); err == nil {
+		t.Fatal("expected validation error for harvest area over lot area")
+	}
+}
+
+func TestUpdateWorkOrderExcludesCurrentWorkOrderFromHarvestArea(t *testing.T) {
+	t.Parallel()
+
+	var gotExcludeID int64
+	uc := NewUseCases(useCasesRepoStub{
+		getHarvestAreaSnapshotFn: func(_ context.Context, _ int64, _ int64, excludeWorkOrderID int64) (bool, decimal.Decimal, decimal.Decimal, error) {
+			gotExcludeID = excludeWorkOrderID
+			return true, decimal.NewFromInt(100), decimal.NewFromInt(40), nil
+		},
+	}, nil)
+
+	workOrder := validHarvestWorkOrder()
+	workOrder.ID = 55
+	workOrder.EffectiveArea = decimal.NewFromInt(50)
+
+	if err := uc.UpdateWorkOrderByID(context.Background(), workOrder); err != nil {
+		t.Fatalf("expected update to be allowed, got %v", err)
+	}
+	if gotExcludeID != 55 {
+		t.Fatalf("expected excludeWorkOrderID 55, got %d", gotExcludeID)
+	}
+}
+
+func TestCreateWorkOrderSkipsHarvestLimitForNonHarvestLabor(t *testing.T) {
+	t.Parallel()
+
+	uc := NewUseCases(useCasesRepoStub{
+		getHarvestAreaSnapshotFn: func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error) {
+			return false, decimal.NewFromInt(100), decimal.NewFromInt(100), nil
+		},
+	}, nil)
+
+	workOrder := validHarvestWorkOrder()
+	workOrder.EffectiveArea = decimal.NewFromInt(500)
+
+	if _, err := uc.CreateWorkOrder(context.Background(), workOrder); err != nil {
+		t.Fatalf("expected non-harvest labor to skip harvest area limit, got %v", err)
+	}
+}
+
+func validHarvestWorkOrder() *domain.WorkOrder {
+	return &domain.WorkOrder{
+		Number:        "OT-1",
+		ProjectID:     1,
+		FieldID:       2,
+		LotID:         3,
+		CropID:        4,
+		LaborID:       5,
+		InvestorID:    6,
+		EffectiveArea: decimal.NewFromInt(10),
+		Items: []domain.WorkOrderItem{
+			{
+				SupplyID:  7,
+				TotalUsed: decimal.NewFromInt(1),
+				FinalDose: decimal.NewFromInt(1),
+			},
+		},
 	}
 }
