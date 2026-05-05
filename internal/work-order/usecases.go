@@ -26,6 +26,8 @@ type RepositoryPort interface {
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
+
+	GetHarvestAreaSnapshot(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
 }
 
 type ExporterAdapterPort interface {
@@ -59,6 +61,9 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 	if err := validateUniqueSupplyItems(o); err != nil {
 		return 0, err
 	}
+	if err := u.validateHarvestAreaLimit(ctx, o, 0); err != nil {
+	return 0, err
+}
 	return u.repo.CreateWorkOrder(ctx, o)
 }
 
@@ -83,6 +88,9 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 	if err := validateUniqueSupplyItems(o); err != nil {
 		return err
 	}
+	if err := u.validateHarvestAreaLimit(ctx, o, o.ID); err != nil {
+	return err
+}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
 }
 
@@ -261,4 +269,36 @@ func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFi
 	}
 
 	return u.excel.Export(ctx, items)
+}
+
+func (u *UseCases) validateHarvestAreaLimit(ctx context.Context, o *domain.WorkOrder, excludeWorkOrderID int64) error {
+	if o == nil {
+		return domainerr.Validation("work order is nil")
+	}
+	if o.LotID <= 0 || o.LaborID <= 0 {
+		return nil
+	}
+	if o.EffectiveArea.LessThanOrEqual(decimal.Zero) {
+		return nil
+	}
+
+	isHarvest, lotHectares, existingHarvestedArea, err := u.repo.GetHarvestAreaSnapshot(
+		ctx,
+		o.LotID,
+		o.LaborID,
+		excludeWorkOrderID,
+	)
+	if err != nil {
+		return err
+	}
+	if !isHarvest {
+		return nil
+	}
+
+	totalHarvestedArea := existingHarvestedArea.Add(o.EffectiveArea)
+	if totalHarvestedArea.GreaterThan(lotHectares) {
+		return domainerr.Validation("la superficie de cosecha supera la superficie total del lote")
+	}
+
+	return nil
 }
