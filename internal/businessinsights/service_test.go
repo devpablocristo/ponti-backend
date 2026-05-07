@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 )
 
-type stubReview struct {
+type stubGovernance struct {
 	calls    int
-	response reviewclient.SubmitResponse
+	response governanceclient.SubmitResponse
 	err      error
-	lastBody reviewclient.SubmitRequestBody
+	lastBody governanceclient.SubmitRequestBody
 }
 
-func (s *stubReview) SubmitRequest(_ context.Context, _ string, body reviewclient.SubmitRequestBody) (reviewclient.SubmitResponse, error) {
+func (s *stubGovernance) SubmitRequest(_ context.Context, _ string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
 	s.calls++
 	s.lastBody = body
 	return s.response, s.err
@@ -55,12 +55,12 @@ func (s *stubRepo) MarkNotified(_ context.Context, tenantID, candidateID string,
 
 func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 	repo := &stubRepo{shouldNotify: true}
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	governance := &stubGovernance{response: governanceclient.SubmitResponse{
 		RequestID:      "req-1",
 		Decision:       "allow",
 		DecisionReason: "Policy 'ponti-stock-negative-notify'",
 	}}
-	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, governance, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID:   "p-1",
@@ -70,8 +70,8 @@ func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NotifyStockNegative: %v", err)
 	}
-	if review.calls != 1 {
-		t.Fatalf("review calls = %d, want 1", review.calls)
+	if governance.calls != 1 {
+		t.Fatalf("governance calls = %d, want 1", governance.calls)
 	}
 	if repo.upsertCalls != 1 {
 		t.Fatalf("upsert calls = %d, want 1", repo.upsertCalls)
@@ -86,12 +86,12 @@ func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 
 func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	repo := &stubRepo{}
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	governance := &stubGovernance{response: governanceclient.SubmitResponse{
 		RequestID:      "req-2",
 		Decision:       "allow",
 		DecisionReason: "No policy matched; default for risk low",
 	}}
-	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, nil, nil, governance, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: -1,
@@ -99,18 +99,18 @@ func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NotifyStockNegative: %v", err)
 	}
-	if review.calls != 1 {
-		t.Fatalf("review calls = %d, want 1", review.calls)
+	if governance.calls != 1 {
+		t.Fatalf("governance calls = %d, want 1", governance.calls)
 	}
 	if repo.upsertCalls != 0 {
 		t.Fatalf("upsert calls = %d, want 0 (no policy match)", repo.upsertCalls)
 	}
 }
 
-func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
+func TestNotifyStockNegative_PositiveStock_SkipsGovernance(t *testing.T) {
 	repo := &stubRepo{}
-	review := &stubReview{}
-	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
+	governance := &stubGovernance{}
+	svc := businessinsights.NewService(repo, nil, nil, governance, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "user-1", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: 5,
@@ -118,8 +118,8 @@ func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NotifyStockNegative: %v", err)
 	}
-	if review.calls != 0 {
-		t.Fatalf("review calls = %d, want 0 (quantity >= 0)", review.calls)
+	if governance.calls != 0 {
+		t.Fatalf("governance calls = %d, want 0 (quantity >= 0)", governance.calls)
 	}
 	if repo.upsertCalls != 0 {
 		t.Fatalf("upsert calls = %d, want 0", repo.upsertCalls)
@@ -128,11 +128,11 @@ func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
 
 func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 	repo := &stubRepo{shouldNotify: false} // segunda invocacion: no re-notifica
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	governance := &stubGovernance{response: governanceclient.SubmitResponse{
 		Decision:       "allow",
 		DecisionReason: "Policy 'p'",
 	}}
-	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{
+	svc := businessinsights.NewService(repo, nil, nil, governance, businessinsights.Config{
 		NegativeStockDedupWindow: 24 * time.Hour,
 	})
 	level := businessinsights.StockLevel{ProductID: "p-x", Quantity: -2}
@@ -155,23 +155,23 @@ func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 	}
 }
 
-func TestNotifyStockNegative_ReviewError_PropagatesFailure(t *testing.T) {
+func TestNotifyStockNegative_GovernanceError_PropagatesFailure(t *testing.T) {
 	repo := &stubRepo{}
-	review := &stubReview{err: errors.New("network down")}
-	svc := businessinsights.NewService(repo, nil, nil, review, businessinsights.Config{})
+	governance := &stubGovernance{err: errors.New("network down")}
+	svc := businessinsights.NewService(repo, nil, nil, governance, businessinsights.Config{})
 
 	err := svc.NotifyStockNegative(context.Background(), uuid.New(), "u", businessinsights.StockLevel{
 		ProductID: "p-1", Quantity: -1,
 	})
 	if err == nil {
-		t.Fatal("expected error when review client fails")
+		t.Fatal("expected error when governance client fails")
 	}
 	if repo.upsertCalls != 0 {
-		t.Fatalf("upsert should not be called when review fails")
+		t.Fatalf("upsert should not be called when governance fails")
 	}
 }
 
-func TestNotifyStockNegative_NilReview_NoOp(t *testing.T) {
+func TestNotifyStockNegative_NilGovernance_NoOp(t *testing.T) {
 	repo := &stubRepo{}
 	svc := businessinsights.NewService(repo, nil, nil, nil, businessinsights.Config{})
 
@@ -179,9 +179,9 @@ func TestNotifyStockNegative_NilReview_NoOp(t *testing.T) {
 		ProductID: "p-1", Quantity: -1,
 	})
 	if err != nil {
-		t.Fatalf("NotifyStockNegative should no-op silently when review is nil, got: %v", err)
+		t.Fatalf("NotifyStockNegative should no-op silently when governance is nil, got: %v", err)
 	}
 	if repo.upsertCalls != 0 {
-		t.Fatalf("upsert should not be called when review is nil")
+		t.Fatalf("upsert should not be called when governance is nil")
 	}
 }

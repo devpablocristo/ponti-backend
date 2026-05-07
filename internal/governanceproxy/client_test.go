@@ -1,4 +1,4 @@
-package reviewproxy_test
+package governanceproxy_test
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
-	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
+	"github.com/devpablocristo/ponti-backend/internal/governanceproxy"
 )
 
 func TestNewClient_SubmitRequestSendsAPIKey(t *testing.T) {
@@ -20,8 +20,8 @@ func TestNewClient_SubmitRequestSendsAPIKey(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	client := reviewproxy.NewClient(srv.URL, "test-key")
-	body := reviewclient.SubmitRequestBody{
+	client := governanceproxy.NewClient(srv.URL, "test-key")
+	body := governanceclient.SubmitRequestBody{
 		RequesterType: "service",
 		RequesterID:   "ponti-backend",
 		ActionType:    "stock.write",

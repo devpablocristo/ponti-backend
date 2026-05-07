@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/gin-gonic/gin"
@@ -28,9 +29,13 @@ type MiddlewaresEnginePort interface {
 	GetValidation() []gin.HandlerFunc
 }
 
-// ListRepository expone la lectura de candidatos enriquecida con read_at por usuario.
+// ListRepository expone la lectura de candidatos enriquecida con read_at por usuario,
+// más operaciones de agregación y lookup puntual usadas por las capabilities
+// publicadas a Companion (ponti.insights.summary, ponti.insights.explain).
 type ListRepository interface {
 	ListByTenantForUser(ctx context.Context, tenantID, userID string, opts ListOptions) ([]CandidateView, error)
+	SummaryByTenant(ctx context.Context, tenantID string) (SummaryCounts, error)
+	GetByTenantAndID(ctx context.Context, tenantID, userID, candidateID string) (CandidateView, error)
 }
 
 // Handler expone lectura y mutaciones de candidatos (business insights).
@@ -51,10 +56,107 @@ func (h *Handler) Routes() {
 	base := h.cfg.APIBaseURL() + "/insights"
 	group := h.eng.GetRouter().Group(base, h.mws.GetValidation()...)
 	group.GET("", h.List)
+	// Endpoints expuestos como capabilities a Companion (read-only):
+	group.GET("/summary", h.Summary)
+	group.GET("/:id/explain", h.Explain)
 	group.POST("/:id/read", h.MarkRead)
 	group.DELETE("/:id/read", h.MarkUnread)
 	group.POST("/:id/resolve", h.Resolve)
 	group.DELETE("/:id/resolve", h.Reopen)
+}
+
+// Summary devuelve totales agregados por status/severity/kind para el tenant
+// autenticado. Capability: ponti.insights.summary@1.0.0.
+func (h *Handler) Summary(c *gin.Context) {
+	orgID, err := sharedhandlers.ParseOrgID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	counts, err := h.repo.SummaryByTenant(c.Request.Context(), orgID.String())
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"summary": counts,
+		"evidence": gin.H{
+			"source_ref":   "ponti.businessinsights.summary",
+			"captured_at":  nowRFC3339(),
+			"tenant_scope": orgID.String(),
+		},
+	})
+}
+
+// Explain devuelve el detalle de un insight con bloque de evidencia para que
+// Companion lo cite al usuario. Capability: ponti.insights.explain@1.0.0.
+func (h *Handler) Explain(c *gin.Context) {
+	orgID, err := sharedhandlers.ParseOrgID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	userID, _ := sharedhandlers.ParseActor(c)
+	candidateID := strings.TrimSpace(c.Param("id"))
+	if candidateID == "" {
+		sharedhandlers.RespondError(c, domainerr.Validation("candidate id is required"))
+		return
+	}
+	view, err := h.repo.GetByTenantAndID(c.Request.Context(), orgID.String(), userID, candidateID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	resp := candidateResponseFromView(view)
+	c.JSON(http.StatusOK, gin.H{
+		"insight": resp,
+		"evidence": gin.H{
+			"source_ref":   "ponti.businessinsights.candidate:" + view.ID,
+			"captured_at":  view.LastSeenAt.Format("2006-01-02T15:04:05Z07:00"),
+			"first_seen":   view.FirstSeenAt.Format("2006-01-02T15:04:05Z07:00"),
+			"event_type":   view.EventType,
+			"entity":       view.EntityType + ":" + view.EntityID,
+			"tenant_scope": orgID.String(),
+		},
+	})
+}
+
+// nowRFC3339 helper de evidencia.
+func nowRFC3339() string {
+	return time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
+}
+
+// candidateResponseFromView reusa la serialización ya existente para List,
+// extrayendo a un helper para usar en Explain también.
+func candidateResponseFromView(v CandidateView) CandidateResponse {
+	item := CandidateResponse{
+		ID:              v.ID,
+		Kind:            v.Kind,
+		EventType:       v.EventType,
+		EntityType:      v.EntityType,
+		EntityID:        v.EntityID,
+		Severity:        v.Severity,
+		Status:          v.Status,
+		Title:           v.Title,
+		Body:            v.Body,
+		Evidence:        v.Evidence,
+		OccurrenceCount: v.OccurrenceCount,
+		FirstSeenAt:     v.FirstSeenAt.Format("2006-01-02T15:04:05Z07:00"),
+		LastSeenAt:      v.LastSeenAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if v.LastNotifiedAt != nil {
+		ts := v.LastNotifiedAt.Format("2006-01-02T15:04:05Z07:00")
+		item.LastNotifiedAt = &ts
+	}
+	if v.ResolvedAt != nil {
+		ts := v.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
+		item.ResolvedAt = &ts
+	}
+	if v.ReadAt != nil {
+		ts := v.ReadAt.Format("2006-01-02T15:04:05Z07:00")
+		item.ReadAt = &ts
+	}
+	return item
 }
 
 // CandidateResponse es la forma serializada de un CandidateView.

@@ -21,7 +21,7 @@ type Config struct {
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
 	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
-	Review         Review         // Configuración de Nexus Review / approvals
+	Governance         Governance         // Configuración de Nexus Governance / approvals
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.
