@@ -20,6 +20,10 @@ type transactionExecutor interface {
 	ExecuteInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
+type stockFieldCountResetter interface {
+	ResetMissingFieldStockCounts(ctx context.Context, projectID int64, includedSupplyIDs []int64, updatedBy *string) error
+}
+
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
 	if err := u.validateDuplicateReferenceSupply(ctx, movement); err != nil {
 		return 0, err
@@ -257,6 +261,16 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 		return nil, domainerr.Internal("transactions not supported for strict mode")
 	}
 
+	isFieldStockCountBatch := isStockFieldCountBatch(movements)
+	includedSupplyIDs := stockFieldCountSupplyIDs(movements)
+
+	projectID := int64(0)
+	var updatedBy *string
+	if isFieldStockCountBatch {
+		projectID = movements[0].ProjectId
+		updatedBy = movements[0].UpdatedBy
+	}
+
 	ids := make([]int64, len(movements))
 	err := txRepo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
 		for i := range movements {
@@ -266,6 +280,17 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 			}
 			ids[i] = id
 		}
+
+		if isFieldStockCountBatch {
+			resetter, ok := u.repo.(stockFieldCountResetter)
+			if !ok {
+				return domainerr.Internal("stock field count reset not supported")
+			}
+			if err := resetter.ResetMissingFieldStockCounts(txCtx, projectID, includedSupplyIDs, updatedBy); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -273,6 +298,41 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 	}
 
 	return ids, nil
+}
+
+func isStockFieldCountBatch(movements []*domain.SupplyMovement) bool {
+	if len(movements) == 0 {
+		return false
+	}
+
+	for i := range movements {
+		if movements[i] == nil || movements[i].MovementType != domain.STOCK {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stockFieldCountSupplyIDs(movements []*domain.SupplyMovement) []int64 {
+	seen := make(map[int64]struct{}, len(movements))
+	ids := make([]int64, 0, len(movements))
+
+	for i := range movements {
+		if movements[i] == nil || movements[i].Supply == nil || movements[i].Supply.ID <= 0 {
+			continue
+		}
+
+		id := movements[i].Supply.ID
+		if _, ok := seen[id]; ok {
+			continue
+		}
+
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	return ids
 }
 
 func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
@@ -313,9 +373,17 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 		return err
 	}
 	if isFirst {
-		return domainerr.Validation("no existe stock para este insumo en el proyecto")
-	}
+		if supplyMovement.MovementType != domain.OFFICIAL_INVOICE {
+			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+		}
 
+		stock = createStockDomainFromSupplyMovement(supplyMovement)
+		stockID, err := u.stockUseCases.CreateStock(ctx, stock)
+		if err != nil {
+			return err
+		}
+		stock.ID = stockID
+	}
 	supplyMovement.StockId = stock.ID
 	return u.repo.UpdateSupplyMovement(ctx, supplyMovement)
 }

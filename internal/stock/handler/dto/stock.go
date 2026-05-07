@@ -51,6 +51,7 @@ type GetStockSummary struct {
 	OutStock        decimal.Decimal  `json:"out_stock"`
 	Consumed        decimal.Decimal  `json:"consumed"`
 	UpdatedAt       *time.Time       `json:"updated_at,omitempty"`
+	HasMultipleInvestors bool        `json:"has_multiple_investors"`
 }
 
 // MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
@@ -79,6 +80,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		OutStock        string     `json:"out_stock"`
 		Consumed        string     `json:"consumed"`
 		UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+		HasMultipleInvestors bool        `json:"has_multiple_investors"`
 	}{
 		ID:              s.ID,
 		SupplyID:        s.SupplyID,
@@ -96,6 +98,7 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 		OutStock:        s.OutStock.StringFixed(2),
 		Consumed:        s.Consumed.StringFixed(2),
 		UpdatedAt:       s.UpdatedAt,
+		HasMultipleInvestors: s.HasMultipleInvestors,
 	}
 	return json.Marshal(aux)
 }
@@ -138,6 +141,7 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 		OutStock:        s.GetOutStock(),
 		Consumed:        s.Consumed,
 		UpdatedAt:       timePtrIfNotZero(s.UpdatedAt),
+		HasMultipleInvestors: s.HasMultipleInvestors,
 	}
 }
 

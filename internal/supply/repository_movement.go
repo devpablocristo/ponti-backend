@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
@@ -13,6 +14,7 @@ import (
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +28,35 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 		return 0, err
 	}
 	return model.ID, nil
+}
+
+func (r *Repository) ResetMissingFieldStockCounts(ctx context.Context, projectID int64, includedSupplyIDs []int64, updatedBy *string) error {
+	if projectID <= 0 {
+		return domainerr.Validation("project_id must be greater than 0")
+	}
+
+	query := r.getDB(ctx).
+		Model(&stockmodel.Stock{}).
+		Where("project_id = ?", projectID).
+		Where("close_date IS NULL").
+		Where("deleted_at IS NULL")
+
+	if len(includedSupplyIDs) > 0 {
+		query = query.Where("supply_id NOT IN ?", includedSupplyIDs)
+	}
+
+	updates := map[string]any{
+		"real_stock_units":     decimal.Zero,
+		"has_real_stock_count": true,
+		"updated_at":           time.Now().UTC(),
+		"updated_by":           updatedBy,
+	}
+
+	if err := query.Updates(updates).Error; err != nil {
+		return domainerr.Internal("failed to reset missing field stock counts")
+	}
+
+	return nil
 }
 
 func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomain.Provider) (int64, error) {
@@ -298,12 +329,37 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	db := r.getDB(ctx)
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		var previous models.SupplyMovement
+		if err := tx.
+			Where("id = ?", movement.ID).
+			First(&previous).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("supply movement not found")
+			}
+			return domainerr.Internal("failed to get supply movement")
+		}
+
 		if err := tx.Model(&models.SupplyMovement{}).
 			Where("id = ?", movement.ID).
 			Updates(model).
 			Error; err != nil {
-
 			return domainerr.Internal("failed to update supply movement")
+		}
+
+		if previous.StockId != 0 && previous.StockId != movement.StockId {
+			var remainingCount int64
+			if err := tx.Model(&models.SupplyMovement{}).
+				Where("stock_id = ?", previous.StockId).
+				Where("deleted_at IS NULL").
+				Count(&remainingCount).Error; err != nil {
+				return domainerr.Internal("failed to get remaining movements")
+			}
+
+			if remainingCount == 0 {
+				if err := tx.Delete(&stockmodel.Stock{}, "id = ?", previous.StockId).Error; err != nil {
+					return domainerr.Internal("failed to delete stock")
+				}
+			}
 		}
 
 		return nil
