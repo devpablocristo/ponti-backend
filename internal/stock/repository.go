@@ -190,6 +190,7 @@ func stockSummaryFromModels(
 	stock.ID = 0
 	stock.RealStockUnits = decimal.Zero
 	stock.HasRealStockCount = false
+	stock.HasMultipleInvestors = false
 	stock.UpdatedAt = time.Time{}
 
 	for _, stockModel := range stockModels {
@@ -202,6 +203,7 @@ func stockSummaryFromModels(
 		}
 		if stockModel.InvestorID != stockModels[0].InvestorID {
 			stock.Investor = nil
+			stock.HasMultipleInvestors = true
 		}
 	}
 

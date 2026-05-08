@@ -1,6 +1,6 @@
 module github.com/devpablocristo/ponti-backend
 
-go 1.26.2
+go 1.26.3
 
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
@@ -26,7 +26,7 @@ require (
 	github.com/shopspring/decimal v1.2.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go-micro.dev/v4 v4.11.0
-	golang.org/x/text v0.34.0
+	golang.org/x/text v0.36.0
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -127,11 +127,11 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.247.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect

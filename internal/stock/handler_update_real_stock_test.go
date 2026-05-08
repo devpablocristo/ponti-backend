@@ -105,3 +105,23 @@ func newUpdateRealStockTestContext(t *testing.T, projectID, stockID, body string
 	}
 	return ctx, recorder
 }
+
+func TestHandler_UpdateRealStockRejectsInvalidStockIDWithBusinessMessage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fakeUC := &updateRealStockFakeUseCases{}
+	handler := &Handler{ucs: fakeUC}
+
+	ctx, recorder := newUpdateRealStockTestContext(
+		t,
+		"1",
+		"0",
+		`{"real_stock_units":"7"}`,
+	)
+
+	handler.UpdateRealStock(ctx)
+
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.False(t, fakeUC.updateCalled)
+	assert.Contains(t, recorder.Body.String(), "Para cargar stock de campo, primero cargá un ingreso del insumo.")
+}

@@ -35,22 +35,23 @@ func (r GetStocksResponse) MarshalJSON() ([]byte, error) {
 }
 
 type GetStockSummary struct {
-	ID              int64            `json:"id"`
-	SupplyID        int64            `json:"supply_id"`
-	SupplyName      string           `json:"supply_name"`
-	InvestorName    string           `json:"investor_name"`
-	StockUnits      decimal.Decimal  `json:"stock_units"`
-	RealStockUnits  decimal.Decimal  `json:"real_stock_units"`
-	StockDifference *decimal.Decimal `json:"stock_difference"`
-	TotalUSD        decimal.Decimal  `json:"total_usd"`
-	ClassType       string           `json:"class_type"`
-	CloseDate       *time.Time       `json:"close_date"`
-	SupplyUnitID    int64            `json:"supply_unit_id"`
-	SupplyUnitPrice decimal.Decimal  `json:"supply_unit_price"`
-	EntryStock      decimal.Decimal  `json:"entry_stock"`
-	OutStock        decimal.Decimal  `json:"out_stock"`
-	Consumed        decimal.Decimal  `json:"consumed"`
-	UpdatedAt       *time.Time       `json:"updated_at,omitempty"`
+	ID                   int64            `json:"id"`
+	SupplyID             int64            `json:"supply_id"`
+	SupplyName           string           `json:"supply_name"`
+	InvestorName         string           `json:"investor_name"`
+	StockUnits           decimal.Decimal  `json:"stock_units"`
+	RealStockUnits       decimal.Decimal  `json:"real_stock_units"`
+	StockDifference      *decimal.Decimal `json:"stock_difference"`
+	TotalUSD             decimal.Decimal  `json:"total_usd"`
+	ClassType            string           `json:"class_type"`
+	CloseDate            *time.Time       `json:"close_date"`
+	SupplyUnitID         int64            `json:"supply_unit_id"`
+	SupplyUnitPrice      decimal.Decimal  `json:"supply_unit_price"`
+	EntryStock           decimal.Decimal  `json:"entry_stock"`
+	OutStock             decimal.Decimal  `json:"out_stock"`
+	Consumed             decimal.Decimal  `json:"consumed"`
+	UpdatedAt            *time.Time       `json:"updated_at,omitempty"`
+	HasMultipleInvestors bool             `json:"has_multiple_investors"`
 }
 
 // MarshalJSON aplica redondeo: Precio u: 2 dec, Total u$s: 2 dec
@@ -63,39 +64,41 @@ func (s GetStockSummary) MarshalJSON() ([]byte, error) {
 	}
 
 	aux := struct {
-		ID              int64      `json:"id"`
-		SupplyID        int64      `json:"supply_id"`
-		SupplyName      string     `json:"supply_name"`
-		InvestorName    string     `json:"investor_name"`
-		StockUnits      string     `json:"stock_units"`
-		RealStockUnits  string     `json:"real_stock_units"`
-		StockDifference any        `json:"stock_difference"`
-		TotalUSD        string     `json:"total_usd"`
-		ClassType       string     `json:"class_type"`
-		CloseDate       *time.Time `json:"close_date"`
-		SupplyUnitID    int64      `json:"supply_unit_id"`
-		SupplyUnitPrice string     `json:"supply_unit_price"`
-		EntryStock      string     `json:"entry_stock"`
-		OutStock        string     `json:"out_stock"`
-		Consumed        string     `json:"consumed"`
-		UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+		ID                   int64      `json:"id"`
+		SupplyID             int64      `json:"supply_id"`
+		SupplyName           string     `json:"supply_name"`
+		InvestorName         string     `json:"investor_name"`
+		StockUnits           string     `json:"stock_units"`
+		RealStockUnits       string     `json:"real_stock_units"`
+		StockDifference      any        `json:"stock_difference"`
+		TotalUSD             string     `json:"total_usd"`
+		ClassType            string     `json:"class_type"`
+		CloseDate            *time.Time `json:"close_date"`
+		SupplyUnitID         int64      `json:"supply_unit_id"`
+		SupplyUnitPrice      string     `json:"supply_unit_price"`
+		EntryStock           string     `json:"entry_stock"`
+		OutStock             string     `json:"out_stock"`
+		Consumed             string     `json:"consumed"`
+		UpdatedAt            *time.Time `json:"updated_at,omitempty"`
+		HasMultipleInvestors bool       `json:"has_multiple_investors"`
 	}{
-		ID:              s.ID,
-		SupplyID:        s.SupplyID,
-		SupplyName:      s.SupplyName,
-		InvestorName:    s.InvestorName,
-		StockUnits:      s.StockUnits.StringFixed(2),
-		RealStockUnits:  s.RealStockUnits.StringFixed(2),
-		StockDifference: stockDifference,
-		TotalUSD:        s.TotalUSD.StringFixed(2),
-		ClassType:       s.ClassType,
-		CloseDate:       s.CloseDate,
-		SupplyUnitID:    s.SupplyUnitID,
-		SupplyUnitPrice: s.SupplyUnitPrice.StringFixed(2),
-		EntryStock:      s.EntryStock.StringFixed(2),
-		OutStock:        s.OutStock.StringFixed(2),
-		Consumed:        s.Consumed.StringFixed(2),
-		UpdatedAt:       s.UpdatedAt,
+		ID:                   s.ID,
+		SupplyID:             s.SupplyID,
+		SupplyName:           s.SupplyName,
+		InvestorName:         s.InvestorName,
+		StockUnits:           s.StockUnits.StringFixed(2),
+		RealStockUnits:       s.RealStockUnits.StringFixed(2),
+		StockDifference:      stockDifference,
+		TotalUSD:             s.TotalUSD.StringFixed(2),
+		ClassType:            s.ClassType,
+		CloseDate:            s.CloseDate,
+		SupplyUnitID:         s.SupplyUnitID,
+		SupplyUnitPrice:      s.SupplyUnitPrice.StringFixed(2),
+		EntryStock:           s.EntryStock.StringFixed(2),
+		OutStock:             s.OutStock.StringFixed(2),
+		Consumed:             s.Consumed.StringFixed(2),
+		UpdatedAt:            s.UpdatedAt,
+		HasMultipleInvestors: s.HasMultipleInvestors,
 	}
 	return json.Marshal(aux)
 }
@@ -122,22 +125,23 @@ func FromDomain(s *domain.Stock) *GetStockSummary {
 	}
 
 	return &GetStockSummary{
-		ID:              s.ID,
-		SupplyID:        supplyID,
-		InvestorName:    investorName,
-		SupplyName:      supplyName,
-		StockUnits:      s.GetStockUnits(),
-		RealStockUnits:  s.RealStockUnits,
-		TotalUSD:        s.GetTotalUSD(),
-		StockDifference: s.GetStockDifferencePtr(),
-		CloseDate:       s.CloseDate,
-		ClassType:       classType,
-		SupplyUnitID:    supplyUnitID,
-		SupplyUnitPrice: supplyUnitPrice,
-		EntryStock:      s.GetEntryStock(),
-		OutStock:        s.GetOutStock(),
-		Consumed:        s.Consumed,
-		UpdatedAt:       timePtrIfNotZero(s.UpdatedAt),
+		ID:                   s.ID,
+		SupplyID:             supplyID,
+		InvestorName:         investorName,
+		SupplyName:           supplyName,
+		StockUnits:           s.GetStockUnits(),
+		RealStockUnits:       s.RealStockUnits,
+		TotalUSD:             s.GetTotalUSD(),
+		StockDifference:      s.GetStockDifferencePtr(),
+		CloseDate:            s.CloseDate,
+		ClassType:            classType,
+		SupplyUnitID:         supplyUnitID,
+		SupplyUnitPrice:      supplyUnitPrice,
+		EntryStock:           s.GetEntryStock(),
+		OutStock:             s.GetOutStock(),
+		Consumed:             s.Consumed,
+		UpdatedAt:            timePtrIfNotZero(s.UpdatedAt),
+		HasMultipleInvestors: s.HasMultipleInvestors,
 	}
 }
 
