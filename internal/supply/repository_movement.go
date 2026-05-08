@@ -30,19 +30,9 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 	return model.ID, nil
 }
 
-func (r *Repository) ResetMissingFieldStockCounts(ctx context.Context, projectID int64, includedSupplyIDs []int64, updatedBy *string) error {
+func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error {
 	if projectID <= 0 {
 		return domainerr.Validation("project_id must be greater than 0")
-	}
-
-	query := r.getDB(ctx).
-		Model(&stockmodel.Stock{}).
-		Where("project_id = ?", projectID).
-		Where("close_date IS NULL").
-		Where("deleted_at IS NULL")
-
-	if len(includedSupplyIDs) > 0 {
-		query = query.Where("supply_id NOT IN ?", includedSupplyIDs)
 	}
 
 	updates := map[string]any{
@@ -52,8 +42,13 @@ func (r *Repository) ResetMissingFieldStockCounts(ctx context.Context, projectID
 		"updated_by":           updatedBy,
 	}
 
-	if err := query.Updates(updates).Error; err != nil {
-		return domainerr.Internal("failed to reset missing field stock counts")
+	if err := r.getDB(ctx).
+		Model(&stockmodel.Stock{}).
+		Where("project_id = ?", projectID).
+		Where("close_date IS NULL").
+		Where("deleted_at IS NULL").
+		Updates(updates).Error; err != nil {
+		return domainerr.Internal("failed to reset field stock counts")
 	}
 
 	return nil

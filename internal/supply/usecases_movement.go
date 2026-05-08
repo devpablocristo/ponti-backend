@@ -21,7 +21,7 @@ type transactionExecutor interface {
 }
 
 type stockFieldCountResetter interface {
-	ResetMissingFieldStockCounts(ctx context.Context, projectID int64, includedSupplyIDs []int64, updatedBy *string) error
+	ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
@@ -262,7 +262,6 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 	}
 
 	isFieldStockCountBatch := isStockFieldCountBatch(movements)
-	includedSupplyIDs := stockFieldCountSupplyIDs(movements)
 
 	projectID := int64(0)
 	var updatedBy *string
@@ -273,22 +272,22 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 
 	ids := make([]int64, len(movements))
 	err := txRepo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
+		if isFieldStockCountBatch {
+			resetter, ok := u.repo.(stockFieldCountResetter)
+			if !ok {
+				return domainerr.Internal("stock field count reset not supported")
+			}
+			if err := resetter.ResetFieldStockCounts(txCtx, projectID, updatedBy); err != nil {
+				return err
+			}
+		}
+
 		for i := range movements {
 			id, err := u.CreateSupplyMovement(txCtx, movements[i])
 			if err != nil {
 				return fmt.Errorf("item %d: %w", i, err)
 			}
 			ids[i] = id
-		}
-
-		if isFieldStockCountBatch {
-			resetter, ok := u.repo.(stockFieldCountResetter)
-			if !ok {
-				return domainerr.Internal("stock field count reset not supported")
-			}
-			if err := resetter.ResetMissingFieldStockCounts(txCtx, projectID, includedSupplyIDs, updatedBy); err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -312,27 +311,6 @@ func isStockFieldCountBatch(movements []*domain.SupplyMovement) bool {
 	}
 
 	return true
-}
-
-func stockFieldCountSupplyIDs(movements []*domain.SupplyMovement) []int64 {
-	seen := make(map[int64]struct{}, len(movements))
-	ids := make([]int64, 0, len(movements))
-
-	for i := range movements {
-		if movements[i] == nil || movements[i].Supply == nil || movements[i].Supply.ID <= 0 {
-			continue
-		}
-
-		id := movements[i].Supply.ID
-		if _, ok := seen[id]; ok {
-			continue
-		}
-
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-	}
-
-	return ids
 }
 
 func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
