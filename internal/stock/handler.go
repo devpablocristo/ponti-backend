@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
@@ -199,11 +199,11 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	}
 
 	stockIDRaw := c.Param("stock_id")
-stockID, err := strconv.ParseInt(stockIDRaw, 10, 64)
-if err != nil || stockID <= 0 {
-	sharedhandlers.RespondError(c, domainerr.Validation("Para cargar stock de campo, primero cargá un ingreso del insumo."))
-	return
-}
+	stockID, err := strconv.ParseInt(stockIDRaw, 10, 64)
+	if err != nil || stockID <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("Para cargar stock de campo, primero cargá un ingreso del insumo."))
+		return
+	}
 
 	stockDomain, err := h.ucs.GetStockByID(ctx, stockID)
 	if err != nil {
