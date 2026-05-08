@@ -14,7 +14,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
-	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
+	"github.com/devpablocristo/ponti-backend/internal/capabilities"
+	"github.com/devpablocristo/ponti-backend/internal/governanceproxy"
 	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
@@ -30,12 +31,13 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
 
 	// Service de notificaciones reactivas (stock bajo, etc). El Service es
-	// opcional: si REVIEW_URL no esta seteado, el service degrada gracioso
+	// opcional: si GOVERNANCE_URL no esta seteado, el service degrada gracioso
 	// y los use cases que lo llamen quedan no-op. Wireado manualmente
 	// porque todavia no tiene consumidores en google/wire.
 	biRepo := businessinsights.NewRepository(deps.GormRepo.Client())
 	biService := buildBusinessInsightsService(deps, biRepo)
 	biHandler := businessinsights.NewHandler(biRepo, biService, deps.GinEngine, &deps.Config.API, deps.Middlewares)
+	capHandler := capabilities.NewHandler(deps.GinEngine, &deps.Config.API, deps.Middlewares)
 	deps.StockUseCases.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
@@ -70,7 +72,7 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 
 	// Registrar todas las rutas de la aplicación.
 	// Cada handler aplica sus middlewares de validación específicos.
-	registerHTTPRoutes(deps, biHandler)
+	registerHTTPRoutes(deps, biHandler, capHandler)
 
 	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
 	log.Println("Version: ", deps.Config.Service.Version)
@@ -108,18 +110,18 @@ func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, te
 }
 
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.
-// Si REVIEW_URL esta vacio devuelve un Service con review=nil (no-op gracioso).
+// Si GOVERNANCE_URL esta vacio devuelve un Service con governance=nil (no-op gracioso).
 func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsights.Repository) *businessinsights.Service {
-	reviewURL := strings.TrimSpace(deps.Config.Review.URL)
-	var client businessinsights.ReviewClient
-	if reviewURL != "" {
-		client = reviewproxy.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
+	governanceURL := strings.TrimSpace(deps.Config.Governance.URL)
+	var client businessinsights.GovernanceClient
+	if governanceURL != "" {
+		client = governanceproxy.NewClient(governanceURL, strings.TrimSpace(deps.Config.Governance.APIKey))
 	}
 	return businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{})
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
-func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
+func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler, capHandler *capabilities.Handler) {
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
@@ -147,4 +149,5 @@ func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Han
 	deps.AIHandler.Routes()
 	deps.AdminHandler.Routes()
 	biHandler.Routes()
+	capHandler.Routes()
 }

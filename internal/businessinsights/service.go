@@ -1,6 +1,6 @@
 // Package businessinsights genera candidatos de notificacion a partir de
 // eventos de dominio (stock negativo, resultado negativo, etc.). Consulta a
-// Nexus Review para decidir si el evento amerita notificar y, si si,
+// Nexus Governance para decidir si el evento amerita notificar y, si si,
 // dedupica via core/notifications/go/candidates.
 package businessinsights
 
@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
 	"github.com/google/uuid"
 )
 
-// ReviewClient es el subset de reviewclient.Client que usa el service.
-type ReviewClient interface {
-	SubmitRequest(ctx context.Context, idempotencyKey string, body reviewclient.SubmitRequestBody) (reviewclient.SubmitResponse, error)
+// GovernanceClient es el subset de governanceclient.Client que usa el service.
+type GovernanceClient interface {
+	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 }
 
 // Config centraliza thresholds y ventanas de dedup del service.
@@ -50,13 +50,13 @@ type Service struct {
 	candidates *corecandidates.Usecases
 	resolver   ResolverRepository
 	reads      ReadRepository
-	review     ReviewClient
+	governance     GovernanceClient
 	config     Config
 }
 
-// NewService construye un Service. Si review es nil, el Service degrada
+// NewService construye un Service. Si governance es nil, el Service degrada
 // gracioso (no emite notificaciones).
-func NewService(repo CandidateRepository, resolver ResolverRepository, reads ReadRepository, review ReviewClient, cfg Config) *Service {
+func NewService(repo CandidateRepository, resolver ResolverRepository, reads ReadRepository, governance GovernanceClient, cfg Config) *Service {
 	if cfg.NegativeStockDedupWindow <= 0 {
 		cfg.NegativeStockDedupWindow = 6 * time.Hour
 	}
@@ -64,7 +64,7 @@ func NewService(repo CandidateRepository, resolver ResolverRepository, reads Rea
 		candidates: corecandidates.NewWriteUsecases(repo, repo),
 		resolver:   resolver,
 		reads:      reads,
-		review:     review,
+		governance:     governance,
 		config:     cfg,
 	}
 }
@@ -79,9 +79,9 @@ type StockLevel struct {
 // NotifyStockNegative evalua via Nexus si corresponde notificar stock
 // negativo y, si la policy matchea, upserta el candidato (dedup por
 // fingerprint bucketed). Retorna nil y no hace nada si el stock no es
-// negativo o si no hay review client configurado.
+// negativo o si no hay governance client configurado.
 func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockLevel) error {
-	if s == nil || s.review == nil {
+	if s == nil || s.governance == nil {
 		return nil
 	}
 	if level.Quantity >= 0 {
@@ -91,7 +91,7 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 	now := time.Now().UTC()
 	fingerprint := bucketedID("ponti.stock.negative", level.ProductID, s.config.NegativeStockDedupWindow, now)
 
-	decision, err := s.review.SubmitRequest(ctx, fingerprint, reviewclient.SubmitRequestBody{
+	decision, err := s.governance.SubmitRequest(ctx, fingerprint, governanceclient.SubmitRequestBody{
 		RequesterType: "service",
 		RequesterID:   "ponti-backend",
 		ActionType:    "ponti.stock.negative",
@@ -103,7 +103,7 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("review submit: %w", err)
+		return fmt.Errorf("governance submit: %w", err)
 	}
 	if !policyMatched(decision) {
 		return nil
@@ -129,8 +129,8 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 			"product_id":        level.ProductID,
 			"product_name":      level.ProductName,
 			"quantity":          level.Quantity,
-			"review_request_id": decision.RequestID,
-			"review_policy_hit": decision.DecisionReason,
+			"governance_request_id": decision.RequestID,
+			"governance_policy_hit": decision.DecisionReason,
 		},
 		Actor: actor,
 		Now:   now,
@@ -203,7 +203,7 @@ func (s *Service) Reopen(ctx context.Context, tenantID uuid.UUID, candidateID, a
 // llega vacio pero el decision/status sigue siendo allow/allowed. Nexus
 // rechaza por default si no matchea policy, asi que `decision=allow` ya es
 // señal suficiente para nuestro caso (1 sola policy por action_type).
-func policyMatched(d reviewclient.SubmitResponse) bool {
+func policyMatched(d governanceclient.SubmitResponse) bool {
 	if d.Decision != "allow" {
 		return false
 	}

@@ -250,6 +250,74 @@ type CandidateView struct {
 	ReadAt *time.Time
 }
 
+// SummaryCounts agrega métricas de candidatos del tenant agrupadas por status,
+// severity y kind. Se usa para la capability ponti.insights.summary.
+type SummaryCounts struct {
+	Total      int            `json:"total"`
+	ByStatus   map[string]int `json:"by_status"`
+	BySeverity map[string]int `json:"by_severity"`
+	ByKind     map[string]int `json:"by_kind"`
+}
+
+// SummaryByTenant computa SummaryCounts para el tenant indicado.
+// Excluye candidatos resueltos para reflejar carga pendiente actual.
+func (r *Repository) SummaryByTenant(ctx context.Context, tenantID string) (SummaryCounts, error) {
+	out := SummaryCounts{
+		ByStatus:   make(map[string]int),
+		BySeverity: make(map[string]int),
+		ByKind:     make(map[string]int),
+	}
+	tID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return out, fmt.Errorf("parse tenant_id: %w", err)
+	}
+	var rows []models.CandidateModel
+	if err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND status <> ?", tID, candidatesdomain.StatusResolved).
+		Find(&rows).Error; err != nil {
+		return out, err
+	}
+	for _, row := range rows {
+		out.Total++
+		out.ByStatus[row.Status]++
+		out.BySeverity[row.Severity]++
+		out.ByKind[row.Kind]++
+	}
+	return out, nil
+}
+
+// GetByTenantAndID devuelve un candidato puntual del tenant con la marca de
+// lectura del usuario (si la hubiera). Se usa para ponti.insights.explain.
+// Si el candidato no pertenece al tenant, devuelve un error de no encontrado:
+// es defense-in-depth contra cross-tenant probes vía adivinanza de IDs.
+func (r *Repository) GetByTenantAndID(ctx context.Context, tenantID, userID, candidateID string) (CandidateView, error) {
+	tID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return CandidateView{}, fmt.Errorf("parse tenant_id: %w", err)
+	}
+	id, err := uuid.Parse(candidateID)
+	if err != nil {
+		return CandidateView{}, fmt.Errorf("parse candidate_id: %w", err)
+	}
+	var row models.CandidateModel
+	if err := r.db.WithContext(ctx).
+		Where("id = ? AND tenant_id = ?", id, tID).
+		First(&row).Error; err != nil {
+		return CandidateView{}, err
+	}
+	view := CandidateView{CandidateRecord: toCandidateRecord(row)}
+	if userID != "" {
+		var read models.ReadModel
+		if err := r.db.WithContext(ctx).
+			Where("user_id = ? AND insight_id = ?", userID, id).
+			First(&read).Error; err == nil {
+			t := read.ReadAt
+			view.ReadAt = &t
+		}
+	}
+	return view, nil
+}
+
 // ListByTenantForUser devuelve candidatos del tenant con `read_at` per-usuario.
 // Si IncludeResolved=false (default), filtra los resueltos.
 func (r *Repository) ListByTenantForUser(ctx context.Context, tenantID, userID string, opts ListOptions) ([]CandidateView, error) {
