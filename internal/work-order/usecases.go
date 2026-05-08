@@ -62,8 +62,8 @@ func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (in
 		return 0, err
 	}
 	if err := u.validateHarvestAreaLimit(ctx, o, 0); err != nil {
-	return 0, err
-}
+		return 0, err
+	}
 	return u.repo.CreateWorkOrder(ctx, o)
 }
 
@@ -89,8 +89,8 @@ func (u *UseCases) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrder)
 		return err
 	}
 	if err := u.validateHarvestAreaLimit(ctx, o, o.ID); err != nil {
-	return err
-}
+		return err
+	}
 	return u.repo.UpdateWorkOrderByID(ctx, o)
 }
 
