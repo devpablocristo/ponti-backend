@@ -78,6 +78,14 @@ func (s *handlerUseCasesStub) DeleteSupply(context.Context, int64) error {
 	return nil
 }
 
+func (s *handlerUseCasesStub) HardDeleteSupply(context.Context, int64) error {
+	return nil
+}
+
+func (s *handlerUseCasesStub) ListArchivedSupplies(context.Context, int, int) ([]domain.Supply, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *handlerUseCasesStub) CountWorkOrdersBySupplyID(context.Context, int64) (int64, error) {
 	return 0, nil
 }

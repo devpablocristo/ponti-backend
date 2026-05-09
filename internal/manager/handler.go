@@ -15,11 +15,12 @@ import (
 type UseCasesPort interface {
 	CreateManager(context.Context, *domain.Manager) (int64, error)
 	ListManagers(context.Context, int, int) ([]domain.Manager, int64, error)
+	ListArchivedManagers(context.Context, int, int) ([]domain.Manager, int64, error)
 	GetManager(context.Context, int64) (*domain.Manager, error)
 	UpdateManager(context.Context, *domain.Manager) error
-	DeleteManager(context.Context, int64) error
 	ArchiveManager(context.Context, int64) error
 	RestoreManager(context.Context, int64) error
+	HardDeleteManager(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -65,11 +66,12 @@ func (h *Handler) Routes() {
 	{
 		group.POST("", h.CreateManager)
 		group.GET("", h.ListManagers)
+		group.GET("/archived", h.ListArchivedManagers)
 		group.GET("/:manager_id", h.GetManager)
 		group.PUT("/:manager_id", h.UpdateManager)
-		group.DELETE("/:manager_id", h.DeleteManager)
 		group.POST("/:manager_id/archive", h.ArchiveManager)
 		group.POST("/:manager_id/restore", h.RestoreManager)
+		group.DELETE("/:manager_id/hard", h.HardDeleteManager)
 	}
 }
 
@@ -127,13 +129,23 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteManager(c *gin.Context) {
+func (h *Handler) ListArchivedManagers(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListArchivedManagers(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListManagersResponse(items, page, perPage, total))
+}
+
+func (h *Handler) HardDeleteManager(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "manager_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteManager(c.Request.Context(), id); err != nil {
+	if err := h.ucs.HardDeleteManager(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

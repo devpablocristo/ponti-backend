@@ -50,9 +50,10 @@ func (f *fakeUseCases) UpdateProject(_ context.Context, p *domain.Project) error
 	f.updatedProj = p
 	return f.updateErr
 }
-func (f *fakeUseCases) ArchiveProject(context.Context, int64) error { return nil }
-func (f *fakeUseCases) RestoreProject(context.Context, int64) error { return nil }
-func (f *fakeUseCases) DeleteProject(context.Context, int64) error  { return nil }
+func (f *fakeUseCases) ArchiveProject(context.Context, int64) error    { return nil }
+func (f *fakeUseCases) RestoreProject(context.Context, int64) error    { return nil }
+func (f *fakeUseCases) DeleteProject(context.Context, int64) error     { return nil }
+func (f *fakeUseCases) HardDeleteProject(context.Context, int64) error { return nil }
 
 type fakeGinEngine struct{ r *gin.Engine }
 

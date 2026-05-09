@@ -2,6 +2,9 @@ package campaign
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -107,7 +110,8 @@ func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaig
 	var m models.Campaign
 	err := r.db.Client().
 		WithContext(ctx).
-		First(&m, id).
+		Where("id = ? AND deleted_at IS NULL", id).
+		First(&m).
 		Error
 	if err != nil {
 		return nil, sharedrepo.HandleGormError(err, "campaign", id)
@@ -115,4 +119,130 @@ func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaig
 
 	// Devolver el domain, sin exponer directamente Base
 	return m.ToDomain(), nil
+}
+
+// ListArchivedCampaigns lista campañas archivadas paginadas.
+func (r *Repository) ListArchivedCampaigns(ctx context.Context, page, perPage int) ([]domain.Campaign, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Campaign{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived campaigns")
+	}
+
+	var list []models.Campaign
+	offset := (page - 1) * perPage
+	if err := base.
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived campaigns")
+	}
+
+	out := make([]domain.Campaign, len(list))
+	for i, m := range list {
+		out[i] = *m.ToDomain()
+	}
+	return out, total, nil
+}
+
+// ArchiveCampaign ejecuta soft delete con validación.
+func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "campaign"); err != nil {
+		return err
+	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var c models.Campaign
+		if err := tx.Unscoped().Where("id = ?", id).First(&c).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
+			}
+			return domainerr.Internal("failed to get campaign")
+		}
+		if c.DeletedAt.Valid {
+			return domainerr.Conflict("campaign already archived")
+		}
+
+		if err := tx.Model(&models.Campaign{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to archive campaign")
+		}
+		return nil
+	})
+}
+
+// RestoreCampaign restaura una campaña archivada.
+func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "campaign"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var c models.Campaign
+		if err := tx.Unscoped().Where("id = ?", id).First(&c).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
+			}
+			return domainerr.Internal("failed to get campaign")
+		}
+		if !c.DeletedAt.Valid {
+			return domainerr.Conflict("campaign is not archived")
+		}
+
+		if err := tx.Unscoped().Model(&models.Campaign{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore campaign")
+		}
+		return nil
+	})
+}
+
+// HardDeleteCampaign elimina definitivamente una campaña.
+// Bloquea con 409 si hay proyectos (activos o archivados) referenciándola.
+func (r *Repository) HardDeleteCampaign(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "campaign"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Unscoped().Table("campaigns").Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check campaign existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
+		}
+
+		var projCount int64
+		if err := tx.Unscoped().Model(&projectmod.Project{}).Where("campaign_id = ?", id).Count(&projCount).Error; err != nil {
+			return domainerr.Internal("failed to check projects")
+		}
+		if projCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("campaign has %d project(s); archive or hard-delete them first", projCount))
+		}
+
+		if err := tx.Unscoped().Delete(&models.Campaign{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete campaign")
+		}
+		return nil
+	})
 }

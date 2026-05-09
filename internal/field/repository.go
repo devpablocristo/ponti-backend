@@ -2,6 +2,7 @@ package field
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -58,13 +59,17 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 
 func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Field{}).Count(&total).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("deleted_at IS NULL").
+		Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count fields")
 	}
 
 	var list []models.Field
 	offset := (page - 1) * perPage
 	err := r.db.Client().WithContext(ctx).
+		Where("deleted_at IS NULL").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -80,14 +85,41 @@ func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domai
 	return result, total, nil
 }
 
+func (r *Repository) ListArchivedFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Field{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived fields")
+	}
+
+	var list []models.Field
+	offset := (page - 1) * perPage
+	if err := base.
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived fields")
+	}
+
+	result := make([]domain.Field, 0, len(list))
+	for i := range list {
+		result = append(result, *list[i].ToDomain())
+	}
+	return result, total, nil
+}
+
 func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, error) {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return nil, err
 	}
 	var model models.Field
 	if err := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Where("id = ?", id).
+		Where("id = ? AND deleted_at IS NULL", id).
 		First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "field", id)
 	}
@@ -123,24 +155,38 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	return nil
 }
 
-// DeleteField ejecuta un hard delete (permanente).
-func (r *Repository) DeleteField(ctx context.Context, id int64) error {
+// HardDeleteField elimina definitivamente un campo.
+// Bloquea con 409 si tiene lots (activos o archivados).
+func (r *Repository) HardDeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Delete(&models.Field{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to delete field")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
-	}
-	return nil
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Unscoped().Table("fields").Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check field existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+		}
+
+		var lotCount int64
+		if err := tx.Unscoped().Model(&lotmod.Lot{}).Where("field_id = ?", id).Count(&lotCount).Error; err != nil {
+			return domainerr.Internal("failed to check lots")
+		}
+		if lotCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("field has %d lot(s); archive or hard-delete them first", lotCount))
+		}
+
+		if err := tx.Unscoped().Delete(&models.Field{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete field")
+		}
+		return nil
+	})
 }
 
-// ArchiveField ejecuta un soft delete (idempotente).
+// ArchiveField ejecuta un soft delete con validación.
 func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
@@ -151,17 +197,28 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	}
 	deletedBy := &actor
 
-	result := r.db.Client().WithContext(ctx).
-		Model(&models.Field{}).
-		Where("id = ? AND deleted_at IS NULL", id).
-		Updates(map[string]any{
-			"deleted_at": time.Now(),
-			"deleted_by": deletedBy,
-		})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive field")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var f models.Field
+		if err := tx.Unscoped().Where("id = ?", id).First(&f).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+			}
+			return domainerr.Internal("failed to get field")
+		}
+		if f.DeletedAt.Valid {
+			return domainerr.Conflict("field already archived")
+		}
+
+		if err := tx.Model(&models.Field{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to archive field")
+		}
+		return nil
+	})
 }
 
 // RestoreField restaura un registro previamente archivado.
@@ -169,13 +226,28 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Field{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore field")
-	}
-	return nil
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var f models.Field
+		if err := tx.Unscoped().Where("id = ?", id).First(&f).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+			}
+			return domainerr.Internal("failed to get field")
+		}
+		if !f.DeletedAt.Valid {
+			return domainerr.Conflict("field is not archived")
+		}
+
+		if err := tx.Unscoped().Model(&models.Field{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore field")
+		}
+		return nil
+	})
 }

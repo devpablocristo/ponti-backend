@@ -126,6 +126,36 @@ func (mr *MockRepositoryPortMockRecorder) DeleteSupply(arg0, arg1 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupply", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupply), arg0, arg1)
 }
 
+// HardDeleteSupply mocks base method.
+func (m *MockRepositoryPort) HardDeleteSupply(arg0 context.Context, arg1 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HardDeleteSupply", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// HardDeleteSupply indicates an expected call of HardDeleteSupply.
+func (mr *MockRepositoryPortMockRecorder) HardDeleteSupply(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HardDeleteSupply", reflect.TypeOf((*MockRepositoryPort)(nil).HardDeleteSupply), arg0, arg1)
+}
+
+// ListArchivedSupplies mocks base method.
+func (m *MockRepositoryPort) ListArchivedSupplies(arg0 context.Context, arg1, arg2 int) ([]domain1.Supply, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListArchivedSupplies", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]domain1.Supply)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListArchivedSupplies indicates an expected call of ListArchivedSupplies.
+func (mr *MockRepositoryPortMockRecorder) ListArchivedSupplies(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListArchivedSupplies", reflect.TypeOf((*MockRepositoryPort)(nil).ListArchivedSupplies), arg0, arg1, arg2)
+}
+
 // DeleteSupplyMovement mocks base method.
 func (m *MockRepositoryPort) DeleteSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
 	m.ctrl.T.Helper()

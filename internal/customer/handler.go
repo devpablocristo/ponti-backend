@@ -19,6 +19,7 @@ type UseCasesPort interface {
 	GetCustomer(context.Context, int64) (*domain.Customer, error)
 	UpdateCustomer(context.Context, *domain.Customer) error
 	DeleteCustomer(context.Context, int64) error
+	HardDeleteCustomer(context.Context, int64) error
 	ArchiveCustomer(context.Context, int64) error
 	RestoreCustomer(context.Context, int64) error
 }
@@ -66,9 +67,10 @@ func (h *Handler) Routes() {
 		public.GET("/archived", h.ListArchivedCustomers)
 		public.GET("/:customer_id", h.GetCustomer)
 		public.PUT("/:customer_id", h.UpdateCustomer)
-		public.DELETE("/:customer_id", h.DeleteCustomer)
 		public.POST("/:customer_id/archive", h.ArchiveCustomer)
 		public.POST("/:customer_id/restore", h.RestoreCustomer)
+		public.DELETE("/:customer_id/hard", h.HardDeleteCustomer)
+		public.DELETE("/:customer_id", h.DeleteCustomer) // legacy alias hacia hard delete
 	}
 }
 
@@ -169,7 +171,7 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteCustomer ejecuta hard delete del customer.
+// DeleteCustomer es alias legacy hacia HardDeleteCustomer (ruta DELETE /:id).
 func (h *Handler) DeleteCustomer(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "customer_id")
 	if err != nil {
@@ -177,6 +179,20 @@ func (h *Handler) DeleteCustomer(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteCustomer(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// HardDeleteCustomer elimina definitivamente. Bloquea si tiene proyectos.
+func (h *Handler) HardDeleteCustomer(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteCustomer(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

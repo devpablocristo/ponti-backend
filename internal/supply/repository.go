@@ -407,9 +407,83 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": nil,
+				"deleted_by": nil,
 				"updated_at": time.Now(),
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore supply")
+		}
+		return nil
+	})
+}
+
+// ListArchivedSupplies lista supplies archivados.
+func (r *Repository) ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error) {
+	var total int64
+	base := r.getDB(ctx).
+		Unscoped().
+		Model(&models.Supply{}).
+		Where("supplies.deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived supplies")
+	}
+
+	var list []models.Supply
+	offset := (page - 1) * perPage
+	if err := base.
+		Preload("Category").
+		Preload("Type").
+		Offset(offset).
+		Limit(perPage).
+		Order("supplies.deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived supplies")
+	}
+
+	out := make([]domain.Supply, len(list))
+	for i := range list {
+		out[i] = *list[i].ToDomain()
+	}
+	return out, total, nil
+}
+
+// HardDeleteSupply elimina definitivamente un supply.
+// Bloquea con 409 si tiene supply_movements (activos o archivados).
+func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
+
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Unscoped().Table("supplies").Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check supply existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
+		}
+
+		var movCount int64
+		if err := tx.Unscoped().Table("supply_movements").Where("supply_id = ?", id).Count(&movCount).Error; err != nil {
+			return domainerr.Internal("failed to check supply_movements")
+		}
+		if movCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d movement(s); archive or hard-delete them first", movCount))
+		}
+
+		var stkCount int64
+		if err := tx.Unscoped().Table("stocks").Where("supply_id = ?", id).Count(&stkCount).Error; err != nil {
+			return domainerr.Internal("failed to check stocks")
+		}
+		if stkCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d stock record(s); archive or hard-delete them first", stkCount))
+		}
+
+		if err := tx.Unscoped().Delete(&models.Supply{}, "id = ?", id).Error; err != nil {
+			if isForeignKeyViolation(err) {
+				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
+			}
+			return domainerr.Internal("failed to delete supply")
 		}
 		return nil
 	})

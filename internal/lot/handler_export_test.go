@@ -38,6 +38,22 @@ func (s *exportLotsUseCasesStub) DeleteLot(context.Context, int64) error {
 	return nil
 }
 
+func (s *exportLotsUseCasesStub) ArchiveLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) RestoreLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) HardDeleteLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *exportLotsUseCasesStub) ListLotsByField(context.Context, int64) ([]domain.Lot, error) {
 	return nil, nil
 }

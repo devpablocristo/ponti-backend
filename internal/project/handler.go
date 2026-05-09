@@ -31,6 +31,7 @@ type UseCasesPort interface {
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
 	DeleteProject(context.Context, int64) error
+	HardDeleteProject(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -86,7 +87,8 @@ func (h *Handler) Routes() {
 		public.PUT("/:project_id", h.UpdateProject)
 		public.POST("/:project_id/archive", h.ArchiveProject)
 		public.POST("/:project_id/restore", h.RestoreProject)
-		public.DELETE("/:project_id", h.DeleteProject)
+		public.DELETE("/:project_id/hard", h.HardDeleteProject)
+		public.DELETE("/:project_id", h.DeleteProject) // legacy alias hacia hard delete
 		public.GET("/search", h.ListProjectsByName)
 	}
 }
@@ -274,7 +276,7 @@ func (h *Handler) RestoreProject(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-// DeleteProject elimina físicamente un proyecto por ID.
+// DeleteProject es alias legacy hacia HardDeleteProject (ruta DELETE /:id).
 func (h *Handler) DeleteProject(c *gin.Context) {
 	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
@@ -282,6 +284,20 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// HardDeleteProject elimina definitivamente. Bloquea si tiene dependientes.
+func (h *Handler) HardDeleteProject(c *gin.Context) {
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteProject(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

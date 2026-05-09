@@ -20,8 +20,10 @@ type RepositoryPort interface {
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
+	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
+	ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrder, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -225,12 +227,20 @@ func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
 }
 
+func (u *UseCases) HardDeleteWorkOrder(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteWorkOrder(ctx, id)
+}
+
 func (u *UseCases) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.ArchiveWorkOrder(ctx, id)
 }
 
 func (u *UseCases) RestoreWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.RestoreWorkOrder(ctx, id)
+}
+
+func (u *UseCases) ListArchivedWorkOrders(ctx context.Context, page, perPage int) ([]domain.WorkOrder, int64, error) {
+	return u.repo.ListArchivedWorkOrders(ctx, page, perPage)
 }
 
 // ListWorkOrders delega al repositorio.

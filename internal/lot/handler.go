@@ -31,7 +31,11 @@ type UseCasesPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
-	DeleteLot(context.Context, int64) error
+	ArchiveLot(context.Context, int64) error
+	RestoreLot(context.Context, int64) error
+	HardDeleteLot(context.Context, int64) error
+	ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error)
+	DeleteLot(context.Context, int64) error // legacy alias hacia ArchiveLot
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
@@ -83,11 +87,15 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", ValidateLotRequest(), h.CreateLot)
 		public.GET("", h.ListLots)
+		public.GET("/archived", h.ListArchivedLots)
 		public.GET("/metrics", h.GetMetrics)
 		public.PUT("/:lot_id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
 		public.GET("/:lot_id", h.GetLot)
 		public.PUT("/:lot_id", ValidateLotUpdate(), h.UpdateLot)
-		public.DELETE("/:lot_id", h.DeleteLot)
+		public.POST("/:lot_id/archive", h.ArchiveLot)
+		public.POST("/:lot_id/restore", h.RestoreLot)
+		public.DELETE("/:lot_id/hard", h.HardDeleteLot)
+		public.DELETE("/:lot_id", h.DeleteLot) // legacy: equivale a archive
 		public.GET("/export", h.ExportLots)
 	}
 }
@@ -229,6 +237,62 @@ func (h *Handler) DeleteLot(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ArchiveLot(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveLot(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreLot(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreLot(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) HardDeleteLot(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteLot(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ListArchivedLots(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	lots, total, err := h.ucs.ListArchivedLots(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	items := make([]*dto.Lot, len(lots))
+	for i := range lots {
+		items[i] = dto.FromDomain(&lots[i])
+	}
+	sharedhandlers.RespondOK(c, gin.H{
+		"data":      items,
+		"page_info": types.NewPageInfo(page, perPage, total),
+	})
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {

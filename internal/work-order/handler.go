@@ -24,8 +24,10 @@ type UseCasesPort interface {
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
+	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
+	ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrder, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -69,14 +71,16 @@ func (h *Handler) Routes() {
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
+		grp.GET("/archived", h.ListArchivedWorkOrders)
 		grp.GET("/filter-rows", h.ListWorkOrderFilterRows)
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
 		grp.GET("/:work_order_id", h.GetWorkOrderByID)
 		grp.PUT("/:work_order_id", h.UpdateWorkOrderByID)
-		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
 		grp.POST("/:work_order_id/archive", h.ArchiveWorkOrder)
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
+		grp.DELETE("/:work_order_id/hard", h.HardDeleteWorkOrder)
+		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID) // legacy: hard delete
 		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
 	}
@@ -331,4 +335,32 @@ func (h *Handler) RestoreWorkOrder(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
+}
+
+// HardDeleteWorkOrder elimina definitivamente una work order.
+func (h *Handler) HardDeleteWorkOrder(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteWorkOrder(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ListArchivedWorkOrders lista work orders archivadas paginadas.
+func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, gin.H{
+		"data":      items,
+		"page_info": types.NewPageInfo(page, perPage, total),
+	})
 }

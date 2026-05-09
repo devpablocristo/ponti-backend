@@ -218,19 +218,39 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	})
 }
 
-func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+// HardDeleteWorkOrder elimina definitivamente una orden de trabajo.
+// Bloquea con 409 si tiene invoices o labors (activos o archivados) referenciándola.
+// Sus children "propios" (items, investor_splits) se eliminan en cascada.
+func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.NotFound("work order not found")
-			}
+		var count int64
+		if err := tx.Unscoped().Table("workorders").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check work order existence")
 		}
+		if count == 0 {
+			return domainerr.NotFound("work order not found")
+		}
 
+		var invCount int64
+		if err := tx.Unscoped().Table("invoices").Where("work_order_id = ?", id).Count(&invCount).Error; err != nil {
+			return domainerr.Internal("failed to check invoices")
+		}
+		if invCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("work order has %d invoice(s); archive or hard-delete them first", invCount))
+		}
+
+		var laborCount int64
+		if err := tx.Unscoped().Table("labors").Where("work_order_id = ?", id).Count(&laborCount).Error; err != nil {
+			return domainerr.Internal("failed to check labors")
+		}
+		if laborCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("work order has %d labor record(s); archive or hard-delete them first", laborCount))
+		}
+
+		// Cascada de "owned children" (no son entidades de negocio independientes).
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order items")
 		}
@@ -242,6 +262,41 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// DeleteWorkOrderByID se mantiene como alias de HardDeleteWorkOrder por compatibilidad.
+// Deprecated: usar HardDeleteWorkOrder.
+func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+	return r.HardDeleteWorkOrder(ctx, id)
+}
+
+// ListArchivedWorkOrders lista ordenes archivadas paginadas.
+func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int) ([]domain.WorkOrder, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.WorkOrder{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived work orders")
+	}
+
+	var list []models.WorkOrder
+	offset := (page - 1) * perPage
+	if err := base.
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived work orders")
+	}
+
+	out := make([]domain.WorkOrder, len(list))
+	for i := range list {
+		out[i] = *list[i].ToDomain()
+	}
+	return out, total, nil
 }
 
 func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
@@ -298,6 +353,7 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": nil,
+				"deleted_by": nil,
 				"updated_at": time.Now(),
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore work order")

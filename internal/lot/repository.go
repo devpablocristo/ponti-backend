@@ -282,8 +282,8 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 	})
 }
 
-// DeleteLot elimina un lote por ID.
-func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
+// ArchiveLot ejecuta soft delete con validación.
+func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
 	}
@@ -291,26 +291,128 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
+	deletedBy := &userID
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var l models.Lot
+		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
+			}
+			return domainerr.Internal("failed to get lot")
+		}
+		if l.DeletedAt.Valid {
+			return domainerr.Conflict("lot already archived")
+		}
+
+		if err := tx.Model(&models.Lot{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to archive lot")
+		}
+		return nil
+	})
+}
+
+// RestoreLot restaura un lote archivado.
+func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var l models.Lot
+		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
+			}
+			return domainerr.Internal("failed to get lot")
+		}
+		if !l.DeletedAt.Valid {
+			return domainerr.Conflict("lot is not archived")
+		}
+
+		if err := tx.Unscoped().Model(&models.Lot{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore lot")
+		}
+		return nil
+	})
+}
+
+// ListArchivedLots lista lotes archivados.
+func (r *Repository) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.Lot, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Lot{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived lots")
+	}
+
+	var list []models.Lot
+	offset := (page - 1) * perPage
+	if err := base.
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived lots")
+	}
+
+	return mapLotsToDomain(list), total, nil
+}
+
+// HardDeleteLot elimina definitivamente un lote.
+// Bloquea con 409 si tiene workorders (activas o archivadas) referenciándolo.
+func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", id).
-			Count(&count).Error; err != nil {
+		if err := tx.Unscoped().Table("lots").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", id).
-			Updates(map[string]any{
-				"deleted_at": time.Now(),
-				"deleted_by": &userID,
-			}).Error; err != nil {
-			return domainerr.Internal("failed to soft-delete lot")
+
+		var woCount int64
+		if err := tx.Unscoped().Table("workorders").Where("lot_id = ?", id).Count(&woCount).Error; err != nil {
+			return domainerr.Internal("failed to check workorders")
+		}
+		if woCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("lot has %d workorder(s); archive or hard-delete them first", woCount))
+		}
+
+		// Limpiar lot_dates físicamente (no son entidad de negocio independiente).
+		if err := tx.Unscoped().Where("lot_id = ?", id).Delete(&models.LotDates{}).Error; err != nil {
+			return domainerr.Internal("failed to delete lot_dates")
+		}
+
+		if err := tx.Unscoped().Delete(&models.Lot{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete lot")
 		}
 		return nil
 	})
+}
+
+// DeleteLot mantiene compatibilidad: alias hacia ArchiveLot (soft delete).
+// Deprecated: usar ArchiveLot explícitamente.
+func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
+	return r.ArchiveLot(ctx, id)
 }
 
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {

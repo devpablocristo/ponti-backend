@@ -30,6 +30,8 @@ type UseCasesPort interface {
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
 	CompletePendingSupply(ctx context.Context, s *domain.Supply) error
 	DeleteSupply(ctx context.Context, id int64) error
+	HardDeleteSupply(ctx context.Context, id int64) error
+	ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error)
 	CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	ListSuppliesPaginated(
 		ctx context.Context,
@@ -96,15 +98,17 @@ func (h *Handler) Routes() {
 		supplies.POST("/pending", h.CreatePendingSupply)
 		supplies.POST("/bulk", h.CreateSuppliesBulk)
 		supplies.GET("", h.ListSupplies)
+		supplies.GET("/archived", h.ListArchivedSupplies)
 		supplies.GET("/pending", h.ListPendingSupplies)
 		supplies.GET("/export/all", h.ExportTableSupplies)
 		supplies.PUT("/bulk", h.UpdateSuppliesBulk)
 		supplies.GET("/:supply_id", h.GetSupply)
 		supplies.PUT("/pending/:supply_id/complete", h.CompletePendingSupply)
 		supplies.PUT("/:supply_id", h.UpdateSupply)
-		supplies.DELETE("/:supply_id", h.DeleteSupply)
 		supplies.POST("/:supply_id/archive", h.ArchiveSupply)
 		supplies.POST("/:supply_id/restore", h.RestoreSupply)
+		supplies.DELETE("/:supply_id/hard", h.HardDeleteSupply)
+		supplies.DELETE("/:supply_id", h.DeleteSupply) // legacy: hard delete
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
@@ -301,6 +305,29 @@ func (h *Handler) DeleteSupply(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) HardDeleteSupply(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteSupply(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ListArchivedSupplies(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListArchivedSupplies(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, listDto.NewListSuppliesResponse(items, page, perPage, total))
 }
 
 func (h *Handler) ArchiveSupply(c *gin.Context) {

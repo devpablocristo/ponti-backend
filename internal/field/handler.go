@@ -14,11 +14,12 @@ import (
 type UseCasesPort interface {
 	CreateField(ctx context.Context, f *domain.Field) (int64, error)
 	ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error)
+	ListArchivedFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error)
 	GetField(ctx context.Context, id int64) (*domain.Field, error)
 	UpdateField(ctx context.Context, f *domain.Field) error
-	DeleteField(ctx context.Context, id int64) error
 	ArchiveField(ctx context.Context, id int64) error
 	RestoreField(ctx context.Context, id int64) error
+	HardDeleteField(ctx context.Context, id int64) error
 }
 
 type GinEnginePort interface {
@@ -61,11 +62,12 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateField)
 		public.GET("", h.ListFields)
+		public.GET("/archived", h.ListArchivedFields)
 		public.GET("/:field_id", h.GetField)
 		public.PUT("/:field_id", h.UpdateField)
-		public.DELETE("/:field_id", h.DeleteField)
 		public.POST("/:field_id/archive", h.ArchiveField)
 		public.POST("/:field_id/restore", h.RestoreField)
+		public.DELETE("/:field_id/hard", h.HardDeleteField)
 	}
 }
 
@@ -123,13 +125,23 @@ func (h *Handler) UpdateField(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteField(c *gin.Context) {
+func (h *Handler) ListArchivedFields(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	fields, total, err := h.ucs.ListArchivedFields(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListFieldsResponse(fields, page, perPage, total))
+}
+
+func (h *Handler) HardDeleteField(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "field_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteField(c.Request.Context(), id); err != nil {
+	if err := h.ucs.HardDeleteField(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

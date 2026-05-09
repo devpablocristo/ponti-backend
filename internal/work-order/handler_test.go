@@ -58,11 +58,17 @@ func (s *workOrderHandlerUseCasesStub) UpdateInvestorPaymentStatus(
 func (s *workOrderHandlerUseCasesStub) DeleteWorkOrderByID(context.Context, int64) error {
 	return nil
 }
+func (s *workOrderHandlerUseCasesStub) HardDeleteWorkOrder(context.Context, int64) error {
+	return nil
+}
 func (s *workOrderHandlerUseCasesStub) ArchiveWorkOrder(context.Context, int64) error {
 	return nil
 }
 func (s *workOrderHandlerUseCasesStub) RestoreWorkOrder(context.Context, int64) error {
 	return nil
+}
+func (s *workOrderHandlerUseCasesStub) ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrder, int64, error) {
+	return nil, 0, nil
 }
 func (s *workOrderHandlerUseCasesStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil

@@ -2,6 +2,7 @@ package investor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -105,18 +106,37 @@ func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 	return nil
 }
 
+// DeleteInvestor permanece como helper interno; los handlers usan HardDeleteInvestor.
 func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
-	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
-		return err
+	return r.HardDeleteInvestor(ctx, id)
+}
+
+func (r *Repository) ListArchivedInvestors(ctx context.Context, page, perPage int) ([]domain.Investor, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Investor{}).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived investors")
 	}
-	result := r.db.Client().WithContext(ctx).Unscoped().Delete(&models.Investor{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to delete investor")
+
+	var list []models.Investor
+	offset := (page - 1) * perPage
+	if err := base.
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived investors")
 	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d does not exist", id))
+
+	result := make([]domain.Investor, 0, len(list))
+	for _, m := range list {
+		result = append(result, *m.ToDomain())
 	}
-	return nil
+	return result, total, nil
 }
 
 func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
@@ -129,30 +149,100 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 	}
 	deletedBy := &actor
 
-	result := r.db.Client().WithContext(ctx).
-		Model(&models.Investor{}).
-		Where("id = ? AND deleted_at IS NULL", id).
-		Updates(map[string]any{
-			"deleted_at": time.Now(),
-			"deleted_by": deletedBy,
-		})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive investor")
-	}
-	// Idempotente: si ya estaba archivado, RowsAffected == 0 es OK
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var inv models.Investor
+		if err := tx.Unscoped().Where("id = ?", id).First(&inv).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor %d not found", id))
+			}
+			return domainerr.Internal("failed to get investor")
+		}
+		if inv.DeletedAt.Valid {
+			return domainerr.Conflict("investor already archived")
+		}
+
+		if err := tx.Model(&models.Investor{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to archive investor")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).Unscoped().
-		Model(&models.Investor{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore investor")
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var inv models.Investor
+		if err := tx.Unscoped().Where("id = ?", id).First(&inv).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor %d not found", id))
+			}
+			return domainerr.Internal("failed to get investor")
+		}
+		if !inv.DeletedAt.Valid {
+			return domainerr.Conflict("investor is not archived")
+		}
+
+		if err := tx.Unscoped().Model(&models.Investor{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore investor")
+		}
+		return nil
+	})
+}
+
+// HardDeleteInvestor elimina definitivamente un inversor.
+// Bloquea con 409 si tiene registros (activos o archivados) en project_investors,
+// field_investors o admin_cost_investors.
+func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
+		return err
 	}
-	return nil
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Unscoped().Table("investors").Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check investor existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d does not exist", id))
+		}
+
+		// Validar dependientes en las tres tablas pivot (incluso archivados).
+		type dep struct {
+			table string
+			label string
+		}
+		deps := []dep{
+			{"project_investors", "project assignments"},
+			{"field_investors", "field assignments"},
+			{"admin_cost_investors", "admin cost assignments"},
+		}
+		for _, d := range deps {
+			var n int64
+			if err := tx.Unscoped().Table(d.table).Where("investor_id = ?", id).Count(&n).Error; err != nil {
+				return domainerr.Internal(fmt.Sprintf("failed to check %s", d.table))
+			}
+			if n > 0 {
+				return domainerr.Conflict(fmt.Sprintf("investor has %d %s; archive or remove them first", n, d.label))
+			}
+		}
+
+		if err := tx.Unscoped().Delete(&models.Investor{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete investor")
+		}
+		return nil
+	})
 }
