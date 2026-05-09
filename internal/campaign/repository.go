@@ -106,6 +106,33 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 	return out, nil
 }
 
+// UpdateCampaign actualiza el nombre de una campaña existente.
+func (r *Repository) UpdateCampaign(ctx context.Context, c *domain.Campaign) error {
+	if err := sharedrepo.ValidateEntity(c, "campaign"); err != nil {
+		return err
+	}
+	if err := sharedrepo.ValidateID(c.ID, "campaign"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Campaign{}).
+		Where("id = ?", c.ID)
+	if !c.UpdatedAt.IsZero() {
+		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
+	}
+	result := updateTx.Updates(models.FromDomain(c))
+	if result.Error != nil {
+		return domainerr.Internal("failed to update campaign")
+	}
+	if result.RowsAffected == 0 {
+		if !c.UpdatedAt.IsZero() {
+			return domainerr.Conflict("campaign not found or outdated")
+		}
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign with id %d does not exist", c.ID))
+	}
+	return nil
+}
+
 func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaign, error) {
 	var m models.Campaign
 	err := r.db.Client().

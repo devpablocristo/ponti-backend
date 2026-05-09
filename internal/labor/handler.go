@@ -21,7 +21,11 @@ import (
 type UseCasesPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
+	ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
 	DeleteLabor(context.Context, int64) error
+	ArchiveLabor(context.Context, int64) error
+	RestoreLabor(context.Context, int64) error
+	HardDeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	CountWorkOrdersByLaborID(context.Context, int64) (int64, error)
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
@@ -75,6 +79,7 @@ func (h *Handler) Routes() {
 	{
 		projectLaborsGroup.POST("", h.CreateLabor)
 		projectLaborsGroup.GET("", h.ListLabor)
+		projectLaborsGroup.GET("/archived", h.ListArchivedLabors)
 		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
 		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
 		projectLaborsGroup.GET("/:labor_id/workorders-count", h.CountWorkOrdersByLaborID)
@@ -86,6 +91,9 @@ func (h *Handler) Routes() {
 	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
 		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
+		workOrderLaborsGroup.POST("/:labor_id/archive", h.ArchiveLabor)
+		workOrderLaborsGroup.POST("/:labor_id/restore", h.RestoreLabor)
+		workOrderLaborsGroup.DELETE("/:labor_id/hard", h.HardDeleteLabor)
 		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
 		workOrderLaborsGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
 		workOrderLaborsGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
@@ -162,6 +170,65 @@ func (h *Handler) ListLabor(c *gin.Context) {
 
 	resp := dto.NewListLaborsResponse(items, page, perPage, total)
 	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) ListArchivedLabors(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
+
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	items, total, err := h.ucs.ListArchivedLabors(c.Request.Context(), page, perPage, projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewListLaborsResponse(items, page, perPage, total)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) ArchiveLabor(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "labor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveLabor(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreLabor(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "labor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreLabor(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) HardDeleteLabor(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "labor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.HardDeleteLabor(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {

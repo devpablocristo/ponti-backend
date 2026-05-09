@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
@@ -105,6 +107,145 @@ func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
 		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", id))
 	}
 	return nil
+}
+
+// ArchiveLabor archiva (soft delete) un labor con validación.
+func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "labor"); err != nil {
+		return err
+	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var l models.Labor
+		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
+			}
+			return domainerr.Internal("failed to get labor")
+		}
+		if l.DeletedAt.Valid {
+			return domainerr.Conflict("labor already archived")
+		}
+
+		if err := tx.Model(&models.Labor{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to archive labor")
+		}
+		return nil
+	})
+}
+
+// RestoreLabor restaura un labor archivado.
+func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "labor"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var l models.Labor
+		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
+			}
+			return domainerr.Internal("failed to get labor")
+		}
+		if !l.DeletedAt.Valid {
+			return domainerr.Conflict("labor is not archived")
+		}
+
+		if err := tx.Unscoped().Model(&models.Labor{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore labor")
+		}
+		return nil
+	})
+}
+
+// HardDeleteLabor elimina definitivamente un labor.
+// Bloquea con 409 si tiene workorders (activas o archivadas) referenciándolo.
+func (r *Repository) HardDeleteLabor(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "labor"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Unscoped().Table("labors").Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check labor existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
+		}
+
+		var woCount int64
+		if err := tx.Unscoped().Model(&workOrderModels.WorkOrder{}).Where("labor_id = ?", id).Count(&woCount).Error; err != nil {
+			return domainerr.Internal("failed to check work orders")
+		}
+		if woCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("labor has %d work order(s); archive or hard-delete them first", woCount))
+		}
+
+		if err := tx.Unscoped().Delete(&models.Labor{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete labor")
+		}
+		return nil
+	})
+}
+
+// ListArchivedLabors lista labors archivados de un proyecto, paginado.
+func (r *Repository) ListArchivedLabors(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
+	var total int64
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Labor{}).
+		Where("project_id = ?", projectID).
+		Where("deleted_at IS NOT NULL")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived labors")
+	}
+
+	var list []models.Labor
+	offset := (page - 1) * perPage
+	if err := base.
+		Preload("Category").
+		Select("id, name, contractor_name, price, is_partial_price, category_id, project_id, updated_at").
+		Offset(offset).
+		Limit(perPage).
+		Order("deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived labors")
+	}
+
+	labors := make([]domain.ListedLabor, len(list))
+	for i, labor := range list {
+		labors[i] = domain.ListedLabor{
+			ID:             labor.ID,
+			Name:           labor.Name,
+			Price:          labor.Price,
+			IsPartialPrice: labor.IsPartialPrice,
+			ContractorName: labor.ContractorName,
+			ProjectId:      labor.ProjectId,
+			CategoryId:     labor.LaborCategoryID,
+			CategoryName:   labor.Category.Name,
+			Base:           shareddomain.Base{UpdatedAt: labor.UpdatedAt},
+		}
+	}
+	return labors, total, nil
 }
 
 func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error {

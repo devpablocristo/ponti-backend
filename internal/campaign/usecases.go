@@ -11,6 +11,7 @@ type RepositoryPort interface {
 	ListCampaigns(context.Context, int64, string) ([]domain.Campaign, error)
 	ListArchivedCampaigns(context.Context, int, int) ([]domain.Campaign, int64, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
+	UpdateCampaign(context.Context, *domain.Campaign) error
 	ArchiveCampaign(context.Context, int64) error
 	RestoreCampaign(context.Context, int64) error
 	HardDeleteCampaign(context.Context, int64) error
@@ -38,6 +39,10 @@ func (u *UseCases) ListArchivedCampaigns(ctx context.Context, page, perPage int)
 
 func (u *UseCases) GetCampaign(ctx context.Context, id int64) (*domain.Campaign, error) {
 	return u.repo.GetCampaign(ctx, id)
+}
+
+func (u *UseCases) UpdateCampaign(ctx context.Context, c *domain.Campaign) error {
+	return u.repo.UpdateCampaign(ctx, c)
 }
 
 func (u *UseCases) ArchiveCampaign(ctx context.Context, id int64) error {

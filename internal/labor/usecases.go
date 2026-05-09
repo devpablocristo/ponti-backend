@@ -13,7 +13,11 @@ import (
 type RepositoryPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
+	ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
 	DeleteLabor(context.Context, int64) error
+	ArchiveLabor(context.Context, int64) error
+	RestoreLabor(context.Context, int64) error
+	HardDeleteLabor(context.Context, int64) error
 	GetWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error)
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
@@ -87,6 +91,22 @@ func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectID i
 
 func (u *UseCases) DeleteLabor(ctx context.Context, laborID int64) error {
 	return u.repo.DeleteLabor(ctx, laborID)
+}
+
+func (u *UseCases) ArchiveLabor(ctx context.Context, laborID int64) error {
+	return u.repo.ArchiveLabor(ctx, laborID)
+}
+
+func (u *UseCases) RestoreLabor(ctx context.Context, laborID int64) error {
+	return u.repo.RestoreLabor(ctx, laborID)
+}
+
+func (u *UseCases) HardDeleteLabor(ctx context.Context, laborID int64) error {
+	return u.repo.HardDeleteLabor(ctx, laborID)
+}
+
+func (u *UseCases) ListArchivedLabors(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
+	return u.repo.ListArchivedLabors(ctx, page, perPage, projectID)
 }
 
 func (u *UseCases) CountWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
