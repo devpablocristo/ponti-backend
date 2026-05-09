@@ -142,7 +142,8 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 
 	base := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
-		Where("project_id = ?", projectID)
+		Where("project_id = ?", projectID).
+		Where("deleted_at IS NULL")
 
 	// Conteo total filtrado por proyecto
 	if err := base.Count(&total).Error; err != nil {

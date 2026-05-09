@@ -63,6 +63,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			Select("id, campaign_id").
 			Where("customer_id = ?", customerID).
 			Where("name = ?", projectName).
+			Where("deleted_at IS NULL").
 			Scan(&filter).
 			Error; err != nil {
 			return nil, domainerr.Internal("failed to list by project filter")
@@ -78,7 +79,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			ids[i] = f.CampaignID
 			mapProject[f.CampaignID] = f.ProjectID
 		}
-		if err := db.Where("id IN ?", ids).Find(&raw).Error; err != nil {
+		if err := db.Where("id IN ? AND deleted_at IS NULL", ids).Find(&raw).Error; err != nil {
 			return nil, domainerr.Internal("failed to fetch filtered campaigns")
 		}
 
@@ -92,7 +93,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 	}
 
 	// Sin filtro
-	if err := db.Find(&raw).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list campaigns")
 	}
 	out := make([]domain.Campaign, len(raw))

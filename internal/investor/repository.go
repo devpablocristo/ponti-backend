@@ -3,6 +3,7 @@ package investor
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -42,13 +43,17 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 
 func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]domain.Investor, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Investor{}).Count(&total).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).
+		Model(&models.Investor{}).
+		Where("deleted_at IS NULL").
+		Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count investors")
 	}
 
 	var list []models.Investor
 	offset := (page - 1) * perPage
 	err := r.db.Client().WithContext(ctx).
+		Where("deleted_at IS NULL").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -66,7 +71,9 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 
 func (r *Repository) GetInvestor(ctx context.Context, id int64) (*domain.Investor, error) {
 	var model models.Investor
-	if err := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id).First(&model).Error; err != nil {
+	if err := r.db.Client().WithContext(ctx).
+		Where("id = ? AND deleted_at IS NULL", id).
+		First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "investor", id)
 	}
 	return model.ToDomain(), nil
@@ -116,7 +123,19 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).Delete(&models.Investor{}, "id = ?", id)
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
+	result := r.db.Client().WithContext(ctx).
+		Model(&models.Investor{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		})
 	if result.Error != nil {
 		return domainerr.Internal("failed to archive investor")
 	}

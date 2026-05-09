@@ -248,6 +248,12 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
 		return err
 	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
 		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
@@ -264,6 +270,7 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive work order")
 		}

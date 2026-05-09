@@ -572,6 +572,7 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 	gormDB := r.getDB(ctx)
 
 	query := gormDB.
+		Where("deleted_at IS NULL").
 		Preload("Project").
 		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").

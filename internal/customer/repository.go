@@ -152,6 +152,12 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var customer models.Customer
 		if err := tx.Unscoped().Where("id = ?", id).First(&customer).Error; err != nil {
@@ -174,14 +180,12 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return domainerr.Conflict("customer has active projects")
 		}
 
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
 		if err := tx.Model(&models.Customer{}).
 			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
 			return domainerr.Internal("failed to archive customer")
 		}
 		return nil

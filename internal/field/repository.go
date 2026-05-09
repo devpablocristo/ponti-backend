@@ -3,6 +3,7 @@ package field
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -10,6 +11,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -143,8 +145,19 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
 	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Field{}, "id = ?", id)
+		Model(&models.Field{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		})
 	if result.Error != nil {
 		return domainerr.Internal("failed to archive field")
 	}
