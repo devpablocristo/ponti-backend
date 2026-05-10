@@ -35,7 +35,19 @@ func (s *laborHandlerUseCasesStub) GetLabor(ctx context.Context, id int64) (*dom
 func (s *laborHandlerUseCasesStub) ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
 	return nil, 0, nil
 }
+func (s *laborHandlerUseCasesStub) ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
+	return nil, 0, nil
+}
 func (s *laborHandlerUseCasesStub) DeleteLabor(context.Context, int64) error { return nil }
+func (s *laborHandlerUseCasesStub) ArchiveLabor(context.Context, int64) error {
+	return nil
+}
+func (s *laborHandlerUseCasesStub) RestoreLabor(context.Context, int64) error {
+	return nil
+}
+func (s *laborHandlerUseCasesStub) HardDeleteLabor(context.Context, int64) error {
+	return nil
+}
 func (s *laborHandlerUseCasesStub) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
 	s.updateLaborCall = append(s.updateLaborCall, *labor)
 	if s.updateLaborFn != nil {
