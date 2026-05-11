@@ -37,6 +37,26 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 // createSupplyMovementInternal crea el movimiento sin chequear duplicados
 // (para uso en flujos que ya validaron previamente, ej. import).
 func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
+	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
+	// Se resuelve por proyecto + insumo porque stock de campo no depende del inversor.
+	if movement.MovementType == domain.STOCK {
+		stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+		if err != nil {
+			return 0, err
+		}
+		if isFirst {
+			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+		}
+
+		stock.RealStockUnits = movement.Quantity
+		stock.HasRealStockCount = true
+		stock.UpdatedBy = movement.UpdatedBy
+		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
+
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 	if err != nil {
 		return 0, err
@@ -64,20 +84,6 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 		}
 
 		return u.repo.CreateSupplyMovement(ctx, movement)
-	}
-
-	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
-	if movement.MovementType == domain.STOCK {
-		if isFirst {
-			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
-		}
-		stock.RealStockUnits = movement.Quantity
-		stock.HasRealStockCount = true
-		stock.UpdatedBy = movement.UpdatedBy
-		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
-			return 0, err
-		}
-		return 0, nil
 	}
 
 	if isFirst {
@@ -285,7 +291,7 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 		for i := range movements {
 			id, err := u.CreateSupplyMovement(txCtx, movements[i])
 			if err != nil {
-				return fmt.Errorf("item %d: %w", i, err)
+				return newSupplyMovementItemError(i, movements[i], err)
 			}
 			ids[i] = id
 		}
@@ -297,6 +303,32 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 	}
 
 	return ids, nil
+}
+
+type supplyMovementItemError struct {
+	index    int
+	supplyID int64
+	err      error
+}
+
+func newSupplyMovementItemError(index int, movement *domain.SupplyMovement, err error) error {
+	supplyID := int64(0)
+	if movement != nil && movement.Supply != nil {
+		supplyID = movement.Supply.ID
+	}
+	return supplyMovementItemError{
+		index:    index,
+		supplyID: supplyID,
+		err:      err,
+	}
+}
+
+func (e supplyMovementItemError) Error() string {
+	return e.err.Error()
+}
+
+func (e supplyMovementItemError) Unwrap() error {
+	return e.err
 }
 
 func isStockFieldCountBatch(movements []*domain.SupplyMovement) bool {

@@ -448,6 +448,20 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	}
 
 	warnings := make([]string, 0)
+
+	isStockFieldCountBatch := len(req.SupplyMovements) > 0
+	for _, item := range req.SupplyMovements {
+		if item.MovementType != domain.STOCK {
+			isStockFieldCountBatch = false
+			break
+		}
+	}
+
+	if isStockFieldCountBatch && mode == "partial" {
+		mode = "strict"
+		warnings = append(warnings, "partial mode was overridden to strict for stock field count")
+	}
+
 	for _, item := range req.SupplyMovements {
 		if item.MovementType == domain.INTERNAL_MOVEMENT && mode == "partial" {
 			mode = "strict"
@@ -554,6 +568,14 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 							msg = parts[1]
 						}
 					}
+					if failedValidPos < 0 || failedValidPos >= len(validIndexes) {
+						failures = append(failures, createDto.SupplyMovementFailure{
+							Index:   -1,
+							Code:    "apply_error",
+							Message: msg,
+						})
+					}
+
 					for _, itemIndex := range validIndexes {
 						if failedValidPos >= 0 && failedValidPos < len(validIndexes) && itemIndex == validIndexes[failedValidPos] {
 							failures = append(failures, createDto.SupplyMovementFailure{
@@ -566,6 +588,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 							supplyMovementsResponse[itemIndex] = createDto.NewErrorCreateSupplyMovementResponse(msg)
 							continue
 						}
+
 						skipped = append(skipped, createDto.SupplyMovementSkipped{
 							Index:    itemIndex,
 							SupplyID: req.SupplyMovements[itemIndex].SupplyID,
@@ -575,6 +598,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 							IsSaved: false,
 						}
 					}
+
 					if len(skipped) > 0 {
 						warnings = append(warnings, "Hay insumos válidos que no se ejecutaron por rollback estricto")
 					}
@@ -634,7 +658,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	}
 
 	response := createDto.CreateSupplyMovementBulkResponse{
-		Success:         len(failures) == 0,
+		Success:         len(failures) == 0 && len(skipped) == 0,
 		Mode:            mode,
 		Total:           total,
 		Applied:         len(successes),

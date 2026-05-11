@@ -1291,7 +1291,7 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 		GetProvider(gomock.Any(), providerID).
 		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{ID: stockID, RealStockUnits: decimal.NewFromInt(4)}, false, nil).
 		Times(2)
 	mockStock.EXPECT().
