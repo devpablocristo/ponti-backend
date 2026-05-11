@@ -52,6 +52,9 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 				"base_url": apiBase,
 				"version":  deps.Config.API.APIVersion(),
 			},
+			"reporting": gin.H{
+				"read_mode": deps.Config.Reporting.ReadMode,
+			},
 			"runtime": gin.H{
 				"go": runtime.Version(),
 			},
@@ -120,6 +123,7 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
 func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
+	deps.ActorHandler.Routes()
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
