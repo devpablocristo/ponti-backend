@@ -69,7 +69,7 @@ ping_status="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE_URL%/}/ping")"
 expect_status "200" "${ping_status}" "Ping falló"
 
 echo "[smoke] Resolve project..."
-resp="$(request GET "$(api_url "/projects?page=1&per_page=1")")"
+resp="$(request GET "$(api_url "/projects?page=1&per_page=50")")"
 proj_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
 proj_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
 if [[ "${proj_status}" == "401" || "${proj_status}" == "403" ]]; then
@@ -83,33 +83,84 @@ if [[ "${proj_status}" == "401" || "${proj_status}" == "403" ]]; then
 fi
 expect_status "200" "${proj_status}" "No se pudieron listar proyectos"
 
-project_id="$(json_extract "${proj_body}" '
+readarray -t candidate_project_ids < <(json_extract "${proj_body}" '
 items=obj.get("items")
-if isinstance(items,list) and items:
-    print(items[0].get("id",""))
-    raise SystemExit
-data=obj.get("data")
-if isinstance(data,list) and data:
-    print(data[0].get("id",""))
-    raise SystemExit
-if isinstance(data,dict):
-    rows=data.get("data")
-    if isinstance(rows,list) and rows:
-        print(rows[0].get("id",""))
-        raise SystemExit
-print("")
-')"
+if not isinstance(items,list):
+    data=obj.get("data")
+    if isinstance(data,list):
+        items=data
+    elif isinstance(data,dict):
+        items=data.get("data")
+if not isinstance(items,list):
+    items=[]
+for item in items:
+    project_id=item.get("id") if isinstance(item,dict) else None
+    if project_id:
+        print(project_id)
+')
 
-if [[ -z "${project_id}" ]]; then
+if [[ "${SMOKE_PROJECT_ID:-}" != "" ]]; then
+  candidate_project_ids=("${SMOKE_PROJECT_ID}")
+fi
+
+if [[ "${#candidate_project_ids[@]}" -eq 0 ]]; then
   echo "ERROR: No hay proyectos para correr smoke test." >&2
   exit 1
 fi
 
+project_id=""
+detail_body=""
+for candidate_project_id in "${candidate_project_ids[@]}"; do
+  [[ -z "${candidate_project_id}" ]] && continue
+
+  resp="$(request GET "$(api_url "/projects/${candidate_project_id}")")"
+  detail_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
+  candidate_detail_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
+  [[ "${detail_status}" != "200" ]] && continue
+
+  project_ready="$(json_extract "${candidate_detail_body}" '
+data=obj.get("data",obj)
+investors=data.get("investors") or []
+customer=(data.get("customer") or {}).get("id","")
+campaign=(data.get("campaign") or {}).get("id","")
+has_lot=False
+for f in data.get("fields") or []:
+    for lot in f.get("lots") or []:
+        if lot.get("id") and lot.get("current_crop_id"):
+            has_lot=True
+            break
+    if has_lot:
+        break
+print("1" if len(investors) >= 2 and customer and campaign and has_lot else "")
+')"
+  [[ -z "${project_ready}" ]] && continue
+
+  resp="$(request GET "$(api_url "/projects/${candidate_project_id}/labors")")"
+  labor_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
+  labor_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
+  [[ "${labor_status}" != "200" ]] && continue
+
+  has_labor="$(json_extract "${labor_body}" '
+data=obj.get("data",obj)
+rows=data.get("data") if isinstance(data,dict) else data
+if not isinstance(rows,list):
+    rows=[]
+print("1" if rows else "")
+')"
+  [[ -z "${has_labor}" ]] && continue
+
+  project_id="${candidate_project_id}"
+  detail_body="${candidate_detail_body}"
+  break
+done
+
+if [[ -z "${project_id}" ]]; then
+  echo "ERROR: No se encontró un proyecto con inversores, campo/lote/cultivo y labores para smoke test." >&2
+  exit 1
+fi
+
+echo "[smoke] Using project ${project_id}."
 echo "[smoke] Resolve project detail and investors..."
-resp="$(request GET "$(api_url "/projects/${project_id}")")"
-detail_status="$(printf "%s" "${resp}" | awk 'NR==1{print $1}')"
-detail_body="$(printf "%s" "${resp}" | awk 'NR>1{print}')"
-expect_status "200" "${detail_status}" "No se pudo obtener detalle de proyecto"
 
 readarray -t ids < <(json_extract "${detail_body}" '
 data=obj.get("data",obj)
