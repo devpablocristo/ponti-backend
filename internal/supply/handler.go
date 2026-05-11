@@ -52,6 +52,10 @@ type UseCasesPort interface {
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
 	ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
+	ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error)
+	ArchiveSupplyMovement(context.Context, int64, int64) error
+	RestoreSupplyMovement(context.Context, int64, int64) error
+	HardDeleteSupplyMovement(context.Context, int64, int64) error
 	ArchiveSupply(context.Context, int64) error
 	RestoreSupply(context.Context, int64) error
 }
@@ -117,9 +121,13 @@ func (h *Handler) Routes() {
 		supplyMovements.POST("", h.CreateSupplyMovement)
 		supplyMovements.POST("/import", h.ImportSupplyMovements)
 		supplyMovements.GET("", h.GetSupplyMovementsByProjectID)
+		supplyMovements.GET("/archived", h.ListArchivedSupplyMovements)
 		supplyMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		supplyMovements.GET("/providers", h.GetProviders)
 		supplyMovements.PUT("/:supply_movement_id", h.UpdateSupplyMovementByID)
+		supplyMovements.POST("/:supply_movement_id/archive", h.ArchiveSupplyMovement)
+		supplyMovements.POST("/:supply_movement_id/restore", h.RestoreSupplyMovement)
+		supplyMovements.DELETE("/:supply_movement_id/hard", h.HardDeleteSupplyMovement)
 		supplyMovements.DELETE("/:supply_movement_id", h.DeleteSupplyMovement)
 	}
 
@@ -128,9 +136,13 @@ func (h *Handler) Routes() {
 	{
 		stockMovements.POST("", h.CreateSupplyMovement)
 		stockMovements.GET("", h.GetSupplyMovementsByProjectID)
+		stockMovements.GET("/archived", h.ListArchivedSupplyMovements)
 		stockMovements.GET("/export", h.ExportSupplyMovementsByProjectID)
 		stockMovements.GET("/providers", h.GetProviders)
 		stockMovements.PUT("/:stock_movement_id", h.UpdateSupplyMovementByID)
+		stockMovements.POST("/:stock_movement_id/archive", h.ArchiveSupplyMovement)
+		stockMovements.POST("/:stock_movement_id/restore", h.RestoreSupplyMovement)
+		stockMovements.DELETE("/:stock_movement_id/hard", h.HardDeleteSupplyMovement)
 		stockMovements.DELETE("/:stock_movement_id", h.DeleteSupplyMovement)
 	}
 }
@@ -834,6 +846,72 @@ func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ListArchivedSupplyMovements(c *gin.Context) {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	supplyMovements, err := h.ucs.ListArchivedSupplyMovements(c.Request.Context(), projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, getDto.NewGetEntrySupplyMovementsResponse(supplyMovements))
+}
+
+func (h *Handler) ArchiveSupplyMovement(c *gin.Context) {
+	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
+	if !ok {
+		return
+	}
+	if err := h.ucs.ArchiveSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreSupplyMovement(c *gin.Context) {
+	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
+	if !ok {
+		return
+	}
+	if err := h.ucs.RestoreSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) HardDeleteSupplyMovement(c *gin.Context) {
+	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
+	if !ok {
+		return
+	}
+	if err := h.ucs.HardDeleteSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) parseSupplyMovementActionParams(c *gin.Context) (int64, int64, bool) {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return 0, 0, false
+	}
+	movementID, err := sharedhandlers.ParseMovementIDParam(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return 0, 0, false
+	}
+	return projectID, movementID, true
 }
 
 func (h *Handler) UpdateSupplyMovementByID(c *gin.Context) {

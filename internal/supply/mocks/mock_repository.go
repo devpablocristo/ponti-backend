@@ -170,6 +170,63 @@ func (mr *MockRepositoryPortMockRecorder) DeleteSupplyMovement(arg0, arg1, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupplyMovement), arg0, arg1, arg2)
 }
 
+// ListArchivedSupplyMovements mocks base method.
+func (m *MockRepositoryPort) ListArchivedSupplyMovements(arg0 context.Context, arg1 int64) ([]*domain1.SupplyMovement, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListArchivedSupplyMovements", arg0, arg1)
+	ret0, _ := ret[0].([]*domain1.SupplyMovement)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListArchivedSupplyMovements indicates an expected call of ListArchivedSupplyMovements.
+func (mr *MockRepositoryPortMockRecorder) ListArchivedSupplyMovements(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListArchivedSupplyMovements", reflect.TypeOf((*MockRepositoryPort)(nil).ListArchivedSupplyMovements), arg0, arg1)
+}
+
+// ArchiveSupplyMovement mocks base method.
+func (m *MockRepositoryPort) ArchiveSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ArchiveSupplyMovement", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ArchiveSupplyMovement indicates an expected call of ArchiveSupplyMovement.
+func (mr *MockRepositoryPortMockRecorder) ArchiveSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ArchiveSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).ArchiveSupplyMovement), arg0, arg1, arg2)
+}
+
+// RestoreSupplyMovement mocks base method.
+func (m *MockRepositoryPort) RestoreSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RestoreSupplyMovement", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RestoreSupplyMovement indicates an expected call of RestoreSupplyMovement.
+func (mr *MockRepositoryPortMockRecorder) RestoreSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestoreSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).RestoreSupplyMovement), arg0, arg1, arg2)
+}
+
+// HardDeleteSupplyMovement mocks base method.
+func (m *MockRepositoryPort) HardDeleteSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HardDeleteSupplyMovement", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// HardDeleteSupplyMovement indicates an expected call of HardDeleteSupplyMovement.
+func (mr *MockRepositoryPortMockRecorder) HardDeleteSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HardDeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).HardDeleteSupplyMovement), arg0, arg1, arg2)
+}
+
 // ArchiveSupply mocks base method.
 func (m *MockRepositoryPort) ArchiveSupply(arg0 context.Context, arg1 int64) error {
 	m.ctrl.T.Helper()

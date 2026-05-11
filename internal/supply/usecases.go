@@ -41,6 +41,10 @@ type RepositoryPort interface {
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
+	ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error)
+	ArchiveSupplyMovement(context.Context, int64, int64) error
+	RestoreSupplyMovement(context.Context, int64, int64) error
+	HardDeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
 	ArchiveSupply(context.Context, int64) error
 	RestoreSupply(context.Context, int64) error

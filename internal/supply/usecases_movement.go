@@ -374,6 +374,34 @@ func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectID, supplyID
 	return u.repo.DeleteSupplyMovement(ctx, projectID, supplyID)
 }
 
+func (u *UseCases) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
+	if projectID <= 0 {
+		return nil, domainerr.Validation("project_id must be greater than 0")
+	}
+	return u.repo.ListArchivedSupplyMovements(ctx, projectID)
+}
+
+func (u *UseCases) ArchiveSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.ArchiveSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) RestoreSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.RestoreSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) HardDeleteSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.HardDeleteSupplyMovement(ctx, projectID, movementID)
+}
+
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	return u.repo.GetProviders(ctx)
 }

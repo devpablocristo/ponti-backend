@@ -149,6 +149,22 @@ func (s *handlerUseCasesStub) DeleteSupplyMovement(context.Context, int64, int64
 	return nil
 }
 
+func (s *handlerUseCasesStub) ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error) {
+	return nil, nil
+}
+
+func (s *handlerUseCasesStub) ArchiveSupplyMovement(context.Context, int64, int64) error {
+	return nil
+}
+
+func (s *handlerUseCasesStub) RestoreSupplyMovement(context.Context, int64, int64) error {
+	return nil
+}
+
+func (s *handlerUseCasesStub) HardDeleteSupplyMovement(context.Context, int64, int64) error {
+	return nil
+}
+
 func (s *handlerUseCasesStub) ArchiveSupply(ctx context.Context, id int64) error {
 	return nil
 }

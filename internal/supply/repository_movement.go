@@ -454,6 +454,97 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 	})
 }
 
+func (r *Repository) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
+	if projectID <= 0 {
+		return nil, domainerr.Validation("project_id must be greater than 0")
+	}
+
+	var modelSupplyMovements []models.SupplyMovement
+	if err := r.getDB(ctx).
+		Unscoped().
+		Model(&models.SupplyMovement{}).
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Preload("Provider").
+		Where("project_id = ?", projectID).
+		Where("is_entry = TRUE").
+		Where("deleted_at IS NOT NULL").
+		Find(&modelSupplyMovements).
+		Error; err != nil {
+		return nil, domainerr.Internal("failed to list archived supply movements")
+	}
+
+	movements := make([]*domain.SupplyMovement, len(modelSupplyMovements))
+	for i := range modelSupplyMovements {
+		movements[i] = modelSupplyMovements[i].ToDomain()
+	}
+
+	if err := r.attachOriginsToMovements(ctx, movements); err != nil {
+		return nil, err
+	}
+	return movements, nil
+}
+
+func (r *Repository) ArchiveSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+
+	result := r.getDB(ctx).
+		Where("project_id = ?", projectID).
+		Where("id = ?", movementID).
+		Delete(&models.SupplyMovement{})
+	if result.Error != nil {
+		return domainerr.Internal("failed to archive supply movement")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.NotFound("supply movement not found")
+	}
+	return nil
+}
+
+func (r *Repository) RestoreSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+
+	result := r.getDB(ctx).
+		Unscoped().
+		Model(&models.SupplyMovement{}).
+		Where("project_id = ?", projectID).
+		Where("id = ?", movementID).
+		Where("deleted_at IS NOT NULL").
+		Update("deleted_at", nil)
+	if result.Error != nil {
+		return domainerr.Internal("failed to restore supply movement")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.NotFound("archived supply movement not found")
+	}
+	return nil
+}
+
+func (r *Repository) HardDeleteSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+
+	result := r.getDB(ctx).
+		Unscoped().
+		Where("project_id = ?", projectID).
+		Where("id = ?", movementID).
+		Delete(&models.SupplyMovement{})
+	if result.Error != nil {
+		return domainerr.Internal("failed to hard delete supply movement")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.NotFound("supply movement not found")
+	}
+	return nil
+}
+
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	var providers []providermodel.Provider
 	if err := r.getDB(ctx).Find(&providers).Error; err != nil {
