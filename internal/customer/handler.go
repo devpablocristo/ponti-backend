@@ -56,6 +56,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runCustomerIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "customer_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/customers"
@@ -173,55 +186,19 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 
 // DeleteCustomer es alias legacy hacia HardDeleteCustomer (ruta DELETE /:id).
 func (h *Handler) DeleteCustomer(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "customer_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteCustomer(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCustomerIDAction(c, h.ucs.DeleteCustomer)
 }
 
 // HardDeleteCustomer elimina definitivamente. Bloquea si tiene proyectos.
 func (h *Handler) HardDeleteCustomer(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "customer_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteCustomer(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCustomerIDAction(c, h.ucs.HardDeleteCustomer)
 }
 
 // ArchiveCustomer ejecuta soft delete (archivado) del customer.
 func (h *Handler) ArchiveCustomer(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "customer_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveCustomer(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCustomerIDAction(c, h.ucs.ArchiveCustomer)
 }
 
 func (h *Handler) RestoreCustomer(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "customer_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreCustomer(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCustomerIDAction(c, h.ucs.RestoreCustomer)
 }

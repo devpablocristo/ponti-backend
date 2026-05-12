@@ -54,6 +54,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runFieldIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "field_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/fields"
@@ -136,40 +149,13 @@ func (h *Handler) ListArchivedFields(c *gin.Context) {
 }
 
 func (h *Handler) HardDeleteField(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "field_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteField(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runFieldIDAction(c, h.ucs.HardDeleteField)
 }
 
 func (h *Handler) ArchiveField(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "field_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveField(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runFieldIDAction(c, h.ucs.ArchiveField)
 }
 
 func (h *Handler) RestoreField(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "field_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreField(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runFieldIDAction(c, h.ucs.RestoreField)
 }

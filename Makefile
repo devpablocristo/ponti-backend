@@ -58,7 +58,7 @@ bin-clean:
 
 lint:
 	@echo "Linting the project..."
-	@golangci-lint run --config .golangci.yml --verbose
+	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run --timeout=5m
 
 run-api:
 	@echo "Starting API server..."

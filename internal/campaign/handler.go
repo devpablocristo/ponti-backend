@@ -56,6 +56,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runCampaignIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "campaign_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/campaigns"
@@ -150,40 +163,13 @@ func (h *Handler) ListArchivedCampaigns(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveCampaign(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "campaign_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveCampaign(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCampaignIDAction(c, h.ucs.ArchiveCampaign)
 }
 
 func (h *Handler) RestoreCampaign(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "campaign_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreCampaign(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCampaignIDAction(c, h.ucs.RestoreCampaign)
 }
 
 func (h *Handler) HardDeleteCampaign(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "campaign_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteCampaign(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runCampaignIDAction(c, h.ucs.HardDeleteCampaign)
 }

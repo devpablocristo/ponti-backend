@@ -55,6 +55,8 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/admin"
 
+	h.registerMeContextRoute()
+
 	admin := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		admin.GET("/tenants", h.ListTenants)
