@@ -572,6 +572,38 @@ func (mr *MockStockUseCasesPortMockRecorder) GetLastStockByProjectID(ctx, projec
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastStockByProjectID), ctx, projectId, supplyId)
 }
 
+// GetLastClosedStockByProjectID mocks base method.
+func (m *MockStockUseCasesPort) GetLastClosedStockByProjectID(ctx context.Context, projectId, supplyId int64) (*domain0.Stock, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastClosedStockByProjectID", ctx, projectId, supplyId)
+	ret0, _ := ret[0].(*domain0.Stock)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetLastClosedStockByProjectID indicates an expected call of GetLastClosedStockByProjectID.
+func (mr *MockStockUseCasesPortMockRecorder) GetLastClosedStockByProjectID(ctx, projectId, supplyId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastClosedStockByProjectID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastClosedStockByProjectID), ctx, projectId, supplyId)
+}
+
+// GetLastStockByProjectInvestorID mocks base method.
+func (m *MockStockUseCasesPort) GetLastStockByProjectInvestorID(ctx context.Context, projectId, supplyId, investorId int64) (*domain0.Stock, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastStockByProjectInvestorID", ctx, projectId, supplyId, investorId)
+	ret0, _ := ret[0].(*domain0.Stock)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetLastStockByProjectInvestorID indicates an expected call of GetLastStockByProjectInvestorID.
+func (mr *MockStockUseCasesPortMockRecorder) GetLastStockByProjectInvestorID(ctx, projectId, supplyId, investorId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectInvestorID", reflect.TypeOf((*MockStockUseCasesPort)(nil).GetLastStockByProjectInvestorID), ctx, projectId, supplyId, investorId)
+}
+
 // UpdateRealStockUnits mocks base method.
 func (m *MockStockUseCasesPort) UpdateRealStockUnits(ctx context.Context, stockId int64, stock *domain0.Stock) error {
 	m.ctrl.T.Helper()
