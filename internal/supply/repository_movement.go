@@ -35,10 +35,76 @@ func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64,
 		return domainerr.Validation("project_id must be greater than 0")
 	}
 
+	now := time.Now().UTC()
+
+	yearPeriod := int64(now.Year())
+	monthPeriod := int64(now.Month())
+
+	if err := r.getDB(ctx).Exec(`
+		WITH latest_closed AS (
+			SELECT DISTINCT ON (st.supply_id, st.investor_id)
+				st.project_id,
+				st.supply_id,
+				st.investor_id,
+				st.real_stock_units,
+				st.has_real_stock_count
+			FROM stocks st
+			WHERE st.project_id = ?
+			  AND st.close_date IS NOT NULL
+			  AND st.deleted_at IS NULL
+			  AND NOT EXISTS (
+				  SELECT 1
+				  FROM stocks active
+				  WHERE active.project_id = st.project_id
+				    AND active.supply_id = st.supply_id
+				    AND active.investor_id = st.investor_id
+				    AND active.close_date IS NULL
+				    AND active.deleted_at IS NULL
+			  )
+			ORDER BY st.supply_id, st.investor_id, st.close_date DESC, st.id DESC
+		)
+		INSERT INTO stocks (
+			project_id,
+			supply_id,
+			investor_id,
+			close_date,
+			real_stock_units,
+			initial_units,
+			year_period,
+			month_period,
+			units_entered,
+			units_consumed,
+			has_real_stock_count,
+			created_at,
+			updated_at,
+			created_by,
+			updated_by
+		)
+		SELECT
+			project_id,
+			supply_id,
+			investor_id,
+			NULL,
+			real_stock_units,
+			real_stock_units,
+			?,
+			?,
+			0,
+			0,
+			has_real_stock_count,
+			?,
+			?,
+			?,
+			?
+		FROM latest_closed
+	`, projectID, yearPeriod, monthPeriod, now, now, updatedBy, updatedBy).Error; err != nil {
+		return domainerr.Internal("failed to prepare field stock counts")
+	}
+
 	updates := map[string]any{
 		"real_stock_units":     decimal.Zero,
 		"has_real_stock_count": true,
-		"updated_at":           time.Now().UTC(),
+		"updated_at":           now,
 		"updated_by":           updatedBy,
 	}
 
