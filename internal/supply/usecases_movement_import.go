@@ -278,7 +278,13 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 			return err
 		}
 		if isFirst {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			_, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+			if err != nil {
+				return err
+			}
+			if closedIsFirst {
+				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			}
 		}
 		return nil
 	default:

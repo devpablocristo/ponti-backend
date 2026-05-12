@@ -11,6 +11,7 @@ import (
 
 	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
@@ -40,7 +41,7 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
 	// Se resuelve por proyecto + insumo porque stock de campo no depende del inversor.
 	if movement.MovementType == domain.STOCK {
-		stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+		stock, isFirst, err := u.getOrCreateStockForFieldCount(ctx, movement)
 		if err != nil {
 			return 0, err
 		}
@@ -148,7 +149,13 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 			return err
 		}
 		if isFirst {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			_, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+			if err != nil {
+				return err
+			}
+			if closedIsFirst {
+				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			}
 		}
 		return nil
 	}
@@ -178,6 +185,53 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 	}
 
 	return nil
+}
+
+func (u *UseCases) getOrCreateStockForFieldCount(ctx context.Context, movement *domain.SupplyMovement) (*stockdomain.Stock, bool, error) {
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !isFirst {
+		return stock, false, nil
+	}
+
+	closedStock, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	if closedIsFirst {
+		return nil, true, nil
+	}
+
+	newStock := createActiveStockFromClosedFieldCount(closedStock, movement)
+	stockID, err := u.stockUseCases.CreateStock(ctx, newStock)
+	if err != nil {
+		return nil, false, err
+	}
+	newStock.ID = stockID
+	return newStock, false, nil
+}
+
+func createActiveStockFromClosedFieldCount(closedStock *stockdomain.Stock, movement *domain.SupplyMovement) *stockdomain.Stock {
+	now := time.Now()
+	return &stockdomain.Stock{
+		Project:           closedStock.Project,
+		Supply:            closedStock.Supply,
+		Investor:          closedStock.Investor,
+		CloseDate:         nil,
+		InitialStock:      closedStock.RealStockUnits,
+		RealStockUnits:    movement.Quantity,
+		HasRealStockCount: true,
+		YearPeriod:        int64(now.Year()),
+		MonthPeriod:       int64(now.Month()),
+		Base: shareddomain.Base{
+			CreatedAt: now,
+			UpdatedAt: now,
+			CreatedBy: movement.CreatedBy,
+			UpdatedBy: movement.UpdatedBy,
+		},
+	}
 }
 
 func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movement *domain.SupplyMovement) error {

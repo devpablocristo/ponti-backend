@@ -505,6 +505,29 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 	return stockModel.ToDomain(), false, nil
 }
 
+func (r *Repository) GetLastClosedStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
+	var stockModel models.Stock
+	err := r.getDB(ctx).
+		Preload("Project").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Where("project_id = ?", projectID).
+		Where("supply_id = ?", supplyID).
+		Where("close_date IS NOT NULL").
+		Order("close_date DESC, id DESC").
+		First(&stockModel).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, true, nil
+		}
+		return nil, false, domainerr.Internal("failed to get last closed stock")
+	}
+
+	return stockModel.ToDomain(), false, nil
+}
+
 func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
