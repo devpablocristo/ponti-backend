@@ -4,6 +4,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
@@ -21,7 +22,8 @@ import (
 // WorkOrder GORM model con todas las relaciones.
 type WorkOrder struct {
 	ID             int64                    `gorm:"primaryKey;column:id"`
-	Number         string                   `gorm:"column:number;uniqueIndex"`
+	TenantID       uuid.UUID                `gorm:"column:tenant_id;type:uuid;index"`
+	Number         string                   `gorm:"column:number"`
 	ProjectID      int64                    `gorm:"not null"`
 	Project        projectmod.Project       `gorm:"foreignKey:ProjectID"`
 	FieldID        int64                    `gorm:"not null"`
@@ -50,6 +52,7 @@ func (WorkOrder) TableName() string { return "workorders" }
 // WorkOrderItem GORM model.
 type WorkOrderItem struct {
 	ID          int64            `gorm:"primaryKey;autoIncrement"`
+	TenantID    uuid.UUID        `gorm:"column:tenant_id;type:uuid;index"`
 	WorkOrderID int64            `gorm:"column:workorder_id;index"`
 	SupplyID    int64            `gorm:"not null"`
 	SupplyName  string           `gorm:"column:supply_name;not null"`
@@ -84,12 +87,12 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 	if len(o.Items) > 0 {
 		items := make([]WorkOrderItem, len(o.Items))
 		for i, it := range o.Items {
-				items[i] = WorkOrderItem{
-					SupplyID:   it.SupplyID,
-					SupplyName: it.SupplyName,
-					TotalUsed:  it.TotalUsed,
-					FinalDose:  it.FinalDose,
-				}
+			items[i] = WorkOrderItem{
+				SupplyID:   it.SupplyID,
+				SupplyName: it.SupplyName,
+				TotalUsed:  it.TotalUsed,
+				FinalDose:  it.FinalDose,
+			}
 		}
 		w.Items = items
 	}

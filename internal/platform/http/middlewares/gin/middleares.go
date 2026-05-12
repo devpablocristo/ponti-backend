@@ -1,6 +1,8 @@
 package pkgmwr
 
 import (
+	"net/http"
+	"strings"
 	"time"
 
 	coreginmw "github.com/devpablocristo/core/http/gin/go"
@@ -33,7 +35,11 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {
-		validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
+		if isLocalLikeEnvironment(cfg.Auth.Environment) {
+			validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
+		} else {
+			validation = append(validation, RejectUnsafeLocalAuthz(cfg.Auth.Environment))
+		}
 	}
 	protected := []gin.HandlerFunc{}
 
@@ -45,6 +51,24 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 		global:     global,
 		validation: validation,
 		protected:  protected,
+	}
+}
+
+func isLocalLikeEnvironment(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "", "local", "localhost", "dev", "development", "test", "testing":
+		return true
+	default:
+		return false
+	}
+}
+
+func RejectUnsafeLocalAuthz(env string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+			"message": "AUTH_ENABLED=false is allowed only in local/test environments",
+			"env":     strings.TrimSpace(env),
+		})
 	}
 }
 func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }

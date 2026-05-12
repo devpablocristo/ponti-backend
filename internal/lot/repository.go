@@ -19,6 +19,7 @@ import (
 	// project
 	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -42,7 +43,9 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 	var lotID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing models.Lot
-		if err := tx.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
+		tenantID, hasTenant := authz.TenantFromContext(ctx)
+		existingDB := authz.MaybeTenantScope(ctx, tx, "lots")
+		if err := existingDB.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
 			First(&existing).Error; err == nil {
 			lotID = existing.ID
 			return nil
@@ -50,6 +53,9 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 			return domainerr.Internal("failed to check lot")
 		}
 		model := models.FromDomain(l)
+		if hasTenant {
+			model.TenantID = tenantID
+		}
 		model.CreatedBy = l.CreatedBy
 		model.UpdatedBy = l.UpdatedBy
 
@@ -68,7 +74,8 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 // ListLotsByField lista los lotes por ID de field.
 func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	if err := r.db.Client().WithContext(ctx).
+	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lots")
+	if err := db0.
 		Where("field_id = ? AND deleted_at IS NULL", fieldID).
 		Find(&lots).Error; err != nil {
 		return nil, domainerr.Internal("failed to list lots")
@@ -79,7 +86,8 @@ func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]doma
 // GetLot obtiene un lote por ID.
 func (r *Repository) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 	var m models.Lot
-	err := r.db.Client().WithContext(ctx).
+	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lots")
+	err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&m).Error
 	if err != nil {
@@ -103,7 +111,8 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	model.ID = l.ID
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Unicidad de nombre dentro del field (si aplica renombrado)
-		if err := tx.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
+		lotDB := authz.MaybeTenantScope(ctx, tx, "lots")
+		if err := lotDB.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
 			l.Name, l.FieldID, l.ID).First(&models.Lot{}).Error; err == nil {
 			return domainerr.Conflict("lot with same name already exists in this field")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -112,7 +121,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		// Verificación de existencia (distingue 404 de 409)
 		var exists int64
-		if err := tx.Model(&models.Lot{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Count(&exists).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
@@ -126,7 +135,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		// Obtener la fecha de actualización actual para optimistic locking
 		var currentLot models.Lot
-		if err := tx.Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx, "lots").Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
 			return domainerr.Internal("failed to get current lot for optimistic locking")
 		}
 
@@ -157,7 +166,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			updateFields["variety"] = l.Variety
 		}
 
-		res := tx.Model(&models.Lot{}).
+		res := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Updates(updateFields)
 		if res.Error != nil {
@@ -171,7 +180,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// Si cambió el cultivo actual del lote, sincronizar las workorders activas de ese lote
 		// para que el listado de órdenes refleje el mismo cultivo.
 		if l.CurrentCrop.ID > 0 {
-			if err := tx.Table("workorders").
+			if err := authz.MaybeTenantScope(ctx, tx.Table("workorders"), "workorders").
 				Where("lot_id = ? AND deleted_at IS NULL", l.ID).
 				Updates(map[string]any{
 					"crop_id":    l.CurrentCrop.ID,
@@ -202,7 +211,7 @@ func upsertLotDateBySequence(
 	nowTS time.Time,
 ) error {
 	var existing []models.LotDates
-	if err := tx.Unscoped().
+	if err := authz.MaybeTenantScope(tx.Statement.Context, tx.Unscoped(), "lot_dates").
 		Where("lot_id = ? AND sequence = ?", lotID, date.Sequence).
 		Order("id DESC").
 		Find(&existing).Error; err != nil {
@@ -217,7 +226,7 @@ func upsertLotDateBySequence(
 			duplicateIDs = append(duplicateIDs, existing[i].ID)
 		}
 		if len(duplicateIDs) > 0 {
-			if err := tx.Model(&models.LotDates{}).
+			if err := authz.MaybeTenantScope(tx.Statement.Context, tx.Model(&models.LotDates{}), "lot_dates").
 				Where("id IN ? AND deleted_at IS NULL", duplicateIDs).
 				Updates(map[string]any{
 					"deleted_at": nowTS,
@@ -232,7 +241,7 @@ func upsertLotDateBySequence(
 
 	if len(existing) > 0 {
 		keepID := existing[0].ID
-		return tx.Unscoped().
+		return authz.MaybeTenantScope(tx.Statement.Context, tx.Unscoped(), "lot_dates").
 			Model(&models.LotDates{}).
 			Where("id = ?", keepID).
 			Updates(map[string]any{
@@ -256,6 +265,9 @@ func upsertLotDateBySequence(
 			UpdatedAt: nowTS,
 		},
 	}
+	if tenantID, ok := authz.TenantFromContext(tx.Statement.Context); ok {
+		lotDate.TenantID = tenantID
+	}
 	return tx.Create(&lotDate).Error
 }
 
@@ -265,13 +277,13 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
-		if err := tx.Model(&models.Lot{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").
 			Where("id = ? AND deleted_at IS NULL", id).
 			Updates(map[string]any{
 				"tons": tons,
@@ -295,7 +307,7 @@ func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var l models.Lot
-		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lots").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 			}
@@ -305,7 +317,7 @@ func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 			return domainerr.Conflict("lot already archived")
 		}
 
-		if err := tx.Model(&models.Lot{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
@@ -325,7 +337,7 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var l models.Lot
-		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lots").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 			}
@@ -335,7 +347,7 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 			return domainerr.Conflict("lot is not archived")
 		}
 
-		if err := tx.Unscoped().Model(&models.Lot{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Lot{}), "lots").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": nil,
@@ -355,6 +367,7 @@ func (r *Repository) ListArchivedLots(ctx context.Context, page, perPage int) ([
 		Unscoped().
 		Model(&models.Lot{}).
 		Where("deleted_at IS NOT NULL")
+	base = authz.MaybeTenantScope(ctx, base, "lots")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived lots")
@@ -382,7 +395,7 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Unscoped().Table("lots").Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lots"), "lots").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
@@ -390,7 +403,7 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 		}
 
 		var woCount int64
-		if err := tx.Unscoped().Table("workorders").Where("lot_id = ?", id).Count(&woCount).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("workorders"), "workorders").Where("lot_id = ?", id).Count(&woCount).Error; err != nil {
 			return domainerr.Internal("failed to check workorders")
 		}
 		if woCount > 0 {
@@ -398,11 +411,11 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 		}
 
 		// Limpiar lot_dates físicamente (no son entidad de negocio independiente).
-		if err := tx.Unscoped().Where("lot_id = ?", id).Delete(&models.LotDates{}).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lot_dates").Where("lot_id = ?", id).Delete(&models.LotDates{}).Error; err != nil {
 			return domainerr.Internal("failed to delete lot_dates")
 		}
 
-		if err := tx.Unscoped().Delete(&models.Lot{}, "id = ?", id).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lots").Delete(&models.Lot{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete lot")
 		}
 		return nil
@@ -417,9 +430,11 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	err := r.db.Client().WithContext(ctx).
+	db := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
-		Where("fields.project_id = ? AND lots.deleted_at IS NULL", projectID).
+		Where("fields.project_id = ? AND lots.deleted_at IS NULL", projectID)
+	err := authz.MaybeTenantScope(ctx, db, "lots").
+		Where("fields.tenant_id = lots.tenant_id").
 		Find(&lots).Error
 	if err != nil {
 		return nil, domainerr.Internal("failed to list lots by project")
@@ -429,9 +444,11 @@ func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]
 
 func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	err := r.db.Client().WithContext(ctx).
+	db := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
-		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID).
+		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID)
+	err := authz.MaybeTenantScope(ctx, db, "lots").
+		Where("fields.tenant_id = lots.tenant_id").
 		Find(&lots).Error
 	if err != nil {
 		return nil, domainerr.Internal("failed to list lots by project and field")
@@ -444,6 +461,8 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	db := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
 		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID)
+	db = authz.MaybeTenantScope(ctx, db, "lots").
+		Where("fields.tenant_id = lots.tenant_id")
 	switch cropType {
 	case "current":
 		db = db.Where("lots.current_crop_id = ?", cropID)

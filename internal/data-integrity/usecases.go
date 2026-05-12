@@ -35,8 +35,8 @@ type LotRepositoryPort interface {
 
 // ReportRepositoryPort define la interfaz para el repositorio de reportes
 type ReportRepositoryPort interface {
-	GetSummaryResults(filters reportDomain.SummaryResultsFilter) ([]reportDomain.SummaryResults, error)
-	GetFieldCropMetrics(filters reportDomain.ReportFilter) ([]reportDomain.FieldCropMetric, error)
+	GetSummaryResults(ctx context.Context, filters reportDomain.SummaryResultsFilter) ([]reportDomain.SummaryResults, error)
+	GetFieldCropMetrics(ctx context.Context, filters reportDomain.ReportFilter) ([]reportDomain.FieldCropMetric, error)
 	GetInvestorContributionReport(ctx context.Context, filter reportDomain.ReportFilter) (*reportDomain.InvestorContributionReport, error)
 }
 
@@ -101,14 +101,14 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	sd.dashboardData = dashboardData
 
 	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
-	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(reportFilter)
+	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(ctx, reportFilter)
 	if err != nil {
 		return nil, fmt.Errorf("fetch field_crop_metrics: %w", err)
 	}
 	sd.fieldCropMetrics = fieldCropMetrics
 
 	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
-	summaryResults, err := u.reportRepo.GetSummaryResults(summaryFilter)
+	summaryResults, err := u.reportRepo.GetSummaryResults(ctx, summaryFilter)
 	if err != nil {
 		return nil, fmt.Errorf("fetch summary_results: %w", err)
 	}

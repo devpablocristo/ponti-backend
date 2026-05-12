@@ -12,6 +12,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/actor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
@@ -34,16 +35,14 @@ func (r *Repository) CreateActor(ctx context.Context, actor *domain.Actor) (int6
 	if err := validateActor(actor); err != nil {
 		return 0, err
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return 0, err
+	}
+	actor.TenantID = tenantID
 
 	returning := int64(0)
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if actor.TenantID == "" {
-			tenantID, err := r.defaultTenantID(ctx, tx)
-			if err != nil {
-				return err
-			}
-			actor.TenantID = tenantID
-		}
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		actor.NormalizedName = normalizeName(actor.DisplayName)
 
 		model := models.FromDomain(actor)
@@ -86,10 +85,11 @@ func (r *Repository) ListActors(ctx context.Context, filters domain.ListFilters,
 		perPage = 100
 	}
 
-	query := r.db.Client().WithContext(ctx).Model(&models.Actor{}).Where("deleted_at IS NULL")
-	if filters.TenantID != "" {
-		query = query.Where("tenant_id = ?", filters.TenantID)
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return nil, 0, err
 	}
+	query := r.db.Client().WithContext(ctx).Model(&models.Actor{}).Where("tenant_id = ? AND deleted_at IS NULL", tenantID)
 	switch filters.Status {
 	case "archived":
 		query = query.Where("archived_at IS NOT NULL")
@@ -150,9 +150,13 @@ func (r *Repository) GetActor(ctx context.Context, id int64) (*domain.Actor, err
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
 		return nil, err
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var row models.Actor
-	if err := r.db.Client().WithContext(ctx).
-		Where("id = ? AND deleted_at IS NULL", id).
+	if err = r.db.Client().WithContext(ctx).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
 		First(&row).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "actor", id)
 	}
@@ -170,8 +174,21 @@ func (r *Repository) UpdateActor(ctx context.Context, actor *domain.Actor) error
 	if err := sharedrepo.ValidateID(actor.ID, "actor"); err != nil {
 		return err
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return err
+	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Actor{}).
+			Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", actor.ID, tenantID).
+			Select("tenant_id").
+			Scan(&actor.TenantID).Error; err != nil {
+			return domainerr.Internal("failed to resolve actor tenant")
+		}
+		if actor.TenantID == "" {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", actor.ID))
+		}
 		actor.NormalizedName = normalizeName(actor.DisplayName)
 		updates := map[string]any{
 			"actor_kind":      actor.ActorKind,
@@ -183,19 +200,32 @@ func (r *Repository) UpdateActor(ctx context.Context, actor *domain.Actor) error
 			"updated_at":      time.Now(),
 			"updated_by":      actor.UpdatedBy,
 		}
-		res := tx.Model(&models.Actor{}).Where("id = ? AND deleted_at IS NULL", actor.ID).Updates(updates)
+		res := tx.Model(&models.Actor{}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", actor.ID, tenantID).Updates(updates)
 		if res.Error != nil {
 			return domainerr.Internal("failed to update actor")
 		}
 		if res.RowsAffected == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", actor.ID))
 		}
-		return r.replaceProfiles(ctx, tx, actor)
+		if err := r.replaceProfiles(ctx, tx, actor); err != nil {
+			return err
+		}
+		if err := r.replaceRoles(ctx, tx, actor.ID, actor.Roles); err != nil {
+			return err
+		}
+		if err := r.replaceAliases(ctx, tx, actor); err != nil {
+			return err
+		}
+		return r.replaceIdentifiers(ctx, tx, actor)
 	})
 }
 
 func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
+		return err
+	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
 		return err
 	}
 	actorName, err := sharedmodels.ActorFromContext(ctx)
@@ -205,7 +235,7 @@ func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 	now := time.Now()
 	res := r.db.Client().WithContext(ctx).
 		Model(&models.Actor{}).
-		Where("id = ? AND deleted_at IS NULL AND archived_at IS NULL", id).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL AND archived_at IS NULL", id, tenantID).
 		Updates(map[string]any{
 			"archived_at": now,
 			"updated_at":  now,
@@ -224,9 +254,13 @@ func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
 		return err
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return err
+	}
 	res := r.db.Client().WithContext(ctx).
 		Model(&models.Actor{}).
-		Where("id = ? AND deleted_at IS NULL AND archived_at IS NOT NULL", id).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL AND archived_at IS NOT NULL", id, tenantID).
 		Updates(map[string]any{
 			"archived_at": nil,
 			"updated_at":  time.Now(),
@@ -244,9 +278,13 @@ func (r *Repository) HardDeleteActor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
 		return err
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return err
+	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Actor{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
+		if err := tx.Model(&models.Actor{}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check actor existence")
 		}
 		if count == 0 {
@@ -259,7 +297,7 @@ func (r *Repository) HardDeleteActor(ctx context.Context, id int64) error {
 		if totalImpact(impact.Counts) > 0 {
 			return domainerr.Conflict("actor has historical or active references; archive it instead")
 		}
-		if err := tx.Delete(&models.Actor{}, "id = ?", id).Error; err != nil {
+		if err := tx.Where("tenant_id = ?", tenantID).Delete(&models.Actor{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete actor")
 		}
 		return nil
@@ -273,6 +311,19 @@ func (r *Repository) AddRole(ctx context.Context, id int64, role string) error {
 	if _, ok := domain.ValidRoles[role]; !ok {
 		return domainerr.Validation("invalid actor role")
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return err
+	}
+	var actorCount int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.Actor{}).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
+		Count(&actorCount).Error; err != nil {
+		return domainerr.Internal("failed to validate actor")
+	}
+	if actorCount == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
+	}
 	if err := r.db.Client().WithContext(ctx).
 		Clauses(clause.OnConflict{DoNothing: true}).
 		Create(&models.ActorRole{ActorID: id, Role: role}).Error; err != nil {
@@ -285,9 +336,18 @@ func (r *Repository) AddAlias(ctx context.Context, id int64, alias domain.ActorA
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
 		return 0, err
 	}
-	tenantID, err := r.defaultTenantID(ctx, r.db.Client())
+	tenantID, err := requestTenantID(ctx)
 	if err != nil {
 		return 0, err
+	}
+	var actorCount int64
+	if err := r.db.Client().WithContext(ctx).Model(&models.Actor{}).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
+		Count(&actorCount).Error; err != nil {
+		return 0, domainerr.Internal("failed to validate actor")
+	}
+	if actorCount == 0 {
+		return 0, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
 	}
 	alias.ActorID = id
 	alias.TenantID = tenantID
@@ -309,11 +369,15 @@ func (r *Repository) MergeActors(ctx context.Context, req domain.MergeRequest) (
 			return nil, domainerr.Validation("source actor cannot be the target actor")
 		}
 	}
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	var impact *domain.MergeImpact
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var targetCount int64
-		if err := tx.Model(&models.Actor{}).Where("id = ? AND deleted_at IS NULL", req.TargetActorID).Count(&targetCount).Error; err != nil {
+		if err := tx.Model(&models.Actor{}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", req.TargetActorID, tenantID).Count(&targetCount).Error; err != nil {
 			return domainerr.Internal("failed to check target actor")
 		}
 		if targetCount == 0 {
@@ -321,7 +385,7 @@ func (r *Repository) MergeActors(ctx context.Context, req domain.MergeRequest) (
 		}
 
 		var sourceCount int64
-		if err := tx.Model(&models.Actor{}).Where("id IN ? AND deleted_at IS NULL", req.SourceActorIDs).Count(&sourceCount).Error; err != nil {
+		if err := tx.Model(&models.Actor{}).Where("id IN ? AND tenant_id = ? AND deleted_at IS NULL", req.SourceActorIDs, tenantID).Count(&sourceCount).Error; err != nil {
 			return domainerr.Internal("failed to check source actors")
 		}
 		if sourceCount != int64(len(req.SourceActorIDs)) {
@@ -360,15 +424,137 @@ func (r *Repository) MergeActors(ctx context.Context, req domain.MergeRequest) (
 	return impact, err
 }
 
-func (r *Repository) defaultTenantID(ctx context.Context, tx *gorm.DB) (string, error) {
-	var tenantID string
-	if err := tx.WithContext(ctx).Table("auth_tenants").Where("name = ?", "default").Select("id").Scan(&tenantID).Error; err != nil {
-		return "", domainerr.Internal("failed to resolve default tenant")
+func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.DuplicateCandidate, error) {
+	tenantID, err := requestTenantID(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if tenantID == "" {
-		return "", domainerr.Internal("default tenant does not exist")
+	type row struct {
+		GroupType   string
+		GroupKey    string
+		ActorID     int64
+		DisplayName string
+		ActorKind   string
+		Roles       *string
 	}
-	return tenantID, nil
+
+	var rows []row
+	err = r.db.Client().WithContext(ctx).Raw(`
+		WITH actor_roles_agg AS (
+			SELECT actor_id, string_agg(DISTINCT role, ',' ORDER BY role) AS roles
+			FROM actor_roles
+			WHERE archived_at IS NULL
+			GROUP BY actor_id
+		),
+		active_actors AS (
+			SELECT a.id, a.display_name, a.actor_kind, a.normalized_name, ara.roles
+			FROM actors a
+			LEFT JOIN actor_roles_agg ara ON ara.actor_id = a.id
+			WHERE a.deleted_at IS NULL
+			  AND a.tenant_id = ?
+			  AND a.merged_into_actor_id IS NULL
+		),
+		name_groups AS (
+			SELECT normalized_name AS group_key
+			FROM active_actors
+			WHERE normalized_name <> ''
+			GROUP BY normalized_name
+			HAVING COUNT(*) > 1
+		),
+		identifier_groups AS (
+			SELECT concat_ws(':', tenant_id::text, country, identifier_type, normalized_identifier_value) AS group_key
+			FROM actor_identifiers
+			WHERE normalized_identifier_value <> ''
+			GROUP BY tenant_id, country, identifier_type, normalized_identifier_value
+			HAVING COUNT(DISTINCT actor_id) > 1
+		),
+		alias_groups AS (
+			SELECT normalized_alias AS group_key
+			FROM actor_aliases
+			WHERE archived_at IS NULL
+			  AND normalized_alias <> ''
+			GROUP BY normalized_alias
+			HAVING COUNT(DISTINCT actor_id) > 1
+		),
+		legal_name_groups AS (
+			SELECT normalized_legal_name AS group_key
+			FROM actor_organization_profiles
+			WHERE COALESCE(normalized_legal_name, '') <> ''
+			GROUP BY normalized_legal_name
+			HAVING COUNT(DISTINCT actor_id) > 1
+		),
+		trade_name_groups AS (
+			SELECT normalized_trade_name AS group_key
+			FROM actor_organization_profiles
+			WHERE COALESCE(normalized_trade_name, '') <> ''
+			GROUP BY normalized_trade_name
+			HAVING COUNT(DISTINCT actor_id) > 1
+		)
+		SELECT 'nombre' AS group_type, ng.group_key, a.id AS actor_id, a.display_name, a.actor_kind, a.roles
+		FROM name_groups ng
+		JOIN active_actors a ON a.normalized_name = ng.group_key
+		UNION ALL
+		SELECT 'identificador', ig.group_key, a.id, a.display_name, a.actor_kind, a.roles
+		FROM identifier_groups ig
+		JOIN actor_identifiers ai ON concat_ws(':', ai.tenant_id::text, ai.country, ai.identifier_type, ai.normalized_identifier_value) = ig.group_key
+		JOIN active_actors a ON a.id = ai.actor_id
+		UNION ALL
+		SELECT 'alias', ag.group_key, a.id, a.display_name, a.actor_kind, a.roles
+		FROM alias_groups ag
+		JOIN actor_aliases aa ON aa.normalized_alias = ag.group_key AND aa.archived_at IS NULL
+		JOIN active_actors a ON a.id = aa.actor_id
+		UNION ALL
+		SELECT 'razon_social', lg.group_key, a.id, a.display_name, a.actor_kind, a.roles
+		FROM legal_name_groups lg
+		JOIN actor_organization_profiles aop ON aop.normalized_legal_name = lg.group_key
+		JOIN active_actors a ON a.id = aop.actor_id
+		UNION ALL
+		SELECT 'nombre_comercial', tg.group_key, a.id, a.display_name, a.actor_kind, a.roles
+		FROM trade_name_groups tg
+		JOIN actor_organization_profiles aop ON aop.normalized_trade_name = tg.group_key
+		JOIN active_actors a ON a.id = aop.actor_id
+		ORDER BY group_type, group_key, display_name, actor_id
+	`, tenantID).Scan(&rows).Error
+	if err != nil {
+		return nil, domainerr.Internal("failed to list duplicate actor candidates")
+	}
+
+	grouped := make([]domain.DuplicateCandidate, 0)
+	seen := map[string]int{}
+	actorSeen := map[string]map[int64]struct{}{}
+	for _, item := range rows {
+		key := item.GroupType + "\x00" + item.GroupKey
+		index, ok := seen[key]
+		if !ok {
+			grouped = append(grouped, domain.DuplicateCandidate{
+				GroupType: item.GroupType,
+				GroupKey:  item.GroupKey,
+				Actors:    []domain.DuplicateActor{},
+			})
+			index = len(grouped) - 1
+			seen[key] = index
+			actorSeen[key] = map[int64]struct{}{}
+		}
+		if _, ok := actorSeen[key][item.ActorID]; ok {
+			continue
+		}
+		actorSeen[key][item.ActorID] = struct{}{}
+		grouped[index].Actors = append(grouped[index].Actors, domain.DuplicateActor{
+			ID:          item.ActorID,
+			DisplayName: item.DisplayName,
+			ActorKind:   item.ActorKind,
+			Roles:       splitCSV(valueOf(item.Roles)),
+		})
+	}
+	return grouped, nil
+}
+
+func requestTenantID(ctx context.Context) (string, error) {
+	tenantID, err := authz.RequireTenant(ctx)
+	if err != nil {
+		return "", err
+	}
+	return tenantID.String(), nil
 }
 
 func validateActor(actor *domain.Actor) error {
@@ -394,6 +580,12 @@ func validateActor(actor *domain.Actor) error {
 }
 
 func (r *Repository) replaceProfiles(ctx context.Context, tx *gorm.DB, actor *domain.Actor) error {
+	if err := tx.WithContext(ctx).Where("actor_id = ?", actor.ID).Delete(&models.ActorPersonProfile{}).Error; err != nil {
+		return domainerr.Internal("failed to clear person profile")
+	}
+	if err := tx.WithContext(ctx).Where("actor_id = ?", actor.ID).Delete(&models.ActorOrganizationProfile{}).Error; err != nil {
+		return domainerr.Internal("failed to clear organization profile")
+	}
 	if actor.PersonProfile != nil {
 		profile := models.ActorPersonProfile{
 			ActorID:                  actor.ID,
@@ -450,6 +642,41 @@ func (r *Repository) insertRoles(ctx context.Context, tx *gorm.DB, actorID int64
 			Clauses(clause.OnConflict{DoNothing: true}).
 			Create(&models.ActorRole{ActorID: actorID, Role: role}).Error; err != nil {
 			return domainerr.Internal("failed to add actor role")
+		}
+	}
+	return nil
+}
+
+func (r *Repository) replaceRoles(ctx context.Context, tx *gorm.DB, actorID int64, roles []string) error {
+	if err := tx.WithContext(ctx).Where("actor_id = ?", actorID).Delete(&models.ActorRole{}).Error; err != nil {
+		return domainerr.Internal("failed to clear actor roles")
+	}
+	return r.insertRoles(ctx, tx, actorID, roles)
+}
+
+func (r *Repository) replaceAliases(ctx context.Context, tx *gorm.DB, actor *domain.Actor) error {
+	if err := tx.WithContext(ctx).Where("actor_id = ?", actor.ID).Delete(&models.ActorAlias{}).Error; err != nil {
+		return domainerr.Internal("failed to clear actor aliases")
+	}
+	for _, alias := range actor.Aliases {
+		alias.TenantID = actor.TenantID
+		alias.ActorID = actor.ID
+		if _, err := r.addAliasTx(ctx, tx, alias); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) replaceIdentifiers(ctx context.Context, tx *gorm.DB, actor *domain.Actor) error {
+	if err := tx.WithContext(ctx).Where("actor_id = ?", actor.ID).Delete(&models.ActorIdentifier{}).Error; err != nil {
+		return domainerr.Internal("failed to clear actor identifiers")
+	}
+	for _, identifier := range actor.Identifiers {
+		identifier.TenantID = actor.TenantID
+		identifier.ActorID = actor.ID
+		if err := r.addIdentifierTx(ctx, tx, identifier); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -767,6 +994,21 @@ func valueOf(s *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*s)
+}
+
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return []string{}
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func totalImpact(counts map[string]int64) int64 {

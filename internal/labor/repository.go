@@ -11,6 +11,7 @@ import (
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
@@ -42,6 +43,9 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 		return 0, err
 	}
 	model := models.FromDomain(labor)
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		model.TenantID = tenantID
+	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, domainerr.Internal("failed to create labor")
 	}
@@ -52,6 +56,7 @@ func (r *Repository) ExistsLaborByProjectAndName(ctx context.Context, projectID 
 	var count int64
 	err := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
 		Where("project_id = ? AND deleted_at IS NULL AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, name).
 		Count(&count).Error
 	if err != nil {
@@ -64,6 +69,7 @@ func (r *Repository) ExistsOtherLaborByProjectAndName(ctx context.Context, proje
 	var count int64
 	err := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
 		Where("project_id = ? AND deleted_at IS NULL AND id <> ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))", projectID, laborID, name).
 		Count(&count).Error
 	if err != nil {
@@ -74,7 +80,7 @@ func (r *Repository) ExistsOtherLaborByProjectAndName(ctx context.Context, proje
 
 func (r *Repository) GetLabor(ctx context.Context, laborID int64) (*domain.Labor, error) {
 	var m models.Labor
-	if err := r.db.Client().WithContext(ctx).
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "labors").
 		Preload("Category").
 		First(&m, laborID).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "labor", laborID)
@@ -86,8 +92,9 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 	var count int64
 	if err := r.db.Client().WithContext(ctx).
 		Model(&workOrderModels.WorkOrder{}).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorders") }).
 		Joins("JOIN labors ON labors.id = workorders.labor_id").
-		Where("labors.id = ? AND workorders.deleted_at IS NULL", laborID).
+		Where("labors.id = ? AND labors.tenant_id = workorders.tenant_id AND workorders.deleted_at IS NULL", laborID).
 		Count(&count).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
@@ -99,6 +106,7 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 
 func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
 	result := r.db.Client().WithContext(ctx).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
 		Delete(&models.Labor{}, "id = ?", id)
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete labor")
@@ -122,7 +130,7 @@ func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var l models.Labor
-		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "labors").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
 			}
@@ -132,7 +140,7 @@ func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 			return domainerr.Conflict("labor already archived")
 		}
 
-		if err := tx.Model(&models.Labor{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Labor{}), "labors").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
@@ -152,7 +160,7 @@ func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var l models.Labor
-		if err := tx.Unscoped().Where("id = ?", id).First(&l).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "labors").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
 			}
@@ -162,7 +170,7 @@ func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
 			return domainerr.Conflict("labor is not archived")
 		}
 
-		if err := tx.Unscoped().Model(&models.Labor{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Labor{}), "labors").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": nil,
@@ -184,7 +192,7 @@ func (r *Repository) HardDeleteLabor(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Unscoped().Table("labors").Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("labors"), "labors").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check labor existence")
 		}
 		if count == 0 {
@@ -192,14 +200,14 @@ func (r *Repository) HardDeleteLabor(ctx context.Context, id int64) error {
 		}
 
 		var woCount int64
-		if err := tx.Unscoped().Model(&workOrderModels.WorkOrder{}).Where("labor_id = ?", id).Count(&woCount).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&workOrderModels.WorkOrder{}), "workorders").Where("labor_id = ?", id).Count(&woCount).Error; err != nil {
 			return domainerr.Internal("failed to check work orders")
 		}
 		if woCount > 0 {
 			return domainerr.Conflict(fmt.Sprintf("labor has %d work order(s); archive or hard-delete them first", woCount))
 		}
 
-		if err := tx.Unscoped().Delete(&models.Labor{}, "id = ?", id).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "labors").Delete(&models.Labor{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete labor")
 		}
 		return nil
@@ -214,6 +222,7 @@ func (r *Repository) ListArchivedLabors(ctx context.Context, page, perPage int, 
 		Model(&models.Labor{}).
 		Where("project_id = ?", projectID).
 		Where("deleted_at IS NOT NULL")
+	base = authz.MaybeTenantScope(ctx, base, "labors")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived labors")
@@ -265,6 +274,7 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 
 	result := r.db.Client().WithContext(ctx).
 		Model(&models.Labor{}).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
 		Where("id = ?", labor.ID).
 		Updates(updates)
 
@@ -285,6 +295,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 		Model(&models.Labor{}).
 		Where("project_id = ?", projectID).
 		Where("deleted_at IS NULL")
+	base = authz.MaybeTenantScope(ctx, base, "labors")
 
 	// Conteo total filtrado por proyecto
 	if err := base.Count(&total).Error; err != nil {
@@ -570,9 +581,9 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		var investorID int64
-if m.InvestorID != nil {
-	investorID = *m.InvestorID
-}
+		if m.InvestorID != nil {
+			investorID = *m.InvestorID
+		}
 
 		list[i] = domain.LaborListItem{
 			WorkOrderID:     m.WorkOrderID,

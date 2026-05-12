@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/authn/go/jwks"
-	"github.com/devpablocristo/core/security/go/contextkeys"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httperr"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 const (
@@ -26,21 +26,25 @@ const (
 )
 
 type IdentityAuthConfig struct {
-	Enabled       bool
-	ProjectID     string
-	Issuer        string
-	Audience      string
-	JWKSURL       string
-	CacheTTL      time.Duration
-	TenantHeader  string
-	AutoProvision bool
-	DefaultTenant string
-	DefaultRole   string
+	Enabled             bool
+	Environment         string
+	ProjectID           string
+	Issuer              string
+	Audience            string
+	JWKSURL             string
+	CacheTTL            time.Duration
+	TenantHeader        string
+	RequireTenantHeader bool
+	AutoProvision       bool
+	DefaultTenant       string
+	DefaultRole         string
 }
 
 type identityClaims struct {
-	Subject string
-	Email   string
+	Subject  string
+	Email    string
+	Issuer   string
+	Audience []string
 }
 
 type membershipResolved struct {
@@ -57,7 +61,67 @@ func extractClaimsFromMap(m map[string]any) identityClaims {
 	if email, ok := m["email"].(string); ok {
 		c.Email = email
 	}
+	if iss, ok := m["iss"].(string); ok {
+		c.Issuer = iss
+	}
+	c.Audience = extractAudience(m["aud"])
 	return c
+}
+
+func extractAudience(raw any) []string {
+	switch v := raw.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		return []string{strings.TrimSpace(v)}
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+		return out
+	case []string:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if strings.TrimSpace(item) != "" {
+				out = append(out, strings.TrimSpace(item))
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func validateIdentityClaims(cfg IdentityAuthConfig, claims identityClaims) error {
+	if strings.TrimSpace(cfg.Issuer) != "" && claims.Issuer != strings.TrimSpace(cfg.Issuer) {
+		return errors.New("token issuer mismatch")
+	}
+
+	expectedAudience := strings.TrimSpace(cfg.Audience)
+	if expectedAudience == "" {
+		expectedAudience = strings.TrimSpace(cfg.ProjectID)
+	}
+	if expectedAudience == "" {
+		return errors.New("identity audience not configured")
+	}
+	for _, aud := range claims.Audience {
+		if aud == expectedAudience {
+			return nil
+		}
+	}
+	return errors.New("token audience mismatch")
+}
+
+func allowsImplicitTenant(c *gin.Context) bool {
+	if c == nil || c.Request == nil {
+		return false
+	}
+	path := c.Request.URL.Path
+	return c.Request.Method == http.MethodGet && (strings.HasSuffix(path, "/me/context") || strings.HasSuffix(path, "/me/tenants"))
 }
 
 func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
@@ -86,6 +150,11 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
 			return
 		}
+		if err := validateIdentityClaims(cfg, claims); err != nil {
+			denyAuthRequest(c, err.Error())
+			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+			return
+		}
 
 		userID, err := ensureUserByIDPSub(c.Request.Context(), db, claims.Subject, claims.Email)
 		if err != nil {
@@ -96,7 +165,16 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			return
 		}
 
-		membership, err := resolveMembership(c.Request.Context(), db, userID, c.GetHeader(cfg.TenantHeader))
+		requestedTenant := c.GetHeader(cfg.TenantHeader)
+		if cfg.RequireTenantHeader && strings.TrimSpace(requestedTenant) == "" && !allowsImplicitTenant(c) {
+			domErr := domainerr.Forbidden("tenant header required")
+			status, apiErr := httperr.Normalize(domErr)
+			c.AbortWithStatusJSON(status, apiErr)
+			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+			return
+		}
+
+		membership, err := resolveMembership(c.Request.Context(), db, userID, requestedTenant)
 		if err != nil {
 			if cfg.AutoProvision {
 				membership, err = ensureDefaultMembership(
@@ -168,6 +246,21 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 	if err := db.WithContext(ctx).Table("auth_tenants").Select("id").Where("name = ?", tenantName).Limit(1).Take(&tenant).Error; err != nil {
 		return nil, err
 	}
+
+	return ensureMembershipForTenantID(ctx, db, userID, tenant.ID, roleName)
+}
+
+func ensureMembershipForTenantID(ctx context.Context, db *gorm.DB, userID uuid.UUID, tenantID uuid.UUID, roleName string) (*membershipResolved, error) {
+	if tenantID == uuid.Nil {
+		return nil, errors.New("tenant id required")
+	}
+	if strings.TrimSpace(roleName) == "" {
+		roleName = "admin"
+	}
+
+	type roleRow struct {
+		ID uuid.UUID
+	}
 	var role roleRow
 	if err := db.WithContext(ctx).Table("auth_roles").Select("id").Where("name = ?", roleName).Limit(1).Take(&role).Error; err != nil {
 		return nil, err
@@ -177,7 +270,7 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 	now := time.Now().UTC()
 	payload := map[string]any{
 		"user_id":    userID,
-		"tenant_id":  tenant.ID,
+		"tenant_id":  tenantID,
 		"role_id":    role.ID,
 		"status":     "active",
 		"created_at": now,
@@ -187,14 +280,14 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 		// If duplicate, try update to ensure active status and role.
 		_ = db.WithContext(ctx).
 			Table("auth_memberships").
-			Where("user_id = ? AND tenant_id = ?", userID, tenant.ID).
+			Where("user_id = ? AND tenant_id = ?", userID, tenantID).
 			Updates(map[string]any{
 				"role_id":    role.ID,
 				"status":     "active",
 				"updated_at": now,
 			}).Error
 	}
-	return resolveMembership(ctx, db, userID, tenant.ID.String())
+	return resolveMembership(ctx, db, userID, tenantID.String())
 }
 
 func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, requestedTenant string) (*membershipResolved, error) {

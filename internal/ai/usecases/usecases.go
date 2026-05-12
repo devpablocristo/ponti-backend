@@ -12,8 +12,8 @@ import (
 )
 
 type ClientPort interface {
-	Do(ctx context.Context, method, path string, body any, userID, projectID string) (int, []byte, error)
-	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, projectID string) (*http.Response, error)
+	Do(ctx context.Context, method, path string, body any, userID, tenantID, projectID string) (int, []byte, error)
+	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, tenantID, projectID string) (*http.Response, error)
 }
 
 type UseCases struct {
@@ -35,8 +35,8 @@ func isAIServiceNotConfigured(err error) bool {
 }
 
 // dummyOrReal ejecuta la llamada al cliente; si AI no está configurada, devuelve respuestas dummy.
-func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body any, userID, projectID string, dummyResp any) (int, []byte, error) {
-	status, raw, err := u.client.Do(ctx, method, path, body, userID, projectID)
+func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body any, userID, tenantID, projectID string, dummyResp any) (int, []byte, error) {
+	status, raw, err := u.client.Do(ctx, method, path, body, userID, tenantID, projectID)
 	if err == nil {
 		return status, raw, nil
 	}
@@ -48,8 +48,8 @@ func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body an
 }
 
 // ChatStream proxea POST /v1/chat/stream hacia ponti-ai (SSE); escribe headers y cuerpo en w.
-func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error {
-	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, projectID)
+func (u *UseCases) ChatStream(ctx context.Context, userID, tenantID, projectID string, body io.Reader, w http.ResponseWriter) error {
+	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, tenantID, projectID)
 	if err != nil {
 		if isAIServiceNotConfigured(err) {
 			w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
@@ -72,8 +72,8 @@ func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, bod
 	return err
 }
 
-func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/chat", body, userID, projectID, map[string]any{
+func (u *UseCases) Chat(ctx context.Context, userID, tenantID, projectID string, body any) (int, []byte, error) {
+	return u.dummyOrReal(ctx, "POST", "/v1/chat", body, userID, tenantID, projectID, map[string]any{
 		"request_id":            "dummy",
 		"output_kind":           "chat_reply",
 		"content_language":      "es",
@@ -88,7 +88,7 @@ func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any)
 	})
 }
 
-func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error) {
+func (u *UseCases) ListChatConversations(ctx context.Context, userID, tenantID, projectID string, limit int) (int, []byte, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -96,14 +96,14 @@ func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID 
 		limit = 200
 	}
 	path := "/v1/chat/conversations?limit=" + strconv.Itoa(limit)
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, tenantID, projectID, map[string]any{
 		"items": []any{},
 	})
 }
 
-func (u *UseCases) GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error) {
+func (u *UseCases) GetChatConversation(ctx context.Context, userID, tenantID, projectID, conversationID string) (int, []byte, error) {
 	path := "/v1/chat/conversations/" + strings.TrimSpace(conversationID)
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
+	return u.dummyOrReal(ctx, "GET", path, nil, userID, tenantID, projectID, map[string]any{
 		"id":         conversationID,
 		"title":      "dummy",
 		"messages":   []any{},

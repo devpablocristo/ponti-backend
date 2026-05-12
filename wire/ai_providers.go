@@ -6,6 +6,7 @@ import (
 	aiusecases "github.com/devpablocristo/ponti-backend/internal/ai/usecases"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
+	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 	"github.com/google/wire"
 )
 
@@ -30,8 +31,10 @@ func ProvideAIHandler(
 	useCases ai.UseCasesPort,
 	cfg ai.ConfigAPIPort,
 	middlewares ai.MiddlewaresEnginePort,
+	repo *pgorm.Repository,
+	appCfg *config.Config,
 ) *ai.Handler {
-	return ai.NewHandler(useCases, server, cfg, middlewares)
+	return ai.NewHandler(useCases, server, cfg, middlewares, repo.Client(), appCfg.Security.AITenantScope)
 }
 
 // ProvideAIGinEnginePort adapta *pgin.Server.

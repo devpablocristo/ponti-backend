@@ -12,6 +12,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -32,12 +33,17 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(f)
+		tenantID, hasTenant := authz.TenantFromContext(ctx)
+		if hasTenant {
+			model.TenantID = tenantID
+		}
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create field")
 		}
 		fieldID = model.ID
 		for _, lot := range f.Lots {
 			lotModel := lotmod.Lot{
+				TenantID:       model.TenantID,
 				Name:           lot.Name,
 				FieldID:        fieldID,
 				Hectares:       lot.Hectares,
@@ -59,17 +65,15 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 
 func (r *Repository) ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).
-		Model(&models.Field{}).
-		Where("deleted_at IS NULL").
-		Count(&total).Error; err != nil {
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Field{}), "fields").
+		Where("deleted_at IS NULL")
+	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count fields")
 	}
 
 	var list []models.Field
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
-		Where("deleted_at IS NULL").
+	err := base.
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -91,6 +95,7 @@ func (r *Repository) ListArchivedFields(ctx context.Context, page, perPage int) 
 		Unscoped().
 		Model(&models.Field{}).
 		Where("deleted_at IS NOT NULL")
+	base = authz.MaybeTenantScope(ctx, base, "fields")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived fields")
@@ -118,7 +123,8 @@ func (r *Repository) GetField(ctx context.Context, id int64) (*domain.Field, err
 		return nil, err
 	}
 	var model models.Field
-	if err := r.db.Client().WithContext(ctx).
+	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "fields")
+	if err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "field", id)
@@ -133,8 +139,7 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if err := sharedrepo.ValidateID(f.ID, "field"); err != nil {
 		return err
 	}
-	updateTx := r.db.Client().WithContext(ctx).
-		Model(&models.Field{}).
+	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Field{}), "fields").
 		Where("id = ?", f.ID)
 	if !f.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
@@ -164,7 +169,8 @@ func (r *Repository) HardDeleteField(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Unscoped().Table("fields").Where("id = ?", id).Count(&count).Error; err != nil {
+		fieldDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields")
+		if err := fieldDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check field existence")
 		}
 		if count == 0 {
@@ -172,14 +178,15 @@ func (r *Repository) HardDeleteField(ctx context.Context, id int64) error {
 		}
 
 		var lotCount int64
-		if err := tx.Unscoped().Model(&lotmod.Lot{}).Where("field_id = ?", id).Count(&lotCount).Error; err != nil {
+		lotDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&lotmod.Lot{}), "lots")
+		if err := lotDB.Where("field_id = ?", id).Count(&lotCount).Error; err != nil {
 			return domainerr.Internal("failed to check lots")
 		}
 		if lotCount > 0 {
 			return domainerr.Conflict(fmt.Sprintf("field has %d lot(s); archive or hard-delete them first", lotCount))
 		}
 
-		if err := tx.Unscoped().Delete(&models.Field{}, "id = ?", id).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "fields").Delete(&models.Field{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete field")
 		}
 		return nil
@@ -199,7 +206,8 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var f models.Field
-		if err := tx.Unscoped().Where("id = ?", id).First(&f).Error; err != nil {
+		fieldQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "fields")
+		if err := fieldQuery.Where("id = ?", id).First(&f).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
 			}
@@ -209,7 +217,7 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 			return domainerr.Conflict("field already archived")
 		}
 
-		if err := tx.Model(&models.Field{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Field{}), "fields").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
@@ -229,7 +237,8 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var f models.Field
-		if err := tx.Unscoped().Where("id = ?", id).First(&f).Error; err != nil {
+		fieldQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "fields")
+		if err := fieldQuery.Where("id = ?", id).First(&f).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
 			}
@@ -239,7 +248,7 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 			return domainerr.Conflict("field is not archived")
 		}
 
-		if err := tx.Unscoped().Model(&models.Field{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Field{}), "fields").
 			Where("id = ?", id).
 			Updates(map[string]any{
 				"deleted_at": nil,

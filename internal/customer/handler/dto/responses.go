@@ -11,6 +11,7 @@ import (
 type CustomerResponse struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
+	ActorID    *int64     `json:"actor_id,omitempty"`
 	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
@@ -19,14 +20,16 @@ func CustomerFromDomain(d *domain.Customer) CustomerResponse {
 	return CustomerResponse{
 		ID:         d.ID,
 		Name:       d.Name,
+		ActorID:    d.ActorID,
 		ArchivedAt: d.ArchivedAt,
 	}
 }
 
 // ListedCustomerResponse es el DTO ligero para listados: sólo ID y Name.
 type ListedCustomerResponse struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	ActorID *int64 `json:"actor_id,omitempty"`
 }
 
 // ListCustomersResponse es la respuesta paginada para el listado de customers.
@@ -40,8 +43,9 @@ func NewListCustomersResponse(items []domain.ListedCustomer, page, perPage int, 
 	data := make([]ListedCustomerResponse, 0, len(items))
 	for _, c := range items {
 		data = append(data, ListedCustomerResponse{
-			ID:   c.ID,
-			Name: c.Name,
+			ID:      c.ID,
+			Name:    c.Name,
+			ActorID: c.ActorID,
 		})
 	}
 	return ListCustomersResponse{

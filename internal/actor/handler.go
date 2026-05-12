@@ -21,6 +21,7 @@ type UseCasesPort interface {
 	HardDeleteActor(context.Context, int64) error
 	AddRole(context.Context, int64, string) error
 	AddAlias(context.Context, int64, domain.ActorAlias) (int64, error)
+	ListDuplicateCandidates(context.Context) ([]domain.DuplicateCandidate, error)
 	MergeActors(context.Context, domain.MergeRequest) (*domain.MergeImpact, error)
 }
 
@@ -65,6 +66,7 @@ func (h *Handler) Routes() {
 		public.POST("", h.CreateActor)
 		public.GET("", h.ListActors)
 		public.GET("/archived", h.ListArchivedActors)
+		public.GET("/duplicate-candidates", h.ListDuplicateCandidates)
 		public.POST("/merge", h.MergeActors)
 		public.GET("/:actor_id", h.GetActor)
 		public.PUT("/:actor_id", h.UpdateActor)
@@ -117,6 +119,15 @@ func (h *Handler) ListArchivedActors(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondOK(c, dto.NewListActorsResponse(actors, page, perPage, total))
+}
+
+func (h *Handler) ListDuplicateCandidates(c *gin.Context) {
+	candidates, err := h.ucs.ListDuplicateCandidates(c.Request.Context())
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, candidates)
 }
 
 func (h *Handler) GetActor(c *gin.Context) {

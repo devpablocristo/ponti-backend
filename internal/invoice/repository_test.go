@@ -30,6 +30,7 @@ func newInvoiceTestRepo(t *testing.T) *Repository {
 	stmts := []string{
 		`CREATE TABLE invoices (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NULL,
 			work_order_id INTEGER NOT NULL,
 			investor_id INTEGER NULL,
 			number TEXT NOT NULL,
@@ -45,11 +46,13 @@ func newInvoiceTestRepo(t *testing.T) *Repository {
 		);`,
 		`CREATE TABLE workorders (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NULL,
 			investor_id INTEGER NOT NULL,
 			deleted_at DATETIME NULL
 		);`,
 		`CREATE TABLE workorder_investor_splits (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NULL,
 			workorder_id INTEGER NOT NULL,
 			investor_id INTEGER NOT NULL,
 			percentage NUMERIC NOT NULL,

@@ -15,6 +15,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -22,6 +23,7 @@ import (
 
 type Project struct {
 	ID          int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID    uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	Name        string          `gorm:"size:100;not null;column:name"`
 	CustomerID  int64           `gorm:"not null;index;column:customer_id"`
 	CampaignID  int64           `gorm:"not null;index;column:campaign_id"`
@@ -39,38 +41,44 @@ type Project struct {
 }
 
 type Manager struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(255);not null;unique"`
+	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string    `gorm:"type:varchar(255);not null"`
 	sharedmodels.Base
 }
 
 type Customer struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(255);not null;unique"`
+	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string    `gorm:"type:varchar(255);not null"`
 }
 
 type Campaign struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(255);not null;unique"`
+	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string    `gorm:"type:varchar(255);not null"`
 }
 
 type Investor struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(255);not null;unique"`
+	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string    `gorm:"type:varchar(255);not null"`
 }
 
 type ProjectInvestor struct {
-	ProjectID  int64 `gorm:"primaryKey;autoIncrement:false;column:project_id"`
-	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
-	Percentage int   `gorm:"not null;column:percentage"`
+	TenantID   uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	ProjectID  int64     `gorm:"primaryKey;autoIncrement:false;column:project_id"`
+	InvestorID int64     `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
+	Percentage int       `gorm:"not null;column:percentage"`
 	sharedmodels.Base
 	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
 
 type AdminCostInvestor struct {
-	ProjectID  int64 `gorm:"primaryKey;autoIncrement:false;column:project_id"`
-	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
-	Percentage int   `gorm:"not null;column:percentage"`
+	TenantID   uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	ProjectID  int64     `gorm:"primaryKey;autoIncrement:false;column:project_id"`
+	InvestorID int64     `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
+	Percentage int       `gorm:"not null;column:percentage"`
 	sharedmodels.Base
 	Investor Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }

@@ -321,7 +321,7 @@ func Initialize() (*Dependencies, error) {
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
-	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort)
+	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort, repository, config)
 	app, err := ProvideFirebaseApp(config)
 	if err != nil {
 		return nil, err

@@ -48,4 +48,3 @@ func (ir *InvoiceRequest) ToDomain(workOrderID int64, investorID int64, userID s
 		},
 	}
 }
-

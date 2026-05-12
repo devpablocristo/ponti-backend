@@ -115,3 +115,16 @@ type MergeImpact struct {
 	Counts         map[string]int64 `json:"counts"`
 	Confirmed      bool             `json:"confirmed"`
 }
+
+type DuplicateActor struct {
+	ID          int64    `json:"id"`
+	DisplayName string   `json:"display_name"`
+	ActorKind   string   `json:"actor_kind"`
+	Roles       []string `json:"roles"`
+}
+
+type DuplicateCandidate struct {
+	GroupType string           `json:"group_type"`
+	GroupKey  string           `json:"group_key"`
+	Actors    []DuplicateActor `json:"actors"`
+}

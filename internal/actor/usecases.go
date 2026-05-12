@@ -16,6 +16,7 @@ type RepositoryPort interface {
 	HardDeleteActor(context.Context, int64) error
 	AddRole(context.Context, int64, string) error
 	AddAlias(context.Context, int64, domain.ActorAlias) (int64, error)
+	ListDuplicateCandidates(context.Context) ([]domain.DuplicateCandidate, error)
 	MergeActors(context.Context, domain.MergeRequest) (*domain.MergeImpact, error)
 }
 
@@ -61,6 +62,10 @@ func (u *UseCases) AddRole(ctx context.Context, id int64, role string) error {
 
 func (u *UseCases) AddAlias(ctx context.Context, id int64, alias domain.ActorAlias) (int64, error) {
 	return u.repo.AddAlias(ctx, id, alias)
+}
+
+func (u *UseCases) ListDuplicateCandidates(ctx context.Context) ([]domain.DuplicateCandidate, error) {
+	return u.repo.ListDuplicateCandidates(ctx)
 }
 
 func (u *UseCases) MergeActors(ctx context.Context, req domain.MergeRequest) (*domain.MergeImpact, error) {

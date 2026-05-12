@@ -23,6 +23,7 @@ type Config struct {
 	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
 	Review         Review         // Configuración de Nexus Review / approvals
 	Reporting      Reporting      // Configuración de lectura de reportes legacy/actors
+	Security       Security       // Feature flags de auth/multi-tenant/auditoría
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

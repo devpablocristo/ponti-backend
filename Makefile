@@ -19,7 +19,7 @@ LOCAL_DEV_ENV      := .env.develop.local
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
         run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
         migrate-create \
-        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local \
+        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local actors-backfill-sync \
         select-ponti-stg-local select-ponti-dev-local up-ponti-stg-local up-ponti-dev-local
 
 define compose_cmd
@@ -108,8 +108,13 @@ db-staging-to-local:
 	@bash ./scripts/db/db_staging_to_local.sh
 
 # Reset local DB + migraciones + carga data-only desde STAGING
-db-reset-from-staging: db-reset db-migrate-up db-staging-to-local
+db-reset-from-staging: db-reset db-migrate-up db-staging-to-local actors-backfill-sync
 	@echo "Local DB reset + migrate + staging data-only restore completed."
+
+actors-backfill-sync:
+	@echo "Re-ejecutando backfill/sync de actors sobre datos locales..."
+	@set -a && source .env && set +a && \
+	PGPASSWORD="$$DB_PASSWORD" psql -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USER" -d "$$DB_NAME" -v ON_ERROR_STOP=1 -f scripts/db/actors_backfill_sync.sql
 
 # Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
 staging-db-2-dev-db:

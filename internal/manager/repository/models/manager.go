@@ -1,6 +1,8 @@
 package models
 
 import (
+	"github.com/google/uuid"
+
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -9,7 +11,8 @@ import (
 
 type Manager struct {
 	ID       int64                `gorm:"primaryKey;autoIncrement"`
-	Name     string               `gorm:"type:varchar(255);not null;unique"`
+	TenantID uuid.UUID            `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string               `gorm:"type:varchar(255);not null"`
 	Projects []projectmod.Project `gorm:"many2many:project_managers;"`
 	sharedmodels.Base
 }

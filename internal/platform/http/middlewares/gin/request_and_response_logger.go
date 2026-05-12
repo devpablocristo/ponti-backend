@@ -3,6 +3,7 @@ package pkgmwr
 import (
 	"bytes"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,9 +37,7 @@ func RequestAndResponseLogger(options HttpLoggingOptions) gin.HandlerFunc {
 		if options.IncludeHeaders {
 			headers := make(map[string][]string)
 			for k, v := range c.Request.Header {
-				if k != "Authorization" && k != "Cookie" {
-					headers[k] = v
-				}
+				headers[k] = redactHeaderValue(k, v)
 			}
 			logger.Infof("[%s] Request headers: %v", requestID, headers)
 		}
@@ -55,5 +54,33 @@ func RequestAndResponseLogger(options HttpLoggingOptions) gin.HandlerFunc {
 		latency := time.Since(startTime)
 		statusCode := c.Writer.Status()
 		logger.Infof("[%s] Response: %d, Latency: %v", requestID, statusCode, latency)
+	}
+}
+
+func redactHeaderValue(name string, values []string) []string {
+	if isSensitiveHeader(name) {
+		return []string{"<redacted>"}
+	}
+	return values
+}
+
+func isSensitiveHeader(name string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	if normalized == "" {
+		return false
+	}
+	if strings.Contains(normalized, "authorization") ||
+		strings.Contains(normalized, "cookie") ||
+		strings.Contains(normalized, "api-key") ||
+		strings.Contains(normalized, "service-key") ||
+		strings.Contains(normalized, "token") ||
+		strings.Contains(normalized, "secret") {
+		return true
+	}
+	switch normalized {
+	case "x-api-key", "x-service-key", "x-user-id", "x-tenant-id", "x-project-id":
+		return true
+	default:
+		return false
 	}
 }

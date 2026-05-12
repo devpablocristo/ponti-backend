@@ -132,38 +132,15 @@ func (r *Repository) operationalIndicatorsView(filter domain.DashboardFilter) st
 
 // resolveProjectIDs determina los IDs de proyectos a consultar basándose en los filtros
 func (r *Repository) resolveProjectIDs(ctx context.Context, filter domain.DashboardFilter) ([]int64, error) {
-	// Si tenemos ProjectID directamente, usarlo
-	if filter.ProjectID != nil {
-		return []int64{*filter.ProjectID}, nil
-	}
-
-	// Buscar proyectos relacionados con los otros filtros
-	return r.getRelatedProjectIDs(ctx, filter)
-}
-
-// getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros
-func (r *Repository) getRelatedProjectIDs(ctx context.Context, filter domain.DashboardFilter) ([]int64, error) {
-	query := r.db.Client().WithContext(ctx).
-		Table("projects p").
-		Select("DISTINCT p.id").
-		Where("p.deleted_at IS NULL")
-
-	// Aplicar filtros dinámicamente
-	if filter.CustomerID != nil {
-		query = query.Where("p.customer_id = ?", *filter.CustomerID)
-	}
-	if filter.CampaignID != nil {
-		query = query.Where("p.campaign_id = ?", *filter.CampaignID)
-	}
-	if filter.FieldID != nil {
-		query = query.Where("EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)", *filter.FieldID)
-	}
-
-	var projectIDs []int64
-	if err := query.Pluck("p.id", &projectIDs).Error; err != nil {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
 		return nil, domainerr.Internal("failed to get related project IDs")
 	}
-
 	return projectIDs, nil
 }
 
@@ -399,7 +376,7 @@ func aggregateCropIncidence(rows []models.CropIncidenceModel) []models.CropIncid
 	}
 
 	type aggregate struct {
-		model    models.CropIncidenceModel
+		model   models.CropIncidenceModel
 		costUSD decimal.Decimal
 	}
 

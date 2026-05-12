@@ -73,6 +73,12 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		}
 
 		role := "admin"
+		if resolvedUserID != uuid.Nil && tenantID != uuid.Nil && db != nil {
+			if membership, err := ensureMembershipForTenantID(c.Request.Context(), db, resolvedUserID, tenantID, cfg.DefaultRole); err == nil {
+				role = membership.RoleName
+				tenantID = membership.TenantID
+			}
+		}
 
 		// Inject core/saas/go context keys.
 		ctx := c.Request.Context()
