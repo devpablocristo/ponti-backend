@@ -238,9 +238,6 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 	type tenantRow struct {
 		ID uuid.UUID
 	}
-	type roleRow struct {
-		ID uuid.UUID
-	}
 
 	var tenant tenantRow
 	if err := db.WithContext(ctx).Table("auth_tenants").Select("id").Where("name = ?", tenantName).Limit(1).Take(&tenant).Error; err != nil {

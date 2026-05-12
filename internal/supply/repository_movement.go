@@ -654,7 +654,7 @@ func (r *Repository) HardDeleteSupplyMovement(ctx context.Context, projectID, mo
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	db := r.getDB(ctx)
-	if db.Dialector.Name() == "sqlite" {
+	if db.Name() == "sqlite" {
 		var providers []providermodel.Provider
 		if err := authz.MaybeTenantScope(ctx, db, "providers").Find(&providers).Error; err != nil {
 			return nil, domainerr.Internal("failed to list providers")

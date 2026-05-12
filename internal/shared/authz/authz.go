@@ -190,8 +190,5 @@ func (p Principal) HasPermission(permission string) bool {
 			return true
 		}
 	}
-	if strings.EqualFold(p.Role, "saas_superadmin") {
-		return true
-	}
-	return false
+	return strings.EqualFold(p.Role, "saas_superadmin")
 }

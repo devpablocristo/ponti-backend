@@ -16,7 +16,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
@@ -72,30 +71,12 @@ func (h *Handler) Routes() {
 	}
 }
 
-func requireAdmin(c *gin.Context) bool {
-	role, _ := c.Request.Context().Value(ctxkeys.Role).(string)
-	if !isAdminLikeRole(role) {
-		sharedhandlers.RespondError(c, domainerr.Forbidden("admin role required"))
-		return false
-	}
-	return true
-}
-
 func requireAdminPermission(c *gin.Context, permission string) bool {
 	if authz.HasPermission(c.Request.Context(), permission) {
 		return true
 	}
 	sharedhandlers.RespondError(c, domainerr.Forbidden("insufficient permissions"))
 	return false
-}
-
-func isAdminLikeRole(role string) bool {
-	switch strings.TrimSpace(role) {
-	case "admin", "saas_superadmin", "tenant_owner", "tenant_admin":
-		return true
-	default:
-		return false
-	}
 }
 
 type createTenantReq struct {

@@ -564,5 +564,5 @@ func defaultTenantIDTx(tx *gorm.DB) (string, error) {
 }
 
 func actorSyncDisabled(tx *gorm.DB) bool {
-	return tx != nil && tx.Dialector != nil && tx.Dialector.Name() == "sqlite"
+	return tx != nil && tx.Name() == "sqlite"
 }
