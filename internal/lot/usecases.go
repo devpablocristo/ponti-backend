@@ -27,7 +27,7 @@ type RepositoryPort interface {
 	RestoreLot(context.Context, int64) error
 	HardDeleteLot(context.Context, int64) error
 	DeleteLot(context.Context, int64) error // legacy alias hacia ArchiveLot
-	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 }
@@ -101,9 +101,9 @@ func (u *UseCases) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID,
 
 func (u *UseCases) GetMetrics(
 	ctx context.Context,
-	projectID, fieldID, cropID int64,
+	filter domain.LotListFilter,
 ) (*domain.LotMetrics, error) {
-	return u.repo.GetMetrics(ctx, projectID, fieldID, cropID)
+	return u.repo.GetMetrics(ctx, filter)
 }
 
 func (u *UseCases) ListLots(

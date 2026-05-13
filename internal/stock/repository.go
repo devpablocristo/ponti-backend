@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplymodels "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
@@ -121,6 +122,34 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 		}
 
 		stocks = append(stocks, virtualStock)
+	}
+
+	return stocks, nil
+}
+
+func (r *Repository) ListStocksByFilter(ctx context.Context, filter domain.StockFilter, closeDate time.Time) ([]*domain.Stock, error) {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hasScope := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
+	if len(projectIDs) == 0 && hasScope {
+		return []*domain.Stock{}, nil
+	}
+
+	stocks := make([]*domain.Stock, 0)
+	for _, projectID := range projectIDs {
+		projectStocks, err := r.GetStocks(ctx, projectID, closeDate)
+		if err != nil {
+			return nil, err
+		}
+		stocks = append(stocks, projectStocks...)
 	}
 
 	return stocks, nil

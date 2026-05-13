@@ -90,7 +90,7 @@ func (s *laborHandlerUseCasesStub) ListLaborCategoriesByTypeID(context.Context, 
 func (s *laborHandlerUseCasesStub) ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error) {
 	return nil, nil
 }
-func (s *laborHandlerUseCasesStub) ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error) {
+func (s *laborHandlerUseCasesStub) ListGroupLaborByWorkOrder(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
 }
 func (s *laborHandlerUseCasesStub) ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error) {

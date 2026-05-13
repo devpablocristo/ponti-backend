@@ -40,7 +40,7 @@ type UseCasesPort interface {
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
-	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	ExportLots(context.Context, domain.LotListFilter, int, int) ([]byte, error)
 }
@@ -272,38 +272,28 @@ func (h *Handler) ListArchivedLots(c *gin.Context) {
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
-	projectID := int64(0)
-	if raw := c.Query("project_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			sharedhandlers.RespondError(c, domainerr.Validation("invalid project_id"))
-			return
-		}
-		projectID = parsed
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
-	fieldID := int64(0)
-	if raw := c.Query("field_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			sharedhandlers.RespondError(c, domainerr.Validation("invalid field_id"))
-			return
-		}
-		fieldID = parsed
-	}
-	cropID := int64(0)
+	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			sharedhandlers.RespondError(c, domainerr.Validation("invalid crop_id"))
 			return
 		}
-		cropID = parsed
+		cropID = &parsed
 	}
 
-	// Los filtros por ID son opcionales para permitir búsquedas globales
-	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
-
-	m, err := h.ucs.GetMetrics(c.Request.Context(), projectID, fieldID, cropID)
+	m, err := h.ucs.GetMetrics(c.Request.Context(), domain.LotListFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+		CropID:     cropID,
+	})
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

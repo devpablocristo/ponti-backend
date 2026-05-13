@@ -120,6 +120,10 @@ func (s *handlerUseCasesStub) GetEntriesSupplyMovementsByProjectID(context.Conte
 	return nil, nil
 }
 
+func (s *handlerUseCasesStub) ListEntrySupplyMovements(context.Context, domain.SupplyFilter) ([]*domain.SupplyMovement, error) {
+	return nil, nil
+}
+
 func (s *handlerUseCasesStub) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
 	if s.createSupplyMovementFn != nil {
 		return s.createSupplyMovementFn(ctx, movement)

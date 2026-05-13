@@ -21,6 +21,7 @@ import (
 
 type UseCasesPort interface {
 	GetStocksSummary(context.Context, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksSummaryByFilter(context.Context, domain.StockFilter, time.Time) ([]*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
@@ -78,6 +79,11 @@ func (h *Handler) Routes() {
 		public.PUT("/close-date", h.UpdateStocksCloseDate)
 		public.PUT("/real-stock/:stock_id", h.UpdateRealStock)
 	}
+
+	global := r.Group(baseURL+"/stocks", h.mws.GetValidation()...)
+	{
+		global.GET("/summary", h.getStocksSummaryByFilter)
+	}
 }
 
 func parseStockProjectID(c *gin.Context) (int64, bool) {
@@ -118,6 +124,40 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 	}
 
 	stocks, err := h.ucs.GetStocksSummary(ctx, projectID, cutoffDate)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewGetStocksListed(stocks)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) getStocksSummaryByFilter(c *gin.Context) {
+	ctx := c.Request.Context()
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	cutoffDateStr := c.Query("cutoff_date")
+	var cutoffDate time.Time
+	if cutoffDateStr != "" {
+		parsedDate, err := time.Parse("2006-01-02", cutoffDateStr)
+		if err != nil {
+			sharedhandlers.RespondError(c, err)
+			return
+		}
+		cutoffDate = parsedDate
+	}
+
+	stocks, err := h.ucs.GetStocksSummaryByFilter(ctx, domain.StockFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	}, cutoffDate)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

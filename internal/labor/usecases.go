@@ -22,7 +22,7 @@ type RepositoryPort interface {
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
-	ListGroupLabor(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListGroupLabor(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error)
 	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 	GetLabor(context.Context, int64) (*domain.Labor, error)
@@ -49,8 +49,6 @@ type UseCases struct {
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
 }
-
-
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {
@@ -146,8 +144,8 @@ func (u *UseCases) ListLaborByWorkOrder(ctx context.Context, workOrderID int64) 
 	return u.repo.ListByWorkOrder(ctx, workOrderID)
 }
 
-func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Input, projectID int64, fieldID int64) ([]domain.LaborListItem, types.PageInfo, error) {
-	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID)
+func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Input, filter domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error) {
+	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, filter)
 
 	// Mapear directamente - NO hacer cálculos manuales (ya vienen de la vista)
 	items := make([]domain.LaborListItem, len(rawItems))
@@ -163,7 +161,14 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
-	items, _, err := u.ListGroupLaborByWorkOrder(ctx, in, pid, fid)
+	filter := domain.LaborFilter{}
+	if pid > 0 {
+		filter.ProjectID = &pid
+	}
+	if fid > 0 {
+		filter.FieldID = &fid
+	}
+	items, _, err := u.ListGroupLaborByWorkOrder(ctx, in, filter)
 	if err != nil {
 		return nil, domainerr.Internal("list group labor")
 	}

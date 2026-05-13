@@ -145,13 +145,13 @@ func TestValidateInvestorSplitsRejectsInvalidPaymentStatus(t *testing.T) {
 	}
 }
 
-func TestListWorkOrderFilterRowsRequiresProjectOrFieldScope(t *testing.T) {
+func TestListWorkOrderFilterRowsAllowsUnscopedWorkspaceQuery(t *testing.T) {
 	t.Parallel()
 
 	uc := NewUseCases(useCasesRepoStub{}, nil)
 
-	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err == nil {
-		t.Fatalf("expected validation error for unscoped filter rows request")
+	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err != nil {
+		t.Fatalf("expected unscoped filter rows request to delegate to repository: %v", err)
 	}
 }
 

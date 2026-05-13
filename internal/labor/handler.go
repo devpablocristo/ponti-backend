@@ -30,7 +30,7 @@ type UseCasesPort interface {
 	CountWorkOrdersByLaborID(context.Context, int64) (int64, error)
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
-	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListGroupLaborByWorkOrder(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
 	ExportAllGroupLabors(context.Context, int64) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
@@ -95,11 +95,12 @@ func (h *Handler) Routes() {
 		workOrderLaborsGroup.POST("/:labor_id/archive", h.ArchiveLabor)
 		workOrderLaborsGroup.POST("/:labor_id/restore", h.RestoreLabor)
 		workOrderLaborsGroup.DELETE("/:labor_id/hard", h.HardDeleteLabor)
-		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
+		workOrderLaborsGroup.GET("/group", h.ListGroupLabor)
 		workOrderLaborsGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
 		workOrderLaborsGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
 		workOrderLaborsGroup.GET("/export/all", h.ExportAllGroupLabors)
 		workOrderLaborsGroup.GET("/metrics", h.GetMetrics)
+		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
 	}
 }
 
@@ -332,26 +333,20 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 		return
 	}
 
+	filter := domain.LaborFilter{ProjectID: &projectID}
 	fieldIDParam := c.Query("field_id")
-	if fieldIDParam == "" && projectID == 0 {
-		domErr := domainerr.Validation("field_id or project_id is required")
-		sharedhandlers.RespondError(c, domErr)
-		return
-	}
-
-	var fieldID int64
 	if fieldIDParam != "" {
 		parsedFieldID, err := ginmw.ParseOptionalInt64Query(c, "field_id")
 		if err != nil {
 			sharedhandlers.RespondError(c, err)
 			return
 		}
-		fieldID = *parsedFieldID
+		filter.FieldID = parsedFieldID
 	}
 
 	input := types.NewInput(c.Request)
 
-	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, projectID, fieldID)
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, filter)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -360,6 +355,29 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	resp := dto.FromDomainList(pageInfo, list)
 
 	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) ListGroupLabor(c *gin.Context) {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	input := types.NewInput(c.Request)
+	filter := domain.LaborFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	}
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, filter)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {

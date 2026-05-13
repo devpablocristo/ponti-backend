@@ -53,6 +53,7 @@ type UseCasesPort interface {
 	ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
 	ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error)
+	ListEntrySupplyMovements(context.Context, domain.SupplyFilter) ([]*domain.SupplyMovement, error)
 	ArchiveSupplyMovement(context.Context, int64, int64) error
 	RestoreSupplyMovement(context.Context, int64, int64) error
 	HardDeleteSupplyMovement(context.Context, int64, int64) error
@@ -160,6 +161,11 @@ func (h *Handler) Routes() {
 		supplies.DELETE("/:supply_id/hard", h.HardDeleteSupply)
 		supplies.DELETE("/:supply_id", h.DeleteSupply) // legacy: hard delete
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
+	}
+
+	globalSupplyMovements := r.Group(baseURL+"/supply-movements", h.mws.GetValidation()...)
+	{
+		globalSupplyMovements.GET("", h.ListSupplyMovements)
 	}
 
 	supplyMovements := r.Group(baseURL+"/projects/:project_id/supply-movements", h.mws.GetValidation()...)
@@ -802,6 +808,28 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 	}
 
 	supplyMovements, err := h.ucs.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, getDto.NewGetEntrySupplyMovementsResponse(supplyMovements))
+}
+
+func (h *Handler) ListSupplyMovements(c *gin.Context) {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	filter := domain.SupplyFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	}
+	supplyMovements, err := h.ucs.ListEntrySupplyMovements(c.Request.Context(), filter)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

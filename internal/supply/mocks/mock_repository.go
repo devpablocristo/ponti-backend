@@ -480,6 +480,21 @@ func (mr *MockRepositoryPortMockRecorder) ListAllSupplies(arg0, arg1 interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllSupplies", reflect.TypeOf((*MockRepositoryPort)(nil).ListAllSupplies), arg0, arg1)
 }
 
+// ListEntrySupplyMovements mocks base method.
+func (m *MockRepositoryPort) ListEntrySupplyMovements(arg0 context.Context, arg1 domain1.SupplyFilter) ([]*domain1.SupplyMovement, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEntrySupplyMovements", arg0, arg1)
+	ret0, _ := ret[0].([]*domain1.SupplyMovement)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEntrySupplyMovements indicates an expected call of ListEntrySupplyMovements.
+func (mr *MockRepositoryPortMockRecorder) ListEntrySupplyMovements(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEntrySupplyMovements", reflect.TypeOf((*MockRepositoryPort)(nil).ListEntrySupplyMovements), arg0, arg1)
+}
+
 // ListSuppliesPaginated mocks base method.
 func (m *MockRepositoryPort) ListSuppliesPaginated(arg0 context.Context, arg1 domain1.SupplyFilter, arg2 string, arg3, arg4 int) ([]domain1.Supply, int64, error) {
 	m.ctrl.T.Helper()

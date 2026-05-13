@@ -317,6 +317,10 @@ func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, pro
 	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
 }
 
+func (u *UseCases) ListEntrySupplyMovements(ctx context.Context, filter domain.SupplyFilter) ([]*domain.SupplyMovement, error) {
+	return u.repo.ListEntrySupplyMovements(ctx, filter)
+}
+
 func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
 	if supplyMovement == nil {
 		return domainerr.Validation("invalid supply movement")

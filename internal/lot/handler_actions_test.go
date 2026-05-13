@@ -142,7 +142,7 @@ func (s *lotActionUseCasesSpy) ListLotsByProjectFieldAndCrop(context.Context, in
 	panic("not implemented")
 }
 
-func (s *lotActionUseCasesSpy) GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error) {
+func (s *lotActionUseCasesSpy) GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error) {
 	panic("not implemented")
 }
 

@@ -483,21 +483,25 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	return mapLotsToDomain(lots), nil
 }
 
-func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
-	var projectIDPtr *int64
-	if projectID > 0 {
-		projectIDPtr = &projectID
-	}
-	var fieldIDPtr *int64
-	if fieldID > 0 {
-		fieldIDPtr = &fieldID
-	}
+func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter) (*domain.LotMetrics, error) {
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
-		ProjectID: projectIDPtr,
-		FieldID:   fieldIDPtr,
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
 	})
 	if err != nil {
 		return nil, err
+	}
+	hasWorkspaceFilter := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
+	if len(projectIDs) == 0 && hasWorkspaceFilter {
+		return &domain.LotMetrics{
+			SeededArea:      decimal.Zero,
+			HarvestedArea:   decimal.Zero,
+			YieldTnPerHa:    decimal.Zero,
+			CostPerHectare:  decimal.Zero,
+			SuperficieTotal: decimal.Zero,
+		}, nil
 	}
 	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
 		return nil, domainerr.Forbidden("tenant context required")
@@ -508,8 +512,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
 		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
 		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
-		SuperficieTotal decimal.Decimal `gorm:"column:project_total_hectares"`
-		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
+		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
 	}
 
 	view := shareddb.ReportView("lot_metrics")
@@ -519,11 +522,11 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		where = append(where, "project_id IN ?")
 		args = append(args, projectIDs)
 	}
-	if fieldID > 0 {
+	if filter.FieldID != nil && *filter.FieldID > 0 {
 		where = append(where, "field_id = ?")
-		args = append(args, fieldID)
+		args = append(args, *filter.FieldID)
 	}
-	if cropID > 0 {
+	if filter.CropID != nil && *filter.CropID > 0 {
 		where = append(where, `
 			lot_id IN (
 				SELECT id
@@ -532,7 +535,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 				  AND deleted_at IS NULL
 			)
 		`)
-		args = append(args, cropID, cropID)
+		args = append(args, *filter.CropID, *filter.CropID)
 	}
 
 	query := fmt.Sprintf(`
@@ -541,8 +544,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 			COALESCE(SUM(yield_tn_per_ha * seeded_area_ha) / NULLIF(SUM(seeded_area_ha), 0), 0) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
-			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
-			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
+			COALESCE(SUM(hectares), 0) AS superficie_total
 		FROM %s
 		WHERE %s
 	`, view, strings.Join(where, " AND "))
@@ -552,17 +554,12 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		return nil, domainerr.Internal("failed to scan lot metrics")
 	}
 
-	superficieTotal := row.SuperficieTotal
-	if fieldID > 0 && row.FieldTotal.GreaterThan(decimal.Zero) {
-		superficieTotal = row.FieldTotal
-	}
-
 	return &domain.LotMetrics{
 		SeededArea:      row.SeededArea,
 		HarvestedArea:   row.HarvestedArea,
 		YieldTnPerHa:    row.YieldTnPerHa,
 		CostPerHectare:  row.CostPerHa,
-		SuperficieTotal: superficieTotal,
+		SuperficieTotal: row.SuperficieTotal,
 	}, nil
 }
 
@@ -582,6 +579,10 @@ func (r *Repository) ListLots(
 	})
 	if err != nil {
 		return nil, 0, decimal.Zero, decimal.Zero, err
+	}
+	hasWorkspaceFilter := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
+	if len(projectIDs) == 0 && hasWorkspaceFilter {
+		return []domain.LotTable{}, 0, decimal.Zero, decimal.Zero, nil
 	}
 	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
 		return nil, 0, decimal.Zero, decimal.Zero, domainerr.Forbidden("tenant context required")

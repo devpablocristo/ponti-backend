@@ -453,24 +453,39 @@ func (r *Repository) ListByWorkOrder(ctx context.Context, workOrderID int64) ([]
 func (r *Repository) ListGroupLabor(
 	ctx context.Context,
 	inp types.Input,
-	projectID int64,
-	fieldID int64,
+	filter domain.LaborFilter,
 ) ([]domain.LaborListItem, types.PageInfo, error) {
-	if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
 		return nil, types.PageInfo{}, err
 	}
+	hasWorkspaceFilter := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
+	if len(projectIDs) == 0 && hasWorkspaceFilter {
+		return []domain.LaborListItem{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+	}
+	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
+		return nil, types.PageInfo{}, domainerr.Forbidden("tenant context required")
+	}
+
 	where := []string{}
 	args := []any{}
-	if fieldID != 0 {
-		where = append(where, "v4.field_id = ?")
-		args = append(args, fieldID)
-	} else if projectID != 0 {
-		where = append(where, "v4.project_id = ?")
-		args = append(args, projectID)
-	} else {
-		return nil, types.PageInfo{}, domainerr.Validation("fieldID or projectID is required")
+	if len(projectIDs) > 0 {
+		where = append(where, "v4.project_id IN ?")
+		args = append(args, projectIDs)
 	}
-	whereSQL := strings.Join(where, " AND ")
+	if filter.FieldID != nil && *filter.FieldID > 0 {
+		where = append(where, "v4.field_id = ?")
+		args = append(args, *filter.FieldID)
+	}
+	whereSQL := "1=1"
+	if len(where) > 0 {
+		whereSQL = strings.Join(where, " AND ")
+	}
 	view := shareddb.ReportView("labor_list")
 
 	selectCols := `
@@ -690,6 +705,9 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 			AvgCostPerHa: decimal.Zero,
 		}, nil
 	}
+	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
+	}
 
 	var row struct {
 		SurfaceHa    decimal.Decimal `gorm:"column:surface_ha"`
@@ -697,78 +715,37 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 		AvgCostPerHa decimal.Decimal `gorm:"column:avg_labor_cost_per_ha"`
 	}
 
-	// Caso 1: project_id Y field_id → devolver métricas de un campo específico
-	if len(projectIDs) > 0 && f.FieldID != nil {
-		q := fmt.Sprintf(`
-			SELECT 
-				surface_ha,
-				total_labor_cost,
-				avg_labor_cost_per_ha
-			FROM %s
-			WHERE project_id IN ? AND field_id = ?
-		`, shareddb.ReportView("labor_metrics"))
-		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs, *f.FieldID).Scan(&row).Error; err != nil {
-			return nil, domainerr.Internal("failed to get labor metrics")
-		}
-
-		return &domain.LaborMetrics{
-			SurfaceHa:    row.SurfaceHa,
-			NetTotalCost: row.NetTotalCost,
-			AvgCostPerHa: row.AvgCostPerHa,
-		}, nil
-	}
-
-	// Caso 2: SOLO project_id (sin field_id) → sumar métricas de todos los campos del proyecto
+	where := []string{"1=1"}
+	args := []any{}
 	if len(projectIDs) > 0 {
-		q := fmt.Sprintf(`
-			SELECT 
-				COALESCE(SUM(surface_ha), 0) as surface_ha,
-				COALESCE(SUM(total_labor_cost), 0) as total_labor_cost,
-				CASE 
-					WHEN COALESCE(SUM(surface_ha), 0) > 0 
-					THEN COALESCE(SUM(total_labor_cost), 0) / COALESCE(SUM(surface_ha), 0)
-					ELSE 0 
-				END as avg_labor_cost_per_ha
-			FROM %s
-			WHERE project_id IN ?
-		`, shareddb.ReportView("labor_metrics"))
-		if err := r.db.Client().WithContext(ctx).Raw(q, projectIDs).Scan(&row).Error; err != nil {
-			return nil, domainerr.Internal("failed to get labor metrics")
-		}
-
-		return &domain.LaborMetrics{
-			SurfaceHa:    row.SurfaceHa,
-			NetTotalCost: row.NetTotalCost,
-			AvgCostPerHa: row.AvgCostPerHa,
-		}, nil
+		where = append(where, "project_id IN ?")
+		args = append(args, projectIDs)
+	}
+	if f.FieldID != nil && *f.FieldID > 0 {
+		where = append(where, "field_id = ?")
+		args = append(args, *f.FieldID)
 	}
 
-	// Caso 3: SOLO field_id → devolver métricas de ese campo específico
-	if f.FieldID != nil {
-		q := fmt.Sprintf(`
-			SELECT 
-				surface_ha,
-				total_labor_cost,
-				avg_labor_cost_per_ha
-			FROM %s
-			WHERE field_id = ?
-		`, shareddb.ReportView("labor_metrics"))
-		if err := r.db.Client().WithContext(ctx).Raw(q, *f.FieldID).Scan(&row).Error; err != nil {
-			return nil, domainerr.Internal("failed to get labor metrics")
-		}
-
-		return &domain.LaborMetrics{
-			SurfaceHa:    row.SurfaceHa,
-			NetTotalCost: row.NetTotalCost,
-			AvgCostPerHa: row.AvgCostPerHa,
-		}, nil
+	q := fmt.Sprintf(`
+		SELECT 
+			COALESCE(SUM(surface_ha), 0) as surface_ha,
+			COALESCE(SUM(total_labor_cost), 0) as total_labor_cost,
+			CASE 
+				WHEN COALESCE(SUM(surface_ha), 0) > 0 
+				THEN COALESCE(SUM(total_labor_cost), 0) / COALESCE(SUM(surface_ha), 0)
+				ELSE 0 
+			END as avg_labor_cost_per_ha
+		FROM %s
+		WHERE %s
+	`, shareddb.ReportView("labor_metrics"), strings.Join(where, " AND "))
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&row).Error; err != nil {
+		return nil, domainerr.Internal("failed to get labor metrics")
 	}
 
-	// Si no hay filtros, devolver ceros
 	return &domain.LaborMetrics{
-		SurfaceHa:    decimal.Zero,
-		NetTotalCost: decimal.Zero,
-		AvgCostPerHa: decimal.Zero,
+		SurfaceHa:    row.SurfaceHa,
+		NetTotalCost: row.NetTotalCost,
+		AvgCostPerHa: row.AvgCostPerHa,
 	}, nil
 }
 

@@ -70,7 +70,7 @@ func (s *exportLotsUseCasesStub) ListLotsByProjectFieldAndCrop(context.Context, 
 	return nil, nil
 }
 
-func (s *exportLotsUseCasesStub) GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error) {
+func (s *exportLotsUseCasesStub) GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error) {
 	return nil, nil
 }
 

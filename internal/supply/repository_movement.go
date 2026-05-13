@@ -12,6 +12,7 @@ import (
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
@@ -186,6 +187,50 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 		Where("is_entry = TRUE").
 		Find(&modelSupplyMovements).
 		Error; err != nil {
+		return nil, domainerr.Internal("failed to list supplyEntriesMovement")
+	}
+
+	domainSupplyMovements := make([]*domain.SupplyMovement, len(modelSupplyMovements))
+	for i, moddomainSupplyMovement := range modelSupplyMovements {
+		domainSupplyMovements[i] = moddomainSupplyMovement.ToDomain()
+	}
+
+	if err := r.attachOriginsToMovements(ctx, domainSupplyMovements); err != nil {
+		return nil, err
+	}
+
+	return domainSupplyMovements, nil
+}
+
+func (r *Repository) ListEntrySupplyMovements(ctx context.Context, filter domain.SupplyFilter) ([]*domain.SupplyMovement, error) {
+	db := r.getDB(ctx)
+
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hasScope := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
+	if len(projectIDs) == 0 && hasScope {
+		return []*domain.SupplyMovement{}, nil
+	}
+
+	query := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, db.Model(&models.SupplyMovement{}), "supply_movements")).
+		Joins("JOIN stocks ON supply_movements.stock_id = stocks.id AND stocks.tenant_id = supply_movements.tenant_id").
+		Joins("JOIN projects ON projects.id = stocks.project_id AND projects.tenant_id = supply_movements.tenant_id").
+		Where("is_entry = TRUE")
+
+	if len(projectIDs) > 0 {
+		query = query.Where("projects.id IN ?", projectIDs)
+	}
+
+	var modelSupplyMovements []models.SupplyMovement
+	if err := query.Find(&modelSupplyMovements).Error; err != nil {
 		return nil, domainerr.Internal("failed to list supplyEntriesMovement")
 	}
 

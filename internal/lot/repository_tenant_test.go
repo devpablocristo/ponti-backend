@@ -192,7 +192,7 @@ func TestLotRepositoryRequiresTenantInStrictModeForReportViews(t *testing.T) {
 	db := setupLotTenantDB(t)
 	repo := NewRepository(lotTenantGormEngine{client: db})
 
-	if _, err := repo.GetMetrics(context.Background(), 0, 0, 0); err == nil {
+	if _, err := repo.GetMetrics(context.Background(), domain.LotListFilter{}); err == nil {
 		t.Fatalf("expected strict mode to reject lot metrics without tenant context")
 	}
 
