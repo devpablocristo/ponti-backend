@@ -42,7 +42,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -59,6 +58,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 		acf: c,
 		mws: m,
 	}
+}
+
+func (h *Handler) runWorkOrderDraftIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) Routes() {
@@ -278,18 +290,7 @@ func (h *Handler) UpdateWorkOrderDraftByID(c *gin.Context) {
 }
 
 func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	if err := h.ucs.DeleteWorkOrderDraftByID(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	sharedhandlers.RespondNoContent(c)
+	h.runWorkOrderDraftIDAction(c, h.ucs.DeleteWorkOrderDraftByID)
 }
 
 func (h *Handler) ListWorkOrderDrafts(c *gin.Context) {

@@ -3,7 +3,6 @@ package provider
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -29,7 +28,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 // Routes registra las rutas del módulo Provider.
@@ -73,5 +71,5 @@ func (h *Handler) GetProviders(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.NewGetProvidersResponse(providers))
+	sharedhandlers.RespondOK(c, dto.NewGetProvidersResponse(providers))
 }

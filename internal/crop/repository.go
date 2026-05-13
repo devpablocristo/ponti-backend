@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -30,6 +31,11 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 		return 0, err
 	}
 	model := models.FromDomainCrop(c)
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
+		model.TenantID = tenantID
+	}
 	model.Base = sharedmodels.Base{
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
@@ -42,13 +48,14 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 
 func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Crop{}).Count(&total).Error; err != nil {
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops")
+	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count crops")
 	}
 
 	var list []models.Crop
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "crops").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -69,7 +76,7 @@ func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error
 		return nil, err
 	}
 	var model models.Crop
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "crops").Where("id = ?", id).First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "crop", id)
 	}
 	return model.ToDomain(), nil
@@ -82,8 +89,7 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	if err := sharedrepo.ValidateID(c.ID, "crop"); err != nil {
 		return err
 	}
-	updateTx := r.db.Client().WithContext(ctx).
-		Model(&models.Crop{}).
+	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops").
 		Where("id = ?", c.ID)
 	if !c.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
@@ -105,7 +111,7 @@ func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	result := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "crops").
 		Delete(&models.Crop{}, "id = ?", id)
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete crop")

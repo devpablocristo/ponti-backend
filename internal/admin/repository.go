@@ -361,12 +361,13 @@ func (r *repo) updateMembershipRole(ctx context.Context, tenantID, membershipID,
 		return domainerr.Validation("invalid membership")
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		updatedAt := time.Now().UTC()
 		if err := r.ensureOwnerInvariantForRoleChange(ctx, tx, tenantID, membershipID, roleID); err != nil {
 			return err
 		}
 		res := tx.Table("auth_memberships").
 			Where("id = ? AND tenant_id = ? AND status = 'active'", membershipID, tenantID).
-			Updates(map[string]any{"role_id": roleID, "updated_at": time.Now().UTC()})
+			Updates(map[string]any{"role_id": roleID, "updated_at": updatedAt})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -382,12 +383,13 @@ func (r *repo) archiveMembership(ctx context.Context, tenantID, membershipID uui
 		return domainerr.Validation("invalid membership")
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		updatedAt := time.Now().UTC()
 		if err := r.ensureOwnerInvariantForArchive(ctx, tx, tenantID, membershipID); err != nil {
 			return err
 		}
 		res := tx.Table("auth_memberships").
 			Where("id = ? AND tenant_id = ? AND status = 'active'", membershipID, tenantID).
-			Updates(map[string]any{"status": "archived", "updated_at": time.Now().UTC()})
+			Updates(map[string]any{"status": "archived", "updated_at": updatedAt})
 		if res.Error != nil {
 			return res.Error
 		}

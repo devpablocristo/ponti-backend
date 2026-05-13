@@ -50,7 +50,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsulates all dependencies for the LeaseType HTTP handler.
@@ -60,6 +59,8 @@ type Handler struct {
 	acf ConfigAPIPort
 	mws MiddlewaresEnginePort
 }
+
+type laborIDAction func(context.Context, int64) error
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
@@ -193,42 +194,15 @@ func (h *Handler) ListArchivedLabors(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveLabor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "labor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveLabor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLaborIDAction(c, h.ucs.ArchiveLabor)
 }
 
 func (h *Handler) RestoreLabor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "labor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreLabor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLaborIDAction(c, h.ucs.RestoreLabor)
 }
 
 func (h *Handler) HardDeleteLabor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "labor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteLabor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLaborIDAction(c, h.ucs.HardDeleteLabor)
 }
 
 func (h *Handler) UpdateLabor(c *gin.Context) {
@@ -278,16 +252,7 @@ func (h *Handler) DeleteLabor(c *gin.Context) {
 		return
 	}
 
-	id, err := ginmw.ParseParamID(c, "labor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLaborIDAction(c, h.ucs.DeleteLabor)
 }
 
 func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
@@ -305,12 +270,16 @@ func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLaborByID(c *gin.Context) {
+	h.runLaborIDAction(c, h.ucs.DeleteLabor)
+}
+
+func (h *Handler) runLaborIDAction(c *gin.Context, action laborIDAction) {
 	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

@@ -339,26 +339,6 @@ func (m *DashboardModelMapper) cropIncidenceToDomain(models []CropIncidenceModel
 	return breakdown
 }
 
-// investorContributionsToDomain convierte InvestorContributionModel a domain.DashboardInvestorBreakdown.
-//
-//nolint:unused
-func (m *DashboardModelMapper) investorContributionsToDomain(models []InvestorContributionModel) []domain.DashboardInvestorBreakdown {
-	if len(models) == 0 {
-		return []domain.DashboardInvestorBreakdown{}
-	}
-
-	breakdown := make([]domain.DashboardInvestorBreakdown, len(models))
-	for i, model := range models {
-		breakdown[i] = domain.DashboardInvestorBreakdown{
-			InvestorID:   model.InvestorID,
-			InvestorName: model.InvestorName,
-			PercentPct:   model.Percentage,
-		}
-	}
-
-	return breakdown
-}
-
 // operationalIndicatorsToDomain convierte OperationalIndicatorModel a domain.DashboardOperationalIndicators
 func (m *DashboardModelMapper) operationalIndicatorsToDomain(model *OperationalIndicatorModel) *domain.DashboardOperationalIndicators {
 	if model == nil {

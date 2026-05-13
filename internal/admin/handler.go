@@ -36,7 +36,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -320,10 +319,11 @@ func (h *Handler) CreateInvite(c *gin.Context) {
 	if roleName == "" {
 		roleName = "tenant_viewer"
 	}
-	expiresAt := time.Now().UTC().Add(7 * 24 * time.Hour)
+	now := time.Now().UTC()
+	expiresAt := now.Add(7 * 24 * time.Hour)
 	if req.ExpiresIn != "" {
 		if d, parseErr := time.ParseDuration(req.ExpiresIn); parseErr == nil && d > 0 {
-			expiresAt = time.Now().UTC().Add(d)
+			expiresAt = now.Add(d)
 		}
 	}
 	token, err := newInviteToken()

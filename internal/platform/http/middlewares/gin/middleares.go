@@ -13,7 +13,6 @@ import (
 type Middlewares struct {
 	global     []gin.HandlerFunc
 	validation []gin.HandlerFunc
-	protected  []gin.HandlerFunc
 }
 
 type BuildConfig struct {
@@ -41,8 +40,6 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 			validation = append(validation, RejectUnsafeLocalAuthz(cfg.Auth.Environment))
 		}
 	}
-	protected := []gin.HandlerFunc{}
-
 	if cfg.Auth.CacheTTL <= 0 {
 		cfg.Auth.CacheTTL = 5 * time.Minute
 	}
@@ -50,7 +47,6 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	return &Middlewares{
 		global:     global,
 		validation: validation,
-		protected:  protected,
 	}
 }
 
@@ -73,4 +69,3 @@ func RejectUnsafeLocalAuthz(env string) gin.HandlerFunc {
 }
 func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }
 func (m *Middlewares) GetValidation() []gin.HandlerFunc { return m.validation }
-func (m *Middlewares) GetProtected() []gin.HandlerFunc  { return m.protected }

@@ -43,7 +43,9 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 		return 0, err
 	}
 	model := models.FromDomain(labor)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
@@ -129,6 +131,7 @@ func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 	deletedBy := &actor
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var l models.Labor
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "labors").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -143,7 +146,7 @@ func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Labor{}), "labors").
 			Where("id = ?", id).
 			Updates(map[string]any{
-				"deleted_at": time.Now(),
+				"deleted_at": archivedAt,
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive labor")
@@ -159,6 +162,7 @@ func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var l models.Labor
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "labors").Where("id = ?", id).First(&l).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -175,7 +179,7 @@ func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore labor")
 		}
@@ -356,6 +360,16 @@ func (r *Repository) ListLaborCategoriesByTypeID(ctx context.Context, typeID int
 }
 
 func (r *Repository) ListByWorkOrder(ctx context.Context, workOrderID int64) ([]domain.LaborRawItem, error) {
+	var workOrderCount int64
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Table("workorders"), "workorders").
+		Where("id = ? AND deleted_at IS NULL", workOrderID).
+		Count(&workOrderCount).Error; err != nil {
+		return nil, domainerr.Internal("failed to validate work order")
+	}
+	if workOrderCount == 0 {
+		return nil, domainerr.NotFound("work order not found")
+	}
+
 	var v4Models []models.LaborListItem
 
 	query := fmt.Sprintf(`
@@ -644,170 +658,6 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 	return v, nil
 }
 
-// ListGroupLaborOld MÉTODO VIEJO COMPLETAMENTE COMENTADO PARA REFERENCIA.
-// TODO: Eliminar este método.
-// Este método implementa la lógica original con cálculos en Go y join con project_dollar_values.
-func (r *Repository) ListGroupLaborOld(ctx context.Context, inp types.Input, projectID int64, fieldID int64, usdMonth string) ([]domain.LaborRawItem, types.PageInfo, error) {
-	if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
-		return nil, types.PageInfo{}, err
-	}
-	where := []string{}
-	args := []any{usdMonth}
-	if fieldID != 0 {
-		where = append(where, "v4.field_id = ?")
-		args = append(args, fieldID)
-	} else if projectID != 0 {
-		where = append(where, "v4.project_id = ?")
-		args = append(args, projectID)
-	} else {
-		return nil, types.PageInfo{}, domainerr.Validation(
-			"fieldID or projectID is required")
-	}
-	whereSQL := strings.Join(where, " AND ")
-	view := shareddb.ReportView("labor_list")
-
-	selectCols := `
-				v4.workorder_id,
-				v4.workorder_number,
-				v4.date,
-				v4.project_id,
-				v4.field_id,
-				v4.project_name,
-				v4.field_name,
-				COALESCE(v4.crop_name, '') AS crop_name,
-				v4.labor_name,
-				COALESCE(v4.labor_category_name, '') AS category_name,
-				v4.contractor,
-				v4.surface_ha,
-				v4.cost_per_ha,
-				v4.contractor_name,
-				COALESCE(v4.investor_name, '') AS investor_name,
-				pdv.average_value AS usd_avg_value,
-				i.id AS invoice_id,
-				i.number AS invoice_number,
-				i.company AS invoice_company,
-				i.date AS invoice_date,
-				i.status AS invoice_status
-			`
-
-	var total int64
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*)
-		FROM %s AS v4
-		LEFT JOIN LATERAL (
-    SELECT i.*
-    FROM invoices i
-    WHERE i.work_order_id = v4.workorder_id
-      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
-      AND i.deleted_at IS NULL
-    ORDER BY
-      CASE
-        WHEN i.investor_id = v4.investor_id THEN 0
-        WHEN i.investor_id IS NULL THEN 1
-        ELSE 2
-      END,
-      i.id DESC
-    LIMIT 1
-) i ON true
-
-
-		INNER JOIN project_dollar_values pdv
-			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
-		WHERE %s
-	`, view, whereSQL)
-	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, types.PageInfo{}, domainerr.Internal(
-			"failed to count labors for work order")
-	}
-
-	offset := (int(inp.Page) - 1) * int(inp.PageSize)
-
-	var rows []models.LaborListItem
-	dataQuery := fmt.Sprintf(`
-		SELECT %s
-		FROM %s AS v4
-		LEFT JOIN LATERAL (
-    SELECT i.*
-    FROM invoices i
-    WHERE i.work_order_id = v4.workorder_id
-      AND (i.investor_id = v4.investor_id OR i.investor_id IS NULL)
-      AND i.deleted_at IS NULL
-    ORDER BY
-      CASE
-        WHEN i.investor_id = v4.investor_id THEN 0
-        WHEN i.investor_id IS NULL THEN 1
-        ELSE 2
-      END,
-      i.id DESC
-    LIMIT 1
-) i ON true
-
-
-		INNER JOIN project_dollar_values pdv
-			ON pdv.project_id = v4.project_id AND pdv.month = ? AND pdv.deleted_at IS NULL
-		WHERE %s
-		ORDER BY v4.workorder_number DESC
-		LIMIT ? OFFSET ?
-	`, selectCols, view, whereSQL)
-	dataArgs := append(append([]any{}, args...), int(inp.PageSize), offset)
-	if err := r.db.Client().WithContext(ctx).Raw(dataQuery, dataArgs...).Scan(&rows).Error; err != nil {
-		return nil, types.PageInfo{}, domainerr.Internal(
-			"failed to list grouped labors")
-	}
-
-	list := make([]domain.LaborRawItem, len(rows))
-	for i, m := range rows {
-		// Calcular valores de USD dinámicamente
-		netTotal := m.SurfaceHa.Mul(m.CostPerHa)
-
-		// Obtener porcentaje de IVA dinámicamente desde bparams
-		ivaPercentage, err := r.getIVAPercentage(ctx)
-		if err != nil {
-			slog.Warn("failed to get IVA percentage from bparams, using fallback 0.105",
-				"error", err)
-			ivaPercentage = decimal.NewFromFloat(0.105)
-		}
-		totalIVA := netTotal.Mul(ivaPercentage)
-
-		usdCostHa := m.CostPerHa.Div(m.USDAvgValue)
-		usdNetTotal := netTotal.Div(m.USDAvgValue)
-
-		// Manejar InvoiceID de forma segura
-		var invoiceID int64
-		if m.InvoiceID != nil {
-			invoiceID = *m.InvoiceID
-		}
-
-		list[i] = domain.LaborRawItem{
-			WorkOrderID:     m.WorkOrderID,
-			WorkOrderNumber: m.WorkOrderNumber,
-			Date:            m.Date,
-			ProjectName:     m.ProjectName,
-			FieldName:       m.FieldName,
-			CropName:        safeStringPtr(m.CropName),
-			LaborName:       m.LaborName,
-			Contractor:      m.Contractor,
-			SurfaceHa:       m.SurfaceHa,
-			CostHa:          m.CostPerHa,
-			CategoryName:    safeStringPtr(m.LaborCategoryName),
-			InvestorName:    safeStringPtr(m.InvestorName),
-			USDAvgValue:     m.USDAvgValue,
-			NetTotal:        netTotal,
-			TotalIVA:        totalIVA,
-			USDCostHa:       usdCostHa,
-			USDNetTotal:     usdNetTotal,
-			InvoiceID:       invoiceID,
-			InvoiceNumber:   safeStringPtr(m.InvoiceNumber),
-			InvoiceCompany:  safeStringPtr(m.InvoiceCompany),
-			InvoiceDate:     m.InvoiceDate,
-			InvoiceStatus:   safeStringPtr(m.InvoiceStatus),
-		}
-	}
-
-	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
-	return list, pageInfo, nil
-}
-
 // safeStringPtr convierte un string pointer a string seguro
 func safeStringPtr(ptr *string) string {
 	if ptr == nil {
@@ -923,6 +773,11 @@ func (r *Repository) GetMetrics(ctx context.Context, f domain.LaborFilter) (*dom
 }
 
 func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawItem, error) {
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{})
+	if err != nil {
+		return nil, err
+	}
+
 	base := r.db.Client().
 		WithContext(ctx).
 		Table(shareddb.ReportView("labor_list") + " AS v4").
@@ -965,6 +820,12 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
       i.id DESC
     LIMIT 1
 ) i ON true`)
+	if len(projectIDs) > 0 {
+		base = base.Where("v4.project_id IN ?", projectIDs)
+	} else if authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
+	}
+
 	var rows []models.LaborListItem
 
 	if err := base.Order("v4.workorder_number DESC").Scan(&rows).Error; err != nil {

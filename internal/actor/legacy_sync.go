@@ -146,7 +146,7 @@ func SyncLegacyActor(tx *gorm.DB, input LegacyActorSync) (int64, error) {
 	if err := refreshActorArchiveState(tx, actorID, input.ArchivedAt); err != nil {
 		return 0, err
 	}
-	if err := refreshLegacyActorColumns(tx, input.SourceTable, input.SourceID, actorID); err != nil {
+	if err := refreshLegacyActorColumns(tx, tenantID, input.SourceTable, input.SourceID, actorID); err != nil {
 		return 0, err
 	}
 
@@ -302,70 +302,91 @@ func RefreshProjectActorMirrors(tx *gorm.DB, projectID int64) error {
 	if projectID <= 0 {
 		return domainerr.Validation("project_id is required")
 	}
+	var tenantID string
+	if err := tx.Table("projects").
+		Select("tenant_id").
+		Where("id = ? AND deleted_at IS NULL", projectID).
+		Scan(&tenantID).Error; err != nil {
+		return domainerr.Internal("failed to resolve project tenant")
+	}
+	if strings.TrimSpace(tenantID) == "" {
+		return domainerr.NotFound("project not found")
+	}
 	if err := tx.Exec(`
 		UPDATE projects p
 		SET customer_actor_id = m.actor_id
 		FROM legacy_actor_map m
 		WHERE p.id = ?
+		  AND p.tenant_id = ?
 		  AND m.source_table = 'customers'
 		  AND m.source_id = p.customer_id
-	`, projectID).Error; err != nil {
+		  AND m.tenant_id = p.tenant_id
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to refresh project customer actor")
 	}
-	if err := tx.Exec(`DELETE FROM project_responsibles WHERE project_id = ?`, projectID).Error; err != nil {
+	if err := tx.Exec(`
+		DELETE FROM project_responsibles
+		WHERE project_id IN (SELECT id FROM projects WHERE id = ? AND tenant_id = ?)
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to clear project responsibles actors")
 	}
 	if err := tx.Exec(`
 		INSERT INTO project_responsibles (project_id, actor_id, created_at, updated_at, created_by, updated_by)
 		SELECT pm.project_id, m.actor_id, COALESCE(pm.created_at, now()), COALESCE(pm.updated_at, now()), pm.created_by::text, pm.updated_by::text
 		FROM project_managers pm
-		JOIN legacy_actor_map m ON m.source_table = 'managers' AND m.source_id = pm.manager_id
-		WHERE pm.project_id = ? AND pm.deleted_at IS NULL
+		JOIN legacy_actor_map m ON m.source_table = 'managers' AND m.source_id = pm.manager_id AND m.tenant_id = pm.tenant_id
+		WHERE pm.project_id = ? AND pm.tenant_id = ? AND pm.deleted_at IS NULL
 		ON CONFLICT DO NOTHING
-	`, projectID).Error; err != nil {
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to refresh project responsibles actors")
 	}
-	if err := tx.Exec(`DELETE FROM project_investor_allocations WHERE project_id = ?`, projectID).Error; err != nil {
+	if err := tx.Exec(`
+		DELETE FROM project_investor_allocations
+		WHERE project_id IN (SELECT id FROM projects WHERE id = ? AND tenant_id = ?)
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to clear project investor actors")
 	}
 	if err := tx.Exec(`
 		INSERT INTO project_investor_allocations (project_id, actor_id, percentage, created_at, updated_at, created_by, updated_by)
 		SELECT pi.project_id, m.actor_id, pi.percentage, COALESCE(pi.created_at, now()), COALESCE(pi.updated_at, now()), pi.created_by::text, pi.updated_by::text
 		FROM project_investors pi
-		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = pi.investor_id
-		WHERE pi.project_id = ? AND pi.deleted_at IS NULL
+		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = pi.investor_id AND m.tenant_id = pi.tenant_id
+		WHERE pi.project_id = ? AND pi.tenant_id = ? AND pi.deleted_at IS NULL
 		ON CONFLICT DO NOTHING
-	`, projectID).Error; err != nil {
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to refresh project investor actors")
 	}
-	if err := tx.Exec(`DELETE FROM project_admin_cost_allocations WHERE project_id = ?`, projectID).Error; err != nil {
+	if err := tx.Exec(`
+		DELETE FROM project_admin_cost_allocations
+		WHERE project_id IN (SELECT id FROM projects WHERE id = ? AND tenant_id = ?)
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to clear project admin cost actor allocations")
 	}
 	if err := tx.Exec(`
 		INSERT INTO project_admin_cost_allocations (project_id, actor_id, percentage, created_at, updated_at, created_by, updated_by)
 		SELECT aci.project_id, m.actor_id, aci.percentage, COALESCE(aci.created_at, now()), COALESCE(aci.updated_at, now()), aci.created_by::text, aci.updated_by::text
 		FROM admin_cost_investors aci
-		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = aci.investor_id
-		WHERE aci.project_id = ? AND aci.deleted_at IS NULL
+		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = aci.investor_id AND m.tenant_id = aci.tenant_id
+		WHERE aci.project_id = ? AND aci.tenant_id = ? AND aci.deleted_at IS NULL
 		ON CONFLICT DO NOTHING
-	`, projectID).Error; err != nil {
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to refresh project admin cost actors")
 	}
 	if err := tx.Exec(`
 		DELETE FROM field_lease_participants
-		WHERE field_id IN (SELECT id FROM fields WHERE project_id = ?)
-	`, projectID).Error; err != nil {
+		WHERE field_id IN (SELECT id FROM fields WHERE project_id = ? AND tenant_id = ?)
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to clear field lease actor participants")
 	}
 	if err := tx.Exec(`
 		INSERT INTO field_lease_participants (field_id, actor_id, percentage, created_at, updated_at, created_by, updated_by)
 		SELECT fi.field_id, m.actor_id, fi.percentage, COALESCE(fi.created_at, now()), COALESCE(fi.updated_at, now()), fi.created_by::text, fi.updated_by::text
 		FROM field_investors fi
-		JOIN fields f ON f.id = fi.field_id
-		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = fi.investor_id
-		WHERE f.project_id = ? AND fi.deleted_at IS NULL
+		JOIN fields f ON f.id = fi.field_id AND f.tenant_id = fi.tenant_id
+		JOIN legacy_actor_map m ON m.source_table = 'investors' AND m.source_id = fi.investor_id AND m.tenant_id = fi.tenant_id
+		WHERE f.project_id = ? AND fi.tenant_id = ? AND fi.deleted_at IS NULL
 		ON CONFLICT DO NOTHING
-	`, projectID).Error; err != nil {
+	`, projectID, tenantID).Error; err != nil {
 		return domainerr.Internal("failed to refresh field lease actors")
 	}
 	return nil
@@ -383,11 +404,13 @@ func RefreshSupplyMovementActorColumns(tx *gorm.DB, movementID int64) error {
 		SET investor_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'investors' AND source_id = sm.investor_id
+				  AND tenant_id = sm.tenant_id
 				LIMIT 1
 			),
 			provider_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'providers' AND source_id = sm.provider_id
+				  AND tenant_id = sm.tenant_id
 				LIMIT 1
 			)
 		WHERE sm.id = ?
@@ -409,12 +432,14 @@ func RefreshWorkOrderActorColumns(tx *gorm.DB, workOrderID int64) error {
 		SET investor_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'investors' AND source_id = wo.investor_id
+				  AND tenant_id = wo.tenant_id
 				LIMIT 1
 			),
 			contractor_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'workorders.contractor'
 				  AND source_key = public.normalize_actor_name(wo.contractor)
+				  AND tenant_id = wo.tenant_id
 				LIMIT 1
 			),
 			contractor_name_snapshot = NULLIF(wo.contractor, '')
@@ -427,6 +452,7 @@ func RefreshWorkOrderActorColumns(tx *gorm.DB, workOrderID int64) error {
 		SET actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'investors' AND source_id = wis.investor_id
+				  AND tenant_id = wis.tenant_id
 				LIMIT 1
 			)
 		WHERE wis.workorder_id = ?
@@ -448,12 +474,14 @@ func RefreshInvoiceActorColumns(tx *gorm.DB, invoiceID int64) error {
 		SET investor_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'investors' AND source_id = i.investor_id
+				  AND tenant_id = i.tenant_id
 				LIMIT 1
 			),
 			company_actor_id = (
 				SELECT actor_id FROM legacy_actor_map
 				WHERE source_table = 'invoices.company'
 				  AND source_key = public.normalize_actor_name(i.company)
+				  AND tenant_id = i.tenant_id
 				LIMIT 1
 			),
 			company_name_snapshot = NULLIF(i.company, '')
@@ -478,6 +506,7 @@ func RefreshStockActorColumns(tx *gorm.DB, stockID int64) error {
 		WHERE s.id = ?
 		  AND m.source_table = 'investors'
 		  AND m.source_id = s.investor_id
+		  AND m.tenant_id = s.tenant_id
 	`, stockID).Error; err != nil {
 		return domainerr.Internal("failed to refresh stock actor columns")
 	}
@@ -512,34 +541,69 @@ func refreshActorArchiveState(tx *gorm.DB, actorID int64, archivedAt *time.Time)
 	return nil
 }
 
-func refreshLegacyActorColumns(tx *gorm.DB, sourceTable string, sourceID int64, actorID int64) error {
+func refreshLegacyActorColumns(tx *gorm.DB, tenantID string, sourceTable string, sourceID int64, actorID int64) error {
 	switch sourceTable {
 	case LegacyCustomers:
-		return tx.Exec(`UPDATE projects SET customer_actor_id = ? WHERE customer_id = ?`, actorID, sourceID).Error
+		return tx.Exec(
+			`UPDATE projects SET customer_actor_id = ? WHERE customer_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error
 	case LegacyInvestors:
-		if err := tx.Exec(`UPDATE workorders SET investor_actor_id = ? WHERE investor_id = ?`, actorID, sourceID).Error; err != nil {
+		if err := tx.Exec(
+			`UPDATE workorders SET investor_actor_id = ? WHERE investor_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec(`UPDATE workorder_investor_splits SET actor_id = ? WHERE investor_id = ?`, actorID, sourceID).Error; err != nil {
+		if err := tx.Exec(
+			`UPDATE workorder_investor_splits SET actor_id = ? WHERE investor_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec(`UPDATE stocks SET investor_actor_id = ? WHERE investor_id = ?`, actorID, sourceID).Error; err != nil {
+		if err := tx.Exec(
+			`UPDATE stocks SET investor_actor_id = ? WHERE investor_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec(`UPDATE supply_movements SET investor_actor_id = ? WHERE investor_id = ?`, actorID, sourceID).Error; err != nil {
+		if err := tx.Exec(
+			`UPDATE supply_movements SET investor_actor_id = ? WHERE investor_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error; err != nil {
 			return err
 		}
-		return tx.Exec(`UPDATE invoices SET investor_actor_id = ? WHERE investor_id = ?`, actorID, sourceID).Error
+		return tx.Exec(
+			`UPDATE invoices SET investor_actor_id = ? WHERE investor_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error
 	case LegacyProviders:
-		return tx.Exec(`UPDATE supply_movements SET provider_actor_id = ? WHERE provider_id = ?`, actorID, sourceID).Error
+		return tx.Exec(
+			`UPDATE supply_movements SET provider_actor_id = ? WHERE provider_id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error
 	case LegacyManagers:
 		return tx.Exec(`
 			INSERT INTO project_responsibles (project_id, actor_id, created_at, updated_at, created_by, updated_by)
 			SELECT pm.project_id, ?, COALESCE(pm.created_at, now()), COALESCE(pm.updated_at, now()), pm.created_by::text, pm.updated_by::text
 			FROM project_managers pm
-			WHERE pm.manager_id = ? AND pm.deleted_at IS NULL
+			WHERE pm.manager_id = ? AND pm.tenant_id = ? AND pm.deleted_at IS NULL
 			ON CONFLICT DO NOTHING
-		`, actorID, sourceID).Error
+		`, actorID, sourceID, tenantID).Error
 	default:
 		return nil
 	}

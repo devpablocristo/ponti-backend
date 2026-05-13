@@ -21,12 +21,23 @@ import (
 	"gorm.io/gorm"
 )
 
+func withSupplyMovementLookups(db *gorm.DB) *gorm.DB {
+	return db.
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Preload("Provider")
+}
+
 func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
 	if err := sharedrepo.ValidateEntity(movement, "supply movement"); err != nil {
 		return 0, err
 	}
 	model := models.SupplyMovementFromDomain(movement)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 	db := r.getDB(ctx)
@@ -109,7 +120,9 @@ func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomai
 	}
 
 	model := providermodel.FromDomain(provider)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 	providerId, err := ensureProvider(client, model)
@@ -145,7 +158,7 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 		if err := scope.First(&existing, i.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, fmt.Errorf("failed to check investor: %w", err)
+			return 0, fmt.Errorf("failed to check provider: %w", err)
 		}
 	}
 	var existing providermodel.Provider
@@ -166,14 +179,9 @@ func (r *Repository) GetEntriesSupplyMovementsByProjectID(ctx context.Context, p
 
 	var modelSupplyMovements []models.SupplyMovement
 
-	if err := authz.MaybeTenantScope(ctx, db.Model(&models.SupplyMovement{}), "supply_movements").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("Provider").
-		Joins("JOIN stocks ON supply_movements.stock_id = stocks.id").
-		Joins("JOIN projects ON projects.id = stocks.project_id").
+	if err := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, db.Model(&models.SupplyMovement{}), "supply_movements")).
+		Joins("JOIN stocks ON supply_movements.stock_id = stocks.id AND stocks.tenant_id = supply_movements.tenant_id").
+		Joins("JOIN projects ON projects.id = stocks.project_id AND projects.tenant_id = supply_movements.tenant_id").
 		Where("projects.id = ?", projectId).
 		Where("is_entry = TRUE").
 		Find(&modelSupplyMovements).
@@ -203,6 +211,11 @@ type movementOriginRow struct {
 func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*domain.SupplyMovement) error {
 	if len(movements) == 0 {
 		return nil
+	}
+
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return domainerr.Forbidden("tenant context required")
 	}
 
 	ids := make([]int64, 0, len(movements))
@@ -252,7 +265,7 @@ func (r *Repository) attachOriginsToMovements(ctx context.Context, movements []*
 		WHERE sm_in.id IN ?
 	`
 	args := []any{ids}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if hasTenant {
 		query += " AND sm_in.tenant_id = ?"
 		args = append(args, tenantID)
 	}
@@ -330,6 +343,11 @@ func (r *Repository) getDestinationProjectMetadata(
 		return map[int64]destinationProjectMetadata{}, nil
 	}
 
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
+	}
+
 	query := `
 		SELECT
 			p.id AS project_id,
@@ -337,12 +355,12 @@ func (r *Repository) getDestinationProjectMetadata(
 			cu.name AS customer_name,
 			ca.name AS campaign_name
 		FROM projects p
-		LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.deleted_at IS NULL
-		LEFT JOIN campaigns ca ON ca.id = p.campaign_id AND ca.deleted_at IS NULL
+		LEFT JOIN customers cu ON cu.id = p.customer_id AND cu.deleted_at IS NULL AND cu.tenant_id = p.tenant_id
+		LEFT JOIN campaigns ca ON ca.id = p.campaign_id AND ca.deleted_at IS NULL AND ca.tenant_id = p.tenant_id
 		WHERE p.id IN ? AND p.deleted_at IS NULL
 	`
 	args := []any{projectIDs}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if hasTenant {
 		query += " AND p.tenant_id = ?"
 		args = append(args, tenantID)
 	}
@@ -369,12 +387,7 @@ func (r *Repository) GetSupplyMovementByID(ctx context.Context, id int64) (*doma
 
 	var modelSupplyMovement models.SupplyMovement
 
-	if err := authz.MaybeTenantScope(ctx, db, "supply_movements").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("Provider").
+	if err := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, db, "supply_movements")).
 		First(&modelSupplyMovement, "id = ?", id).
 		Error; err != nil {
 
@@ -564,14 +577,9 @@ func (r *Repository) ListArchivedSupplyMovements(ctx context.Context, projectID 
 	}
 
 	var modelSupplyMovements []models.SupplyMovement
-	if err := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements").
+	if err := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements")).
 		Unscoped().
 		Model(&models.SupplyMovement{}).
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("Provider").
 		Where("project_id = ?", projectID).
 		Where("is_entry = TRUE").
 		Where("deleted_at IS NOT NULL").
@@ -676,7 +684,7 @@ func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provide
 	if err := authz.MaybeTenantScope(ctx, db, "p").
 		Table("providers p").
 		Select("p.id, p.name, lm.actor_id").
-		Joins("LEFT JOIN legacy_actor_map lm ON lm.source_table = 'providers' AND lm.source_id = p.id").
+		Joins("LEFT JOIN legacy_actor_map lm ON lm.source_table = 'providers' AND lm.source_id = p.id AND lm.tenant_id = p.tenant_id").
 		Where("p.deleted_at IS NULL").
 		Order("p.name ASC").
 		Scan(&providers).Error; err != nil {

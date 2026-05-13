@@ -26,12 +26,26 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID int64, investorID int64) (*domain.Invoice, error) {
+func validateInvoiceTarget(workOrderID int64, investorID int64) error {
 	if workOrderID == 0 {
-		return nil, domainerr.Validation("invalid WorkOrderID")
+		return domainerr.Validation("invalid WorkOrderID")
 	}
 	if investorID == 0 {
-		return nil, domainerr.Validation("invalid InvestorID")
+		return domainerr.Validation("invalid InvestorID")
+	}
+	return nil
+}
+
+func invoiceNotFound(workOrderID int64, investorID int64) error {
+	return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
+		"invoice for work order %d and investor %d does not exist",
+		workOrderID, investorID,
+	))
+}
+
+func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID int64, investorID int64) (*domain.Invoice, error) {
+	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
+		return nil, err
 	}
 
 	var row models.Invoice
@@ -50,15 +64,14 @@ func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID 
 }
 
 func (r *Repository) Create(ctx context.Context, item *domain.Invoice) (int64, error) {
-	if item.WorkOrderID == 0 {
-		return 0, domainerr.Validation("invalid WorkOrderID")
-	}
-	if item.InvestorID == 0 {
-		return 0, domainerr.Validation("invalid InvestorID")
+	if err := validateInvoiceTarget(item.WorkOrderID, item.InvestorID); err != nil {
+		return 0, err
 	}
 
 	m := models.FromDomain(item)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		m.TenantID = tenantID
 	}
 	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -88,21 +101,19 @@ func (r *Repository) Create(ctx context.Context, item *domain.Invoice) (int64, e
 }
 
 func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
-	if item.WorkOrderID == 0 {
-		return domainerr.Validation("invalid WorkOrderID")
-	}
-	if item.InvestorID == 0 {
-		return domainerr.Validation("invalid InvestorID")
+	if err := validateInvoiceTarget(item.WorkOrderID, item.InvestorID); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		updatedAt := time.Now()
 		if item.Company != "" {
 			if _, err := actorsync.SyncLegacyTextActor(tx, actorsync.LegacyTextActorSync{
 				SourceTable: actorsync.LegacyInvoiceCompany,
 				Name:        item.Company,
 				ActorKind:   actorsync.KindOrganization,
 				Role:        actorsync.RoleFacturador,
-				UpdatedAt:   time.Now(),
+				UpdatedAt:   updatedAt,
 				UpdatedBy:   item.UpdatedBy,
 			}); err != nil {
 				return err
@@ -117,17 +128,14 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 				"company":     item.Company,
 				"date":        item.Date,
 				"status":      item.Status,
-				"updated_at":  time.Now(),
+				"updated_at":  updatedAt,
 				"updated_by":  item.UpdatedBy,
 			})
 		if result.Error != nil {
 			return domainerr.Internal("failed to update invoice")
 		}
 		if result.RowsAffected == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
-				"invoice for work order %d and investor %d does not exist",
-				item.WorkOrderID, item.InvestorID,
-			))
+			return invoiceNotFound(item.WorkOrderID, item.InvestorID)
 		}
 		var id int64
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Invoice{}), "invoices").
@@ -154,7 +162,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page,
 	query := r.db.Client().WithContext(ctx).
 		Model(&models.Invoice{}).
 		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "invoices") }).
-		Joins("JOIN workorders ON workorders.id = invoices.work_order_id").
+		Joins("JOIN workorders ON workorders.id = invoices.work_order_id AND workorders.tenant_id = invoices.tenant_id AND workorders.deleted_at IS NULL").
 		Where("workorders.project_id = ?", projectID)
 
 	if err := query.Count(&total).Error; err != nil {
@@ -176,11 +184,8 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page,
 }
 
 func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID int64) error {
-	if workOrderID == 0 {
-		return domainerr.Validation("invalid WorkOrderID")
-	}
-	if investorID == 0 {
-		return domainerr.Validation("invalid InvestorID")
+	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
+		return err
 	}
 
 	result := r.db.Client().WithContext(ctx).
@@ -192,20 +197,18 @@ func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID i
 		return domainerr.Internal("failed to delete invoice")
 	}
 	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
-			"invoice for work order %d and investor %d does not exist",
-			workOrderID, investorID,
-		))
+		return invoiceNotFound(workOrderID, investorID)
 	}
 	return nil
 }
 
 func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID int64, investorID int64) (bool, error) {
-	if workOrderID == 0 {
-		return false, domainerr.Validation("invalid WorkOrderID")
+	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
+		return false, err
 	}
-	if investorID == 0 {
-		return false, domainerr.Validation("invalid InvestorID")
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return false, domainerr.Forbidden("tenant context required")
 	}
 
 	type resultRow struct {
@@ -238,9 +241,9 @@ func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID
 		END AS is_valid
 	`
 	args := []any{workOrderID, workOrderID, investorID, workOrderID, investorID}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if hasTenant {
 		query = `
-		WITH split_count AS (
+			WITH split_count AS (
 			SELECT COUNT(*) AS total
 			FROM workorder_investor_splits
 			WHERE workorder_id = ?

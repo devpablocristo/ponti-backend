@@ -33,7 +33,10 @@ func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, e
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(f)
-		tenantID, hasTenant := authz.TenantFromContext(ctx)
+		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+		if err != nil {
+			return err
+		}
 		if hasTenant {
 			model.TenantID = tenantID
 		}
@@ -205,6 +208,7 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	deletedBy := &actor
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var f models.Field
 		fieldQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "fields")
 		if err := fieldQuery.Where("id = ?", id).First(&f).Error; err != nil {
@@ -220,7 +224,7 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Field{}), "fields").
 			Where("id = ?", id).
 			Updates(map[string]any{
-				"deleted_at": time.Now(),
+				"deleted_at": archivedAt,
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive field")
@@ -236,6 +240,7 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var f models.Field
 		fieldQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "fields")
 		if err := fieldQuery.Where("id = ?", id).First(&f).Error; err != nil {
@@ -253,7 +258,7 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore field")
 		}

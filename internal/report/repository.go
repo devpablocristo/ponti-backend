@@ -387,7 +387,8 @@ func (r *ReportRepository) buildEmptyLaborRows(ctx context.Context, columnMap ma
 
 // getSupplyCategories obtiene las categorías de insumos desde la base de datos.
 func (r *ReportRepository) getSupplyCategories(ctx context.Context) (map[string]string, error) {
-	query := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Table("categories c"), "c").
+	// categories is a global catalog table; it is intentionally not tenant-scoped.
+	query := r.db.Client().WithContext(ctx).Table("categories c").
 		Select("c.id, c.name, c.type_id").
 		Where("c.deleted_at IS NULL").
 		Where("c.type_id IN ?", []int64{1, 2, 3}).
@@ -444,7 +445,8 @@ func (r *ReportRepository) getSupplyCategories(ctx context.Context) (map[string]
 
 // getLaborCategories obtiene las categorías de labores desde la base de datos.
 func (r *ReportRepository) getLaborCategories(ctx context.Context) (map[string]string, error) {
-	query := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Table("categories c"), "c").
+	// categories is a global catalog table; it is intentionally not tenant-scoped.
+	query := r.db.Client().WithContext(ctx).Table("categories c").
 		Select("c.id, c.name, c.type_id").
 		Where("c.deleted_at IS NULL").
 		Where("c.type_id = ?", 4).
@@ -713,12 +715,17 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 			camp.id as campaign_id,
 			camp.name as campaign_name
 		FROM projects p
-		LEFT JOIN customers c ON p.customer_id = c.id
-		LEFT JOIN campaigns camp ON p.campaign_id = camp.id
+		LEFT JOIN customers c ON p.customer_id = c.id AND c.tenant_id = p.tenant_id
+		LEFT JOIN campaigns camp ON p.campaign_id = camp.id AND camp.tenant_id = p.tenant_id
 		WHERE p.id = ? AND p.deleted_at IS NULL
 	`
+	args := []any{projectID}
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		query += " AND p.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
-	err = r.db.Client().WithContext(ctx).Raw(query, projectID).Scan(&projectInfo).Error
+	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&projectInfo).Error
 	if err != nil {
 		return nil, fmt.Errorf("error getting project information: %w", err)
 	}

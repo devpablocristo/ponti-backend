@@ -47,7 +47,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -60,6 +59,19 @@ type Handler struct {
 // NewHandler crea un handler de work orders.
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
+}
+
+func (h *Handler) runWorkOrderIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 // Routes registra las rutas del módulo work orders.
@@ -184,17 +196,7 @@ func (h *Handler) UpdateInvestorPaymentStatus(c *gin.Context) {
 
 // DeleteWorkOrderByID elimina una orden de trabajo.
 func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	if err := h.ucs.DeleteWorkOrderByID(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runWorkOrderIDAction(c, h.ucs.DeleteWorkOrderByID)
 }
 
 // ListWorkOrders lista órdenes de trabajo con filtros.
@@ -311,44 +313,17 @@ func (h *Handler) ExportWorkOrders(c *gin.Context) {
 
 // ArchiveWorkOrder ejecuta soft delete (archivado) de la work order.
 func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveWorkOrder(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runWorkOrderIDAction(c, h.ucs.ArchiveWorkOrder)
 }
 
 // RestoreWorkOrder restaura una work order archivada.
 func (h *Handler) RestoreWorkOrder(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreWorkOrder(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runWorkOrderIDAction(c, h.ucs.RestoreWorkOrder)
 }
 
 // HardDeleteWorkOrder elimina definitivamente una work order.
 func (h *Handler) HardDeleteWorkOrder(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteWorkOrder(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runWorkOrderIDAction(c, h.ucs.HardDeleteWorkOrder)
 }
 
 // ListArchivedWorkOrders lista work orders archivadas paginadas.

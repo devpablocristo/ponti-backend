@@ -258,12 +258,13 @@ func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
+	now := time.Now()
 	res := r.db.Client().WithContext(ctx).
 		Model(&models.Actor{}).
 		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL AND archived_at IS NOT NULL", id, tenantID).
 		Updates(map[string]any{
 			"archived_at": nil,
-			"updated_at":  time.Now(),
+			"updated_at":  now,
 		})
 	if res.Error != nil {
 		return domainerr.Internal("failed to restore actor")
@@ -315,14 +316,8 @@ func (r *Repository) AddRole(ctx context.Context, id int64, role string) error {
 	if err != nil {
 		return err
 	}
-	var actorCount int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
-		Count(&actorCount).Error; err != nil {
-		return domainerr.Internal("failed to validate actor")
-	}
-	if actorCount == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
+	if err := r.requireActiveActor(ctx, r.db.Client(), id, tenantID); err != nil {
+		return err
 	}
 	if err := r.db.Client().WithContext(ctx).
 		Clauses(clause.OnConflict{DoNothing: true}).
@@ -340,14 +335,8 @@ func (r *Repository) AddAlias(ctx context.Context, id int64, alias domain.ActorA
 	if err != nil {
 		return 0, err
 	}
-	var actorCount int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
-		Count(&actorCount).Error; err != nil {
-		return 0, domainerr.Internal("failed to validate actor")
-	}
-	if actorCount == 0 {
-		return 0, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
+	if err := r.requireActiveActor(ctx, r.db.Client(), id, tenantID); err != nil {
+		return 0, err
 	}
 	alias.ActorID = id
 	alias.TenantID = tenantID
@@ -464,7 +453,8 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 		identifier_groups AS (
 			SELECT concat_ws(':', tenant_id::text, country, identifier_type, normalized_identifier_value) AS group_key
 			FROM actor_identifiers
-			WHERE normalized_identifier_value <> ''
+			WHERE tenant_id = ?
+			  AND normalized_identifier_value <> ''
 			GROUP BY tenant_id, country, identifier_type, normalized_identifier_value
 			HAVING COUNT(DISTINCT actor_id) > 1
 		),
@@ -472,21 +462,30 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 			SELECT normalized_alias AS group_key
 			FROM actor_aliases
 			WHERE archived_at IS NULL
+			  AND tenant_id = ?
 			  AND normalized_alias <> ''
 			GROUP BY normalized_alias
 			HAVING COUNT(DISTINCT actor_id) > 1
 		),
 		legal_name_groups AS (
 			SELECT normalized_legal_name AS group_key
-			FROM actor_organization_profiles
-			WHERE COALESCE(normalized_legal_name, '') <> ''
+			FROM actor_organization_profiles aop
+			JOIN actors a ON a.id = aop.actor_id
+			WHERE a.tenant_id = ?
+			  AND a.deleted_at IS NULL
+			  AND a.merged_into_actor_id IS NULL
+			  AND COALESCE(normalized_legal_name, '') <> ''
 			GROUP BY normalized_legal_name
 			HAVING COUNT(DISTINCT actor_id) > 1
 		),
 		trade_name_groups AS (
 			SELECT normalized_trade_name AS group_key
-			FROM actor_organization_profiles
-			WHERE COALESCE(normalized_trade_name, '') <> ''
+			FROM actor_organization_profiles aop
+			JOIN actors a ON a.id = aop.actor_id
+			WHERE a.tenant_id = ?
+			  AND a.deleted_at IS NULL
+			  AND a.merged_into_actor_id IS NULL
+			  AND COALESCE(normalized_trade_name, '') <> ''
 			GROUP BY normalized_trade_name
 			HAVING COUNT(DISTINCT actor_id) > 1
 		)
@@ -514,7 +513,7 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 		JOIN actor_organization_profiles aop ON aop.normalized_trade_name = tg.group_key
 		JOIN active_actors a ON a.id = aop.actor_id
 		ORDER BY group_type, group_key, display_name, actor_id
-	`, tenantID).Scan(&rows).Error
+	`, tenantID, tenantID, tenantID, tenantID, tenantID).Scan(&rows).Error
 	if err != nil {
 		return nil, domainerr.Internal("failed to list duplicate actor candidates")
 	}
@@ -575,6 +574,20 @@ func validateActor(actor *domain.Actor) error {
 		if _, ok := domain.ValidRoles[role]; !ok {
 			return domainerr.Validation("invalid actor role")
 		}
+	}
+	return nil
+}
+
+func (r *Repository) requireActiveActor(ctx context.Context, tx *gorm.DB, actorID int64, tenantID string) error {
+	var actorCount int64
+	if err := tx.WithContext(ctx).
+		Model(&models.Actor{}).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", actorID, tenantID).
+		Count(&actorCount).Error; err != nil {
+		return domainerr.Internal("failed to validate actor")
+	}
+	if actorCount == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", actorID))
 	}
 	return nil
 }

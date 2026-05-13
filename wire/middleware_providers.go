@@ -15,7 +15,6 @@ import (
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 func ProvideMiddlewares(cfg *config.Config, repo *pgorm.Repository) *mwr.Middlewares {

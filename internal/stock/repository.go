@@ -38,17 +38,28 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-// GetStocks retorna stocks filtrando por proyecto y opcionalmente por fecha de corte.
-func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
-	gormDB := r.getDB(ctx)
-
-	stockQuery := authz.MaybeTenantScope(ctx, gormDB.Model(&models.Stock{}), "stocks").
+func withStockLookups(db *gorm.DB) *gorm.DB {
+	return db.
 		Preload("Project").
 		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Supply.Type").
 		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("SupplyMovements").
+		Preload("Investor")
+}
+
+func withStockMovements(db *gorm.DB) *gorm.DB {
+	return withStockLookups(db).Preload("SupplyMovements")
+}
+
+func withStockSupplyLookups(db *gorm.DB) *gorm.DB {
+	return db.Preload("Category").Preload("Type")
+}
+
+// GetStocks retorna stocks filtrando por proyecto y opcionalmente por fecha de corte.
+func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
+	gormDB := r.getDB(ctx)
+
+	stockQuery := withStockMovements(authz.MaybeTenantScope(ctx, gormDB.Model(&models.Stock{}), "stocks")).
 		Where("stocks.project_id = ?", projectID)
 
 	if !closeDate.IsZero() {
@@ -62,9 +73,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	}
 
 	var supplies []supplymodels.Supply
-	if err := authz.MaybeTenantScope(ctx, gormDB.Model(&supplymodels.Supply{}), "supplies").
-		Preload("Category").
-		Preload("Type").
+	if err := withStockSupplyLookups(authz.MaybeTenantScope(ctx, gormDB.Model(&supplymodels.Supply{}), "supplies")).
 		Where("project_id = ?", projectID).
 		Order("LOWER(name) ASC").
 		Find(&supplies).Error; err != nil {
@@ -273,6 +282,11 @@ func (r *Repository) loadConsumedByStockKey(ctx context.Context, projectID int64
 		Consumed   decimal.Decimal `gorm:"column:consumed"`
 	}
 
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return nil, nil, domainerr.Forbidden("tenant context required")
+	}
+
 	var rows []consumedRow
 	args := []any{projectID}
 	dateFilter := ""
@@ -282,9 +296,9 @@ func (r *Repository) loadConsumedByStockKey(ctx context.Context, projectID int64
 		dateFilter = "AND wo.date < ?"
 		args = append(args, end)
 	}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
-		tenantFilter = "AND wo.tenant_id = ? AND woi.tenant_id = ?"
-		args = append(args, tenantID, tenantID)
+	if hasTenant {
+		tenantFilter = "AND wo.tenant_id = ? AND woi.tenant_id = wo.tenant_id"
+		args = append(args, tenantID)
 	}
 
 	err := r.getDB(ctx).Raw(`
@@ -330,12 +344,7 @@ func stockDateRange(date time.Time) (time.Time, time.Time) {
 // (supply, investor) activo al cerrar un período.
 func (r *Repository) GetActiveStocksByProjectID(ctx context.Context, projectID int64) ([]*domain.Stock, error) {
 	var stockModels []models.Stock
-	if err := authz.MaybeTenantScope(ctx, r.getDB(ctx), "stocks").
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
+	if err := withStockLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx), "stocks")).
 		Where("project_id = ? AND close_date IS NULL", projectID).
 		Find(&stockModels).Error; err != nil {
 		return nil, err
@@ -374,7 +383,9 @@ func (r *Repository) CreateStock(ctx context.Context, stock *domain.Stock) (int6
 		return 0, domainerr.Validation("stock is nil")
 	}
 	model := models.FromDomain(stock)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 	if err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
@@ -484,13 +495,7 @@ func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain
 
 func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
-	err := r.getDB(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
+	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
 		First(&stockModel, stockID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -504,14 +509,7 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
-	err := gormDB.
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("SupplyMovements").
+	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
 		Where("close_date is null").
@@ -545,14 +543,7 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
-	err := gormDB.
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("SupplyMovements").
+	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
 		Where("investor_id = ?", investorID).
@@ -585,13 +576,7 @@ func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projec
 func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
-	err := r.getDB(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
+	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("close_date IS NULL").
 		First(&stockModel).Error
@@ -610,15 +595,9 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 
 	gormDB := r.getDB(ctx)
 
-	query := gormDB.
+	query := withStockMovements(gormDB.
 		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
-		Where("deleted_at IS NULL").
-		Preload("Project").
-		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("Supply.Type").
-		Preload("Supply.Category").
-		Preload("Investor").
-		Preload("SupplyMovements")
+		Where("deleted_at IS NULL"))
 
 	if err := query.Find(&stockModel).Error; err != nil {
 		return nil, err
@@ -678,6 +657,11 @@ func (r *Repository) loadAllConsumedByStockKey(ctx context.Context) (map[stockKe
 		Consumed   decimal.Decimal `gorm:"column:consumed"`
 	}
 
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
+	}
+
 	var rows []consumedRow
 	query := `
 		SELECT
@@ -692,9 +676,9 @@ func (r *Repository) loadAllConsumedByStockKey(ctx context.Context) (map[stockKe
 		  AND woi.supply_id IS NOT NULL
 	`
 	args := []any{}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
-		query += " AND wo.tenant_id = ? AND woi.tenant_id = ?"
-		args = append(args, tenantID, tenantID)
+	if hasTenant {
+		query += " AND wo.tenant_id = ? AND woi.tenant_id = wo.tenant_id"
+		args = append(args, tenantID)
 	}
 	query += " GROUP BY wo.project_id, woi.supply_id, wo.investor_id"
 	err := r.getDB(ctx).Raw(query, args...).Scan(&rows).Error

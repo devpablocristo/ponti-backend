@@ -4,11 +4,13 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
 type ProjectDollarValue struct {
 	ID           int64           `gorm:"primaryKey;autoIncrement"`
+	TenantID     uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	ProjectID    int64           `gorm:"not null;index"`
 	Year         int64           `gorm:"not null;index"`
 	Month        string          `gorm:"size:20;not null;index"`

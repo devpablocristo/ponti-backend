@@ -31,7 +31,9 @@ func NewRepository(db GormEngine) *Repository {
 
 func (r *Repository) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
 	model := models.FromDomain(d)
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 
@@ -80,9 +82,13 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 	}
 
 	modelsToCreate := make([]*models.WorkOrderDraft, len(drafts))
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for i, d := range drafts {
 		model := models.FromDomain(d)
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		if hasTenant {
 			model.TenantID = tenantID
 		}
 		if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
@@ -92,7 +98,7 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 		modelsToCreate[i] = model
 	}
 
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, model := range modelsToCreate {
 			if err := tx.Omit("Items", "InvestorSplits").Create(model).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to create work order draft header", err)
@@ -243,7 +249,11 @@ func (r *Repository) ListOccupiedWorkOrderNumbersByProject(ctx context.Context, 
 		  AND deleted_at IS NULL
 	`
 	args := []any{projectID, projectID}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
 		query = `
 		SELECT number
 		FROM public.workorders
@@ -305,7 +315,11 @@ func (r *Repository) ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx con
 		  AND deleted_at IS NULL
 	`
 	args := []any{projectID, projectID, draftID}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
 		query = `
 		SELECT number
 		FROM public.workorders
@@ -358,7 +372,11 @@ func (r *Repository) ListPublishedWorkOrderNumbersByProject(ctx context.Context,
 			  AND btrim(number) <> ''
 		`
 	args := []any{projectID}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
 		query = `
 			SELECT number
 			FROM public.workorders
@@ -414,8 +432,8 @@ func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, sta
 			"wod.status",
 			"wod.created_at",
 		).
-		Joins("join projects p on p.id = wod.project_id").
-		Joins("join fields f on f.id = wod.field_id")
+		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id and p.deleted_at is null").
+		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id and f.deleted_at is null")
 	base = authz.MaybeTenantScope(ctx, base, "wod")
 
 	if strings.TrimSpace(number) != "" {

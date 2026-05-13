@@ -40,7 +40,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 			CreatedBy: c.CreatedBy,
 			UpdatedBy: c.UpdatedBy,
 		}
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
 			model.TenantID = tenantID
 		}
 		if err := tx.Create(model).Error; err != nil {
@@ -270,6 +272,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var customer models.Customer
 		customerQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers")
 		if err := customerQuery.Where("id = ?", id).First(&customer).Error; err != nil {
@@ -287,7 +290,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore customer")
 		}
@@ -297,7 +300,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			Name:        customer.Name,
 			ActorKind:   actorsync.KindOrganization,
 			Role:        actorsync.RoleCliente,
-			UpdatedAt:   time.Now(),
+			UpdatedAt:   restoredAt,
 			UpdatedBy:   customer.UpdatedBy,
 		}); err != nil {
 			return err

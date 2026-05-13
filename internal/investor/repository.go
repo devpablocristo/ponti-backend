@@ -40,7 +40,9 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 			CreatedBy: inv.CreatedBy,
 			UpdatedBy: inv.UpdatedBy,
 		}
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
 			model.TenantID = tenantID
 		}
 		if err := tx.Create(model).Error; err != nil {
@@ -259,6 +261,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var inv models.Investor
 		investorQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "investors")
 		if err := investorQuery.Where("id = ?", id).First(&inv).Error; err != nil {
@@ -276,7 +279,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore investor")
 		}
@@ -286,7 +289,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 			Name:        inv.Name,
 			ActorKind:   actorsync.KindUnknown,
 			Role:        actorsync.RoleInversor,
-			UpdatedAt:   time.Now(),
+			UpdatedAt:   restoredAt,
 			UpdatedBy:   inv.UpdatedBy,
 		}); err != nil {
 			return err

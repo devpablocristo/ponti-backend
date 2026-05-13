@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -30,6 +31,11 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		return 0, err
 	}
 	model := models.FromDomainLeaseType(lt)
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
+		model.TenantID = tenantID
+	}
 	model.Base = sharedmodels.Base{
 		CreatedBy: lt.CreatedBy,
 		UpdatedBy: lt.UpdatedBy,
@@ -42,13 +48,14 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 
 func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.LeaseType{}).Count(&total).Error; err != nil {
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), "lease_types")
+	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count lease types")
 	}
 
 	var list []models.LeaseType
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lease_types").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -69,7 +76,7 @@ func (r *Repository) GetLeaseType(ctx context.Context, id int64) (*domain.LeaseT
 		return nil, err
 	}
 	var model models.LeaseType
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lease_types").Where("id = ?", id).First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "lease type", id)
 	}
 	return model.ToDomain(), nil
@@ -82,8 +89,7 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	if err := sharedrepo.ValidateID(lt.ID, "lease type"); err != nil {
 		return err
 	}
-	updateTx := r.db.Client().WithContext(ctx).
-		Model(&models.LeaseType{}).
+	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), "lease_types").
 		Where("id = ?", lt.ID)
 	if !lt.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", lt.UpdatedAt)
@@ -105,7 +111,7 @@ func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	result := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lease_types").
 		Delete(&models.LeaseType{}, "id = ?", id)
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete lease type")

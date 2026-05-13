@@ -41,7 +41,9 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
 	}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
 		model.TenantID = tenantID
 	}
 
@@ -195,6 +197,7 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 	deletedBy := &actor
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var c models.Campaign
 		campaignQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "campaigns")
 		if err := campaignQuery.Where("id = ?", id).First(&c).Error; err != nil {
@@ -210,7 +213,7 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Campaign{}), "campaigns").
 			Where("id = ?", id).
 			Updates(map[string]any{
-				"deleted_at": time.Now(),
+				"deleted_at": archivedAt,
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive campaign")
@@ -226,6 +229,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var c models.Campaign
 		campaignQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "campaigns")
 		if err := campaignQuery.Where("id = ?", id).First(&c).Error; err != nil {
@@ -243,7 +247,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore campaign")
 		}

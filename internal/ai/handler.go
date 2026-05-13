@@ -185,7 +185,10 @@ func (h *Handler) validateProjectTenant(ctx context.Context, tenantID string, pr
 	type row struct{ One int }
 	var out row
 	err := h.db.WithContext(ctx).
-		Raw("SELECT 1 AS one FROM public.projects WHERE id::text = ? AND tenant_id::text = ? AND deleted_at IS NULL LIMIT 1", projectID, tenantID).
+		Table("projects").
+		Select("1 AS one").
+		Where("CAST(id AS TEXT) = ? AND CAST(tenant_id AS TEXT) = ? AND deleted_at IS NULL", projectID, tenantID).
+		Limit(1).
 		Scan(&out).Error
 	if err != nil {
 		return domainerr.Forbidden("project is not available for this tenant")

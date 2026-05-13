@@ -31,6 +31,11 @@ type handlerUseCasesStub struct {
 	updateSupplyCalls       []domain.Supply
 	updateBulkCalls         [][]domain.Supply
 	importCalls             [][]*domain.SupplyMovement
+	supplyAction            string
+	movementAction          string
+	actionSupplyID          int64
+	actionProjectID         int64
+	actionMovementID        int64
 }
 
 func (s *handlerUseCasesStub) CreateSupply(context.Context, *domain.Supply) (int64, error) {
@@ -74,11 +79,15 @@ func (s *handlerUseCasesStub) CompletePendingSupply(ctx context.Context, supply 
 	return s.UpdateSupply(ctx, supply)
 }
 
-func (s *handlerUseCasesStub) DeleteSupply(context.Context, int64) error {
+func (s *handlerUseCasesStub) DeleteSupply(_ context.Context, id int64) error {
+	s.supplyAction = "delete"
+	s.actionSupplyID = id
 	return nil
 }
 
-func (s *handlerUseCasesStub) HardDeleteSupply(context.Context, int64) error {
+func (s *handlerUseCasesStub) HardDeleteSupply(_ context.Context, id int64) error {
+	s.supplyAction = "hard"
+	s.actionSupplyID = id
 	return nil
 }
 
@@ -145,7 +154,10 @@ func (s *handlerUseCasesStub) ExportSupplyMovementsByProjectID(context.Context, 
 	return nil, nil
 }
 
-func (s *handlerUseCasesStub) DeleteSupplyMovement(context.Context, int64, int64) error {
+func (s *handlerUseCasesStub) DeleteSupplyMovement(_ context.Context, projectID int64, movementID int64) error {
+	s.movementAction = "delete"
+	s.actionProjectID = projectID
+	s.actionMovementID = movementID
 	return nil
 }
 
@@ -153,24 +165,175 @@ func (s *handlerUseCasesStub) ListArchivedSupplyMovements(context.Context, int64
 	return nil, nil
 }
 
-func (s *handlerUseCasesStub) ArchiveSupplyMovement(context.Context, int64, int64) error {
+func (s *handlerUseCasesStub) ArchiveSupplyMovement(_ context.Context, projectID int64, movementID int64) error {
+	s.movementAction = "archive"
+	s.actionProjectID = projectID
+	s.actionMovementID = movementID
 	return nil
 }
 
-func (s *handlerUseCasesStub) RestoreSupplyMovement(context.Context, int64, int64) error {
+func (s *handlerUseCasesStub) RestoreSupplyMovement(_ context.Context, projectID int64, movementID int64) error {
+	s.movementAction = "restore"
+	s.actionProjectID = projectID
+	s.actionMovementID = movementID
 	return nil
 }
 
-func (s *handlerUseCasesStub) HardDeleteSupplyMovement(context.Context, int64, int64) error {
+func (s *handlerUseCasesStub) HardDeleteSupplyMovement(_ context.Context, projectID int64, movementID int64) error {
+	s.movementAction = "hard"
+	s.actionProjectID = projectID
+	s.actionMovementID = movementID
 	return nil
 }
 
-func (s *handlerUseCasesStub) ArchiveSupply(ctx context.Context, id int64) error {
+func (s *handlerUseCasesStub) ArchiveSupply(_ context.Context, id int64) error {
+	s.supplyAction = "archive"
+	s.actionSupplyID = id
 	return nil
 }
 
-func (s *handlerUseCasesStub) RestoreSupply(ctx context.Context, id int64) error {
+func (s *handlerUseCasesStub) RestoreSupply(_ context.Context, id int64) error {
+	s.supplyAction = "restore"
+	s.actionSupplyID = id
 	return nil
+}
+
+type supplyGinEngineStub struct{ router *gin.Engine }
+
+func (s *supplyGinEngineStub) GetRouter() *gin.Engine          { return s.router }
+func (s *supplyGinEngineStub) RunServer(context.Context) error { return nil }
+
+type supplyConfigStub struct{}
+
+func (supplyConfigStub) APIVersion() string { return "v1" }
+func (supplyConfigStub) APIBaseURL() string { return "/api/v1" }
+
+type supplyMiddlewaresStub struct{}
+
+func (supplyMiddlewaresStub) GetGlobal() []gin.HandlerFunc     { return nil }
+func (supplyMiddlewaresStub) GetValidation() []gin.HandlerFunc { return nil }
+
+func setupSupplyRouter(ucs *handlerUseCasesStub) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	NewHandler(
+		ucs,
+		&supplyGinEngineStub{router: router},
+		supplyConfigStub{},
+		supplyMiddlewaresStub{},
+	).Routes()
+	return router
+}
+
+func TestSupplyActionRoutesCallExplicitUseCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantAction string
+	}{
+		{
+			name:       "archive route calls archive usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/supplies/17/archive",
+			wantAction: "archive",
+		},
+		{
+			name:       "restore route calls restore usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/supplies/17/restore",
+			wantAction: "restore",
+		},
+		{
+			name:       "explicit hard delete route calls hard-delete usecase",
+			method:     http.MethodDelete,
+			path:       "/api/v1/supplies/17/hard",
+			wantAction: "hard",
+		},
+		{
+			name:       "legacy delete route calls legacy hard-delete alias",
+			method:     http.MethodDelete,
+			path:       "/api/v1/supplies/17",
+			wantAction: "delete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &handlerUseCasesStub{}
+			router := setupSupplyRouter(stub)
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+			assert.Equal(t, tt.wantAction, stub.supplyAction)
+			assert.Equal(t, int64(17), stub.actionSupplyID)
+		})
+	}
+}
+
+func TestSupplyMovementActionRoutesCallExplicitUseCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantAction string
+	}{
+		{
+			name:       "supply movement archive route calls archive usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/projects/9/supply-movements/33/archive",
+			wantAction: "archive",
+		},
+		{
+			name:       "supply movement restore route calls restore usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/projects/9/supply-movements/33/restore",
+			wantAction: "restore",
+		},
+		{
+			name:       "supply movement hard route calls hard usecase",
+			method:     http.MethodDelete,
+			path:       "/api/v1/projects/9/supply-movements/33/hard",
+			wantAction: "hard",
+		},
+		{
+			name:       "supply movement legacy delete route calls delete usecase",
+			method:     http.MethodDelete,
+			path:       "/api/v1/projects/9/supply-movements/33",
+			wantAction: "delete",
+		},
+		{
+			name:       "stock movement archive route calls same archive usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/projects/9/stock-movements/33/archive",
+			wantAction: "archive",
+		},
+		{
+			name:       "stock movement legacy delete route calls same delete usecase",
+			method:     http.MethodDelete,
+			path:       "/api/v1/projects/9/stock-movements/33",
+			wantAction: "delete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &handlerUseCasesStub{}
+			router := setupSupplyRouter(stub)
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+			assert.Equal(t, tt.wantAction, stub.movementAction)
+			assert.Equal(t, int64(9), stub.actionProjectID)
+			assert.Equal(t, int64(33), stub.actionMovementID)
+		})
+	}
 }
 
 func newHandlerJSONContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {

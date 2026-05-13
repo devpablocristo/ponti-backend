@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
@@ -110,6 +111,14 @@ func TenantFromContext(ctx context.Context) (uuid.UUID, bool) {
 	return uuid.Nil, false
 }
 
+func OptionalTenantOrStrict(ctx context.Context) (uuid.UUID, bool, error) {
+	tenantID, ok := TenantFromContext(ctx)
+	if !ok && TenantStrictModeEnabled() {
+		return uuid.Nil, false, domainerr.Forbidden("tenant context required")
+	}
+	return tenantID, ok, nil
+}
+
 func TenantWhere(ctx context.Context, columnOrAlias string) (string, []any, error) {
 	tenantID, err := RequireTenant(ctx)
 	if err != nil {
@@ -136,10 +145,27 @@ func MaybeTenantScope(ctx context.Context, db *gorm.DB, columnOrAlias string) *g
 	}
 	tenantID, ok := TenantFromContext(ctx)
 	if !ok {
+		if TenantStrictModeEnabled() {
+			err := domainerr.Forbidden("tenant context required")
+			if db.Config == nil {
+				db.Error = err
+			} else {
+				_ = db.AddError(err)
+			}
+		}
 		return db
 	}
 	column := normalizeTenantColumn(columnOrAlias)
 	return db.Where(column+" = ?", tenantID)
+}
+
+func TenantStrictModeEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("TENANT_STRICT_MODE"))) {
+	case "1", "t", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeTenantColumn(columnOrAlias string) string {

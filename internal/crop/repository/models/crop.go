@@ -4,11 +4,13 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/google/uuid"
 )
 
 type Crop struct {
-	ID   int64  `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
-	Name string `gorm:"uniqueIndex:idx_crops_name;size:50;not null"`
+	ID       int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
+	Name     string    `gorm:"size:50;not null"`
 
 	sharedmodels.Base
 }

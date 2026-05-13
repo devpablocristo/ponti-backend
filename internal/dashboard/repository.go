@@ -11,6 +11,7 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/dashboard/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	db "github.com/devpablocristo/ponti-backend/internal/shared/db"
 )
 
@@ -265,11 +266,15 @@ func (r *Repository) getContributionFallbacks(ctx context.Context, projectIDs []
 	}
 
 	var rows []row
-	err := r.db.Client().WithContext(ctx).
+	query := r.db.Client().WithContext(ctx).
 		Table("project_investors pi").
 		Select("pi.investor_id, i.name AS investor_name, SUM(pi.percentage)::numeric AS investor_percentage_pct").
-		Joins("JOIN investors i ON i.id = pi.investor_id AND i.deleted_at IS NULL").
-		Where("pi.project_id IN ? AND pi.deleted_at IS NULL", projectIDs).
+		Joins("JOIN investors i ON i.id = pi.investor_id AND i.tenant_id = pi.tenant_id AND i.deleted_at IS NULL").
+		Where("pi.project_id IN ? AND pi.deleted_at IS NULL", projectIDs)
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		query = query.Where("pi.tenant_id = ?", tenantID)
+	}
+	err := query.
 		Group("pi.investor_id, i.name").
 		Order("pi.investor_id").
 		Scan(&rows).Error

@@ -19,6 +19,7 @@ type fakeUseCases struct {
 	updateCalled bool
 	updatedProj  *domain.Project
 	updateErr    error
+	actionCall   string
 }
 
 func (f *fakeUseCases) CreateProject(context.Context, *domain.Project) (int64, error) {
@@ -50,10 +51,34 @@ func (f *fakeUseCases) UpdateProject(_ context.Context, p *domain.Project) error
 	f.updatedProj = p
 	return f.updateErr
 }
-func (f *fakeUseCases) ArchiveProject(context.Context, int64) error    { return nil }
-func (f *fakeUseCases) RestoreProject(context.Context, int64) error    { return nil }
-func (f *fakeUseCases) DeleteProject(context.Context, int64) error     { return nil }
-func (f *fakeUseCases) HardDeleteProject(context.Context, int64) error { return nil }
+func (f *fakeUseCases) ArchiveProject(_ context.Context, id int64) error {
+	f.actionCall = "archive"
+	if id != 25 {
+		f.actionCall = "archive:unexpected"
+	}
+	return nil
+}
+func (f *fakeUseCases) RestoreProject(_ context.Context, id int64) error {
+	f.actionCall = "restore"
+	if id != 25 {
+		f.actionCall = "restore:unexpected"
+	}
+	return nil
+}
+func (f *fakeUseCases) DeleteProject(_ context.Context, id int64) error {
+	f.actionCall = "delete"
+	if id != 25 {
+		f.actionCall = "delete:unexpected"
+	}
+	return nil
+}
+func (f *fakeUseCases) HardDeleteProject(_ context.Context, id int64) error {
+	f.actionCall = "hard"
+	if id != 25 {
+		f.actionCall = "hard:unexpected"
+	}
+	return nil
+}
 
 type fakeGinEngine struct{ r *gin.Engine }
 
@@ -69,7 +94,6 @@ type fakeMiddlewares struct{}
 
 func (fakeMiddlewares) GetGlobal() []gin.HandlerFunc     { return nil }
 func (fakeMiddlewares) GetValidation() []gin.HandlerFunc { return nil }
-func (fakeMiddlewares) GetProtected() []gin.HandlerFunc  { return nil }
 
 func setupProjectRouter(ucs *fakeUseCases) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -83,6 +107,58 @@ func setupProjectRouter(ucs *fakeUseCases) *gin.Engine {
 	)
 	h.Routes()
 	return r
+}
+
+func TestProjectActionRoutesCallExplicitUseCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantAction string
+	}{
+		{
+			name:       "archive route calls archive usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/projects/25/archive",
+			wantAction: "archive",
+		},
+		{
+			name:       "restore route calls restore usecase",
+			method:     http.MethodPost,
+			path:       "/api/v1/projects/25/restore",
+			wantAction: "restore",
+		},
+		{
+			name:       "explicit hard delete route calls hard-delete usecase",
+			method:     http.MethodDelete,
+			path:       "/api/v1/projects/25/hard",
+			wantAction: "hard",
+		},
+		{
+			name:       "legacy delete route calls legacy hard-delete alias",
+			method:     http.MethodDelete,
+			path:       "/api/v1/projects/25",
+			wantAction: "delete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ucs := &fakeUseCases{}
+			router := setupProjectRouter(ucs)
+
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusNoContent {
+				t.Fatalf("expected status 204, got %d. body=%s", rr.Code, rr.Body.String())
+			}
+			if ucs.actionCall != tt.wantAction {
+				t.Fatalf("expected action %q, got %q", tt.wantAction, ucs.actionCall)
+			}
+		})
+	}
 }
 
 func TestUpdateProject_AllowsFrontendPayloadWithEmptyLeaseTypeDecimals(t *testing.T) {

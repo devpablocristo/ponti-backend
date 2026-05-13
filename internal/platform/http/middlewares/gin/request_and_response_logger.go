@@ -66,6 +66,7 @@ func redactHeaderValue(name string, values []string) []string {
 
 func isSensitiveHeader(name string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(name))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
 	if normalized == "" {
 		return false
 	}

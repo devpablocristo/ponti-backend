@@ -18,8 +18,16 @@ import (
 type laborHandlerUseCasesStub struct {
 	getLaborFn      func(ctx context.Context, id int64) (*domain.Labor, error)
 	updateLaborFn   func(ctx context.Context, labor *domain.Labor) error
+	deleteLaborFn   func(ctx context.Context, id int64) error
+	archiveLaborFn  func(ctx context.Context, id int64) error
+	restoreLaborFn  func(ctx context.Context, id int64) error
+	hardDeleteFn    func(ctx context.Context, id int64) error
 	getLaborCalls   []int64
 	updateLaborCall []domain.Labor
+	deleteCalls     []int64
+	archiveCalls    []int64
+	restoreCalls    []int64
+	hardDeleteCalls []int64
 }
 
 func (s *laborHandlerUseCasesStub) CreateLabor(context.Context, *domain.Labor) (int64, error) {
@@ -38,14 +46,32 @@ func (s *laborHandlerUseCasesStub) ListLabor(context.Context, int, int, int64) (
 func (s *laborHandlerUseCasesStub) ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
 	return nil, 0, nil
 }
-func (s *laborHandlerUseCasesStub) DeleteLabor(context.Context, int64) error { return nil }
-func (s *laborHandlerUseCasesStub) ArchiveLabor(context.Context, int64) error {
+func (s *laborHandlerUseCasesStub) DeleteLabor(ctx context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	if s.deleteLaborFn != nil {
+		return s.deleteLaborFn(ctx, id)
+	}
 	return nil
 }
-func (s *laborHandlerUseCasesStub) RestoreLabor(context.Context, int64) error {
+func (s *laborHandlerUseCasesStub) ArchiveLabor(ctx context.Context, id int64) error {
+	s.archiveCalls = append(s.archiveCalls, id)
+	if s.archiveLaborFn != nil {
+		return s.archiveLaborFn(ctx, id)
+	}
 	return nil
 }
-func (s *laborHandlerUseCasesStub) HardDeleteLabor(context.Context, int64) error {
+func (s *laborHandlerUseCasesStub) RestoreLabor(ctx context.Context, id int64) error {
+	s.restoreCalls = append(s.restoreCalls, id)
+	if s.restoreLaborFn != nil {
+		return s.restoreLaborFn(ctx, id)
+	}
+	return nil
+}
+func (s *laborHandlerUseCasesStub) HardDeleteLabor(ctx context.Context, id int64) error {
+	s.hardDeleteCalls = append(s.hardDeleteCalls, id)
+	if s.hardDeleteFn != nil {
+		return s.hardDeleteFn(ctx, id)
+	}
 	return nil
 }
 func (s *laborHandlerUseCasesStub) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
@@ -163,5 +189,89 @@ func TestHandler_UpdateLabor_ExplicitIsPartialPrice_DoesNotFetchCurrent(t *testi
 	}
 	if stub.updateLaborCall[0].IsPartialPrice {
 		t.Fatalf("expected IsPartialPrice=false from explicit payload")
+	}
+}
+
+func TestHandler_DeleteLabor_ProjectRouteDeletesLabor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &laborHandlerUseCasesStub{}
+	h := &Handler{ucs: stub}
+	ctx, _ := newLaborHandlerJSONContext(http.MethodDelete, "/api/v1/projects/10/labors/42", "")
+	ctx.Params = gin.Params{
+		{Key: "project_id", Value: "10"},
+		{Key: "labor_id", Value: "42"},
+	}
+
+	h.DeleteLabor(ctx)
+
+	if ctx.Writer.Status() != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
+	}
+	if len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
+		t.Fatalf("expected DeleteLabor to be called with id 42, got %#v", stub.deleteCalls)
+	}
+}
+
+func TestHandler_DeleteLaborByID_GlobalRouteDeletesLabor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &laborHandlerUseCasesStub{}
+	h := &Handler{ucs: stub}
+	ctx, _ := newLaborHandlerJSONContext(http.MethodDelete, "/api/v1/labors/42", "")
+	ctx.Params = gin.Params{{Key: "labor_id", Value: "42"}}
+
+	h.DeleteLaborByID(ctx)
+
+	if ctx.Writer.Status() != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
+	}
+	if len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
+		t.Fatalf("expected DeleteLabor to be called with id 42, got %#v", stub.deleteCalls)
+	}
+}
+
+func TestHandler_LaborArchiveRestoreHardDeleteRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name  string
+		run   func(*Handler, *gin.Context)
+		calls func(*laborHandlerUseCasesStub) []int64
+	}{
+		{
+			name:  "archive",
+			run:   (*Handler).ArchiveLabor,
+			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.archiveCalls },
+		},
+		{
+			name:  "restore",
+			run:   (*Handler).RestoreLabor,
+			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.restoreCalls },
+		},
+		{
+			name:  "hard delete",
+			run:   (*Handler).HardDeleteLabor,
+			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.hardDeleteCalls },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &laborHandlerUseCasesStub{}
+			h := &Handler{ucs: stub}
+			ctx, _ := newLaborHandlerJSONContext(http.MethodPost, "/api/v1/labors/42", "")
+			ctx.Params = gin.Params{{Key: "labor_id", Value: "42"}}
+
+			tt.run(h, ctx)
+
+			if ctx.Writer.Status() != http.StatusNoContent {
+				t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
+			}
+			calls := tt.calls(stub)
+			if len(calls) != 1 || calls[0] != 42 {
+				t.Fatalf("expected action to be called with id 42, got %#v", calls)
+			}
+		})
 	}
 }

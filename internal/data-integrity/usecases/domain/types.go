@@ -14,10 +14,13 @@ type IntegrityReport struct {
 //   - RecalcA: recálculo independiente por camino A
 //   - RecalcB: recálculo independiente por camino B (opcional)
 type IntegrityCheck struct {
-	ControlNumber int    `json:"control_number"` // 1-9
-	DataToVerify  string `json:"data_to_verify"` // Dato a verificar
-	Description   string `json:"description"`    // Descripción breve del control
-	ControlRule   string `json:"control_rule"`   // Regla de control
+	ControlNumber  int    `json:"control_number"` // 1-17
+	DataToVerify   string `json:"data_to_verify"` // Dato a verificar
+	Description    string `json:"description"`    // Descripción breve del control
+	ControlRule    string `json:"control_rule"`   // Regla de control
+	CheckType      string `json:"check_type"`     // STRONG, WEAK, FORMULA_ALIGNMENT
+	Severity       string `json:"severity"`       // INFO, WARNING, ERROR
+	Recommendation string `json:"recommendation"` // Qué hacer si el control requiere acción
 
 	// SYSTEM VALUE (lo que el usuario ve en pantalla)
 	SystemCalculation string          `json:"system_calculation"`
@@ -40,7 +43,7 @@ type IntegrityCheck struct {
 	// RESULTADO
 	DifferenceA decimal.Decimal  `json:"difference_a"`           // SystemValue - RecalcAValue
 	DifferenceB *decimal.Decimal `json:"difference_b,omitempty"` // SystemValue - RecalcBValue (nil si RecalcB no aplica)
-	Status      string           `json:"status"`                 // OK, ERROR
+	Status      string           `json:"status"`                 // OK, ERROR, WARNING, SKIPPED
 	Tolerance   decimal.Decimal  `json:"tolerance"`
 }
 

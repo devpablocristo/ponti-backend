@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
 
@@ -27,7 +28,7 @@ func NewRepository(db GormEnginePort) *Repository {
 
 func (r *Repository) GetByKey(ctx context.Context, key string) (*domain.BusinessParameter, error) {
 	var m models.BusinessParameter
-	err := r.db.Client().WithContext(ctx).
+	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "business_parameters").
 		Where("key = ?", key).
 		First(&m).Error
 
@@ -45,6 +46,7 @@ func (r *Repository) ListByCategory(ctx context.Context, category string) ([]dom
 		WithContext(ctx).
 		Model(&models.BusinessParameter{}).
 		Where("category = ?", category)
+	tx = authz.MaybeTenantScope(ctx, tx, "business_parameters")
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -62,6 +64,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.BusinessParameter{})
+	tx = authz.MaybeTenantScope(ctx, tx, "business_parameters")
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -77,6 +80,11 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 
 func (r *Repository) Create(ctx context.Context, item *domain.BusinessParameter) (int64, error) {
 	m := models.FromDomain(item)
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
+		m.TenantID = tenantID
+	}
 	if err := r.db.Client().WithContext(ctx).Create(m).Error; err != nil {
 		return 0, domainerr.Internal("failed to create business parameter")
 	}
@@ -90,7 +98,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.BusinessParameter{}).Where("id = ?", item.ID).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").Where("id = ?", item.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
@@ -98,7 +106,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
-		updateTx := tx.Model(&models.BusinessParameter{}).
+		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").
 			Where("id = ?", item.ID)
 		if !item.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", item.UpdatedAt)
@@ -130,14 +138,14 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.BusinessParameter{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
 			return domainerr.NotFound("business parameter not found")
 		}
 
-		result := tx.Delete(&models.BusinessParameter{}, id)
+		result := authz.MaybeTenantScope(ctx, tx, "business_parameters").Delete(&models.BusinessParameter{}, id)
 		if result.Error != nil {
 			return domainerr.Internal("failed to delete business parameter")
 		}

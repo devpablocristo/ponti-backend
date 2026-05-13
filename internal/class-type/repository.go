@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -27,6 +28,11 @@ func NewRepository(db GormEnginePort) *Repository {
 
 func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (int64, error) {
 	model := models.FromDomain(c)
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
+		model.TenantID = tenantID
+	}
 	model.Base = sharedmodels.Base{
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
@@ -39,13 +45,14 @@ func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (
 
 func (r *Repository) ListClassTypes(ctx context.Context, page, perPage int) ([]domain.ClassType, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.ClassType{}).Count(&total).Error; err != nil {
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.ClassType{}), "types")
+	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count class types")
 	}
 
 	var list []models.ClassType
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "types").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -66,7 +73,7 @@ func (r *Repository) GetClassType(ctx context.Context, id int64) (*domain.ClassT
 		return nil, err
 	}
 	var model models.ClassType
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "types").Where("id = ?", id).First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "class type", id)
 	}
 	return model.ToDomain(), nil
@@ -78,13 +85,13 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.ClassType{}).Where("id = ?", c.ID).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.ClassType{}), "types").Where("id = ?", c.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check class type existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("class type %d not found", c.ID))
 		}
-		updateTx := tx.Model(&models.ClassType{}).
+		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.ClassType{}), "types").
 			Where("id = ?", c.ID)
 		if !c.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
@@ -112,13 +119,13 @@ func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.ClassType{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.ClassType{}), "types").Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check class type existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("class type %d not found", id))
 		}
-		result := tx.Delete(&models.ClassType{}, id)
+		result := authz.MaybeTenantScope(ctx, tx, "types").Delete(&models.ClassType{}, id)
 		if result.Error != nil {
 			return domainerr.Internal("failed to delete class type")
 		}

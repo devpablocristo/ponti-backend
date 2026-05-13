@@ -58,7 +58,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 const maxLotExportPageSize = 1000
@@ -77,6 +76,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 		acf: c,
 		mws: m,
 	}
+}
+
+func (h *Handler) runLotIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) Routes() {
@@ -227,55 +239,19 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "lot_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLotIDAction(c, h.ucs.DeleteLot)
 }
 
 func (h *Handler) ArchiveLot(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "lot_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveLot(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLotIDAction(c, h.ucs.ArchiveLot)
 }
 
 func (h *Handler) RestoreLot(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "lot_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreLot(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLotIDAction(c, h.ucs.RestoreLot)
 }
 
 func (h *Handler) HardDeleteLot(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "lot_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteLot(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runLotIDAction(c, h.ucs.HardDeleteLot)
 }
 
 func (h *Handler) ListArchivedLots(c *gin.Context) {

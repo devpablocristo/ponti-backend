@@ -41,7 +41,10 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
-	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return 0, err
+	}
 	if hasTenant {
 		model.TenantID = tenantID
 	}
@@ -51,7 +54,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	}
 
 	// 3) crear todo en una transacción
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) insertar la cabecera para obtener model.ID
 		// Importante: evitamos que GORM intente crear también las asociaciones (Items) acá,
 		// porque abajo insertamos los items explícitamente. Si se insertan dos veces puede
@@ -372,8 +375,9 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	deletedBy := &actor
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var wo models.WorkOrder
-		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Preload("Items"), "workorders")
+		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
 		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
@@ -387,7 +391,7 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
 			Updates(map[string]any{
-				"deleted_at": time.Now(),
+				"deleted_at": archivedAt,
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive work order")
@@ -401,8 +405,9 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var wo models.WorkOrder
-		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Preload("Items"), "workorders")
+		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
 		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
@@ -418,7 +423,7 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore work order")
 		}
@@ -664,7 +669,8 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 	if err != nil {
 		return nil, err
 	}
-	if len(projectIDs) == 0 && (filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil) {
+	hasWorkspaceFilter := filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil
+	if len(projectIDs) == 0 && hasWorkspaceFilter {
 		return &domain.WorkOrderMetrics{
 			SurfaceHa:   decimal.Zero,
 			Liters:      decimal.Zero,
@@ -672,6 +678,9 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 			DirectCost:  decimal.Zero,
 			OrdersCount: 0,
 		}, nil
+	}
+	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
 	}
 
 	if filt.SupplyID != nil {
@@ -710,9 +719,9 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 		return nil, domainerr.Internal("failed to get metrics")
 	}
 
-	orderCountQuery := r.db.Client().
+	orderCountQuery := authz.MaybeTenantScope(ctx, r.db.Client().
 		WithContext(ctx).
-		Table("workorders").
+		Table("workorders"), "workorders").
 		Where("deleted_at IS NULL")
 	if len(projectIDs) > 0 {
 		orderCountQuery = orderCountQuery.Where("project_id IN ?", projectIDs)
@@ -748,15 +757,19 @@ func (r *Repository) getSupplyFilteredMetrics(
 			COALESCE(SUM(CASE WHEN s.unit_id = 1 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS liters,
 			COALESCE(SUM(CASE WHEN s.unit_id = 2 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS kilograms,
 			COALESCE(SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0)), 0) AS direct_cost,
-			COUNT(DISTINCT split_part(wo.number::text, '.', 1)) AS orders_count
+		COUNT(DISTINCT split_part(wo.number::text, '.', 1)) AS orders_count
 		FROM workorders wo
-		JOIN workorder_items wi ON wi.workorder_id = wo.id AND wi.deleted_at IS NULL
-		JOIN supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+		JOIN workorder_items wi ON wi.workorder_id = wo.id AND wi.tenant_id = wo.tenant_id AND wi.deleted_at IS NULL
+		JOIN supplies s ON s.id = wi.supply_id AND s.tenant_id = wo.tenant_id AND s.deleted_at IS NULL
 		WHERE wo.deleted_at IS NULL
 		  AND wi.supply_id = ?
 	`
 	args := []any{*filt.SupplyID}
 
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		q += " AND wo.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 	if len(projectIDs) > 0 {
 		q += " AND wo.project_id IN ?"
 		args = append(args, projectIDs)
@@ -791,6 +804,11 @@ func (r *Repository) getSupplyFilteredMetrics(
 // Calcula ∑(Órdenes_de_trabajo.costo_total) como indica el CSV de controles
 // Este cálculo es INDEPENDIENTE de las vistas SSOT para validar coherencia
 func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.Forbidden("tenant context required")
+	}
+
 	// Query RAW: suma directa desde workorders + workorder_items
 	// Labor cost: effective_area × labor.price
 	// Supply cost: total_used × price (consistente con v4_calc.workorder_metrics).
@@ -804,6 +822,10 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		whereProject = "AND wo.project_id = ?"
 		args = append(args, projectID)
 	}
+	if hasTenant {
+		whereProject += " AND wo.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
 	q := fmt.Sprintf(`
 		WITH workorder_costs AS (
@@ -815,19 +837,20 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		    COALESCE((
 		      SELECT SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0))
 		      FROM public.workorder_items wi
-		      JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+		      JOIN public.supplies s ON s.id = wi.supply_id AND s.tenant_id = wo.tenant_id AND s.deleted_at IS NULL
 		      WHERE wi.workorder_id = wo.id 
+		        AND wi.tenant_id = wo.tenant_id
 		        AND wi.deleted_at IS NULL
 		    ), 0) AS supply_cost
 		  FROM public.workorders wo
-		  JOIN public.labors l ON l.id = wo.labor_id AND l.deleted_at IS NULL
+		  JOIN public.labors l ON l.id = wo.labor_id AND l.tenant_id = wo.tenant_id AND l.deleted_at IS NULL
 		  WHERE wo.deleted_at IS NULL
 		    AND wo.effective_area IS NOT NULL
 		    AND wo.effective_area > 0
 		    %s
-		)
-		SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
-		FROM workorder_costs
+	)
+	SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
+	FROM workorder_costs
 	`, whereProject)
 
 	var totalCost decimal.Decimal
@@ -852,13 +875,39 @@ func (r *Repository) GetHarvestAreaSnapshot(
 
 	var result row
 
-	err := r.db.Client().WithContext(ctx).Raw(`
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return false, decimal.Zero, decimal.Zero, domainerr.Forbidden("tenant context required")
+	}
+
+	laborTenantFilter := ""
+	lotTenantFilter := ""
+	workOrderTenantFilter := ""
+	args := []any{laborID}
+	if hasTenant {
+		laborTenantFilter = "AND lb.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, lotID)
+	if hasTenant {
+		lotTenantFilter = "AND l.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, lotID)
+	if hasTenant {
+		workOrderTenantFilter = "AND w.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, excludeWorkOrderID, excludeWorkOrderID)
+
+	query := fmt.Sprintf(`
 		SELECT
 			EXISTS (
 				SELECT 1
 				FROM public.labors lb
 				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
 				WHERE lb.id = ?
+				  %s
 				  AND lb.deleted_at IS NULL
 				  AND cat.type_id = 4
 				  AND LOWER(TRIM(cat.name)) = 'cosecha'
@@ -867,21 +916,25 @@ func (r *Repository) GetHarvestAreaSnapshot(
 				SELECT l.hectares
 				FROM public.lots l
 				WHERE l.id = ?
+				  %s
 				  AND l.deleted_at IS NULL
 			), 0)::numeric AS lot_hectares,
 			COALESCE((
 				SELECT SUM(w.effective_area)
 				FROM public.workorders w
-				JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
+				JOIN public.labors lb ON lb.id = w.labor_id AND lb.tenant_id = w.tenant_id AND lb.deleted_at IS NULL
 				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
 				WHERE w.lot_id = ?
+				  %s
 				  AND w.deleted_at IS NULL
 				  AND w.effective_area > 0
 				  AND cat.type_id = 4
 				  AND LOWER(TRIM(cat.name)) = 'cosecha'
 				  AND (? = 0 OR w.id <> ?)
 			), 0)::numeric AS existing_harvested_area
-	`, laborID, lotID, lotID, excludeWorkOrderID, excludeWorkOrderID).Scan(&result).Error
+	`, laborTenantFilter, lotTenantFilter, workOrderTenantFilter)
+
+	err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&result).Error
 
 	if err != nil {
 		return false, decimal.Zero, decimal.Zero, domainerr.Internal("failed to validate harvest area")

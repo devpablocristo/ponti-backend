@@ -32,7 +32,7 @@ type providerRow struct {
 func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error) {
 	if r.db.Client().Name() == "sqlite" {
 		var providers []models.Provider
-		if err := r.db.Client().WithContext(ctx).Find(&providers).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "providers").Find(&providers).Error; err != nil {
 			return nil, domainerr.Internal("failed to list providers")
 		}
 		res := make([]domain.Provider, len(providers))

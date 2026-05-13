@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights/repository/models"
 )
 
@@ -142,14 +143,21 @@ func (r *Repository) ResolveByID(ctx context.Context, tenantID, candidateID, act
 	if err != nil {
 		return fmt.Errorf("parse candidate_id: %w", err)
 	}
-	return r.db.WithContext(ctx).Model(&models.CandidateModel{}).
+	res := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
 		Where("id = ? AND tenant_id = ?", id, tID).
 		Updates(map[string]any{
 			"status":      candidatesdomain.StatusResolved,
 			"resolved_at": now.UTC(),
 			"last_actor":  actor,
 			"updated_at":  now.UTC(),
-		}).Error
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.NotFound("candidate not found")
+	}
+	return nil
 }
 
 // ReopenByID reactiva un candidato resuelto y limpia las marcas "leida" para
@@ -166,15 +174,19 @@ func (r *Repository) ReopenByID(ctx context.Context, tenantID, candidateID, acto
 	if err != nil {
 		return fmt.Errorf("parse candidate_id: %w", err)
 	}
-	if err := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
+	res := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
 		Where("id = ? AND tenant_id = ?", id, tID).
 		Updates(map[string]any{
 			"status":      candidatesdomain.StatusNotified,
 			"resolved_at": nil,
 			"last_actor":  actor,
 			"updated_at":  now.UTC(),
-		}).Error; err != nil {
-		return err
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.NotFound("candidate not found")
 	}
 	return r.db.WithContext(ctx).
 		Where("insight_id = ?", id).

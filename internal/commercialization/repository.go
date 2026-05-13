@@ -2,6 +2,7 @@ package commercialization
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -9,6 +10,8 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/commercialization/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
 
 type GormEnginePort interface {
@@ -28,9 +31,27 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 		return nil
 	}
 
+	seenProjects := make(map[int64]struct{})
+	for _, item := range items {
+		if _, ok := seenProjects[item.ProjectID]; ok {
+			continue
+		}
+		if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), item.ProjectID); err != nil {
+			return err
+		}
+		seenProjects[item.ProjectID] = struct{}{}
+	}
+
 	modelList := make([]models.CropCommercialization, len(items))
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return err
+	}
 	for i, item := range items {
 		modelList[i] = *models.FromDomain(&item)
+		if hasTenant {
+			modelList[i].TenantID = tenantID
+		}
 	}
 
 	if err := r.db.Client().WithContext(ctx).Create(&modelList).Error; err != nil {
@@ -41,11 +62,15 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 }
 
 func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]domain.CropCommercialization, error) {
+	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), projectID); err != nil {
+		return nil, err
+	}
 
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.CropCommercialization{}).
 		Where("project_id = ?", projectID)
+	tx = authz.MaybeTenantScope(ctx, tx, "crop_commercializations")
 
 	var rows []models.CropCommercialization
 
@@ -71,17 +96,20 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.CropCommercialization{}).
+		var current models.CropCommercialization
+		if err := authz.MaybeTenantScope(ctx, tx, "crop_commercializations").
 			Where("id = ?", item.ID).
-			Count(&count).Error; err != nil {
+			First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("crop commercialization not found")
+			}
 			return domainerr.Internal("failed to check existence")
 		}
-		if count == 0 {
-			return domainerr.NotFound("crop commercialization not found")
+		if err := sharedfilters.ValidateProjectAccess(ctx, tx, current.ProjectID); err != nil {
+			return err
 		}
 
-		if err := tx.Model(&models.CropCommercialization{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.CropCommercialization{}), "crop_commercializations").
 			Where("id = ?", item.ID).
 			Updates(map[string]any{
 				"crop_id":         item.CropID,

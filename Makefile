@@ -12,15 +12,11 @@ DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}
 MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
-LOCAL_STG_ENV      := .env.main.local
-LOCAL_DEV_ENV      := .env.develop.local
-
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
-        run-api up-ponti-local down-ponti-local seed seed-dashboard db-staging-to-local db-reset-from-staging staging-db-2-dev-db e2e-changes \
+        run-api up-ponti-local down-ponti-local seed seed-dashboard reset-local-db-from-prod e2e-changes \
         migrate-create \
-        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline db-force-reset-gcp db-gcp-reset-and-load-local actors-backfill-sync \
-        select-ponti-stg-local select-ponti-dev-local up-ponti-stg-local up-ponti-dev-local
+        db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline actors-backfill-sync
 
 define compose_cmd
 GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
@@ -72,23 +68,6 @@ down-ponti-local:
 	@echo "Stopping full local stack (backend + frontend + ai)..."
 	@bash ./scripts/down_ponti_local.sh
 
-# --------------------------------------------------
-# Selección de entorno local (copia .env.*.local → .env)
-# --------------------------------------------------
-select-ponti-stg-local:
-	@test -f $(LOCAL_STG_ENV) || (echo "ERROR: falta $(LOCAL_STG_ENV)" >&2; exit 1)
-	@cp $(LOCAL_STG_ENV) .env
-	@echo "Backend local env activo: $(LOCAL_STG_ENV)"
-
-select-ponti-dev-local:
-	@test -f $(LOCAL_DEV_ENV) || (echo "ERROR: falta $(LOCAL_DEV_ENV)" >&2; exit 1)
-	@cp $(LOCAL_DEV_ENV) .env
-	@echo "Backend local env activo: $(LOCAL_DEV_ENV)"
-
-up-ponti-stg-local: select-ponti-stg-local up-ponti-local
-
-up-ponti-dev-local: select-ponti-dev-local up-ponti-local
-
 seed:
 	@echo "Seeding database..."
 	@go run ./cmd/seed/main.go
@@ -98,28 +77,20 @@ seed-dashboard:
 	@go run ./cmd/api/main.go seed
 
 # --------------------------------------------------
-# Base de datos (descarga GCP STAGING → local, data-only)
+# Base de datos (reset local + migraciones + dump data-only PROD → local)
 # --------------------------------------------------
-db-staging-to-local:
-	@echo "Downloading GCP STAGING and restoring data-only to local..."
+reset-local-db-from-prod:
+	@echo "Resetting local DB from PROD data-only dump..."
 	@echo "Asegurando que la DB local esté levantada..."
 	@echo "Tip: si no seteás SRC_PASS, el script intenta leer db-password-dev desde Secret Manager (requiere gcloud auth)."
 	@docker compose -f $(DOCKER_COMPOSE_YML) up -d ponti-db 2>/dev/null || true
-	@bash ./scripts/db/db_staging_to_local.sh
-
-# Reset local DB + migraciones + carga data-only desde STAGING
-db-reset-from-staging: db-reset db-migrate-up db-staging-to-local actors-backfill-sync
-	@echo "Local DB reset + migrate + staging data-only restore completed."
+	@bash ./scripts/db/reset-local-db-from-prod.sh
+	@echo "Local DB reset + migrations + PROD data-only restore completed."
 
 actors-backfill-sync:
 	@echo "Re-ejecutando backfill/sync de actors sobre datos locales..."
 	@set -a && source .env && set +a && \
 	PGPASSWORD="$$DB_PASSWORD" psql -h "$$DB_HOST" -p "$$DB_PORT" -U "$$DB_USER" -d "$$DB_NAME" -v ON_ERROR_STOP=1 -f scripts/db/actors_backfill_sync.sql
-
-# Copia datos GCP STAGING → GCP DEV (data-only). Requiere scripts/staging_db_2_dev_db.env.
-staging-db-2-dev-db:
-	@set -a && [ -f scripts/staging_db_2_dev_db.env ] && source scripts/staging_db_2_dev_db.env; set +a && \
-	bash ./scripts/staging_db_2_dev_db.sh
 
 # Smoke tests de release (incluye divisor de aportes). Uso: make e2e-changes [BASE_URL=http://...]
 e2e-changes:
@@ -149,14 +120,6 @@ db-verify: db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff
 db-adopt-baseline:
 	@echo "Uso: make db-adopt-baseline DB_HOST=... DB_NAME=... [DB_USER=...] [DB_PORT=...] [DB_SSL_MODE=...]"
 	@bash ./scripts/db/db_adopt_baseline.sh $(DB_HOST) $(DB_NAME) $(DB_USER) $(DB_PORT) $(DB_SSL_MODE)
-
-# Fuerza reset de la DB en GCP (DROP schema public + migraciones). Requiere scripts/db/db_force_reset_gcp.env.
-db-force-reset-gcp:
-	@bash ./scripts/db/db_force_reset_gcp.sh
-
-# Después del merge: reset GCP + migraciones + cargar datos desde DB local. Requiere scripts/db/db_gcp_reset_and_load_local.env.
-db-gcp-reset-and-load-local:
-	@bash ./scripts/db/db_gcp_reset_and_load_local.sh
 
 # --------------------------------------------------
 # Desarrollo con hot reload (Air)

@@ -39,6 +39,10 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
+func withSupplyLookups(db *gorm.DB) *gorm.DB {
+	return db.Preload("Category").Preload("Type")
+}
+
 func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(shareddb.WithTx(ctx, tx))
@@ -50,7 +54,9 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		model := models.FromDomain(s)
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
 			model.TenantID = tenantID
 		}
 		if err := tx.Create(model).Error; err != nil {
@@ -94,7 +100,9 @@ func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, n
 			CreatedBy:      userID,
 			UpdatedBy:      userID,
 		}
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
 			row.TenantID = tenantID
 		}
 
@@ -114,7 +122,10 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		modelsSlice := make([]*models.Supply, len(supplies))
-		tenantID, hasTenant := authz.TenantFromContext(ctx)
+		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+		if err != nil {
+			return err
+		}
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
 			modelsSlice[i].CreatedBy = &userID
@@ -133,10 +144,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
 	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
-	if err := db.
-		Preload("Category").
-		Preload("Type").
-		First(&m, id).Error; err != nil {
+	if err := withSupplyLookups(db).First(&m, id).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "supply", id)
 	}
 	return m.ToDomain(), nil
@@ -149,9 +157,7 @@ func (r *Repository) GetSuppliesByIDs(ctx context.Context, ids []int64) ([]domai
 
 	var rows []models.Supply
 	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
-	if err := db.
-		Preload("Category").
-		Preload("Type").
+	if err := withSupplyLookups(db).
 		Where("id IN ?", ids).
 		Find(&rows).Error; err != nil {
 		return nil, domainerr.Internal("failed to get supplies by ids")
@@ -172,9 +178,7 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 
 	var m models.Supply
 	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
-	err := db.
-		Preload("Category").
-		Preload("Type").
+	err := withSupplyLookups(db).
 		Where("project_id = ?", projectID).
 		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", normalizedName).
 		First(&m).Error
@@ -383,6 +387,7 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 	deletedBy := &actor
 
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var supply models.Supply
 		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies")
 		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
@@ -398,7 +403,7 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
 			Updates(map[string]any{
-				"deleted_at": time.Now(),
+				"deleted_at": archivedAt,
 				"deleted_by": deletedBy,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to archive supply")
@@ -412,6 +417,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var supply models.Supply
 		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies")
 		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
@@ -429,7 +435,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"deleted_by": nil,
-				"updated_at": time.Now(),
+				"updated_at": restoredAt,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to restore supply")
 		}
@@ -452,9 +458,7 @@ func (r *Repository) ListArchivedSupplies(ctx context.Context, page, perPage int
 
 	var list []models.Supply
 	offset := (page - 1) * perPage
-	if err := base.
-		Preload("Category").
-		Preload("Type").
+	if err := withSupplyLookups(base).
 		Offset(offset).
 		Limit(perPage).
 		Order("supplies.deleted_at DESC").
@@ -524,9 +528,7 @@ func (r *Repository) ListSuppliesPaginated(
 	var supplies []models.Supply
 	var total int64
 
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies").
-		Preload("Category").
-		Preload("Type")
+	db := withSupplyLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies"))
 
 	// Filtrado flexible
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
@@ -635,10 +637,7 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	}
 
 	var rows []models.Supply
-	db := base.
-		Preload("Category").
-		Preload("Type").
-		Order("name")
+	db := withSupplyLookups(base).Order("name")
 
 	if err := db.Find(&rows).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to list all supplies")
@@ -676,6 +675,11 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 		return nil
 	}
 
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return domainerr.Forbidden("tenant context required")
+	}
+
 	supplyIDs := make([]int64, 0, len(supplies))
 	for i := range supplies {
 		supplyIDs = append(supplyIDs, supplies[i].ID)
@@ -709,7 +713,7 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 			src.project_id AS source_project_id,
 			pj.name AS source_project
 		FROM latest l
-		LEFT JOIN providers pv ON pv.id = l.provider_id
+		LEFT JOIN providers pv ON pv.id = l.provider_id AND pv.tenant_id = l.tenant_id
 		LEFT JOIN LATERAL (
 			SELECT sm_out.project_id
 			FROM supply_movements sm_out
@@ -724,10 +728,10 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 			ORDER BY sm_out.id DESC
 			LIMIT 1
 		) src ON l.movement_type = 'Movimiento interno entrada'
-		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL
+		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL AND pj.tenant_id = l.tenant_id
 	`
 	args := []any{supplyIDs}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+	if hasTenant {
 		query += " WHERE l.tenant_id = ?"
 		args = append(args, tenantID)
 	}

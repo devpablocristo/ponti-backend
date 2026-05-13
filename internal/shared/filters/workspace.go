@@ -45,6 +45,10 @@ func ApplyWorkspaceFilters(q *gorm.DB, f WorkspaceFilter, cols WorkspaceFilterCo
 
 // ResolveProjectIDs devuelve project_ids aplicando customer/campaign/field si project_id no viene definido.
 func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]int64, error) {
+	if _, _, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return nil, err
+	}
+
 	if f.ProjectID != nil {
 		query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 			Where("p.id = ? AND p.deleted_at IS NULL", *f.ProjectID)
@@ -125,6 +129,32 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 	}
 
 	return projectIDs, nil
+}
+
+// ValidateProjectAccess valida que un project_id pertenezca al tenant activo cuando hay contexto tenant.
+// En modo de transición sin tenant preserva compatibilidad; en modo strict falla cerrado.
+func ValidateProjectAccess(ctx context.Context, db *gorm.DB, projectID int64) error {
+	if projectID <= 0 {
+		return domainerr.Validation("project_id is required")
+	}
+
+	if _, hasTenant, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return err
+	} else if !hasTenant {
+		return nil
+	}
+
+	var count int64
+	query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("projects p"), "p").
+		Where("p.id = ? AND p.deleted_at IS NULL", projectID)
+	if err := query.Count(&count).Error; err != nil {
+		return domainerr.Internal("failed to validate project tenant")
+	}
+	if count == 0 {
+		return domainerr.NotFound("project not found")
+	}
+
+	return nil
 }
 
 // ValidateFieldBelongsToProject valida que field_id pertenezca al project_id.

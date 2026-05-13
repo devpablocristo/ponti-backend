@@ -73,7 +73,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -90,6 +89,53 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 		acf: c,
 		mws: m,
 	}
+}
+
+func (h *Handler) runSupplyIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "supply_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) runSupplyMovementAction(c *gin.Context, action func(context.Context, int64, int64) error) {
+	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
+	if !ok {
+		return
+	}
+	if err := action(c.Request.Context(), projectID, movementID); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func parseSupplyMovementBulkRequest(c *gin.Context) (int64, string, createDto.CreateSupplyMovementRequestBulk, bool) {
+	var req createDto.CreateSupplyMovementRequestBulk
+
+	userID, err := sharedhandlers.ParseActor(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return 0, "", req, false
+	}
+
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return 0, "", req, false
+	}
+
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return 0, "", req, false
+	}
+
+	return projectID, userID, req, true
 }
 
 func (h *Handler) Routes() {
@@ -307,29 +353,11 @@ func (h *Handler) CompletePendingSupply(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSupply(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "supply_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteSupply(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyIDAction(c, h.ucs.DeleteSupply)
 }
 
 func (h *Handler) HardDeleteSupply(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "supply_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.HardDeleteSupply(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyIDAction(c, h.ucs.HardDeleteSupply)
 }
 
 func (h *Handler) ListArchivedSupplies(c *gin.Context) {
@@ -343,29 +371,11 @@ func (h *Handler) ListArchivedSupplies(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveSupply(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "supply_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveSupply(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyIDAction(c, h.ucs.ArchiveSupply)
 }
 
 func (h *Handler) RestoreSupply(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "supply_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreSupply(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyIDAction(c, h.ucs.RestoreSupply)
 }
 
 func (h *Handler) CountWorkOrdersBySupplyID(c *gin.Context) {
@@ -459,21 +469,9 @@ func (h *Handler) ExportTableSupplies(c *gin.Context) {
 
 func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 	ctx := c.Request.Context()
-	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseActor(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+	projectID, userID, req, ok := parseSupplyMovementBulkRequest(c)
+	if !ok {
 		return
 	}
 
@@ -692,21 +690,9 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 
 func (h *Handler) ImportSupplyMovements(c *gin.Context) {
 	ctx := c.Request.Context()
-	var req createDto.CreateSupplyMovementRequestBulk
 
-	userID, err := sharedhandlers.ParseActor(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+	projectID, userID, req, ok := parseSupplyMovementBulkRequest(c)
+	if !ok {
 		return
 	}
 
@@ -825,27 +811,7 @@ func (h *Handler) GetSupplyMovementsByProjectID(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSupplyMovement(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	supplyMovementID, err := sharedhandlers.ParseMovementIDParam(c)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	err = h.ucs.DeleteSupplyMovement(ctx, id, supplyMovementID)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyMovementAction(c, h.ucs.DeleteSupplyMovement)
 }
 
 func (h *Handler) ListArchivedSupplyMovements(c *gin.Context) {
@@ -865,39 +831,15 @@ func (h *Handler) ListArchivedSupplyMovements(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveSupplyMovement(c *gin.Context) {
-	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
-	if !ok {
-		return
-	}
-	if err := h.ucs.ArchiveSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyMovementAction(c, h.ucs.ArchiveSupplyMovement)
 }
 
 func (h *Handler) RestoreSupplyMovement(c *gin.Context) {
-	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
-	if !ok {
-		return
-	}
-	if err := h.ucs.RestoreSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyMovementAction(c, h.ucs.RestoreSupplyMovement)
 }
 
 func (h *Handler) HardDeleteSupplyMovement(c *gin.Context) {
-	projectID, movementID, ok := h.parseSupplyMovementActionParams(c)
-	if !ok {
-		return
-	}
-	if err := h.ucs.HardDeleteSupplyMovement(c.Request.Context(), projectID, movementID); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runSupplyMovementAction(c, h.ucs.HardDeleteSupplyMovement)
 }
 
 func (h *Handler) parseSupplyMovementActionParams(c *gin.Context) (int64, int64, bool) {

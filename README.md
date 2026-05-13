@@ -41,10 +41,9 @@ Esto levanta:
 go run ./cmd/api
 ```
 
-### Sincronizar DB local con dev remoto
+### Resetear DB local desde PROD
 ```bash
-SRC_FROM_CLOUD_RUN=1 SRC_FORCE_CLOUD_RUN=1 SRC_SERVICE_NAME=ponti-backend \
-SRC_PROJECT_ID=<gcp_project_id> SRC_REGION=<gcp_region> make staging-db-2-local-db
+make reset-local-db-from-prod
 ```
 
 ## Headers requeridos

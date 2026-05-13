@@ -1,17 +1,11 @@
 package pkggorm
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
-	"net"
 	"os"
 
-	"cloud.google.com/go/cloudsqlconn"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/stdlib"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	gormdb "github.com/devpablocristo/core/databases/postgres/go"
@@ -112,56 +106,6 @@ func mapDriver(t DBType) gormdb.DriverType {
 	default:
 		return gormdb.DriverPostgres
 	}
-}
-
-// connectWithConnectorIAMAuthN conecta a Cloud SQL con IAM auth (usado en Cloud Run).
-//
-//nolint:unused
-func connectWithConnectorIAMAuthN(config ConfigPort) (gorm.Dialector, error) {
-	mustGetenv := func(k string) string {
-		v := os.Getenv(k)
-		if v == "" {
-			log.Fatalf("Warning: %s environment variable not set.", k)
-		}
-		return v
-	}
-
-	var (
-		dbUser                 = config.GetUser()
-		dbName                 = config.GetDBName()
-		instanceConnectionName = mustGetenv("INSTANCE_CONNECTION_NAME")
-		usePrivate             = os.Getenv("PRIVATE_IP")
-	)
-
-	d, err := cloudsqlconn.NewDialer(
-		context.Background(),
-		cloudsqlconn.WithIAMAuthN(),
-		cloudsqlconn.WithLazyRefresh(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cloudsqlconn.NewDialer: %w", err)
-	}
-	var opts []cloudsqlconn.DialOption
-	if usePrivate != "" {
-		opts = append(opts, cloudsqlconn.WithPrivateIP())
-	}
-
-	dsn := fmt.Sprintf("user=%s database=%s", dbUser, dbName)
-	dbConfigPort, err := pgx.ParseConfig(dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	dbConfigPort.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return d.Dial(ctx, instanceConnectionName, opts...)
-	}
-	dbURI := stdlib.RegisterConnConfig(dbConfigPort)
-	sqlDB, err := sql.Open("pgx", dbURI)
-	if err != nil {
-		return nil, fmt.Errorf("sql.Open: %w", err)
-	}
-
-	return postgres.New(postgres.Config{Conn: sqlDB}), nil
 }
 
 func (r *Repository) Client() *gorm.DB {

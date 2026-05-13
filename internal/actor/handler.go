@@ -38,7 +38,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -47,6 +46,8 @@ type Handler struct {
 	acf ConfigAPIPort
 	mws MiddlewaresEnginePort
 }
+
+type actorIDAction func(context.Context, int64) error
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
@@ -162,38 +163,24 @@ func (h *Handler) UpdateActor(c *gin.Context) {
 }
 
 func (h *Handler) ArchiveActor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "actor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveActor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runActorIDAction(c, h.ucs.ArchiveActor)
 }
 
 func (h *Handler) RestoreActor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "actor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreActor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runActorIDAction(c, h.ucs.RestoreActor)
 }
 
 func (h *Handler) HardDeleteActor(c *gin.Context) {
+	h.runActorIDAction(c, h.ucs.HardDeleteActor)
+}
+
+func (h *Handler) runActorIDAction(c *gin.Context, action actorIDAction) {
 	id, err := ginmw.ParseParamID(c, "actor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.HardDeleteActor(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
