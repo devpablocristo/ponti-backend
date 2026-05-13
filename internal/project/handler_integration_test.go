@@ -168,13 +168,13 @@ func TestUpdateProject_AllowsFrontendPayloadWithEmptyLeaseTypeDecimals(t *testin
 	payload := `{
 		"name":"DEPOSITO",
 		"updated_at":"2026-02-14T12:00:00Z",
-		"customer":{"id":25,"name":"SOALEN SRL 25%"},
+			"customer":{"id":25,"actor_id":201,"name":"SOALEN SRL 25%"},
 		"campaign":{"id":3,"name":"2025-2026"},
 		"admin_cost":100,
 		"planned_cost":200,
-		"managers":[{"id":1,"name":"RESP"}],
-		"investors":[{"id":1,"name":"INV","percentage":100}],
-		"admin_cost_investors":[{"id":1,"name":"INV","percentage":100}],
+			"managers":[{"id":1,"actor_id":301,"name":"RESP"}],
+			"investors":[{"id":1,"actor_id":401,"name":"INV","percentage":100}],
+			"admin_cost_investors":[{"id":1,"actor_id":401,"name":"INV","percentage":100}],
 		"fields":[
 			{
 				"id":10,
@@ -182,7 +182,7 @@ func TestUpdateProject_AllowsFrontendPayloadWithEmptyLeaseTypeDecimals(t *testin
 				"lease_type_id":2,
 				"lease_type_percent":"",
 				"lease_type_value":"",
-				"investors":[{"id":1,"name":"INV","percentage":100}],
+					"investors":[{"id":1,"actor_id":402,"name":"INV","percentage":100}],
 				"lots":[
 					{
 						"id":1,
@@ -218,6 +218,18 @@ func TestUpdateProject_AllowsFrontendPayloadWithEmptyLeaseTypeDecimals(t *testin
 	}
 	if len(ucs.updatedProj.Fields) != 1 {
 		t.Fatalf("expected 1 field, got %d", len(ucs.updatedProj.Fields))
+	}
+	if ucs.updatedProj.Customer.ActorID == nil || *ucs.updatedProj.Customer.ActorID != 201 {
+		t.Fatalf("expected customer actor_id=201, got %#v", ucs.updatedProj.Customer.ActorID)
+	}
+	if ucs.updatedProj.Managers[0].ActorID == nil || *ucs.updatedProj.Managers[0].ActorID != 301 {
+		t.Fatalf("expected manager actor_id=301, got %#v", ucs.updatedProj.Managers[0].ActorID)
+	}
+	if ucs.updatedProj.Investors[0].ActorID == nil || *ucs.updatedProj.Investors[0].ActorID != 401 {
+		t.Fatalf("expected investor actor_id=401, got %#v", ucs.updatedProj.Investors[0].ActorID)
+	}
+	if ucs.updatedProj.Fields[0].Investors[0].ActorID == nil || *ucs.updatedProj.Fields[0].Investors[0].ActorID != 402 {
+		t.Fatalf("expected field investor actor_id=402, got %#v", ucs.updatedProj.Fields[0].Investors[0].ActorID)
 	}
 	if ucs.updatedProj.Fields[0].LeaseTypePercent != nil {
 		t.Fatalf("expected lease_type_percent nil, got %+v", ucs.updatedProj.Fields[0].LeaseTypePercent)

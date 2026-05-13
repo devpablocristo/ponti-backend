@@ -46,12 +46,13 @@ func setupReportTenantDB(t *testing.T) *gorm.DB {
 			campaign_id INTEGER,
 			deleted_at DATETIME
 		);
-		CREATE TABLE customers (
-			id INTEGER PRIMARY KEY,
-			tenant_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			deleted_at DATETIME
-		);
+			CREATE TABLE customers (
+				id INTEGER PRIMARY KEY,
+				tenant_id TEXT NOT NULL,
+				name TEXT NOT NULL,
+				actor_id INTEGER,
+				deleted_at DATETIME
+			);
 		CREATE TABLE campaigns (
 			id INTEGER PRIMARY KEY,
 			tenant_id TEXT NOT NULL,

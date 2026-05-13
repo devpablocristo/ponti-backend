@@ -59,6 +59,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			ID:       p.Customer.ID,
 			TenantID: tenantID,
 			Name:     p.Customer.Name,
+			ActorID:  p.Customer.ActorID,
 			Base: base.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
@@ -90,6 +91,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				ID:       p.Managers[i].ID,
 				TenantID: tenantID,
 				Name:     p.Managers[i].Name,
+				ActorID:  p.Managers[i].ActorID,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -107,6 +109,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				ID:       p.Investors[i].ID,
 				TenantID: tenantID,
 				Name:     p.Investors[i].Name,
+				ActorID:  p.Investors[i].ActorID,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -124,6 +127,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 				ID:       p.AdminCostInvestors[aci].ID,
 				TenantID: tenantID,
 				Name:     p.AdminCostInvestors[aci].Name,
+				ActorID:  p.AdminCostInvestors[aci].ActorID,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -162,6 +166,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					ID:       p.Fields[key].Investors[fi].ID,
 					TenantID: tenantID,
 					Name:     p.Fields[key].Investors[fi].Name,
+					ActorID:  p.Fields[key].Investors[fi].ActorID,
 					Base: base.Base{
 						CreatedBy: p.CreatedBy,
 						UpdatedBy: p.UpdatedBy,
@@ -531,8 +536,9 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 
 		if existing.CustomerID != d.Customer.ID {
 			customer := &cusmod.Customer{
-				ID:   d.Customer.ID,
-				Name: d.Customer.Name,
+				ID:      d.Customer.ID,
+				Name:    d.Customer.Name,
+				ActorID: d.Customer.ActorID,
 				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
@@ -978,6 +984,22 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	if hasTenant {
 		c.TenantID = tenantID
 	}
+	result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
+		CustomerID: c.ID,
+		ActorID:    c.ActorID,
+		Name:       c.Name,
+		CreatedAt:  c.CreatedAt,
+		UpdatedAt:  c.UpdatedAt,
+		CreatedBy:  c.CreatedBy,
+		UpdatedBy:  c.UpdatedBy,
+	})
+	if err != nil {
+		return 0, err
+	}
+	if result != nil {
+		c.ActorID = &result.ActorID
+		return result.CustomerID, nil
+	}
 	if c.ID != 0 {
 		var existing cusmod.Customer
 		query := tx
@@ -1085,6 +1107,25 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	if hasTenant {
 		m.TenantID = tenantID
 	}
+	if m.ActorID != nil && *m.ActorID > 0 {
+		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
+			SourceTable: actorsync.LegacyManagers,
+			ActorID:     m.ActorID,
+			Name:        m.Name,
+			ActorKind:   actorsync.KindPerson,
+			Role:        actorsync.RoleResponsable,
+			CreatedAt:   m.CreatedAt,
+			UpdatedAt:   m.UpdatedAt,
+			CreatedBy:   m.CreatedBy,
+			UpdatedBy:   m.UpdatedBy,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if id > 0 {
+			return id, nil
+		}
+	}
 	if m.ID != 0 {
 		var existing manmod.Manager
 		query := tx
@@ -1157,6 +1198,25 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	tenantID, hasTenant := tenantIDFromTx(tx)
 	if hasTenant {
 		i.TenantID = tenantID
+	}
+	if i.ActorID != nil && *i.ActorID > 0 {
+		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
+			SourceTable: actorsync.LegacyInvestors,
+			ActorID:     i.ActorID,
+			Name:        i.Name,
+			ActorKind:   actorsync.KindUnknown,
+			Role:        actorsync.RoleInversor,
+			CreatedAt:   i.CreatedAt,
+			UpdatedAt:   i.UpdatedAt,
+			CreatedBy:   i.CreatedBy,
+			UpdatedBy:   i.UpdatedBy,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if id > 0 {
+			return id, nil
+		}
 	}
 	if i.ID != 0 {
 		var existing invmod.Investor
@@ -1405,7 +1465,8 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 			newManagerIDs[m.ID] = struct{}{}
 		} else {
 			manager := &manmod.Manager{
-				Name: m.Name,
+				Name:    m.Name,
+				ActorID: m.ActorID,
 				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
@@ -1470,7 +1531,8 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 			newInvestorIDs[i.ID] = struct{}{}
 		} else {
 			invID, err := ensureInvestor(tx, &invmod.Investor{
-				Name: i.Name,
+				Name:    i.Name,
+				ActorID: i.ActorID,
 				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
@@ -1742,7 +1804,8 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 			newAdCostInvIDs[aci.ID] = struct{}{}
 		} else {
 			aciID, err := ensureInvestor(tx, &invmod.Investor{
-				Name: aci.Name,
+				Name:    aci.Name,
+				ActorID: aci.ActorID,
 				Base: base.Base{
 					CreatedBy: d.UpdatedBy,
 					UpdatedBy: d.UpdatedBy,
@@ -1830,8 +1893,9 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 			inv := &df.Investors[i]
 			if inv.ID == 0 {
 				id, err := ensureInvestor(tx, &invmod.Investor{
-					Name: inv.Name,
-					Base: base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
+					Name:    inv.Name,
+					ActorID: inv.ActorID,
+					Base:    base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
 				})
 				if err != nil {
 					return err

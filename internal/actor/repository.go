@@ -392,6 +392,9 @@ func (r *Repository) MergeActors(ctx context.Context, req domain.MergeRequest) (
 		if !req.Confirm {
 			return nil
 		}
+		if err := r.validateCustomerMergeCompatibility(ctx, tx, req.TargetActorID, req.SourceActorIDs); err != nil {
+			return err
+		}
 
 		if err := r.applyMerge(ctx, tx, req); err != nil {
 			return err
@@ -850,6 +853,7 @@ func (r *Repository) mergeOrDeleteImpact(ctx context.Context, tx *gorm.DB, ids [
 		col   string
 	}{
 		{"legacy_actor_map", "legacy_actor_map", "actor_id"},
+		{"customers.actor_id", "customers", "actor_id"},
 		{"project_responsibles", "project_responsibles", "actor_id"},
 		{"project_investor_allocations", "project_investor_allocations", "actor_id"},
 		{"project_admin_cost_allocations", "project_admin_cost_allocations", "actor_id"},
@@ -877,6 +881,22 @@ func (r *Repository) mergeOrDeleteImpact(ctx context.Context, tx *gorm.DB, ids [
 		}
 	}
 	return &domain.MergeImpact{Counts: counts}, nil
+}
+
+func (r *Repository) validateCustomerMergeCompatibility(ctx context.Context, tx *gorm.DB, targetID int64, sourceIDs []int64) error {
+	ids := append([]int64{targetID}, sourceIDs...)
+	var count int64
+	if err := tx.WithContext(ctx).
+		Unscoped().
+		Table("customers").
+		Where("actor_id IN ?", ids).
+		Count(&count).Error; err != nil {
+		return domainerr.Internal("failed to validate customer merge")
+	}
+	if count > 1 {
+		return domainerr.New(domainerr.KindConflict, "cannot merge actors linked to different customers; consolidate customers/projects first")
+	}
+	return nil
 }
 
 func (r *Repository) applyMerge(ctx context.Context, tx *gorm.DB, req domain.MergeRequest) error {
@@ -924,6 +944,7 @@ func (r *Repository) applyMerge(ctx context.Context, tx *gorm.DB, req domain.Mer
 			col   string
 		}{
 			{"legacy_actor_map", "actor_id"},
+			{"customers", "actor_id"},
 			{"projects", "customer_actor_id"},
 			{"workorders", "investor_actor_id"},
 			{"workorders", "contractor_actor_id"},

@@ -41,9 +41,10 @@ func setupCustomerTenantDB(t *testing.T) *gorm.DB {
 	if err := db.Exec(`
 		CREATE TABLE customers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			tenant_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			created_at DATETIME,
+				tenant_id TEXT NOT NULL,
+				name TEXT NOT NULL,
+				actor_id INTEGER,
+				created_at DATETIME,
 			updated_at DATETIME,
 			deleted_at DATETIME,
 			created_by TEXT,

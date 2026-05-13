@@ -44,6 +44,7 @@ type Manager struct {
 	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
 	Name     string    `gorm:"type:varchar(255);not null"`
+	ActorID  *int64    `gorm:"-"`
 	sharedmodels.Base
 }
 
@@ -51,6 +52,7 @@ type Customer struct {
 	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
 	Name     string    `gorm:"type:varchar(255);not null"`
+	ActorID  *int64    `gorm:"column:actor_id"`
 }
 
 type Campaign struct {
@@ -63,6 +65,7 @@ type Investor struct {
 	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
 	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
 	Name     string    `gorm:"type:varchar(255);not null"`
+	ActorID  *int64    `gorm:"-"`
 }
 
 type ProjectInvestor struct {
@@ -188,8 +191,9 @@ func (m *Project) ToDomain() *domain.Project {
 		AdminCost:   m.AdminCost,
 		PlannedCost: m.PlannedCost,
 		Customer: customerdom.Customer{
-			ID:   m.CustomerID,
-			Name: m.Customer.Name,
+			ID:      m.CustomerID,
+			Name:    m.Customer.Name,
+			ActorID: m.Customer.ActorID,
 		},
 		Campaign: campaigndom.Campaign{
 			ID:   m.CampaignID,
@@ -209,14 +213,16 @@ func (m *Project) ToDomain() *domain.Project {
 
 	for _, mgr := range m.Managers {
 		d.Managers = append(d.Managers, managerdom.Manager{
-			ID:   mgr.ID,
-			Name: mgr.Name, // Solo si preload
+			ID:      mgr.ID,
+			Name:    mgr.Name, // Solo si preload
+			ActorID: mgr.ActorID,
 		})
 	}
 	for _, piv := range m.Investors {
 		d.Investors = append(d.Investors, investordom.Investor{
 			ID:         piv.InvestorID,
 			Name:       piv.Investor.Name,
+			ActorID:    piv.Investor.ActorID,
 			Percentage: piv.Percentage,
 		})
 	}
@@ -224,6 +230,7 @@ func (m *Project) ToDomain() *domain.Project {
 		d.AdminCostInvestors = append(d.AdminCostInvestors, investordom.Investor{
 			ID:         aci.InvestorID,
 			Name:       aci.Investor.Name,
+			ActorID:    aci.Investor.ActorID,
 			Percentage: aci.Percentage,
 		})
 	}
@@ -248,6 +255,7 @@ func (m *Project) ToDomain() *domain.Project {
 			field.Investors = append(field.Investors, investordom.Investor{
 				ID:         fi.InvestorID,
 				Name:       fi.Investor.Name,
+				ActorID:    fi.Investor.ActorID,
 				Percentage: fi.Percentage,
 				Base: shareddomain.Base{
 					CreatedAt: fi.CreatedAt,

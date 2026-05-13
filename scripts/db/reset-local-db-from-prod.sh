@@ -77,9 +77,9 @@ RESTORE_MODE="${RESTORE_MODE:-data-only}" # data-only | full (solo data-only sop
 TRUNCATE_BEFORE_RESTORE="${TRUNCATE_BEFORE_RESTORE:-1}"
 RESET_LOCAL_DB="${RESET_LOCAL_DB:-1}"
 ACTORS_BACKFILL_SYNC="${ACTORS_BACKFILL_SYNC:-1}"
-MIGRATE_TARGET_VERSION="${MIGRATE_TARGET_VERSION:-}" # e.g. 224 para restaurar dumps legacy antes de NOT NULL
+MIGRATE_TARGET_VERSION="${MIGRATE_TARGET_VERSION:-224}" # schema compatible con dumps PROD legacy antes de NOT NULL
 POST_RESTORE_TENANT_BACKFILL="${POST_RESTORE_TENANT_BACKFILL:-1}"
-RUN_FINAL_MIGRATIONS="${RUN_FINAL_MIGRATIONS:-0}"
+RUN_FINAL_MIGRATIONS="${RUN_FINAL_MIGRATIONS:-1}"
 
 log(){ echo -e "\n[INFO] $*"; }
 warn(){ echo -e "\n[WARN] $*"; }
@@ -411,7 +411,7 @@ END $$;
 SQL
 fi
 
-RESTORE_COMMON=(-h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" --no-owner --no-privileges -v)
+RESTORE_COMMON=(-h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" --no-owner --no-privileges --exit-on-error -v)
 LIST_FILE="$(mktemp)"
 LIST_FILE_FILTERED="$(mktemp)"
 

@@ -544,6 +544,14 @@ func refreshActorArchiveState(tx *gorm.DB, actorID int64, archivedAt *time.Time)
 func refreshLegacyActorColumns(tx *gorm.DB, tenantID string, sourceTable string, sourceID int64, actorID int64) error {
 	switch sourceTable {
 	case LegacyCustomers:
+		if err := tx.Exec(
+			`UPDATE customers SET actor_id = ? WHERE id = ? AND tenant_id = ?`,
+			actorID,
+			sourceID,
+			tenantID,
+		).Error; err != nil {
+			return err
+		}
 		return tx.Exec(
 			`UPDATE projects SET customer_actor_id = ? WHERE customer_id = ? AND tenant_id = ?`,
 			actorID,

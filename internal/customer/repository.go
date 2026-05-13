@@ -35,6 +35,23 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 	}
 	var id int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
+			ActorID:   c.ActorID,
+			Name:      c.Name,
+			CreatedAt: c.CreatedAt,
+			UpdatedAt: c.UpdatedAt,
+			CreatedBy: c.CreatedBy,
+			UpdatedBy: c.UpdatedBy,
+		})
+		if err != nil {
+			return err
+		}
+		if result != nil {
+			id = result.CustomerID
+			c.ActorID = &result.ActorID
+			return nil
+		}
+
 		model := models.FromDomain(c)
 		model.Base = sharedmodels.Base{
 			CreatedBy: c.CreatedBy,
@@ -49,21 +66,6 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 			return domainerr.Internal("failed to create customer")
 		}
 		id = model.ID
-		actorID, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyCustomers,
-			SourceID:    model.ID,
-			Name:        model.Name,
-			ActorKind:   actorsync.KindOrganization,
-			Role:        actorsync.RoleCliente,
-			CreatedAt:   model.CreatedAt,
-			UpdatedAt:   model.UpdatedAt,
-			CreatedBy:   model.CreatedBy,
-			UpdatedBy:   model.UpdatedBy,
-		})
-		if err != nil {
-			return err
-		}
-		c.ActorID = &actorID
 		return nil
 	})
 	return id, err
@@ -91,7 +93,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 
 	// Consulta ligera: sólo id y name
 	listDB := db0.
-		Select("c.id, c.name, m.actor_id").
+		Select("c.id, c.name, COALESCE(c.actor_id, m.actor_id) AS actor_id").
 		Joins("LEFT JOIN legacy_actor_map m ON m.source_table = 'customers' AND m.source_id = c.id AND m.tenant_id = c.tenant_id")
 	if err := listDB.
 		Limit(perPage).
@@ -128,7 +130,7 @@ func (r *Repository) ListArchivedCustomers(ctx context.Context, page, perPage in
 	}
 
 	if err := db0.
-		Select("c.id, c.name, m.actor_id").
+		Select("c.id, c.name, COALESCE(c.actor_id, m.actor_id) AS actor_id").
 		Joins("LEFT JOIN legacy_actor_map m ON m.source_table = 'customers' AND m.source_id = c.id AND m.tenant_id = c.tenant_id").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
@@ -161,11 +163,17 @@ func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Custome
 		return nil, domainerr.Internal("failed to get customer")
 	}
 	out := model.ToDomain()
-	actorID, err := actorsync.ActorIDForLegacy(r.db.Client().WithContext(ctx), actorsync.LegacyCustomers, id)
-	if err != nil {
-		return nil, err
+	if out.ActorID == nil {
+		actorID, err := actorsync.ActorIDForLegacy(r.db.Client().WithContext(ctx), actorsync.LegacyCustomers, id)
+		if err != nil {
+			return nil, err
+		}
+		if actorID > 0 {
+			out.ActorID = &actorID
+		}
 	}
-	if actorID > 0 {
+	if out.ActorID != nil {
+		actorID := *out.ActorID
 		out.ActorID = &actorID
 	}
 	return out, nil
@@ -192,6 +200,18 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 				return domainerr.Conflict("customer not found or outdated")
 			}
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer with id %d does not exist", c.ID))
+		}
+		if c.ActorID != nil && *c.ActorID > 0 {
+			_, err := actorsync.LinkLegacyEntityToActor(tx, actorsync.LegacyActorSync{
+				SourceTable: actorsync.LegacyCustomers,
+				SourceID:    c.ID,
+				Name:        c.Name,
+				ActorKind:   actorsync.KindOrganization,
+				Role:        actorsync.RoleCliente,
+				UpdatedAt:   time.Now(),
+				UpdatedBy:   c.UpdatedBy,
+			}, *c.ActorID)
+			return err
 		}
 		_, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 			SourceTable: actorsync.LegacyCustomers,

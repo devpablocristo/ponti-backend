@@ -57,12 +57,13 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			updated_by TEXT,
 			deleted_by TEXT
 		);
-		CREATE TABLE customers (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			tenant_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			deleted_at DATETIME
-		);
+			CREATE TABLE customers (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				tenant_id TEXT NOT NULL,
+				name TEXT NOT NULL,
+				actor_id INTEGER,
+				deleted_at DATETIME
+			);
 		CREATE TABLE campaigns (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id TEXT NOT NULL,

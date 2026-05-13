@@ -106,11 +106,37 @@ BEGIN
     END LOOP;
 END $$;
 
+WITH unambiguous_customer_actor AS (
+    SELECT m.tenant_id, m.source_id, m.actor_id
+    FROM public.legacy_actor_map m
+    WHERE m.source_table = 'customers'
+      AND m.actor_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1
+          FROM public.legacy_actor_map other
+          WHERE other.tenant_id = m.tenant_id
+            AND other.source_table = 'customers'
+            AND other.actor_id = m.actor_id
+            AND other.source_id IS DISTINCT FROM m.source_id
+      )
+)
+UPDATE public.customers c
+SET actor_id = m.actor_id
+FROM unambiguous_customer_actor m
+WHERE m.source_id = c.id
+  AND m.tenant_id = c.tenant_id
+  AND c.actor_id IS NULL;
+
 UPDATE public.projects p
-SET customer_actor_id = m.actor_id
-FROM public.legacy_actor_map m
-WHERE m.source_table = 'customers'
-  AND m.source_id = p.customer_id;
+SET customer_actor_id = COALESCE(c.actor_id, m.actor_id)
+FROM public.customers c
+LEFT JOIN public.legacy_actor_map m
+  ON m.source_table = 'customers'
+ AND m.source_id = c.id
+ AND m.tenant_id = c.tenant_id
+WHERE c.id = p.customer_id
+  AND c.tenant_id = p.tenant_id
+  AND COALESCE(c.actor_id, m.actor_id) IS NOT NULL;
 
 UPDATE public.workorders w
 SET investor_actor_id = m.actor_id
