@@ -48,11 +48,15 @@ func (s *Stock) GetStockDifferencePtr() *decimal.Decimal {
 
 func (s *Stock) GetEntryStock() decimal.Decimal {
 	var stockUnits decimal.Decimal
+
 	for _, supplyMovement := range s.SupplyMovements {
-		if supplyMovement.IsEntry && supplyMovement.Quantity.GreaterThanOrEqual(decimal.Zero) {
-			stockUnits = stockUnits.Add(supplyMovement.Quantity)
+		if !supplyMovement.IsEntry {
+			continue
 		}
+
+		stockUnits = stockUnits.Add(supplyMovement.Quantity)
 	}
+
 	return stockUnits
 }
 
