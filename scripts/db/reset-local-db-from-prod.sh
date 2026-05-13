@@ -1,35 +1,34 @@
 #!/usr/bin/env bash
-# db_staging_to_local.sh
-# - Descarga dump desde GCP STAGING y restaura solo datos en DB local (tal cual, sin cambios)
-# - Origen: new_ponti_db_staging. Tratamiento: data-only, sin schema, sin renames.
+# reset-local-db-from-prod.sh
+# - Resetea la DB local, aplica migraciones y restaura datos desde PROD.
+# - Origen: new_ponti_db_prod. Tratamiento: data-only, sin schema, sin renames.
 #
-# Requiere: scripts/db/db_staging_to_local.env (origen + destino).
+# Requiere: .env (destino local). PROD se infiere con defaults seguros y gcloud.
 #
 # Uso:
-#   cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env
-#   editar scripts/db/db_staging_to_local.env
-#   ./scripts/db/db_staging_to_local.sh
+#   cp .env.example .env
+#   editar .env
+#   ./scripts/db/reset-local-db-from-prod.sh
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ENV_FILE="${BACKEND_DIR}/.env"
 
-### ===== Config (SIEMPRE desde scripts/db/db_staging_to_local.env) =====
-CREDS_FILE="${SCRIPT_DIR}/db_staging_to_local.env"
-if [[ ! -f "${CREDS_FILE}" ]]; then
-  echo "[ERROR] Falta ${CREDS_FILE}."
-  echo "[ERROR] Copiá el ejemplo: cp scripts/db/db_staging_to_local.env.example scripts/db/db_staging_to_local.env"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "[ERROR] Falta ${ENV_FILE}."
+  echo "[ERROR] Copiá el ejemplo: cp .env.example .env"
   exit 1
 fi
 set -a
-source "${CREDS_FILE}"
+source "${ENV_FILE}"
 set +a
 
-SRC_USER="${SRC_USER:-${DB_USER_STG:-soalen-db-v3}}"
+SRC_USER="${SRC_USER:-${DB_USER_PROD:-soalen-db-v3}}"
 SRC_PASS="${SRC_PASS:-}"
 SRC_HOST="${SRC_HOST:-}"
 SRC_PORT="${SRC_PORT:-5432}"
-SRC_DB="${SRC_DB:-${DB_NAME_STG:-new_ponti_db_staging}}"
+SRC_DB="${SRC_DB:-${DB_NAME_PROD:-new_ponti_db_prod}}"
 SRC_SSL="${SRC_SSL:-disable}"
 
 # Si no se provee SRC_PASS, intentar obtenerlo automáticamente desde Secret Manager.
@@ -47,34 +46,40 @@ fi
 
 # Cloud SQL Proxy (fallback si no hay acceso directo)
 USE_CLOUDSQL_PROXY="${USE_CLOUDSQL_PROXY:-auto}" # auto | 1 | 0
-SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-${CLOUDSQL_PROJECT_STG:-}}"
+SRC_INSTANCE_PROJECT="${SRC_INSTANCE_PROJECT:-${CLOUDSQL_PROJECT_PROD:-}}"
 SRC_INSTANCE_REGION="${SRC_INSTANCE_REGION:-}"
-SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_STG:-}}"
+SRC_INSTANCE_NAME="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_PROD:-}}"
 SRC_INSTANCE_CONN="${SRC_INSTANCE_CONN:-}"
 SRC_PROXY_PORT="${SRC_PROXY_PORT:-55433}"
 PROXY_CONTAINER_NAME="${PROXY_CONTAINER_NAME:-ponti-cloudsql-proxy}"
 
-### ===== Destino (Local) =====
-DB_USER="${DST_DB_USER:-}"
-DB_PASSWORD="${DST_DB_PASSWORD:-}"
-DB_HOST="${DST_DB_HOST:-127.0.0.1}"
-DB_NAME="${DST_DB_NAME:-}"
-DB_PORT="${DST_DB_PORT:-}"
+### ===== Destino (Local, desde .env) =====
+DB_USER="${DB_USER:-}"
+DB_PASSWORD="${DB_PASSWORD:-}"
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_NAME="${DB_NAME:-}"
+DB_PORT="${DB_PORT:-}"
+DB_SSL_MODE="${DB_SSL_MODE:-disable}"
 
 if [[ -z "${DB_USER}" || -z "${DB_PASSWORD}" || -z "${DB_NAME}" || -z "${DB_PORT}" ]]; then
-  echo "[ERROR] En ${CREDS_FILE} faltan variables del destino local."
-  echo "[ERROR] Requeridas: DST_DB_USER, DST_DB_PASSWORD, DST_DB_NAME, DST_DB_PORT (DST_DB_HOST opcional)."
+  echo "[ERROR] En ${ENV_FILE} faltan variables del destino local."
+  echo "[ERROR] Requeridas: DB_USER, DB_PASSWORD, DB_NAME, DB_PORT (DB_HOST opcional)."
   exit 1
 fi
 
 # Control
 DISABLE_TRIGGERS="${DISABLE_TRIGGERS:-1}"  # 1= intentar deshabilitar triggers (requiere superuser)
 SKIP_DUMP="${SKIP_DUMP:-0}"                # 1= salta el pg_dump
-DUMP_FILE="${DUMP_FILE:-/tmp/staging_to_local_$(date +%F_%H%M%S).dump}"
+DUMP_FILE="${DUMP_FILE:-/tmp/prod_to_local_$(date +%F_%H%M%S).dump}"
 PGDUMP_RETRIES="${PGDUMP_RETRIES:-3}"
 PGDUMP_RETRY_SLEEP="${PGDUMP_RETRY_SLEEP:-5}"
-RESTORE_MODE="${RESTORE_MODE:-data-only}" # data-only | full (solo data-only soportado para staging)
+RESTORE_MODE="${RESTORE_MODE:-data-only}" # data-only | full (solo data-only soportado)
 TRUNCATE_BEFORE_RESTORE="${TRUNCATE_BEFORE_RESTORE:-1}"
+RESET_LOCAL_DB="${RESET_LOCAL_DB:-1}"
+ACTORS_BACKFILL_SYNC="${ACTORS_BACKFILL_SYNC:-1}"
+MIGRATE_TARGET_VERSION="${MIGRATE_TARGET_VERSION:-}" # e.g. 224 para restaurar dumps legacy antes de NOT NULL
+POST_RESTORE_TENANT_BACKFILL="${POST_RESTORE_TENANT_BACKFILL:-1}"
+RUN_FINAL_MIGRATIONS="${RUN_FINAL_MIGRATIONS:-0}"
 
 log(){ echo -e "\n[INFO] $*"; }
 warn(){ echo -e "\n[WARN] $*"; }
@@ -140,23 +145,23 @@ PY
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   log "DRY_RUN=1 (sin dump/restore)"
-  log "Origen efectivo: ${SRC_USER}@${SRC_HOST:-<infer>}:${SRC_PORT}/${SRC_DB} (sslmode=${SRC_SSL})"
+  log "Origen efectivo: ${SRC_USER}@${SRC_HOST:-<infer>}:${SRC_PORT}/${SRC_DB} (PROD, sslmode=${SRC_SSL})"
   log "Destino efectivo: ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
   exit 0
 fi
 
-### ===== Validaciones de credenciales origen (STAGING) =====
+### ===== Validaciones de credenciales origen (PROD) =====
 if [[ -z "${SRC_PASS}" ]]; then
-  err "SRC_PASS es requerido para el usuario de staging (${SRC_USER})."
+  err "SRC_PASS es requerido para el usuario de PROD (${SRC_USER})."
   err "Opciones:"
-  err "  - Editá ${CREDS_FILE} y seteá SRC_PASS=..."
-  err "  - O configurá gcloud ADC y seteá SRC_PASS_SECRET_PROJECT/SRC_PASS_SECRET_NAME"
+  err "  - Seteá SRC_PASS en el entorno antes de ejecutar"
+  err "  - O configurá gcloud ADC y dejá que el script lea db-password-dev desde Secret Manager"
   exit 1
 fi
 
 if [[ -z "${SRC_USER}" || -z "${SRC_DB}" || -z "${SRC_PORT}" ]]; then
   err "Faltan credenciales mínimas de origen. Definí SRC_USER, SRC_PASS, SRC_DB, SRC_PORT."
-  err "Ejemplo: SRC_PASS='...' ./scripts/db/db_staging_to_local.sh"
+  err "Ejemplo: SRC_PASS='...' ./scripts/db/reset-local-db-from-prod.sh"
   exit 1
 fi
 
@@ -165,7 +170,7 @@ infer_src_host_from_gcloud() {
     return 1
   fi
 
-  # Defaults seguros para este repo: STAGING vive en la instancia unificada de DEV.
+  # Defaults seguros para este repo: PROD vive en la instancia unificada de DEV.
   local proj="${SRC_INSTANCE_PROJECT:-new-ponti-dev}"
   local inst="${SRC_INSTANCE_NAME:-${DB_INSTANCE_NAME_DEV:-new-ponti-db-dev}}"
 
@@ -192,10 +197,14 @@ if [[ -z "${SRC_SSL}" ]]; then
   SRC_SSL="disable"
 fi
 
-log "Origen efectivo: ${SRC_USER}@${SRC_HOST}:${SRC_PORT}/${SRC_DB} (STAGING, sslmode=${SRC_SSL})"
+log "Origen efectivo: ${SRC_USER}@${SRC_HOST}:${SRC_PORT}/${SRC_DB} (PROD, sslmode=${SRC_SSL})"
 
 ### ===== Chequeo binarios =====
 need psql; need pg_dump; need pg_restore; need pg_isready
+
+if [[ "$RESET_LOCAL_DB" == "1" ]]; then
+  need docker
+fi
 
 cleanup_proxy() {
   if docker ps -a --format '{{.Names}}' | grep -q "^${PROXY_CONTAINER_NAME}$"; then
@@ -214,7 +223,7 @@ start_proxy() {
   if [[ -z "${SRC_INSTANCE_CONN}" ]]; then
     if [[ -z "${SRC_INSTANCE_PROJECT}" && -z "${SRC_INSTANCE_REGION}" && -z "${SRC_INSTANCE_NAME}" ]]; then
       err "Para usar Cloud SQL Proxy faltan SRC_INSTANCE_* (project/region/name) o SRC_INSTANCE_CONN."
-      err "Definilos en scripts/db/db_staging_to_local.env (no se hardcodean defaults en el repo)."
+      err "Definilos en .env o en el entorno antes de ejecutar."
       return 1
     fi
     if command -v gcloud >/dev/null 2>&1; then
@@ -311,6 +320,35 @@ done
 # Probar conexión real (captura error de auth)
 PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "\conninfo" >/dev/null
 
+if [[ "$RESET_LOCAL_DB" == "1" ]]; then
+  log "Reseteando DB local ${DB_NAME}..."
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 <<SQL
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = '${DB_NAME}'
+  AND pid <> pg_backend_pid();
+
+DROP DATABASE IF EXISTS ${DB_NAME};
+CREATE DATABASE ${DB_NAME};
+SQL
+
+  log "Aplicando migraciones locales..."
+  DB_PASSWORD_ENC="$(urlencode_pass "$DB_PASSWORD")"
+  MIGRATE_COMMON=(
+    docker run --rm --network host
+    -v "${BACKEND_DIR}/migrations_v4:/migrations:ro"
+    migrate/migrate:v4.17.1
+    -path /migrations
+    -database "postgres://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}"
+  )
+  if [[ -n "$MIGRATE_TARGET_VERSION" ]]; then
+    log "  -> hasta versión ${MIGRATE_TARGET_VERSION}"
+    "${MIGRATE_COMMON[@]}" goto "$MIGRATE_TARGET_VERSION"
+  else
+    "${MIGRATE_COMMON[@]}" up
+  fi
+fi
+
 ### ===== Detectar si el rol es superuser =====
 IS_SUPER=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -At -d postgres -c "SELECT rolsuper::int FROM pg_roles WHERE rolname='${DB_USER}';" || echo 0)
 if [[ "${IS_SUPER:-0}" != "1" ]]; then
@@ -324,7 +362,7 @@ fi
 if [[ "$SKIP_DUMP" == "1" && -f "$DUMP_FILE" ]]; then
   log "SKIP_DUMP=1 → uso dump existente: ${DUMP_FILE}"
 else
-  log "Generando dump data-only desde STAGING -> ${DUMP_FILE}"
+  log "Generando dump data-only desde PROD -> ${DUMP_FILE}"
   SRC_PASS_ENC="$(urlencode_pass "$SRC_PASS")"
   SRC_CONN="postgresql://${SRC_USER}:${SRC_PASS_ENC}@${SRC_HOST}:${SRC_PORT}/${SRC_DB}?sslmode=${SRC_SSL}"
   DUMP_ARGS=(-F c --no-owner --no-acl --data-only -v -f "$DUMP_FILE")
@@ -441,4 +479,25 @@ END $$;
 SQL
 log "OK. Secuencias sincronizadas."
 
-log "✅ RESTAURACIÓN COMPLETA (staging → local, data-only, tal cual)."
+if [[ "$POST_RESTORE_TENANT_BACKFILL" == "1" ]]; then
+  log "Reejecutando backfill tenant post-restore..."
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
+fi
+
+if [[ "$ACTORS_BACKFILL_SYNC" == "1" ]]; then
+  log "Reejecutando backfill/sync de actors..."
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
+fi
+
+if [[ "$RUN_FINAL_MIGRATIONS" == "1" ]]; then
+  log "Aplicando migraciones finales post-restore..."
+  DB_PASSWORD_ENC="$(urlencode_pass "$DB_PASSWORD")"
+  docker run --rm --network host \
+    -v "${BACKEND_DIR}/migrations_v4:/migrations:ro" \
+    migrate/migrate:v4.17.1 \
+    -path /migrations \
+    -database "postgres://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}" \
+    up
+fi
+
+log "✅ RESTAURACIÓN COMPLETA (PROD → local, data-only, tal cual)."
