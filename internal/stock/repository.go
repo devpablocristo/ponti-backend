@@ -385,6 +385,62 @@ func (r *Repository) GetActiveStocksByProjectID(ctx context.Context, projectID i
 	}
 	return stocks, nil
 }
+func (r *Repository) GetLastClosedStocksWithoutActiveByProjectID(ctx context.Context, projectID int64) ([]*domain.Stock, error) {
+	var ids []int64
+
+	err := r.getDB(ctx).Raw(`
+		WITH ranked_closed AS (
+			SELECT
+				st.id,
+				ROW_NUMBER() OVER (
+					PARTITION BY st.supply_id, st.investor_id
+					ORDER BY st.close_date DESC, st.id DESC
+				) AS rn
+			FROM stocks st
+			WHERE st.project_id = ?
+			  AND st.close_date IS NOT NULL
+			  AND st.deleted_at IS NULL
+			  AND NOT EXISTS (
+				  SELECT 1
+				  FROM stocks active
+				  WHERE active.project_id = st.project_id
+				    AND active.supply_id = st.supply_id
+				    AND active.investor_id = st.investor_id
+				    AND active.close_date IS NULL
+				    AND active.deleted_at IS NULL
+			  )
+		)
+		SELECT id
+		FROM ranked_closed
+		WHERE rn = 1
+	`, projectID).Scan(&ids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ids) == 0 {
+		return []*domain.Stock{}, nil
+	}
+
+	var stockModels []models.Stock
+	if err := r.getDB(ctx).
+		Preload("Project").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Where("id IN ?", ids).
+		Find(&stockModels).Error; err != nil {
+		return nil, err
+	}
+
+	stocks := make([]*domain.Stock, 0, len(stockModels))
+	for i := range stockModels {
+		stocks = append(stocks, stockModels[i].ToDomain())
+	}
+
+	return stocks, nil
+}
 
 func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
 	var rawPeriods []time.Time
@@ -565,6 +621,29 @@ func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int6
 		}
 	}
 	stockModel.Consumed = consumedBySupplyID[supplyID]
+
+	return stockModel.ToDomain(), false, nil
+}
+
+func (r *Repository) GetLastClosedStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
+	var stockModel models.Stock
+	err := r.getDB(ctx).
+		Preload("Project").
+		Preload("Supply", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Supply.Type").
+		Preload("Supply.Category").
+		Preload("Investor").
+		Where("project_id = ?", projectID).
+		Where("supply_id = ?", supplyID).
+		Where("close_date IS NOT NULL").
+		Order("close_date DESC, id DESC").
+		First(&stockModel).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, true, nil
+		}
+		return nil, false, domainerr.Internal("failed to get last closed stock")
+	}
 
 	return stockModel.ToDomain(), false, nil
 }

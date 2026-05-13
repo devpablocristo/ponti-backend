@@ -87,10 +87,98 @@ func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64,
 		return domainerr.Validation("project_id must be greater than 0")
 	}
 
+	now := time.Now().UTC()
+
+	yearPeriod := int64(now.Year())
+	monthPeriod := int64(now.Month())
+
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return domainerr.Forbidden("tenant context required")
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND st.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, yearPeriod, monthPeriod, now, now, updatedBy, updatedBy)
+
+	if err := r.getDB(ctx).Exec(fmt.Sprintf(`
+		WITH ranked_closed AS (
+			SELECT
+				st.tenant_id,
+				st.project_id,
+				st.supply_id,
+				st.investor_id,
+				st.real_stock_units,
+				st.has_real_stock_count,
+				ROW_NUMBER() OVER (
+					PARTITION BY st.supply_id, st.investor_id
+					ORDER BY st.close_date DESC, st.id DESC
+				) AS row_num
+			FROM stocks st
+			WHERE st.project_id = ?
+			  AND st.close_date IS NOT NULL
+			  AND st.deleted_at IS NULL
+			  %s
+			  AND NOT EXISTS (
+				  SELECT 1
+				  FROM stocks active
+				  WHERE active.project_id = st.project_id
+				    AND active.supply_id = st.supply_id
+				    AND active.investor_id = st.investor_id
+				    AND active.close_date IS NULL
+				    AND active.deleted_at IS NULL
+				    AND active.tenant_id = st.tenant_id
+			  )
+		)
+		INSERT INTO stocks (
+			tenant_id,
+			project_id,
+			supply_id,
+			investor_id,
+			close_date,
+			real_stock_units,
+			initial_units,
+			year_period,
+			month_period,
+			units_entered,
+			units_consumed,
+			has_real_stock_count,
+			created_at,
+			updated_at,
+			created_by,
+			updated_by
+		)
+		SELECT
+			tenant_id,
+			project_id,
+			supply_id,
+			investor_id,
+			NULL,
+			real_stock_units,
+			real_stock_units,
+			?,
+			?,
+			0,
+			0,
+			has_real_stock_count,
+			?,
+			?,
+			?,
+			?
+		FROM ranked_closed
+		WHERE row_num = 1
+	`, tenantFilter), args...).Error; err != nil {
+		return domainerr.Internal("failed to prepare field stock counts")
+	}
+
 	updates := map[string]any{
 		"real_stock_units":     decimal.Zero,
 		"has_real_stock_count": true,
-		"updated_at":           time.Now().UTC(),
+		"updated_at":           now,
 		"updated_by":           updatedBy,
 	}
 

@@ -83,6 +83,22 @@ func (mr *MockUseCasesPortMockRecorder) GetLastStockByProjectID(arg0, arg1, arg2
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastStockByProjectID", reflect.TypeOf((*MockUseCasesPort)(nil).GetLastStockByProjectID), arg0, arg1, arg2)
 }
 
+// GetLastClosedStockByProjectID mocks base method.
+func (m *MockUseCasesPort) GetLastClosedStockByProjectID(arg0 context.Context, arg1, arg2 int64) (*domain.Stock, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastClosedStockByProjectID", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*domain.Stock)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetLastClosedStockByProjectID indicates an expected call of GetLastClosedStockByProjectID.
+func (mr *MockUseCasesPortMockRecorder) GetLastClosedStockByProjectID(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastClosedStockByProjectID", reflect.TypeOf((*MockUseCasesPort)(nil).GetLastClosedStockByProjectID), arg0, arg1, arg2)
+}
+
 // GetLastStockByProjectInvestorID mocks base method.
 func (m *MockUseCasesPort) GetLastStockByProjectInvestorID(arg0 context.Context, arg1, arg2, arg3 int64) (*domain.Stock, bool, error) {
 	m.ctrl.T.Helper()

@@ -36,11 +36,13 @@ type BusinessInsightsNotifier interface {
 type RepositoryPort interface {
 	GetStocks(context.Context, int64, time.Time) ([]*domain.Stock, error)
 	GetActiveStocksByProjectID(context.Context, int64) ([]*domain.Stock, error)
+	GetLastClosedStocksWithoutActiveByProjectID(context.Context, int64) ([]*domain.Stock, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, *domain.Stock) error
 	UpdateRealStockUnits(context.Context, int64, *domain.Stock) error
 	GetStockByID(context.Context, int64) (*domain.Stock, error)
 	GetLastStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
+	GetLastClosedStockByProjectID(context.Context, int64, int64) (*domain.Stock, bool, error)
 	GetLastStockByProjectInvestorID(context.Context, int64, int64, int64) (*domain.Stock, bool, error)
 	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
@@ -109,20 +111,39 @@ func (u *UseCases) UpdateCloseDateByProject(ctx context.Context, projectID int64
 	if err != nil {
 		return err
 	}
-	if len(activeStocks) == 0 {
-		return domainerr.NotFound("no active stocks to close for project")
+
+	closedWithoutActive, err := u.repo.GetLastClosedStocksWithoutActiveByProjectID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	stocksToCarryForward := make([]*domain.Stock, 0, len(activeStocks)+len(closedWithoutActive))
+	stocksToCarryForward = append(stocksToCarryForward, activeStocks...)
+	stocksToCarryForward = append(stocksToCarryForward, closedWithoutActive...)
+
+	if len(stocksToCarryForward) == 0 {
+		return domainerr.NotFound("no stocks found to close for project")
 	}
 
 	return u.repo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
+		for _, closed := range closedWithoutActive {
+			activeFromClosed := createActiveStockFromClosed(*stock.UpdatedBy, monthPeriod, yearPeriod, closed)
+			if _, err := u.repo.CreateStock(txCtx, &activeFromClosed); err != nil {
+				return err
+			}
+		}
+
 		if err := u.repo.UpdateCloseDateByProject(txCtx, projectID, stock); err != nil {
 			return err
 		}
-		for _, active := range activeStocks {
-			newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, active)
+
+		for _, sourceStock := range stocksToCarryForward {
+			newStock := createNewStockPeriod(*stock.UpdatedBy, monthPeriod, yearPeriod, sourceStock)
 			if _, err := u.repo.CreateStock(txCtx, &newStock); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 }
@@ -179,6 +200,10 @@ func (u *UseCases) GetLastStockByProjectID(ctx context.Context, projectID int64,
 	return u.repo.GetLastStockByProjectID(ctx, projectID, supplyID)
 }
 
+func (u *UseCases) GetLastClosedStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
+	return u.repo.GetLastClosedStockByProjectID(ctx, projectID, supplyID)
+}
+
 func (u *UseCases) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
 	return u.repo.GetLastStockByProjectInvestorID(ctx, projectID, supplyID, investorID)
 }
@@ -206,6 +231,25 @@ func createNewStockPeriod(userID string, monthPeriod int64, yearPeriod int64, st
 		},
 	}
 	return newStock
+}
+
+func createActiveStockFromClosed(userID string, monthPeriod int64, yearPeriod int64, stock *domain.Stock) domain.Stock {
+	return domain.Stock{
+		Project:           stock.Project,
+		YearPeriod:        yearPeriod,
+		MonthPeriod:       monthPeriod,
+		Supply:            stock.Supply,
+		Investor:          stock.Investor,
+		InitialStock:      stock.InitialStock,
+		RealStockUnits:    stock.RealStockUnits,
+		HasRealStockCount: stock.HasRealStockCount,
+		Base: shareddomain.Base{
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			CreatedBy: &userID,
+			UpdatedBy: &userID,
+		},
+	}
 }
 
 func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
