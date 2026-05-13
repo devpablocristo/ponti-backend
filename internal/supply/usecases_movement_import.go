@@ -273,12 +273,18 @@ func (u *UseCases) validateSupplyMovementImport(
 func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, movement *domain.SupplyMovement) error {
 	switch movement.MovementType {
 	case domain.STOCK:
-		_, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
+		_, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
 		if err != nil {
 			return err
 		}
 		if isFirst {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			_, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+			if err != nil {
+				return err
+			}
+			if closedIsFirst {
+				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			}
 		}
 		return nil
 	default:

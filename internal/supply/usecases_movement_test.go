@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/golang/mock/gomock"
 	"github.com/shopspring/decimal"
@@ -1291,7 +1292,7 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 		GetProvider(gomock.Any(), providerID).
 		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
 	mockStock.EXPECT().
-		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
 		Return(&stockdomain.Stock{ID: stockID, RealStockUnits: decimal.NewFromInt(4)}, false, nil).
 		Times(2)
 	mockStock.EXPECT().
@@ -1309,6 +1310,88 @@ func TestImportSupplyMovements_AllowsZeroQuantityForStock(t *testing.T) {
 		MovementType:    domain.STOCK,
 		MovementDate:    &date,
 		ReferenceNumber: "STK-200",
+		Supply:          &domain.Supply{ID: supplyID},
+		Investor:        &investordomain.Investor{ID: investorID},
+		Provider:        &providerdomain.Provider{ID: providerID},
+		IsEntry:         true,
+	}})
+
+	assert.NoError(t, err)
+	assert.Nil(t, failures)
+	assert.Equal(t, []int64{0}, ids)
+}
+
+func TestImportSupplyMovements_StockCreatesActiveStockFromClosedStock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(44)
+	supplyID := int64(10)
+	investorID := int64(5)
+	providerID := int64(7)
+	newStockID := int64(100)
+	date := mustTime(t, "2026-05-06T00:00:00Z")
+	closedStock := &stockdomain.Stock{
+		ID:             99,
+		Project:        &projectdomain.Project{ID: projectID},
+		Supply:         &domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"},
+		Investor:       &investordomain.Investor{ID: investorID, Name: "Inv"},
+		RealStockUnits: decimal.NewFromInt(12),
+	}
+
+	mockRepo.EXPECT().
+		ExecuteInTransaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(nil, true, nil).
+		Times(2)
+	mockStock.EXPECT().
+		GetLastClosedStockByProjectID(gomock.Any(), projectID, supplyID).
+		Return(closedStock, false, nil).
+		Times(2)
+	mockStock.EXPECT().
+		CreateStock(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, stock *stockdomain.Stock) (int64, error) {
+			assert.Equal(t, projectID, stock.Project.ID)
+			assert.Equal(t, supplyID, stock.Supply.ID)
+			assert.Equal(t, investorID, stock.Investor.ID)
+			assert.Nil(t, stock.CloseDate)
+			assert.True(t, stock.InitialStock.Equal(decimal.NewFromInt(12)))
+			assert.True(t, stock.RealStockUnits.Equal(decimal.NewFromInt(5)))
+			assert.True(t, stock.HasRealStockCount)
+			return newStockID, nil
+		})
+	mockStock.EXPECT().
+		UpdateRealStockUnits(gomock.Any(), newStockID, gomock.Any()).
+		DoAndReturn(func(_ context.Context, id int64, stock *stockdomain.Stock) error {
+			assert.Equal(t, newStockID, id)
+			assert.True(t, stock.RealStockUnits.Equal(decimal.NewFromInt(5)))
+			assert.True(t, stock.HasRealStockCount)
+			return nil
+		})
+
+	ids, failures, err := u.ImportSupplyMovements(context.Background(), []*domain.SupplyMovement{{
+		ProjectId:       projectID,
+		Quantity:        decimal.NewFromInt(5),
+		MovementType:    domain.STOCK,
+		MovementDate:    &date,
+		ReferenceNumber: "STK-201",
 		Supply:          &domain.Supply{ID: supplyID},
 		Investor:        &investordomain.Investor{ID: investorID},
 		Provider:        &providerdomain.Provider{ID: providerID},
@@ -1368,6 +1451,62 @@ func TestUpdateSupplyMovement_ReassignsStockByInvestor(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUpdateSupplyMovement_OfficialInvoiceCreatesStockWhenTargetSupplyHasNoStock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(44)
+	supplyID := int64(10)
+	investorID := int64(5)
+	providerID := int64(7)
+	targetStockID := int64(99)
+
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		Return(nil, true, nil)
+	mockStock.EXPECT().
+		CreateStock(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, stock *stockdomain.Stock) (int64, error) {
+			assert.Equal(t, projectID, stock.Project.ID)
+			assert.Equal(t, supplyID, stock.Supply.ID)
+			assert.Equal(t, investorID, stock.Investor.ID)
+			return targetStockID, nil
+		})
+	mockRepo.EXPECT().
+		UpdateSupplyMovement(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, movement *domain.SupplyMovement) error {
+			assert.Equal(t, targetStockID, movement.StockId)
+			assert.Equal(t, supplyID, movement.Supply.ID)
+			assert.Equal(t, investorID, movement.Investor.ID)
+			return nil
+		})
+
+	err := u.UpdateSupplyMovement(context.Background(), &domain.SupplyMovement{
+		ID:           1,
+		StockId:      1,
+		ProjectId:    projectID,
+		MovementType: domain.OFFICIAL_INVOICE,
+		Supply:       &domain.Supply{ID: supplyID},
+		Investor:     &investordomain.Investor{ID: investorID},
+		Provider:     &providerdomain.Provider{ID: providerID},
+	})
+
+	assert.NoError(t, err)
+}
+
 func TestUpdateSupplyMovement_RejectsInternalMovements(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
@@ -1396,4 +1535,44 @@ func mustTime(t *testing.T, value string) time.Time {
 		t.Fatalf("parse time: %v", err)
 	}
 	return parsed
+}
+
+func TestUpdateSupplyMovement_NonOfficialInvoiceRejectsTargetSupplyWithoutStock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	mockRepo := mocks.NewMockRepositoryPort(ctrl)
+	mockStock := mocks.NewMockUseCasesPort(ctrl)
+	u := &UseCases{repo: mockRepo, stockUseCases: mockStock}
+
+	projectID := int64(44)
+	supplyID := int64(10)
+	investorID := int64(5)
+	providerID := int64(7)
+
+	mockRepo.EXPECT().
+		GetSupply(gomock.Any(), supplyID).
+		Return(&domain.Supply{ID: supplyID, ProjectID: projectID, Name: "Urea"}, nil)
+	mockRepo.EXPECT().
+		GetInvestor(gomock.Any(), investorID).
+		Return(&investordomain.Investor{ID: investorID, Name: "Inv"}, nil)
+	mockRepo.EXPECT().
+		GetProvider(gomock.Any(), providerID).
+		Return(&providerdomain.Provider{ID: providerID, Name: "Prov"}, nil)
+	mockStock.EXPECT().
+		GetLastStockByProjectInvestorID(gomock.Any(), projectID, supplyID, investorID).
+		Return(nil, true, nil)
+
+	err := u.UpdateSupplyMovement(context.Background(), &domain.SupplyMovement{
+		ID:           1,
+		StockId:      1,
+		ProjectId:    projectID,
+		MovementType: domain.RETURN_MOVEMENT,
+		Supply:       &domain.Supply{ID: supplyID},
+		Investor:     &investordomain.Investor{ID: investorID},
+		Provider:     &providerdomain.Provider{ID: providerID},
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no existe stock para este insumo en el proyecto")
 }

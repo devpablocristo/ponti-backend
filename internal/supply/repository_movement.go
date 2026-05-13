@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
@@ -13,6 +14,7 @@ import (
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +28,96 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 		return 0, err
 	}
 	return model.ID, nil
+}
+
+func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error {
+	if projectID <= 0 {
+		return domainerr.Validation("project_id must be greater than 0")
+	}
+
+	now := time.Now().UTC()
+
+	yearPeriod := int64(now.Year())
+	monthPeriod := int64(now.Month())
+
+	if err := r.getDB(ctx).Exec(`
+		WITH latest_closed AS (
+			SELECT DISTINCT ON (st.supply_id, st.investor_id)
+				st.project_id,
+				st.supply_id,
+				st.investor_id,
+				st.real_stock_units,
+				st.has_real_stock_count
+			FROM stocks st
+			WHERE st.project_id = ?
+			  AND st.close_date IS NOT NULL
+			  AND st.deleted_at IS NULL
+			  AND NOT EXISTS (
+				  SELECT 1
+				  FROM stocks active
+				  WHERE active.project_id = st.project_id
+				    AND active.supply_id = st.supply_id
+				    AND active.investor_id = st.investor_id
+				    AND active.close_date IS NULL
+				    AND active.deleted_at IS NULL
+			  )
+			ORDER BY st.supply_id, st.investor_id, st.close_date DESC, st.id DESC
+		)
+		INSERT INTO stocks (
+			project_id,
+			supply_id,
+			investor_id,
+			close_date,
+			real_stock_units,
+			initial_units,
+			year_period,
+			month_period,
+			units_entered,
+			units_consumed,
+			has_real_stock_count,
+			created_at,
+			updated_at,
+			created_by,
+			updated_by
+		)
+		SELECT
+			project_id,
+			supply_id,
+			investor_id,
+			NULL,
+			real_stock_units,
+			real_stock_units,
+			?,
+			?,
+			0,
+			0,
+			has_real_stock_count,
+			?,
+			?,
+			?,
+			?
+		FROM latest_closed
+	`, projectID, yearPeriod, monthPeriod, now, now, updatedBy, updatedBy).Error; err != nil {
+		return domainerr.Internal("failed to prepare field stock counts")
+	}
+
+	updates := map[string]any{
+		"real_stock_units":     decimal.Zero,
+		"has_real_stock_count": true,
+		"updated_at":           now,
+		"updated_by":           updatedBy,
+	}
+
+	if err := r.getDB(ctx).
+		Model(&stockmodel.Stock{}).
+		Where("project_id = ?", projectID).
+		Where("close_date IS NULL").
+		Where("deleted_at IS NULL").
+		Updates(updates).Error; err != nil {
+		return domainerr.Internal("failed to reset field stock counts")
+	}
+
+	return nil
 }
 
 func (r *Repository) CreateProvider(ctx context.Context, provider *providerdomain.Provider) (int64, error) {
@@ -298,12 +390,37 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	db := r.getDB(ctx)
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		var previous models.SupplyMovement
+		if err := tx.
+			Where("id = ?", movement.ID).
+			First(&previous).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("supply movement not found")
+			}
+			return domainerr.Internal("failed to get supply movement")
+		}
+
 		if err := tx.Model(&models.SupplyMovement{}).
 			Where("id = ?", movement.ID).
 			Updates(model).
 			Error; err != nil {
-
 			return domainerr.Internal("failed to update supply movement")
+		}
+
+		if previous.StockId != 0 && previous.StockId != movement.StockId {
+			var remainingCount int64
+			if err := tx.Model(&models.SupplyMovement{}).
+				Where("stock_id = ?", previous.StockId).
+				Where("deleted_at IS NULL").
+				Count(&remainingCount).Error; err != nil {
+				return domainerr.Internal("failed to get remaining movements")
+			}
+
+			if remainingCount == 0 {
+				if err := tx.Delete(&stockmodel.Stock{}, "id = ?", previous.StockId).Error; err != nil {
+					return domainerr.Internal("failed to delete stock")
+				}
+			}
 		}
 
 		return nil

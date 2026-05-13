@@ -11,6 +11,7 @@ import (
 
 	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	stockdomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	"github.com/shopspring/decimal"
@@ -18,6 +19,10 @@ import (
 
 type transactionExecutor interface {
 	ExecuteInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type stockFieldCountResetter interface {
+	ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error
 }
 
 func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
@@ -33,6 +38,26 @@ func (u *UseCases) CreateSupplyMovement(ctx context.Context, movement *domain.Su
 // createSupplyMovementInternal crea el movimiento sin chequear duplicados
 // (para uso en flujos que ya validaron previamente, ej. import).
 func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *domain.SupplyMovement) (int64, error) {
+	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
+	// Se resuelve por proyecto + insumo porque stock de campo no depende del inversor.
+	if movement.MovementType == domain.STOCK {
+		stock, isFirst, err := u.getOrCreateStockForFieldCount(ctx, movement)
+		if err != nil {
+			return 0, err
+		}
+		if isFirst {
+			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+		}
+
+		stock.RealStockUnits = movement.Quantity
+		stock.HasRealStockCount = true
+		stock.UpdatedBy = movement.UpdatedBy
+		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
+
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 	if err != nil {
 		return 0, err
@@ -60,20 +85,6 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 		}
 
 		return u.repo.CreateSupplyMovement(ctx, movement)
-	}
-
-	// "Stock" (conteo manual) SOLO sobreescribe stock de campo. No crea movimiento ni nada más.
-	if movement.MovementType == domain.STOCK {
-		if isFirst {
-			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
-		}
-		stock.RealStockUnits = movement.Quantity
-		stock.HasRealStockCount = true
-		stock.UpdatedBy = movement.UpdatedBy
-		if err := u.stockUseCases.UpdateRealStockUnits(ctx, stock.ID, stock); err != nil {
-			return 0, err
-		}
-		return 0, nil
 	}
 
 	if isFirst {
@@ -132,6 +143,23 @@ func (u *UseCases) ValidateSupplyMovement(ctx context.Context, movement *domain.
 }
 
 func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement *domain.SupplyMovement) error {
+	if movement.MovementType == domain.STOCK {
+		_, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+		if err != nil {
+			return err
+		}
+		if isFirst {
+			_, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+			if err != nil {
+				return err
+			}
+			if closedIsFirst {
+				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			}
+		}
+		return nil
+	}
+
 	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectInvestorID(ctx, movement.ProjectId, movement.Supply.ID, movement.Investor.ID)
 	if err != nil {
 		return err
@@ -157,6 +185,53 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 	}
 
 	return nil
+}
+
+func (u *UseCases) getOrCreateStockForFieldCount(ctx context.Context, movement *domain.SupplyMovement) (*stockdomain.Stock, bool, error) {
+	stock, isFirst, err := u.stockUseCases.GetLastStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !isFirst {
+		return stock, false, nil
+	}
+
+	closedStock, closedIsFirst, err := u.stockUseCases.GetLastClosedStockByProjectID(ctx, movement.ProjectId, movement.Supply.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	if closedIsFirst {
+		return nil, true, nil
+	}
+
+	newStock := createActiveStockFromClosedFieldCount(closedStock, movement)
+	stockID, err := u.stockUseCases.CreateStock(ctx, newStock)
+	if err != nil {
+		return nil, false, err
+	}
+	newStock.ID = stockID
+	return newStock, false, nil
+}
+
+func createActiveStockFromClosedFieldCount(closedStock *stockdomain.Stock, movement *domain.SupplyMovement) *stockdomain.Stock {
+	now := time.Now()
+	return &stockdomain.Stock{
+		Project:           closedStock.Project,
+		Supply:            closedStock.Supply,
+		Investor:          closedStock.Investor,
+		CloseDate:         nil,
+		InitialStock:      closedStock.RealStockUnits,
+		RealStockUnits:    movement.Quantity,
+		HasRealStockCount: true,
+		YearPeriod:        int64(now.Year()),
+		MonthPeriod:       int64(now.Month()),
+		Base: shareddomain.Base{
+			CreatedAt: now,
+			UpdatedAt: now,
+			CreatedBy: movement.CreatedBy,
+			UpdatedBy: movement.UpdatedBy,
+		},
+	}
 }
 
 func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movement *domain.SupplyMovement) error {
@@ -257,15 +332,35 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 		return nil, domainerr.Internal("transactions not supported for strict mode")
 	}
 
+	isFieldStockCountBatch := isStockFieldCountBatch(movements)
+
+	projectID := int64(0)
+	var updatedBy *string
+	if isFieldStockCountBatch {
+		projectID = movements[0].ProjectId
+		updatedBy = movements[0].UpdatedBy
+	}
+
 	ids := make([]int64, len(movements))
 	err := txRepo.ExecuteInTransaction(ctx, func(txCtx context.Context) error {
+		if isFieldStockCountBatch {
+			resetter, ok := u.repo.(stockFieldCountResetter)
+			if !ok {
+				return domainerr.Internal("stock field count reset not supported")
+			}
+			if err := resetter.ResetFieldStockCounts(txCtx, projectID, updatedBy); err != nil {
+				return err
+			}
+		}
+
 		for i := range movements {
 			id, err := u.CreateSupplyMovement(txCtx, movements[i])
 			if err != nil {
-				return fmt.Errorf("item %d: %w", i, err)
+				return newSupplyMovementItemError(i, movements[i], err)
 			}
 			ids[i] = id
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -273,6 +368,46 @@ func (u *UseCases) CreateSupplyMovementsStrict(ctx context.Context, movements []
 	}
 
 	return ids, nil
+}
+
+type supplyMovementItemError struct {
+	index    int
+	supplyID int64
+	err      error
+}
+
+func newSupplyMovementItemError(index int, movement *domain.SupplyMovement, err error) error {
+	supplyID := int64(0)
+	if movement != nil && movement.Supply != nil {
+		supplyID = movement.Supply.ID
+	}
+	return supplyMovementItemError{
+		index:    index,
+		supplyID: supplyID,
+		err:      err,
+	}
+}
+
+func (e supplyMovementItemError) Error() string {
+	return e.err.Error()
+}
+
+func (e supplyMovementItemError) Unwrap() error {
+	return e.err
+}
+
+func isStockFieldCountBatch(movements []*domain.SupplyMovement) bool {
+	if len(movements) == 0 {
+		return false
+	}
+
+	for i := range movements {
+		if movements[i] == nil || movements[i].MovementType != domain.STOCK {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
@@ -313,9 +448,17 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 		return err
 	}
 	if isFirst {
-		return domainerr.Validation("no existe stock para este insumo en el proyecto")
-	}
+		if supplyMovement.MovementType != domain.OFFICIAL_INVOICE {
+			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+		}
 
+		stock = createStockDomainFromSupplyMovement(supplyMovement)
+		stockID, err := u.stockUseCases.CreateStock(ctx, stock)
+		if err != nil {
+			return err
+		}
+		stock.ID = stockID
+	}
 	supplyMovement.StockId = stock.ID
 	return u.repo.UpdateSupplyMovement(ctx, supplyMovement)
 }
