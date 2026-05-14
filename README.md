@@ -5,7 +5,8 @@ TLDR:
 2. `docker compose up -d` (levanta DB y corre migraciones).
 3. `go run ./cmd/api` (levanta la API local).
 4. Deploys: ver `docs/DEPLOY.md`.
-5. Índice de docs: `docs/README.md`.
+5. Versionado/rollback: ver `docs/VERSIONADO_DEPLOYS.md`.
+6. Índice de docs: `docs/README.md`.
 
 ## Local
 
@@ -95,6 +96,7 @@ Customer (1)──────(∞) Project (∞)──────(1) Campaign
 
 ## Docs útiles
 - `docs/DEPLOY.md`
+- `docs/VERSIONADO_DEPLOYS.md`
 - `docs/CONFIGURAR_VARIABLES_GITHUB.md`
 - `docs/DIAGNOSTICO_CLOUD_RUN.md`
 - `docs/ENDPOINT_NORMALIZATION.md`
