@@ -29,4 +29,3 @@ jobs:
         run: python3 scripts/release/deployments.py approve-staging
         env:
           GH_TOKEN: ${{ github.token }}
-

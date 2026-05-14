@@ -76,4 +76,3 @@ jobs:
             echo "- Image: \`${{ steps.approved.outputs.image_uri }}\`"
             echo "- Migration version: \`${{ steps.approved.outputs.migration_version }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-

@@ -70,6 +70,17 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.ref_name }}
 
+      - name: Resolve deploy SHA
+        run: |
+          set -euo pipefail
+          deploy_sha="$(git rev-parse HEAD)"
+          if [[ ! "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: invalid deploy SHA: $deploy_sha"
+            exit 1
+          fi
+          echo "DEPLOY_SHA=$deploy_sha" >> "$GITHUB_ENV"
+          echo "DEPLOY_SHORT_SHA=${deploy_sha::12}" >> "$GITHUB_ENV"
+
       - name: Auth GCP
         uses: google-github-actions/auth@v3
         with:
@@ -83,10 +94,10 @@ jobs:
 
       - name: Build metadata
         run: |
-          short_sha="${GITHUB_SHA::12}"
-          echo "SERVICE_GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          set -euo pipefail
+          echo "SERVICE_GIT_SHA=${DEPLOY_SHA}" >> "$GITHUB_ENV"
           echo "SERVICE_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-          echo "RELEASE_SERVICE_VERSION=dev-${short_sha}" >> "$GITHUB_ENV"
+          echo "RELEASE_SERVICE_VERSION=dev-${DEPLOY_SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Install PostgreSQL client
         run: |
@@ -98,9 +109,10 @@ jobs:
 
       - name: Build y push imagen
         env:
-          IMAGE_TAG: ${{ github.sha }}
           GO_MODULES_TOKEN: ${{ secrets.CORE_REPO_READ_TOKEN }}
         run: |
+          set -euo pipefail
+          IMAGE_TAG="${DEPLOY_SHA}"
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
           docker build --secret id=go_modules_token,env=GO_MODULES_TOKEN -t "$image_uri" .
           docker push "$image_uri"
@@ -263,15 +275,16 @@ jobs:
           REQUIRE_AUTH_SMOKE: ${{ env.REQUIRE_AUTH_SMOKE }}
 
       - name: Record DEV deployment
-        run: python3 scripts/release/deployments.py record
+        run: |
+          set -euo pipefail
+          DEPLOY_DESCRIPTION="DEV smoke OK ${DEPLOY_SHA}" \
+          SERVICE_VERSION="${RELEASE_SERVICE_VERSION}" \
+          python3 scripts/release/deployments.py record
         env:
           GH_TOKEN: ${{ github.token }}
           DEPLOY_ENV: dev
-          DEPLOY_SHA: ${{ github.sha }}
           DEPLOY_STATUS_LABEL: SMOKE_OK
           DEPLOY_STATE: success
-          DEPLOY_DESCRIPTION: "DEV smoke OK ${{ github.sha }}"
-          SERVICE_VERSION: ${{ env.RELEASE_SERVICE_VERSION }}
           MIGRATIONS_DIR_FOR_RELEASE: migrations_v4
 
       - name: Stop Cloud SQL Proxy (DEV)

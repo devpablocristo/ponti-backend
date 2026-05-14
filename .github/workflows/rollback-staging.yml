@@ -169,4 +169,3 @@ jobs:
           DEPLOY_DESCRIPTION: "STAGING rollback to ${{ steps.target.outputs.deploy_sha }}"
           SERVICE_VERSION: ${{ env.RELEASE_SERVICE_VERSION }}
           MIGRATION_VERSION: ${{ steps.target.outputs.migration_version }}
-
