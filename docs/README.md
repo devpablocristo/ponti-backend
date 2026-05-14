@@ -8,6 +8,7 @@
 | [ESTADO_FINAL_WORKFLOWS.md](ESTADO_FINAL_WORKFLOWS.md) | Detalle de workflows actuales |
 | [CONFIGURAR_VARIABLES_GITHUB.md](CONFIGURAR_VARIABLES_GITHUB.md) | Variables y secrets para GitHub Actions |
 | [GITHUB_SECRETS.md](GITHUB_SECRETS.md) | Secrets, WIF e IAM (refresh-golden-snapshot) |
+| [VERSIONADO_DEPLOYS.md](VERSIONADO_DEPLOYS.md) | Versionado, trazabilidad, promocion y rollback por SHA |
 | [GCP_DB_CREDS.md](GCP_DB_CREDS.md) | Credenciales Cloud SQL (dev) |
 | [DIAGNOSTICO_CLOUD_RUN.md](DIAGNOSTICO_CLOUD_RUN.md) | Troubleshooting Cloud Run |
 | [SETUP_PROD.md](SETUP_PROD.md) | Setup proyecto producción |
