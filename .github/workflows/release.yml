@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump SemVer"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  deployments: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve approved STAGING candidate
+        id: approved
+        run: python3 scripts/release/deployments.py resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESOLVE_ENV: staging-approved
+          RESOLVE_LABELS: QA_APPROVED
+
+      - name: Calculate next version
+        id: version
+        run: python3 scripts/release/deployments.py next-version
+        env:
+          TARGET_SHA: ${{ steps.approved.outputs.deploy_sha }}
+          BUMP: ${{ inputs.bump }}
+          RELEASE_NOTES_PATH: release-notes.md
+
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.next_version }}" "${{ steps.approved.outputs.deploy_sha }}" -m "${{ steps.version.outputs.next_version }}"
+          git push origin "${{ steps.version.outputs.next_version }}"
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ steps.version.outputs.next_version }}" \
+            --title "ponti-backend ${{ steps.version.outputs.next_version }}" \
+            --notes-file "${{ steps.version.outputs.notes_path }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release created"
+            echo
+            echo "- Version: \`${{ steps.version.outputs.next_version }}\`"
+            echo "- SHA: \`${{ steps.approved.outputs.deploy_sha }}\`"
+            echo "- Image: \`${{ steps.approved.outputs.image_uri }}\`"
+            echo "- Migration version: \`${{ steps.approved.outputs.migration_version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
