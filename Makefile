@@ -7,14 +7,12 @@ BUILD_DIR          := $(ROOT_DIR)/bin
 DOCKER_COMPOSE_YML := $(ROOT_DIR)/docker-compose.yml
 GO_MODULES_TOKEN   ?=
 
-# Recomiendo usar variables de entorno para la base de datos
-DB_URL             := postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}
 MIGRATIONS_DIR     := ./migrations_v4
 MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
-        run-api up-ponti-local down-ponti-local seed seed-dashboard reset-local-db-from-prod e2e-changes \
+        run-api up-ponti-local down-ponti-local reset-local-db-from-prod e2e-changes \
         migrate-create \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline actors-backfill-sync
 
@@ -38,11 +36,11 @@ bin-build:
 	SERVICE_NAME=ponti-api go build -gcflags "all=-N -l" \
 		-o $(BUILD_DIR)/ponti-api \
 		-ldflags "-X main.Version=$(VERSION)" \
-		$(ROOT_DIR)/cmd/
+		$(ROOT_DIR)/cmd/api
 
 run:
 	@echo "Running the project (local)..."
-	@go run $(ROOT_DIR)/cmd/
+	@go run ./cmd/api
 
 test:
 	@echo "Running tests..."
@@ -62,19 +60,11 @@ run-api:
 
 up-ponti-local:
 	@echo "Starting full local stack (backend + frontend + ai)..."
-	@if [ -f ./scripts/run-ponti-local.sh ]; then bash ./scripts/run-ponti-local.sh; else bash ./scripts/run_ponti_local.sh; fi
+	@bash ./scripts/run_ponti_local.sh
 
 down-ponti-local:
 	@echo "Stopping full local stack (backend + frontend + ai)..."
 	@bash ./scripts/down_ponti_local.sh
-
-seed:
-	@echo "Seeding database..."
-	@go run ./cmd/seed/main.go
-
-seed-dashboard:
-	@echo "Seeding dashboard test data..."
-	@go run ./cmd/api/main.go seed
 
 # --------------------------------------------------
 # Base de datos (reset local + migraciones + dump data-only PROD → local)

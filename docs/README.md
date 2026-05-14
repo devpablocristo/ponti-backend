@@ -28,4 +28,4 @@
 ## Migraciones
 
 - **Directorio:** `migrations_v4/`
-- **Make:** `make migrate-up`, `make migrate-create NAME=nombre`
+- **Make:** `make db-migrate-up`, `make migrate-create NAME=nombre`
