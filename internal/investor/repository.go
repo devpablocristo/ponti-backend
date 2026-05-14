@@ -13,6 +13,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -230,12 +231,13 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 		}
 
 		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, inv.TenantID, "investors", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Investor{}), "investors").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "investors", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive investor")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
@@ -276,11 +278,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Investor{}), "investors").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "investors", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore investor")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
@@ -314,6 +312,9 @@ func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d does not exist", id))
+		}
+		if err := lifecycle.RequireArchived(investorDB, "investors", "investor", id); err != nil {
+			return err
 		}
 
 		// Validar dependientes en las tres tablas pivot (incluso archivados).

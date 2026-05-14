@@ -14,8 +14,12 @@ import (
 type UseCasesPort interface {
 	CreateLeaseType(context.Context, *domain.LeaseType) (int64, error)
 	ListLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
+	ListArchivedLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
+	ArchiveLeaseType(context.Context, int64) error
+	RestoreLeaseType(context.Context, int64) error
+	HardDeleteLeaseType(context.Context, int64) error
 	DeleteLeaseType(context.Context, int64) error
 }
 
@@ -58,8 +62,12 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateLeaseType)
 		public.GET("", h.ListLeaseTypes)
+		public.GET("/archived", h.ListArchivedLeaseTypes)
 		public.GET("/:lease_type_id", h.GetLeaseType)
 		public.PUT("/:lease_type_id", h.UpdateLeaseType)
+		public.POST("/:lease_type_id/archive", h.ArchiveLeaseType)
+		public.POST("/:lease_type_id/restore", h.RestoreLeaseType)
+		public.DELETE("/:lease_type_id/hard", h.HardDeleteLeaseType)
 		public.DELETE("/:lease_type_id", h.DeleteLeaseType)
 	}
 }
@@ -80,6 +88,16 @@ func (h *Handler) CreateLeaseType(c *gin.Context) {
 func (h *Handler) ListLeaseTypes(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 	leaseTypes, total, err := h.ucs.ListLeaseTypes(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListLeaseTypesResponse(leaseTypes, page, perPage, total))
+}
+
+func (h *Handler) ListArchivedLeaseTypes(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	leaseTypes, total, err := h.ucs.ListArchivedLeaseTypes(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -118,13 +136,29 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
+func (h *Handler) ArchiveLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.ArchiveLeaseType)
+}
+
+func (h *Handler) RestoreLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.RestoreLeaseType)
+}
+
+func (h *Handler) HardDeleteLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.HardDeleteLeaseType)
+}
+
 func (h *Handler) DeleteLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.DeleteLeaseType)
+}
+
+func (h *Handler) runLeaseTypeIDAction(c *gin.Context, action func(context.Context, int64) error) {
 	id, err := ginmw.ParseParamID(c, "lease_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

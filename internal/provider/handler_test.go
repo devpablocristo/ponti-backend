@@ -58,3 +58,35 @@ type providerUseCasesStub struct {
 func (s *providerUseCasesStub) GetProviders(context.Context) ([]domain.Provider, error) {
 	return s.providers, nil
 }
+
+func (s *providerUseCasesStub) ListArchivedProviders(context.Context) ([]domain.Provider, error) {
+	return s.providers, nil
+}
+
+func (s *providerUseCasesStub) GetProvider(_ context.Context, id int64) (*domain.Provider, error) {
+	return &domain.Provider{ID: id, Name: "Proveedor A"}, nil
+}
+
+func (s *providerUseCasesStub) CreateProvider(context.Context, *domain.Provider) (int64, error) {
+	return 99, nil
+}
+
+func (s *providerUseCasesStub) UpdateProvider(context.Context, *domain.Provider) error {
+	return nil
+}
+
+func (s *providerUseCasesStub) ArchiveProvider(context.Context, int64) error {
+	return nil
+}
+
+func (s *providerUseCasesStub) RestoreProvider(context.Context, int64) error {
+	return nil
+}
+
+func (s *providerUseCasesStub) HardDeleteProvider(context.Context, int64) error {
+	return nil
+}
+
+func (s *providerUseCasesStub) DeleteProvider(context.Context, int64) error {
+	return nil
+}

@@ -98,6 +98,11 @@ func (ActorOrganizationProfile) TableName() string {
 }
 
 func (a Actor) ToDomain() *domain.Actor {
+	archivedAt := a.ArchivedAt
+	if a.DeletedAt.Valid {
+		t := a.DeletedAt.Time
+		archivedAt = &t
+	}
 	return &domain.Actor{
 		ID:                a.ID,
 		TenantID:          a.TenantID,
@@ -107,7 +112,7 @@ func (a Actor) ToDomain() *domain.Actor {
 		PrimaryEmail:      a.PrimaryEmail,
 		PrimaryPhone:      a.PrimaryPhone,
 		Notes:             a.Notes,
-		ArchivedAt:        a.ArchivedAt,
+		ArchivedAt:        archivedAt,
 		MergedIntoActorID: a.MergedIntoActorID,
 		Base: shareddomain.Base{
 			CreatedAt: a.CreatedAt,

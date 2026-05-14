@@ -32,6 +32,12 @@ func (s *classTypeHandlerUseCasesStub) ListClassTypes(_ context.Context, page in
 	return []domain.ClassType{{ID: 1, Name: "Insumos"}}, 1, nil
 }
 
+func (s *classTypeHandlerUseCasesStub) ListArchivedClassTypes(_ context.Context, page int, perPage int) ([]domain.ClassType, int64, error) {
+	s.listPage = page
+	s.listPerPage = perPage
+	return []domain.ClassType{{ID: 1, Name: "Insumos"}}, 1, nil
+}
+
 func (s *classTypeHandlerUseCasesStub) GetClassType(_ context.Context, id int64) (*domain.ClassType, error) {
 	s.getCalls = append(s.getCalls, id)
 	return &domain.ClassType{ID: id, Name: "Insumos"}, nil
@@ -39,6 +45,21 @@ func (s *classTypeHandlerUseCasesStub) GetClassType(_ context.Context, id int64)
 
 func (s *classTypeHandlerUseCasesStub) UpdateClassType(_ context.Context, item *domain.ClassType) error {
 	s.updateCalls = append(s.updateCalls, *item)
+	return nil
+}
+
+func (s *classTypeHandlerUseCasesStub) ArchiveClassType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *classTypeHandlerUseCasesStub) RestoreClassType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *classTypeHandlerUseCasesStub) HardDeleteClassType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
 	return nil
 }
 

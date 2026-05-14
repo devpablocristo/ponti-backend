@@ -15,6 +15,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
@@ -210,12 +211,13 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 			return domainerr.Conflict("campaign already archived")
 		}
 
+		cause, err := lifecycle.RootCause(tx, c.TenantID, "campaigns", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Campaign{}), "campaigns").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "campaigns", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive campaign")
 		}
 		return nil
@@ -244,11 +246,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Campaign{}), "campaigns").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "campaigns", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore campaign")
 		}
 		return nil
@@ -270,6 +268,9 @@ func (r *Repository) HardDeleteCampaign(ctx context.Context, id int64) error {
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
+		}
+		if err := lifecycle.RequireArchived(campaignDB, "campaigns", "campaign", id); err != nil {
+			return err
 		}
 
 		var projCount int64

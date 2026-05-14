@@ -37,6 +37,11 @@ func (s *businessParametersHandlerUseCasesStub) GetAllParameters(context.Context
 	return []domain.BusinessParameter{{ID: 1, Key: "kg", Value: "1", Type: "decimal", Category: "units"}}, nil
 }
 
+func (s *businessParametersHandlerUseCasesStub) GetArchivedParameters(context.Context) ([]domain.BusinessParameter, error) {
+	s.getAllCalls++
+	return []domain.BusinessParameter{{ID: 1, Key: "kg", Value: "1", Type: "decimal", Category: "units"}}, nil
+}
+
 func (s *businessParametersHandlerUseCasesStub) CreateParameter(_ context.Context, param *domain.BusinessParameter) (int64, error) {
 	s.createCalls = append(s.createCalls, *param)
 	return 99, nil
@@ -44,6 +49,21 @@ func (s *businessParametersHandlerUseCasesStub) CreateParameter(_ context.Contex
 
 func (s *businessParametersHandlerUseCasesStub) UpdateParameter(_ context.Context, param *domain.BusinessParameter) error {
 	s.updateCalls = append(s.updateCalls, *param)
+	return nil
+}
+
+func (s *businessParametersHandlerUseCasesStub) ArchiveParameter(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *businessParametersHandlerUseCasesStub) RestoreParameter(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *businessParametersHandlerUseCasesStub) HardDeleteParameter(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
 	return nil
 }
 

@@ -12,8 +12,10 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -249,24 +251,29 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return domainerr.Conflict("customer already archived")
 		}
 
-		var activeProjects int64
-		if err := tx.Table("projects").
-			Where("customer_id = ? AND deleted_at IS NULL", id).
-			Where("tenant_id = ?", customer.TenantID).
-			Count(&activeProjects).Error; err != nil {
-			return domainerr.Internal("failed to check active projects")
+		var activeProjectIDs []int64
+		activeProjectsQuery := tx.Table("projects").
+			Where("customer_id = ? AND deleted_at IS NULL", id)
+		if customer.TenantID != uuid.Nil {
+			activeProjectsQuery = activeProjectsQuery.Where("tenant_id = ?", customer.TenantID)
 		}
-		if activeProjects > 0 {
-			return domainerr.Conflict("customer has active projects")
+		if err := activeProjectsQuery.Pluck("id", &activeProjectIDs).Error; err != nil {
+			return domainerr.Internal("failed to list active projects")
 		}
 
 		archivedAt := time.Now()
+		batch, err := lifecycle.CreateArchiveBatch(tx, customer.TenantID, "customers", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromBatch(batch)
+		if err := archiveCustomerProjects(tx, activeProjectIDs, customer.TenantID, archivedAt, deletedBy, cause); err != nil {
+			return err
+		}
+
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "customers", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive customer")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
@@ -284,6 +291,89 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+var customerProjectScopedArchiveTables = []string{
+	"project_managers",
+	"project_investors",
+	"workorders",
+	"supply_movements",
+	"stocks",
+	"crop_commercializations",
+	"project_dollar_values",
+	"admin_cost_investors",
+}
+
+func archiveCustomerProjects(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
+	if len(projectIDs) == 0 {
+		return nil
+	}
+
+	for _, table := range customerProjectScopedArchiveTables {
+		if err := archiveProjectScopedCustomerTable(tx, table, projectIDs, tenantID, archivedAt, deletedBy, cause); err != nil {
+			return err
+		}
+	}
+
+	if tx.Migrator().HasTable("fields") {
+		var fieldIDs []int64
+		fieldsQuery := tx.Table("fields").Where("project_id IN ? AND deleted_at IS NULL", projectIDs)
+		if tenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
+			fieldsQuery = fieldsQuery.Where("tenant_id = ?", tenantID)
+		}
+		if err := fieldsQuery.Pluck("id", &fieldIDs).Error; err != nil {
+			return domainerr.Internal("failed to list project fields")
+		}
+		if len(fieldIDs) > 0 {
+			if tx.Migrator().HasTable("lots") {
+				lotsQuery := tx.Table("lots").Where("field_id IN ? AND deleted_at IS NULL", fieldIDs)
+				if tenantID != uuid.Nil && tx.Migrator().HasColumn("lots", "tenant_id") {
+					lotsQuery = lotsQuery.Where("tenant_id = ?", tenantID)
+				}
+				if err := lotsQuery.Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
+					return domainerr.Internal("failed to archive project lots")
+				}
+			}
+
+			fieldUpdate := tx.Table("fields").Where("id IN ? AND deleted_at IS NULL", fieldIDs)
+			if tenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
+				fieldUpdate = fieldUpdate.Where("tenant_id = ?", tenantID)
+			}
+			if err := fieldUpdate.Updates(lifecycle.ArchiveUpdates(tx, "fields", archivedAt, deletedBy, cause)).Error; err != nil {
+				return domainerr.Internal("failed to archive project fields")
+			}
+		}
+	}
+
+	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NULL", projectIDs)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
+		projectUpdate = projectUpdate.Where("tenant_id = ?", tenantID)
+	}
+	if err := projectUpdate.Updates(lifecycle.ArchiveUpdates(tx, "projects", archivedAt, deletedBy, cause)).Error; err != nil {
+		return domainerr.Internal("failed to archive customer projects")
+	}
+
+	for _, projectID := range projectIDs {
+		if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func archiveProjectScopedCustomerTable(tx *gorm.DB, table string, projectIDs []int64, tenantID uuid.UUID, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
+	if !tx.Migrator().HasTable(table) {
+		return nil
+	}
+	update := tx.Table(table).Where("project_id IN ? AND deleted_at IS NULL", projectIDs)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn(table, "tenant_id") {
+		update = update.Where("tenant_id = ?", tenantID)
+	}
+	if err := update.Updates(lifecycle.ArchiveUpdates(tx, table, archivedAt, deletedBy, cause)).Error; err != nil {
+		return domainerr.Internal(fmt.Sprintf("failed to archive %s", table))
+	}
+	return nil
 }
 
 func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
@@ -305,13 +395,18 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			return domainerr.Conflict("customer is not archived")
 		}
 
+		rowState, err := lifecycle.ReadRowState(tx, "customers", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "customers", id)
+		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
+			return err
+		}
+
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "customers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore customer")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
@@ -329,6 +424,38 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	})
 }
 
+func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
+	var projectIDs []int64
+	projectLookup := tx.Table("projects").Where("customer_id = ? AND deleted_at IS NOT NULL", customerID)
+	projectLookup = lifecycle.ApplyCauseScope(projectLookup, "projects", cause)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
+		projectLookup = projectLookup.Where("tenant_id = ?", tenantID)
+	}
+	if err := projectLookup.Pluck("id", &projectIDs).Error; err != nil {
+		return domainerr.Internal("failed to list archived projects")
+	}
+	if len(projectIDs) == 0 {
+		return nil
+	}
+
+	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NOT NULL", projectIDs)
+	projectUpdate = lifecycle.ApplyCauseScope(projectUpdate, "projects", cause)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
+		projectUpdate = projectUpdate.Where("tenant_id = ?", tenantID)
+	}
+	if err := projectUpdate.Updates(lifecycle.RestoreUpdates(tx, "projects", restoredAt)).Error; err != nil {
+		return domainerr.Internal("failed to restore customer projects")
+	}
+
+	for _, projectID := range projectIDs {
+		if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // HardDeleteCustomer elimina definitivamente un cliente.
 // Bloquea con 409 si tiene proyectos (activos o archivados).
 func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
@@ -337,13 +464,16 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		customerDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers")
-		if err := customerDB.Where("id = ?", id).Count(&count).Error; err != nil {
+		var customer models.Customer
+		customerDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers")
+		if err := customerDB.Where("id = ?", id).First(&customer).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer with id %d does not exist", id))
+			}
 			return domainerr.Internal("failed to check customer existence")
 		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer with id %d does not exist", id))
+		if !customer.DeletedAt.Valid {
+			return domainerr.Conflict("customer must be archived before hard delete")
 		}
 
 		var activeCount, archivedCount int64

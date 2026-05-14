@@ -98,12 +98,12 @@ func SyncLegacyActor(tx *gorm.DB, input LegacyActorSync) (int64, error) {
 	if actorID == 0 {
 		if err := tx.Raw(`
 			INSERT INTO actors (
-				tenant_id, actor_kind, display_name, normalized_name, archived_at,
+				tenant_id, actor_kind, display_name, normalized_name, archived_at, deleted_at,
 				created_at, updated_at, created_by, updated_by, deleted_by
 			)
-			VALUES (?, ?, ?, public.normalize_actor_name(?), ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, public.normalize_actor_name(?), ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
-		`, tenantID, input.ActorKind, input.Name, input.Name, input.ArchivedAt, input.CreatedAt, input.UpdatedAt, input.CreatedBy, input.UpdatedBy, input.DeletedBy).
+		`, tenantID, input.ActorKind, input.Name, input.Name, input.ArchivedAt, input.ArchivedAt, input.CreatedAt, input.UpdatedAt, input.CreatedBy, input.UpdatedBy, input.DeletedBy).
 			Scan(&actorID).Error; err != nil {
 			return 0, domainerr.Internal("failed to create legacy actor")
 		}
@@ -305,7 +305,7 @@ func RefreshProjectActorMirrors(tx *gorm.DB, projectID int64) error {
 	var tenantID string
 	if err := tx.Table("projects").
 		Select("tenant_id").
-		Where("id = ? AND deleted_at IS NULL", projectID).
+		Where("id = ?", projectID).
 		Scan(&tenantID).Error; err != nil {
 		return domainerr.Internal("failed to resolve project tenant")
 	}
@@ -527,7 +527,7 @@ func upsertActorRole(tx *gorm.DB, actorID int64, role string, archivedAt *time.T
 
 func refreshActorArchiveState(tx *gorm.DB, actorID int64, archivedAt *time.Time) error {
 	if archivedAt == nil {
-		return tx.Exec(`UPDATE actors SET archived_at = NULL WHERE id = ?`, actorID).Error
+		return tx.Exec(`UPDATE actors SET archived_at = NULL, deleted_at = NULL, deleted_by = NULL WHERE id = ?`, actorID).Error
 	}
 	var activeRoles int64
 	if err := tx.Table("actor_roles").
@@ -536,7 +536,7 @@ func refreshActorArchiveState(tx *gorm.DB, actorID int64, archivedAt *time.Time)
 		return domainerr.Internal("failed to check actor roles")
 	}
 	if activeRoles == 0 {
-		return tx.Exec(`UPDATE actors SET archived_at = ? WHERE id = ?`, archivedAt, actorID).Error
+		return tx.Exec(`UPDATE actors SET archived_at = ?, deleted_at = ? WHERE id = ?`, archivedAt, archivedAt, actorID).Error
 	}
 	return nil
 }

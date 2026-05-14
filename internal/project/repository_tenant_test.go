@@ -55,7 +55,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
 		);
 			CREATE TABLE customers (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +86,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
 		);
 		CREATE TABLE lots (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,7 +109,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
 		);
 		CREATE TABLE managers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,7 +124,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
 		);
 		CREATE TABLE project_managers (
 			tenant_id TEXT NOT NULL,
@@ -123,7 +139,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
 		);
 		CREATE TABLE investors (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,7 +172,21 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			deleted_at DATETIME,
 			created_by TEXT,
 			updated_by TEXT,
-			deleted_by TEXT
+			deleted_by TEXT,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
+		);
+		CREATE TABLE archive_batches (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT,
+			root_entity TEXT NOT NULL,
+			root_id INTEGER NOT NULL,
+			action TEXT NOT NULL DEFAULT 'archive',
+			reason TEXT,
+			created_by TEXT,
+			created_at DATETIME
 		);
 	`).Error; err != nil {
 		t.Fatalf("create schema: %v", err)
@@ -294,6 +328,143 @@ func TestProjectRepositoryRequiresTenantInStrictModeForCreate(t *testing.T) {
 	ctx := context.WithValue(context.Background(), contextkeys.Actor, "tenant-user@example.com")
 	if _, err := repo.CreateProject(ctx, &domain.Project{}); err == nil {
 		t.Fatalf("expected CreateProject without tenant to fail in strict mode")
+	}
+}
+
+func TestArchiveProjectUsesBatchAndDoesNotArchiveCustomer(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(10, ?, 'Customer A', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(10, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(10, ?, 'Project A', 10, 10, 0, 0, ?, ?, NULL);
+		INSERT INTO fields (id, tenant_id, name, project_id, lease_type_id, created_at, updated_at, deleted_at) VALUES
+			(10, ?, 'Field A', 10, 0, ?, ?, NULL);
+		INSERT INTO lots (id, tenant_id, name, field_id, hectares, previous_crop_id, current_crop_id, season, created_at, updated_at, deleted_at) VALUES
+			(10, ?, 'Lot A', 10, 1, 0, 0, '2025-2026', ?, ?, NULL);
+	`, tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+	).Error; err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+
+	if err := repo.ArchiveProject(projectTenantContext(tenantID), 10); err != nil {
+		t.Fatalf("archive project: %v", err)
+	}
+
+	var archivedProject, archivedField, archivedLot, archivedCustomer int64
+	if err := db.Raw(`SELECT COUNT(*) FROM projects WHERE id = 10 AND deleted_at IS NOT NULL AND archive_batch_id IS NOT NULL AND archive_origin_entity = 'projects' AND archive_origin_id = 10`).Scan(&archivedProject).Error; err != nil {
+		t.Fatalf("count archived project: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM fields WHERE id = 10 AND deleted_at IS NOT NULL AND archive_batch_id IS NOT NULL AND archive_origin_entity = 'projects' AND archive_origin_id = 10`).Scan(&archivedField).Error; err != nil {
+		t.Fatalf("count archived field: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 10 AND deleted_at IS NOT NULL AND archive_batch_id IS NOT NULL AND archive_origin_entity = 'projects' AND archive_origin_id = 10`).Scan(&archivedLot).Error; err != nil {
+		t.Fatalf("count archived lot: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM customers WHERE id = 10 AND deleted_at IS NOT NULL`).Scan(&archivedCustomer).Error; err != nil {
+		t.Fatalf("count archived customer: %v", err)
+	}
+	if archivedProject != 1 || archivedField != 1 || archivedLot != 1 {
+		t.Fatalf("expected project/field/lot archived with project cause, got project=%d field=%d lot=%d", archivedProject, archivedField, archivedLot)
+	}
+	if archivedCustomer != 0 {
+		t.Fatalf("project archive must not archive customer")
+	}
+
+	if err := repo.RestoreProject(projectTenantContext(tenantID), 10); err != nil {
+		t.Fatalf("restore project: %v", err)
+	}
+
+	var activeProject, activeField, activeLot int64
+	if err := db.Raw(`SELECT COUNT(*) FROM projects WHERE id = 10 AND deleted_at IS NULL AND archive_batch_id IS NULL`).Scan(&activeProject).Error; err != nil {
+		t.Fatalf("count active project: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM fields WHERE id = 10 AND deleted_at IS NULL AND archive_batch_id IS NULL`).Scan(&activeField).Error; err != nil {
+		t.Fatalf("count active field: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 10 AND deleted_at IS NULL AND archive_batch_id IS NULL`).Scan(&activeLot).Error; err != nil {
+		t.Fatalf("count active lot: %v", err)
+	}
+	if activeProject != 1 || activeField != 1 || activeLot != 1 {
+		t.Fatalf("expected project/field/lot restored, got project=%d field=%d lot=%d", activeProject, activeField, activeLot)
+	}
+}
+
+func TestRestoreProjectRequiresActiveCustomer(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(20, ?, 'Archived Customer', ?);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(20, ?, '2025-2026');
+		INSERT INTO archive_batches (id, tenant_id, root_entity, root_id, action, created_at) VALUES
+			(20, ?, 'projects', 20, 'archive', ?);
+		INSERT INTO projects (
+			id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost,
+			created_at, updated_at, deleted_at, archive_batch_id, archive_origin_entity, archive_origin_id
+		) VALUES
+			(20, ?, 'Project A', 20, 20, 0, 0, ?, ?, ?, 20, 'projects', 20);
+	`, tenantID.String(), now,
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(), now, now, now,
+	).Error; err != nil {
+		t.Fatalf("seed archived project: %v", err)
+	}
+
+	if err := repo.RestoreProject(projectTenantContext(tenantID), 20); err == nil {
+		t.Fatalf("expected restore project to fail when customer is archived")
+	}
+}
+
+func TestHardDeleteProjectRequiresArchivedState(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(30, ?, 'Customer A', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(30, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(30, ?, 'Active Project', 30, 30, 0, 0, ?, ?, NULL),
+			(31, ?, 'Archived Project', 30, 30, 0, 0, ?, ?, ?);
+	`, tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+		tenantID.String(), now, now, now,
+	).Error; err != nil {
+		t.Fatalf("seed projects: %v", err)
+	}
+
+	if err := repo.HardDeleteProject(projectTenantContext(tenantID), 30); err == nil {
+		t.Fatalf("expected hard delete active project to fail")
+	}
+	if err := repo.HardDeleteProject(projectTenantContext(tenantID), 31); err != nil {
+		t.Fatalf("hard delete archived project: %v", err)
+	}
+	var exists int64
+	if err := db.Raw(`SELECT COUNT(*) FROM projects WHERE id = 31`).Scan(&exists).Error; err != nil {
+		t.Fatalf("count hard deleted project: %v", err)
+	}
+	if exists != 0 {
+		t.Fatalf("expected archived project to be hard deleted")
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -641,7 +642,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		archivedAt := time.Now()
 		var project models.Project
-		projectQuery := tx.Unscoped().Select("id", "tenant_id", "customer_id").Where("id = ?", id)
+		projectQuery := tx.Unscoped().Select("id", "tenant_id", "customer_id", "deleted_at").Where("id = ?", id)
 		projectQuery = authz.MaybeTenantScope(ctx, projectQuery, "projects")
 		if err := projectQuery.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -649,20 +650,11 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			}
 			return domainerr.Internal("failed to load project")
 		}
-
-		var count int64
-		countQuery := tx.Model(&models.Project{}).Where("id = ?", id)
-		if project.TenantID != uuid.Nil {
-			countQuery = countQuery.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := countQuery.Count(&count).Error; err != nil {
-			return domainerr.Internal("failed to check project existence")
-		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
+		if project.DeletedAt.Valid {
+			return domainerr.Conflict("project already archived")
 		}
 
-		if deletedBy != nil {
+		if deletedBy != nil && tx.Migrator().HasTable("users") {
 			var userCount int64
 			if err := tx.Table("users").
 				Where("id = ?", *deletedBy).
@@ -674,27 +666,27 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			}
 		}
 
+		batch, err := lifecycle.CreateArchiveBatch(tx, project.TenantID, "projects", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromBatch(batch)
+
 		// clear managers
-		if err := execWithOptionalTenant(
-			tx,
-			"UPDATE project_managers SET deleted_at = ?, deleted_by = ? WHERE project_id = ?",
-			"UPDATE project_managers SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND tenant_id = ?",
-			archivedAt,
-			deletedBy,
-			id,
-		); err != nil {
+		managerUpdate := tx.Table("project_managers").Where("project_id = ? AND deleted_at IS NULL", id)
+		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_managers", "tenant_id") {
+			managerUpdate = managerUpdate.Where("tenant_id = ?", project.TenantID)
+		}
+		if err := managerUpdate.Updates(lifecycle.ArchiveUpdates(tx, "project_managers", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to clear managers")
 		}
 
 		// clear investors
-		investorUpdate := tx.Model(&models.ProjectInvestor{}).Where("project_id = ?", id)
-		if tenantID, ok := tenantIDFromTx(tx); ok {
-			investorUpdate = investorUpdate.Where("tenant_id = ?", tenantID)
+		investorUpdate := tx.Table("project_investors").Where("project_id = ? AND deleted_at IS NULL", id)
+		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_investors", "tenant_id") {
+			investorUpdate = investorUpdate.Where("tenant_id = ?", project.TenantID)
 		}
-		if err := investorUpdate.Updates(map[string]any{
-			"deleted_at": archivedAt,
-			"deleted_by": deletedBy,
-		}).Error; err != nil {
+		if err := investorUpdate.Updates(lifecycle.ArchiveUpdates(tx, "project_investors", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to clear investors")
 		}
 
@@ -713,15 +705,12 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			if tenantID, ok := tenantIDFromTx(tx); ok {
 				lotUpdate = lotUpdate.Where("tenant_id = ?", tenantID)
 			}
-			if err := lotUpdate.Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			if err := lotUpdate.Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
 				return domainerr.Internal("failed to soft delete lots")
 			}
 		}
 
-		if err := archiveProjectScopedTables(tx, id, archivedAt, deletedBy); err != nil {
+		if err := archiveProjectScopedTables(tx, id, archivedAt, deletedBy, cause); err != nil {
 			return err
 		}
 
@@ -729,10 +718,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		if tenantID, ok := tenantIDFromTx(tx); ok {
 			fieldUpdate = fieldUpdate.Where("tenant_id = ?", tenantID)
 		}
-		if err := fieldUpdate.Updates(map[string]any{
-			"deleted_at": archivedAt,
-			"deleted_by": deletedBy,
-		}).Error; err != nil {
+		if err := fieldUpdate.Updates(lifecycle.ArchiveUpdates(tx, "fields", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to soft delete fields")
 		}
 
@@ -741,16 +727,10 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		if project.TenantID != uuid.Nil {
 			deleteQuery = deleteQuery.Where("tenant_id = ?", project.TenantID)
 		}
-		if err := deleteQuery.Updates(map[string]any{
-			"deleted_at": archivedAt,
-			"deleted_by": deletedBy,
-		}).Error; err != nil {
+		if err := deleteQuery.Updates(lifecycle.ArchiveUpdates(tx, "projects", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to delete project")
 		}
 
-		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
-			return err
-		}
 		if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
 			return err
 		}
@@ -782,37 +762,50 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return domainerr.Validation("project is not deleted, cannot restore")
 		}
 
+		var activeCustomerCount int64
+		customerQuery := tx.Model(&cusmod.Customer{}).Where("id = ? AND deleted_at IS NULL", project.CustomerID)
+		if project.TenantID != uuid.Nil {
+			customerQuery = customerQuery.Where("tenant_id = ?", project.TenantID)
+		}
+		if err := customerQuery.Count(&activeCustomerCount).Error; err != nil {
+			return domainerr.Internal("failed to check customer")
+		}
+		if activeCustomerCount == 0 {
+			return domainerr.Conflict("project parent customer is archived")
+		}
+
+		rowState, err := lifecycle.ReadRowState(tx, "projects", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "projects", id)
+
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)
 		restoreQuery := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id)
 		if project.TenantID != uuid.Nil {
 			restoreQuery = restoreQuery.Where("tenant_id = ?", project.TenantID)
 		}
-		if err := restoreQuery.Updates(map[string]any{
-			"deleted_at": nil,
-			"updated_at": restoredAt,
-		}).Error; err != nil {
+		if err := restoreQuery.Updates(lifecycle.RestoreUpdates(tx, "projects", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore project")
 		}
 
 		// Restaurar managers
-		if err := execWithOptionalTenant(
-			tx,
-			"UPDATE project_managers SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL",
-			"UPDATE project_managers SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?",
-			restoredAt,
-			id,
-		); err != nil {
+		managerRestore := tx.Table("project_managers").Where("project_id = ? AND deleted_at IS NOT NULL", id)
+		managerRestore = lifecycle.ApplyCauseScope(managerRestore, "project_managers", cause)
+		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_managers", "tenant_id") {
+			managerRestore = managerRestore.Where("tenant_id = ?", project.TenantID)
+		}
+		if err := managerRestore.Updates(lifecycle.RestoreUpdates(tx, "project_managers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore managers")
 		}
 
 		// Restaurar investors
-		if err := execWithOptionalTenant(
-			tx,
-			"UPDATE project_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL",
-			"UPDATE project_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?",
-			restoredAt,
-			id,
-		); err != nil {
+		investorRestore := tx.Table("project_investors").Where("project_id = ? AND deleted_at IS NOT NULL", id)
+		investorRestore = lifecycle.ApplyCauseScope(investorRestore, "project_investors", cause)
+		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_investors", "tenant_id") {
+			investorRestore = investorRestore.Where("tenant_id = ?", project.TenantID)
+		}
+		if err := investorRestore.Updates(lifecycle.RestoreUpdates(tx, "project_investors", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore investors")
 		}
 
@@ -828,40 +821,31 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		}
 
 		// Restaurar fields
-		if err := execWithOptionalTenant(
-			tx,
-			"UPDATE fields SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL",
-			"UPDATE fields SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?",
-			restoredAt,
-			id,
-		); err != nil {
+		fieldRestore := tx.Table("fields").Where("project_id = ? AND deleted_at IS NOT NULL", id)
+		fieldRestore = lifecycle.ApplyCauseScope(fieldRestore, "fields", cause)
+		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
+			fieldRestore = fieldRestore.Where("tenant_id = ?", project.TenantID)
+		}
+		if err := fieldRestore.Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore fields")
 		}
 
 		// Restaurar lots (solo los que pertenecen a los fields de este proyecto)
 		if len(fieldIDs) > 0 {
-			if err := execWithOptionalTenant(
-				tx,
-				"UPDATE lots SET deleted_at = NULL, updated_at = ? WHERE field_id IN ? AND deleted_at IS NOT NULL",
-				"UPDATE lots SET deleted_at = NULL, updated_at = ? WHERE field_id IN ? AND deleted_at IS NOT NULL AND tenant_id = ?",
-				restoredAt,
-				fieldIDs,
-			); err != nil {
+			lotRestore := tx.Table("lots").Where("field_id IN ? AND deleted_at IS NOT NULL", fieldIDs)
+			lotRestore = lifecycle.ApplyCauseScope(lotRestore, "lots", cause)
+			if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("lots", "tenant_id") {
+				lotRestore = lotRestore.Where("tenant_id = ?", project.TenantID)
+			}
+			if err := lotRestore.Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
 				return domainerr.Internal("failed to restore lots")
 			}
 		}
 
-		if err := restoreProjectScopedTables(tx, id, restoredAt); err != nil {
+		if err := restoreProjectScopedTables(tx, id, restoredAt, cause); err != nil {
 			return err
 		}
 
-		var deletedBy *string
-		if userID, err := actorFromContext(ctx); err == nil {
-			deletedBy = &userID
-		}
-		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
-			return err
-		}
 		if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
 			return err
 		}
@@ -871,42 +855,47 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 }
 
 type projectScopedSoftDeleteTable struct {
-	query        string
-	tenantQuery  string
+	name         string
 	errorMessage string
 }
 
 var projectScopedSoftDeleteTables = []projectScopedSoftDeleteTable{
-	{query: "UPDATE workorders SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE workorders SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete workorders"},
-	{query: "UPDATE supply_movements SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE supply_movements SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete supply_movements"},
-	{query: "UPDATE stocks SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE stocks SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete stocks"},
-	{query: "UPDATE crop_commercializations SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE crop_commercializations SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete commercializations"},
-	{query: "UPDATE project_dollar_values SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE project_dollar_values SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete dollar values"},
-	{query: "UPDATE admin_cost_investors SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", tenantQuery: "UPDATE admin_cost_investors SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL AND tenant_id = ?", errorMessage: "failed to soft delete admin cost investors"},
+	{name: "workorders", errorMessage: "failed to soft delete workorders"},
+	{name: "supply_movements", errorMessage: "failed to soft delete supply_movements"},
+	{name: "stocks", errorMessage: "failed to soft delete stocks"},
+	{name: "crop_commercializations", errorMessage: "failed to soft delete commercializations"},
+	{name: "project_dollar_values", errorMessage: "failed to soft delete dollar values"},
+	{name: "admin_cost_investors", errorMessage: "failed to soft delete admin cost investors"},
 }
 
-var projectScopedRestoreTables = []projectScopedSoftDeleteTable{
-	{query: "UPDATE workorders SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE workorders SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore workorders"},
-	{query: "UPDATE supply_movements SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE supply_movements SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore supply_movements"},
-	{query: "UPDATE stocks SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE stocks SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore stocks"},
-	{query: "UPDATE crop_commercializations SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE crop_commercializations SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore commercializations"},
-	{query: "UPDATE project_dollar_values SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE project_dollar_values SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore dollar values"},
-	{query: "UPDATE admin_cost_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", tenantQuery: "UPDATE admin_cost_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL AND tenant_id = ?", errorMessage: "failed to restore admin cost investors"},
-}
-
-func archiveProjectScopedTables(tx *gorm.DB, projectID int64, archivedAt time.Time, deletedBy *string) error {
+func archiveProjectScopedTables(tx *gorm.DB, projectID int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
 	for _, table := range projectScopedSoftDeleteTables {
-		if err := execWithOptionalTenant(tx, table.query, table.tenantQuery, archivedAt, deletedBy, projectID); err != nil {
+		if !tx.Migrator().HasTable(table.name) {
+			continue
+		}
+		update := tx.Table(table.name).Where("project_id = ? AND deleted_at IS NULL", projectID)
+		if tenantID, ok := tenantIDFromTx(tx); ok && tx.Migrator().HasColumn(table.name, "tenant_id") {
+			update = update.Where("tenant_id = ?", tenantID)
+		}
+		if err := update.Updates(lifecycle.ArchiveUpdates(tx, table.name, archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal(table.errorMessage)
 		}
 	}
 	return nil
 }
 
-func restoreProjectScopedTables(tx *gorm.DB, projectID int64, restoredAt time.Time) error {
-	for _, table := range projectScopedRestoreTables {
-		if err := execWithOptionalTenant(tx, table.query, table.tenantQuery, restoredAt, projectID); err != nil {
-			return domainerr.Internal(table.errorMessage)
+func restoreProjectScopedTables(tx *gorm.DB, projectID int64, restoredAt time.Time, cause lifecycle.Cause) error {
+	for _, table := range projectScopedSoftDeleteTables {
+		if !tx.Migrator().HasTable(table.name) {
+			continue
+		}
+		update := tx.Table(table.name).Where("project_id = ? AND deleted_at IS NOT NULL", projectID)
+		update = lifecycle.ApplyCauseScope(update, table.name, cause)
+		if tenantID, ok := tenantIDFromTx(tx); ok && tx.Migrator().HasColumn(table.name, "tenant_id") {
+			update = update.Where("tenant_id = ?", tenantID)
+		}
+		if err := update.Updates(lifecycle.RestoreUpdates(tx, table.name, restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore " + table.name)
 		}
 	}
 	return nil
@@ -923,14 +912,17 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		projectQuery := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id)
+		projectQuery := tx.Unscoped().Where("id = ?", id)
 		projectQuery = authz.MaybeTenantScope(ctx, projectQuery, "projects")
-		var count int64
-		if err := projectQuery.Count(&count).Error; err != nil {
+		var project models.Project
+		if err := projectQuery.First(&project).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
+			}
 			return domainerr.Internal("failed to check project existence")
 		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
+		if !project.DeletedAt.Valid {
+			return domainerr.Conflict("project must be archived before hard delete")
 		}
 
 		// Validar dependientes (incluso archivados): si hay alguno, bloquear con detalle.
@@ -951,8 +943,15 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 			{"admin_cost_investors", "admin cost investor record(s)"},
 		}
 		for _, d := range deps {
+			if !tx.Migrator().HasTable(d.table) {
+				continue
+			}
 			var n int64
-			if err := tx.Unscoped().Table(d.table).Where("project_id = ?", id).Count(&n).Error; err != nil {
+			depQuery := tx.Unscoped().Table(d.table).Where("project_id = ?", id)
+			if project.TenantID != uuid.Nil && tx.Migrator().HasColumn(d.table, "tenant_id") {
+				depQuery = depQuery.Where("tenant_id = ?", project.TenantID)
+			}
+			if err := depQuery.Count(&n).Error; err != nil {
 				return domainerr.Internal(fmt.Sprintf("failed to check %s", d.table))
 			}
 			if n > 0 {

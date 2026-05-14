@@ -15,6 +15,7 @@ import (
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
@@ -107,16 +108,7 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 }
 
 func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
-	result := r.db.Client().WithContext(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
-		Delete(&models.Labor{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to delete labor")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", id))
-	}
-	return nil
+	return r.ArchiveLabor(ctx, id)
 }
 
 // ArchiveLabor archiva (soft delete) un labor con validación.
@@ -143,12 +135,13 @@ func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 			return domainerr.Conflict("labor already archived")
 		}
 
+		cause, err := lifecycle.RootCause(tx, l.TenantID, "labors", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Labor{}), "labors").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "labors", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive labor")
 		}
 		return nil
@@ -173,14 +166,19 @@ func (r *Repository) RestoreLabor(ctx context.Context, id int64) error {
 		if !l.DeletedAt.Valid {
 			return domainerr.Conflict("labor is not archived")
 		}
+		var projectActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", l.ProjectId).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore labor while project is archived")
+		}
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Labor{}), "labors").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "labors", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore labor")
 		}
 		return nil
@@ -201,6 +199,9 @@ func (r *Repository) HardDeleteLabor(ctx context.Context, id int64) error {
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor %d not found", id))
+		}
+		if err := lifecycle.RequireArchived(authz.MaybeTenantScope(ctx, tx.Unscoped().Table("labors"), "labors"), "labors", "labor", id); err != nil {
+			return err
 		}
 
 		var woCount int64

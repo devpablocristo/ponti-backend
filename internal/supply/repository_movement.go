@@ -13,6 +13,8 @@ import (
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
@@ -737,18 +739,37 @@ func (r *Repository) ArchiveSupplyMovement(ctx context.Context, projectID, movem
 		return domainerr.Validation("project_id and movement_id are required")
 	}
 
-	result := r.getDB(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "supply_movements") }).
-		Where("project_id = ?", projectID).
-		Where("id = ?", movementID).
-		Delete(&models.SupplyMovement{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive supply movement")
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return domainerr.NotFound("supply movement not found")
-	}
-	return nil
+	deletedBy := &actor
+
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var movement models.SupplyMovement
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supply_movements").
+			Where("project_id = ? AND id = ?", projectID, movementID).
+			First(&movement).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("supply movement not found")
+			}
+			return domainerr.Internal("failed to get supply movement")
+		}
+		if movement.DeletedAt.Valid {
+			return domainerr.Conflict("supply movement already archived")
+		}
+		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, movement.TenantID, "supply_movements", movementID, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.SupplyMovement{}), "supply_movements").
+			Where("project_id = ? AND id = ?", projectID, movementID).
+			Updates(lifecycle.ArchiveUpdates(tx, "supply_movements", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive supply movement")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) RestoreSupplyMovement(ctx context.Context, projectID, movementID int64) error {
@@ -756,21 +777,35 @@ func (r *Repository) RestoreSupplyMovement(ctx context.Context, projectID, movem
 		return domainerr.Validation("project_id and movement_id are required")
 	}
 
-	result := r.getDB(ctx).
-		Unscoped().
-		Model(&models.SupplyMovement{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "supply_movements") }).
-		Where("project_id = ?", projectID).
-		Where("id = ?", movementID).
-		Where("deleted_at IS NOT NULL").
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore supply movement")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.NotFound("archived supply movement not found")
-	}
-	return nil
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var movement models.SupplyMovement
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supply_movements").
+			Where("project_id = ? AND id = ?", projectID, movementID).
+			First(&movement).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("supply movement not found")
+			}
+			return domainerr.Internal("failed to get supply movement")
+		}
+		if !movement.DeletedAt.Valid {
+			return domainerr.Conflict("supply movement is not archived")
+		}
+		var projectActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", projectID).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore supply movement while project is archived")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.SupplyMovement{}), "supply_movements").
+			Where("project_id = ? AND id = ?", projectID, movementID).
+			Updates(lifecycle.RestoreUpdates(tx, "supply_movements", time.Now())).Error; err != nil {
+			return domainerr.Internal("failed to restore supply movement")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) HardDeleteSupplyMovement(ctx context.Context, projectID, movementID int64) error {
@@ -778,19 +813,25 @@ func (r *Repository) HardDeleteSupplyMovement(ctx context.Context, projectID, mo
 		return domainerr.Validation("project_id and movement_id are required")
 	}
 
-	result := r.getDB(ctx).
-		Unscoped().
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "supply_movements") }).
-		Where("project_id = ?", projectID).
-		Where("id = ?", movementID).
-		Delete(&models.SupplyMovement{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to hard delete supply movement")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.NotFound("supply movement not found")
-	}
-	return nil
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		scoped := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements")
+		var count int64
+		if err := scoped.Where("project_id = ? AND id = ?", projectID, movementID).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check supply movement existence")
+		}
+		if count == 0 {
+			return domainerr.NotFound("supply movement not found")
+		}
+		if err := lifecycle.RequireArchived(scoped.Where("project_id = ?", projectID), "supply_movements", "supply movement", movementID); err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supply_movements").
+			Where("project_id = ? AND id = ?", projectID, movementID).
+			Delete(&models.SupplyMovement{}).Error; err != nil {
+			return domainerr.Internal("failed to hard delete supply movement")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

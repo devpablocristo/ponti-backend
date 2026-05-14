@@ -18,6 +18,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -345,30 +346,7 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 }
 
 func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
-	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
-		return err
-	}
-	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Supply{}), "supplies")
-		if err := supplyDB.Where("id = ?", id).Count(&count).Error; err != nil {
-			return domainerr.Internal("failed to check supply existence")
-		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-		}
-		result := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies").Delete(&models.Supply{}, id)
-		if result.Error != nil {
-			if isForeignKeyViolation(result.Error) {
-				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
-			}
-			return domainerr.Internal("failed to delete supply")
-		}
-		if result.RowsAffected == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-		}
-		return nil
-	})
+	return r.HardDeleteSupply(ctx, id)
 }
 
 func isForeignKeyViolation(err error) bool {
@@ -400,12 +378,13 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("supply already archived")
 		}
 
+		cause, err := lifecycle.RootCause(tx, supply.TenantID, "supplies", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "supplies", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive supply")
 		}
 		return nil
@@ -429,14 +408,19 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		if !supply.DeletedAt.Valid {
 			return domainerr.Conflict("supply is not archived")
 		}
+		var projectActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", supply.ProjectID).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore supply while project is archived")
+		}
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "supplies", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore supply")
 		}
 		return nil
@@ -489,6 +473,9 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 		}
+		if err := lifecycle.RequireArchived(supplyDB, "supplies", "supply", id); err != nil {
+			return err
+		}
 
 		var movCount int64
 		movementDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements")
@@ -506,6 +493,15 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 		}
 		if stkCount > 0 {
 			return domainerr.Conflict(fmt.Sprintf("supply has %d stock record(s); archive or hard-delete them first", stkCount))
+		}
+
+		var itemCount int64
+		itemDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("workorder_items"), "workorder_items")
+		if err := itemDB.Where("supply_id = ?", id).Count(&itemCount).Error; err != nil {
+			return domainerr.Internal("failed to check workorder_items")
+		}
+		if itemCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d work order item(s); archive or hard-delete them first", itemCount))
 		}
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies").Delete(&models.Supply{}, "id = ?", id).Error; err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -295,6 +296,9 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 		if count == 0 {
 			return domainerr.NotFound("work order not found")
 		}
+		if err := lifecycle.RequireArchived(workOrderDB, "workorders", "work order", id); err != nil {
+			return err
+		}
 
 		var invCount int64
 		invoiceDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("invoices"), "invoices")
@@ -388,12 +392,23 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 			return domainerr.Conflict("work order already archived")
 		}
 
+		cause, err := lifecycle.RootCause(tx, wo.TenantID, "workorders", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+			Where("workorder_id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "workorder_items", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive work order items")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+			Where("workorder_id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "workorder_investor_splits", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive work order investor splits")
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "workorders", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive work order")
 		}
 		return nil
@@ -417,15 +432,37 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		if !wo.DeletedAt.Valid {
 			return domainerr.Conflict("work order is not archived")
 		}
+		var projectActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", wo.ProjectID).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore work order while project is archived")
+		}
+		rowState, err := lifecycle.ReadRowState(tx, "workorders", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "workorders", id)
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "workorders", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore work order")
+		}
+		itemsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
+		itemsRestore = lifecycle.ApplyCauseScope(itemsRestore, "workorder_items", cause)
+		if err := itemsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_items", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore work order items")
+		}
+		splitsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
+		splitsRestore = lifecycle.ApplyCauseScope(splitsRestore, "workorder_investor_splits", cause)
+		if err := splitsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_investor_splits", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore work order investor splits")
 		}
 		return nil
 	})

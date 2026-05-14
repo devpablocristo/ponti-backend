@@ -32,6 +32,12 @@ func (s *cropHandlerUseCasesStub) ListCrops(_ context.Context, page int, perPage
 	return []domain.Crop{{ID: 1, Name: "Soja"}}, 1, nil
 }
 
+func (s *cropHandlerUseCasesStub) ListArchivedCrops(_ context.Context, page int, perPage int) ([]domain.Crop, int64, error) {
+	s.listPage = page
+	s.listPerPage = perPage
+	return []domain.Crop{{ID: 1, Name: "Soja"}}, 1, nil
+}
+
 func (s *cropHandlerUseCasesStub) GetCrop(_ context.Context, id int64) (*domain.Crop, error) {
 	s.getCalls = append(s.getCalls, id)
 	return &domain.Crop{ID: id, Name: "Soja"}, nil
@@ -39,6 +45,21 @@ func (s *cropHandlerUseCasesStub) GetCrop(_ context.Context, id int64) (*domain.
 
 func (s *cropHandlerUseCasesStub) UpdateCrop(_ context.Context, crop *domain.Crop) error {
 	s.updateCalls = append(s.updateCalls, *crop)
+	return nil
+}
+
+func (s *cropHandlerUseCasesStub) ArchiveCrop(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *cropHandlerUseCasesStub) RestoreCrop(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *cropHandlerUseCasesStub) HardDeleteCrop(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
 	return nil
 }
 

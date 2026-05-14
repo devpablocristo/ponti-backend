@@ -484,11 +484,6 @@ if [[ "$POST_RESTORE_TENANT_BACKFILL" == "1" ]]; then
   PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
 fi
 
-if [[ "$ACTORS_BACKFILL_SYNC" == "1" ]]; then
-  log "Reejecutando backfill/sync de actors..."
-  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
-fi
-
 if [[ "$RUN_FINAL_MIGRATIONS" == "1" ]]; then
   log "Aplicando migraciones finales post-restore..."
   DB_PASSWORD_ENC="$(urlencode_pass "$DB_PASSWORD")"
@@ -498,6 +493,11 @@ if [[ "$RUN_FINAL_MIGRATIONS" == "1" ]]; then
     -path /migrations \
     -database "postgres://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}" \
     up
+fi
+
+if [[ "$ACTORS_BACKFILL_SYNC" == "1" ]]; then
+  log "Reejecutando backfill/sync de actors..."
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
 fi
 
 log "✅ RESTAURACIÓN COMPLETA (PROD → local, data-only, tal cual)."

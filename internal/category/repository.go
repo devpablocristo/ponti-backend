@@ -2,7 +2,9 @@ package category
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -10,6 +12,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -108,16 +111,120 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 }
 
 func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
+	return r.HardDeleteCategory(ctx, id)
+}
+
+func (r *Repository) ListArchivedCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
+	var total int64
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.Category{}), "categories").
+		Where("deleted_at IS NOT NULL")
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived categories")
+	}
+	var list []models.Category
+	if err := base.Offset((page - 1) * perPage).Limit(perPage).Order("deleted_at DESC").Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived categories")
+	}
+	out := make([]domain.Category, 0, len(list))
+	for i := range list {
+		out = append(out, *list[i].ToDomain())
+	}
+	return out, total, nil
+}
+
+func (r *Repository) ArchiveCategory(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "category"); err != nil {
 		return err
 	}
-	result := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "categories").
-		Delete(&models.Category{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to delete category")
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category with id %d does not exist", id))
+	deletedBy := &actor
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var category models.Category
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "categories").Where("id = ?", id).First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
+			}
+			return domainerr.Internal("failed to get category")
+		}
+		if category.DeletedAt.Valid {
+			return domainerr.Conflict("category already archived")
+		}
+		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, category.TenantID, "categories", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Category{}), "categories").
+			Where("id = ?", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "categories", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive category")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreCategory(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "category"); err != nil {
+		return err
 	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var category models.Category
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "categories").Where("id = ?", id).First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
+			}
+			return domainerr.Internal("failed to get category")
+		}
+		if !category.DeletedAt.Valid {
+			return domainerr.Conflict("category is not archived")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Category{}), "categories").
+			Where("id = ?", id).
+			Updates(lifecycle.RestoreUpdates(tx, "categories", time.Now())).Error; err != nil {
+			return domainerr.Internal("failed to restore category")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDeleteCategory(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "category"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		categoryDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("categories"), "categories")
+		var count int64
+		if err := categoryDB.Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check category existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category with id %d does not exist", id))
+		}
+		if err := lifecycle.RequireArchived(categoryDB, "categories", "category", id); err != nil {
+			return err
+		}
+		for _, dep := range []struct {
+			table  string
+			column string
+			label  string
+		}{
+			{"supplies", "category_id", "supply"},
+			{"labors", "category_id", "labor"},
+		} {
+			var n int64
+			if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table(dep.table), dep.table).Where(dep.column+" = ?", id).Count(&n).Error; err != nil {
+				return domainerr.Internal("failed to check " + dep.table)
+			}
+			if n > 0 {
+				return domainerr.Conflict(fmt.Sprintf("category has %d %s reference(s); remove them first", n, dep.label))
+			}
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "categories").Delete(&models.Category{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete category")
+		}
+		return nil
+	})
 }

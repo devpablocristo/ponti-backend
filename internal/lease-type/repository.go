@@ -2,7 +2,9 @@ package leasetype
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -10,6 +12,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -108,16 +111,111 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 }
 
 func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
+	return r.HardDeleteLeaseType(ctx, id)
+}
+
+func (r *Repository) ListArchivedLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
+	var total int64
+	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.LeaseType{}), "lease_types").
+		Where("deleted_at IS NOT NULL")
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived lease types")
+	}
+	var list []models.LeaseType
+	if err := base.Offset((page - 1) * perPage).Limit(perPage).Order("deleted_at DESC").Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived lease types")
+	}
+	out := make([]domain.LeaseType, 0, len(list))
+	for i := range list {
+		out = append(out, *list[i].ToDomain())
+	}
+	return out, total, nil
+}
+
+func (r *Repository) ArchiveLeaseType(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
 		return err
 	}
-	result := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "lease_types").
-		Delete(&models.LeaseType{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to delete lease type")
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type with id %d does not exist", id))
+	deletedBy := &actor
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var item models.LeaseType
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lease_types").Where("id = ?", id).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
+			}
+			return domainerr.Internal("failed to get lease type")
+		}
+		if item.DeletedAt.Valid {
+			return domainerr.Conflict("lease type already archived")
+		}
+		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, item.TenantID, "lease_types", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.LeaseType{}), "lease_types").
+			Where("id = ?", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "lease_types", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive lease type")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreLeaseType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
+		return err
 	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var item models.LeaseType
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lease_types").Where("id = ?", id).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
+			}
+			return domainerr.Internal("failed to get lease type")
+		}
+		if !item.DeletedAt.Valid {
+			return domainerr.Conflict("lease type is not archived")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.LeaseType{}), "lease_types").
+			Where("id = ?", id).
+			Updates(lifecycle.RestoreUpdates(tx, "lease_types", time.Now())).Error; err != nil {
+			return domainerr.Internal("failed to restore lease type")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDeleteLeaseType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		leaseDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lease_types"), "lease_types")
+		var count int64
+		if err := leaseDB.Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check lease type existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type with id %d does not exist", id))
+		}
+		if err := lifecycle.RequireArchived(leaseDB, "lease_types", "lease type", id); err != nil {
+			return err
+		}
+		var fields int64
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").Where("lease_type_id = ?", id).Count(&fields).Error; err != nil {
+			return domainerr.Internal("failed to check fields")
+		}
+		if fields > 0 {
+			return domainerr.Conflict(fmt.Sprintf("lease type has %d field reference(s); remove them first", fields))
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "lease_types").Delete(&models.LeaseType{}, "id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete lease type")
+		}
+		return nil
+	})
 }

@@ -89,13 +89,14 @@ func (r *Repository) ListActors(ctx context.Context, filters domain.ListFilters,
 	if err != nil {
 		return nil, 0, err
 	}
-	query := r.db.Client().WithContext(ctx).Model(&models.Actor{}).Where("tenant_id = ? AND deleted_at IS NULL", tenantID)
+	query := r.db.Client().WithContext(ctx).Model(&models.Actor{}).Where("tenant_id = ?", tenantID)
 	switch filters.Status {
 	case "archived":
-		query = query.Where("archived_at IS NOT NULL")
+		query = query.Unscoped().Where("deleted_at IS NOT NULL")
 	case "all":
+		query = query.Unscoped()
 	default:
-		query = query.Where("archived_at IS NULL")
+		query = query.Where("deleted_at IS NULL")
 	}
 	if filters.Role != "" {
 		if _, ok := domain.ValidRoles[filters.Role]; !ok {
@@ -235,9 +236,11 @@ func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 	now := time.Now()
 	res := r.db.Client().WithContext(ctx).
 		Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL AND archived_at IS NULL", id, tenantID).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
 		Updates(map[string]any{
 			"archived_at": now,
+			"deleted_at":  now,
+			"deleted_by":  actorName,
 			"updated_at":  now,
 			"updated_by":  actorName,
 		})
@@ -260,10 +263,13 @@ func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
 	}
 	now := time.Now()
 	res := r.db.Client().WithContext(ctx).
+		Unscoped().
 		Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL AND archived_at IS NOT NULL", id, tenantID).
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NOT NULL", id, tenantID).
 		Updates(map[string]any{
 			"archived_at": nil,
+			"deleted_at":  nil,
+			"deleted_by":  nil,
 			"updated_at":  now,
 		})
 	if res.Error != nil {
@@ -284,12 +290,15 @@ func (r *Repository) HardDeleteActor(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&models.Actor{}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).Count(&count).Error; err != nil {
+		var actor models.Actor
+		if err := tx.Unscoped().Where("id = ? AND tenant_id = ?", id, tenantID).First(&actor).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
+			}
 			return domainerr.Internal("failed to check actor existence")
 		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", id))
+		if !actor.DeletedAt.Valid {
+			return domainerr.Conflict("actor must be archived before hard delete")
 		}
 		impact, err := r.mergeOrDeleteImpact(ctx, tx, []int64{id})
 		if err != nil {
@@ -298,7 +307,7 @@ func (r *Repository) HardDeleteActor(ctx context.Context, id int64) error {
 		if totalImpact(impact.Counts) > 0 {
 			return domainerr.Conflict("actor has historical or active references; archive it instead")
 		}
-		if err := tx.Where("tenant_id = ?", tenantID).Delete(&models.Actor{}, "id = ?", id).Error; err != nil {
+		if err := tx.Unscoped().Where("tenant_id = ?", tenantID).Delete(&models.Actor{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete actor")
 		}
 		return nil

@@ -13,6 +13,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -219,6 +220,9 @@ func (r *Repository) HardDeleteManager(ctx context.Context, id int64) error {
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager with id %d does not exist", id))
 		}
+		if err := lifecycle.RequireArchived(managerDB, "managers", "manager", id); err != nil {
+			return err
+		}
 
 		var pmCount int64
 		pmDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("project_managers"), "project_managers")
@@ -274,12 +278,13 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 		}
 
 		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, m.TenantID, "managers", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Manager{}), "managers").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "managers", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive manager")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
@@ -321,11 +326,7 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Manager{}), "managers").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "managers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore manager")
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{

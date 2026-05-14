@@ -32,6 +32,12 @@ func (s *leaseTypeHandlerUseCasesStub) ListLeaseTypes(_ context.Context, page in
 	return []domain.LeaseType{{ID: 1, Name: "Propio"}}, 1, nil
 }
 
+func (s *leaseTypeHandlerUseCasesStub) ListArchivedLeaseTypes(_ context.Context, page int, perPage int) ([]domain.LeaseType, int64, error) {
+	s.listPage = page
+	s.listPerPage = perPage
+	return []domain.LeaseType{{ID: 1, Name: "Propio"}}, 1, nil
+}
+
 func (s *leaseTypeHandlerUseCasesStub) GetLeaseType(_ context.Context, id int64) (*domain.LeaseType, error) {
 	s.getCalls = append(s.getCalls, id)
 	return &domain.LeaseType{ID: id, Name: "Propio"}, nil
@@ -39,6 +45,21 @@ func (s *leaseTypeHandlerUseCasesStub) GetLeaseType(_ context.Context, id int64)
 
 func (s *leaseTypeHandlerUseCasesStub) UpdateLeaseType(_ context.Context, item *domain.LeaseType) error {
 	s.updateCalls = append(s.updateCalls, *item)
+	return nil
+}
+
+func (s *leaseTypeHandlerUseCasesStub) ArchiveLeaseType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *leaseTypeHandlerUseCasesStub) RestoreLeaseType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *leaseTypeHandlerUseCasesStub) HardDeleteLeaseType(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
 	return nil
 }
 

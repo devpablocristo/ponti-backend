@@ -22,6 +22,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -321,12 +322,18 @@ func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 			return domainerr.Conflict("lot already archived")
 		}
 
+		cause, err := lifecycle.RootCause(tx, l.TenantID, "lots", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Table("lot_dates"), "lot_dates").
+			Where("lot_id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "lot_dates", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive lot dates")
+		}
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Lot{}), "lots").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": archivedAt,
-				"deleted_by": deletedBy,
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive lot")
 		}
 		return nil
@@ -351,15 +358,31 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 		if !l.DeletedAt.Valid {
 			return domainerr.Conflict("lot is not archived")
 		}
+		var fieldActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("fields"), "fields").
+			Where("id = ? AND deleted_at IS NULL", l.FieldID).
+			Count(&fieldActive).Error; err != nil {
+			return domainerr.Internal("failed to check field")
+		}
+		if fieldActive == 0 {
+			return domainerr.Conflict("cannot restore lot while field is archived")
+		}
+		rowState, err := lifecycle.ReadRowState(tx, "lots", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "lots", id)
 
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Lot{}), "lots").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": restoredAt,
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore lot")
+		}
+		dateRestore := authz.MaybeTenantScope(ctx, tx.Table("lot_dates"), "lot_dates").
+			Where("lot_id = ? AND deleted_at IS NOT NULL", id)
+		dateRestore = lifecycle.ApplyCauseScope(dateRestore, "lot_dates", cause)
+		if err := dateRestore.Updates(lifecycle.RestoreUpdates(tx, "lot_dates", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore lot dates")
 		}
 		return nil
 	})
@@ -405,6 +428,9 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
+		}
+		if err := lifecycle.RequireArchived(authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lots"), "lots"), "lots", "lot", id); err != nil {
+			return err
 		}
 
 		var woCount int64

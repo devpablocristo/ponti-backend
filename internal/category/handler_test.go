@@ -32,6 +32,12 @@ func (s *categoryHandlerUseCasesStub) ListCategories(_ context.Context, page int
 	return []domain.Category{{ID: 1, Name: "Semilla", TypeID: 2}}, 1, nil
 }
 
+func (s *categoryHandlerUseCasesStub) ListArchivedCategories(_ context.Context, page int, perPage int) ([]domain.Category, int64, error) {
+	s.listPage = page
+	s.listPerPage = perPage
+	return []domain.Category{{ID: 1, Name: "Semilla", TypeID: 2}}, 1, nil
+}
+
 func (s *categoryHandlerUseCasesStub) GetCategory(_ context.Context, id int64) (*domain.Category, error) {
 	s.getCalls = append(s.getCalls, id)
 	return &domain.Category{ID: id, Name: "Semilla", TypeID: 2}, nil
@@ -39,6 +45,21 @@ func (s *categoryHandlerUseCasesStub) GetCategory(_ context.Context, id int64) (
 
 func (s *categoryHandlerUseCasesStub) UpdateCategory(_ context.Context, category *domain.Category) error {
 	s.updateCalls = append(s.updateCalls, *category)
+	return nil
+}
+
+func (s *categoryHandlerUseCasesStub) ArchiveCategory(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *categoryHandlerUseCasesStub) RestoreCategory(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
+	return nil
+}
+
+func (s *categoryHandlerUseCasesStub) HardDeleteCategory(_ context.Context, id int64) error {
+	s.deleteCalls = append(s.deleteCalls, id)
 	return nil
 }
 
