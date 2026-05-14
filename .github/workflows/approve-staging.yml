@@ -1,0 +1,31 @@
+name: Approve STAGING candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: approve-staging
+  cancel-in-progress: false
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Approve latest STAGING smoke-ok deployment
+        run: python3 scripts/release/deployments.py approve-staging
+        env:
+          GH_TOKEN: ${{ github.token }}
