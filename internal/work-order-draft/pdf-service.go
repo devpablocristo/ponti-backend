@@ -139,7 +139,8 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 		TotalUsed decimal.Decimal
 	}
 
-	bySupply := make(map[string]*aggregated)
+	bySupply := make(map[int64]*aggregated)
+	supplyOrder := make([]int64, 0)
 
 	for _, draft := range drafts {
 		totalSurface = totalSurface.Add(draft.EffectiveArea)
@@ -150,21 +151,15 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 		})
 
 		for _, item := range draft.Items {
-			key := strings.TrimSpace(item.SupplyName)
-			if key == "" {
-				key = fmt.Sprintf("supply-%d", item.SupplyID)
-			}
+			key := item.SupplyID
 
 			if _, exists := bySupply[key]; !exists {
 				bySupply[key] = &aggregated{
 					Name:      safeValue(item.SupplyName),
-					TotalUsed: decimal.Zero,
+					TotalUsed: item.TotalUsed,
 				}
-
+				supplyOrder = append(supplyOrder, key)
 			}
-
-			bySupply[key].TotalUsed = bySupply[key].TotalUsed.Add(item.TotalUsed)
-
 		}
 	}
 
@@ -172,14 +167,8 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 		return lots[i].Name < lots[j].Name
 	})
 
-	keys := make([]string, 0, len(bySupply))
-	for key := range bySupply {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	items := make([]pdfItemLine, 0, len(keys))
-	for _, key := range keys {
+	items := make([]pdfItemLine, 0, len(supplyOrder))
+	for _, key := range supplyOrder {
 		row := bySupply[key]
 
 		finalDose := decimal.Zero

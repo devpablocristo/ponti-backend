@@ -24,11 +24,21 @@ RUN --mount=type=secret,id=go_modules_token,required=false \
       git config --global url."https://${token}@github.com/".insteadOf "https://github.com/"; \
     fi && \
     git config --global http.version HTTP/1.1 && \
+    core_modules="github.com/devpablocristo/core/authn/go github.com/devpablocristo/core/databases/postgres/go github.com/devpablocristo/core/errors/go github.com/devpablocristo/core/governance/go github.com/devpablocristo/core/http/gin/go github.com/devpablocristo/core/http/go github.com/devpablocristo/core/notifications/go github.com/devpablocristo/core/security/go github.com/devpablocristo/core/validate/go" && \
+    for module in $core_modules; do \
+      go mod download "$module"; \
+    done && \
     i=0 && \
-    until [ "$i" -ge 3 ]; do \
-      go mod download && break; \
+    until go mod download; do \
       i=$((i+1)); \
+      if [ "$i" -ge 3 ]; then \
+        exit 1; \
+      fi; \
       echo "go mod download failed, retry $i/3" >&2; \
+      rm -rf "$(go env GOMODCACHE)/cache/vcs"; \
+      for module in $core_modules; do \
+        go mod download "$module"; \
+      done; \
       sleep 2; \
     done && \
     go mod verify && \
@@ -60,6 +70,5 @@ EXPOSE 8080
 
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-
 
 
