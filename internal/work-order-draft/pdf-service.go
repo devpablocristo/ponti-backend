@@ -139,9 +139,8 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 		TotalUsed decimal.Decimal
 	}
 
-	bySupply := make(map[string]*aggregated)
-	supplyOrder := make([]string, 0)
-
+	bySupply := make(map[int64]*aggregated)
+	supplyOrder := make([]int64, 0)
 
 	for _, draft := range drafts {
 		totalSurface = totalSurface.Add(draft.EffectiveArea)
@@ -152,19 +151,15 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 		})
 
 		for _, item := range draft.Items {
-			key := strings.TrimSpace(item.SupplyName)
-			if key == "" {
-				key = fmt.Sprintf("supply-%d", item.SupplyID)
-			}
+			key := item.SupplyID
 
 			if _, exists := bySupply[key]; !exists {
-	bySupply[key] = &aggregated{
-		Name:      safeValue(item.SupplyName),
-		TotalUsed: item.TotalUsed,
-	}
-	supplyOrder = append(supplyOrder, key)
-}
-
+				bySupply[key] = &aggregated{
+					Name:      safeValue(item.SupplyName),
+					TotalUsed: item.TotalUsed,
+				}
+				supplyOrder = append(supplyOrder, key)
+			}
 		}
 	}
 
@@ -173,7 +168,7 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 	})
 
 	items := make([]pdfItemLine, 0, len(supplyOrder))
-for _, key := range supplyOrder {
+	for _, key := range supplyOrder {
 		row := bySupply[key]
 
 		finalDose := decimal.Zero
