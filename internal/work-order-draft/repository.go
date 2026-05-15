@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -139,7 +140,9 @@ func (r *Repository) GetWorkOrderDraftByID(ctx context.Context, id int64) (*doma
 		Preload("Lot").
 		Preload("Crop").
 		Preload("Labor").
-		Preload("Items").
+		Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Items.Supply").
 		Preload("InvestorSplits").
 		Where("id = ?", id).
@@ -194,7 +197,9 @@ func (r *Repository) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.C
 		Preload("Lot").
 		Preload("Crop").
 		Preload("Labor").
-		Preload("Items").
+		Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Items.Supply").
 		Preload("InvestorSplits").
 		Where("project_id = ?", projectID).
@@ -416,6 +421,124 @@ func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, sta
 	return items, pageInfo, nil
 }
 
+func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error) {
+	type row struct {
+		ID            int64
+		Number        string
+		Date          time.Time
+		ProjectID     int64
+		ProjectName   string
+		FieldID       int64
+		FieldName     string
+		IsDigital     bool
+		Status        string
+		LotsCount     int64
+		EffectiveArea decimal.Decimal
+		CreatedAt     time.Time
+	}
+
+	var rows []row
+
+	base := r.db.Client().
+		WithContext(ctx).
+		Table("work_order_drafts wod").
+		Select(`
+			MIN(wod.id) AS id,
+			CASE
+ 				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
+  				THEN split_part(wod.number, '.', 1)
+ 				ELSE wod.number
+			END AS number,
+			MIN(wod.date) AS date,
+			wod.project_id,
+			MIN(p.name) AS project_name,
+			wod.field_id,
+			MIN(f.name) AS field_name,
+			TRUE AS is_digital,
+			CASE
+				WHEN COUNT(DISTINCT wod.status) = 1 THEN MIN(wod.status)
+				ELSE 'pending_review'
+			END AS status,
+			COUNT(*) AS lots_count,
+			COALESCE(SUM(wod.effective_area), 0) AS effective_area,
+			MIN(wod.created_at) AS created_at
+		`).
+		Joins("join projects p on p.id = wod.project_id").
+		Joins("join fields f on f.id = wod.field_id").
+		Where("wod.is_digital = ?", true).
+		Where("wod.deleted_at IS NULL").
+		Group(`
+			CASE
+				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
+				THEN split_part(wod.number, '.', 1)
+				ELSE wod.number
+			END,
+			wod.project_id,
+			wod.field_id
+		`)
+
+	if strings.TrimSpace(number) != "" {
+		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
+	}
+
+	if strings.TrimSpace(status) != "" {
+		base = base.Where("wod.status = ?", strings.TrimSpace(status))
+	}
+
+	var total int64
+	countQuery := r.db.Client().
+		WithContext(ctx).
+		Table("(?) as grouped", base)
+
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count work order draft groups", err)
+	}
+
+	if total == 0 {
+		return []domain.WorkOrderDraftGroupListItem{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+	}
+
+	page := int(inp.Page)
+	if page < 1 {
+		page = 1
+	}
+	pageSize := int(inp.PageSize)
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	if err := base.
+		Order("created_at desc").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list work order draft groups", err)
+	}
+
+	items := make([]domain.WorkOrderDraftGroupListItem, len(rows))
+	for i, row := range rows {
+		items[i] = domain.WorkOrderDraftGroupListItem{
+			ID:            row.ID,
+			Number:        row.Number,
+			Date:          row.Date,
+			ProjectID:     row.ProjectID,
+			ProjectName:   row.ProjectName,
+			FieldID:       row.FieldID,
+			FieldName:     row.FieldName,
+			IsDigital:     row.IsDigital,
+			Status:        domain.Status(row.Status),
+			LotsCount:     row.LotsCount,
+			EffectiveArea: row.EffectiveArea,
+			Base: shareddomain.Base{
+				CreatedAt: row.CreatedAt,
+			},
+		}
+	}
+
+	return items, types.NewPageInfo(page, pageSize, total), nil
+}
+
 func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkOrderDraft) error {
 	if err := sharedrepo.ValidateEntity(d, "work order draft"); err != nil {
 		return err
@@ -486,14 +609,15 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 
 		if len(model.Items) > 0 {
 			items := make([]models.WorkOrderDraftItem, len(model.Items))
-			for i := range model.Items {
-				items[i] = models.WorkOrderDraftItem{
-					DraftID:   model.ID,
-					SupplyID:  model.Items[i].SupplyID,
-					TotalUsed: model.Items[i].TotalUsed,
-					FinalDose: model.Items[i].FinalDose,
+				for i := range model.Items {
+					items[i] = models.WorkOrderDraftItem{
+						DraftID:    model.ID,
+						SupplyID:   model.Items[i].SupplyID,
+						SupplyName: model.Items[i].SupplyName,
+						TotalUsed:  model.Items[i].TotalUsed,
+						FinalDose:  model.Items[i].FinalDose,
+					}
 				}
-			}
 			if err := tx.Omit("id").Create(&items).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to insert new draft items", err)
 			}

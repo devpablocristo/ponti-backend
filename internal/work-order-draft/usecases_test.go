@@ -21,6 +21,7 @@ type testDraftRepo struct {
 	listPendingSupplyNamesFn     func(context.Context, []int64) ([]string, error)
 	listRelatedFn                func(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	listFn                       func(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
+	listGroupsFn func(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
 	listOccupiedFn               func(context.Context, int64) ([]string, error)
 	listOccupiedExcludingDraftFn func(context.Context, int64, int64) ([]string, error)
 	listPublishedFn              func(context.Context, int64) ([]string, error)
@@ -63,6 +64,13 @@ func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, 
 		return nil, types.PageInfo{}, nil
 	}
 	return r.listFn(ctx, number, status, isDigital, inp)
+}
+
+func (r *testDraftRepo) ListDigitalWorkOrderDraftGroups(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error) {
+	if r.listGroupsFn == nil {
+		return nil, types.PageInfo{}, nil
+	}
+	return r.listGroupsFn(ctx, number, status, inp)
 }
 
 func (r *testDraftRepo) ListOccupiedWorkOrderNumbersByProject(ctx context.Context, projectID int64) ([]string, error) {
@@ -197,6 +205,70 @@ func TestCreateDigitalWorkOrderDraft_AssignsSplitNumberWhenBaseExists(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, created)
 	require.Equal(t, "D-41.2", created.Number)
+}
+
+func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *testing.T) {
+	var created []*domain.WorkOrderDraft
+
+	repo := &testDraftRepo{
+		listOccupiedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return []string{}, nil
+		},
+		createBatchFn: func(ctx context.Context, drafts []*domain.WorkOrderDraft) ([]int64, error) {
+			created = drafts
+			return []int64{101, 102}, nil
+		},
+	}
+
+	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+
+	batch := &domain.WorkOrderDraftBatchCreate{
+		Date:       time.Date(2026, 5, 14, 0, 0, 0, 0, time.UTC),
+		CustomerID: 1,
+		ProjectID:  10,
+		FieldID:    20,
+		CropID:     30,
+		LaborID:    40,
+		Contractor: "Contratista",
+		InvestorID: 50,
+		Lots: []domain.WorkOrderDraftBatchLot{
+			{
+				LotID:         101,
+				EffectiveArea: decimal.NewFromInt(60),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{
+						SupplyID:  999,
+						TotalUsed: decimal.NewFromInt(120),
+					},
+				},
+			},
+			{
+				LotID:         102,
+				EffectiveArea: decimal.NewFromInt(60),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{
+						SupplyID:  999,
+						TotalUsed: decimal.NewFromInt(120),
+					},
+				},
+			},
+		},
+	}
+
+	result, err := uc.CreateDigitalWorkOrderDraftBatch(context.Background(), batch)
+
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Len(t, created, 2)
+
+	require.Equal(t, "D-1.1", created[0].Number)
+	require.Equal(t, "D-1.2", created[1].Number)
+
+	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
+	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
+
+	require.True(t, created[0].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+	require.True(t, created[1].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
 }
 
 func TestUpdateWorkOrderDraftByID_RevalidatesDigitalNumberExcludingSelf(t *testing.T) {
