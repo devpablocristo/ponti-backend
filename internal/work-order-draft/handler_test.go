@@ -46,10 +46,25 @@ func (s *workOrderDraftUseCasesStub) ListWorkOrderDrafts(context.Context, string
 func (s *workOrderDraftUseCasesStub) ListDigitalWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
 }
+func (s *workOrderDraftUseCasesStub) ListArchivedWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return nil, types.PageInfo{}, nil
+}
 func (s *workOrderDraftUseCasesStub) UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error {
 	return nil
 }
 func (s *workOrderDraftUseCasesStub) DeleteWorkOrderDraftByID(_ context.Context, id int64) error {
+	s.deletedID = id
+	return nil
+}
+func (s *workOrderDraftUseCasesStub) ArchiveWorkOrderDraftByID(_ context.Context, id int64) error {
+	s.deletedID = id
+	return nil
+}
+func (s *workOrderDraftUseCasesStub) RestoreWorkOrderDraftByID(_ context.Context, id int64) error {
+	s.deletedID = id
+	return nil
+}
+func (s *workOrderDraftUseCasesStub) HardDeleteWorkOrderDraftByID(_ context.Context, id int64) error {
 	s.deletedID = id
 	return nil
 }

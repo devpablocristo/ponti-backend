@@ -114,6 +114,14 @@ func TestCampaignRepositoryTenantIsolation(t *testing.T) {
 		t.Fatalf("expected only tenant A filtered campaign/project, got %#v", filtered)
 	}
 
+	customerFiltered, err := repo.ListCampaigns(ctxA, 100, "")
+	if err != nil {
+		t.Fatalf("list customer-filtered campaigns: %v", err)
+	}
+	if len(customerFiltered) != 1 || customerFiltered[0].ID != 1 || customerFiltered[0].ProjectID != 10 {
+		t.Fatalf("expected only tenant A customer-filtered campaign/project, got %#v", customerFiltered)
+	}
+
 	if _, err := repo.GetCampaign(ctxA, 2); err == nil {
 		t.Fatalf("expected get cross-tenant campaign to fail")
 	}

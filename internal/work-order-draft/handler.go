@@ -24,8 +24,12 @@ type UseCasesPort interface {
 	ExportWorkOrderDraftGroupPDF(context.Context, int64) ([]byte, error)
 	ListWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListDigitalWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
+	ListArchivedWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
 	DeleteWorkOrderDraftByID(context.Context, int64) error
+	ArchiveWorkOrderDraftByID(context.Context, int64) error
+	RestoreWorkOrderDraftByID(context.Context, int64) error
+	HardDeleteWorkOrderDraftByID(context.Context, int64) error
 	PublishWorkOrderDraft(context.Context, int64) (int64, error)
 }
 
@@ -89,11 +93,15 @@ func (h *Handler) Routes() {
 		grp.POST("/digital/batch/preview-number", h.PreviewDigitalWorkOrderDraftBatchNumber)
 		grp.GET("", h.ListWorkOrderDrafts)
 		grp.GET("/digital", h.ListDigitalWorkOrderDrafts)
+		grp.GET("/archived", h.ListArchivedWorkOrderDrafts)
 		grp.GET("/:work_order_draft_id", h.GetWorkOrderDraftByID)
 		grp.GET("/:work_order_draft_id/pdf", h.ExportWorkOrderDraftPDF)
 		grp.GET("/:work_order_draft_id/group-pdf", h.ExportWorkOrderDraftGroupPDF)
 		grp.PUT("/:work_order_draft_id", h.UpdateWorkOrderDraftByID)
 		grp.DELETE("/:work_order_draft_id", h.DeleteWorkOrderDraftByID)
+		grp.POST("/:work_order_draft_id/archive", h.ArchiveWorkOrderDraftByID)
+		grp.POST("/:work_order_draft_id/restore", h.RestoreWorkOrderDraftByID)
+		grp.DELETE("/:work_order_draft_id/hard", h.HardDeleteWorkOrderDraftByID)
 		grp.POST("/:work_order_draft_id/publish", h.PublishWorkOrderDraft)
 	}
 }
@@ -293,6 +301,18 @@ func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
 	h.runWorkOrderDraftIDAction(c, h.ucs.DeleteWorkOrderDraftByID)
 }
 
+func (h *Handler) ArchiveWorkOrderDraftByID(c *gin.Context) {
+	h.runWorkOrderDraftIDAction(c, h.ucs.ArchiveWorkOrderDraftByID)
+}
+
+func (h *Handler) RestoreWorkOrderDraftByID(c *gin.Context) {
+	h.runWorkOrderDraftIDAction(c, h.ucs.RestoreWorkOrderDraftByID)
+}
+
+func (h *Handler) HardDeleteWorkOrderDraftByID(c *gin.Context) {
+	h.runWorkOrderDraftIDAction(c, h.ucs.HardDeleteWorkOrderDraftByID)
+}
+
 func (h *Handler) ListWorkOrderDrafts(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
 
@@ -317,6 +337,26 @@ func (h *Handler) ListDigitalWorkOrderDrafts(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
 
 	items, pageInfo, err := h.ucs.ListDigitalWorkOrderDrafts(
+		c.Request.Context(),
+		c.Query("number"),
+		c.Query("status"),
+		types.Input{
+			Page:     uint(page),
+			PageSize: uint(perPage),
+		},
+	)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.NewListResponse(pageInfo, items))
+}
+
+func (h *Handler) ListArchivedWorkOrderDrafts(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
+
+	items, pageInfo, err := h.ucs.ListArchivedWorkOrderDrafts(
 		c.Request.Context(),
 		c.Query("number"),
 		c.Query("status"),

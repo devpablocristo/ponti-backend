@@ -280,6 +280,188 @@ func TestRestoreCustomerDoesNotRestoreManuallyArchivedProject(t *testing.T) {
 	}
 }
 
+func TestRestoreCustomerRestoresProjectGraphOnlyByCause(t *testing.T) {
+	db := setupCustomerTenantDB(t)
+	repo := NewRepository(customerTenantGormEngine{client: db})
+
+	if err := db.Exec(`
+		CREATE TABLE fields (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+		CREATE TABLE lots (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			field_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+		CREATE TABLE workorders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+		CREATE TABLE workorder_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			workorder_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+		CREATE TABLE work_order_drafts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+		CREATE TABLE work_order_draft_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			draft_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+	`).Error; err != nil {
+		t.Fatalf("create graph tables: %v", err)
+	}
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, created_at, updated_at, deleted_at) VALUES
+			(80, ?, 'Customer Graph', ?, ?, NULL);
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, created_at, updated_at, deleted_at) VALUES
+			(80, ?, 'Project Graph', 80, 1, ?, ?, NULL);
+		INSERT INTO fields (id, tenant_id, name, project_id, deleted_at) VALUES
+			(80, ?, 'Field Graph', 80, NULL);
+		INSERT INTO lots (id, tenant_id, name, field_id, deleted_at) VALUES
+			(80, ?, 'Lot Graph', 80, NULL),
+			(81, ?, 'Manual Lot', 80, ?);
+		INSERT INTO workorders (id, tenant_id, project_id, deleted_at) VALUES
+			(80, ?, 80, NULL);
+		INSERT INTO workorder_items (id, tenant_id, workorder_id, deleted_at) VALUES
+			(80, ?, 80, NULL);
+		INSERT INTO work_order_drafts (id, tenant_id, project_id, deleted_at) VALUES
+			(80, ?, 80, NULL);
+		INSERT INTO work_order_draft_items (id, draft_id, deleted_at) VALUES
+			(80, 80, NULL);
+	`, tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
+	).Error; err != nil {
+		t.Fatalf("seed graph: %v", err)
+	}
+
+	ctx := customerTenantContext(tenantID)
+	if err := repo.ArchiveCustomer(ctx, 80); err != nil {
+		t.Fatalf("archive customer graph: %v", err)
+	}
+	if err := repo.RestoreCustomer(ctx, 80); err != nil {
+		t.Fatalf("restore customer graph: %v", err)
+	}
+
+	checks := map[string]string{
+		"project":    `SELECT COUNT(*) FROM projects WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"field":      `SELECT COUNT(*) FROM fields WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"lot":        `SELECT COUNT(*) FROM lots WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"workorder":  `SELECT COUNT(*) FROM workorders WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"wo_item":    `SELECT COUNT(*) FROM workorder_items WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"draft":      `SELECT COUNT(*) FROM work_order_drafts WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"draft_item": `SELECT COUNT(*) FROM work_order_draft_items WHERE id = 80 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"manual_lot": `SELECT COUNT(*) FROM lots WHERE id = 81 AND deleted_at IS NOT NULL`,
+	}
+	for name, query := range checks {
+		var count int64
+		if err := db.Raw(query).Scan(&count).Error; err != nil {
+			t.Fatalf("check %s: %v", name, err)
+		}
+		if count != 1 {
+			t.Fatalf("expected %s count 1, got %d", name, count)
+		}
+	}
+}
+
+func TestRestoreActiveCustomerRepairsChildrenArchivedBySameOrigin(t *testing.T) {
+	db := setupCustomerTenantDB(t)
+	repo := NewRepository(customerTenantGormEngine{client: db})
+
+	if err := db.Exec(`
+		CREATE TABLE fields (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER
+		);
+	`).Error; err != nil {
+		t.Fatalf("create repair tables: %v", err)
+	}
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, created_at, updated_at, deleted_at, archive_batch_id, archive_origin_entity, archive_origin_id) VALUES
+			(90, ?, 'Active Customer', ?, ?, NULL, NULL, NULL, NULL);
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, created_at, updated_at, deleted_at, archive_batch_id, archive_origin_entity, archive_origin_id) VALUES
+			(90, ?, 'Active Project', 90, 1, ?, ?, NULL, NULL, NULL, NULL);
+		INSERT INTO fields (id, tenant_id, name, project_id, deleted_at, archive_batch_id, archive_origin_entity, archive_origin_id) VALUES
+			(90, ?, 'Broken Cascade Field', 90, ?, 77, 'customers', 90),
+			(91, ?, 'Manual Field', 90, ?, 88, 'fields', 91);
+	`, tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+	).Error; err != nil {
+		t.Fatalf("seed repair graph: %v", err)
+	}
+
+	ctx := customerTenantContext(tenantID)
+	if err := repo.RestoreCustomer(ctx, 90); err != nil {
+		t.Fatalf("repair active customer graph: %v", err)
+	}
+
+	checks := map[string]string{
+		"same_origin_restored": `SELECT COUNT(*) FROM fields WHERE id = 90 AND deleted_at IS NULL AND archive_batch_id IS NULL`,
+		"manual_preserved":     `SELECT COUNT(*) FROM fields WHERE id = 91 AND deleted_at IS NOT NULL AND archive_batch_id = 88`,
+	}
+	for name, query := range checks {
+		var count int64
+		if err := db.Raw(query).Scan(&count).Error; err != nil {
+			t.Fatalf("check %s: %v", name, err)
+		}
+		if count != 1 {
+			t.Fatalf("expected %s count 1, got %d", name, count)
+		}
+	}
+}
+
 func TestCustomerRepositoryRequiresTenantInStrictMode(t *testing.T) {
 	t.Setenv("TENANT_STRICT_MODE", "true")
 

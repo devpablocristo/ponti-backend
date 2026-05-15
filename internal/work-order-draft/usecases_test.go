@@ -64,6 +64,12 @@ func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, 
 	}
 	return r.listFn(ctx, number, status, isDigital, inp)
 }
+func (r *testDraftRepo) ListArchivedWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	if r.listFn == nil {
+		return nil, types.PageInfo{}, nil
+	}
+	return r.listFn(ctx, number, status, isDigital, inp)
+}
 
 func (r *testDraftRepo) ListOccupiedWorkOrderNumbersByProject(ctx context.Context, projectID int64) ([]string, error) {
 	return r.listOccupiedFn(ctx, projectID)
@@ -82,6 +88,15 @@ func (r *testDraftRepo) DeleteWorkOrderDraftByID(ctx context.Context, id int64) 
 		return nil
 	}
 	return r.deleteFn(ctx, id)
+}
+func (r *testDraftRepo) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
+	return r.DeleteWorkOrderDraftByID(ctx, id)
+}
+func (r *testDraftRepo) RestoreWorkOrderDraftByID(context.Context, int64) error {
+	return nil
+}
+func (r *testDraftRepo) HardDeleteWorkOrderDraftByID(context.Context, int64) error {
+	return nil
 }
 func (r *testDraftRepo) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID int64, workOrderID int64) error {
 	return r.markPublishedFn(ctx, draftID, workOrderID)

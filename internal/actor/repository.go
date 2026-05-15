@@ -13,8 +13,10 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/actor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -233,24 +235,31 @@ func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	res := r.db.Client().WithContext(ctx).
-		Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
-		Updates(map[string]any{
-			"archived_at": now,
-			"deleted_at":  now,
-			"deleted_by":  actorName,
-			"updated_at":  now,
-			"updated_by":  actorName,
-		})
-	if res.Error != nil {
-		return domainerr.Internal("failed to archive actor")
-	}
-	if res.RowsAffected == 0 {
-		return domainerr.Conflict("actor not found or already archived")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		parsedTenantID, _ := uuid.Parse(tenantID)
+		deletedBy := &actorName
+		cause, err := lifecycle.RootCause(tx, parsedTenantID, "actors", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		updates := lifecycle.ArchiveUpdates(tx, "actors", now, deletedBy, cause)
+		if tx.Migrator().HasColumn("actors", "archived_at") {
+			updates["archived_at"] = now
+		}
+		updates["updated_by"] = actorName
+
+		res := tx.Model(&models.Actor{}).
+			Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID).
+			Updates(updates)
+		if res.Error != nil {
+			return domainerr.Internal("failed to archive actor")
+		}
+		if res.RowsAffected == 0 {
+			return domainerr.Conflict("actor not found or already archived")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
@@ -261,24 +270,31 @@ func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	res := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Actor{}).
-		Where("id = ? AND tenant_id = ? AND deleted_at IS NOT NULL", id, tenantID).
-		Updates(map[string]any{
-			"archived_at": nil,
-			"deleted_at":  nil,
-			"deleted_by":  nil,
-			"updated_at":  now,
-		})
-	if res.Error != nil {
-		return domainerr.Internal("failed to restore actor")
-	}
-	if res.RowsAffected == 0 {
-		return domainerr.Conflict("actor not found or not archived")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		rowState, err := lifecycle.ReadRowState(tx, "actors", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "actors", id)
+		updates := lifecycle.RestoreUpdates(tx, "actors", now)
+		if tx.Migrator().HasColumn("actors", "archived_at") {
+			updates["archived_at"] = nil
+		}
+
+		query := tx.Unscoped().
+			Model(&models.Actor{}).
+			Where("id = ? AND tenant_id = ? AND deleted_at IS NOT NULL", id, tenantID)
+		query = lifecycle.ApplyCauseScope(query, "actors", cause)
+		res := query.Updates(updates)
+		if res.Error != nil {
+			return domainerr.Internal("failed to restore actor")
+		}
+		if res.RowsAffected == 0 {
+			return domainerr.Conflict("actor not found or not archived")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) HardDeleteActor(ctx context.Context, id int64) error {

@@ -138,10 +138,11 @@ func RestoreUpdates(tx *gorm.DB, table string, restoredAt time.Time) map[string]
 }
 
 func ApplyCauseScope(tx *gorm.DB, table string, cause Cause) *gorm.DB {
-	if cause.BatchID <= 0 || !hasColumn(tx, table, "archive_batch_id") {
+	if cause.BatchID > 0 && hasColumn(tx, table, "archive_batch_id") {
+		tx = tx.Where("archive_batch_id = ?", cause.BatchID)
+	} else if cause.OriginEntity == "" || cause.OriginID <= 0 {
 		return tx.Where("1 = 0")
 	}
-	tx = tx.Where("archive_batch_id = ?", cause.BatchID)
 	if cause.OriginEntity != "" && hasColumn(tx, table, "archive_origin_entity") {
 		tx = tx.Where("archive_origin_entity = ?", cause.OriginEntity)
 	}

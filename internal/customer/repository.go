@@ -297,6 +297,9 @@ var customerProjectScopedArchiveTables = []string{
 	"project_managers",
 	"project_investors",
 	"workorders",
+	"work_order_drafts",
+	"labors",
+	"supplies",
 	"supply_movements",
 	"stocks",
 	"crop_commercializations",
@@ -315,22 +318,33 @@ func archiveCustomerProjects(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID
 		}
 	}
 
+	fieldIDs, err := lifecycle.ListScopedIDs(tx, "fields", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
+	if err != nil {
+		return domainerr.Internal("failed to list project fields")
+	}
+	var lotIDs []int64
+	if len(fieldIDs) > 0 {
+		lotIDs, err = lifecycle.ListScopedIDs(tx, "lots", "id", tenantID, "field_id IN ? AND deleted_at IS NULL", fieldIDs)
+		if err != nil {
+			return err
+		}
+	}
+	workOrderIDs, err := lifecycle.ListScopedIDs(tx, "workorders", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
+	if err != nil {
+		return err
+	}
+	draftIDs, err := lifecycle.ListScopedIDs(tx, "work_order_drafts", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
+	if err != nil {
+		return err
+	}
+	if err := archiveCustomerProjectChildren(tx, tenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, archivedAt, deletedBy, cause); err != nil {
+		return err
+	}
+
 	if tx.Migrator().HasTable("fields") {
-		var fieldIDs []int64
-		fieldsQuery := tx.Table("fields").Where("project_id IN ? AND deleted_at IS NULL", projectIDs)
-		if tenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
-			fieldsQuery = fieldsQuery.Where("tenant_id = ?", tenantID)
-		}
-		if err := fieldsQuery.Pluck("id", &fieldIDs).Error; err != nil {
-			return domainerr.Internal("failed to list project fields")
-		}
 		if len(fieldIDs) > 0 {
 			if tx.Migrator().HasTable("lots") {
-				lotsQuery := tx.Table("lots").Where("field_id IN ? AND deleted_at IS NULL", fieldIDs)
-				if tenantID != uuid.Nil && tx.Migrator().HasColumn("lots", "tenant_id") {
-					lotsQuery = lotsQuery.Where("tenant_id = ?", tenantID)
-				}
-				if err := lotsQuery.Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
+				if err := lifecycle.ArchiveScopedRows(tx, "lots", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
 					return domainerr.Internal("failed to archive project lots")
 				}
 			}
@@ -359,6 +373,36 @@ func archiveCustomerProjects(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID
 		}
 	}
 
+	return nil
+}
+
+func archiveCustomerProjectChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
+	if len(fieldIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "field_investors", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
+			return err
+		}
+	}
+	if len(lotIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "lot_dates", tenantID, archivedAt, deletedBy, cause, "lot_id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	if len(workOrderIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "workorder_items", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "workorder_investor_splits", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+	}
+	if len(draftIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -391,15 +435,16 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			}
 			return domainerr.Internal("failed to get customer")
 		}
-		if !customer.DeletedAt.Valid {
-			return domainerr.Conflict("customer is not archived")
-		}
-
 		rowState, err := lifecycle.ReadRowState(tx, "customers", id)
 		if err != nil {
 			return err
 		}
 		cause := lifecycle.CauseFromRow(rowState, "customers", id)
+
+		if !customer.DeletedAt.Valid {
+			return restoreCustomerActiveProjectGraph(tx, id, customer.TenantID, restoredAt, cause)
+		}
+
 		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
 			return err
 		}
@@ -424,6 +469,29 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	})
 }
 
+func restoreCustomerActiveProjectGraph(tx *gorm.DB, customerID int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
+	var projectIDs []int64
+	projectLookup := tx.Table("projects").Where("customer_id = ? AND deleted_at IS NULL", customerID)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
+		projectLookup = projectLookup.Where("tenant_id = ?", tenantID)
+	}
+	if err := projectLookup.Pluck("id", &projectIDs).Error; err != nil {
+		return domainerr.Internal("failed to list active customer projects")
+	}
+	if len(projectIDs) == 0 {
+		return nil
+	}
+	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
+		return err
+	}
+	for _, projectID := range projectIDs {
+		if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
 	var projectIDs []int64
 	projectLookup := tx.Table("projects").Where("customer_id = ? AND deleted_at IS NOT NULL", customerID)
@@ -436,6 +504,10 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 	}
 	if len(projectIDs) == 0 {
 		return nil
+	}
+
+	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
+		return err
 	}
 
 	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NOT NULL", projectIDs)
@@ -454,6 +526,91 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 	}
 
 	return nil
+}
+
+func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
+	for _, table := range customerProjectScopedArchiveTables {
+		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
+			return err
+		}
+	}
+
+	fieldIDs, err := restoreCustomerProjectChildIDs(tx, "fields", "id", tenantID, cause, "project_id IN ?", projectIDs)
+	if err != nil {
+		return err
+	}
+	var lotIDs []int64
+	if len(fieldIDs) > 0 {
+		lotIDs, err = restoreCustomerProjectChildIDs(tx, "lots", "id", tenantID, cause, "field_id IN ?", fieldIDs)
+		if err != nil {
+			return err
+		}
+	}
+	workOrderIDs, err := restoreCustomerProjectChildIDs(tx, "workorders", "id", tenantID, cause, "project_id IN ?", projectIDs)
+	if err != nil {
+		return err
+	}
+	draftIDs, err := restoreCustomerProjectChildIDs(tx, "work_order_drafts", "id", tenantID, cause, "project_id IN ?", projectIDs)
+	if err != nil {
+		return err
+	}
+
+	if len(fieldIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "fields", tenantID, restoredAt, cause, "id IN ?", fieldIDs); err != nil {
+			return err
+		}
+	}
+	if len(lotIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "lot_dates", tenantID, restoredAt, cause, "lot_id IN ?", lotIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "lots", tenantID, restoredAt, cause, "id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	if len(workOrderIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "workorder_items", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "workorder_investor_splits", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+	}
+	if len(draftIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_items", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_investor_splits", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func restoreProjectScopedCustomerTable(tx *gorm.DB, table string, projectIDs []int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
+	if len(projectIDs) == 0 {
+		return nil
+	}
+	return lifecycle.RestoreScopedRows(tx, table, tenantID, restoredAt, cause, "project_id IN ?", projectIDs)
+}
+
+func restoreCustomerProjectChildIDs(tx *gorm.DB, table string, idColumn string, tenantID uuid.UUID, cause lifecycle.Cause, where string, args ...any) ([]int64, error) {
+	if !tx.Migrator().HasTable(table) {
+		return []int64{}, nil
+	}
+	query := tx.Table(table).Where(where, args...).Where("deleted_at IS NOT NULL")
+	query = lifecycle.ApplyCauseScope(query, table, cause)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn(table, "tenant_id") {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	var ids []int64
+	if err := query.Pluck(idColumn, &ids).Error; err != nil {
+		return nil, domainerr.Internal("failed to list archived " + table)
+	}
+	return ids, nil
 }
 
 // HardDeleteCustomer elimina definitivamente un cliente.

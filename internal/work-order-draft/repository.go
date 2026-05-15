@@ -10,6 +10,7 @@ import (
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -403,7 +404,14 @@ func (r *Repository) ListPublishedWorkOrderNumbersByProject(ctx context.Context,
 }
 
 func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return r.listWorkOrderDrafts(ctx, number, status, isDigital, false, inp)
+}
 
+func (r *Repository) ListArchivedWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return r.listWorkOrderDrafts(ctx, number, status, isDigital, true, inp)
+}
+
+func (r *Repository) listWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, archived bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
 	var rows []struct {
 		ID          int64
 		Number      string
@@ -432,9 +440,16 @@ func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, sta
 			"wod.status",
 			"wod.created_at",
 		).
-		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id and p.deleted_at is null").
-		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id and f.deleted_at is null")
+		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id").
+		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id")
 	base = authz.MaybeTenantScope(ctx, base, "wod")
+	if archived {
+		base = base.Where("wod.deleted_at IS NOT NULL")
+	} else {
+		base = base.Where("wod.deleted_at IS NULL").
+			Where("p.deleted_at IS NULL").
+			Where("f.deleted_at IS NULL")
+	}
 
 	if strings.TrimSpace(number) != "" {
 		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
@@ -603,26 +618,142 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 }
 
 func (r *Repository) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	return r.ArchiveWorkOrderDraftByID(ctx, id)
+}
+
+func (r *Repository) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
 		return err
 	}
 
-	tx := r.db.Client().
-		WithContext(ctx).
-		Unscoped().
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "work_order_drafts") }).
-		Where("id = ?", id).
-		Delete(&models.WorkOrderDraft{})
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var draft models.WorkOrderDraft
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			First(&draft).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get work order draft", err)
+		}
+		if draft.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order draft already archived", nil)
+		}
+		if domain.Status(draft.Status) == domain.StatusPublished {
+			return types.NewError(types.ErrConflict, "published work order drafts cannot be archived", nil)
+		}
 
-	if tx.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete work order draft", tx.Error)
+		var deletedBy *string
+		if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
+			deletedBy = &userID
+		}
+		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, draft.TenantID, "work_order_drafts", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", draft.TenantID, archivedAt, deletedBy, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", draft.TenantID, archivedAt, deletedBy, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		update := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrderDraft{}), "work_order_drafts").
+			Where("id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "work_order_drafts", archivedAt, deletedBy, cause))
+		if update.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to archive work order draft", update.Error)
+		}
+		if update.RowsAffected == 0 {
+			return types.NewError(types.ErrConflict, "work order draft not found or already archived", nil)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
+		return err
 	}
 
-	if tx.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var draft models.WorkOrderDraft
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			First(&draft).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get work order draft", err)
+		}
+		if !draft.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order draft is not archived", nil)
+		}
+
+		var activeParentCount int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", draft.ProjectID).
+			Count(&activeParentCount).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check draft project", err)
+		}
+		if activeParentCount == 0 {
+			return types.NewError(types.ErrConflict, "work order draft parent project is archived", nil)
+		}
+
+		rowState, err := lifecycle.ReadRowState(tx, "work_order_drafts", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "work_order_drafts", id)
+		restoredAt := time.Now()
+
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_items", draft.TenantID, restoredAt, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_investor_splits", draft.TenantID, restoredAt, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		restore := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.WorkOrderDraft{}), "work_order_drafts").
+			Where("id = ? AND deleted_at IS NOT NULL", id)
+		restore = lifecycle.ApplyCauseScope(restore, "work_order_drafts", cause)
+		res := restore.Updates(lifecycle.RestoreUpdates(tx, "work_order_drafts", restoredAt))
+		if res.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to restore work order draft", res.Error)
+		}
+		if res.RowsAffected == 0 {
+			return types.NewError(types.ErrConflict, "work order draft not found or not archived", nil)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
+		return err
 	}
 
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lifecycle.RequireArchived(authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts"), "work_order_drafts", "work order draft", id); err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("draft_id = ?", id).Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete draft items", err)
+		}
+		if err := tx.Unscoped().Where("draft_id = ?", id).Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete draft investor splits", err)
+		}
+		res := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			Delete(&models.WorkOrderDraft{})
+		if res.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete work order draft", res.Error)
+		}
+		if res.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+		}
+		return nil
+	})
 }
 
 func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID int64, workOrderID int64) error {

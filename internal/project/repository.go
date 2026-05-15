@@ -690,22 +690,29 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to clear investors")
 		}
 
-		// clear fields
-		var fieldIDs []int64
-		fieldIDsQuery := tx.Model(&fieldmod.Field{}).Where("project_id = ?", id)
-		if tenantID, ok := tenantIDFromTx(tx); ok {
-			fieldIDsQuery = fieldIDsQuery.Where("tenant_id = ?", tenantID)
-		}
-		if err := fieldIDsQuery.Pluck("id", &fieldIDs).Error; err != nil {
+		fieldIDs, err := lifecycle.ListScopedIDs(tx, "fields", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
+		if err != nil {
 			return domainerr.Internal("failed to get field ids")
+		}
+		lotIDs, err := projectLotIDs(tx, project.TenantID, fieldIDs, true, lifecycle.Cause{})
+		if err != nil {
+			return err
+		}
+		workOrderIDs, err := lifecycle.ListScopedIDs(tx, "workorders", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
+		if err != nil {
+			return err
+		}
+		draftIDs, err := lifecycle.ListScopedIDs(tx, "work_order_drafts", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
+		if err != nil {
+			return err
+		}
+
+		if err := archiveProjectGraphChildren(tx, project.TenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, archivedAt, deletedBy, cause); err != nil {
+			return err
 		}
 
 		if len(fieldIDs) > 0 {
-			lotUpdate := tx.Model(&lotmod.Lot{}).Where("field_id IN ?", fieldIDs)
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				lotUpdate = lotUpdate.Where("tenant_id = ?", tenantID)
-			}
-			if err := lotUpdate.Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
+			if err := lifecycle.ArchiveScopedRows(tx, "lots", project.TenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
 				return domainerr.Internal("failed to soft delete lots")
 			}
 		}
@@ -714,12 +721,10 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			return err
 		}
 
-		fieldUpdate := tx.Model(&fieldmod.Field{}).Where("id IN ?", fieldIDs)
-		if tenantID, ok := tenantIDFromTx(tx); ok {
-			fieldUpdate = fieldUpdate.Where("tenant_id = ?", tenantID)
-		}
-		if err := fieldUpdate.Updates(lifecycle.ArchiveUpdates(tx, "fields", archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal("failed to soft delete fields")
+		if len(fieldIDs) > 0 {
+			if err := lifecycle.ArchiveScopedRows(tx, "fields", project.TenantID, archivedAt, deletedBy, cause, "id IN ?", fieldIDs); err != nil {
+				return domainerr.Internal("failed to soft delete fields")
+			}
 		}
 
 		// delete project
@@ -758,8 +763,20 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check project")
 		}
 
+		rowState, err := lifecycle.ReadRowState(tx, "projects", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "projects", id)
+
 		if !project.DeletedAt.Valid {
-			return domainerr.Validation("project is not deleted, cannot restore")
+			if err := restoreActiveProjectGraph(tx, project.TenantID, id, restoredAt, cause); err != nil {
+				return err
+			}
+			if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
+				return err
+			}
+			return nil
 		}
 
 		var activeCustomerCount int64
@@ -773,12 +790,6 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		if activeCustomerCount == 0 {
 			return domainerr.Conflict("project parent customer is archived")
 		}
-
-		rowState, err := lifecycle.ReadRowState(tx, "projects", id)
-		if err != nil {
-			return err
-		}
-		cause := lifecycle.CauseFromRow(rowState, "projects", id)
 
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)
 		restoreQuery := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id)
@@ -809,37 +820,37 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to restore investors")
 		}
 
-		// Restaurar fields (obtener IDs primero)
-		var fieldIDs []int64
-		fieldIDsQuery := tx.Unscoped().Model(&fieldmod.Field{}).
-			Where("project_id = ? AND deleted_at IS NOT NULL", id)
-		if tenantID, ok := tenantIDFromTx(tx); ok {
-			fieldIDsQuery = fieldIDsQuery.Where("tenant_id = ?", tenantID)
-		}
-		if err := fieldIDsQuery.Pluck("id", &fieldIDs).Error; err != nil {
+		fieldIDs, err := restoreProjectFieldIDs(tx, project.TenantID, id, cause)
+		if err != nil {
 			return domainerr.Internal("failed to get field ids")
+		}
+		lotIDs, err := projectLotIDs(tx, project.TenantID, fieldIDs, false, cause)
+		if err != nil {
+			return err
+		}
+		workOrderIDs, err := restoreProjectChildIDs(tx, "workorders", "id", project.TenantID, cause, "project_id = ?", id)
+		if err != nil {
+			return err
+		}
+		draftIDs, err := restoreProjectChildIDs(tx, "work_order_drafts", "id", project.TenantID, cause, "project_id = ?", id)
+		if err != nil {
+			return err
 		}
 
 		// Restaurar fields
-		fieldRestore := tx.Table("fields").Where("project_id = ? AND deleted_at IS NOT NULL", id)
-		fieldRestore = lifecycle.ApplyCauseScope(fieldRestore, "fields", cause)
-		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
-			fieldRestore = fieldRestore.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := fieldRestore.Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
+		if err := lifecycle.RestoreScopedRows(tx, "fields", project.TenantID, restoredAt, cause, "project_id = ?", id); err != nil {
 			return domainerr.Internal("failed to restore fields")
 		}
 
 		// Restaurar lots (solo los que pertenecen a los fields de este proyecto)
 		if len(fieldIDs) > 0 {
-			lotRestore := tx.Table("lots").Where("field_id IN ? AND deleted_at IS NOT NULL", fieldIDs)
-			lotRestore = lifecycle.ApplyCauseScope(lotRestore, "lots", cause)
-			if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("lots", "tenant_id") {
-				lotRestore = lotRestore.Where("tenant_id = ?", project.TenantID)
-			}
-			if err := lotRestore.Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
+			if err := lifecycle.RestoreScopedRows(tx, "lots", project.TenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
 				return domainerr.Internal("failed to restore lots")
 			}
+		}
+
+		if err := restoreProjectGraphChildren(tx, project.TenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, restoredAt, cause); err != nil {
+			return err
 		}
 
 		if err := restoreProjectScopedTables(tx, id, restoredAt, cause); err != nil {
@@ -854,6 +865,37 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	})
 }
 
+func restoreActiveProjectGraph(tx *gorm.DB, tenantID uuid.UUID, projectID int64, restoredAt time.Time, cause lifecycle.Cause) error {
+	fieldIDs, err := restoreProjectFieldIDs(tx, tenantID, projectID, cause)
+	if err != nil {
+		return domainerr.Internal("failed to get field ids")
+	}
+	lotIDs, err := projectLotIDs(tx, tenantID, fieldIDs, false, cause)
+	if err != nil {
+		return err
+	}
+	workOrderIDs, err := restoreProjectChildIDs(tx, "workorders", "id", tenantID, cause, "project_id = ?", projectID)
+	if err != nil {
+		return err
+	}
+	draftIDs, err := restoreProjectChildIDs(tx, "work_order_drafts", "id", tenantID, cause, "project_id = ?", projectID)
+	if err != nil {
+		return err
+	}
+	if err := lifecycle.RestoreScopedRows(tx, "fields", tenantID, restoredAt, cause, "project_id = ?", projectID); err != nil {
+		return domainerr.Internal("failed to restore fields")
+	}
+	if len(fieldIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "lots", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
+			return domainerr.Internal("failed to restore lots")
+		}
+	}
+	if err := restoreProjectGraphChildren(tx, tenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, restoredAt, cause); err != nil {
+		return err
+	}
+	return restoreProjectScopedTables(tx, projectID, restoredAt, cause)
+}
+
 type projectScopedSoftDeleteTable struct {
 	name         string
 	errorMessage string
@@ -861,11 +903,105 @@ type projectScopedSoftDeleteTable struct {
 
 var projectScopedSoftDeleteTables = []projectScopedSoftDeleteTable{
 	{name: "workorders", errorMessage: "failed to soft delete workorders"},
+	{name: "work_order_drafts", errorMessage: "failed to soft delete work order drafts"},
+	{name: "labors", errorMessage: "failed to soft delete labors"},
+	{name: "supplies", errorMessage: "failed to soft delete supplies"},
 	{name: "supply_movements", errorMessage: "failed to soft delete supply_movements"},
 	{name: "stocks", errorMessage: "failed to soft delete stocks"},
 	{name: "crop_commercializations", errorMessage: "failed to soft delete commercializations"},
 	{name: "project_dollar_values", errorMessage: "failed to soft delete dollar values"},
 	{name: "admin_cost_investors", errorMessage: "failed to soft delete admin cost investors"},
+}
+
+func archiveProjectGraphChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
+	if len(fieldIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "field_investors", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
+			return err
+		}
+	}
+	if len(lotIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "lot_dates", tenantID, archivedAt, deletedBy, cause, "lot_id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	if len(workOrderIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "workorder_items", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "workorder_investor_splits", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+	}
+	if len(draftIDs) > 0 {
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func restoreProjectGraphChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, restoredAt time.Time, cause lifecycle.Cause) error {
+	if len(fieldIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
+			return err
+		}
+	}
+	if len(lotIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "lot_dates", tenantID, restoredAt, cause, "lot_id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	if len(workOrderIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "workorder_items", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "workorder_investor_splits", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
+			return err
+		}
+	}
+	if len(draftIDs) > 0 {
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_items", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_investor_splits", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func restoreProjectFieldIDs(tx *gorm.DB, tenantID uuid.UUID, projectID int64, cause lifecycle.Cause) ([]int64, error) {
+	return restoreProjectChildIDs(tx, "fields", "id", tenantID, cause, "project_id = ?", projectID)
+}
+
+func projectLotIDs(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, active bool, cause lifecycle.Cause) ([]int64, error) {
+	if len(fieldIDs) == 0 {
+		return []int64{}, nil
+	}
+	where := "field_id IN ? AND deleted_at IS NULL"
+	if !active {
+		return restoreProjectChildIDs(tx, "lots", "id", tenantID, cause, "field_id IN ?", fieldIDs)
+	}
+	return lifecycle.ListScopedIDs(tx, "lots", "id", tenantID, where, fieldIDs)
+}
+
+func restoreProjectChildIDs(tx *gorm.DB, table string, idColumn string, tenantID uuid.UUID, cause lifecycle.Cause, where string, args ...any) ([]int64, error) {
+	if !tx.Migrator().HasTable(table) {
+		return []int64{}, nil
+	}
+	query := tx.Table(table).Where(where, args...).Where("deleted_at IS NOT NULL")
+	query = lifecycle.ApplyCauseScope(query, table, cause)
+	if tenantID != uuid.Nil && tx.Migrator().HasColumn(table, "tenant_id") {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	var ids []int64
+	if err := query.Pluck(idColumn, &ids).Error; err != nil {
+		return nil, domainerr.Internal("failed to list archived " + table)
+	}
+	return ids, nil
 }
 
 func archiveProjectScopedTables(tx *gorm.DB, projectID int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {

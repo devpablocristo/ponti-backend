@@ -400,6 +400,71 @@ func TestArchiveProjectUsesBatchAndDoesNotArchiveCustomer(t *testing.T) {
 	}
 }
 
+func TestArchiveProjectDoesNotOverwriteManuallyArchivedChildren(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(50, ?, 'Customer A', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(50, ?, '2025-2026');
+		INSERT INTO archive_batches (id, tenant_id, root_entity, root_id, action, created_at) VALUES
+			(950, ?, 'lots', 950, 'archive', ?);
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(50, ?, 'Project A', 50, 50, 0, 0, ?, ?, NULL);
+		INSERT INTO fields (id, tenant_id, name, project_id, lease_type_id, created_at, updated_at, deleted_at) VALUES
+			(50, ?, 'Field A', 50, 0, ?, ?, NULL);
+		INSERT INTO lots (
+			id, tenant_id, name, field_id, hectares, previous_crop_id, current_crop_id, season,
+			created_at, updated_at, deleted_at, archive_batch_id, archive_origin_entity, archive_origin_id
+		) VALUES
+			(50, ?, 'Active Lot', 50, 1, 0, 0, '2025-2026', ?, ?, NULL, NULL, NULL, NULL),
+			(51, ?, 'Manual Lot', 50, 1, 0, 0, '2025-2026', ?, ?, ?, 950, 'lots', 950);
+	`, tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(), now, now, now,
+	).Error; err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+
+	if err := repo.ArchiveProject(projectTenantContext(tenantID), 50); err != nil {
+		t.Fatalf("archive project: %v", err)
+	}
+
+	var activeLotArchived, manualLotPreserved int64
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 50 AND deleted_at IS NOT NULL AND archive_origin_entity = 'projects' AND archive_origin_id = 50`).Scan(&activeLotArchived).Error; err != nil {
+		t.Fatalf("count active lot archive cause: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 51 AND deleted_at IS NOT NULL AND archive_batch_id = 950 AND archive_origin_entity = 'lots' AND archive_origin_id = 950`).Scan(&manualLotPreserved).Error; err != nil {
+		t.Fatalf("count manual lot cause: %v", err)
+	}
+	if activeLotArchived != 1 || manualLotPreserved != 1 {
+		t.Fatalf("expected active lot archived by project and manual lot preserved, got active=%d manual=%d", activeLotArchived, manualLotPreserved)
+	}
+
+	if err := repo.RestoreProject(projectTenantContext(tenantID), 50); err != nil {
+		t.Fatalf("restore project: %v", err)
+	}
+
+	var restoredActiveLot, manualStillArchived int64
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 50 AND deleted_at IS NULL AND archive_batch_id IS NULL`).Scan(&restoredActiveLot).Error; err != nil {
+		t.Fatalf("count restored lot: %v", err)
+	}
+	if err := db.Raw(`SELECT COUNT(*) FROM lots WHERE id = 51 AND deleted_at IS NOT NULL AND archive_batch_id = 950`).Scan(&manualStillArchived).Error; err != nil {
+		t.Fatalf("count manual still archived: %v", err)
+	}
+	if restoredActiveLot != 1 || manualStillArchived != 1 {
+		t.Fatalf("expected project restore to skip manual lot, got restored=%d manual=%d", restoredActiveLot, manualStillArchived)
+	}
+}
+
 func TestRestoreProjectRequiresActiveCustomer(t *testing.T) {
 	db := setupProjectTenantDB(t)
 	repo := NewRepository(projectTenantGormEngine{client: db})

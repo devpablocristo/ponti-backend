@@ -59,7 +59,8 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 }
 
 func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projectName string) ([]domain.Campaign, error) {
-	// Si se filtra por proyecto, obtengo campaign_id y project_id
+	// Si se filtra por cliente/proyecto, resuelvo campaigns desde projects para no
+	// mezclar valores de otros clientes ni perder el project_id real del workspace.
 	var filter []struct {
 		ProjectID  int64 `gorm:"column:id"`
 		CampaignID int64
@@ -67,16 +68,24 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 
 	db := r.db.Client().WithContext(ctx)
 
-	if customerID != 0 && projectName != "" {
+	if customerID != 0 || projectName != "" {
 		projectDB := authz.MaybeTenantScope(ctx, db.Model(&projectmod.Project{}), "projects")
-		if err := projectDB.
+		projectDB = projectDB.
 			Select("id, campaign_id").
-			Where("customer_id = ?", customerID).
-			Where("name = ?", projectName).
-			Where("deleted_at IS NULL").
+			Where("deleted_at IS NULL")
+		if customerID != 0 {
+			projectDB = projectDB.Where("customer_id = ?", customerID)
+		}
+		if projectName != "" {
+			projectDB = projectDB.Where("name = ?", projectName)
+		}
+		if err := projectDB.
 			Scan(&filter).
 			Error; err != nil {
 			return nil, domainerr.Internal("failed to list by project filter")
+		}
+		if len(filter) == 0 {
+			return []domain.Campaign{}, nil
 		}
 	}
 

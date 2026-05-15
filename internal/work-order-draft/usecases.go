@@ -23,11 +23,15 @@ type RepositoryPort interface {
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
 	ListRelatedDigitalWorkOrderDraftsByBaseNumber(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	ListWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
+	ListArchivedWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListOccupiedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	ListOccupiedWorkOrderNumbersByProjectExcludingDraft(context.Context, int64, int64) ([]string, error)
 	ListPublishedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
 	DeleteWorkOrderDraftByID(context.Context, int64) error
+	ArchiveWorkOrderDraftByID(context.Context, int64) error
+	RestoreWorkOrderDraftByID(context.Context, int64) error
+	HardDeleteWorkOrderDraftByID(context.Context, int64) error
 	MarkWorkOrderDraftAsPublished(context.Context, int64, int64) error
 }
 
@@ -301,6 +305,10 @@ func (u *UseCases) ListDigitalWorkOrderDrafts(ctx context.Context, number string
 	return u.repo.ListWorkOrderDrafts(ctx, number, status, &isDigital, inp)
 }
 
+func (u *UseCases) ListArchivedWorkOrderDrafts(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return u.repo.ListArchivedWorkOrderDrafts(ctx, number, status, nil, inp)
+}
+
 func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkOrderDraft) error {
 	if d == nil {
 		return types.NewError(types.ErrValidation, "work order draft is nil", nil)
@@ -355,6 +363,10 @@ func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkO
 }
 
 func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	return u.ArchiveWorkOrderDraftByID(ctx, id)
+}
+
+func (u *UseCases) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError("invalid work order draft id", nil)
 	}
@@ -368,7 +380,21 @@ func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error
 		return types.NewError(types.ErrConflict, "published work order drafts cannot be deleted", nil)
 	}
 
-	return u.repo.DeleteWorkOrderDraftByID(ctx, id)
+	return u.repo.ArchiveWorkOrderDraftByID(ctx, id)
+}
+
+func (u *UseCases) RestoreWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+	return u.repo.RestoreWorkOrderDraftByID(ctx, id)
+}
+
+func (u *UseCases) HardDeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+	return u.repo.HardDeleteWorkOrderDraftByID(ctx, id)
 }
 
 func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, error) {
