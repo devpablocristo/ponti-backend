@@ -30,7 +30,6 @@ type UseCasesPort interface {
 	PublishWorkOrderDraft(context.Context, int64) (int64, error)
 	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
 	UpdateWorkOrderDraftGroupByID(context.Context, int64, *domain.WorkOrderDraftGroup) error
-
 }
 
 type GinEnginePort interface {
@@ -406,7 +405,6 @@ func (h *Handler) ListDigitalWorkOrderDraftGroups(c *gin.Context) {
 
 	sharedhandlers.RespondOK(c, dto.NewGroupListResponse(pageInfo, items))
 }
-
 
 func (h *Handler) PublishWorkOrderDraft(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")

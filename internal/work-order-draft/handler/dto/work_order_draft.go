@@ -251,7 +251,7 @@ type WorkOrderDraftGroupListItem struct {
 }
 
 type WorkOrderDraftGroupListResponse struct {
-	PageInfo types.PageInfo              `json:"page_info"`
+	PageInfo types.PageInfo                `json:"page_info"`
 	Data     []WorkOrderDraftGroupListItem `json:"data"`
 }
 
@@ -453,6 +453,7 @@ type WorkOrderDraftGroupUpdateRequest struct {
 	InvestorSplits []InvestorSplit      `json:"investor_splits,omitempty"`
 	Items          []WorkOrderDraftItem `json:"items" binding:"required"`
 }
+
 func (r *WorkOrderDraftGroupUpdateRequest) ToDomain() (*domain.WorkOrderDraftGroup, error) {
 	dateValue, err := time.Parse(dateLayout, strings.TrimSpace(r.Date))
 	if err != nil {

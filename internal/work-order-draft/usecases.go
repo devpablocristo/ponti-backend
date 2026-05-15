@@ -27,6 +27,7 @@ type RepositoryPort interface {
 	ListOccupiedWorkOrderNumbersByProjectExcludingDraft(context.Context, int64, int64) ([]string, error)
 	ListPublishedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
+	UpdateWorkOrderDraftGroup(context.Context, []*domain.WorkOrderDraft) error
 	DeleteWorkOrderDraftByID(context.Context, int64) error
 	MarkWorkOrderDraftAsPublished(context.Context, int64, int64) error
 	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
@@ -130,12 +131,12 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 	}
 
 	totalEffectiveArea := decimal.Zero
-for _, lot := range b.Lots {
-	if lot.EffectiveArea.LessThanOrEqual(decimal.Zero) {
-		return nil, types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
+	for _, lot := range b.Lots {
+		if lot.EffectiveArea.LessThanOrEqual(decimal.Zero) {
+			return nil, types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
+		}
+		totalEffectiveArea = totalEffectiveArea.Add(lot.EffectiveArea)
 	}
-	totalEffectiveArea = totalEffectiveArea.Add(lot.EffectiveArea)
-}
 
 	seenLots := make(map[int64]struct{})
 	drafts := make([]*domain.WorkOrderDraft, len(b.Lots))
@@ -423,7 +424,8 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
 	}
 
-	for _, lot := range current.Lots {
+	drafts := make([]*domain.WorkOrderDraft, len(current.Lots))
+	for i, lot := range current.Lots {
 		draft := &domain.WorkOrderDraft{
 			ID:             lot.DraftID,
 			Number:         lot.Number,
@@ -445,13 +447,13 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			InvestorSplits: group.InvestorSplits,
 		}
 
-		for i, item := range group.Items {
+		for j, item := range group.Items {
 			finalDose := item.FinalDose
 			if finalDose.LessThanOrEqual(decimal.Zero) {
 				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
 			}
 
-			draft.Items[i] = domain.WorkOrderDraftItem{
+			draft.Items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
 				TotalUsed: item.TotalUsed,
 				FinalDose: finalDose,
@@ -466,12 +468,10 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			return err
 		}
 
-		if err := u.repo.UpdateWorkOrderDraftByID(ctx, draft); err != nil {
-			return err
-		}
+		drafts[i] = draft
 	}
 
-	return nil
+	return u.repo.UpdateWorkOrderDraftGroup(ctx, drafts)
 }
 
 func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
@@ -750,8 +750,8 @@ func (u *UseCases) validateDigitalNumberForPublish(ctx context.Context, projectI
 	}
 
 	if digitalBaseNumberRE.MatchString(number) && baseSequenceUsedByDifferentNumber(base, number, occupied) {
-	return newWorkOrderNumberConflictError(number, projectID)
-}
+		return newWorkOrderNumberConflictError(number, projectID)
+	}
 
 	return nil
 }

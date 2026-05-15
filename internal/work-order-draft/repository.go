@@ -555,88 +555,175 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var orig models.WorkOrderDraft
+		return r.applyDraftUpdateWithinTx(tx, model)
+	})
+}
+
+// applyDraftUpdateWithinTx ejecuta toda la lógica de actualización de un draft
+// (header + items + investor splits) reutilizando la *gorm.DB del caller.
+// NO abre transacción propia: el caller controla la atomicidad. Si retorna
+// error, el caller debe garantizar el rollback.
+func (r *Repository) applyDraftUpdateWithinTx(tx *gorm.DB, model *models.WorkOrderDraft) error {
+	var orig models.WorkOrderDraft
+	if err := tx.
+		Preload("Items").
+		Preload("InvestorSplits").
+		Where("id = ?", model.ID).
+		First(&orig).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return types.NewError(types.ErrNotFound, "work order draft not found", err)
+		}
+		return types.NewError(types.ErrInternal, "failed to find work order draft before update", err)
+	}
+
+	if err := tx.
+		Where("draft_id = ?", model.ID).
+		Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to delete old draft items", err)
+	}
+
+	if err := tx.
+		Where("draft_id = ?", model.ID).
+		Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to delete old draft investor splits", err)
+	}
+
+	updates := map[string]any{
+		"number":         model.Number,
+		"date":           model.Date,
+		"customer_id":    model.CustomerID,
+		"project_id":     model.ProjectID,
+		"campaign_id":    model.CampaignID,
+		"field_id":       model.FieldID,
+		"lot_id":         model.LotID,
+		"crop_id":        model.CropID,
+		"labor_id":       model.LaborID,
+		"contractor":     model.Contractor,
+		"effective_area": model.EffectiveArea,
+		"observations":   model.Observations,
+		"investor_id":    model.InvestorID,
+		"is_digital":     model.IsDigital,
+		"status":         model.Status,
+		"review_notes":   model.ReviewNotes,
+		"updated_by":     model.UpdatedBy,
+	}
+
+	updateTx := tx.Model(&models.WorkOrderDraft{}).Where("id = ?", model.ID).Updates(updates)
+	if updateTx.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
+	}
+	if updateTx.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+	}
+
+	if len(model.Items) > 0 {
+		items := make([]models.WorkOrderDraftItem, len(model.Items))
+		for i := range model.Items {
+			items[i] = models.WorkOrderDraftItem{
+				DraftID:    model.ID,
+				SupplyID:   model.Items[i].SupplyID,
+				SupplyName: model.Items[i].SupplyName,
+				TotalUsed:  model.Items[i].TotalUsed,
+				FinalDose:  model.Items[i].FinalDose,
+			}
+		}
+		if err := tx.Omit("id").Create(&items).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to insert new draft items", err)
+		}
+	}
+
+	if len(model.InvestorSplits) > 0 {
+		splits := make([]models.WorkOrderDraftInvestorSplit, len(model.InvestorSplits))
+		for i := range model.InvestorSplits {
+			splits[i] = models.WorkOrderDraftInvestorSplit{
+				DraftID:    model.ID,
+				InvestorID: model.InvestorSplits[i].InvestorID,
+				Percentage: model.InvestorSplits[i].Percentage,
+			}
+		}
+		if err := tx.Omit("id").Create(&splits).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to insert new draft investor splits", err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateWorkOrderDraftGroup actualiza atómicamente todos los drafts de un grupo
+// (mismo número base D-N y mismo project_id). Re-valida defensivamente dentro de
+// la transacción que los drafts referenciados existen, son digitales y comparten
+// número base / project_id. Cualquier fallo dispara rollback de todo el grupo.
+func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*domain.WorkOrderDraft) error {
+	if len(drafts) == 0 {
+		return types.NewError(types.ErrValidation, "no drafts to update", nil)
+	}
+	for _, d := range drafts {
+		if err := sharedrepo.ValidateEntity(d, "work order draft"); err != nil {
+			return err
+		}
+		if err := sharedrepo.ValidateID(d.ID, "work order draft"); err != nil {
+			return err
+		}
+	}
+
+	var actorPtr *string
+	if actor, err := sharedmodels.ActorFromContext(ctx); err == nil && actor != "" {
+		actorCopy := actor
+		actorPtr = &actorCopy
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		ids := make([]int64, len(drafts))
+		for i, d := range drafts {
+			ids[i] = d.ID
+		}
+
+		var existing []models.WorkOrderDraft
 		if err := tx.
-			Preload("Items").
-			Preload("InvestorSplits").
-			Where("id = ?", model.ID).
-			First(&orig).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			Where("id IN ?", ids).
+			Where("deleted_at IS NULL").
+			Find(&existing).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to load drafts before group update", err)
+		}
+		if len(existing) != len(drafts) {
+			return types.NewError(types.ErrNotFound, "one or more drafts in the group were not found", nil)
+		}
+
+		var (
+			projectID int64
+			baseSeq   int
+		)
+		for i, m := range existing {
+			if !m.IsDigital {
+				return types.NewError(types.ErrValidation, "all drafts in a group must be digital", nil)
 			}
-			return types.NewError(types.ErrInternal, "failed to find work order draft before update", err)
-		}
-
-		if err := tx.
-			Where("draft_id = ?", model.ID).
-			Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old draft items", err)
-		}
-
-		if err := tx.
-			Where("draft_id = ?", model.ID).
-			Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old draft investor splits", err)
-		}
-
-		updates := map[string]any{
-			"number":         model.Number,
-			"date":           model.Date,
-			"customer_id":    model.CustomerID,
-			"project_id":     model.ProjectID,
-			"campaign_id":    model.CampaignID,
-			"field_id":       model.FieldID,
-			"lot_id":         model.LotID,
-			"crop_id":        model.CropID,
-			"labor_id":       model.LaborID,
-			"contractor":     model.Contractor,
-			"effective_area": model.EffectiveArea,
-			"observations":   model.Observations,
-			"investor_id":    model.InvestorID,
-			"is_digital":     model.IsDigital,
-			"status":         model.Status,
-			"review_notes":   model.ReviewNotes,
-			"updated_by":     model.UpdatedBy,
-		}
-
-		updateTx := tx.Model(&models.WorkOrderDraft{}).Where("id = ?", model.ID).Updates(updates)
-		if updateTx.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
-		}
-		if updateTx.RowsAffected == 0 {
-			return types.NewError(types.ErrNotFound, "work order draft not found", nil)
-		}
-
-		if len(model.Items) > 0 {
-			items := make([]models.WorkOrderDraftItem, len(model.Items))
-				for i := range model.Items {
-					items[i] = models.WorkOrderDraftItem{
-						DraftID:    model.ID,
-						SupplyID:   model.Items[i].SupplyID,
-						SupplyName: model.Items[i].SupplyName,
-						TotalUsed:  model.Items[i].TotalUsed,
-						FinalDose:  model.Items[i].FinalDose,
-					}
-				}
-			if err := tx.Omit("id").Create(&items).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new draft items", err)
+			seq, ok := extractBaseSequence(m.Number)
+			if !ok {
+				return types.NewError(types.ErrValidation, "draft number does not belong to a digital group", nil)
+			}
+			if i == 0 {
+				projectID = m.ProjectID
+				baseSeq = seq
+				continue
+			}
+			if m.ProjectID != projectID {
+				return types.NewError(types.ErrValidation, "drafts in group must share project_id", nil)
+			}
+			if seq != baseSeq {
+				return types.NewError(types.ErrValidation, "drafts in group must share base number", nil)
 			}
 		}
 
-		if len(model.InvestorSplits) > 0 {
-			splits := make([]models.WorkOrderDraftInvestorSplit, len(model.InvestorSplits))
-			for i := range model.InvestorSplits {
-				splits[i] = models.WorkOrderDraftInvestorSplit{
-					DraftID:    model.ID,
-					InvestorID: model.InvestorSplits[i].InvestorID,
-					Percentage: model.InvestorSplits[i].Percentage,
-				}
+		for _, d := range drafts {
+			m := models.FromDomain(d)
+			m.ID = d.ID
+			if actorPtr != nil {
+				m.UpdatedBy = actorPtr
 			}
-			if err := tx.Omit("id").Create(&splits).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new draft investor splits", err)
+			if err := r.applyDraftUpdateWithinTx(tx, m); err != nil {
+				return err
 			}
 		}
-
 		return nil
 	})
 }

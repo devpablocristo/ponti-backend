@@ -100,8 +100,8 @@ func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.Wo
 	var m models.WorkOrder
 	if err := r.db.Client().WithContext(ctx).
 		Preload("Items", func(db *gorm.DB) *gorm.DB {
-	return db.Order("id ASC")
-}).
+			return db.Order("id ASC")
+		}).
 		Preload("InvestorSplits").
 		Where("id = ?", id).
 		First(&m).Error; err != nil {
