@@ -333,12 +333,17 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 }
 
 // ListArchivedWorkOrders lista ordenes archivadas con nombres joineados (project, field, lot, labor).
-func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int) ([]domain.WorkOrderListElement, int64, error) {
+// Si filter.LotID > 0, filtra solo las WOs de ese lote.
+func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int, filter domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
 	where := []string{"w.deleted_at IS NOT NULL"}
 	args := []any{}
 	if tenantID, ok := authz.TenantFromContext(ctx); ok {
 		where = append(where, "w.tenant_id = ?")
 		args = append(args, tenantID)
+	}
+	if filter.LotID > 0 {
+		where = append(where, "w.lot_id = ?")
+		args = append(args, filter.LotID)
 	}
 	whereSQL := strings.Join(where, " AND ")
 

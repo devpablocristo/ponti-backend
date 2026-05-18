@@ -131,7 +131,7 @@ func TestWorkOrderRepositoryTenantIsolation(t *testing.T) {
 
 	ctxA := workOrderTenantContext(tenantA)
 
-	archived, total, err := repo.ListArchivedWorkOrders(ctxA, 1, 50)
+	archived, total, err := repo.ListArchivedWorkOrders(ctxA, 1, 50, domain.ArchivedWorkOrderFilter{})
 	if err != nil {
 		t.Fatalf("list archived work orders: %v", err)
 	}

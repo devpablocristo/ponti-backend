@@ -27,7 +27,7 @@ type UseCasesPort interface {
 	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
-	ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrderListElement, int64, error)
+	ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -327,9 +327,16 @@ func (h *Handler) HardDeleteWorkOrder(c *gin.Context) {
 }
 
 // ListArchivedWorkOrders lista work orders archivadas paginadas.
+// Acepta query param `lot_id` opcional para filtrar por lote.
 func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	items, total, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), page, perPage)
+	filter := domain.ArchivedWorkOrderFilter{}
+	if raw := c.Query("lot_id"); raw != "" {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+			filter.LotID = parsed
+		}
+	}
+	items, total, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), page, perPage, filter)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

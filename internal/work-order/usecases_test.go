@@ -53,7 +53,7 @@ func (useCasesRepoStub) ArchiveWorkOrder(context.Context, int64) error {
 func (useCasesRepoStub) RestoreWorkOrder(context.Context, int64) error {
 	return nil
 }
-func (useCasesRepoStub) ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrderListElement, int64, error) {
+func (useCasesRepoStub) ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
 	return nil, 0, nil
 }
 func (useCasesRepoStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
