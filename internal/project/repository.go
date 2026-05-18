@@ -654,18 +654,6 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			return domainerr.Conflict("project already archived")
 		}
 
-		if deletedBy != nil && tx.Migrator().HasTable("users") {
-			var userCount int64
-			if err := tx.Table("users").
-				Where("id = ?", *deletedBy).
-				Count(&userCount).Error; err != nil {
-				return domainerr.Internal("failed to validate deleted_by")
-			}
-			if userCount == 0 {
-				deletedBy = nil
-			}
-		}
-
 		batch, err := lifecycle.CreateArchiveBatch(tx, project.TenantID, "projects", id, nil, deletedBy)
 		if err != nil {
 			return err
