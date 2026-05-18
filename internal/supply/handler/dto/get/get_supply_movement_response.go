@@ -37,6 +37,7 @@ func (s summary) MarshalJSON() ([]byte, error) {
 
 type entrySupplyMovementsResponse struct {
 	ID                   int64           `json:"id"`
+	ProjectID            int64           `json:"project_id"`
 	EntryType            string          `json:"entry_type"`
 	ReferenceNumber      string          `json:"reference_number"`
 	EntryDate            time.Time       `json:"entry_date"`
@@ -59,6 +60,7 @@ type entrySupplyMovementsResponse struct {
 func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement) entrySupplyMovementsResponse {
 	return entrySupplyMovementsResponse{
 		ID:                   dsm.ID,
+		ProjectID:            dsm.ProjectId,
 		EntryType:            dsm.MovementType,
 		ReferenceNumber:      dsm.ReferenceNumber,
 		EntryDate:            *dsm.MovementDate,

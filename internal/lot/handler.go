@@ -34,7 +34,7 @@ type UseCasesPort interface {
 	ArchiveLot(context.Context, int64) error
 	RestoreLot(context.Context, int64) error
 	HardDeleteLot(context.Context, int64) error
-	ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error)
+	ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error)
 	DeleteLot(context.Context, int64) error // legacy alias hacia ArchiveLot
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
@@ -261,9 +261,9 @@ func (h *Handler) ListArchivedLots(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	items := make([]*dto.Lot, len(lots))
+	items := make([]dto.LotListElement, len(lots))
 	for i := range lots {
-		items[i] = dto.FromDomain(&lots[i])
+		items[i] = dto.FromDomainListElement(lots[i])
 	}
 	sharedhandlers.RespondOK(c, gin.H{
 		"data":      items,

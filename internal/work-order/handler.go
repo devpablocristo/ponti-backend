@@ -27,7 +27,7 @@ type UseCasesPort interface {
 	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
-	ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrder, int64, error)
+	ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrderListElement, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -334,8 +334,12 @@ func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	dtos := make([]dto.WorkOrderListElement, len(items))
+	for i := range items {
+		dtos[i] = *dto.FromDomainListElement(&items[i])
+	}
 	sharedhandlers.RespondOK(c, gin.H{
-		"data":      items,
+		"data":      dtos,
 		"page_info": types.NewPageInfo(page, perPage, total),
 	})
 }

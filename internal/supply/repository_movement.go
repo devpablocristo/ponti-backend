@@ -707,19 +707,18 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 }
 
 func (r *Repository) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
-	if projectID <= 0 {
-		return nil, domainerr.Validation("project_id must be greater than 0")
+	// projectID = 0 → todos los proyectos del tenant.
+	q := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements")).
+		Unscoped().
+		Model(&models.SupplyMovement{}).
+		Where("is_entry = TRUE").
+		Where("deleted_at IS NOT NULL")
+	if projectID > 0 {
+		q = q.Where("project_id = ?", projectID)
 	}
 
 	var modelSupplyMovements []models.SupplyMovement
-	if err := withSupplyMovementLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements")).
-		Unscoped().
-		Model(&models.SupplyMovement{}).
-		Where("project_id = ?", projectID).
-		Where("is_entry = TRUE").
-		Where("deleted_at IS NOT NULL").
-		Find(&modelSupplyMovements).
-		Error; err != nil {
+	if err := q.Order("supply_movements.deleted_at DESC").Find(&modelSupplyMovements).Error; err != nil {
 		return nil, domainerr.Internal("failed to list archived supply movements")
 	}
 

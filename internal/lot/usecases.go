@@ -20,7 +20,7 @@ type RepositoryPort interface {
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
-	ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error)
+	ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	ArchiveLot(context.Context, int64) error
@@ -78,7 +78,7 @@ func (u *UseCases) HardDeleteLot(ctx context.Context, id int64) error {
 	return u.repo.HardDeleteLot(ctx, id)
 }
 
-func (u *UseCases) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.Lot, int64, error) {
+func (u *UseCases) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.LotTable, int64, error) {
 	return u.repo.ListArchivedLots(ctx, page, perPage)
 }
 

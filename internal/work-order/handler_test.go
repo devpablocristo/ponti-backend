@@ -72,7 +72,7 @@ func (s *workOrderHandlerUseCasesStub) RestoreWorkOrder(context.Context, int64) 
 	s.actionCall = "restore"
 	return nil
 }
-func (s *workOrderHandlerUseCasesStub) ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrder, int64, error) {
+func (s *workOrderHandlerUseCasesStub) ListArchivedWorkOrders(context.Context, int, int) ([]domain.WorkOrderListElement, int64, error) {
 	return nil, 0, nil
 }
 func (s *workOrderHandlerUseCasesStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {

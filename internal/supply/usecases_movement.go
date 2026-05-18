@@ -476,9 +476,7 @@ func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectID, supplyID
 }
 
 func (u *UseCases) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
-	if projectID <= 0 {
-		return nil, domainerr.Validation("project_id must be greater than 0")
-	}
+	// projectID = 0 → listar movimientos archivados de todos los proyectos del tenant.
 	return u.repo.ListArchivedSupplyMovements(ctx, projectID)
 }
 

@@ -91,6 +91,7 @@ func (h *Handler) Routes() {
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
 	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
+		workOrderLaborsGroup.GET("/archived", h.ListArchivedLaborsGlobal)
 		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
 		workOrderLaborsGroup.POST("/:labor_id/archive", h.ArchiveLabor)
 		workOrderLaborsGroup.POST("/:labor_id/restore", h.RestoreLabor)
@@ -185,6 +186,22 @@ func (h *Handler) ListArchivedLabors(c *gin.Context) {
 	}
 
 	items, total, err := h.ucs.ListArchivedLabors(c.Request.Context(), page, perPage, projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewListLaborsResponse(items, page, perPage, total)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+// ListArchivedLaborsGlobal lista labors archivados de todos los proyectos del tenant.
+// Usado por el drawer "Labores archivadas" cuando no hay proyecto seleccionado.
+func (h *Handler) ListArchivedLaborsGlobal(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
+
+	items, total, err := h.ucs.ListArchivedLabors(c.Request.Context(), page, perPage, 0)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

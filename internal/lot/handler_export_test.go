@@ -50,7 +50,7 @@ func (s *exportLotsUseCasesStub) HardDeleteLot(context.Context, int64) error {
 	return nil
 }
 
-func (s *exportLotsUseCasesStub) ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error) {
+func (s *exportLotsUseCasesStub) ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error) {
 	return nil, 0, nil
 }
 

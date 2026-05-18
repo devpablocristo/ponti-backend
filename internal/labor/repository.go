@@ -219,14 +219,16 @@ func (r *Repository) HardDeleteLabor(ctx context.Context, id int64) error {
 	})
 }
 
-// ListArchivedLabors lista labors archivados de un proyecto, paginado.
+// ListArchivedLabors lista labors archivados. Si projectID es 0, devuelve labors de todos los proyectos del tenant.
 func (r *Repository) ListArchivedLabors(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
 	var total int64
 	base := r.db.Client().WithContext(ctx).
 		Unscoped().
 		Model(&models.Labor{}).
-		Where("project_id = ?", projectID).
 		Where("deleted_at IS NOT NULL")
+	if projectID > 0 {
+		base = base.Where("project_id = ?", projectID)
+	}
 	base = authz.MaybeTenantScope(ctx, base, "labors")
 
 	if err := base.Count(&total).Error; err != nil {

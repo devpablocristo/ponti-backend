@@ -114,7 +114,7 @@ func (s *lotActionUseCasesSpy) HardDeleteLot(_ context.Context, id int64) error 
 	return nil
 }
 
-func (s *lotActionUseCasesSpy) ListArchivedLots(context.Context, int, int) ([]domain.Lot, int64, error) {
+func (s *lotActionUseCasesSpy) ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error) {
 	panic("not implemented")
 }
 

@@ -168,6 +168,10 @@ func (h *Handler) Routes() {
 		globalSupplyMovements.GET("", h.ListSupplyMovements)
 	}
 
+	// Endpoint global para listar movimientos archivados de todos los proyectos del tenant.
+	r.GET(baseURL+"/supply-movements/archived", append(h.mws.GetValidation(), h.ListArchivedSupplyMovementsGlobal)...)
+	r.GET(baseURL+"/stock-movements/archived", append(h.mws.GetValidation(), h.ListArchivedSupplyMovementsGlobal)...)
+
 	supplyMovements := r.Group(baseURL+"/projects/:project_id/supply-movements", h.mws.GetValidation()...)
 	{
 		supplyMovements.POST("", h.CreateSupplyMovement)
@@ -874,6 +878,17 @@ func (h *Handler) ListArchivedSupplyMovements(c *gin.Context) {
 	}
 
 	supplyMovements, err := h.ucs.ListArchivedSupplyMovements(c.Request.Context(), projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, getDto.NewGetEntrySupplyMovementsResponse(supplyMovements))
+}
+
+// ListArchivedSupplyMovementsGlobal lista movimientos archivados de todos los proyectos del tenant.
+func (h *Handler) ListArchivedSupplyMovementsGlobal(c *gin.Context) {
+	supplyMovements, err := h.ucs.ListArchivedSupplyMovements(c.Request.Context(), 0)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

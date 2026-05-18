@@ -340,7 +340,9 @@ func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 	})
 }
 
-// RestoreLot restaura un lote archivado.
+// RestoreLot restaura un lote archivado. Si el field padre está archivado (caso típico de cascade-archive),
+// también se restaura la row del field — pero NO los otros lots del field (cada lot conserva su deleted_at).
+// Si el project padre está archivado, retorna 409 pidiendo restaurar el proyecto primero.
 func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
@@ -358,14 +360,31 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 		if !l.DeletedAt.Valid {
 			return domainerr.Conflict("lot is not archived")
 		}
-		var fieldActive int64
-		if err := authz.MaybeTenantScope(ctx, tx.Table("fields"), "fields").
-			Where("id = ? AND deleted_at IS NULL", l.FieldID).
-			Count(&fieldActive).Error; err != nil {
+		var fieldRow struct {
+			ProjectID int64      `gorm:"column:project_id"`
+			DeletedAt *time.Time `gorm:"column:deleted_at"`
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
+			Select("project_id, deleted_at").
+			Where("id = ?", l.FieldID).
+			Scan(&fieldRow).Error; err != nil {
 			return domainerr.Internal("failed to check field")
 		}
-		if fieldActive == 0 {
-			return domainerr.Conflict("cannot restore lot while field is archived")
+		if fieldRow.DeletedAt != nil {
+			var projectActive int64
+			if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+				Where("id = ? AND deleted_at IS NULL", fieldRow.ProjectID).
+				Count(&projectActive).Error; err != nil {
+				return domainerr.Internal("failed to check project")
+			}
+			if projectActive == 0 {
+				return domainerr.Conflict("cannot restore lot while project is archived; restore the project first")
+			}
+			if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
+				Where("id = ?", l.FieldID).
+				Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
+				return domainerr.Internal("failed to restore parent field")
+			}
 		}
 		rowState, err := lifecycle.ReadRowState(tx, "lots", id)
 		if err != nil {
@@ -388,30 +407,85 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 	})
 }
 
-// ListArchivedLots lista lotes archivados.
-func (r *Repository) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.Lot, int64, error) {
-	var total int64
-	base := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Lot{}).
-		Where("deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "lots")
+// ListArchivedLots lista lotes archivados con nombres de proyecto/campo/cultivo joineados.
+func (r *Repository) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.LotTable, int64, error) {
+	where := []string{"l.deleted_at IS NOT NULL"}
+	args := []any{}
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		where = append(where, "l.tenant_id = ?")
+		args = append(args, tenantID)
+	}
+	whereSQL := strings.Join(where, " AND ")
 
-	if err := base.Count(&total).Error; err != nil {
+	var total int64
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM lots l WHERE %s", whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived lots")
 	}
 
-	var list []models.Lot
+	type archivedLotRow struct {
+		ID             int64           `gorm:"column:id"`
+		ProjectID      int64           `gorm:"column:project_id"`
+		FieldID        int64           `gorm:"column:field_id"`
+		ProjectName    string          `gorm:"column:project_name"`
+		FieldName      string          `gorm:"column:field_name"`
+		LotName        string          `gorm:"column:lot_name"`
+		PreviousCropID int64           `gorm:"column:previous_crop_id"`
+		PreviousCrop   string          `gorm:"column:previous_crop"`
+		CurrentCropID  int64           `gorm:"column:current_crop_id"`
+		CurrentCrop    string          `gorm:"column:current_crop"`
+		Variety        string          `gorm:"column:variety"`
+		Hectares       decimal.Decimal `gorm:"column:hectares"`
+		Season         string          `gorm:"column:season"`
+		Tons           decimal.Decimal `gorm:"column:tons"`
+		UpdatedAt      *time.Time      `gorm:"column:updated_at"`
+	}
+
 	offset := (page - 1) * perPage
-	if err := base.
-		Offset(offset).
-		Limit(perPage).
-		Order("deleted_at DESC").
-		Find(&list).Error; err != nil {
+	listQuery := fmt.Sprintf(`
+		SELECT
+			l.id, f.project_id, l.field_id,
+			p.name AS project_name, f.name AS field_name, l.name AS lot_name,
+			l.previous_crop_id, COALESCE(prev_crop.name, '') AS previous_crop,
+			l.current_crop_id, COALESCE(curr_crop.name, '') AS current_crop,
+			l.variety, l.hectares, l.season, l.tons, l.updated_at
+		FROM lots l
+		LEFT JOIN fields f ON f.id = l.field_id
+		LEFT JOIN projects p ON p.id = f.project_id
+		LEFT JOIN crops prev_crop ON prev_crop.id = l.previous_crop_id
+		LEFT JOIN crops curr_crop ON curr_crop.id = l.current_crop_id
+		WHERE %s
+		ORDER BY l.deleted_at DESC
+		LIMIT ? OFFSET ?
+	`, whereSQL)
+	listArgs := append(append([]any{}, args...), perPage, offset)
+
+	var rows []archivedLotRow
+	if err := r.db.Client().WithContext(ctx).Raw(listQuery, listArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to list archived lots")
 	}
 
-	return mapLotsToDomain(list), total, nil
+	result := make([]domain.LotTable, len(rows))
+	for i, row := range rows {
+		result[i] = domain.LotTable{
+			ID:             row.ID,
+			ProjectID:      row.ProjectID,
+			FieldID:        row.FieldID,
+			ProjectName:    row.ProjectName,
+			FieldName:      row.FieldName,
+			LotName:        row.LotName,
+			PreviousCropID: row.PreviousCropID,
+			PreviousCrop:   row.PreviousCrop,
+			CurrentCropID:  row.CurrentCropID,
+			CurrentCrop:    row.CurrentCrop,
+			Variety:        row.Variety,
+			Hectares:       row.Hectares,
+			Season:         row.Season,
+			Tons:           row.Tons,
+			UpdatedAt:      row.UpdatedAt,
+		}
+	}
+	return result, total, nil
 }
 
 // HardDeleteLot elimina definitivamente un lote.
@@ -438,7 +512,7 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check workorders")
 		}
 		if woCount > 0 {
-			return domainerr.Conflict(fmt.Sprintf("lot has %d workorder(s); archive or hard-delete them first", woCount))
+			return domainerr.Conflict(fmt.Sprintf("El lote tiene %d orden(es) de trabajo asociada(s). Eliminá o archivá esas órdenes primero (Órdenes de Trabajo → Archivadas → Eliminar) y después podés eliminar el lote.", woCount))
 		}
 
 		// Limpiar lot_dates físicamente (no son entidad de negocio independiente).

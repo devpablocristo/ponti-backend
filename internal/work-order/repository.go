@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -281,8 +282,10 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 }
 
 // HardDeleteWorkOrder elimina definitivamente una orden de trabajo.
-// Bloquea con 409 si tiene invoices o labors (activos o archivados) referenciándola.
+// Bloquea con 409 si tiene invoices referenciándola.
 // Sus children "propios" (items, investor_splits) se eliminan en cascada.
+// Nota: la relación con labors es inversa (workorders.labor_id → labors), por lo que
+// borrar una work-order no impacta a labors. No se chequea ese sentido.
 func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
 		return err
@@ -309,15 +312,6 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 			return domainerr.Conflict(fmt.Sprintf("work order has %d invoice(s); archive or hard-delete them first", invCount))
 		}
 
-		var laborCount int64
-		laborDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("labors"), "labors")
-		if err := laborDB.Where("work_order_id = ?", id).Count(&laborCount).Error; err != nil {
-			return domainerr.Internal("failed to check labors")
-		}
-		if laborCount > 0 {
-			return domainerr.Conflict(fmt.Sprintf("work order has %d labor record(s); archive or hard-delete them first", laborCount))
-		}
-
 		// Cascada de "owned children" (no son entidades de negocio independientes).
 		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorder_items").Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order items")
@@ -338,34 +332,77 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return r.HardDeleteWorkOrder(ctx, id)
 }
 
-// ListArchivedWorkOrders lista ordenes archivadas paginadas.
-func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int) ([]domain.WorkOrder, int64, error) {
-	var total int64
-	base := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.WorkOrder{}).
-		Where("deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "workorders")
+// ListArchivedWorkOrders lista ordenes archivadas con nombres joineados (project, field, lot, labor).
+func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int) ([]domain.WorkOrderListElement, int64, error) {
+	where := []string{"w.deleted_at IS NOT NULL"}
+	args := []any{}
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		where = append(where, "w.tenant_id = ?")
+		args = append(args, tenantID)
+	}
+	whereSQL := strings.Join(where, " AND ")
 
-	if err := base.Count(&total).Error; err != nil {
+	var total int64
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM workorders w WHERE %s", whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived work orders")
 	}
 
-	var list []models.WorkOrder
+	type archivedRow struct {
+		ID          int64     `gorm:"column:id"`
+		Number      string    `gorm:"column:number"`
+		ProjectName string    `gorm:"column:project_name"`
+		FieldName   string    `gorm:"column:field_name"`
+		LotName     string    `gorm:"column:lot_name"`
+		Date        time.Time `gorm:"column:date"`
+		SequenceDay int64     `gorm:"column:sequence_day"`
+		CropName    string    `gorm:"column:crop_name"`
+		LaborName   string    `gorm:"column:labor_name"`
+		Contractor  string    `gorm:"column:contractor"`
+	}
+
 	offset := (page - 1) * perPage
-	if err := base.
-		Offset(offset).
-		Limit(perPage).
-		Order("deleted_at DESC").
-		Find(&list).Error; err != nil {
+	listQuery := fmt.Sprintf(`
+		SELECT
+			w.id, w.number, w.date, w.sequence_day, w.contractor,
+			COALESCE(p.name, '') AS project_name,
+			COALESCE(f.name, '') AS field_name,
+			COALESCE(l.name, '') AS lot_name,
+			COALESCE(c.name, '') AS crop_name,
+			COALESCE(lb.name, '') AS labor_name
+		FROM workorders w
+		LEFT JOIN projects p ON p.id = w.project_id
+		LEFT JOIN fields f ON f.id = w.field_id
+		LEFT JOIN lots l ON l.id = w.lot_id
+		LEFT JOIN crops c ON c.id = w.crop_id
+		LEFT JOIN labors lb ON lb.id = w.labor_id
+		WHERE %s
+		ORDER BY w.deleted_at DESC
+		LIMIT ? OFFSET ?
+	`, whereSQL)
+	listArgs := append(append([]any{}, args...), perPage, offset)
+
+	var rows []archivedRow
+	if err := r.db.Client().WithContext(ctx).Raw(listQuery, listArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to list archived work orders")
 	}
 
-	out := make([]domain.WorkOrder, len(list))
-	for i := range list {
-		out[i] = *list[i].ToDomain()
+	result := make([]domain.WorkOrderListElement, len(rows))
+	for i, row := range rows {
+		result[i] = domain.WorkOrderListElement{
+			ID:          row.ID,
+			Number:      row.Number,
+			ProjectName: row.ProjectName,
+			FieldName:   row.FieldName,
+			LotName:     row.LotName,
+			Date:        row.Date,
+			SequenceDay: row.SequenceDay,
+			CropName:    row.CropName,
+			LaborName:   row.LaborName,
+			Contractor:  row.Contractor,
+		}
 	}
-	return out, total, nil
+	return result, total, nil
 }
 
 func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
@@ -432,6 +469,9 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		if !wo.DeletedAt.Valid {
 			return domainerr.Conflict("work order is not archived")
 		}
+		// Cascade-up: si field/lot padres están archivados, restaurar solo sus rows
+		// (sin cascade-down a otros hijos). Si project está archivado, exigir que
+		// el usuario lo restaure manualmente.
 		var projectActive int64
 		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
 			Where("id = ? AND deleted_at IS NULL", wo.ProjectID).
@@ -439,7 +479,17 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check project")
 		}
 		if projectActive == 0 {
-			return domainerr.Conflict("cannot restore work order while project is archived")
+			return domainerr.Conflict("cannot restore work order while project is archived; restore the project first")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
+			Where("id = ? AND deleted_at IS NOT NULL", wo.FieldID).
+			Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore parent field")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lots"), "lots").
+			Where("id = ? AND deleted_at IS NOT NULL", wo.LotID).
+			Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore parent lot")
 		}
 		rowState, err := lifecycle.ReadRowState(tx, "workorders", id)
 		if err != nil {
