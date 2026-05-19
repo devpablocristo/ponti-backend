@@ -21,6 +21,7 @@ permissions:
 
 env:
   GOPRIVATE: github.com/devpablocristo/*
+  CORE_GOVERNANCE_MODULE: github.com/devpablocristo/core/governance/go@v0.0.0-20260328151810-084828e80b26
 
 jobs:
   lint:
@@ -36,6 +37,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules
+        run: |
+          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9
@@ -56,6 +63,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules
+        run: |
+          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download
 
       - name: Build
         run: go build ./...
@@ -73,6 +86,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules
+        run: |
+          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download
 
       - name: Tests
         run: go test ./...
@@ -92,6 +111,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules
+        run: |
+          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download
 
       - name: Govulncheck
         run: |
