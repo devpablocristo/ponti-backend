@@ -642,7 +642,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 		SELECT
 			COALESCE(SUM(seeded_area_ha), 0) AS seeded_area,
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-			COALESCE(SUM(yield_tn_per_ha * seeded_area_ha) / NULLIF(SUM(seeded_area_ha), 0), 0) AS yield_tn_per_ha,
+			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(seeded_area_ha), 0)) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
 			COALESCE(SUM(hectares), 0) AS superficie_total
 		FROM %s

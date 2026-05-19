@@ -90,7 +90,32 @@ func setupWorkOrderTenantDB(t *testing.T) *gorm.DB {
 		CREATE TABLE labors (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id TEXT NOT NULL,
+			name TEXT,
 			work_order_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE projects (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			name TEXT,
+			deleted_at DATETIME
+		);
+		CREATE TABLE fields (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			name TEXT,
+			deleted_at DATETIME
+		);
+		CREATE TABLE lots (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			name TEXT,
+			deleted_at DATETIME
+		);
+		CREATE TABLE crops (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			name TEXT,
 			deleted_at DATETIME
 		);
 	`).Error; err != nil {
@@ -109,6 +134,19 @@ func TestWorkOrderRepositoryTenantIsolation(t *testing.T) {
 	now := time.Now().UTC()
 
 	if err := db.Exec(`
+		INSERT INTO projects (id, tenant_id, name, deleted_at) VALUES
+			(10, ?, 'Project A', NULL),
+			(20, ?, 'Project B', NULL);
+		INSERT INTO fields (id, tenant_id, name, deleted_at) VALUES
+			(100, ?, 'Field A', NULL),
+			(200, ?, 'Field B', NULL);
+		INSERT INTO lots (id, tenant_id, name, deleted_at) VALUES
+			(1000, ?, 'Lot A', NULL),
+			(2000, ?, 'Lot B', NULL);
+		INSERT INTO crops (id, tenant_id, name, deleted_at) VALUES
+			(1, ?, 'Crop', NULL);
+		INSERT INTO labors (id, tenant_id, name, work_order_id, deleted_at) VALUES
+			(1, ?, 'Labor', NULL, NULL);
 		INSERT INTO workorders (
 			id, tenant_id, number, project_id, field_id, lot_id, crop_id, labor_id,
 			contractor, observations, date, sequence_day, investor_id, effective_area,
@@ -120,7 +158,12 @@ func TestWorkOrderRepositoryTenantIsolation(t *testing.T) {
 			(4, ?, '4000', 10, 100, 1000, 1, 1, 'A archived', '', ?, 1, 11, 40, ?, ?, ?);
 		INSERT INTO workorder_investor_splits (id, tenant_id, workorder_id, investor_id, percentage, payment_status, deleted_at) VALUES
 			(1, ?, 2, 22, 100, 'Pendiente', NULL);
-	`, tenantA.String(), now, now, now,
+	`, tenantA.String(), tenantB.String(),
+		tenantA.String(), tenantB.String(),
+		tenantA.String(), tenantB.String(),
+		tenantA.String(),
+		tenantA.String(),
+		tenantA.String(), now, now, now,
 		tenantB.String(), now, now, now,
 		tenantB.String(), now, now, now, now,
 		tenantA.String(), now, now, now, now,

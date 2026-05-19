@@ -20,6 +20,7 @@ type UseCasesPort interface {
 	PreviewDigitalWorkOrderNumber(context.Context, int64, string) (string, error)
 	PreviewDigitalWorkOrderDraftBatchNumber(context.Context, int64, string) (string, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
+	GetWorkOrderDraftGroupByID(context.Context, int64) (*domain.WorkOrderDraftGroup, error)
 	ExportWorkOrderDraftPDF(context.Context, int64) ([]byte, error)
 	ExportWorkOrderDraftGroupPDF(context.Context, int64) ([]byte, error)
 	ListWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
@@ -31,6 +32,8 @@ type UseCasesPort interface {
 	RestoreWorkOrderDraftByID(context.Context, int64) error
 	HardDeleteWorkOrderDraftByID(context.Context, int64) error
 	PublishWorkOrderDraft(context.Context, int64) (int64, error)
+	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
+	UpdateWorkOrderDraftGroupByID(context.Context, int64, *domain.WorkOrderDraftGroup) error
 }
 
 type GinEnginePort interface {
@@ -92,11 +95,14 @@ func (h *Handler) Routes() {
 		grp.POST("/digital/preview-number", h.PreviewDigitalWorkOrderNumber)
 		grp.POST("/digital/batch/preview-number", h.PreviewDigitalWorkOrderDraftBatchNumber)
 		grp.GET("", h.ListWorkOrderDrafts)
+		grp.GET("/digital/groups", h.ListDigitalWorkOrderDraftGroups)
 		grp.GET("/digital", h.ListDigitalWorkOrderDrafts)
 		grp.GET("/archived", h.ListArchivedWorkOrderDrafts)
+		grp.GET("/:work_order_draft_id/group", h.GetWorkOrderDraftGroupByID)
 		grp.GET("/:work_order_draft_id", h.GetWorkOrderDraftByID)
 		grp.GET("/:work_order_draft_id/pdf", h.ExportWorkOrderDraftPDF)
 		grp.GET("/:work_order_draft_id/group-pdf", h.ExportWorkOrderDraftGroupPDF)
+		grp.PUT("/:work_order_draft_id/group", h.UpdateWorkOrderDraftGroupByID)
 		grp.PUT("/:work_order_draft_id", h.UpdateWorkOrderDraftByID)
 		grp.DELETE("/:work_order_draft_id", h.DeleteWorkOrderDraftByID)
 		grp.POST("/:work_order_draft_id/archive", h.ArchiveWorkOrderDraftByID)
@@ -219,6 +225,22 @@ func (h *Handler) GetWorkOrderDraftByID(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.FromDomain(draft))
 }
 
+func (h *Handler) GetWorkOrderDraftGroupByID(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	group, err := h.ucs.GetWorkOrderDraftGroupByID(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.GroupFromDomain(group))
+}
+
 func (h *Handler) ExportWorkOrderDraftPDF(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
 	if err != nil {
@@ -297,6 +319,38 @@ func (h *Handler) UpdateWorkOrderDraftByID(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
+func (h *Handler) UpdateWorkOrderDraftGroupByID(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	var req dto.WorkOrderDraftGroupUpdateRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	group, err := req.ToDomain()
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	if err := h.ucs.UpdateWorkOrderDraftGroupByID(c.Request.Context(), id, group); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	updated, err := h.ucs.GetWorkOrderDraftGroupByID(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.GroupFromDomain(updated))
+}
+
 func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
 	h.runWorkOrderDraftIDAction(c, h.ucs.DeleteWorkOrderDraftByID)
 }
@@ -371,6 +425,26 @@ func (h *Handler) ListArchivedWorkOrderDrafts(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondOK(c, dto.NewListResponse(pageInfo, items))
+}
+
+func (h *Handler) ListDigitalWorkOrderDraftGroups(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
+
+	items, pageInfo, err := h.ucs.ListDigitalWorkOrderDraftGroups(
+		c.Request.Context(),
+		c.Query("number"),
+		c.Query("status"),
+		types.Input{
+			Page:     uint(page),
+			PageSize: uint(perPage),
+		},
+	)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.NewGroupListResponse(pageInfo, items))
 }
 
 func (h *Handler) PublishWorkOrderDraft(c *gin.Context) {

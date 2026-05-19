@@ -636,8 +636,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	var deletedBy *string
-	deletedBy = &userID
+	deletedBy := &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		archivedAt := time.Now()

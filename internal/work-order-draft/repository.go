@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
@@ -152,7 +153,9 @@ func (r *Repository) GetWorkOrderDraftByID(ctx context.Context, id int64) (*doma
 		Preload("Lot").
 		Preload("Crop").
 		Preload("Labor").
-		Preload("Items").
+		Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Items.Supply").
 		Preload("InvestorSplits").
 		Where("id = ?", id).
@@ -205,7 +208,9 @@ func (r *Repository) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.C
 		Preload("Lot").
 		Preload("Crop").
 		Preload("Labor").
-		Preload("Items").
+		Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id ASC")
+		}).
 		Preload("Items.Supply").
 		Preload("InvestorSplits").
 		Where("project_id = ?", projectID).
@@ -513,6 +518,127 @@ func (r *Repository) listWorkOrderDrafts(ctx context.Context, number string, sta
 	return items, pageInfo, nil
 }
 
+func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error) {
+	type row struct {
+		ID            int64
+		Number        string
+		Date          time.Time
+		ProjectID     int64
+		ProjectName   string
+		FieldID       int64
+		FieldName     string
+		IsDigital     bool
+		Status        string
+		LotsCount     int64
+		EffectiveArea decimal.Decimal
+		CreatedAt     time.Time
+	}
+
+	var rows []row
+
+	base := r.db.Client().
+		WithContext(ctx).
+		Table("work_order_drafts wod").
+		Select(`
+			MIN(wod.id) AS id,
+			CASE
+				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
+				THEN split_part(wod.number, '.', 1)
+				ELSE wod.number
+			END AS number,
+			MIN(wod.date) AS date,
+			wod.project_id,
+			MIN(p.name) AS project_name,
+			wod.field_id,
+			MIN(f.name) AS field_name,
+			TRUE AS is_digital,
+			CASE
+				WHEN COUNT(DISTINCT wod.status) = 1 THEN MIN(wod.status)
+				ELSE 'pending_review'
+			END AS status,
+			COUNT(*) AS lots_count,
+			COALESCE(SUM(wod.effective_area), 0) AS effective_area,
+			MIN(wod.created_at) AS created_at
+		`).
+		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id").
+		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id").
+		Where("wod.is_digital = ?", true).
+		Where("wod.deleted_at IS NULL").
+		Where("p.deleted_at IS NULL").
+		Where("f.deleted_at IS NULL").
+		Group(`
+			CASE
+				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
+				THEN split_part(wod.number, '.', 1)
+				ELSE wod.number
+			END,
+			wod.project_id,
+			wod.field_id
+		`)
+	base = authz.MaybeTenantScope(ctx, base, "wod")
+
+	if strings.TrimSpace(number) != "" {
+		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
+	}
+
+	if strings.TrimSpace(status) != "" {
+		base = base.Where("wod.status = ?", strings.TrimSpace(status))
+	}
+
+	var total int64
+	countQuery := r.db.Client().
+		WithContext(ctx).
+		Table("(?) as grouped", base)
+
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to count work order draft groups", err)
+	}
+
+	if total == 0 {
+		return []domain.WorkOrderDraftGroupListItem{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
+	}
+
+	page := int(inp.Page)
+	if page < 1 {
+		page = 1
+	}
+	pageSize := int(inp.PageSize)
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	if err := base.
+		Order("created_at desc").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, types.NewError(types.ErrInternal, "failed to list work order draft groups", err)
+	}
+
+	items := make([]domain.WorkOrderDraftGroupListItem, len(rows))
+	for i, row := range rows {
+		items[i] = domain.WorkOrderDraftGroupListItem{
+			ID:            row.ID,
+			Number:        row.Number,
+			Date:          row.Date,
+			ProjectID:     row.ProjectID,
+			ProjectName:   row.ProjectName,
+			FieldID:       row.FieldID,
+			FieldName:     row.FieldName,
+			IsDigital:     row.IsDigital,
+			Status:        domain.Status(row.Status),
+			LotsCount:     row.LotsCount,
+			EffectiveArea: row.EffectiveArea,
+			Base: shareddomain.Base{
+				CreatedAt: row.CreatedAt,
+			},
+		}
+	}
+
+	return items, types.NewPageInfo(page, pageSize, total), nil
+}
+
 func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkOrderDraft) error {
 	if err := sharedrepo.ValidateEntity(d, "work order draft"); err != nil {
 		return err
@@ -532,87 +658,177 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var orig models.WorkOrderDraft
+		return r.applyDraftUpdateWithinTx(ctx, tx, model)
+	})
+}
+
+// applyDraftUpdateWithinTx ejecuta toda la lógica de actualización de un draft
+// (header + items + investor splits) reutilizando la *gorm.DB del caller.
+// NO abre transacción propia: el caller controla la atomicidad. Si retorna
+// error, el caller debe garantizar el rollback.
+func (r *Repository) applyDraftUpdateWithinTx(ctx context.Context, tx *gorm.DB, model *models.WorkOrderDraft) error {
+	var orig models.WorkOrderDraft
+	if err := authz.MaybeTenantScope(ctx, tx, "work_order_drafts").
+		Preload("Items").
+		Preload("InvestorSplits").
+		Where("id = ?", model.ID).
+		First(&orig).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return types.NewError(types.ErrNotFound, "work order draft not found", err)
+		}
+		return types.NewError(types.ErrInternal, "failed to find work order draft before update", err)
+	}
+
+	if err := tx.
+		Where("draft_id = ?", model.ID).
+		Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to delete old draft items", err)
+	}
+
+	if err := tx.
+		Where("draft_id = ?", model.ID).
+		Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
+		return types.NewError(types.ErrInternal, "failed to delete old draft investor splits", err)
+	}
+
+	updates := map[string]any{
+		"number":         model.Number,
+		"date":           model.Date,
+		"customer_id":    model.CustomerID,
+		"project_id":     model.ProjectID,
+		"campaign_id":    model.CampaignID,
+		"field_id":       model.FieldID,
+		"lot_id":         model.LotID,
+		"crop_id":        model.CropID,
+		"labor_id":       model.LaborID,
+		"contractor":     model.Contractor,
+		"effective_area": model.EffectiveArea,
+		"observations":   model.Observations,
+		"investor_id":    model.InvestorID,
+		"is_digital":     model.IsDigital,
+		"status":         model.Status,
+		"review_notes":   model.ReviewNotes,
+		"updated_by":     model.UpdatedBy,
+	}
+
+	updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrderDraft{}), "work_order_drafts").
+		Where("id = ?", model.ID).
+		Updates(updates)
+	if updateTx.Error != nil {
+		return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
+	}
+	if updateTx.RowsAffected == 0 {
+		return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+	}
+
+	if len(model.Items) > 0 {
+		items := make([]models.WorkOrderDraftItem, len(model.Items))
+		for i := range model.Items {
+			items[i] = models.WorkOrderDraftItem{
+				DraftID:    model.ID,
+				SupplyID:   model.Items[i].SupplyID,
+				SupplyName: model.Items[i].SupplyName,
+				TotalUsed:  model.Items[i].TotalUsed,
+				FinalDose:  model.Items[i].FinalDose,
+			}
+		}
+		if err := tx.Omit("id").Create(&items).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to insert new draft items", err)
+		}
+	}
+
+	if len(model.InvestorSplits) > 0 {
+		splits := make([]models.WorkOrderDraftInvestorSplit, len(model.InvestorSplits))
+		for i := range model.InvestorSplits {
+			splits[i] = models.WorkOrderDraftInvestorSplit{
+				DraftID:    model.ID,
+				InvestorID: model.InvestorSplits[i].InvestorID,
+				Percentage: model.InvestorSplits[i].Percentage,
+			}
+		}
+		if err := tx.Omit("id").Create(&splits).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to insert new draft investor splits", err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateWorkOrderDraftGroup actualiza atómicamente todos los drafts de un grupo
+// (mismo número base D-N y mismo project_id). Re-valida defensivamente dentro de
+// la transacción que los drafts referenciados existen, son digitales y comparten
+// número base / project_id. Cualquier fallo dispara rollback de todo el grupo.
+func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*domain.WorkOrderDraft) error {
+	if len(drafts) == 0 {
+		return types.NewError(types.ErrValidation, "no drafts to update", nil)
+	}
+	for _, d := range drafts {
+		if err := sharedrepo.ValidateEntity(d, "work order draft"); err != nil {
+			return err
+		}
+		if err := sharedrepo.ValidateID(d.ID, "work order draft"); err != nil {
+			return err
+		}
+	}
+
+	var actorPtr *string
+	if actor, err := sharedmodels.ActorFromContext(ctx); err == nil && actor != "" {
+		actorCopy := actor
+		actorPtr = &actorCopy
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		ids := make([]int64, len(drafts))
+		for i, d := range drafts {
+			ids[i] = d.ID
+		}
+
+		var existing []models.WorkOrderDraft
 		if err := authz.MaybeTenantScope(ctx, tx, "work_order_drafts").
-			Preload("Items").
-			Preload("InvestorSplits").
-			Where("id = ?", model.ID).
-			First(&orig).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			Where("id IN ?", ids).
+			Where("deleted_at IS NULL").
+			Find(&existing).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to load drafts before group update", err)
+		}
+		if len(existing) != len(drafts) {
+			return types.NewError(types.ErrNotFound, "one or more drafts in the group were not found", nil)
+		}
+
+		var (
+			projectID int64
+			baseSeq   int
+		)
+		for i, m := range existing {
+			if !m.IsDigital {
+				return types.NewError(types.ErrValidation, "all drafts in a group must be digital", nil)
 			}
-			return types.NewError(types.ErrInternal, "failed to find work order draft before update", err)
-		}
-
-		if err := tx.
-			Where("draft_id = ?", model.ID).
-			Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old draft items", err)
-		}
-
-		if err := tx.
-			Where("draft_id = ?", model.ID).
-			Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
-			return types.NewError(types.ErrInternal, "failed to delete old draft investor splits", err)
-		}
-
-		updates := map[string]any{
-			"number":         model.Number,
-			"date":           model.Date,
-			"customer_id":    model.CustomerID,
-			"project_id":     model.ProjectID,
-			"campaign_id":    model.CampaignID,
-			"field_id":       model.FieldID,
-			"lot_id":         model.LotID,
-			"crop_id":        model.CropID,
-			"labor_id":       model.LaborID,
-			"contractor":     model.Contractor,
-			"effective_area": model.EffectiveArea,
-			"observations":   model.Observations,
-			"investor_id":    model.InvestorID,
-			"is_digital":     model.IsDigital,
-			"status":         model.Status,
-			"review_notes":   model.ReviewNotes,
-			"updated_by":     model.UpdatedBy,
-		}
-
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrderDraft{}), "work_order_drafts").Where("id = ?", model.ID).Updates(updates)
-		if updateTx.Error != nil {
-			return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
-		}
-		if updateTx.RowsAffected == 0 {
-			return types.NewError(types.ErrNotFound, "work order draft not found", nil)
-		}
-
-		if len(model.Items) > 0 {
-			items := make([]models.WorkOrderDraftItem, len(model.Items))
-			for i := range model.Items {
-				items[i] = models.WorkOrderDraftItem{
-					DraftID:   model.ID,
-					SupplyID:  model.Items[i].SupplyID,
-					TotalUsed: model.Items[i].TotalUsed,
-					FinalDose: model.Items[i].FinalDose,
-				}
+			seq, ok := extractBaseSequence(m.Number)
+			if !ok {
+				return types.NewError(types.ErrValidation, "draft number does not belong to a digital group", nil)
 			}
-			if err := tx.Omit("id").Create(&items).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new draft items", err)
+			if i == 0 {
+				projectID = m.ProjectID
+				baseSeq = seq
+				continue
+			}
+			if m.ProjectID != projectID {
+				return types.NewError(types.ErrValidation, "drafts in group must share project_id", nil)
+			}
+			if seq != baseSeq {
+				return types.NewError(types.ErrValidation, "drafts in group must share base number", nil)
 			}
 		}
 
-		if len(model.InvestorSplits) > 0 {
-			splits := make([]models.WorkOrderDraftInvestorSplit, len(model.InvestorSplits))
-			for i := range model.InvestorSplits {
-				splits[i] = models.WorkOrderDraftInvestorSplit{
-					DraftID:    model.ID,
-					InvestorID: model.InvestorSplits[i].InvestorID,
-					Percentage: model.InvestorSplits[i].Percentage,
-				}
+		for _, d := range drafts {
+			m := models.FromDomain(d)
+			m.ID = d.ID
+			if actorPtr != nil {
+				m.UpdatedBy = actorPtr
 			}
-			if err := tx.Omit("id").Create(&splits).Error; err != nil {
-				return types.NewError(types.ErrInternal, "failed to insert new draft investor splits", err)
+			if err := r.applyDraftUpdateWithinTx(ctx, tx, m); err != nil {
+				return err
 			}
 		}
-
 		return nil
 	})
 }
