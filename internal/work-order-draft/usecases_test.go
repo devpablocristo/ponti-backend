@@ -121,11 +121,6 @@ type testPublisher struct {
 	createFn func(context.Context, *workorderdomain.WorkOrder) (int64, error)
 }
 
-type testPDFExporter struct {
-	exportFn      func(context.Context, *domain.WorkOrderDraft) ([]byte, error)
-	exportGroupFn func(context.Context, []*domain.WorkOrderDraft) ([]byte, error)
-}
-
 type testSupplyReader struct {
 	getSupplyFn func(context.Context, int64) (*supplydomain.Supply, error)
 }
@@ -138,20 +133,6 @@ func (s *testSupplyReader) GetSupply(ctx context.Context, id int64) (*supplydoma
 		}, nil
 	}
 	return s.getSupplyFn(ctx, id)
-}
-
-func (e *testPDFExporter) ExportDraft(ctx context.Context, draft *domain.WorkOrderDraft) ([]byte, error) {
-	if e.exportFn == nil {
-		return []byte("pdf"), nil
-	}
-	return e.exportFn(ctx, draft)
-}
-
-func (e *testPDFExporter) ExportDraftGroup(ctx context.Context, drafts []*domain.WorkOrderDraft) ([]byte, error) {
-	if e.exportGroupFn == nil {
-		return []byte("pdf-group"), nil
-	}
-	return e.exportGroupFn(ctx, drafts)
 }
 
 func (p *testPublisher) CreateWorkOrder(ctx context.Context, wo *workorderdomain.WorkOrder) (int64, error) {
@@ -194,7 +175,7 @@ func TestCreateDigitalWorkOrderDraft_AssignsNextBaseNumber(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	id, err := uc.CreateDigitalWorkOrderDraft(context.Background(), validDraft())
 	require.NoError(t, err)
@@ -218,7 +199,7 @@ func TestCreateDigitalWorkOrderDraft_AssignsSplitNumberWhenBaseExists(t *testing
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	draft := validDraft()
 	draft.Number = "D-41"
@@ -242,7 +223,7 @@ func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *test
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	batch := &domain.WorkOrderDraftBatchCreate{
 		Date:       time.Date(2026, 5, 14, 0, 0, 0, 0, time.UTC),
@@ -314,7 +295,7 @@ func TestUpdateWorkOrderDraftByID_RevalidatesDigitalNumberExcludingSelf(t *testi
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	draft := validDraft()
 	draft.ID = 15
@@ -352,7 +333,7 @@ func TestPublishWorkOrderDraft_FailsWhenNumberAlreadyPublished(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, pub, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, pub, &testSupplyReader{})
 
 	_, err := uc.PublishWorkOrderDraft(context.Background(), 77)
 	require.Error(t, err)
@@ -383,7 +364,7 @@ func TestPublishWorkOrderDraft_FailsWhenSupplyIsPending(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, pub, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, pub, &testSupplyReader{})
 
 	_, err := uc.PublishWorkOrderDraft(context.Background(), 88)
 	require.Error(t, err)
@@ -459,7 +440,7 @@ func TestUpdateWorkOrderDraftGroupByID_HappyPathSendsAllLotsInSingleCall(t *test
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	err := uc.UpdateWorkOrderDraftGroupByID(context.Background(), 101, groupUpdateRequest())
 	require.NoError(t, err)
@@ -505,7 +486,7 @@ func TestUpdateWorkOrderDraftGroupByID_AtomicErrorFromRepoIsPropagated(t *testin
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	err := uc.UpdateWorkOrderDraftGroupByID(context.Background(), 201, groupUpdateRequest())
 	require.ErrorIs(t, err, repoErr)
@@ -534,7 +515,7 @@ func TestUpdateWorkOrderDraftGroupByID_BlocksWhenAnyLotPublished(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	err := uc.UpdateWorkOrderDraftGroupByID(context.Background(), 301, groupUpdateRequest())
 	require.Error(t, err)
@@ -565,7 +546,7 @@ func TestUpdateWorkOrderDraftGroupByID_RejectsZeroEffectiveArea(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	err := uc.UpdateWorkOrderDraftGroupByID(context.Background(), 401, groupUpdateRequest())
 	require.Error(t, err)
@@ -585,7 +566,7 @@ func TestGetWorkOrderDraftGroupByID_RejectsInvalidNumber(t *testing.T) {
 			return d, nil
 		},
 	}
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	_, err := uc.GetWorkOrderDraftGroupByID(context.Background(), 555)
 	require.Error(t, err)
@@ -607,7 +588,7 @@ func TestGetWorkOrderDraftGroupByID_RejectsWhenNoRelatedFound(t *testing.T) {
 			return []*domain.WorkOrderDraft{}, nil
 		},
 	}
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	_, err := uc.GetWorkOrderDraftGroupByID(context.Background(), 777)
 	require.Error(t, err)
@@ -638,7 +619,7 @@ func TestListDigitalWorkOrderDraftGroups_DelegatesToRepo(t *testing.T) {
 		},
 	}
 
-	uc := NewUseCases(repo, &testPublisher{}, &testPDFExporter{}, &testSupplyReader{})
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
 
 	items, page, err := uc.ListDigitalWorkOrderDraftGroups(
 		context.Background(),

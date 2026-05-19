@@ -37,10 +37,10 @@ func (s *workOrderDraftUseCasesStub) GetWorkOrderDraftByID(context.Context, int6
 func (s *workOrderDraftUseCasesStub) GetWorkOrderDraftGroupByID(context.Context, int64) (*domain.WorkOrderDraftGroup, error) {
 	return nil, nil
 }
-func (s *workOrderDraftUseCasesStub) ExportWorkOrderDraftPDF(context.Context, int64) ([]byte, error) {
+func (s *workOrderDraftUseCasesStub) GetWorkOrderDraftPDFData(context.Context, int64) (*pdfDocumentData, error) {
 	return nil, nil
 }
-func (s *workOrderDraftUseCasesStub) ExportWorkOrderDraftGroupPDF(context.Context, int64) ([]byte, error) {
+func (s *workOrderDraftUseCasesStub) GetWorkOrderDraftGroupPDFData(context.Context, int64) (*pdfDocumentData, error) {
 	return nil, nil
 }
 func (s *workOrderDraftUseCasesStub) ListWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {

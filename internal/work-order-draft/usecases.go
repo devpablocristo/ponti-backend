@@ -45,15 +45,9 @@ type SupplyReaderPort interface {
 	GetSupply(context.Context, int64) (*supplydomain.Supply, error)
 }
 
-type PDFExporterPort interface {
-	ExportDraft(context.Context, *domain.WorkOrderDraft) ([]byte, error)
-	ExportDraftGroup(context.Context, []*domain.WorkOrderDraft) ([]byte, error)
-}
-
 type UseCases struct {
 	repo         RepositoryPort
 	publisher    PublisherPort
-	pdfExporter  PDFExporterPort
 	supplyReader SupplyReaderPort
 }
 
@@ -63,11 +57,10 @@ var (
 	digitalSplitNumberRE = regexp.MustCompile(`^D-(\d+)\.(\d+)$`)
 )
 
-func NewUseCases(r RepositoryPort, p PublisherPort, pdf PDFExporterPort, sr SupplyReaderPort) *UseCases {
+func NewUseCases(r RepositoryPort, p PublisherPort, sr SupplyReaderPort) *UseCases {
 	return &UseCases{
 		repo:         r,
 		publisher:    p,
-		pdfExporter:  pdf,
 		supplyReader: sr,
 	}
 }
@@ -283,57 +276,6 @@ func (u *UseCases) GetWorkOrderDraftGroupByID(ctx context.Context, id int64) (*d
 	sortDigitalDraftGroup(related)
 
 	return buildWorkOrderDraftGroup(related), nil
-}
-
-func (u *UseCases) ExportWorkOrderDraftPDF(ctx context.Context, id int64) ([]byte, error) {
-	if id <= 0 {
-		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
-	}
-
-	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if u.pdfExporter == nil {
-		return nil, types.NewError(types.ErrInternal, "pdf exporter not configured", nil)
-	}
-
-	return u.pdfExporter.ExportDraft(ctx, draft)
-}
-
-func (u *UseCases) ExportWorkOrderDraftGroupPDF(ctx context.Context, id int64) ([]byte, error) {
-	if id <= 0 {
-		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
-	}
-
-	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	baseSequence, ok := extractBaseSequence(draft.Number)
-	if !ok {
-		return nil, types.NewError(types.ErrValidation, "invalid work order draft number", nil)
-	}
-
-	baseNumber := fmt.Sprintf("D-%d", baseSequence)
-
-	related, err := u.repo.ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx, draft.ProjectID, baseNumber)
-	if err != nil {
-		return nil, err
-	}
-	if len(related) == 0 {
-		return nil, types.NewError(types.ErrNotFound, "related work order drafts not found", nil)
-	}
-
-	sortDigitalDraftGroup(related)
-
-	if u.pdfExporter == nil {
-		return nil, types.NewError(types.ErrInternal, "pdf exporter not configured", nil)
-	}
-
-	return u.pdfExporter.ExportDraftGroup(ctx, related)
 }
 
 func (u *UseCases) ListWorkOrderDrafts(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
@@ -1055,4 +997,49 @@ func groupDraftStatus(drafts []*domain.WorkOrderDraft) domain.Status {
 	}
 
 	return status
+}
+
+func (u *UseCases) GetWorkOrderDraftPDFData(ctx context.Context, id int64) (*pdfDocumentData, error) {
+	if id <= 0 {
+		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+
+	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	data := buildSingleDraftPDFData(draft)
+	return &data, nil
+}
+
+func (u *UseCases) GetWorkOrderDraftGroupPDFData(ctx context.Context, id int64) (*pdfDocumentData, error) {
+	if id <= 0 {
+		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+
+	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	baseSequence, ok := extractBaseSequence(draft.Number)
+	if !ok {
+		return nil, types.NewError(types.ErrValidation, "invalid work order draft number", nil)
+	}
+
+	baseNumber := fmt.Sprintf("D-%d", baseSequence)
+
+	related, err := u.repo.ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx, draft.ProjectID, baseNumber)
+	if err != nil {
+		return nil, err
+	}
+	if len(related) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "related work order drafts not found", nil)
+	}
+
+	sortDigitalDraftGroup(related)
+
+	data := buildGroupDraftPDFData(related)
+	return &data, nil
 }
