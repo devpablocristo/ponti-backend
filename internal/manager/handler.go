@@ -15,11 +15,12 @@ import (
 type UseCasesPort interface {
 	CreateManager(context.Context, *domain.Manager) (int64, error)
 	ListManagers(context.Context, int, int) ([]domain.Manager, int64, error)
+	ListArchivedManagers(context.Context, int, int) ([]domain.Manager, int64, error)
 	GetManager(context.Context, int64) (*domain.Manager, error)
 	UpdateManager(context.Context, *domain.Manager) error
-	DeleteManager(context.Context, int64) error
 	ArchiveManager(context.Context, int64) error
 	RestoreManager(context.Context, int64) error
+	HardDeleteManager(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -35,7 +36,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsula dependencias del handler HTTP de Manager.
@@ -56,6 +56,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runManagerIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "manager_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 // Routes registra las rutas del módulo Manager.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
@@ -65,11 +78,12 @@ func (h *Handler) Routes() {
 	{
 		group.POST("", h.CreateManager)
 		group.GET("", h.ListManagers)
+		group.GET("/archived", h.ListArchivedManagers)
 		group.GET("/:manager_id", h.GetManager)
 		group.PUT("/:manager_id", h.UpdateManager)
-		group.DELETE("/:manager_id", h.DeleteManager)
 		group.POST("/:manager_id/archive", h.ArchiveManager)
 		group.POST("/:manager_id/restore", h.RestoreManager)
+		group.DELETE("/:manager_id/hard", h.HardDeleteManager)
 	}
 }
 
@@ -127,41 +141,24 @@ func (h *Handler) UpdateManager(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteManager(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "manager_id")
+func (h *Handler) ListArchivedManagers(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListArchivedManagers(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteManager(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	sharedhandlers.RespondOK(c, dto.NewListManagersResponse(items, page, perPage, total))
+}
+
+func (h *Handler) HardDeleteManager(c *gin.Context) {
+	h.runManagerIDAction(c, h.ucs.HardDeleteManager)
 }
 
 func (h *Handler) ArchiveManager(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "manager_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveManager(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runManagerIDAction(c, h.ucs.ArchiveManager)
 }
 
 func (h *Handler) RestoreManager(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "manager_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreManager(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runManagerIDAction(c, h.ucs.RestoreManager)
 }

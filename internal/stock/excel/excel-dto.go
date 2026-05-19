@@ -28,9 +28,9 @@ func BuildExcelDTO(items []*domain.Stock) []StockExcelDTO {
 		entry := it.GetEntryStock()
 		stockUnits := it.GetStockUnits()
 		diff := decimal.Zero
-if it.HasRealStockCount {
-	diff = it.GetStockDifference()
-}
+		if it.HasRealStockCount {
+			diff = it.GetStockDifference()
+		}
 		total := it.GetTotalUSD()
 
 		investorName := ""

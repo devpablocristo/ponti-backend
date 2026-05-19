@@ -9,7 +9,9 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -31,6 +33,11 @@ func NewRepository(db GormEngine) *Repository {
 
 func (r *Repository) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
 	model := models.FromDomain(d)
+	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return 0, err
+	} else if ok {
+		model.TenantID = tenantID
+	}
 
 	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.CreatedBy = &userID
@@ -77,8 +84,15 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 	}
 
 	modelsToCreate := make([]*models.WorkOrderDraft, len(drafts))
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for i, d := range drafts {
 		model := models.FromDomain(d)
+		if hasTenant {
+			model.TenantID = tenantID
+		}
 		if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 			model.CreatedBy = &userID
 			model.UpdatedBy = &userID
@@ -86,7 +100,7 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 		modelsToCreate[i] = model
 	}
 
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, model := range modelsToCreate {
 			if err := tx.Omit("Items", "InvestorSplits").Create(model).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to create work order draft header", err)
@@ -130,8 +144,7 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 func (r *Repository) GetWorkOrderDraftByID(ctx context.Context, id int64) (*domain.WorkOrderDraft, error) {
 	var model models.WorkOrderDraft
 
-	if err := r.db.Client().
-		WithContext(ctx).
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "work_order_drafts").
 		Preload("Customer").
 		Preload("Project").
 		Preload("Project.Campaign").
@@ -166,9 +179,7 @@ func (r *Repository) ListPendingSupplyNamesByIDs(ctx context.Context, ids []int6
 		Name string `gorm:"column:name"`
 	}
 
-	if err := r.db.Client().
-		WithContext(ctx).
-		Table("supplies").
+	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Table("supplies"), "supplies").
 		Select("name").
 		Where("id IN ?", ids).
 		Where("is_pending = ?", true).
@@ -206,6 +217,7 @@ func (r *Repository) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.C
 		Where("is_digital = ?", true).
 		Where("deleted_at IS NULL").
 		Where("(number = ? OR number LIKE ?)", baseNumber, baseNumber+".%")
+	query = authz.MaybeTenantScope(ctx, query, "work_order_drafts")
 
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list related work order drafts", err)
@@ -242,10 +254,36 @@ func (r *Repository) ListOccupiedWorkOrderNumbersByProject(ctx context.Context, 
 		  AND btrim(number) <> ''
 		  AND deleted_at IS NULL
 	`
+	args := []any{projectID, projectID}
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
+		query = `
+		SELECT number
+		FROM public.workorders
+		WHERE project_id = ?
+		  AND tenant_id = ?
+		  AND number IS NOT NULL
+		  AND btrim(number) <> ''
+
+		UNION
+
+		SELECT number
+		FROM public.work_order_drafts
+		WHERE project_id = ?
+		  AND tenant_id = ?
+		  AND number IS NOT NULL
+		  AND btrim(number) <> ''
+		  AND deleted_at IS NULL
+	`
+		args = []any{projectID, tenantID, projectID, tenantID}
+	}
 
 	if err := r.db.Client().
 		WithContext(ctx).
-		Raw(query, projectID, projectID).
+		Raw(query, args...).
 		Scan(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list occupied work order numbers", err)
 	}
@@ -282,10 +320,37 @@ func (r *Repository) ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx con
 		  AND btrim(number) <> ''
 		  AND deleted_at IS NULL
 	`
+	args := []any{projectID, projectID, draftID}
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
+		query = `
+		SELECT number
+		FROM public.workorders
+		WHERE project_id = ?
+		  AND tenant_id = ?
+		  AND number IS NOT NULL
+		  AND btrim(number) <> ''
+
+		UNION
+
+		SELECT number
+		FROM public.work_order_drafts
+		WHERE project_id = ?
+		  AND tenant_id = ?
+		  AND id <> ?
+		  AND number IS NOT NULL
+		  AND btrim(number) <> ''
+		  AND deleted_at IS NULL
+	`
+		args = []any{projectID, tenantID, projectID, tenantID, draftID}
+	}
 
 	if err := r.db.Client().
 		WithContext(ctx).
-		Raw(query, projectID, projectID, draftID).
+		Raw(query, args...).
 		Scan(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list occupied work order numbers excluding draft", err)
 	}
@@ -305,15 +370,32 @@ func (r *Repository) ListPublishedWorkOrderNumbersByProject(ctx context.Context,
 
 	var rows []row
 
-	if err := r.db.Client().
-		WithContext(ctx).
-		Raw(`
+	query := `
 			SELECT number
 			FROM public.workorders
 			WHERE project_id = ?
 			  AND number IS NOT NULL
 			  AND btrim(number) <> ''
-		`, projectID).
+		`
+	args := []any{projectID}
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasTenant {
+		query = `
+			SELECT number
+			FROM public.workorders
+			WHERE project_id = ?
+			  AND tenant_id = ?
+			  AND number IS NOT NULL
+			  AND btrim(number) <> ''
+		`
+		args = []any{projectID, tenantID}
+	}
+	if err := r.db.Client().
+		WithContext(ctx).
+		Raw(query, args...).
 		Scan(&rows).Error; err != nil {
 		return nil, types.NewError(types.ErrInternal, "failed to list published work order numbers", err)
 	}
@@ -327,7 +409,14 @@ func (r *Repository) ListPublishedWorkOrderNumbersByProject(ctx context.Context,
 }
 
 func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return r.listWorkOrderDrafts(ctx, number, status, isDigital, false, inp)
+}
 
+func (r *Repository) ListArchivedWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return r.listWorkOrderDrafts(ctx, number, status, isDigital, true, inp)
+}
+
+func (r *Repository) listWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, archived bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
 	var rows []struct {
 		ID          int64
 		Number      string
@@ -356,8 +445,16 @@ func (r *Repository) ListWorkOrderDrafts(ctx context.Context, number string, sta
 			"wod.status",
 			"wod.created_at",
 		).
-		Joins("join projects p on p.id = wod.project_id").
-		Joins("join fields f on f.id = wod.field_id")
+		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id").
+		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id")
+	base = authz.MaybeTenantScope(ctx, base, "wod")
+	if archived {
+		base = base.Where("wod.deleted_at IS NOT NULL")
+	} else {
+		base = base.Where("wod.deleted_at IS NULL").
+			Where("p.deleted_at IS NULL").
+			Where("f.deleted_at IS NULL")
+	}
 
 	if strings.TrimSpace(number) != "" {
 		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
@@ -445,9 +542,9 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 		Select(`
 			MIN(wod.id) AS id,
 			CASE
- 				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
-  				THEN split_part(wod.number, '.', 1)
- 				ELSE wod.number
+				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
+				THEN split_part(wod.number, '.', 1)
+				ELSE wod.number
 			END AS number,
 			MIN(wod.date) AS date,
 			wod.project_id,
@@ -463,10 +560,12 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 			COALESCE(SUM(wod.effective_area), 0) AS effective_area,
 			MIN(wod.created_at) AS created_at
 		`).
-		Joins("join projects p on p.id = wod.project_id").
-		Joins("join fields f on f.id = wod.field_id").
+		Joins("join projects p on p.id = wod.project_id and p.tenant_id = wod.tenant_id").
+		Joins("join fields f on f.id = wod.field_id and f.tenant_id = wod.tenant_id").
 		Where("wod.is_digital = ?", true).
 		Where("wod.deleted_at IS NULL").
+		Where("p.deleted_at IS NULL").
+		Where("f.deleted_at IS NULL").
 		Group(`
 			CASE
 				WHEN wod.number ~ '^D-[0-9]+[.][0-9]+$'
@@ -476,6 +575,7 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 			wod.project_id,
 			wod.field_id
 		`)
+	base = authz.MaybeTenantScope(ctx, base, "wod")
 
 	if strings.TrimSpace(number) != "" {
 		base = base.Where("wod.number ILIKE ?", "%"+strings.TrimSpace(number)+"%")
@@ -549,13 +649,16 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 
 	model := models.FromDomain(d)
 	model.ID = d.ID
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		model.TenantID = tenantID
+	}
 
 	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.UpdatedBy = &userID
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return r.applyDraftUpdateWithinTx(tx, model)
+		return r.applyDraftUpdateWithinTx(ctx, tx, model)
 	})
 }
 
@@ -563,9 +666,9 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 // (header + items + investor splits) reutilizando la *gorm.DB del caller.
 // NO abre transacción propia: el caller controla la atomicidad. Si retorna
 // error, el caller debe garantizar el rollback.
-func (r *Repository) applyDraftUpdateWithinTx(tx *gorm.DB, model *models.WorkOrderDraft) error {
+func (r *Repository) applyDraftUpdateWithinTx(ctx context.Context, tx *gorm.DB, model *models.WorkOrderDraft) error {
 	var orig models.WorkOrderDraft
-	if err := tx.
+	if err := authz.MaybeTenantScope(ctx, tx, "work_order_drafts").
 		Preload("Items").
 		Preload("InvestorSplits").
 		Where("id = ?", model.ID).
@@ -608,7 +711,9 @@ func (r *Repository) applyDraftUpdateWithinTx(tx *gorm.DB, model *models.WorkOrd
 		"updated_by":     model.UpdatedBy,
 	}
 
-	updateTx := tx.Model(&models.WorkOrderDraft{}).Where("id = ?", model.ID).Updates(updates)
+	updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrderDraft{}), "work_order_drafts").
+		Where("id = ?", model.ID).
+		Updates(updates)
 	if updateTx.Error != nil {
 		return types.NewError(types.ErrInternal, "failed to update work order draft header", updateTx.Error)
 	}
@@ -679,7 +784,7 @@ func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*do
 		}
 
 		var existing []models.WorkOrderDraft
-		if err := tx.
+		if err := authz.MaybeTenantScope(ctx, tx, "work_order_drafts").
 			Where("id IN ?", ids).
 			Where("deleted_at IS NULL").
 			Find(&existing).Error; err != nil {
@@ -720,7 +825,7 @@ func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*do
 			if actorPtr != nil {
 				m.UpdatedBy = actorPtr
 			}
-			if err := r.applyDraftUpdateWithinTx(tx, m); err != nil {
+			if err := r.applyDraftUpdateWithinTx(ctx, tx, m); err != nil {
 				return err
 			}
 		}
@@ -729,25 +834,142 @@ func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*do
 }
 
 func (r *Repository) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	return r.ArchiveWorkOrderDraftByID(ctx, id)
+}
+
+func (r *Repository) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
 		return err
 	}
 
-	tx := r.db.Client().
-		WithContext(ctx).
-		Unscoped().
-		Where("id = ?", id).
-		Delete(&models.WorkOrderDraft{})
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var draft models.WorkOrderDraft
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			First(&draft).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get work order draft", err)
+		}
+		if draft.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order draft already archived", nil)
+		}
+		if domain.Status(draft.Status) == domain.StatusPublished {
+			return types.NewError(types.ErrConflict, "published work order drafts cannot be archived", nil)
+		}
 
-	if tx.Error != nil {
-		return types.NewError(types.ErrInternal, "failed to delete work order draft", tx.Error)
+		var deletedBy *string
+		if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
+			deletedBy = &userID
+		}
+		archivedAt := time.Now()
+		cause, err := lifecycle.RootCause(tx, draft.TenantID, "work_order_drafts", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", draft.TenantID, archivedAt, deletedBy, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", draft.TenantID, archivedAt, deletedBy, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		update := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrderDraft{}), "work_order_drafts").
+			Where("id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "work_order_drafts", archivedAt, deletedBy, cause))
+		if update.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to archive work order draft", update.Error)
+		}
+		if update.RowsAffected == 0 {
+			return types.NewError(types.ErrConflict, "work order draft not found or already archived", nil)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
+		return err
 	}
 
-	if tx.RowsAffected == 0 {
-		return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var draft models.WorkOrderDraft
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			First(&draft).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return types.NewError(types.ErrNotFound, "work order draft not found", err)
+			}
+			return types.NewError(types.ErrInternal, "failed to get work order draft", err)
+		}
+		if !draft.DeletedAt.Valid {
+			return types.NewError(types.ErrConflict, "work order draft is not archived", nil)
+		}
+
+		var activeParentCount int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", draft.ProjectID).
+			Count(&activeParentCount).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to check draft project", err)
+		}
+		if activeParentCount == 0 {
+			return types.NewError(types.ErrConflict, "work order draft parent project is archived", nil)
+		}
+
+		rowState, err := lifecycle.ReadRowState(tx, "work_order_drafts", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "work_order_drafts", id)
+		restoredAt := time.Now()
+
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_items", draft.TenantID, restoredAt, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_investor_splits", draft.TenantID, restoredAt, cause, "draft_id = ?", id); err != nil {
+			return err
+		}
+		restore := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.WorkOrderDraft{}), "work_order_drafts").
+			Where("id = ? AND deleted_at IS NOT NULL", id)
+		restore = lifecycle.ApplyCauseScope(restore, "work_order_drafts", cause)
+		res := restore.Updates(lifecycle.RestoreUpdates(tx, "work_order_drafts", restoredAt))
+		if res.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to restore work order draft", res.Error)
+		}
+		if res.RowsAffected == 0 {
+			return types.NewError(types.ErrConflict, "work order draft not found or not archived", nil)
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {
+		return err
 	}
 
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lifecycle.RequireArchived(authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts"), "work_order_drafts", "work order draft", id); err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("draft_id = ?", id).Delete(&models.WorkOrderDraftItem{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete draft items", err)
+		}
+		if err := tx.Unscoped().Where("draft_id = ?", id).Delete(&models.WorkOrderDraftInvestorSplit{}).Error; err != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete draft investor splits", err)
+		}
+		res := authz.MaybeTenantScope(ctx, tx.Unscoped(), "work_order_drafts").
+			Where("id = ?", id).
+			Delete(&models.WorkOrderDraft{})
+		if res.Error != nil {
+			return types.NewError(types.ErrInternal, "failed to hard delete work order draft", res.Error)
+		}
+		if res.RowsAffected == 0 {
+			return types.NewError(types.ErrNotFound, "work order draft not found", nil)
+		}
+		return nil
+	})
 }
 
 func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID int64, workOrderID int64) error {
@@ -763,6 +985,7 @@ func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID 
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.WorkOrderDraft{}).
+		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "work_order_drafts") }).
 		Where("id = ?", draftID).
 		Where("status <> ?", string(domain.StatusPublished)).
 		Updates(updates)

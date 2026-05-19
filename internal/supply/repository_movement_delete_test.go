@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/security/go/contextkeys"
 	categorymodels "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtypemodels "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
@@ -22,11 +24,17 @@ import (
 	supplydomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
+var supplyMovementTestTenantID = uuid.MustParse("00000000-0000-0000-0000-000000000501")
+
+func supplyMovementTestContext() context.Context {
+	return context.WithValue(context.Background(), ctxkeys.OrgID, supplyMovementTestTenantID)
+}
+
 func TestDeleteSupplyMovement_DeletesOnlyMatchingInvestorStock(t *testing.T) {
 	repo, db := newSQLiteSupplyRepository(t)
 	fixture := seedDeleteMovementFixture(t, db)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, fixture.movementA.ID)
 	require.NoError(t, err)
 
 	var activeMovementCount int64
@@ -62,7 +70,7 @@ func TestDeleteSupplyMovement_ClosedStockCheckIsInvestorAware(t *testing.T) {
 	}
 	require.NoError(t, db.Create(closedStockOtherInvestor).Error)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, fixture.movementA.ID)
 	require.NoError(t, err)
 
 	var activeStockACount int64
@@ -94,7 +102,7 @@ func TestDeleteSupplyMovement_AllowsActiveMovementWhenSameTripletHasClosedStock(
 	}
 	require.NoError(t, db.Create(closedStockSameTriplet).Error)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, fixture.movementA.ID)
 	require.NoError(t, err)
 
 	var activeMovementCount int64
@@ -127,7 +135,7 @@ func TestCreateSupplyMovement_AllowsBackdatedMovementIntoClosedPeriod(t *testing
 	require.NoError(t, db.Create(closedStockSameTriplet).Error)
 
 	backdated := time.Date(2026, 4, 15, 18, 30, 0, 0, time.UTC)
-	_, err := repo.CreateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+	_, err := repo.CreateSupplyMovement(supplyMovementTestContext(), &supplydomain.SupplyMovement{
 		StockId:              fixture.stockA.ID,
 		Quantity:             decimal.NewFromInt(9),
 		MovementType:         "Remito oficial",
@@ -169,7 +177,7 @@ func TestUpdateSupplyMovement_AllowsMovingActiveMovementIntoClosedPeriod(t *test
 	require.NoError(t, db.Create(closedStockSameTriplet).Error)
 
 	backdated := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
-	err := repo.UpdateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+	err := repo.UpdateSupplyMovement(supplyMovementTestContext(), &supplydomain.SupplyMovement{
 		ID:                   fixture.movementA.ID,
 		StockId:              fixture.stockA.ID,
 		Quantity:             decimal.NewFromInt(9),
@@ -216,7 +224,7 @@ func TestDeleteSupplyMovement_AllowsActiveMovementInsideClosedPeriod(t *testing.
 	fixture.movementA.MovementDate = &backdated
 	require.NoError(t, db.Save(fixture.movementA).Error)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, fixture.movementA.ID)
 
 	require.NoError(t, err)
 
@@ -230,7 +238,7 @@ func TestDeleteSupplyMovement_AllowsMovementFromClosedStock(t *testing.T) {
 	fixture := seedDeleteMovementFixture(t, db)
 	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, closedMovement.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, closedMovement.ID)
 	require.NoError(t, err)
 
 	var movementCount int64
@@ -251,7 +259,7 @@ func TestDeleteSupplyMovement_AllowsInternalMovementWhenRelatedStockIsClosed(t *
 	relatedMovement.MovementType = "Movimiento interno entrada"
 	require.NoError(t, db.Save(relatedMovement).Error)
 
-	err := repo.DeleteSupplyMovement(context.Background(), fixture.project.ID, fixture.movementA.ID)
+	err := repo.DeleteSupplyMovement(supplyMovementTestContext(), fixture.project.ID, fixture.movementA.ID)
 	require.NoError(t, err)
 
 	var closedStockCount int64
@@ -265,7 +273,7 @@ func TestUpdateSupplyMovement_AllowsMovementFromClosedStock(t *testing.T) {
 	_, closedMovement := seedClosedStockAndMovement(t, db, fixture)
 
 	newDate := time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
-	err := repo.UpdateSupplyMovement(context.Background(), &supplydomain.SupplyMovement{
+	err := repo.UpdateSupplyMovement(supplyMovementTestContext(), &supplydomain.SupplyMovement{
 		ID:                   closedMovement.ID,
 		StockId:              fixture.stockA.ID,
 		Quantity:             decimal.NewFromInt(9),
@@ -302,6 +310,7 @@ func newSQLiteSupplyRepository(t *testing.T) (*Repository, *gorm.DB) {
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	registerSupplyMovementTestTenantCallback(t, db)
 	require.NoError(t, db.Exec("PRAGMA foreign_keys = ON").Error)
 	require.NoError(t, db.AutoMigrate(
 		&classtypemodels.ClassType{},
@@ -317,6 +326,25 @@ func newSQLiteSupplyRepository(t *testing.T) (*Repository, *gorm.DB) {
 	))
 
 	return NewRepository(&gormEngineAdapter{client: db}), db
+}
+
+func registerSupplyMovementTestTenantCallback(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register("supply_movement_test:set_tenant", func(tx *gorm.DB) {
+		if tx.Statement == nil || tx.Statement.Schema == nil {
+			return
+		}
+		field := tx.Statement.Schema.LookUpField("TenantID")
+		if field == nil {
+			return
+		}
+		value, _ := field.ValueOf(tx.Statement.Context, tx.Statement.ReflectValue)
+		if tenantID, ok := value.(uuid.UUID); ok && tenantID != uuid.Nil {
+			return
+		}
+		_ = field.Set(tx.Statement.Context, tx.Statement.ReflectValue, supplyMovementTestTenantID)
+	}))
 }
 
 func seedDeleteMovementFixture(t *testing.T, db *gorm.DB) *deleteMovementFixture {

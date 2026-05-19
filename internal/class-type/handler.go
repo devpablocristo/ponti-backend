@@ -14,8 +14,12 @@ import (
 type UseCasesPort interface {
 	CreateClassType(context.Context, *domain.ClassType) (int64, error)
 	ListClassTypes(context.Context, int, int) ([]domain.ClassType, int64, error)
+	ListArchivedClassTypes(context.Context, int, int) ([]domain.ClassType, int64, error)
 	GetClassType(context.Context, int64) (*domain.ClassType, error)
 	UpdateClassType(context.Context, *domain.ClassType) error
+	ArchiveClassType(context.Context, int64) error
+	RestoreClassType(context.Context, int64) error
+	HardDeleteClassType(context.Context, int64) error
 	DeleteClassType(context.Context, int64) error
 }
 
@@ -32,7 +36,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -59,8 +62,12 @@ func (h *Handler) Routes() {
 	{
 		group.POST("", h.CreateClassType)
 		group.GET("", h.ListClassTypes)
+		group.GET("/archived", h.ListArchivedClassTypes)
 		group.GET("/:class_type_id", h.GetClassType)
 		group.PUT("/:class_type_id", h.UpdateClassType)
+		group.POST("/:class_type_id/archive", h.ArchiveClassType)
+		group.POST("/:class_type_id/restore", h.RestoreClassType)
+		group.DELETE("/:class_type_id/hard", h.HardDeleteClassType)
 		group.DELETE("/:class_type_id", h.DeleteClassType)
 	}
 }
@@ -81,6 +88,16 @@ func (h *Handler) CreateClassType(c *gin.Context) {
 func (h *Handler) ListClassTypes(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 	items, total, err := h.ucs.ListClassTypes(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListClassTypesResponse(items, page, perPage, total))
+}
+
+func (h *Handler) ListArchivedClassTypes(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	items, total, err := h.ucs.ListArchivedClassTypes(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -126,6 +143,31 @@ func (h *Handler) DeleteClassType(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteClassType(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) ArchiveClassType(c *gin.Context) {
+	h.runClassTypeIDAction(c, h.ucs.ArchiveClassType)
+}
+
+func (h *Handler) RestoreClassType(c *gin.Context) {
+	h.runClassTypeIDAction(c, h.ucs.RestoreClassType)
+}
+
+func (h *Handler) HardDeleteClassType(c *gin.Context) {
+	h.runClassTypeIDAction(c, h.ucs.HardDeleteClassType)
+}
+
+func (h *Handler) runClassTypeIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "class_type_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

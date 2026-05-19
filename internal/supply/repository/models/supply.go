@@ -3,6 +3,8 @@ package models
 import (
 	"log/slog"
 
+	"github.com/google/uuid"
+
 	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtype "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
@@ -15,6 +17,7 @@ import (
 // Modelo principal de Supply
 type Supply struct {
 	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID       uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	ProjectID      int64           `gorm:"not null;index"`
 	Name           string          `gorm:"type:varchar(100);not null"`
 	Price          decimal.Decimal `gorm:"not null"`

@@ -38,6 +38,22 @@ func (s *exportLotsUseCasesStub) DeleteLot(context.Context, int64) error {
 	return nil
 }
 
+func (s *exportLotsUseCasesStub) ArchiveLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) RestoreLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) HardDeleteLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *exportLotsUseCasesStub) ListLotsByField(context.Context, int64) ([]domain.Lot, error) {
 	return nil, nil
 }
@@ -54,7 +70,7 @@ func (s *exportLotsUseCasesStub) ListLotsByProjectFieldAndCrop(context.Context, 
 	return nil, nil
 }
 
-func (s *exportLotsUseCasesStub) GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error) {
+func (s *exportLotsUseCasesStub) GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error) {
 	return nil, nil
 }
 

@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
 	"github.com/devpablocristo/core/security/go/contextkeys"
 )
 
@@ -47,6 +49,24 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 			subject = "local-dev-user"
 		}
 
+		tenantHeader := strings.TrimSpace(c.GetHeader(cfg.TenantHeader))
+		var tenantID uuid.UUID
+		if tenantHeader == "" {
+			if cfg.RequireTenantHeader && !allowsImplicitTenant(c) {
+				denyLocalDevAuthzRequest(c, "tenant header required")
+				logAuthDecision(subject, "", c.FullPath(), permission, "DENY(local)", start)
+				return
+			}
+		} else {
+			parsed, err := uuid.Parse(tenantHeader)
+			if err != nil {
+				denyLocalDevAuthzRequest(c, "invalid tenant header")
+				logAuthDecision(subject, "", c.FullPath(), permission, "DENY(local)", start)
+				return
+			}
+			tenantID = parsed
+		}
+
 		// Resolve the user in the DB if possible to get a valid UUID user.
 		var resolvedUserID uuid.UUID
 		if db != nil {
@@ -55,15 +75,9 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		// Resolve tenant ID from header; parse as UUID or default.
-		tenantHeader := strings.TrimSpace(c.GetHeader(cfg.TenantHeader))
-		var tenantID uuid.UUID
-		if tenantHeader != "" {
-			if parsed, err := uuid.Parse(tenantHeader); err == nil {
-				tenantID = parsed
-			}
-		}
-		// If no valid tenant UUID was provided, try to look up the "default" tenant.
+		// If no tenant UUID was provided, try to look up the "default" tenant for
+		// legacy local-dev compatibility. Strict tenant-scoped routes are denied
+		// above before reaching this fallback.
 		if tenantID == uuid.Nil && db != nil {
 			type tRow struct{ ID uuid.UUID }
 			var t tRow
@@ -73,6 +87,12 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		}
 
 		role := "admin"
+		if resolvedUserID != uuid.Nil && tenantID != uuid.Nil && db != nil {
+			if membership, err := ensureMembershipForTenantID(c.Request.Context(), db, resolvedUserID, tenantID, cfg.DefaultRole); err == nil {
+				role = membership.RoleName
+				tenantID = membership.TenantID
+			}
+		}
 
 		// Inject core/saas/go context keys.
 		ctx := c.Request.Context()
@@ -97,6 +117,12 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		// Allow
 		c.Next()
 	}
+}
+
+func denyLocalDevAuthzRequest(c *gin.Context, details string) {
+	domErr := domainerr.Forbidden(details)
+	status, apiErr := httperr.Normalize(domErr)
+	c.AbortWithStatusJSON(status, apiErr)
 }
 
 func decodeTokenPayload(token string) map[string]any {

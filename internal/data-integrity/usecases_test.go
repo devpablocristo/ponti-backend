@@ -171,7 +171,7 @@ func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 			mockSummaryResults: []reportDomain.SummaryResults{
 				{TotalOperatingResultUsd: decimal.NewFromFloat(5000.00)},
 			},
-			expectedStatus: "OK",
+			expectedStatus: "WARNING",
 			expectedDiffA:  "0.00",
 			hasDiffB:       true,
 			expectedDiffB:  "0.00",
@@ -194,7 +194,7 @@ func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 			mockSummaryResults: []reportDomain.SummaryResults{
 				{TotalOperatingResultUsd: decimal.NewFromFloat(5005.00)},
 			},
-			expectedStatus: "ERROR",
+			expectedStatus: "WARNING",
 			expectedDiffA:  "0.00",
 			hasDiffB:       true,
 			expectedDiffB:  "-5.00",
@@ -226,6 +226,9 @@ func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 13, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)
+			assert.Equal(t, checkTypeFormulaAlignment, result.CheckType)
+			assert.Equal(t, checkSeverityWarning, result.Severity)
+			assert.NotEmpty(t, result.Recommendation)
 			assert.Equal(t, tt.expectedDiffA, result.DifferenceA.StringFixed(2))
 
 			if tt.hasDiffB {
@@ -234,6 +237,84 @@ func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUseCases_control8LotesAdminVsAportes_reportsFormulaAlignmentWarning(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	useCases := NewUseCases(
+		NewMockWorkOrderRepositoryPort(ctrl),
+		NewMockDashboardRepositoryPort(ctrl),
+		NewMockLotRepositoryPort(ctrl),
+		NewMockReportRepositoryPort(ctrl),
+		NewMockStockRepositoryPort(ctrl),
+	)
+
+	sd := &sharedData{
+		lots: []lotDomain.LotTable{
+			{
+				AdminCost: decimal.NewFromInt(50),
+				Hectares:  decimal.NewFromInt(10),
+			},
+		},
+		investorReport: &reportDomain.InvestorContributionReport{
+			Contributions: []reportDomain.ContributionCategory{
+				{
+					Key:      string(reportDomain.ContributionAdministrationStructure),
+					Label:    "Estructura",
+					TotalUsd: decimal.NewFromInt(100),
+				},
+			},
+		},
+	}
+
+	result, err := useCases.control8LotesAdminVsAportes(context.Background(), sd)
+
+	require.NoError(t, err)
+	assert.Equal(t, 8, result.ControlNumber)
+	assert.Equal(t, "WARNING", result.Status)
+	assert.Equal(t, checkTypeFormulaAlignment, result.CheckType)
+	assert.Equal(t, "-400.00", result.DifferenceA.StringFixed(2))
+	assert.NotEmpty(t, result.Recommendation)
+}
+
+func TestSumContributionCategoriesUsesStableKeysBeforeLabels(t *testing.T) {
+	report := &reportDomain.InvestorContributionReport{
+		Contributions: []reportDomain.ContributionCategory{
+			{
+				Key:      string(reportDomain.ContributionGeneralLabors),
+				Label:    "Etiqueta renombrada",
+				TotalUsd: decimal.NewFromInt(10),
+			},
+			{
+				Type:     reportDomain.ContributionSowing,
+				Label:    "Otra etiqueta",
+				TotalUsd: decimal.NewFromInt(5),
+			},
+			{
+				Label:    "Riego",
+				TotalUsd: decimal.NewFromInt(2),
+			},
+			{
+				Key:      "unrelated",
+				Label:    "No corresponde",
+				TotalUsd: decimal.NewFromInt(99),
+			},
+		},
+	}
+
+	got := sumContributionCategories(
+		report,
+		[]reportDomain.ContributionCategoryType{
+			reportDomain.ContributionGeneralLabors,
+			reportDomain.ContributionSowing,
+			reportDomain.ContributionIrrigation,
+		},
+		"Riego",
+	)
+
+	assert.Equal(t, "17.00", got.StringFixed(2))
 }
 
 func TestBuildCheck(t *testing.T) {

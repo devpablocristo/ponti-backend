@@ -18,8 +18,12 @@ type UseCasesPort interface {
 	GetParameter(context.Context, string) (*domain.BusinessParameter, error)
 	GetParametersByCategory(context.Context, string) ([]domain.BusinessParameter, error)
 	GetAllParameters(context.Context) ([]domain.BusinessParameter, error)
+	GetArchivedParameters(context.Context) ([]domain.BusinessParameter, error)
 	CreateParameter(context.Context, *domain.BusinessParameter) (int64, error)
 	UpdateParameter(context.Context, *domain.BusinessParameter) error
+	ArchiveParameter(context.Context, int64) error
+	RestoreParameter(context.Context, int64) error
+	HardDeleteParameter(context.Context, int64) error
 	DeleteParameter(context.Context, int64) error
 }
 
@@ -36,7 +40,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -62,10 +65,14 @@ func (h *Handler) Routes() {
 	group := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		group.GET("", h.GetAllParameters)
+		group.GET("/archived", h.GetArchivedParameters)
 		group.GET("/category/:category", h.GetParametersByCategory)
 		group.GET("/:parameter_key", h.GetParameter)
 		group.POST("", h.CreateParameter)
 		group.PUT("/:parameter_id", h.UpdateParameter)
+		group.POST("/:parameter_id/archive", h.ArchiveParameter)
+		group.POST("/:parameter_id/restore", h.RestoreParameter)
+		group.DELETE("/:parameter_id/hard", h.HardDeleteParameter)
 		group.DELETE("/:parameter_id", h.DeleteParameter)
 	}
 }
@@ -104,6 +111,19 @@ func (h *Handler) GetParametersByCategory(c *gin.Context) {
 
 func (h *Handler) GetAllParameters(c *gin.Context) {
 	params, err := h.ucs.GetAllParameters(c.Request.Context())
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	response := make([]dto.BusinessParameterResponse, len(params))
+	for i, param := range params {
+		response[i] = dto.FromDomain(&param)
+	}
+	sharedhandlers.RespondOK(c, response)
+}
+
+func (h *Handler) GetArchivedParameters(c *gin.Context) {
+	params, err := h.ucs.GetArchivedParameters(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -157,12 +177,28 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 }
 
 func (h *Handler) DeleteParameter(c *gin.Context) {
+	h.runParameterIDAction(c, h.ucs.DeleteParameter)
+}
+
+func (h *Handler) ArchiveParameter(c *gin.Context) {
+	h.runParameterIDAction(c, h.ucs.ArchiveParameter)
+}
+
+func (h *Handler) RestoreParameter(c *gin.Context) {
+	h.runParameterIDAction(c, h.ucs.RestoreParameter)
+}
+
+func (h *Handler) HardDeleteParameter(c *gin.Context) {
+	h.runParameterIDAction(c, h.ucs.HardDeleteParameter)
+}
+
+func (h *Handler) runParameterIDAction(c *gin.Context, action func(context.Context, int64) error) {
 	id, err := ginmw.ParseParamID(c, "parameter_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteParameter(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

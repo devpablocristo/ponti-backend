@@ -96,13 +96,3 @@ func decToFloat(d decimal.Decimal, scale int32) float64 {
 	f, _ := d.Float64()
 	return f
 }
-
-// decToString obtiene string con decimales fijos (reservado para uso futuro).
-//
-//nolint:unused
-func decToString(d decimal.Decimal, scale int32) string {
-	if scale < 0 {
-		return d.String()
-	}
-	return d.Round(scale).StringFixed(scale)
-}

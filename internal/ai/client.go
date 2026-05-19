@@ -40,6 +40,7 @@ func (c *Client) Do(
 	path string,
 	body any,
 	userID string,
+	tenantID string,
 	projectID string,
 ) (int, []byte, error) {
 	if c.caller.BaseURL == "" {
@@ -47,6 +48,7 @@ func (c *Client) Do(
 	}
 	return c.caller.DoJSON(ctx, method, path, body,
 		httpclient.WithHeader("X-USER-ID", userID),
+		httpclient.WithHeader("X-TENANT-ID", tenantID),
 		httpclient.WithHeader("X-PROJECT-ID", projectID),
 	)
 }
@@ -59,6 +61,7 @@ func (c *Client) DoStream(
 	body io.Reader,
 	contentType string,
 	userID string,
+	tenantID string,
 	projectID string,
 ) (*http.Response, error) {
 	if c.caller.BaseURL == "" {
@@ -79,6 +82,7 @@ func (c *Client) DoStream(
 		}
 	}
 	req.Header.Set("X-USER-ID", userID)
+	req.Header.Set("X-TENANT-ID", tenantID)
 	req.Header.Set("X-PROJECT-ID", projectID)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)

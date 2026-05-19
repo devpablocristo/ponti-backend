@@ -17,6 +17,29 @@ import (
 	workOrderDomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
+const (
+	checkStatusOK      = "OK"
+	checkStatusError   = "ERROR"
+	checkStatusWarning = "WARNING"
+	checkStatusSkipped = "SKIPPED"
+
+	checkTypeStrong           = "STRONG"
+	checkTypeWeak             = "WEAK"
+	checkTypeFormulaAlignment = "FORMULA_ALIGNMENT"
+
+	checkSeverityInfo    = "INFO"
+	checkSeverityWarning = "WARNING"
+	checkSeverityError   = "ERROR"
+)
+
+const (
+	weakInternalCheckRecommendation = "Control útil como sanity check interno, pero no prueba una segunda fuente independiente. No usarlo solo para validar fórmulas."
+	adminFormulaRecommendation      = "Alinear definición de administración: lot_list expone admin_cost_per_ha, mientras Aportes/field_crop usan administración prorrateada por superficie total del proyecto."
+	rentFormulaRecommendation       = "Alinear definición de arriendo: lot_list usa arriendo total por lote, mientras Aportes/field_crop usan arriendo capitalizable/fijo."
+	operatingFormulaRecommendation  = "No tratar este control como error numérico hasta alinear las definiciones de arriendo y administración usadas por lot_list, field_crop, summary_results y dashboard."
+	totalCostsFormulaRecommendation = "No tratar este control como error numérico hasta separar total activo/renta con la misma definición de arriendo y estructura en dashboard, workorders y aportes."
+)
+
 // WorkOrderRepositoryPort define la interfaz para el repositorio de work orders.
 type WorkOrderRepositoryPort interface {
 	GetMetrics(ctx context.Context, filt workOrderDomain.WorkOrderFilter) (*workOrderDomain.WorkOrderMetrics, error)
@@ -35,8 +58,8 @@ type LotRepositoryPort interface {
 
 // ReportRepositoryPort define la interfaz para el repositorio de reportes
 type ReportRepositoryPort interface {
-	GetSummaryResults(filters reportDomain.SummaryResultsFilter) ([]reportDomain.SummaryResults, error)
-	GetFieldCropMetrics(filters reportDomain.ReportFilter) ([]reportDomain.FieldCropMetric, error)
+	GetSummaryResults(ctx context.Context, filters reportDomain.SummaryResultsFilter) ([]reportDomain.SummaryResults, error)
+	GetFieldCropMetrics(ctx context.Context, filters reportDomain.ReportFilter) ([]reportDomain.FieldCropMetric, error)
 	GetInvestorContributionReport(ctx context.Context, filter reportDomain.ReportFilter) (*reportDomain.InvestorContributionReport, error)
 }
 
@@ -101,14 +124,14 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	sd.dashboardData = dashboardData
 
 	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
-	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(reportFilter)
+	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(ctx, reportFilter)
 	if err != nil {
 		return nil, fmt.Errorf("fetch field_crop_metrics: %w", err)
 	}
 	sd.fieldCropMetrics = fieldCropMetrics
 
 	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
-	summaryResults, err := u.reportRepo.GetSummaryResults(summaryFilter)
+	summaryResults, err := u.reportRepo.GetSummaryResults(ctx, summaryFilter)
 	if err != nil {
 		return nil, fmt.Errorf("fetch summary_results: %w", err)
 	}
@@ -364,19 +387,18 @@ func (u *UseCases) control16DashboardAportadoVsLaborsAndSupplies(_ context.Conte
 	var recalcBCalc, recalcBSrc, recalcBMeaning *string
 	var recalcBVal *decimal.Decimal
 	if sd.investorReport != nil {
-		total := decimal.Zero
-		for _, cat := range sd.investorReport.Contributions {
-			// Labores (mismo set usado en control 6)
-			if cat.Label == "Labores Generales" || cat.Label == "Siembra" || cat.Label == "Riego" {
-				total = total.Add(cat.TotalUsd)
-				continue
-			}
-			// Insumos
-			if cat.Label == "Semilla" || cat.Label == "Agroquímicos" || cat.Label == "Fertilizantes" {
-				total = total.Add(cat.TotalUsd)
-				continue
-			}
-		}
+		total := sumContributionCategories(
+			sd.investorReport,
+			[]reportDomain.ContributionCategoryType{
+				reportDomain.ContributionGeneralLabors,
+				reportDomain.ContributionSowing,
+				reportDomain.ContributionIrrigation,
+				reportDomain.ContributionSeeds,
+				reportDomain.ContributionAgrochemicals,
+				reportDomain.ContributionCategoryType("fertilizers"),
+			},
+			"Labores Generales", "Siembra", "Riego", "Semilla", "Agroquímicos", "Fertilizantes",
+		)
 		recalcBCalc = strPtr("∑(contribution_categories.total_usd) labels: Labores + Insumos")
 		recalcBVal = &total
 		recalcBSrc = strPtr("v4_report.investor_contribution_data.contribution_categories")
@@ -433,16 +455,16 @@ func (u *UseCases) control17TotalCostsVsWorkOrdersLeaseStructure(_ context.Conte
 	var recalcBCalc, recalcBSrc, recalcBMeaning *string
 	var recalcBVal *decimal.Decimal
 	if sd.investorReport != nil {
-		rent := decimal.Zero
-		admin := decimal.Zero
-		for _, cat := range sd.investorReport.Contributions {
-			if cat.Label == "Arriendo Capitalizable" {
-				rent = rent.Add(cat.TotalUsd)
-			}
-			if cat.Label == "Administración y Estructura" {
-				admin = admin.Add(cat.TotalUsd)
-			}
-		}
+		rent := sumContributionCategories(
+			sd.investorReport,
+			[]reportDomain.ContributionCategoryType{reportDomain.ContributionCapitalizableLease},
+			"Arriendo Capitalizable",
+		)
+		admin := sumContributionCategories(
+			sd.investorReport,
+			[]reportDomain.ContributionCategoryType{reportDomain.ContributionAdministrationStructure},
+			"Administración y Estructura",
+		)
 		v := woDirect.Add(rent).Add(admin)
 		recalcBCalc = strPtr("workorder_metrics.direct_cost_usd + aportes(Arriendo Capitalizable + Administración y Estructura)")
 		recalcBVal = &v
@@ -450,7 +472,7 @@ func (u *UseCases) control17TotalCostsVsWorkOrdersLeaseStructure(_ context.Conte
 		recalcBMeaning = strPtr("Tercera vía: toma costo directo de órdenes y suma aportes de arriendo + estructura desde el reporte de aportes.")
 	}
 
-	return buildCheck(
+	check := buildCheck(
 		17,
 		"Renta / Total activo",
 		"Dashboard (total_costs_usd) vs Órdenes + Arriendo + Estructura",
@@ -465,7 +487,8 @@ func (u *UseCases) control17TotalCostsVsWorkOrdersLeaseStructure(_ context.Conte
 		"Recálculo: suma costos directos de órdenes + arriendo ejecutado + estructura ejecutada.",
 		recalcBCalc, recalcBVal, recalcBSrc, recalcBMeaning,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, totalCostsFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -625,7 +648,7 @@ func (u *UseCases) control5LaboresInsumosVsDashboard(_ context.Context, sd *shar
 		Add(summary.FertilizantesInvertidosUSD).
 		Add(summary.LaboresInvertidosUSD)
 
-	return buildCheck(
+	check := buildCheck(
 		5,
 		"Invertidos total",
 		"Dashboard total invertido vs suma de componentes",
@@ -640,7 +663,8 @@ func (u *UseCases) control5LaboresInsumosVsDashboard(_ context.Context, sd *shar
 		"Recálculo: suma los 4 componentes invertidos del Cuadro de Gestión.",
 		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateWeakCheck(check, weakInternalCheckRecommendation), nil
 }
 
 // =====================================================
@@ -651,23 +675,25 @@ func (u *UseCases) control5LaboresInsumosVsDashboard(_ context.Context, sd *shar
 func (u *UseCases) control6LaboresVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
 	if sd.dashboardData == nil || sd.dashboardData.ManagementBalance == nil || sd.dashboardData.ManagementBalance.Summary == nil ||
 		sd.investorReport == nil {
-		return domain.IntegrityCheck{
-			ControlNumber: 6,
-			DataToVerify:  "Inversión en labores",
-			Description:   "Dashboard labores vs Informe de Aportes",
-			Status:        "SKIPPED",
-			SystemMeaning: "Datos insuficientes: dashboardData o investorReport es nil.",
-		}, nil
+		return skippedCheck(
+			6,
+			"Inversión en labores",
+			"Dashboard labores vs Informe de Aportes",
+			"Datos insuficientes: dashboardData o investorReport es nil.",
+		), nil
 	}
 
 	systemValue := sd.dashboardData.ManagementBalance.Summary.LaboresInvertidosUSD
 
-	recalcA := decimal.Zero
-	for _, cat := range sd.investorReport.Contributions {
-		if cat.Label == "Labores Generales" || cat.Label == "Siembra" || cat.Label == "Riego" {
-			recalcA = recalcA.Add(cat.TotalUsd)
-		}
-	}
+	recalcA := sumContributionCategories(
+		sd.investorReport,
+		[]reportDomain.ContributionCategoryType{
+			reportDomain.ContributionGeneralLabors,
+			reportDomain.ContributionSowing,
+			reportDomain.ContributionIrrigation,
+		},
+		"Labores Generales", "Siembra", "Riego",
+	)
 
 	return buildCheck(
 		6,
@@ -695,13 +721,12 @@ func (u *UseCases) control6LaboresVsAportes(_ context.Context, sd *sharedData) (
 func (u *UseCases) control7InsumosVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
 	if sd.dashboardData == nil || sd.dashboardData.ManagementBalance == nil || sd.dashboardData.ManagementBalance.Summary == nil ||
 		sd.investorReport == nil {
-		return domain.IntegrityCheck{
-			ControlNumber: 7,
-			DataToVerify:  "Inversión en insumos",
-			Description:   "Dashboard insumos vs Informe de Aportes",
-			Status:        "SKIPPED",
-			SystemMeaning: "Datos insuficientes: dashboardData o investorReport es nil.",
-		}, nil
+		return skippedCheck(
+			7,
+			"Inversión en insumos",
+			"Dashboard insumos vs Informe de Aportes",
+			"Datos insuficientes: dashboardData o investorReport es nil.",
+		), nil
 	}
 
 	summary := sd.dashboardData.ManagementBalance.Summary
@@ -709,12 +734,15 @@ func (u *UseCases) control7InsumosVsAportes(_ context.Context, sd *sharedData) (
 		Add(summary.AgroquimicosInvertidosUSD).
 		Add(summary.FertilizantesInvertidosUSD)
 
-	recalcA := decimal.Zero
-	for _, cat := range sd.investorReport.Contributions {
-		if cat.Label == "Semilla" || cat.Label == "Agroquímicos" || cat.Label == "Fertilizantes" {
-			recalcA = recalcA.Add(cat.TotalUsd)
-		}
-	}
+	recalcA := sumContributionCategories(
+		sd.investorReport,
+		[]reportDomain.ContributionCategoryType{
+			reportDomain.ContributionSeeds,
+			reportDomain.ContributionAgrochemicals,
+			reportDomain.ContributionCategoryType("fertilizers"),
+		},
+		"Semilla", "Agroquímicos", "Fertilizantes",
+	)
 
 	return buildCheck(
 		7,
@@ -741,29 +769,26 @@ func (u *UseCases) control7InsumosVsAportes(_ context.Context, sd *sharedData) (
 // =====================================================
 func (u *UseCases) control8LotesAdminVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
 	if sd.investorReport == nil {
-		return domain.IntegrityCheck{
-			ControlNumber: 8,
-			DataToVerify:  "Administración y Estructura",
-			Description:   "Informe de Aportes vs Lotes admin",
-			Status:        "SKIPPED",
-			SystemMeaning: "Datos insuficientes: investorReport es nil.",
-		}, nil
+		return skippedCheck(
+			8,
+			"Administración y Estructura",
+			"Informe de Aportes vs Lotes admin",
+			"Datos insuficientes: investorReport es nil.",
+		), nil
 	}
 
-	systemValue := decimal.Zero
-	for _, cat := range sd.investorReport.Contributions {
-		if cat.Label == "Administración y Estructura" {
-			systemValue = cat.TotalUsd
-			break
-		}
-	}
+	systemValue := sumContributionCategories(
+		sd.investorReport,
+		[]reportDomain.ContributionCategoryType{reportDomain.ContributionAdministrationStructure},
+		"Administración y Estructura",
+	)
 
 	recalcA := decimal.Zero
 	for _, lot := range sd.lots {
 		recalcA = recalcA.Add(lot.AdminCost.Mul(lot.Hectares))
 	}
 
-	return buildCheck(
+	check := buildCheck(
 		8,
 		"Administración y Estructura",
 		"Informe de Aportes vs Lotes admin",
@@ -778,7 +803,8 @@ func (u *UseCases) control8LotesAdminVsAportes(_ context.Context, sd *sharedData
 		"Recálculo: admin prorrateado por lote desde lot_metrics.",
 		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, adminFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -788,29 +814,26 @@ func (u *UseCases) control8LotesAdminVsAportes(_ context.Context, sd *sharedData
 // =====================================================
 func (u *UseCases) control9LotesArriendoVsAportes(_ context.Context, sd *sharedData) (domain.IntegrityCheck, error) {
 	if sd.investorReport == nil {
-		return domain.IntegrityCheck{
-			ControlNumber: 9,
-			DataToVerify:  "Arriendo Capitalizable",
-			Description:   "Informe de Aportes vs Lotes arriendo",
-			Status:        "SKIPPED",
-			SystemMeaning: "Datos insuficientes: investorReport es nil.",
-		}, nil
+		return skippedCheck(
+			9,
+			"Arriendo Capitalizable",
+			"Informe de Aportes vs Lotes arriendo",
+			"Datos insuficientes: investorReport es nil.",
+		), nil
 	}
 
-	systemValue := decimal.Zero
-	for _, cat := range sd.investorReport.Contributions {
-		if cat.Label == "Arriendo Capitalizable" {
-			systemValue = cat.TotalUsd
-			break
-		}
-	}
+	systemValue := sumContributionCategories(
+		sd.investorReport,
+		[]reportDomain.ContributionCategoryType{reportDomain.ContributionCapitalizableLease},
+		"Arriendo Capitalizable",
+	)
 
 	recalcA := decimal.Zero
 	for _, lot := range sd.lots {
 		recalcA = recalcA.Add(lot.RentPerHa.Mul(lot.Hectares))
 	}
 
-	return buildCheck(
+	check := buildCheck(
 		9,
 		"Arriendo Capitalizable",
 		"Informe de Aportes vs Lotes arriendo",
@@ -825,7 +848,8 @@ func (u *UseCases) control9LotesArriendoVsAportes(_ context.Context, sd *sharedD
 		"Recálculo: arriendo por lote desde lot_metrics.",
 		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, rentFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -873,7 +897,7 @@ func (u *UseCases) control11LotesResultadoVsInformeCultivo(_ context.Context, sd
 	recalcA := sumFieldCropOperatingResult(sd.fieldCropMetrics)
 	recalcBVal := sd.dashboardData.Metrics.OperatingResult.ResultUSD
 
-	return buildCheck(
+	check := buildCheck(
 		11,
 		"Resultado operativo total",
 		"Lotes vs Informe por cultivo vs Dashboard",
@@ -891,7 +915,8 @@ func (u *UseCases) control11LotesResultadoVsInformeCultivo(_ context.Context, sd
 		strPtr("v4_report.dashboard_management_balance"),
 		strPtr("Segundo recálculo: resultado operativo de la tarjeta del Dashboard."),
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, operatingFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -910,7 +935,7 @@ func (u *UseCases) control12LotesResultadoVsInformeGenerales(_ context.Context, 
 
 	recalcBVal := sd.dashboardData.Metrics.OperatingResult.ResultUSD
 
-	return buildCheck(
+	check := buildCheck(
 		12,
 		"Resultado operativo total",
 		"Lotes vs Informe Generales vs Dashboard",
@@ -928,7 +953,8 @@ func (u *UseCases) control12LotesResultadoVsInformeGenerales(_ context.Context, 
 		strPtr("v4_report.dashboard_management_balance"),
 		strPtr("Segundo recálculo: resultado operativo de la tarjeta del Dashboard."),
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, operatingFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -951,7 +977,7 @@ func (u *UseCases) control13LotesResultadoVsDashboard(_ context.Context, sd *sha
 		recalcBMeaning = strPtr("Segundo recálculo: resultado operativo del resumen general.")
 	}
 
-	return buildCheck(
+	check := buildCheck(
 		13,
 		"Resultado operativo total",
 		"Dashboard vs Lotes vs Informe Generales",
@@ -966,7 +992,8 @@ func (u *UseCases) control13LotesResultadoVsDashboard(_ context.Context, sd *sha
 		"Recálculo: resultado operativo por lote × hectáreas.",
 		recalcBCalc, recalcBVal, recalcBSrc, recalcBMeaning,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateFormulaAlignmentCheck(check, operatingFormulaRecommendation), nil
 }
 
 // =====================================================
@@ -985,7 +1012,7 @@ func (u *UseCases) control14StockVsDashboard(_ context.Context, sd *sharedData) 
 	ejecutado := summary.DirectCostsExecutedUSD
 	recalcA := invertido.Sub(ejecutado)
 
-	return buildCheck(
+	check := buildCheck(
 		14,
 		"Stock",
 		"Dashboard stock vs cálculo Invertido - Ejecutado",
@@ -1000,7 +1027,8 @@ func (u *UseCases) control14StockVsDashboard(_ context.Context, sd *sharedData) 
 		"Recálculo: toma los 4 componentes invertidos y resta los costos directos ejecutados.",
 		nil, nil, nil, nil,
 		decimal.NewFromInt(1),
-	), nil
+	)
+	return annotateWeakCheck(check, weakInternalCheckRecommendation), nil
 }
 
 // =====================================================
@@ -1008,6 +1036,84 @@ func (u *UseCases) control14StockVsDashboard(_ context.Context, sd *sharedData) 
 // =====================================================
 
 func strPtr(s string) *string { return &s }
+
+func skippedCheck(controlNumber int, dataToVerify, description, reason string) domain.IntegrityCheck {
+	return domain.IntegrityCheck{
+		ControlNumber:  controlNumber,
+		DataToVerify:   dataToVerify,
+		Description:    description,
+		CheckType:      checkTypeStrong,
+		Severity:       checkSeverityWarning,
+		Recommendation: reason,
+		Status:         checkStatusSkipped,
+		SystemMeaning:  reason,
+	}
+}
+
+func annotateWeakCheck(check domain.IntegrityCheck, recommendation string) domain.IntegrityCheck {
+	check.CheckType = checkTypeWeak
+	check.Recommendation = recommendation
+	if check.Status == checkStatusError {
+		check.Severity = checkSeverityError
+	} else {
+		check.Severity = checkSeverityInfo
+	}
+	return check
+}
+
+func annotateFormulaAlignmentCheck(check domain.IntegrityCheck, recommendation string) domain.IntegrityCheck {
+	check.CheckType = checkTypeFormulaAlignment
+	check.Severity = checkSeverityWarning
+	check.Status = checkStatusWarning
+	check.Recommendation = recommendation
+	return check
+}
+
+func severityForStatus(status string) string {
+	switch status {
+	case checkStatusError:
+		return checkSeverityError
+	case checkStatusWarning, checkStatusSkipped:
+		return checkSeverityWarning
+	default:
+		return checkSeverityInfo
+	}
+}
+
+func sumContributionCategories(
+	report *reportDomain.InvestorContributionReport,
+	keys []reportDomain.ContributionCategoryType,
+	labels ...string,
+) decimal.Decimal {
+	if report == nil {
+		return decimal.Zero
+	}
+
+	keySet := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		keySet[string(key)] = struct{}{}
+	}
+	labelSet := make(map[string]struct{}, len(labels))
+	for _, label := range labels {
+		labelSet[label] = struct{}{}
+	}
+
+	total := decimal.Zero
+	for _, cat := range report.Contributions {
+		if _, ok := keySet[cat.Key]; ok {
+			total = total.Add(cat.TotalUsd)
+			continue
+		}
+		if _, ok := keySet[string(cat.Type)]; ok {
+			total = total.Add(cat.TotalUsd)
+			continue
+		}
+		if _, ok := labelSet[cat.Label]; ok {
+			total = total.Add(cat.TotalUsd)
+		}
+	}
+	return total
+}
 
 // buildCheck construye un IntegrityCheck con SystemValue / RecalcA / RecalcB (opcional)
 func buildCheck(
@@ -1028,10 +1134,10 @@ func buildCheck(
 	tolerance decimal.Decimal,
 ) domain.IntegrityCheck {
 	differenceA := systemValue.Sub(recalcAValue)
-	status := "OK"
+	status := checkStatusOK
 
 	if differenceA.Abs().GreaterThan(tolerance) {
-		status = "ERROR"
+		status = checkStatusError
 	}
 
 	var differenceB *decimal.Decimal
@@ -1039,7 +1145,7 @@ func buildCheck(
 		diff := systemValue.Sub(*recalcBValue)
 		differenceB = &diff
 		if diff.Abs().GreaterThan(tolerance) {
-			status = "ERROR"
+			status = checkStatusError
 		}
 	}
 
@@ -1048,6 +1154,8 @@ func buildCheck(
 		DataToVerify:       dataToVerify,
 		Description:        description,
 		ControlRule:        controlRule,
+		CheckType:          checkTypeStrong,
+		Severity:           severityForStatus(status),
 		SystemCalculation:  systemCalculation,
 		SystemValue:        systemValue,
 		SystemSource:       systemSource,

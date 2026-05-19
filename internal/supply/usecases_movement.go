@@ -414,6 +414,10 @@ func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, pro
 	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
 }
 
+func (u *UseCases) ListEntrySupplyMovements(ctx context.Context, filter domain.SupplyFilter) ([]*domain.SupplyMovement, error) {
+	return u.repo.ListEntrySupplyMovements(ctx, filter)
+}
+
 func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
 	if supplyMovement == nil {
 		return domainerr.Validation("invalid supply movement")
@@ -469,6 +473,32 @@ func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain
 
 func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectID, supplyID int64) error {
 	return u.repo.DeleteSupplyMovement(ctx, projectID, supplyID)
+}
+
+func (u *UseCases) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
+	// projectID = 0 → listar movimientos archivados de todos los proyectos del tenant.
+	return u.repo.ListArchivedSupplyMovements(ctx, projectID)
+}
+
+func (u *UseCases) ArchiveSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.ArchiveSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) RestoreSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.RestoreSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) HardDeleteSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.HardDeleteSupplyMovement(ctx, projectID, movementID)
 }
 
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {

@@ -37,8 +37,9 @@ type Project struct {
 }
 
 type Customer struct {
-	ID   int64  `json:"id,omitempty"`
-	Name string `json:"name" binding:"required"`
+	ID      int64  `json:"id,omitempty"`
+	ActorID *int64 `json:"actor_id,omitempty"`
+	Name    string `json:"name" binding:"required"`
 }
 
 type Campaign struct {
@@ -48,19 +49,22 @@ type Campaign struct {
 
 // Manager DTO
 type Manager struct {
-	ID   int64  `json:"id,omitempty"`
-	Name string `json:"name" binding:"required"`
+	ID      int64  `json:"id,omitempty"`
+	ActorID *int64 `json:"actor_id,omitempty"`
+	Name    string `json:"name" binding:"required"`
 }
 
 // Investor DTO
 type Investor struct {
 	ID         int64  `json:"id,omitempty"`
+	ActorID    *int64 `json:"actor_id,omitempty"`
 	Name       string `json:"name" binding:"required"`
 	Percentage int    `json:"percentage" binding:"required"`
 }
 
 type AdminCostInvestor struct {
 	ID         int64  `json:"id,omitempty"`
+	ActorID    *int64 `json:"actor_id,omitempty"`
 	Name       string `json:"name" binding:"required"`
 	Percentage int    `json:"percentage" binding:"required"`
 }
@@ -207,8 +211,9 @@ func (r *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
 		Name: strings.TrimSpace(r.ProjectName),
 		Customer: customerdom.Customer{
-			ID:   r.Customer.ID,
-			Name: r.Customer.Name,
+			ID:      r.Customer.ID,
+			Name:    r.Customer.Name,
+			ActorID: r.Customer.ActorID,
 		},
 		Campaign: campdom.Campaign{
 			ID:   r.Campaign.ID,
@@ -220,19 +225,19 @@ func (r *Project) ToDomain() *domain.Project {
 
 	for _, mgr := range r.ProjectManagers {
 		d.Managers = append(d.Managers,
-			managerdom.Manager{ID: mgr.ID, Name: mgr.Name},
+			managerdom.Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: mgr.Name},
 		)
 	}
 
 	for _, inv := range r.Investors {
 		d.Investors = append(d.Investors,
-			investordom.Investor{ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage},
+			investordom.Investor{ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage},
 		)
 	}
 
 	for _, aci := range r.AdminCostInvestors {
 		d.AdminCostInvestors = append(d.AdminCostInvestors,
-			investordom.Investor{ID: aci.ID, Name: aci.Name, Percentage: aci.Percentage},
+			investordom.Investor{ID: aci.ID, ActorID: aci.ActorID, Name: aci.Name, Percentage: aci.Percentage},
 		)
 	}
 
@@ -247,6 +252,7 @@ func (r *Project) ToDomain() *domain.Project {
 		for _, fi := range f.Investors {
 			fld.Investors = append(fld.Investors, investordom.Investor{
 				ID:         fi.ID,
+				ActorID:    fi.ActorID,
 				Name:       fi.Name,
 				Percentage: fi.Percentage,
 			})
@@ -278,7 +284,7 @@ func FromDomain(d *domain.Project) *Project {
 	r := &Project{
 		ID:          d.ID,
 		ProjectName: d.Name,
-		Customer:    Customer{ID: d.Customer.ID, Name: d.Customer.Name},
+		Customer:    Customer{ID: d.Customer.ID, ActorID: d.Customer.ActorID, Name: d.Customer.Name},
 		Campaign:    Campaign{ID: d.Campaign.ID, Name: d.Campaign.Name},
 		AdminCost:   d.AdminCost,
 		PlannedCost: d.PlannedCost,
@@ -289,19 +295,19 @@ func FromDomain(d *domain.Project) *Project {
 
 	for _, mgr := range d.Managers {
 		r.ProjectManagers = append(r.ProjectManagers,
-			Manager{ID: mgr.ID, Name: mgr.Name},
+			Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: mgr.Name},
 		)
 	}
 
 	for _, inv := range d.Investors {
 		r.Investors = append(r.Investors,
-			Investor{ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage},
+			Investor{ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage},
 		)
 	}
 
 	for _, aci := range d.AdminCostInvestors {
 		r.AdminCostInvestors = append(r.AdminCostInvestors, AdminCostInvestor{
-			ID: aci.ID, Name: aci.Name, Percentage: aci.Percentage,
+			ID: aci.ID, ActorID: aci.ActorID, Name: aci.Name, Percentage: aci.Percentage,
 		})
 	}
 
@@ -331,6 +337,7 @@ func FromDomain(d *domain.Project) *Project {
 		for _, fi := range fld.Investors {
 			dtoF.Investors = append(dtoF.Investors, Investor{
 				ID:         fi.ID,
+				ActorID:    fi.ActorID,
 				Name:       fi.Name,
 				Percentage: fi.Percentage,
 			})
@@ -351,7 +358,7 @@ func FieldsFromDomain(d fielddom.Field) Field {
 
 	for _, inv := range d.Investors {
 		r.Investors = append(r.Investors, Investor{
-			ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage,
+			ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage,
 		})
 	}
 	for _, ld := range d.Lots {

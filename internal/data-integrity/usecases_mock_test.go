@@ -174,18 +174,18 @@ func (m *MockReportRepositoryPort) EXPECT() *MockReportRepositoryPortMockRecorde
 }
 
 // GetFieldCropMetrics mocks base method.
-func (m *MockReportRepositoryPort) GetFieldCropMetrics(filters domain1.ReportFilter) ([]domain1.FieldCropMetric, error) {
+func (m *MockReportRepositoryPort) GetFieldCropMetrics(ctx context.Context, filters domain1.ReportFilter) ([]domain1.FieldCropMetric, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFieldCropMetrics", filters)
+	ret := m.ctrl.Call(m, "GetFieldCropMetrics", ctx, filters)
 	ret0, _ := ret[0].([]domain1.FieldCropMetric)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetFieldCropMetrics indicates an expected call of GetFieldCropMetrics.
-func (mr *MockReportRepositoryPortMockRecorder) GetFieldCropMetrics(filters interface{}) *gomock.Call {
+func (mr *MockReportRepositoryPortMockRecorder) GetFieldCropMetrics(ctx, filters interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCropMetrics", reflect.TypeOf((*MockReportRepositoryPort)(nil).GetFieldCropMetrics), filters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCropMetrics", reflect.TypeOf((*MockReportRepositoryPort)(nil).GetFieldCropMetrics), ctx, filters)
 }
 
 // GetInvestorContributionReport mocks base method.
@@ -204,18 +204,18 @@ func (mr *MockReportRepositoryPortMockRecorder) GetInvestorContributionReport(ct
 }
 
 // GetSummaryResults mocks base method.
-func (m *MockReportRepositoryPort) GetSummaryResults(filters domain1.SummaryResultsFilter) ([]domain1.SummaryResults, error) {
+func (m *MockReportRepositoryPort) GetSummaryResults(ctx context.Context, filters domain1.SummaryResultsFilter) ([]domain1.SummaryResults, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSummaryResults", filters)
+	ret := m.ctrl.Call(m, "GetSummaryResults", ctx, filters)
 	ret0, _ := ret[0].([]domain1.SummaryResults)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSummaryResults indicates an expected call of GetSummaryResults.
-func (mr *MockReportRepositoryPortMockRecorder) GetSummaryResults(filters interface{}) *gomock.Call {
+func (mr *MockReportRepositoryPortMockRecorder) GetSummaryResults(ctx, filters interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSummaryResults", reflect.TypeOf((*MockReportRepositoryPort)(nil).GetSummaryResults), filters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSummaryResults", reflect.TypeOf((*MockReportRepositoryPort)(nil).GetSummaryResults), ctx, filters)
 }
 
 // MockStockRepositoryPort is a mock of StockRepositoryPort interface.

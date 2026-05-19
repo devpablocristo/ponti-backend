@@ -154,11 +154,11 @@ func ValidateSeason(season string, fieldName string) error {
 		return validate.Err(fieldName, "cannot be empty")
 	}
 
-	// Validar formato de temporada (ej: "2024-2025", "2025")
-	seasonPattern := `^(\d{4}(-\d{4})?)$`
+	// Acepta formato de campaña (YYYY o YYYY-YYYY) o id de estación ("1"-"4": Otoño, Invierno, Primavera, Verano).
+	seasonPattern := `^(\d{4}(-\d{4})?|[1-4])$`
 	matched, _ := regexp.MatchString(seasonPattern, season)
 	if !matched {
-		return validate.Err(fieldName, "invalid season format. Use format: YYYY or YYYY-YYYY")
+		return validate.Err(fieldName, "invalid season format. Use YYYY, YYYY-YYYY, or season id 1-4")
 	}
 
 	return nil

@@ -31,12 +31,16 @@ type UseCasesPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
-	DeleteLot(context.Context, int64) error
+	ArchiveLot(context.Context, int64) error
+	RestoreLot(context.Context, int64) error
+	HardDeleteLot(context.Context, int64) error
+	ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error)
+	DeleteLot(context.Context, int64) error // legacy alias hacia ArchiveLot
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
-	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	ExportLots(context.Context, domain.LotListFilter, int, int) ([]byte, error)
 }
@@ -54,7 +58,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 const maxLotExportPageSize = 1000
@@ -75,6 +78,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runLotIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/lots"
@@ -83,11 +99,15 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", ValidateLotRequest(), h.CreateLot)
 		public.GET("", h.ListLots)
+		public.GET("/archived", h.ListArchivedLots)
 		public.GET("/metrics", h.GetMetrics)
 		public.PUT("/:lot_id/tons", ValidateLotTonsUpdate(), h.UpdateLotTons)
 		public.GET("/:lot_id", h.GetLot)
 		public.PUT("/:lot_id", ValidateLotUpdate(), h.UpdateLot)
-		public.DELETE("/:lot_id", h.DeleteLot)
+		public.POST("/:lot_id/archive", h.ArchiveLot)
+		public.POST("/:lot_id/restore", h.RestoreLot)
+		public.DELETE("/:lot_id/hard", h.HardDeleteLot)
+		public.DELETE("/:lot_id", h.DeleteLot) // legacy: equivale a archive
 		public.GET("/export", h.ExportLots)
 	}
 }
@@ -219,51 +239,61 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLot(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "lot_id")
+	h.runLotIDAction(c, h.ucs.DeleteLot)
+}
+
+func (h *Handler) ArchiveLot(c *gin.Context) {
+	h.runLotIDAction(c, h.ucs.ArchiveLot)
+}
+
+func (h *Handler) RestoreLot(c *gin.Context) {
+	h.runLotIDAction(c, h.ucs.RestoreLot)
+}
+
+func (h *Handler) HardDeleteLot(c *gin.Context) {
+	h.runLotIDAction(c, h.ucs.HardDeleteLot)
+}
+
+func (h *Handler) ListArchivedLots(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	lots, total, err := h.ucs.ListArchivedLots(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteLot(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
+	items := make([]dto.LotListElement, len(lots))
+	for i := range lots {
+		items[i] = dto.FromDomainListElement(lots[i])
 	}
-	sharedhandlers.RespondNoContent(c)
+	sharedhandlers.RespondOK(c, gin.H{
+		"data":      items,
+		"page_info": types.NewPageInfo(page, perPage, total),
+	})
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
-	projectID := int64(0)
-	if raw := c.Query("project_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			sharedhandlers.RespondError(c, domainerr.Validation("invalid project_id"))
-			return
-		}
-		projectID = parsed
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
-	fieldID := int64(0)
-	if raw := c.Query("field_id"); raw != "" {
-		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			sharedhandlers.RespondError(c, domainerr.Validation("invalid field_id"))
-			return
-		}
-		fieldID = parsed
-	}
-	cropID := int64(0)
+	var cropID *int64
 	if raw := c.Query("crop_id"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
 			sharedhandlers.RespondError(c, domainerr.Validation("invalid crop_id"))
 			return
 		}
-		cropID = parsed
+		cropID = &parsed
 	}
 
-	// Los filtros por ID son opcionales para permitir búsquedas globales
-	// Si no se proporcionan filtros, se retornan métricas de todos los lotes
-
-	m, err := h.ucs.GetMetrics(c.Request.Context(), projectID, fieldID, cropID)
+	m, err := h.ucs.GetMetrics(c.Request.Context(), domain.LotListFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+		CropID:     cropID,
+	})
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

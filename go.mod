@@ -3,7 +3,6 @@ module github.com/devpablocristo/ponti-backend
 go 1.26.3
 
 require (
-	cloud.google.com/go/cloudsqlconn v1.17.2
 	firebase.google.com/go/v4 v4.19.0
 	github.com/devpablocristo/core/authn/go v0.2.1
 	github.com/devpablocristo/core/databases/postgres/go v0.1.0
@@ -25,14 +24,14 @@ require (
 	github.com/shopspring/decimal v1.2.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go-micro.dev/v4 v4.11.0
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.36.0 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )
 
-require github.com/golang-jwt/jwt/v5 v5.3.1
+require github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
@@ -84,14 +83,12 @@ require (
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgtype v1.14.4 // indirect
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
@@ -115,7 +112,6 @@ require (
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.1 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
-	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect

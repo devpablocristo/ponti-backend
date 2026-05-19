@@ -20,8 +20,10 @@ type RepositoryPort interface {
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
 	DeleteWorkOrderByID(context.Context, int64) error
+	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
+	ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -225,12 +227,20 @@ func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	return u.repo.DeleteWorkOrderByID(ctx, id)
 }
 
+func (u *UseCases) HardDeleteWorkOrder(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteWorkOrder(ctx, id)
+}
+
 func (u *UseCases) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.ArchiveWorkOrder(ctx, id)
 }
 
 func (u *UseCases) RestoreWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.RestoreWorkOrder(ctx, id)
+}
+
+func (u *UseCases) ListArchivedWorkOrders(ctx context.Context, page, perPage int, filter domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
+	return u.repo.ListArchivedWorkOrders(ctx, page, perPage, filter)
 }
 
 // ListWorkOrders delega al repositorio.
@@ -243,9 +253,6 @@ func (u *UseCases) ListWorkOrders(
 }
 
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
-	if filt.ProjectID == nil && filt.FieldID == nil {
-		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
-	}
 	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 

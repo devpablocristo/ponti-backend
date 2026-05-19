@@ -30,15 +30,22 @@ type RepositoryPort interface {
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
 	DeleteSupply(context.Context, int64) error
+	HardDeleteSupply(context.Context, int64) error
+	ListArchivedSupplies(context.Context, int, int) ([]domain.Supply, int64, error)
 	ListSuppliesPaginated(context.Context, domain.SupplyFilter, string, int, int) ([]domain.Supply, int64, error)
 	ListAllSupplies(context.Context, domain.SupplyFilter) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 	CreateProvider(context.Context, *providerdomain.Provider) (int64, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
 	GetEntriesSupplyMovementsByProjectID(context.Context, int64) ([]*domain.SupplyMovement, error)
+	ListEntrySupplyMovements(context.Context, domain.SupplyFilter) ([]*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
+	ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error)
+	ArchiveSupplyMovement(context.Context, int64, int64) error
+	RestoreSupplyMovement(context.Context, int64, int64) error
+	HardDeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
 	ArchiveSupply(context.Context, int64) error
 	RestoreSupply(context.Context, int64) error
@@ -221,12 +228,20 @@ func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
 	return u.repo.DeleteSupply(ctx, id)
 }
 
+func (u *UseCases) HardDeleteSupply(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteSupply(ctx, id)
+}
+
 func (u *UseCases) ArchiveSupply(ctx context.Context, id int64) error {
 	return u.repo.ArchiveSupply(ctx, id)
 }
 
 func (u *UseCases) RestoreSupply(ctx context.Context, id int64) error {
 	return u.repo.RestoreSupply(ctx, id)
+}
+
+func (u *UseCases) ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error) {
+	return u.repo.ListArchivedSupplies(ctx, page, perPage)
 }
 
 func (u *UseCases) CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {

@@ -44,11 +44,17 @@ func (useCasesRepoStub) UpdateInvestorPaymentStatus(context.Context, int64, int6
 func (useCasesRepoStub) DeleteWorkOrderByID(context.Context, int64) error {
 	return nil
 }
+func (useCasesRepoStub) HardDeleteWorkOrder(context.Context, int64) error {
+	return nil
+}
 func (useCasesRepoStub) ArchiveWorkOrder(context.Context, int64) error {
 	return nil
 }
 func (useCasesRepoStub) RestoreWorkOrder(context.Context, int64) error {
 	return nil
+}
+func (useCasesRepoStub) ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
+	return nil, 0, nil
 }
 func (useCasesRepoStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
@@ -139,13 +145,13 @@ func TestValidateInvestorSplitsRejectsInvalidPaymentStatus(t *testing.T) {
 	}
 }
 
-func TestListWorkOrderFilterRowsRequiresProjectOrFieldScope(t *testing.T) {
+func TestListWorkOrderFilterRowsAllowsUnscopedWorkspaceQuery(t *testing.T) {
 	t.Parallel()
 
 	uc := NewUseCases(useCasesRepoStub{}, nil)
 
-	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err == nil {
-		t.Fatalf("expected validation error for unscoped filter rows request")
+	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err != nil {
+		t.Fatalf("expected unscoped filter rows request to delegate to repository: %v", err)
 	}
 }
 

@@ -31,6 +31,7 @@ type UseCasesPort interface {
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
 	DeleteProject(context.Context, int64) error
+	HardDeleteProject(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -46,7 +47,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsula dependencias del handler HTTP de Project.
@@ -65,6 +65,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 		acf: c,
 		mws: m,
 	}
+}
+
+func (h *Handler) runProjectIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }
 
 // Routes registra las rutas del módulo Project.
@@ -86,7 +99,8 @@ func (h *Handler) Routes() {
 		public.PUT("/:project_id", h.UpdateProject)
 		public.POST("/:project_id/archive", h.ArchiveProject)
 		public.POST("/:project_id/restore", h.RestoreProject)
-		public.DELETE("/:project_id", h.DeleteProject)
+		public.DELETE("/:project_id/hard", h.HardDeleteProject)
+		public.DELETE("/:project_id", h.DeleteProject) // legacy alias hacia hard delete
 		public.GET("/search", h.ListProjectsByName)
 	}
 }
@@ -248,44 +262,22 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 
 // ArchiveProject archiva un proyecto por ID.
 func (h *Handler) ArchiveProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveProject(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runProjectIDAction(c, h.ucs.ArchiveProject)
 }
 
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
 func (h *Handler) RestoreProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreProject(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runProjectIDAction(c, h.ucs.RestoreProject)
 }
 
-// DeleteProject elimina físicamente un proyecto por ID.
+// DeleteProject es alias legacy hacia HardDeleteProject (ruta DELETE /:id).
 func (h *Handler) DeleteProject(c *gin.Context) {
-	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteProject(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runProjectIDAction(c, h.ucs.DeleteProject)
+}
+
+// HardDeleteProject elimina definitivamente. Bloquea si tiene dependientes.
+func (h *Handler) HardDeleteProject(c *gin.Context) {
+	h.runProjectIDAction(c, h.ucs.HardDeleteProject)
 }
 
 func (h *Handler) ListProjectsByName(c *gin.Context) {

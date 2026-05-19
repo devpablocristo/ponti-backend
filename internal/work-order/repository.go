@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -12,8 +13,11 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -39,13 +43,20 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 	model := models.FromDomain(o)
 
 	// 2) poblar auditoría
+	tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if hasTenant {
+		model.TenantID = tenantID
+	}
 	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
 		model.CreatedBy = &userID
 		model.UpdatedBy = &userID
 	}
 
 	// 3) crear todo en una transacción
-	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) insertar la cabecera para obtener model.ID
 		// Importante: evitamos que GORM intente crear también las asociaciones (Items) acá,
 		// porque abajo insertamos los items explícitamente. Si se insertan dos veces puede
@@ -58,11 +69,28 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			}
 			return domainerr.Internal("failed to create work order header")
 		}
+		if model.Contractor != "" {
+			if _, err := actorsync.SyncLegacyTextActor(tx, actorsync.LegacyTextActorSync{
+				SourceTable: actorsync.LegacyWorkOrderContractor,
+				Name:        model.Contractor,
+				ActorKind:   actorsync.KindUnknown,
+				Role:        actorsync.RoleContratista,
+				CreatedAt:   model.CreatedAt,
+				UpdatedAt:   model.UpdatedAt,
+				CreatedBy:   model.CreatedBy,
+				UpdatedBy:   model.UpdatedBy,
+			}); err != nil {
+				return err
+			}
+		}
 
 		// 3.2) insertar los items explícitamente asignando WorkOrderID
 		if len(model.Items) > 0 {
 			for i := range model.Items {
 				model.Items[i].WorkOrderID = model.ID
+				if hasTenant {
+					model.Items[i].TenantID = tenantID
+				}
 				// Asegurar que la PK sea generada por la DB (serial/sequence).
 				model.Items[i].ID = 0
 			}
@@ -75,6 +103,9 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 		if len(model.InvestorSplits) > 0 {
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
+				if hasTenant {
+					model.InvestorSplits[i].TenantID = tenantID
+				}
 				model.InvestorSplits[i].ID = 0
 				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
 					model.InvestorSplits[i].InvestorID,
@@ -85,6 +116,9 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
 				return domainerr.Internal("failed to create work order investor splits")
 			}
+		}
+		if err := actorsync.RefreshWorkOrderActorColumns(tx, model.ID); err != nil {
+			return err
 		}
 
 		return nil
@@ -98,7 +132,8 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 
 func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.WorkOrder, error) {
 	var m models.WorkOrder
-	if err := r.db.Client().WithContext(ctx).
+	db := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "workorders")
+	if err := db.
 		Preload("Items", func(db *gorm.DB) *gorm.DB {
 			return db.Order("id ASC")
 		}).
@@ -116,7 +151,8 @@ func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.Wo
 
 func (r *Repository) GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error) {
 	var m models.WorkOrder
-	if err := r.db.Client().WithContext(ctx).
+	db := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "workorders")
+	if err := db.
 		Where("number = ?", number).
 		Where("project_id = ?", projectID).
 		First(&m).Error; err != nil {
@@ -138,6 +174,10 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	// 1) Convertimos dominio → GORM y fijamos el ID
 	model := models.FromDomain(o)
 	model.ID = o.ID
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if hasTenant {
+		model.TenantID = tenantID
+	}
 
 	// 2) Poblar UpdatedBy si hay usuario en contexto
 	if userID, err := sharedmodels.ActorFromContext(ctx); err == nil {
@@ -147,7 +187,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
-		query := tx.Preload("Items").Preload("InvestorSplits").Where("id = ?", model.ID)
+		query := authz.MaybeTenantScope(ctx, tx.Preload("Items").Preload("InvestorSplits"), "workorders").Where("id = ?", model.ID)
 		if !o.Base.UpdatedAt.IsZero() {
 			query = query.Where("updated_at = ?", o.Base.UpdatedAt)
 		}
@@ -163,6 +203,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 
 		// 3.2) Eliminar todos los items antiguos
 		if err := tx.
+			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_items") }).
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete old items")
@@ -170,6 +211,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 
 		// 3.2b) Eliminar splits antiguos
 		if err := tx.
+			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_investor_splits") }).
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete old investor splits")
@@ -188,10 +230,25 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		if updateTx.RowsAffected == 0 {
 			return domainerr.Conflict("work order not found or outdated")
 		}
+		if model.Contractor != "" {
+			if _, err := actorsync.SyncLegacyTextActor(tx, actorsync.LegacyTextActorSync{
+				SourceTable: actorsync.LegacyWorkOrderContractor,
+				Name:        model.Contractor,
+				ActorKind:   actorsync.KindUnknown,
+				Role:        actorsync.RoleContratista,
+				UpdatedAt:   time.Now(),
+				UpdatedBy:   model.UpdatedBy,
+			}); err != nil {
+				return err
+			}
+		}
 
 		// 3.4) Insertar los items nuevos, asignando WorkOrderID
 		for i := range model.Items {
 			model.Items[i].WorkOrderID = model.ID
+			if hasTenant {
+				model.Items[i].TenantID = tenantID
+			}
 		}
 		if len(model.Items) > 0 {
 			if err := tx.Create(&model.Items).Error; err != nil {
@@ -204,6 +261,9 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 			existingStatuses := indexSplitPaymentStatuses(orig.InvestorSplits)
 			for i := range model.InvestorSplits {
 				model.InvestorSplits[i].WorkOrderID = model.ID
+				if hasTenant {
+					model.InvestorSplits[i].TenantID = tenantID
+				}
 				model.InvestorSplits[i].ID = 0
 				model.InvestorSplits[i].PaymentStatus = normalizeSplitPaymentStatus(
 					model.InvestorSplits[i].InvestorID,
@@ -215,44 +275,158 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 				return domainerr.Internal("failed to insert new investor splits")
 			}
 		}
+		if err := actorsync.RefreshWorkOrderActorColumns(tx, model.ID); err != nil {
+			return err
+		}
 
 		return nil
 	})
 }
 
-func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+// HardDeleteWorkOrder elimina definitivamente una orden de trabajo.
+// Bloquea con 409 si tiene invoices referenciándola.
+// Sus children "propios" (items, investor_splits) se eliminan en cascada.
+// Nota: la relación con labors es inversa (workorders.labor_id → labors), por lo que
+// borrar una work-order no impacta a labors. No se chequea ese sentido.
+func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.NotFound("work order not found")
-			}
+		var count int64
+		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("workorders"), "workorders")
+		if err := workOrderDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check work order existence")
 		}
+		if count == 0 {
+			return domainerr.NotFound("work order not found")
+		}
+		if err := lifecycle.RequireArchived(workOrderDB, "workorders", "work order", id); err != nil {
+			return err
+		}
 
-		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
+		var invCount int64
+		invoiceDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("invoices"), "invoices")
+		if err := invoiceDB.Where("work_order_id = ?", id).Count(&invCount).Error; err != nil {
+			return domainerr.Internal("failed to check invoices")
+		}
+		if invCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("work order has %d invoice(s); archive or hard-delete them first", invCount))
+		}
+
+		// Cascada de "owned children" (no son entidades de negocio independientes).
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorder_items").Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order items")
 		}
-		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorder_investor_splits").Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order investor splits")
 		}
-		if err := tx.Unscoped().Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders").Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete work order")
 		}
 		return nil
 	})
 }
 
+// DeleteWorkOrderByID se mantiene como alias de HardDeleteWorkOrder por compatibilidad.
+// Deprecated: usar HardDeleteWorkOrder.
+func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+	return r.HardDeleteWorkOrder(ctx, id)
+}
+
+// ListArchivedWorkOrders lista ordenes archivadas con nombres joineados (project, field, lot, labor).
+// Si filter.LotID > 0, filtra solo las WOs de ese lote.
+func (r *Repository) ListArchivedWorkOrders(ctx context.Context, page, perPage int, filter domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
+	where := []string{"w.deleted_at IS NOT NULL"}
+	args := []any{}
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		where = append(where, "w.tenant_id = ?")
+		args = append(args, tenantID)
+	}
+	if filter.LotID > 0 {
+		where = append(where, "w.lot_id = ?")
+		args = append(args, filter.LotID)
+	}
+	whereSQL := strings.Join(where, " AND ")
+
+	var total int64
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM workorders w WHERE %s", whereSQL)
+	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived work orders")
+	}
+
+	type archivedRow struct {
+		ID          int64     `gorm:"column:id"`
+		Number      string    `gorm:"column:number"`
+		ProjectName string    `gorm:"column:project_name"`
+		FieldName   string    `gorm:"column:field_name"`
+		LotName     string    `gorm:"column:lot_name"`
+		Date        time.Time `gorm:"column:date"`
+		SequenceDay int64     `gorm:"column:sequence_day"`
+		CropName    string    `gorm:"column:crop_name"`
+		LaborName   string    `gorm:"column:labor_name"`
+		Contractor  string    `gorm:"column:contractor"`
+	}
+
+	offset := (page - 1) * perPage
+	listQuery := fmt.Sprintf(`
+		SELECT
+			w.id, w.number, w.date, w.sequence_day, w.contractor,
+			COALESCE(p.name, '') AS project_name,
+			COALESCE(f.name, '') AS field_name,
+			COALESCE(l.name, '') AS lot_name,
+			COALESCE(c.name, '') AS crop_name,
+			COALESCE(lb.name, '') AS labor_name
+		FROM workorders w
+		LEFT JOIN projects p ON p.id = w.project_id
+		LEFT JOIN fields f ON f.id = w.field_id
+		LEFT JOIN lots l ON l.id = w.lot_id
+		LEFT JOIN crops c ON c.id = w.crop_id
+		LEFT JOIN labors lb ON lb.id = w.labor_id
+		WHERE %s
+		ORDER BY w.deleted_at DESC
+		LIMIT ? OFFSET ?
+	`, whereSQL)
+	listArgs := append(append([]any{}, args...), perPage, offset)
+
+	var rows []archivedRow
+	if err := r.db.Client().WithContext(ctx).Raw(listQuery, listArgs...).Scan(&rows).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived work orders")
+	}
+
+	result := make([]domain.WorkOrderListElement, len(rows))
+	for i, row := range rows {
+		result[i] = domain.WorkOrderListElement{
+			ID:          row.ID,
+			Number:      row.Number,
+			ProjectName: row.ProjectName,
+			FieldName:   row.FieldName,
+			LotName:     row.LotName,
+			Date:        row.Date,
+			SequenceDay: row.SequenceDay,
+			CropName:    row.CropName,
+			LaborName:   row.LaborName,
+			Contractor:  row.Contractor,
+		}
+	}
+	return result, total, nil
+}
+
 func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order"); err != nil {
 		return err
 	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
+		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -262,11 +436,23 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 			return domainerr.Conflict("work order already archived")
 		}
 
-		if err := tx.Model(&models.WorkOrder{}).
+		cause, err := lifecycle.RootCause(tx, wo.TenantID, "workorders", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+			Where("workorder_id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "workorder_items", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive work order items")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+			Where("workorder_id = ? AND deleted_at IS NULL", id).
+			Updates(lifecycle.ArchiveUpdates(tx, "workorder_investor_splits", archivedAt, deletedBy, cause)).Error; err != nil {
+			return domainerr.Internal("failed to archive work order investor splits")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": time.Now(),
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "workorders", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive work order")
 		}
 		return nil
@@ -278,8 +464,10 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
+		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -288,14 +476,50 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		if !wo.DeletedAt.Valid {
 			return domainerr.Conflict("work order is not archived")
 		}
+		// Cascade-up: si field/lot padres están archivados, restaurar solo sus rows
+		// (sin cascade-down a otros hijos). Si project está archivado, exigir que
+		// el usuario lo restaure manualmente.
+		var projectActive int64
+		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", wo.ProjectID).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore work order while project is archived; restore the project first")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
+			Where("id = ? AND deleted_at IS NOT NULL", wo.FieldID).
+			Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore parent field")
+		}
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lots"), "lots").
+			Where("id = ? AND deleted_at IS NOT NULL", wo.LotID).
+			Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore parent lot")
+		}
+		rowState, err := lifecycle.ReadRowState(tx, "workorders", id)
+		if err != nil {
+			return err
+		}
+		cause := lifecycle.CauseFromRow(rowState, "workorders", id)
 
-		if err := tx.Unscoped().Model(&models.WorkOrder{}).
+		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "workorders", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore work order")
+		}
+		itemsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
+		itemsRestore = lifecycle.ApplyCauseScope(itemsRestore, "workorder_items", cause)
+		if err := itemsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_items", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore work order items")
+		}
+		splitsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
+		splitsRestore = lifecycle.ApplyCauseScope(splitsRestore, "workorder_investor_splits", cause)
+		if err := splitsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_investor_splits", restoredAt)).Error; err != nil {
+			return domainerr.Internal("failed to restore work order investor splits")
 		}
 		return nil
 	})
@@ -316,7 +540,7 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var workOrder models.WorkOrder
-		if err := tx.Select("id").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
+		if err := authz.MaybeTenantScope(ctx, tx.Select("id"), "workorders").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -324,6 +548,7 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 		}
 
 		updateTx := tx.Model(&models.WorkOrderInvestorSplit{}).
+			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_investor_splits") }).
 			Where("workorder_id = ? AND investor_id = ? AND deleted_at IS NULL", workOrderID, investorID).
 			Update("payment_status", paymentStatus)
 		if updateTx.Error != nil {
@@ -538,7 +763,8 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 	if err != nil {
 		return nil, err
 	}
-	if len(projectIDs) == 0 && (filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil) {
+	hasWorkspaceFilter := filt.ProjectID != nil || filt.CustomerID != nil || filt.CampaignID != nil || filt.FieldID != nil
+	if len(projectIDs) == 0 && hasWorkspaceFilter {
 		return &domain.WorkOrderMetrics{
 			SurfaceHa:   decimal.Zero,
 			Liters:      decimal.Zero,
@@ -546,6 +772,9 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 			DirectCost:  decimal.Zero,
 			OrdersCount: 0,
 		}, nil
+	}
+	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
+		return nil, domainerr.Forbidden("tenant context required")
 	}
 
 	if filt.SupplyID != nil {
@@ -584,9 +813,9 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 		return nil, domainerr.Internal("failed to get metrics")
 	}
 
-	orderCountQuery := r.db.Client().
+	orderCountQuery := authz.MaybeTenantScope(ctx, r.db.Client().
 		WithContext(ctx).
-		Table("workorders").
+		Table("workorders"), "workorders").
 		Where("deleted_at IS NULL")
 	if len(projectIDs) > 0 {
 		orderCountQuery = orderCountQuery.Where("project_id IN ?", projectIDs)
@@ -622,15 +851,19 @@ func (r *Repository) getSupplyFilteredMetrics(
 			COALESCE(SUM(CASE WHEN s.unit_id = 1 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS liters,
 			COALESCE(SUM(CASE WHEN s.unit_id = 2 THEN COALESCE(wi.total_used, 0) ELSE 0 END), 0) AS kilograms,
 			COALESCE(SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0)), 0) AS direct_cost,
-			COUNT(DISTINCT split_part(wo.number::text, '.', 1)) AS orders_count
+		COUNT(DISTINCT split_part(wo.number::text, '.', 1)) AS orders_count
 		FROM workorders wo
-		JOIN workorder_items wi ON wi.workorder_id = wo.id AND wi.deleted_at IS NULL
-		JOIN supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+		JOIN workorder_items wi ON wi.workorder_id = wo.id AND wi.tenant_id = wo.tenant_id AND wi.deleted_at IS NULL
+		JOIN supplies s ON s.id = wi.supply_id AND s.tenant_id = wo.tenant_id AND s.deleted_at IS NULL
 		WHERE wo.deleted_at IS NULL
 		  AND wi.supply_id = ?
 	`
 	args := []any{*filt.SupplyID}
 
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		q += " AND wo.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 	if len(projectIDs) > 0 {
 		q += " AND wo.project_id IN ?"
 		args = append(args, projectIDs)
@@ -665,6 +898,11 @@ func (r *Repository) getSupplyFilteredMetrics(
 // Calcula ∑(Órdenes_de_trabajo.costo_total) como indica el CSV de controles
 // Este cálculo es INDEPENDIENTE de las vistas SSOT para validar coherencia
 func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.Forbidden("tenant context required")
+	}
+
 	// Query RAW: suma directa desde workorders + workorder_items
 	// Labor cost: effective_area × labor.price
 	// Supply cost: total_used × price (consistente con v4_calc.workorder_metrics).
@@ -678,6 +916,10 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		whereProject = "AND wo.project_id = ?"
 		args = append(args, projectID)
 	}
+	if hasTenant {
+		whereProject += " AND wo.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
 	q := fmt.Sprintf(`
 		WITH workorder_costs AS (
@@ -689,19 +931,20 @@ func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (dec
 		    COALESCE((
 		      SELECT SUM(COALESCE(wi.total_used, 0) * COALESCE(s.price, 0))
 		      FROM public.workorder_items wi
-		      JOIN public.supplies s ON s.id = wi.supply_id AND s.deleted_at IS NULL
+		      JOIN public.supplies s ON s.id = wi.supply_id AND s.tenant_id = wo.tenant_id AND s.deleted_at IS NULL
 		      WHERE wi.workorder_id = wo.id 
+		        AND wi.tenant_id = wo.tenant_id
 		        AND wi.deleted_at IS NULL
 		    ), 0) AS supply_cost
 		  FROM public.workorders wo
-		  JOIN public.labors l ON l.id = wo.labor_id AND l.deleted_at IS NULL
+		  JOIN public.labors l ON l.id = wo.labor_id AND l.tenant_id = wo.tenant_id AND l.deleted_at IS NULL
 		  WHERE wo.deleted_at IS NULL
 		    AND wo.effective_area IS NOT NULL
 		    AND wo.effective_area > 0
 		    %s
-		)
-		SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
-		FROM workorder_costs
+	)
+	SELECT COALESCE(SUM(labor_cost + supply_cost), 0) AS total_cost
+	FROM workorder_costs
 	`, whereProject)
 
 	var totalCost decimal.Decimal
@@ -726,13 +969,39 @@ func (r *Repository) GetHarvestAreaSnapshot(
 
 	var result row
 
-	err := r.db.Client().WithContext(ctx).Raw(`
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return false, decimal.Zero, decimal.Zero, domainerr.Forbidden("tenant context required")
+	}
+
+	laborTenantFilter := ""
+	lotTenantFilter := ""
+	workOrderTenantFilter := ""
+	args := []any{laborID}
+	if hasTenant {
+		laborTenantFilter = "AND lb.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, lotID)
+	if hasTenant {
+		lotTenantFilter = "AND l.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, lotID)
+	if hasTenant {
+		workOrderTenantFilter = "AND w.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, excludeWorkOrderID, excludeWorkOrderID)
+
+	query := fmt.Sprintf(`
 		SELECT
 			EXISTS (
 				SELECT 1
 				FROM public.labors lb
 				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
 				WHERE lb.id = ?
+				  %s
 				  AND lb.deleted_at IS NULL
 				  AND cat.type_id = 4
 				  AND LOWER(TRIM(cat.name)) = 'cosecha'
@@ -741,21 +1010,25 @@ func (r *Repository) GetHarvestAreaSnapshot(
 				SELECT l.hectares
 				FROM public.lots l
 				WHERE l.id = ?
+				  %s
 				  AND l.deleted_at IS NULL
 			), 0)::numeric AS lot_hectares,
 			COALESCE((
 				SELECT SUM(w.effective_area)
 				FROM public.workorders w
-				JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
+				JOIN public.labors lb ON lb.id = w.labor_id AND lb.tenant_id = w.tenant_id AND lb.deleted_at IS NULL
 				JOIN public.categories cat ON cat.id = lb.category_id AND cat.deleted_at IS NULL
 				WHERE w.lot_id = ?
+				  %s
 				  AND w.deleted_at IS NULL
 				  AND w.effective_area > 0
 				  AND cat.type_id = 4
 				  AND LOWER(TRIM(cat.name)) = 'cosecha'
 				  AND (? = 0 OR w.id <> ?)
 			), 0)::numeric AS existing_harvested_area
-	`, laborID, lotID, lotID, excludeWorkOrderID, excludeWorkOrderID).Scan(&result).Error
+	`, laborTenantFilter, lotTenantFilter, workOrderTenantFilter)
+
+	err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&result).Error
 
 	if err != nil {
 		return false, decimal.Zero, decimal.Zero, domainerr.Internal("failed to validate harvest area")

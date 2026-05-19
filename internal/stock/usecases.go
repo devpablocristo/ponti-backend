@@ -47,6 +47,7 @@ type RepositoryPort interface {
 	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
+	ListStocksByFilter(context.Context, domain.StockFilter, time.Time) ([]*domain.Stock, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 	ExecuteInTransaction(context.Context, func(context.Context) error) error
 }
@@ -84,6 +85,10 @@ func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeD
 		return nil, err
 	}
 	return u.repo.GetStocks(ctx, projectID, closeDate)
+}
+
+func (u *UseCases) GetStocksSummaryByFilter(ctx context.Context, filter domain.StockFilter, closeDate time.Time) ([]*domain.Stock, error) {
+	return u.repo.ListStocksByFilter(ctx, filter, closeDate)
 }
 
 func (u *UseCases) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {

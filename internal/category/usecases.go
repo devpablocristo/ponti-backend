@@ -9,8 +9,12 @@ import (
 type RepositoryPort interface {
 	CreateCategory(context.Context, *domain.Category) (int64, error)
 	ListCategories(context.Context, int, int) ([]domain.Category, int64, error)
+	ListArchivedCategories(context.Context, int, int) ([]domain.Category, int64, error)
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
+	ArchiveCategory(context.Context, int64) error
+	RestoreCategory(context.Context, int64) error
+	HardDeleteCategory(context.Context, int64) error
 	DeleteCategory(context.Context, int64) error
 }
 
@@ -30,6 +34,10 @@ func (u *UseCases) ListCategories(ctx context.Context, page, perPage int) ([]dom
 	return u.repo.ListCategories(ctx, page, perPage)
 }
 
+func (u *UseCases) ListArchivedCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
+	return u.repo.ListArchivedCategories(ctx, page, perPage)
+}
+
 func (u *UseCases) GetCategory(ctx context.Context, id int64) (*domain.Category, error) {
 	return u.repo.GetCategory(ctx, id)
 }
@@ -40,4 +48,16 @@ func (u *UseCases) UpdateCategory(ctx context.Context, c *domain.Category) error
 
 func (u *UseCases) DeleteCategory(ctx context.Context, id int64) error {
 	return u.repo.DeleteCategory(ctx, id)
+}
+
+func (u *UseCases) ArchiveCategory(ctx context.Context, id int64) error {
+	return u.repo.ArchiveCategory(ctx, id)
+}
+
+func (u *UseCases) RestoreCategory(ctx context.Context, id int64) error {
+	return u.repo.RestoreCategory(ctx, id)
+}
+
+func (u *UseCases) HardDeleteCategory(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteCategory(ctx, id)
 }

@@ -9,11 +9,12 @@ import (
 type RepositoryPort interface {
 	CreateManager(context.Context, *domain.Manager) (int64, error)
 	ListManagers(context.Context, int, int) ([]domain.Manager, int64, error)
+	ListArchivedManagers(context.Context, int, int) ([]domain.Manager, int64, error)
 	GetManager(context.Context, int64) (*domain.Manager, error)
 	UpdateManager(context.Context, *domain.Manager) error
-	DeleteManager(context.Context, int64) error
 	ArchiveManager(context.Context, int64) error
 	RestoreManager(context.Context, int64) error
+	HardDeleteManager(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -41,8 +42,8 @@ func (u *UseCases) UpdateManager(ctx context.Context, m *domain.Manager) error {
 	return u.repo.UpdateManager(ctx, m)
 }
 
-func (u *UseCases) DeleteManager(ctx context.Context, id int64) error {
-	return u.repo.DeleteManager(ctx, id)
+func (u *UseCases) ListArchivedManagers(ctx context.Context, page, perPage int) ([]domain.Manager, int64, error) {
+	return u.repo.ListArchivedManagers(ctx, page, perPage)
 }
 
 func (u *UseCases) ArchiveManager(ctx context.Context, id int64) error {
@@ -51,4 +52,8 @@ func (u *UseCases) ArchiveManager(ctx context.Context, id int64) error {
 
 func (u *UseCases) RestoreManager(ctx context.Context, id int64) error {
 	return u.repo.RestoreManager(ctx, id)
+}
+
+func (u *UseCases) HardDeleteManager(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteManager(ctx, id)
 }

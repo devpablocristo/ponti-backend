@@ -23,6 +23,7 @@ type RepositoryPort interface {
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
 	DeleteProject(context.Context, int64) error
+	HardDeleteProject(context.Context, int64) error
 	GetFieldsByProjectID(context.Context, int64) ([]domainField.Field, error)
 }
 
@@ -105,6 +106,10 @@ func (u *UseCases) RestoreProject(ctx context.Context, id int64) error {
 
 func (u *UseCases) DeleteProject(ctx context.Context, id int64) error {
 	return u.repo.DeleteProject(ctx, id)
+}
+
+func (u *UseCases) HardDeleteProject(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteProject(ctx, id)
 }
 
 func (u *UseCases) ListProjectsByName(ctx context.Context, name string, page, perPage int) ([]domain.ListedProject, int64, error) {

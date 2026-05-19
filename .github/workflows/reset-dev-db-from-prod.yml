@@ -2,6 +2,11 @@ name: Reset DEV DB from PROD
 
 on:
   workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
