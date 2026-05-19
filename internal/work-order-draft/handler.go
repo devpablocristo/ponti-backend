@@ -2,7 +2,6 @@ package workorderdraft
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,13 +19,16 @@ type UseCasesPort interface {
 	PreviewDigitalWorkOrderNumber(context.Context, int64, string) (string, error)
 	PreviewDigitalWorkOrderDraftBatchNumber(context.Context, int64, string) (string, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
-	ExportWorkOrderDraftPDF(context.Context, int64) ([]byte, error)
-	ExportWorkOrderDraftGroupPDF(context.Context, int64) ([]byte, error)
+	GetWorkOrderDraftGroupByID(context.Context, int64) (*domain.WorkOrderDraftGroup, error)
+	GetWorkOrderDraftPDFData(context.Context, int64) (*pdfDocumentData, error)
+	GetWorkOrderDraftGroupPDFData(context.Context, int64) (*pdfDocumentData, error)
 	ListWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListDigitalWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
 	DeleteWorkOrderDraftByID(context.Context, int64) error
 	PublishWorkOrderDraft(context.Context, int64) (int64, error)
+	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
+	UpdateWorkOrderDraftGroupByID(context.Context, int64, *domain.WorkOrderDraftGroup) error
 }
 
 type GinEnginePort interface {
@@ -76,10 +78,13 @@ func (h *Handler) Routes() {
 		grp.POST("/digital/preview-number", h.PreviewDigitalWorkOrderNumber)
 		grp.POST("/digital/batch/preview-number", h.PreviewDigitalWorkOrderDraftBatchNumber)
 		grp.GET("", h.ListWorkOrderDrafts)
+		grp.GET("/digital/groups", h.ListDigitalWorkOrderDraftGroups)
 		grp.GET("/digital", h.ListDigitalWorkOrderDrafts)
+		grp.GET("/:work_order_draft_id/group", h.GetWorkOrderDraftGroupByID)
 		grp.GET("/:work_order_draft_id", h.GetWorkOrderDraftByID)
-		grp.GET("/:work_order_draft_id/pdf", h.ExportWorkOrderDraftPDF)
-		grp.GET("/:work_order_draft_id/group-pdf", h.ExportWorkOrderDraftGroupPDF)
+		grp.GET("/:work_order_draft_id/pdf-data", h.GetWorkOrderDraftPDFData)
+		grp.GET("/:work_order_draft_id/group-pdf-data", h.GetWorkOrderDraftGroupPDFData)
+		grp.PUT("/:work_order_draft_id/group", h.UpdateWorkOrderDraftGroupByID)
 		grp.PUT("/:work_order_draft_id", h.UpdateWorkOrderDraftByID)
 		grp.DELETE("/:work_order_draft_id", h.DeleteWorkOrderDraftByID)
 		grp.POST("/:work_order_draft_id/publish", h.PublishWorkOrderDraft)
@@ -199,55 +204,20 @@ func (h *Handler) GetWorkOrderDraftByID(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.FromDomain(draft))
 }
 
-func (h *Handler) ExportWorkOrderDraftPDF(c *gin.Context) {
+func (h *Handler) GetWorkOrderDraftGroupByID(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	data, err := h.ucs.ExportWorkOrderDraftPDF(c.Request.Context(), id)
+	group, err := h.ucs.GetWorkOrderDraftGroupByID(c.Request.Context(), id)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
 
-	filename := fmt.Sprintf("orden-digital-%d.pdf", id)
-
-	c.Header("Content-Type", "application/pdf")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/pdf", data)
-}
-
-func (h *Handler) ExportWorkOrderDraftGroupPDF(c *gin.Context) {
-	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	draft, err := h.ucs.GetWorkOrderDraftByID(c.Request.Context(), id)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	data, err := h.ucs.ExportWorkOrderDraftGroupPDF(c.Request.Context(), id)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	baseNumber := draft.Number
-	if base, ok := extractBaseSequence(draft.Number); ok {
-		baseNumber = fmt.Sprintf("D-%d", base)
-	}
-
-	filename := fmt.Sprintf("orden-digital-%s.pdf", baseNumber)
-
-	c.Header("Content-Type", "application/pdf")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/pdf", data)
+	sharedhandlers.RespondOK(c, dto.GroupFromDomain(group))
 }
 
 func (h *Handler) UpdateWorkOrderDraftByID(c *gin.Context) {
@@ -275,6 +245,38 @@ func (h *Handler) UpdateWorkOrderDraftByID(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) UpdateWorkOrderDraftGroupByID(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	var req dto.WorkOrderDraftGroupUpdateRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	group, err := req.ToDomain()
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	if err := h.ucs.UpdateWorkOrderDraftGroupByID(c.Request.Context(), id, group); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	updated, err := h.ucs.GetWorkOrderDraftGroupByID(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.GroupFromDomain(updated))
 }
 
 func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
@@ -332,6 +334,26 @@ func (h *Handler) ListDigitalWorkOrderDrafts(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.NewListResponse(pageInfo, items))
 }
 
+func (h *Handler) ListDigitalWorkOrderDraftGroups(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 10)
+
+	items, pageInfo, err := h.ucs.ListDigitalWorkOrderDraftGroups(
+		c.Request.Context(),
+		c.Query("number"),
+		c.Query("status"),
+		types.Input{
+			Page:     uint(page),
+			PageSize: uint(perPage),
+		},
+	)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.NewGroupListResponse(pageInfo, items))
+}
+
 func (h *Handler) PublishWorkOrderDraft(c *gin.Context) {
 	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
 	if err != nil {
@@ -350,4 +372,36 @@ func (h *Handler) PublishWorkOrderDraft(c *gin.Context) {
 		"published_work_order_id": workOrderID,
 		"status":                  "published",
 	})
+}
+
+func (h *Handler) GetWorkOrderDraftPDFData(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	data, err := h.ucs.GetWorkOrderDraftPDFData(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, data)
+}
+
+func (h *Handler) GetWorkOrderDraftGroupPDFData(c *gin.Context) {
+	id, err := sharedhandlers.ParseParamID(c.Param("work_order_draft_id"), "work_order_draft_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	data, err := h.ucs.GetWorkOrderDraftGroupPDFData(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, data)
 }

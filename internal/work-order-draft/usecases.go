@@ -27,8 +27,10 @@ type RepositoryPort interface {
 	ListOccupiedWorkOrderNumbersByProjectExcludingDraft(context.Context, int64, int64) ([]string, error)
 	ListPublishedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
+	UpdateWorkOrderDraftGroup(context.Context, []*domain.WorkOrderDraft) error
 	DeleteWorkOrderDraftByID(context.Context, int64) error
 	MarkWorkOrderDraftAsPublished(context.Context, int64, int64) error
+	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
 }
 
 type PublisherPort interface {
@@ -39,15 +41,9 @@ type SupplyReaderPort interface {
 	GetSupply(context.Context, int64) (*supplydomain.Supply, error)
 }
 
-type PDFExporterPort interface {
-	ExportDraft(context.Context, *domain.WorkOrderDraft) ([]byte, error)
-	ExportDraftGroup(context.Context, []*domain.WorkOrderDraft) ([]byte, error)
-}
-
 type UseCases struct {
 	repo         RepositoryPort
 	publisher    PublisherPort
-	pdfExporter  PDFExporterPort
 	supplyReader SupplyReaderPort
 }
 
@@ -57,11 +53,10 @@ var (
 	digitalSplitNumberRE = regexp.MustCompile(`^D-(\d+)\.(\d+)$`)
 )
 
-func NewUseCases(r RepositoryPort, p PublisherPort, pdf PDFExporterPort, sr SupplyReaderPort) *UseCases {
+func NewUseCases(r RepositoryPort, p PublisherPort, sr SupplyReaderPort) *UseCases {
 	return &UseCases{
 		repo:         r,
 		publisher:    p,
-		pdfExporter:  pdf,
 		supplyReader: sr,
 	}
 }
@@ -128,6 +123,14 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 		return nil, err
 	}
 
+	totalEffectiveArea := decimal.Zero
+	for _, lot := range b.Lots {
+		if lot.EffectiveArea.LessThanOrEqual(decimal.Zero) {
+			return nil, types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
+		}
+		totalEffectiveArea = totalEffectiveArea.Add(lot.EffectiveArea)
+	}
+
 	seenLots := make(map[int64]struct{})
 	drafts := make([]*domain.WorkOrderDraft, len(b.Lots))
 
@@ -160,7 +163,7 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 				return nil, types.NewError(types.ErrValidation, "item total_used must be greater than 0", nil)
 			}
 
-			finalDose := item.TotalUsed.Div(lot.EffectiveArea).Round(6)
+			finalDose := item.TotalUsed.Div(totalEffectiveArea).Round(6)
 
 			items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
@@ -241,24 +244,7 @@ func (u *UseCases) GetWorkOrderDraftByID(ctx context.Context, id int64) (*domain
 	return u.repo.GetWorkOrderDraftByID(ctx, id)
 }
 
-func (u *UseCases) ExportWorkOrderDraftPDF(ctx context.Context, id int64) ([]byte, error) {
-	if id <= 0 {
-		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
-	}
-
-	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if u.pdfExporter == nil {
-		return nil, types.NewError(types.ErrInternal, "pdf exporter not configured", nil)
-	}
-
-	return u.pdfExporter.ExportDraft(ctx, draft)
-}
-
-func (u *UseCases) ExportWorkOrderDraftGroupPDF(ctx context.Context, id int64) ([]byte, error) {
+func (u *UseCases) GetWorkOrderDraftGroupByID(ctx context.Context, id int64) (*domain.WorkOrderDraftGroup, error) {
 	if id <= 0 {
 		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
 	}
@@ -285,11 +271,7 @@ func (u *UseCases) ExportWorkOrderDraftGroupPDF(ctx context.Context, id int64) (
 
 	sortDigitalDraftGroup(related)
 
-	if u.pdfExporter == nil {
-		return nil, types.NewError(types.ErrInternal, "pdf exporter not configured", nil)
-	}
-
-	return u.pdfExporter.ExportDraftGroup(ctx, related)
+	return buildWorkOrderDraftGroup(related), nil
 }
 
 func (u *UseCases) ListWorkOrderDrafts(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
@@ -299,6 +281,10 @@ func (u *UseCases) ListWorkOrderDrafts(ctx context.Context, number string, statu
 func (u *UseCases) ListDigitalWorkOrderDrafts(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
 	isDigital := true
 	return u.repo.ListWorkOrderDrafts(ctx, number, status, &isDigital, inp)
+}
+
+func (u *UseCases) ListDigitalWorkOrderDraftGroups(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error) {
+	return u.repo.ListDigitalWorkOrderDraftGroups(ctx, number, status, inp)
 }
 
 func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkOrderDraft) error {
@@ -352,6 +338,82 @@ func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkO
 	}
 
 	return u.repo.UpdateWorkOrderDraftByID(ctx, d)
+}
+
+func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, group *domain.WorkOrderDraftGroup) error {
+	if id <= 0 {
+		return types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+	if group == nil {
+		return types.NewError(types.ErrValidation, "work order draft group is nil", nil)
+	}
+
+	current, err := u.GetWorkOrderDraftGroupByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	for _, lot := range current.Lots {
+		if lot.Status == domain.StatusPublished {
+			return types.NewError(types.ErrConflict, "published work order draft groups cannot be updated", nil)
+		}
+	}
+
+	if len(current.Lots) == 0 {
+		return types.NewError(types.ErrValidation, "work order draft group has no lots", nil)
+	}
+	if current.EffectiveArea.LessThanOrEqual(decimal.Zero) {
+		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
+	}
+
+	drafts := make([]*domain.WorkOrderDraft, len(current.Lots))
+	for i, lot := range current.Lots {
+		draft := &domain.WorkOrderDraft{
+			ID:             lot.DraftID,
+			Number:         lot.Number,
+			Date:           group.Date,
+			CustomerID:     group.CustomerID,
+			ProjectID:      group.ProjectID,
+			CampaignID:     group.CampaignID,
+			FieldID:        group.FieldID,
+			LotID:          lot.LotID,
+			CropID:         group.CropID,
+			LaborID:        group.LaborID,
+			Contractor:     group.Contractor,
+			EffectiveArea:  lot.EffectiveArea,
+			Observations:   group.Observations,
+			InvestorID:     group.InvestorID,
+			IsDigital:      true,
+			Status:         domain.StatusDraft,
+			Items:          make([]domain.WorkOrderDraftItem, len(group.Items)),
+			InvestorSplits: group.InvestorSplits,
+		}
+
+		for j, item := range group.Items {
+			finalDose := item.FinalDose
+			if finalDose.LessThanOrEqual(decimal.Zero) {
+				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
+			}
+
+			draft.Items[j] = domain.WorkOrderDraftItem{
+				SupplyID:  item.SupplyID,
+				TotalUsed: item.TotalUsed,
+				FinalDose: finalDose,
+			}
+		}
+
+		if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
+			return err
+		}
+
+		if err := validateDraft(draft); err != nil {
+			return err
+		}
+
+		drafts[i] = draft
+	}
+
+	return u.repo.UpdateWorkOrderDraftGroup(ctx, drafts)
 }
 
 func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
@@ -629,7 +691,7 @@ func (u *UseCases) validateDigitalNumberForPublish(ctx context.Context, projectI
 		return types.NewError(types.ErrValidation, "digital work order number must have format D-<number> or D-<number>.<suffix>", nil)
 	}
 
-	if baseSequenceUsedByDifferentNumber(base, number, occupied) {
+	if digitalBaseNumberRE.MatchString(number) && baseSequenceUsedByDifferentNumber(base, number, occupied) {
 		return newWorkOrderNumberConflictError(number, projectID)
 	}
 
@@ -838,4 +900,120 @@ func newWorkOrderNumberConflictError(number string, projectID int64) error {
 		fmt.Sprintf("work order already exists for number %s and project %d", number, projectID),
 		nil,
 	)
+}
+
+func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrderDraftGroup {
+	first := drafts[0]
+
+	group := &domain.WorkOrderDraftGroup{
+		ID:                   first.ID,
+		Number:               groupBaseNumber(first.Number),
+		Date:                 first.Date,
+		CustomerID:           first.CustomerID,
+		CustomerName:         first.CustomerName,
+		ProjectID:            first.ProjectID,
+		ProjectName:          first.ProjectName,
+		CampaignID:           first.CampaignID,
+		CampaignName:         first.CampaignName,
+		FieldID:              first.FieldID,
+		FieldName:            first.FieldName,
+		CropID:               first.CropID,
+		CropName:             first.CropName,
+		LaborID:              first.LaborID,
+		LaborName:            first.LaborName,
+		Contractor:           first.Contractor,
+		Observations:         first.Observations,
+		InvestorID:           first.InvestorID,
+		IsDigital:            first.IsDigital,
+		Status:               groupDraftStatus(drafts),
+		PublishedWorkOrderID: first.PublishedWorkOrderID,
+		ReviewNotes:          first.ReviewNotes,
+		InvestorSplits:       first.InvestorSplits,
+		Base:                 first.Base,
+	}
+
+	group.Lots = make([]domain.WorkOrderDraftGroupLot, 0, len(drafts))
+	totalArea := decimal.Zero
+
+	for _, draft := range drafts {
+		totalArea = totalArea.Add(draft.EffectiveArea)
+
+		group.Lots = append(group.Lots, domain.WorkOrderDraftGroupLot{
+			DraftID:       draft.ID,
+			Number:        draft.Number,
+			LotID:         draft.LotID,
+			LotName:       draft.LotName,
+			EffectiveArea: draft.EffectiveArea,
+			Status:        draft.Status,
+		})
+	}
+
+	group.EffectiveArea = totalArea
+
+	if len(first.Items) > 0 {
+		group.Items = make([]domain.WorkOrderDraftItem, len(first.Items))
+		copy(group.Items, first.Items)
+	}
+
+	return group
+}
+
+func groupDraftStatus(drafts []*domain.WorkOrderDraft) domain.Status {
+	if len(drafts) == 0 {
+		return ""
+	}
+
+	status := drafts[0].Status
+	for _, draft := range drafts[1:] {
+		if draft.Status != status {
+			return domain.StatusPendingReview
+		}
+	}
+
+	return status
+}
+
+func (u *UseCases) GetWorkOrderDraftPDFData(ctx context.Context, id int64) (*pdfDocumentData, error) {
+	if id <= 0 {
+		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+
+	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	data := buildSingleDraftPDFData(draft)
+	return &data, nil
+}
+
+func (u *UseCases) GetWorkOrderDraftGroupPDFData(ctx context.Context, id int64) (*pdfDocumentData, error) {
+	if id <= 0 {
+		return nil, types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+
+	draft, err := u.repo.GetWorkOrderDraftByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	baseSequence, ok := extractBaseSequence(draft.Number)
+	if !ok {
+		return nil, types.NewError(types.ErrValidation, "invalid work order draft number", nil)
+	}
+
+	baseNumber := fmt.Sprintf("D-%d", baseSequence)
+
+	related, err := u.repo.ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx, draft.ProjectID, baseNumber)
+	if err != nil {
+		return nil, err
+	}
+	if len(related) == 0 {
+		return nil, types.NewError(types.ErrNotFound, "related work order drafts not found", nil)
+	}
+
+	sortDigitalDraftGroup(related)
+
+	data := buildGroupDraftPDFData(related)
+	return &data, nil
 }

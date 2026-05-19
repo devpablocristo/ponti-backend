@@ -23,10 +23,9 @@ func ProvideWorkOrderDraftRepositoryPort(r *workorderdraft.Repository) workorder
 func ProvideWorkOrderDraftUseCases(
 	repo workorderdraft.RepositoryPort,
 	publisher workorderdraft.PublisherPort,
-	pdfExporter workorderdraft.PDFExporterPort,
 	supplyReader workorderdraft.SupplyReaderPort,
 ) *workorderdraft.UseCases {
-	return workorderdraft.NewUseCases(repo, publisher, pdfExporter, supplyReader)
+	return workorderdraft.NewUseCases(repo, publisher, supplyReader)
 }
 
 func ProvideWorkOrderDraftUseCasesPort(uc *workorderdraft.UseCases) workorderdraft.UseCasesPort {
@@ -35,10 +34,6 @@ func ProvideWorkOrderDraftUseCasesPort(uc *workorderdraft.UseCases) workorderdra
 
 func ProvideWorkOrderDraftPublisherPort(repo workorder.RepositoryPort) workorderdraft.PublisherPort {
 	return repo
-}
-
-func ProvideWorkOrderDraftPDFExporterPort() workorderdraft.PDFExporterPort {
-	return workorderdraft.NewPDFExporter()
 }
 
 func ProvideWorkOrderDraftSupplyReaderPort(repo supply.RepositoryPort) workorderdraft.SupplyReaderPort {
@@ -76,7 +71,6 @@ var WorkOrderDraftSet = wire.NewSet(
 	ProvideWorkOrderDraftUseCases,
 	ProvideWorkOrderDraftUseCasesPort,
 	ProvideWorkOrderDraftPublisherPort,
-	ProvideWorkOrderDraftPDFExporterPort,
 	ProvideWorkOrderDraftHandler,
 	ProvideWorkOrderDraftConfigAPI,
 	ProvideWorkOrderDraftGormEnginePort,
