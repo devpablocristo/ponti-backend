@@ -41,7 +41,6 @@ type SupplyReaderPort interface {
 	GetSupply(context.Context, int64) (*supplydomain.Supply, error)
 }
 
-
 type UseCases struct {
 	repo         RepositoryPort
 	publisher    PublisherPort
