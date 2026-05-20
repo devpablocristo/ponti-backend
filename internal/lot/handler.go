@@ -16,12 +16,10 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	// excel
-	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
-
 	// project
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
@@ -324,9 +322,7 @@ func (h *Handler) ExportLots(c *gin.Context) {
 		return
 	}
 
-	filename := lotExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

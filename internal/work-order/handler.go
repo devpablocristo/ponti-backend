@@ -11,8 +11,8 @@ import (
 
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
@@ -297,11 +297,9 @@ func (h *Handler) ExportWorkOrders(c *gin.Context) {
 		return
 	}
 
-	filename := workOrderExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 // ArchiveWorkOrder ejecuta soft delete (archivado) de la work order.

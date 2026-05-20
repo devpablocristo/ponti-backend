@@ -12,9 +12,9 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
 	"github.com/devpablocristo/ponti-backend/internal/stock/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
@@ -351,9 +351,7 @@ func (h *Handler) ExportStocksByProject(c *gin.Context) {
 		return
 	}
 
-	filename := stockExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

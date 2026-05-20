@@ -142,12 +142,7 @@ func Initialize() (*Dependencies, error) {
 	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
 	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
 	lotGinEnginePort := ProvideLotGinEnginePort(server)
-	lotExcelService, err := ProvideLotPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	xlsxEnginePort := ProvideLotXLSXEnginePort(lotExcelService)
-	exporterAdapterPort := ProvideLotExporterPort(xlsxEnginePort)
+	exporterAdapterPort := ProvideLotExporterPort()
 	lotUseCases := ProvideLotUseCases(lotRepositoryPort, exporterAdapterPort)
 	lotUseCasesPort := ProvideLotUseCasesPort(lotUseCases)
 	lotConfigAPIPort := ProvideLotConfigAPI(config)
@@ -209,18 +204,8 @@ func Initialize() (*Dependencies, error) {
 	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
 	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
 	supplyRepositoryPort := ProvideSupplyRepositoryPort(supplyRepository)
-	supplyExcelService, err := ProvideSupplyPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	supplyXLSXEnginePort := ProvideSupplyXLSXEnginePort(supplyExcelService)
-	supplyExporterAdapterPort := ProvideSupplyExporterPort(supplyXLSXEnginePort)
-	stockExcelService, err := ProvideStockPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	stockXLSXEnginePort := ProvideStockXLSXEnginePort(stockExcelService)
-	stockExporterAdapterPort := ProvideStockExporterPort(stockXLSXEnginePort)
+	supplyExporterAdapterPort := ProvideSupplyExporterPort()
+	stockExporterAdapterPort := ProvideStockExporterPort()
 	stockUseCases := ProvideStockUseCases(stockRepositoryPort, stockExporterAdapterPort, projectUseCasesPort)
 	stockUseCasesPort := ProvideSupplyStockUseCasesPort(stockUseCases)
 	supplyUseCases := ProvideSupplyUseCases(supplyRepositoryPort, supplyExporterAdapterPort, stockUseCasesPort)
@@ -265,12 +250,7 @@ func Initialize() (*Dependencies, error) {
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	workorderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
-	service, err := ProvidePkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	workorderXLSXEnginePort := ProvideXLSXEnginePort(service)
-	workorderExporterAdapterPort := ProvideExporterPort(workorderXLSXEnginePort)
+	workorderExporterAdapterPort := ProvideWorkOrderExporterPort()
 	workorderUseCases := ProvideWorkOrderUseCases(workorderRepositoryPort, workorderExporterAdapterPort)
 	workorderUseCasesPort := ProvideWorkOrderUseCasesPort(workorderUseCases)
 	workorderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
@@ -280,12 +260,7 @@ func Initialize() (*Dependencies, error) {
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
 	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
-	laborExcelService, err := ProvideLaborPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	laborXLSXEnginePort := ProvideLaborXLSXEnginePort(laborExcelService)
-	laborExporterAdapterPort := ProvideLaborExporterPort(laborXLSXEnginePort)
+	laborExporterAdapterPort := ProvideLaborExporterPort()
 	laborUseCases := ProvideLaborUseCases(laborRepositoryPort, laborExporterAdapterPort, projectUseCasesPort)
 	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)

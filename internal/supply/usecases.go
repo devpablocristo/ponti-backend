@@ -66,7 +66,7 @@ type StockUseCasesPort interface {
 
 type UseCases struct {
 	repo          RepositoryPort
-	excel         ExporterAdapterPort
+	exporter      ExporterAdapterPort
 	stockUseCases StockUseCasesPort
 }
 
@@ -80,10 +80,10 @@ type SupplyMovementImportFailure struct {
 	Message         string
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
 	return &UseCases{
 		repo:          repo,
-		excel:         excel,
+		exporter:      exporter,
 		stockUseCases: stockUseCases,
 	}
 }
@@ -283,7 +283,7 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 }
 
 func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -305,5 +305,5 @@ func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.Supply
 		itemPointers[i] = &items[i]
 	}
 
-	return u.excel.ExportSupplies(ctx, itemPointers)
+	return u.exporter.ExportSupplies(ctx, itemPointers)
 }

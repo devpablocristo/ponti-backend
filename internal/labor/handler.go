@@ -11,9 +11,9 @@ import (
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
 	"github.com/devpablocristo/ponti-backend/internal/labor/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
@@ -423,11 +423,9 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 		return
 	}
 
-	filename := labexcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
@@ -462,11 +460,9 @@ func (h *Handler) ExportProjectLabors(c *gin.Context) {
 		return
 	}
 
-	filename := "labores_base_datos.xlsx"
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVTableExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
@@ -487,9 +483,7 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 		return
 	}
 
-	filename := "labores_base_datos.xlsx"
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVTableExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

@@ -12,8 +12,8 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
 	createDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/create"
 	getDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/get"
 	listDto "github.com/devpablocristo/ponti-backend/internal/supply/handler/dto/list"
@@ -464,11 +464,9 @@ func (h *Handler) ExportTableSupplies(c *gin.Context) {
 		return
 	}
 
-	filename := supplyExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVSupplyTableFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 func (h *Handler) CreateSupplyMovement(c *gin.Context) {
@@ -987,9 +985,7 @@ func (h *Handler) ExportSupplyMovementsByProjectID(c *gin.Context) {
 		return
 	}
 
-	filename := supplyExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVSupplyMovementsFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

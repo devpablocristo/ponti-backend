@@ -688,7 +688,7 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 }
 
 func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -701,7 +701,7 @@ func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, project
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.ExportSupplyMovements(ctx, items)
+	return u.exporter.ExportSupplyMovements(ctx, items)
 }
 
 // errorMessage extracts the human-readable message from a domainerr.Error,

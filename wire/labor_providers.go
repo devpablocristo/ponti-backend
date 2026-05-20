@@ -1,13 +1,8 @@
 package wire
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/devpablocristo/ponti-backend/cmd/config"
 	"github.com/devpablocristo/ponti-backend/internal/labor"
-	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
-	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
@@ -24,37 +19,12 @@ func ProvideLaborRepositoryPort(r *labor.Repository) labor.RepositoryPort {
 	return r
 }
 
-type LaborExcelService struct {
-	*pkgexcel.Service
+// ProvideLaborExporterPort entrega el exporter CSV.
+func ProvideLaborExporterPort() labor.ExporterAdapterPort {
+	return labor.NewCSVExporter()
 }
 
-// ProvideLaborPkgExcelService crea el engine de Excel ya configurado.
-func ProvideLaborPkgExcelService() (*LaborExcelService, error) {
-	fp := filepath.Join(os.TempDir(), labexcel.DefaultFilename)
-	write := true
-	s, err := pkgexcel.Bootstrap(fp,
-		labexcel.SheetName,
-		labexcel.DateFormat,
-		&write,
-		labexcel.ColumnWidths,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &LaborExcelService{s}, nil
-}
-
-// ProvideLaborXLSXEnginePort bindea el engine como interfaz XLSXEnginePort.
-func ProvideLaborXLSXEnginePort(s *LaborExcelService) labor.XLSXEnginePort {
-	return s
-}
-
-// ProvideLaborExporterPort crea el adaptador de exportación que usa el engine.
-func ProvideLaborExporterPort(eng labor.XLSXEnginePort) labor.ExporterAdapterPort {
-	return labor.NewExcelExporter(eng)
-}
-
-// ProvideLaborUseCases agrupa repositorio y servicio
+// ProvideLaborUseCases agrupa repositorio y exporter CSV.
 func ProvideLaborUseCases(rep labor.RepositoryPort, exp labor.ExporterAdapterPort, projectUC project.UseCasesPort) *labor.UseCases {
 	return labor.NewUseCases(rep, exp, projectUC)
 }
@@ -97,7 +67,5 @@ var LaborSet = wire.NewSet(
 	ProvideLaborGormEnginePort,
 	ProvideLaborGinEnginePort,
 	ProvideLaborMiddlewaresEnginePort,
-	ProvideLaborPkgExcelService,
-	ProvideLaborXLSXEnginePort,
 	ProvideLaborExporterPort,
 )

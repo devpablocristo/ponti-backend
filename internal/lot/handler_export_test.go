@@ -82,7 +82,7 @@ func (s *exportLotsUseCasesStub) ExportLots(_ context.Context, filter domain.Lot
 	s.filter = filter
 	s.page = page
 	s.pageSize = pageSize
-	return []byte("xlsx"), nil
+	return []byte("csv"), nil
 }
 
 func TestExportLotsIgnoresRequestedPageAndUsesBackendLimit(t *testing.T) {
@@ -113,7 +113,7 @@ func TestExportLotsIgnoresRequestedPageAndUsesBackendLimit(t *testing.T) {
 	if stub.filter.ProjectID == nil || *stub.filter.ProjectID != 30 {
 		t.Fatalf("project filter = %#v, want 30", stub.filter.ProjectID)
 	}
-	if got := recorder.Header().Get("Content-Type"); got != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+	if got := recorder.Header().Get("Content-Type"); got != "text/csv; charset=utf-8" {
 		t.Fatalf("content type = %q", got)
 	}
 }

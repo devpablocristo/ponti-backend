@@ -37,13 +37,13 @@ type ExporterAdapterPort interface {
 }
 
 type UseCases struct {
-	repo  RepositoryPort
-	excel ExporterAdapterPort
+	repo     RepositoryPort
+	exporter ExporterAdapterPort
 }
 
 // NewUseCases crea una instancia de casos de uso para work orders.
-func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
-	return &UseCases{repo: r, excel: excel}
+func NewUseCases(r RepositoryPort, exporter ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: r, exporter: exporter}
 }
 
 func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
@@ -257,7 +257,7 @@ func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkOrderFilter) (*d
 }
 
 func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFilter, inp types.Input) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -270,7 +270,7 @@ func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFi
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }
 
 func (u *UseCases) validateHarvestAreaLimit(ctx context.Context, o *domain.WorkOrder, excludeWorkOrderID int64) error {

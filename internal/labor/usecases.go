@@ -41,12 +41,12 @@ type ProjectUseCasesPort interface {
 
 type UseCases struct {
 	repo      RepositoryPort
-	excel     ExporterAdapterPort
+	exporter  ExporterAdapterPort
 	projectUC ProjectUseCasesPort
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter, projectUC: projectUC}
 }
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
@@ -152,7 +152,7 @@ func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Inpu
 }
 
 func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -172,11 +172,11 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }
 
 func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -189,7 +189,7 @@ func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.ExportTable(ctx, items)
+	return u.exporter.ExportTable(ctx, items)
 }
 
 func (u *UseCases) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {

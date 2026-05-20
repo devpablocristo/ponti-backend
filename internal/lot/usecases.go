@@ -37,12 +37,12 @@ type ExporterAdapterPort interface {
 }
 
 type UseCases struct {
-	repo  RepositoryPort
-	excel ExporterAdapterPort
+	repo     RepositoryPort
+	exporter ExporterAdapterPort
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter}
 }
 
 func (u *UseCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
@@ -109,7 +109,7 @@ func (u *UseCases) ListLots(
 }
 
 func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -122,5 +122,5 @@ func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, 
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }

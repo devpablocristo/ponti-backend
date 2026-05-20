@@ -63,14 +63,14 @@ type ProjectUseCasesPort interface {
 
 type UseCases struct {
 	repo      RepositoryPort
-	excel     ExporterAdapterPort
+	exporter  ExporterAdapterPort
 	projectUC ProjectUseCasesPort
 	notifier  BusinessInsightsNotifier
 }
 
 // NewUseCases crea una instancia de casos de uso para stock.
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter, projectUC: projectUC}
 }
 
 // SetBusinessInsightsNotifier conecta el notifier despues de wire (la
@@ -268,7 +268,7 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 
 // ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
 func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -286,7 +286,7 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }
 
 func (u *UseCases) validateProject(ctx context.Context, projectID int64) error {
