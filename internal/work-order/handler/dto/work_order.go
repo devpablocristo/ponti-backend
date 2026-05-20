@@ -47,6 +47,7 @@ type WorkOrder struct {
 	LotID          int64           `json:"lot_id" binding:"required"`
 	CropID         int64           `json:"crop_id" binding:"required"`
 	LaborID        int64           `json:"labor_id" binding:"required"`
+	IsDigital      bool            `json:"is_digital"`
 	Contractor     string          `json:"contractor"`
 	Observations   string          `json:"observations"`
 	Date           time.Time       `json:"date" binding:"required"`
@@ -67,6 +68,7 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 		LotID          int64           `json:"lot_id"`
 		CropID         int64           `json:"crop_id"`
 		LaborID        int64           `json:"labor_id"`
+		IsDigital      bool            `json:"is_digital"`
 		Contractor     string          `json:"contractor"`
 		Observations   string          `json:"observations"`
 		Date           time.Time       `json:"date"`
@@ -83,6 +85,7 @@ func (r WorkOrder) MarshalJSON() ([]byte, error) {
 		LotID:          r.LotID,
 		CropID:         r.CropID,
 		LaborID:        r.LaborID,
+		IsDigital:      r.IsDigital,
 		Contractor:     r.Contractor,
 		Observations:   r.Observations,
 		Date:           r.Date,
@@ -113,6 +116,7 @@ func (r *WorkOrder) ToDomain() *domain.WorkOrder {
 		LotID:          r.LotID,
 		CropID:         r.CropID,
 		LaborID:        r.LaborID,
+		IsDigital:      r.IsDigital,
 		Contractor:     r.Contractor,
 		Observations:   r.Observations,
 		Date:           r.Date,
@@ -165,6 +169,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		LotID:          o.LotID,
 		CropID:         o.CropID,
 		LaborID:        o.LaborID,
+		IsDigital:      o.IsDigital,
 		Contractor:     o.Contractor,
 		Observations:   o.Observations,
 		Date:           o.Date,
