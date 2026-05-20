@@ -18,6 +18,7 @@ type WorkOrder struct {
 	LotID         int64
 	CropID        int64
 	LaborID       int64
+	IsDigital     bool
 	Contractor    string
 	Observations  string
 	Date          time.Time
