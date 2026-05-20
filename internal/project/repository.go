@@ -200,7 +200,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 					`INSERT INTO project_managers (tenant_id, project_id, manager_id, created_by, updated_by)
 					 VALUES (?, ?, ?, ?, ?)
 					 ON CONFLICT (project_id, manager_id)
-					 DO UPDATE SET tenant_id = EXCLUDED.tenant_id, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+					 DO UPDATE SET tenant_id = EXCLUDED.tenant_id, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
 					tenantID, projectID, managerID, p.CreatedBy, p.UpdatedBy,
 				).Error; err != nil {
 					return domainerr.Internal("failed to add manager")

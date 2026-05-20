@@ -76,7 +76,13 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 		CREATE TABLE campaigns (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id TEXT NOT NULL,
-			name TEXT NOT NULL
+			name TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			created_by TEXT,
+			updated_by TEXT,
+			deleted_by TEXT
 		);
 		CREATE TABLE fields (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,7 +154,8 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			archive_batch_id INTEGER,
 			archive_origin_entity TEXT,
 			archive_origin_id INTEGER,
-			archive_reason TEXT
+			archive_reason TEXT,
+			UNIQUE(project_id, manager_id)
 		);
 		CREATE TABLE investors (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

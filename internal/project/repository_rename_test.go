@@ -106,6 +106,201 @@ func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 	}
 }
 
+func int64Ptr(v int64) *int64 { return &v }
+
+// Case 1: create project with a brand-new customer (no id, no actor_id).
+// Expected: the BE creates the customer in `customers` (and an actor in
+// `actors` under postgres, here only legacy is asserted because sqlite
+// disables the actor sync).
+func TestCreateProjectCreatesCustomerWithoutId(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO campaigns (id, tenant_id, name) VALUES (300, ?, '2025-2026');
+	`, tenantID.String()).Error; err != nil {
+		t.Fatalf("seed campaign: %v", err)
+	}
+
+	pid, err := repo.CreateProject(projectTenantContext(tenantID), &domain.Project{
+		Name:        "PROYECTO NUEVO",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{Name: "CLIENTE NUEVO"},
+		Campaign:    campdom.Campaign{ID: 300, Name: "2025-2026"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if pid <= 0 {
+		t.Fatalf("expected project id > 0, got %d", pid)
+	}
+
+	var custID int64
+	if err := db.Raw(`SELECT customer_id FROM projects WHERE id = ?`, pid).Scan(&custID).Error; err != nil {
+		t.Fatalf("read project customer_id: %v", err)
+	}
+	if custID <= 0 {
+		t.Fatalf("expected project linked to a customer, got customer_id=%d", custID)
+	}
+	var custName string
+	if err := db.Raw(`SELECT name FROM customers WHERE id = ?`, custID).Scan(&custName).Error; err != nil {
+		t.Fatalf("read customer name: %v", err)
+	}
+	if custName != "CLIENTE NUEVO" {
+		t.Fatalf("expected customer name CLIENTE NUEVO, got %q", custName)
+	}
+}
+
+// Case 4: swap the project's customer to a different one by sending a new
+// customer.id in the PUT payload.
+func TestUpdateProjectSwapsCustomer(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(400, ?, 'OLD CUSTOMER', NULL),
+			(401, ?, 'NEW CUSTOMER', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES (400, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(400, ?, 'SWAP TEST', 400, 400, 0, 0, ?, ?, NULL);
+	`,
+		tenantID.String(), tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+	).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.UpdateProject(projectTenantContext(tenantID), &domain.Project{
+		ID:          400,
+		Name:        "SWAP TEST",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{ID: 401, Name: "NEW CUSTOMER"},
+		Campaign:    campdom.Campaign{ID: 400, Name: "2025-2026"},
+		Base:        shareddomain.Base{UpdatedAt: now},
+	}); err != nil {
+		t.Fatalf("update project: %v", err)
+	}
+
+	var custID int64
+	if err := db.Raw(`SELECT customer_id FROM projects WHERE id = 400`).Scan(&custID).Error; err != nil {
+		t.Fatalf("read project customer_id: %v", err)
+	}
+	if custID != 401 {
+		t.Fatalf("expected project customer_id swapped to 401, got %d", custID)
+	}
+}
+
+// Case 5: create project with a new manager that has no actor_id (legacy
+// flow). Expected: a row in `managers` is created with the requested name.
+func TestCreateProjectCreatesManagerWithoutActorID(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES (500, ?, 'CUSTOMER', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES (500, ?, '2025-2026');
+	`, tenantID.String(), tenantID.String()).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	pid, err := repo.CreateProject(projectTenantContext(tenantID), &domain.Project{
+		Name:        "PROYECTO CON MANAGER NUEVO",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{ID: 500, Name: "CUSTOMER"},
+		Campaign:    campdom.Campaign{ID: 500, Name: "2025-2026"},
+		Managers: []mgrdom.Manager{
+			{Name: "MANAGER NUEVO"},
+		},
+		Base: shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	var managerName string
+	if err := db.Raw(`
+		SELECT m.name FROM managers m
+		JOIN project_managers pm ON pm.manager_id = m.id
+		WHERE pm.project_id = ?
+	`, pid).Scan(&managerName).Error; err != nil {
+		t.Fatalf("read manager via project: %v", err)
+	}
+	if managerName != "MANAGER NUEVO" {
+		t.Fatalf("expected manager name MANAGER NUEVO, got %q", managerName)
+	}
+}
+
+// Case 7: update project swapping the manager slot to a different one
+// referenced only by actor_id. The FE clears manager.id and sets actor_id,
+// and the BE resolves the legacy row via legacy_actor_map.
+func TestUpdateProjectSwapsManagerByActorID(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES (700, ?, 'CUSTOMER', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES (700, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(700, ?, 'SWAP MGR', 700, 700, 0, 0, ?, ?, NULL);
+		INSERT INTO managers (id, tenant_id, name, created_at, updated_at, deleted_at) VALUES
+			(700, ?, 'OLD MGR', ?, ?, NULL),
+			(701, ?, 'NEW MGR', ?, ?, NULL);
+		INSERT INTO project_managers (tenant_id, project_id, manager_id) VALUES
+			(?, 700, 700);
+		INSERT INTO legacy_actor_map (tenant_id, source_table, source_id, source_key, source_text, actor_id, confidence, mapping_status) VALUES
+			(?, 'managers', 700, '700', 'OLD MGR', 9001, 1.0, 'auto_matched'),
+			(?, 'managers', 701, '701', 'NEW MGR', 9002, 1.0, 'auto_matched');
+	`,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
+	).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.UpdateProject(projectTenantContext(tenantID), &domain.Project{
+		ID:          700,
+		Name:        "SWAP MGR",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{ID: 700, Name: "CUSTOMER"},
+		Campaign:    campdom.Campaign{ID: 700, Name: "2025-2026"},
+		Managers: []mgrdom.Manager{
+			{ID: 0, ActorID: int64Ptr(9002), Name: "NEW MGR"},
+		},
+		Base: shareddomain.Base{UpdatedAt: now},
+	}); err != nil {
+		t.Fatalf("update project: %v", err)
+	}
+
+	var linkedManagerID int64
+	if err := db.Raw(`SELECT manager_id FROM project_managers WHERE project_id = 700`).Scan(&linkedManagerID).Error; err != nil {
+		t.Fatalf("read linked manager: %v", err)
+	}
+	if linkedManagerID != 701 {
+		t.Fatalf("expected project_managers.manager_id=701 after swap, got %d", linkedManagerID)
+	}
+}
+
 // TestGetProjectHydratesActorIDFromLegacyMap verifies that when a manager
 // has a row in legacy_actor_map but no direct actor_id column (which is the
 // default for managers/investors before this hydration was added), GetProject
