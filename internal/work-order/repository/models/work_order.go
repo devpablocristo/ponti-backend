@@ -34,6 +34,7 @@ type WorkOrder struct {
 	Crop           cropmod.Crop             `gorm:"foreignKey:CropID"`
 	LaborID        int64                    `gorm:"not null"`
 	Labor          labormod.Labor           `gorm:"foreignKey:LaborID"`
+	IsDigital      bool                     `gorm:"column:is_digital;not null;default:false"`
 	Contractor     string                   `gorm:"size:100"`
 	Observations   string                   `gorm:"size:1000"`
 	Date           time.Time                `gorm:"type:date;not null"`
@@ -71,6 +72,7 @@ func FromDomain(o *domain.WorkOrder) *WorkOrder {
 		LotID:         o.LotID,
 		CropID:        o.CropID,
 		LaborID:       o.LaborID,
+		IsDigital:     o.IsDigital,
 		Contractor:    o.Contractor,
 		Observations:  o.Observations,
 		Date:          o.Date,
@@ -145,6 +147,7 @@ func (m *WorkOrder) ToDomain() *domain.WorkOrder {
 		LotID:          m.LotID,
 		CropID:         m.CropID,
 		LaborID:        m.LaborID,
+		IsDigital:      m.IsDigital,
 		Contractor:     m.Contractor,
 		Observations:   m.Observations,
 		Date:           m.Date,
