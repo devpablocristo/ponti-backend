@@ -29,7 +29,6 @@ type RepositoryPort interface {
 	ExistsSupplyMovementByProjectReferenceSupplyAndType(context.Context, int64, string, int64, string) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
-	DeleteSupply(context.Context, int64) error
 	HardDeleteSupply(context.Context, int64) error
 	ListArchivedSupplies(context.Context, int, int) ([]domain.Supply, int64, error)
 	ListSuppliesPaginated(context.Context, domain.SupplyFilter, string, int, int) ([]domain.Supply, int64, error)
@@ -222,10 +221,6 @@ func (u *UseCases) CompletePendingSupply(ctx context.Context, s *domain.Supply) 
 	s.Name = normalizeSupplyName(s.Name)
 	s.IsPending = false
 	return u.repo.UpdateSupply(ctx, s)
-}
-
-func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
-	return u.repo.DeleteSupply(ctx, id)
 }
 
 func (u *UseCases) HardDeleteSupply(ctx context.Context, id int64) error {

@@ -664,8 +664,3 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 	})
 }
 
-// DeleteCustomer queda como alias hacia HardDeleteCustomer.
-// Deprecated: usar HardDeleteCustomer.
-func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
-	return r.HardDeleteCustomer(ctx, id)
-}

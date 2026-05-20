@@ -328,11 +328,6 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	})
 }
 
-// DeleteWorkOrderByID se mantiene como alias de HardDeleteWorkOrder por compatibilidad.
-// Deprecated: usar HardDeleteWorkOrder.
-func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
-	return r.HardDeleteWorkOrder(ctx, id)
-}
 
 // ListArchivedWorkOrders lista ordenes archivadas con nombres joineados (project, field, lot, labor).
 // Si filter.LotID > 0, filtra solo las WOs de ese lote.

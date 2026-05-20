@@ -1093,12 +1093,6 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 	})
 }
 
-// DeleteProject queda como alias hacia HardDeleteProject.
-// Deprecated: usar HardDeleteProject.
-func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
-	return r.HardDeleteProject(ctx, id)
-}
-
 // --- HELPERS ---
 
 func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {

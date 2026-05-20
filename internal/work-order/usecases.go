@@ -19,7 +19,6 @@ type RepositoryPort interface {
 	GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
-	DeleteWorkOrderByID(context.Context, int64) error
 	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -223,10 +222,6 @@ func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, err
 		return "", domainerr.Validation("invalid investor payment status")
 	}
 }
-func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
-	return u.repo.DeleteWorkOrderByID(ctx, id)
-}
-
 func (u *UseCases) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.HardDeleteWorkOrder(ctx, id)
 }

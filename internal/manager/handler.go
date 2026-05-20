@@ -84,7 +84,6 @@ func (h *Handler) Routes() {
 		group.POST("/:manager_id/archive", h.ArchiveManager)
 		group.POST("/:manager_id/restore", h.RestoreManager)
 		group.DELETE("/:manager_id/hard", h.HardDeleteManager)
-		group.DELETE("/:manager_id", h.HardDeleteManager) // legacy alias hacia hard delete
 	}
 }
 

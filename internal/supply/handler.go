@@ -29,7 +29,6 @@ type UseCasesPort interface {
 	GetSuppliesByIDs(ctx context.Context, ids []int64) (map[int64]domain.Supply, error)
 	UpdateSupply(ctx context.Context, s *domain.Supply) error
 	CompletePendingSupply(ctx context.Context, s *domain.Supply) error
-	DeleteSupply(ctx context.Context, id int64) error
 	HardDeleteSupply(ctx context.Context, id int64) error
 	ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error)
 	CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
@@ -159,7 +158,6 @@ func (h *Handler) Routes() {
 		supplies.POST("/:supply_id/archive", h.ArchiveSupply)
 		supplies.POST("/:supply_id/restore", h.RestoreSupply)
 		supplies.DELETE("/:supply_id/hard", h.HardDeleteSupply)
-		supplies.DELETE("/:supply_id", h.DeleteSupply) // legacy: hard delete
 		supplies.GET("/:supply_id/workorders-count", h.CountWorkOrdersBySupplyID)
 	}
 
@@ -360,10 +358,6 @@ func (h *Handler) CompletePendingSupply(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteSupply(c *gin.Context) {
-	h.runSupplyIDAction(c, h.ucs.DeleteSupply)
 }
 
 func (h *Handler) HardDeleteSupply(c *gin.Context) {

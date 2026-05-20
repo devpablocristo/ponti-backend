@@ -30,7 +30,6 @@ type UseCasesPort interface {
 	UpdateProject(context.Context, *domain.Project) error
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
-	DeleteProject(context.Context, int64) error
 	HardDeleteProject(context.Context, int64) error
 }
 
@@ -100,7 +99,6 @@ func (h *Handler) Routes() {
 		public.POST("/:project_id/archive", h.ArchiveProject)
 		public.POST("/:project_id/restore", h.RestoreProject)
 		public.DELETE("/:project_id/hard", h.HardDeleteProject)
-		public.DELETE("/:project_id", h.DeleteProject) // legacy alias hacia hard delete
 		public.GET("/search", h.ListProjectsByName)
 	}
 }
@@ -268,11 +266,6 @@ func (h *Handler) ArchiveProject(c *gin.Context) {
 // RestoreProject restaura un proyecto eliminado junto con todas sus entidades relacionadas
 func (h *Handler) RestoreProject(c *gin.Context) {
 	h.runProjectIDAction(c, h.ucs.RestoreProject)
-}
-
-// DeleteProject es alias legacy hacia HardDeleteProject (ruta DELETE /:id).
-func (h *Handler) DeleteProject(c *gin.Context) {
-	h.runProjectIDAction(c, h.ucs.DeleteProject)
 }
 
 // HardDeleteProject elimina definitivamente. Bloquea si tiene dependientes.

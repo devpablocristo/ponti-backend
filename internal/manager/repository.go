@@ -247,12 +247,6 @@ func (r *Repository) HardDeleteManager(ctx context.Context, id int64) error {
 	})
 }
 
-// DeleteManager queda como alias hacia HardDeleteManager para compatibilidad.
-// Deprecated: usar HardDeleteManager.
-func (r *Repository) DeleteManager(ctx context.Context, id int64) error {
-	return r.HardDeleteManager(ctx, id)
-}
-
 // ArchiveManager archiva (soft delete) un manager con validación.
 func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "manager"); err != nil {

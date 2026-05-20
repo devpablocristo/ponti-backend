@@ -18,13 +18,6 @@ func TestCustomerDeleteHandlersCallExplicitUseCases(t *testing.T) {
 		wantCall string
 	}{
 		{
-			name: "legacy delete calls legacy hard-delete alias",
-			run: func(h *Handler, c *gin.Context) {
-				h.DeleteCustomer(c)
-			},
-			wantCall: "delete:42",
-		},
-		{
 			name: "explicit hard delete calls hard-delete usecase",
 			run: func(h *Handler, c *gin.Context) {
 				h.HardDeleteCustomer(c)
@@ -91,14 +84,6 @@ func (s *customerDeleteUseCasesSpy) GetCustomer(context.Context, int64) (*domain
 
 func (s *customerDeleteUseCasesSpy) UpdateCustomer(context.Context, *domain.Customer) error {
 	panic("not implemented")
-}
-
-func (s *customerDeleteUseCasesSpy) DeleteCustomer(_ context.Context, id int64) error {
-	s.call = "delete:42"
-	if id != 42 {
-		s.call = "delete:unexpected"
-	}
-	return nil
 }
 
 func (s *customerDeleteUseCasesSpy) HardDeleteCustomer(_ context.Context, id int64) error {

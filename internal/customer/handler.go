@@ -18,7 +18,6 @@ type UseCasesPort interface {
 	ListArchivedCustomers(context.Context, int, int) ([]domain.ListedCustomer, int64, error)
 	GetCustomer(context.Context, int64) (*domain.Customer, error)
 	UpdateCustomer(context.Context, *domain.Customer) error
-	DeleteCustomer(context.Context, int64) error
 	HardDeleteCustomer(context.Context, int64) error
 	ArchiveCustomer(context.Context, int64) error
 	RestoreCustomer(context.Context, int64) error
@@ -82,7 +81,6 @@ func (h *Handler) Routes() {
 		public.POST("/:customer_id/archive", h.ArchiveCustomer)
 		public.POST("/:customer_id/restore", h.RestoreCustomer)
 		public.DELETE("/:customer_id/hard", h.HardDeleteCustomer)
-		public.DELETE("/:customer_id", h.DeleteCustomer) // legacy alias hacia hard delete
 	}
 }
 
@@ -181,11 +179,6 @@ func (h *Handler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
-}
-
-// DeleteCustomer es alias legacy hacia HardDeleteCustomer (ruta DELETE /:id).
-func (h *Handler) DeleteCustomer(c *gin.Context) {
-	h.runCustomerIDAction(c, h.ucs.DeleteCustomer)
 }
 
 // HardDeleteCustomer elimina definitivamente. Bloquea si tiene proyectos.

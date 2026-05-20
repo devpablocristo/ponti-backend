@@ -329,9 +329,6 @@ func TestSupplyRepositoryTenantIsolation(t *testing.T) {
 		t.Fatalf("cross-tenant restore modified supply 3")
 	}
 
-	if err := repo.DeleteSupply(ctxA, 2); err == nil {
-		t.Fatalf("expected delete cross-tenant supply to fail")
-	}
 	if err := repo.HardDeleteSupply(ctxA, 2); err == nil {
 		t.Fatalf("expected hard-delete cross-tenant supply to fail")
 	}

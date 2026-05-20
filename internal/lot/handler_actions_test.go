@@ -19,13 +19,6 @@ func TestLotIDActionHandlersCallExplicitUseCases(t *testing.T) {
 		wantCall string
 	}{
 		{
-			name: "legacy delete calls legacy hard delete alias",
-			run: func(h *Handler, c *gin.Context) {
-				h.DeleteLot(c)
-			},
-			wantCall: "delete:42",
-		},
-		{
 			name: "archive calls archive usecase",
 			run: func(h *Handler, c *gin.Context) {
 				h.ArchiveLot(c)
@@ -116,14 +109,6 @@ func (s *lotActionUseCasesSpy) HardDeleteLot(_ context.Context, id int64) error 
 
 func (s *lotActionUseCasesSpy) ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error) {
 	panic("not implemented")
-}
-
-func (s *lotActionUseCasesSpy) DeleteLot(_ context.Context, id int64) error {
-	s.call = "delete:42"
-	if id != 42 {
-		s.call = "delete:unexpected"
-	}
-	return nil
 }
 
 func (s *lotActionUseCasesSpy) ListLotsByField(context.Context, int64) ([]domain.Lot, error) {

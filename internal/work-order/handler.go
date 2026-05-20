@@ -23,7 +23,6 @@ type UseCasesPort interface {
 	DuplicateWorkOrder(context.Context, string) (string, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
-	DeleteWorkOrderByID(context.Context, int64) error
 	HardDeleteWorkOrder(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
@@ -92,7 +91,6 @@ func (h *Handler) Routes() {
 		grp.POST("/:work_order_id/archive", h.ArchiveWorkOrder)
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
 		grp.DELETE("/:work_order_id/hard", h.HardDeleteWorkOrder)
-		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID) // legacy: hard delete
 		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
 	}
@@ -192,11 +190,6 @@ func (h *Handler) UpdateInvestorPaymentStatus(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondNoContent(c)
-}
-
-// DeleteWorkOrderByID elimina una orden de trabajo.
-func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
-	h.runWorkOrderIDAction(c, h.ucs.DeleteWorkOrderByID)
 }
 
 // ListWorkOrders lista órdenes de trabajo con filtros.

@@ -254,12 +254,6 @@ func TestSupplyActionRoutesCallExplicitUseCases(t *testing.T) {
 			path:       "/api/v1/supplies/17/hard",
 			wantAction: "hard",
 		},
-		{
-			name:       "legacy delete route calls legacy hard-delete alias",
-			method:     http.MethodDelete,
-			path:       "/api/v1/supplies/17",
-			wantAction: "delete",
-		},
 	}
 
 	for _, tt := range tests {

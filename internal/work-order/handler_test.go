@@ -56,10 +56,6 @@ func (s *workOrderHandlerUseCasesStub) UpdateInvestorPaymentStatus(
 	}
 	return nil
 }
-func (s *workOrderHandlerUseCasesStub) DeleteWorkOrderByID(context.Context, int64) error {
-	s.actionCall = "delete"
-	return nil
-}
 func (s *workOrderHandlerUseCasesStub) HardDeleteWorkOrder(context.Context, int64) error {
 	s.actionCall = "hard"
 	return nil
@@ -139,12 +135,6 @@ func TestWorkOrderActionRoutesCallExplicitUseCases(t *testing.T) {
 			method:     http.MethodDelete,
 			path:       "/api/v1/work-orders/15/hard",
 			wantAction: "hard",
-		},
-		{
-			name:       "legacy delete route calls legacy hard-delete alias",
-			method:     http.MethodDelete,
-			path:       "/api/v1/work-orders/15",
-			wantAction: "delete",
 		},
 	}
 

@@ -82,8 +82,8 @@ func TestHardDeleteCustomer_BlocksWhenCustomerHasProjects(t *testing.T) {
 
 	require.NoError(t, tx.Commit().Error)
 
-	// Act: DeleteCustomer (hard) debe bloquear si hay proyectos asociados.
-	err = repo.DeleteCustomer(ctx, customerID)
+	// Act: HardDeleteCustomer debe bloquear si hay proyectos asociados.
+	err = repo.HardDeleteCustomer(ctx, customerID)
 
 	// Assert: debe fallar y preservar el customer.
 	require.Error(t, err)

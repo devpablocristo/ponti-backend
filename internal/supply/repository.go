@@ -345,10 +345,6 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 	return count, nil
 }
 
-func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
-	return r.HardDeleteSupply(ctx, id)
-}
-
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"

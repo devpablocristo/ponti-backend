@@ -65,13 +65,6 @@ func (f *fakeUseCases) RestoreProject(_ context.Context, id int64) error {
 	}
 	return nil
 }
-func (f *fakeUseCases) DeleteProject(_ context.Context, id int64) error {
-	f.actionCall = "delete"
-	if id != 25 {
-		f.actionCall = "delete:unexpected"
-	}
-	return nil
-}
 func (f *fakeUseCases) HardDeleteProject(_ context.Context, id int64) error {
 	f.actionCall = "hard"
 	if id != 25 {
@@ -133,12 +126,6 @@ func TestProjectActionRoutesCallExplicitUseCases(t *testing.T) {
 			method:     http.MethodDelete,
 			path:       "/api/v1/projects/25/hard",
 			wantAction: "hard",
-		},
-		{
-			name:       "legacy delete route calls legacy hard-delete alias",
-			method:     http.MethodDelete,
-			path:       "/api/v1/projects/25",
-			wantAction: "delete",
 		},
 	}
 

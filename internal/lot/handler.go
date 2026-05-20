@@ -35,7 +35,6 @@ type UseCasesPort interface {
 	RestoreLot(context.Context, int64) error
 	HardDeleteLot(context.Context, int64) error
 	ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error)
-	DeleteLot(context.Context, int64) error // legacy alias hacia HardDeleteLot
 	ListLotsByField(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
@@ -107,7 +106,6 @@ func (h *Handler) Routes() {
 		public.POST("/:lot_id/archive", h.ArchiveLot)
 		public.POST("/:lot_id/restore", h.RestoreLot)
 		public.DELETE("/:lot_id/hard", h.HardDeleteLot)
-		public.DELETE("/:lot_id", h.DeleteLot) // legacy alias hacia hard delete
 		public.GET("/export", h.ExportLots)
 	}
 }
@@ -236,10 +234,6 @@ func (h *Handler) UpdateLotTons(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteLot(c *gin.Context) {
-	h.runLotIDAction(c, h.ucs.DeleteLot)
 }
 
 func (h *Handler) ArchiveLot(c *gin.Context) {
