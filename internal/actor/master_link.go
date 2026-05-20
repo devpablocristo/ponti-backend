@@ -8,6 +8,8 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"gorm.io/gorm"
+
+	sharedtext "github.com/devpablocristo/ponti-backend/internal/shared/text"
 )
 
 type EnsureCustomerInput struct {
@@ -45,7 +47,7 @@ func EnsureCustomerFromActor(tx *gorm.DB, input EnsureCustomerInput) (*EnsureCus
 	if actorSyncDisabled(tx) {
 		return nil, nil
 	}
-	input.Name = strings.TrimSpace(input.Name)
+	input.Name = sharedtext.CanonicalizeName(input.Name)
 	if input.Name == "" && (input.ActorID == nil || *input.ActorID <= 0) {
 		return nil, domainerr.Validation("customer name or actor_id is required")
 	}
@@ -121,7 +123,7 @@ func EnsureLegacyEntityFromActor(tx *gorm.DB, input EnsureLegacyEntityInput) (in
 	if err != nil {
 		return 0, err
 	}
-	input.Name = strings.TrimSpace(input.Name)
+	input.Name = sharedtext.CanonicalizeName(input.Name)
 	if input.Name == "" && (input.ActorID == nil || *input.ActorID <= 0) {
 		return 0, domainerr.Validation("legacy entity name or actor_id is required")
 	}
@@ -184,7 +186,7 @@ func LinkLegacyEntityToActor(tx *gorm.DB, input LegacyActorSync, actorID int64) 
 	if input.SourceID <= 0 || actorID <= 0 {
 		return 0, domainerr.Validation("legacy source id and actor_id are required")
 	}
-	input.Name = strings.TrimSpace(input.Name)
+	input.Name = sharedtext.CanonicalizeName(input.Name)
 	if input.Name == "" {
 		return 0, domainerr.Validation("legacy name is required")
 	}
@@ -388,17 +390,17 @@ func attachCustomerToActor(tx *gorm.DB, tenantID string, customerID int64, actor
 		updates["deleted_at"] = nil
 		updates["deleted_by"] = nil
 	}
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName != "" {
-		updates["name"] = trimmedName
+	canonicalName := sharedtext.CanonicalizeName(name)
+	if canonicalName != "" {
+		updates["name"] = canonicalName
 	}
 	if err := tx.Table("customers").
 		Where("tenant_id = ? AND id = ?", tenantID, customerID).
 		Updates(updates).Error; err != nil {
 		return domainerr.Internal("failed to link customer to actor")
 	}
-	if trimmedName != "" {
-		if err := renameActorDisplayName(tx, actorID, trimmedName, updatedAt, updatedBy); err != nil {
+	if canonicalName != "" {
+		if err := renameActorDisplayName(tx, actorID, canonicalName, updatedAt, updatedBy); err != nil {
 			return err
 		}
 	}
@@ -406,7 +408,7 @@ func attachCustomerToActor(tx *gorm.DB, tenantID string, customerID int64, actor
 }
 
 func renameActorDisplayName(tx *gorm.DB, actorID int64, name string, updatedAt time.Time, updatedBy *string) error {
-	if actorID <= 0 || strings.TrimSpace(name) == "" {
+	if actorID <= 0 || sharedtext.CanonicalizeName(name) == "" {
 		return nil
 	}
 	if err := tx.Exec(`

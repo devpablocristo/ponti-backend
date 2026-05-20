@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +27,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
+	sharedtext "github.com/devpablocristo/ponti-backend/internal/shared/text"
 )
 
 type GormEnginePort interface {
@@ -1222,20 +1222,20 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 		}
 		if err := query.First(&existing, c.ID).Error; err == nil {
 			effectiveName := existing.Name
-			if strings.TrimSpace(c.Name) != "" && strings.TrimSpace(c.Name) != existing.Name {
-				newName := strings.TrimSpace(c.Name)
+			canonicalIncoming := sharedtext.CanonicalizeName(c.Name)
+			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
 				renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
 				if hasTenant {
 					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
 				}
 				if err := renameQuery.Updates(map[string]any{
-					"name":       newName,
+					"name":       canonicalIncoming,
 					"updated_at": time.Now(),
 					"updated_by": c.UpdatedBy,
 				}).Error; err != nil {
 					return 0, fmt.Errorf("failed to rename customer: %w", err)
 				}
-				effectiveName = newName
+				effectiveName = canonicalIncoming
 			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyCustomers,
@@ -1364,20 +1364,20 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 		}
 		if err := query.First(&existing, m.ID).Error; err == nil {
 			effectiveName := existing.Name
-			if strings.TrimSpace(m.Name) != "" && strings.TrimSpace(m.Name) != existing.Name {
-				newName := strings.TrimSpace(m.Name)
+			canonicalIncoming := sharedtext.CanonicalizeName(m.Name)
+			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
 				renameQuery := tx.Table("managers").Where("id = ?", existing.ID)
 				if hasTenant {
 					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
 				}
 				if err := renameQuery.Updates(map[string]any{
-					"name":       newName,
+					"name":       canonicalIncoming,
 					"updated_at": time.Now(),
 					"updated_by": m.UpdatedBy,
 				}).Error; err != nil {
 					return 0, fmt.Errorf("failed to rename manager: %w", err)
 				}
-				effectiveName = newName
+				effectiveName = canonicalIncoming
 			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyManagers,
@@ -1472,20 +1472,20 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 		}
 		if err := query.First(&existing, i.ID).Error; err == nil {
 			effectiveName := existing.Name
-			if strings.TrimSpace(i.Name) != "" && strings.TrimSpace(i.Name) != existing.Name {
-				newName := strings.TrimSpace(i.Name)
+			canonicalIncoming := sharedtext.CanonicalizeName(i.Name)
+			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
 				renameQuery := tx.Table("investors").Where("id = ?", existing.ID)
 				if hasTenant {
 					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
 				}
 				if err := renameQuery.Updates(map[string]any{
-					"name":       newName,
+					"name":       canonicalIncoming,
 					"updated_at": time.Now(),
 					"updated_by": i.UpdatedBy,
 				}).Error; err != nil {
 					return 0, fmt.Errorf("failed to rename investor: %w", err)
 				}
-				effectiveName = newName
+				effectiveName = canonicalIncoming
 			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyInvestors,

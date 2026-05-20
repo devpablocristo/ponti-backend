@@ -4,6 +4,7 @@ import (
 	"time"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/text"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
@@ -63,7 +64,7 @@ func (r ActorRequest) ToDomain(id int64) *domain.Actor {
 	actor := &domain.Actor{
 		ID:           id,
 		ActorKind:    r.ActorKind,
-		DisplayName:  r.DisplayName,
+		DisplayName:  text.CanonicalizeName(r.DisplayName),
 		PrimaryEmail: r.PrimaryEmail,
 		PrimaryPhone: r.PrimaryPhone,
 		Notes:        r.Notes,

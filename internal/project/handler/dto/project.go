@@ -18,6 +18,7 @@ import (
 	lotdom "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	managerdom "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/text"
 )
 
 type Project struct {
@@ -209,15 +210,18 @@ type Lot struct {
 
 func (r *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
-		Name: strings.TrimSpace(r.ProjectName),
+		Name: text.CanonicalizeName(r.ProjectName),
 		Customer: customerdom.Customer{
 			ID:      r.Customer.ID,
-			Name:    r.Customer.Name,
+			Name:    text.CanonicalizeName(r.Customer.Name),
 			ActorID: r.Customer.ActorID,
 		},
+		// Campaign codes (e.g. "2025-2026") are catalog identifiers, not free-
+		// text names — keep them trimmed but not canonicalized so they round-
+		// trip through the catalog matcher unchanged.
 		Campaign: campdom.Campaign{
 			ID:   r.Campaign.ID,
-			Name: r.Campaign.Name,
+			Name: strings.TrimSpace(r.Campaign.Name),
 		},
 		AdminCost:   r.AdminCost,
 		PlannedCost: r.PlannedCost,
@@ -225,26 +229,26 @@ func (r *Project) ToDomain() *domain.Project {
 
 	for _, mgr := range r.ProjectManagers {
 		d.Managers = append(d.Managers,
-			managerdom.Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: mgr.Name},
+			managerdom.Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: text.CanonicalizeName(mgr.Name)},
 		)
 	}
 
 	for _, inv := range r.Investors {
 		d.Investors = append(d.Investors,
-			investordom.Investor{ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage},
+			investordom.Investor{ID: inv.ID, ActorID: inv.ActorID, Name: text.CanonicalizeName(inv.Name), Percentage: inv.Percentage},
 		)
 	}
 
 	for _, aci := range r.AdminCostInvestors {
 		d.AdminCostInvestors = append(d.AdminCostInvestors,
-			investordom.Investor{ID: aci.ID, ActorID: aci.ActorID, Name: aci.Name, Percentage: aci.Percentage},
+			investordom.Investor{ID: aci.ID, ActorID: aci.ActorID, Name: text.CanonicalizeName(aci.Name), Percentage: aci.Percentage},
 		)
 	}
 
 	for _, f := range r.Fields {
 		fld := fielddom.Field{
 			ID:               f.ID,
-			Name:             f.Name,
+			Name:             text.CanonicalizeName(f.Name),
 			LeaseType:        &leasetypedom.LeaseType{ID: f.LeaseTypeID},
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
@@ -253,24 +257,24 @@ func (r *Project) ToDomain() *domain.Project {
 			fld.Investors = append(fld.Investors, investordom.Investor{
 				ID:         fi.ID,
 				ActorID:    fi.ActorID,
-				Name:       fi.Name,
+				Name:       text.CanonicalizeName(fi.Name),
 				Percentage: fi.Percentage,
 			})
 		}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
 				ID:       lt.ID,
-				Name:     lt.Name,
+				Name:     text.CanonicalizeName(lt.Name),
 				Hectares: lt.Hectares,
 				PreviousCrop: cropdom.Crop{
 					ID:   lt.PreviousCropID,
-					Name: lt.PreviousCropName,
+					Name: text.CanonicalizeName(lt.PreviousCropName),
 				},
 				CurrentCrop: cropdom.Crop{
 					ID:   lt.CurrentCropID,
-					Name: lt.CurrentCropName,
+					Name: text.CanonicalizeName(lt.CurrentCropName),
 				},
-				Season: lt.Season,
+				Season: text.CanonicalizeName(lt.Season),
 			})
 		}
 

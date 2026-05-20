@@ -81,28 +81,95 @@ func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 		t.Fatalf("update project: %v", err)
 	}
 
+	// Names are canonicalized at the repository boundary: incoming "AGRO
+	// LAJITAS" / "PEPITO" / "OLEGA SA RENAMED" are normalized to lowercase
+	// ASCII before they hit the legacy table.
 	var customerName string
 	if err := db.Raw(`SELECT name FROM customers WHERE id = 100`).Scan(&customerName).Error; err != nil {
 		t.Fatalf("read customer 100: %v", err)
 	}
-	if customerName != "AGRO LAJITAS" {
-		t.Fatalf("expected customer 100 renamed to AGRO LAJITAS, got %q", customerName)
+	if customerName != "agro lajitas" {
+		t.Fatalf("expected customer 100 renamed to agro lajitas, got %q", customerName)
 	}
 
 	var managerName string
 	if err := db.Raw(`SELECT name FROM managers WHERE id = 100`).Scan(&managerName).Error; err != nil {
 		t.Fatalf("read manager 100: %v", err)
 	}
-	if managerName != "PEPITO" {
-		t.Fatalf("expected manager 100 renamed to PEPITO, got %q", managerName)
+	if managerName != "pepito" {
+		t.Fatalf("expected manager 100 renamed to pepito, got %q", managerName)
 	}
 
 	var investorName string
 	if err := db.Raw(`SELECT name FROM investors WHERE id = 100`).Scan(&investorName).Error; err != nil {
 		t.Fatalf("read investor 100: %v", err)
 	}
-	if investorName != "OLEGA SA RENAMED" {
-		t.Fatalf("expected investor 100 renamed to OLEGA SA RENAMED, got %q", investorName)
+	if investorName != "olega sa renamed" {
+		t.Fatalf("expected investor 100 renamed to olega sa renamed, got %q", investorName)
+	}
+}
+
+// TestUpdateProjectCanonicalizesNames verifies that names with accents,
+// punctuation, mixed case and trailing whitespace land in the legacy
+// tables as canonical lowercase ASCII.
+func TestUpdateProjectCanonicalizesNames(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(800, ?, 'agro lajitas s r l', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(800, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(800, ?, 'la concordia', 800, 800, 0, 0, ?, ?, NULL);
+		INSERT INTO managers (id, tenant_id, name, created_at, updated_at, deleted_at) VALUES
+			(800, ?, 'gero', ?, ?, NULL);
+		INSERT INTO project_managers (tenant_id, project_id, manager_id) VALUES
+			(?, 800, 800);
+	`,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+		tenantID.String(), now, now,
+		tenantID.String(),
+	).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	updated := &domain.Project{
+		ID:          800,
+		Name:        "la concordia",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{ID: 800, Name: "  AGRO LAJITAS S.R.L.  "},
+		Campaign:    campdom.Campaign{ID: 800, Name: "2025-2026"},
+		Managers: []mgrdom.Manager{
+			{ID: 800, Name: "María Ángeles"},
+		},
+		Base: shareddomain.Base{UpdatedAt: now},
+	}
+	if err := repo.UpdateProject(projectTenantContext(tenantID), updated); err != nil {
+		t.Fatalf("update project: %v", err)
+	}
+
+	var customerName string
+	if err := db.Raw(`SELECT name FROM customers WHERE id = 800`).Scan(&customerName).Error; err != nil {
+		t.Fatalf("read customer 800: %v", err)
+	}
+	if customerName != "agro lajitas s r l" {
+		t.Fatalf("expected canonical customer name, got %q", customerName)
+	}
+
+	var managerName string
+	if err := db.Raw(`SELECT name FROM managers WHERE id = 800`).Scan(&managerName).Error; err != nil {
+		t.Fatalf("read manager 800: %v", err)
+	}
+	if managerName != "maria angeles" {
+		t.Fatalf("expected canonical manager name, got %q", managerName)
 	}
 }
 
