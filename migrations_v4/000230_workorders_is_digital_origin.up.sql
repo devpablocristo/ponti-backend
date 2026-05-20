@@ -9,6 +9,18 @@ FROM public.work_order_drafts wod
 WHERE wod.published_work_order_id = w.id
   AND wod.is_digital = true;
 
+UPDATE public.workorder_items wi
+SET total_used = ROUND((wi.final_dose * w.effective_area)::numeric, 2)
+FROM public.workorders w
+WHERE wi.workorder_id = w.id
+  AND wi.deleted_at IS NULL
+  AND w.deleted_at IS NULL
+  AND COALESCE(w.is_digital, false) = true
+  AND wi.final_dose IS NOT NULL
+  AND wi.final_dose > 0
+  AND w.effective_area IS NOT NULL
+  AND w.effective_area > 0;
+
 DROP VIEW IF EXISTS v4_report.workorder_list;
 
 CREATE VIEW v4_report.workorder_list AS

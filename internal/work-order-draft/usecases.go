@@ -478,7 +478,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		workOrder.Items[i] = workorderdomain.WorkOrderItem{
 			SupplyID:   item.SupplyID,
 			SupplyName: item.SupplyName,
-			TotalUsed:  item.TotalUsed,
+			TotalUsed:  publishedTotalUsed(draft, item),
 			FinalDose:  item.FinalDose,
 		}
 	}
@@ -500,6 +500,17 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 	}
 
 	return workOrderID, nil
+}
+
+func publishedTotalUsed(draft *domain.WorkOrderDraft, item domain.WorkOrderDraftItem) decimal.Decimal {
+	if draft != nil &&
+		draft.IsDigital &&
+		item.FinalDose.GreaterThan(decimal.Zero) &&
+		draft.EffectiveArea.GreaterThan(decimal.Zero) {
+		return item.FinalDose.Mul(draft.EffectiveArea).Round(2)
+	}
+
+	return item.TotalUsed
 }
 
 func (u *UseCases) validateDraftSuppliesReadyForPublish(ctx context.Context, draft *domain.WorkOrderDraft) error {

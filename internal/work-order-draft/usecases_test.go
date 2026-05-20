@@ -357,6 +357,51 @@ func TestPublishWorkOrderDraft_FailsWhenSupplyIsPending(t *testing.T) {
 	require.Contains(t, err.Error(), "2,4D ENLIST")
 }
 
+func TestPublishWorkOrderDraft_NormalizesDigitalTotalUsed(t *testing.T) {
+	repo := &testDraftRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.WorkOrderDraft, error) {
+			d := validDraft()
+			d.ID = id
+			d.Number = "D-60"
+			d.IsDigital = true
+			d.Status = domain.StatusDraft
+			d.EffectiveArea = decimal.NewFromInt(60)
+			d.Items = []domain.WorkOrderDraftItem{
+				{
+					SupplyID:  70,
+					TotalUsed: decimal.NewFromInt(120),
+					FinalDose: decimal.NewFromInt(1),
+				},
+			}
+			return d, nil
+		},
+		listPublishedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return []string{}, nil
+		},
+		markPublishedFn: func(ctx context.Context, draftID int64, workOrderID int64) error {
+			return nil
+		},
+	}
+
+	var published *workorderdomain.WorkOrder
+	pub := &testPublisher{
+		createFn: func(ctx context.Context, wo *workorderdomain.WorkOrder) (int64, error) {
+			published = wo
+			return 999, nil
+		},
+	}
+
+	uc := NewUseCases(repo, pub, &testSupplyReader{})
+
+	_, err := uc.PublishWorkOrderDraft(context.Background(), 99)
+	require.NoError(t, err)
+	require.NotNil(t, published)
+	require.Len(t, published.Items, 1)
+	require.True(t, published.Items[0].TotalUsed.Equal(decimal.NewFromInt(60)))
+	require.True(t, published.Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+	require.True(t, published.IsDigital)
+}
+
 // --- Helpers para tests de grupo -------------------------------------------------
 
 // groupDraft construye un draft "digital perteneciente a un grupo" listo para
