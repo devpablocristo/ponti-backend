@@ -24,7 +24,6 @@ type UseCasesPort interface {
 	ArchiveParameter(context.Context, int64) error
 	RestoreParameter(context.Context, int64) error
 	HardDeleteParameter(context.Context, int64) error
-	DeleteParameter(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -73,7 +72,6 @@ func (h *Handler) Routes() {
 		group.POST("/:parameter_id/archive", h.ArchiveParameter)
 		group.POST("/:parameter_id/restore", h.RestoreParameter)
 		group.DELETE("/:parameter_id/hard", h.HardDeleteParameter)
-		group.DELETE("/:parameter_id", h.DeleteParameter)
 	}
 }
 
@@ -174,10 +172,6 @@ func (h *Handler) UpdateParameter(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteParameter(c *gin.Context) {
-	h.runParameterIDAction(c, h.ucs.DeleteParameter)
 }
 
 func (h *Handler) ArchiveParameter(c *gin.Context) {

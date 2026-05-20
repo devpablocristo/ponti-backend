@@ -15,7 +15,6 @@ type RepositoryPort interface {
 	ArchiveCrop(context.Context, int64) error
 	RestoreCrop(context.Context, int64) error
 	HardDeleteCrop(context.Context, int64) error
-	DeleteCrop(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -44,10 +43,6 @@ func (u *UseCases) GetCrop(ctx context.Context, id int64) (*domain.Crop, error) 
 
 func (u *UseCases) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	return u.repo.UpdateCrop(ctx, c)
-}
-
-func (u *UseCases) DeleteCrop(ctx context.Context, id int64) error {
-	return u.repo.DeleteCrop(ctx, id)
 }
 
 func (u *UseCases) ArchiveCrop(ctx context.Context, id int64) error {

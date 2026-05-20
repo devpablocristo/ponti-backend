@@ -20,7 +20,6 @@ type UseCasesPort interface {
 	ArchiveLeaseType(context.Context, int64) error
 	RestoreLeaseType(context.Context, int64) error
 	HardDeleteLeaseType(context.Context, int64) error
-	DeleteLeaseType(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -68,7 +67,6 @@ func (h *Handler) Routes() {
 		public.POST("/:lease_type_id/archive", h.ArchiveLeaseType)
 		public.POST("/:lease_type_id/restore", h.RestoreLeaseType)
 		public.DELETE("/:lease_type_id/hard", h.HardDeleteLeaseType)
-		public.DELETE("/:lease_type_id", h.DeleteLeaseType)
 	}
 }
 
@@ -148,9 +146,6 @@ func (h *Handler) HardDeleteLeaseType(c *gin.Context) {
 	h.runLeaseTypeIDAction(c, h.ucs.HardDeleteLeaseType)
 }
 
-func (h *Handler) DeleteLeaseType(c *gin.Context) {
-	h.runLeaseTypeIDAction(c, h.ucs.DeleteLeaseType)
-}
 
 func (h *Handler) runLeaseTypeIDAction(c *gin.Context, action func(context.Context, int64) error) {
 	id, err := ginmw.ParseParamID(c, "lease_type_id")

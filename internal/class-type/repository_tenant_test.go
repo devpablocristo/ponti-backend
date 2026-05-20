@@ -65,8 +65,8 @@ func TestClassTypeRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.UpdateClassType(ctxA, &domain.ClassType{ID: 2, Name: "cross"}); err == nil {
 		t.Fatalf("expected cross-tenant update to fail")
 	}
-	if err := repo.DeleteClassType(ctxA, 2); err == nil {
-		t.Fatalf("expected cross-tenant delete to fail")
+	if err := repo.HardDeleteClassType(ctxA, 2); err == nil {
+		t.Fatalf("expected cross-tenant hard delete to fail")
 	}
 }
 

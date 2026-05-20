@@ -63,10 +63,6 @@ func (s *classTypeHandlerUseCasesStub) HardDeleteClassType(_ context.Context, id
 	return nil
 }
 
-func (s *classTypeHandlerUseCasesStub) DeleteClassType(_ context.Context, id int64) error {
-	s.deleteCalls = append(s.deleteCalls, id)
-	return nil
-}
 
 func newClassTypeHandlerContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
@@ -109,10 +105,4 @@ func TestHandler_ClassTypeCRUDRoutes(t *testing.T) {
 		t.Fatalf("expected update id 42, status %d calls %#v", updateCtx.Writer.Status(), stub.updateCalls)
 	}
 
-	deleteCtx, _ := newClassTypeHandlerContext(http.MethodDelete, "/api/v1/types/42", "")
-	deleteCtx.Params = gin.Params{{Key: "class_type_id", Value: "42"}}
-	h.DeleteClassType(deleteCtx)
-	if deleteCtx.Writer.Status() != http.StatusNoContent || len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected delete id 42, status %d calls %#v", deleteCtx.Writer.Status(), stub.deleteCalls)
-	}
 }

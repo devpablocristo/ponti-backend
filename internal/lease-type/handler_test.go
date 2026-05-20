@@ -63,11 +63,6 @@ func (s *leaseTypeHandlerUseCasesStub) HardDeleteLeaseType(_ context.Context, id
 	return nil
 }
 
-func (s *leaseTypeHandlerUseCasesStub) DeleteLeaseType(_ context.Context, id int64) error {
-	s.deleteCalls = append(s.deleteCalls, id)
-	return nil
-}
-
 func newLeaseTypeHandlerContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
@@ -109,10 +104,4 @@ func TestHandler_LeaseTypeCRUDRoutes(t *testing.T) {
 		t.Fatalf("expected update id 42, status %d calls %#v", updateCtx.Writer.Status(), stub.updateCalls)
 	}
 
-	deleteCtx, _ := newLeaseTypeHandlerContext(http.MethodDelete, "/api/v1/lease-types/42", "")
-	deleteCtx.Params = gin.Params{{Key: "lease_type_id", Value: "42"}}
-	h.DeleteLeaseType(deleteCtx)
-	if deleteCtx.Writer.Status() != http.StatusNoContent || len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected delete id 42, status %d calls %#v", deleteCtx.Writer.Status(), stub.deleteCalls)
-	}
 }

@@ -110,10 +110,6 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	return nil
 }
 
-func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
-	return r.HardDeleteCrop(ctx, id)
-}
-
 func (r *Repository) ListArchivedCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
 	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.Crop{}), "crops").

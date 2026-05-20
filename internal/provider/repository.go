@@ -157,10 +157,6 @@ func (r *Repository) UpdateProvider(ctx context.Context, provider *domain.Provid
 	return nil
 }
 
-func (r *Repository) DeleteProvider(ctx context.Context, id int64) error {
-	return r.HardDeleteProvider(ctx, id)
-}
-
 func (r *Repository) ArchiveProvider(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "provider"); err != nil {
 		return err

@@ -17,7 +17,6 @@ type RepositoryPort interface {
 	Archive(ctx context.Context, id int64) error
 	Restore(ctx context.Context, id int64) error
 	HardDelete(ctx context.Context, id int64) error
-	Delete(ctx context.Context, id int64) error
 }
 
 type UseCases struct {
@@ -95,10 +94,3 @@ func (u *UseCases) HardDeleteParameter(ctx context.Context, id int64) error {
 	return u.repository.HardDelete(ctx, id)
 }
 
-func (u *UseCases) DeleteParameter(ctx context.Context, id int64) error {
-	if id == 0 {
-		return domainerr.Validation("invalid id")
-	}
-
-	return u.repository.Delete(ctx, id)
-}

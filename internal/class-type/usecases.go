@@ -15,7 +15,6 @@ type RepositoryPort interface {
 	ArchiveClassType(context.Context, int64) error
 	RestoreClassType(context.Context, int64) error
 	HardDeleteClassType(context.Context, int64) error
-	DeleteClassType(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -44,10 +43,6 @@ func (u *UseCases) GetClassType(ctx context.Context, id int64) (*domain.ClassTyp
 
 func (u *UseCases) UpdateClassType(ctx context.Context, c *domain.ClassType) error {
 	return u.repo.UpdateClassType(ctx, c)
-}
-
-func (u *UseCases) DeleteClassType(ctx context.Context, id int64) error {
-	return u.repo.DeleteClassType(ctx, id)
 }
 
 func (u *UseCases) ArchiveClassType(ctx context.Context, id int64) error {

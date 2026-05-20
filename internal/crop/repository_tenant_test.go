@@ -65,8 +65,8 @@ func TestCropRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.UpdateCrop(ctxA, &domain.Crop{ID: 2, Name: "cross"}); err == nil {
 		t.Fatalf("expected cross-tenant update to fail")
 	}
-	if err := repo.DeleteCrop(ctxA, 2); err == nil {
-		t.Fatalf("expected cross-tenant delete to fail")
+	if err := repo.HardDeleteCrop(ctxA, 2); err == nil {
+		t.Fatalf("expected cross-tenant hard delete to fail")
 	}
 }
 

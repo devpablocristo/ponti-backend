@@ -207,7 +207,7 @@ func TestWorkOrderDraftRepositoryTenantIsolation(t *testing.T) {
 		t.Fatalf("cross-tenant mark published changed draft 2 status to %q", status)
 	}
 
-	if err := repo.DeleteWorkOrderDraftByID(ctxA, 2); err == nil {
+	if err := repo.HardDeleteWorkOrderDraftByID(ctxA, 2); err == nil {
 		t.Fatalf("expected hard-delete cross-tenant draft to fail")
 	}
 	var exists int64

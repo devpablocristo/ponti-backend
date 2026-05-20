@@ -65,8 +65,8 @@ func TestLeaseTypeRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.UpdateLeaseType(ctxA, &domain.LeaseType{ID: 2, Name: "cross"}); err == nil {
 		t.Fatalf("expected cross-tenant update to fail")
 	}
-	if err := repo.DeleteLeaseType(ctxA, 2); err == nil {
-		t.Fatalf("expected cross-tenant delete to fail")
+	if err := repo.HardDeleteLeaseType(ctxA, 2); err == nil {
+		t.Fatalf("expected cross-tenant hard delete to fail")
 	}
 }
 

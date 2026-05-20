@@ -21,7 +21,6 @@ type UseCasesPort interface {
 	ArchiveProvider(context.Context, int64) error
 	RestoreProvider(context.Context, int64) error
 	HardDeleteProvider(context.Context, int64) error
-	DeleteProvider(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -54,7 +53,6 @@ func (h *Handler) Routes() {
 		publicGroup.POST("/:provider_id/archive", h.ArchiveProvider)
 		publicGroup.POST("/:provider_id/restore", h.RestoreProvider)
 		publicGroup.DELETE("/:provider_id/hard", h.HardDeleteProvider)
-		publicGroup.DELETE("/:provider_id", h.DeleteProvider)
 	}
 }
 
@@ -154,10 +152,6 @@ func (h *Handler) RestoreProvider(c *gin.Context) {
 
 func (h *Handler) HardDeleteProvider(c *gin.Context) {
 	h.runProviderIDAction(c, h.ucs.HardDeleteProvider)
-}
-
-func (h *Handler) DeleteProvider(c *gin.Context) {
-	h.runProviderIDAction(c, h.ucs.DeleteProvider)
 }
 
 func (h *Handler) runProviderIDAction(c *gin.Context, action func(context.Context, int64) error) {

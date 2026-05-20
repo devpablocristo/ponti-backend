@@ -20,7 +20,6 @@ type UseCasesPort interface {
 	ArchiveClassType(context.Context, int64) error
 	RestoreClassType(context.Context, int64) error
 	HardDeleteClassType(context.Context, int64) error
-	DeleteClassType(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -68,7 +67,6 @@ func (h *Handler) Routes() {
 		group.POST("/:class_type_id/archive", h.ArchiveClassType)
 		group.POST("/:class_type_id/restore", h.RestoreClassType)
 		group.DELETE("/:class_type_id/hard", h.HardDeleteClassType)
-		group.DELETE("/:class_type_id", h.DeleteClassType)
 	}
 }
 
@@ -130,19 +128,6 @@ func (h *Handler) UpdateClassType(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.UpdateClassType(c.Request.Context(), req.ToDomain(id)); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteClassType(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "class_type_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteClassType(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

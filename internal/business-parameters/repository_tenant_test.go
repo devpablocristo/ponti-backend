@@ -69,8 +69,8 @@ func TestBusinessParameterRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.Update(ctxA, &domain.BusinessParameter{ID: 2, Key: "tn", Value: "999", Type: "decimal", Category: "units"}); err == nil {
 		t.Fatalf("expected cross-tenant update to fail")
 	}
-	if err := repo.Delete(ctxA, 2); err == nil {
-		t.Fatalf("expected cross-tenant delete to fail")
+	if err := repo.HardDelete(ctxA, 2); err == nil {
+		t.Fatalf("expected cross-tenant hard delete to fail")
 	}
 }
 

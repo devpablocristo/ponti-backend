@@ -107,10 +107,6 @@ func (r *Repository) GetWorkOrdersByLaborID(ctx context.Context, laborID int64) 
 	return count, nil
 }
 
-func (r *Repository) DeleteLabor(ctx context.Context, id int64) error {
-	return r.ArchiveLabor(ctx, id)
-}
-
 // ArchiveLabor archiva (soft delete) un labor con validación.
 func (r *Repository) ArchiveLabor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "labor"); err != nil {

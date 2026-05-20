@@ -110,10 +110,6 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 	return nil
 }
 
-func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
-	return r.HardDeleteCategory(ctx, id)
-}
-
 func (r *Repository) ListArchivedCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
 	var total int64
 	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.Category{}), "categories").

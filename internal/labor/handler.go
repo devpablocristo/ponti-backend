@@ -22,7 +22,6 @@ type UseCasesPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
 	ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
-	DeleteLabor(context.Context, int64) error
 	ArchiveLabor(context.Context, int64) error
 	RestoreLabor(context.Context, int64) error
 	HardDeleteLabor(context.Context, int64) error
@@ -87,7 +86,6 @@ func (h *Handler) Routes() {
 		projectLaborsGroup.POST("", h.CreateLabor)
 		projectLaborsGroup.GET("", h.ListLabor)
 		projectLaborsGroup.GET("/archived", h.ListArchivedLabors)
-		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
 		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
 		projectLaborsGroup.GET("/:labor_id/workorders-count", h.CountWorkOrdersByLaborID)
 		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
@@ -98,7 +96,6 @@ func (h *Handler) Routes() {
 	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
 		workOrderLaborsGroup.GET("/archived", h.ListArchivedLaborsGlobal)
-		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
 		workOrderLaborsGroup.POST("/:labor_id/archive", h.ArchiveLabor)
 		workOrderLaborsGroup.POST("/:labor_id/restore", h.RestoreLabor)
 		workOrderLaborsGroup.DELETE("/:labor_id/hard", h.HardDeleteLabor)
@@ -270,15 +267,6 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteLabor(c *gin.Context) {
-	if _, err := sharedhandlers.ParseProjectIDParam(c, "project_id"); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	h.runLaborIDAction(c, h.ucs.DeleteLabor)
-}
-
 func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
@@ -291,10 +279,6 @@ func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondOK(c, gin.H{"count": count})
-}
-
-func (h *Handler) DeleteLaborByID(c *gin.Context) {
-	h.runLaborIDAction(c, h.ucs.DeleteLabor)
 }
 
 func (h *Handler) runLaborIDAction(c *gin.Context, action laborIDAction) {

@@ -66,8 +66,8 @@ func TestCategoryRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.UpdateCategory(ctxA, &domain.Category{ID: 2, Name: "cross", TypeID: 1}); err == nil {
 		t.Fatalf("expected cross-tenant update to fail")
 	}
-	if err := repo.DeleteCategory(ctxA, 2); err == nil {
-		t.Fatalf("expected cross-tenant delete to fail")
+	if err := repo.HardDeleteCategory(ctxA, 2); err == nil {
+		t.Fatalf("expected cross-tenant hard delete to fail")
 	}
 }
 

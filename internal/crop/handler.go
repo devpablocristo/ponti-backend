@@ -20,7 +20,6 @@ type UseCasesPort interface {
 	ArchiveCrop(context.Context, int64) error
 	RestoreCrop(context.Context, int64) error
 	HardDeleteCrop(context.Context, int64) error
-	DeleteCrop(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -71,7 +70,6 @@ func (h *Handler) Routes() {
 		public.POST("/:crop_id/archive", h.ArchiveCrop)
 		public.POST("/:crop_id/restore", h.RestoreCrop)
 		public.DELETE("/:crop_id/hard", h.HardDeleteCrop)
-		public.DELETE("/:crop_id", h.DeleteCrop)
 	}
 }
 
@@ -133,19 +131,6 @@ func (h *Handler) UpdateCrop(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.UpdateCrop(c.Request.Context(), req.ToDomain(id)); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteCrop(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "crop_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteCrop(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

@@ -18,13 +18,11 @@ import (
 type laborHandlerUseCasesStub struct {
 	getLaborFn      func(ctx context.Context, id int64) (*domain.Labor, error)
 	updateLaborFn   func(ctx context.Context, labor *domain.Labor) error
-	deleteLaborFn   func(ctx context.Context, id int64) error
 	archiveLaborFn  func(ctx context.Context, id int64) error
 	restoreLaborFn  func(ctx context.Context, id int64) error
 	hardDeleteFn    func(ctx context.Context, id int64) error
 	getLaborCalls   []int64
 	updateLaborCall []domain.Labor
-	deleteCalls     []int64
 	archiveCalls    []int64
 	restoreCalls    []int64
 	hardDeleteCalls []int64
@@ -45,13 +43,6 @@ func (s *laborHandlerUseCasesStub) ListLabor(context.Context, int, int, int64) (
 }
 func (s *laborHandlerUseCasesStub) ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
 	return nil, 0, nil
-}
-func (s *laborHandlerUseCasesStub) DeleteLabor(ctx context.Context, id int64) error {
-	s.deleteCalls = append(s.deleteCalls, id)
-	if s.deleteLaborFn != nil {
-		return s.deleteLaborFn(ctx, id)
-	}
-	return nil
 }
 func (s *laborHandlerUseCasesStub) ArchiveLabor(ctx context.Context, id int64) error {
 	s.archiveCalls = append(s.archiveCalls, id)
@@ -189,45 +180,6 @@ func TestHandler_UpdateLabor_ExplicitIsPartialPrice_DoesNotFetchCurrent(t *testi
 	}
 	if stub.updateLaborCall[0].IsPartialPrice {
 		t.Fatalf("expected IsPartialPrice=false from explicit payload")
-	}
-}
-
-func TestHandler_DeleteLabor_ProjectRouteDeletesLabor(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	stub := &laborHandlerUseCasesStub{}
-	h := &Handler{ucs: stub}
-	ctx, _ := newLaborHandlerJSONContext(http.MethodDelete, "/api/v1/projects/10/labors/42", "")
-	ctx.Params = gin.Params{
-		{Key: "project_id", Value: "10"},
-		{Key: "labor_id", Value: "42"},
-	}
-
-	h.DeleteLabor(ctx)
-
-	if ctx.Writer.Status() != http.StatusNoContent {
-		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
-	}
-	if len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected DeleteLabor to be called with id 42, got %#v", stub.deleteCalls)
-	}
-}
-
-func TestHandler_DeleteLaborByID_GlobalRouteDeletesLabor(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	stub := &laborHandlerUseCasesStub{}
-	h := &Handler{ucs: stub}
-	ctx, _ := newLaborHandlerJSONContext(http.MethodDelete, "/api/v1/labors/42", "")
-	ctx.Params = gin.Params{{Key: "labor_id", Value: "42"}}
-
-	h.DeleteLaborByID(ctx)
-
-	if ctx.Writer.Status() != http.StatusNoContent {
-		t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
-	}
-	if len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected DeleteLabor to be called with id 42, got %#v", stub.deleteCalls)
 	}
 }
 

@@ -67,10 +67,6 @@ func (s *businessParametersHandlerUseCasesStub) HardDeleteParameter(_ context.Co
 	return nil
 }
 
-func (s *businessParametersHandlerUseCasesStub) DeleteParameter(_ context.Context, id int64) error {
-	s.deleteCalls = append(s.deleteCalls, id)
-	return nil
-}
 
 func newBusinessParametersHandlerContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
@@ -122,10 +118,4 @@ func TestHandler_BusinessParametersRoutes(t *testing.T) {
 		t.Fatalf("expected update id 42 with actor, status %d calls %#v", updateCtx.Writer.Status(), stub.updateCalls)
 	}
 
-	deleteCtx, _ := newBusinessParametersHandlerContext(http.MethodDelete, "/api/v1/business-parameters/42", "")
-	deleteCtx.Params = gin.Params{{Key: "parameter_id", Value: "42"}}
-	h.DeleteParameter(deleteCtx)
-	if deleteCtx.Writer.Status() != http.StatusNoContent || len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected delete id 42, status %d calls %#v", deleteCtx.Writer.Status(), stub.deleteCalls)
-	}
 }

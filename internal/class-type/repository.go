@@ -116,10 +116,6 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 	})
 }
 
-func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
-	return r.HardDeleteClassType(ctx, id)
-}
-
 func (r *Repository) ListArchivedClassTypes(ctx context.Context, page, perPage int) ([]domain.ClassType, int64, error) {
 	var total int64
 	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.ClassType{}), "types").

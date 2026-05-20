@@ -20,7 +20,6 @@ type UseCasesPort interface {
 	ArchiveCategory(context.Context, int64) error
 	RestoreCategory(context.Context, int64) error
 	HardDeleteCategory(context.Context, int64) error
-	DeleteCategory(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -71,7 +70,6 @@ func (h *Handler) Routes() {
 		group.POST("/:category_id/archive", h.ArchiveCategory)
 		group.POST("/:category_id/restore", h.RestoreCategory)
 		group.DELETE("/:category_id/hard", h.HardDeleteCategory)
-		group.DELETE("/:category_id", h.DeleteCategory)
 	}
 }
 
@@ -133,19 +131,6 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.UpdateCategory(c.Request.Context(), req.ToDomain(id)); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
-}
-
-func (h *Handler) DeleteCategory(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "category_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteCategory(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

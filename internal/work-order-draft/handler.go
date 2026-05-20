@@ -26,7 +26,6 @@ type UseCasesPort interface {
 	ListDigitalWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListArchivedWorkOrderDrafts(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
-	DeleteWorkOrderDraftByID(context.Context, int64) error
 	ArchiveWorkOrderDraftByID(context.Context, int64) error
 	RestoreWorkOrderDraftByID(context.Context, int64) error
 	HardDeleteWorkOrderDraftByID(context.Context, int64) error
@@ -103,7 +102,6 @@ func (h *Handler) Routes() {
 		grp.GET("/:work_order_draft_id/group-pdf-data", h.GetWorkOrderDraftGroupPDFData)
 		grp.PUT("/:work_order_draft_id/group", h.UpdateWorkOrderDraftGroupByID)
 		grp.PUT("/:work_order_draft_id", h.UpdateWorkOrderDraftByID)
-		grp.DELETE("/:work_order_draft_id", h.DeleteWorkOrderDraftByID)
 		grp.POST("/:work_order_draft_id/archive", h.ArchiveWorkOrderDraftByID)
 		grp.POST("/:work_order_draft_id/restore", h.RestoreWorkOrderDraftByID)
 		grp.DELETE("/:work_order_draft_id/hard", h.HardDeleteWorkOrderDraftByID)
@@ -297,10 +295,6 @@ func (h *Handler) UpdateWorkOrderDraftGroupByID(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondOK(c, dto.GroupFromDomain(updated))
-}
-
-func (h *Handler) DeleteWorkOrderDraftByID(c *gin.Context) {
-	h.runWorkOrderDraftIDAction(c, h.ucs.DeleteWorkOrderDraftByID)
 }
 
 func (h *Handler) ArchiveWorkOrderDraftByID(c *gin.Context) {

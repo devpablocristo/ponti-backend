@@ -29,7 +29,6 @@ type RepositoryPort interface {
 	ListPublishedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
 	UpdateWorkOrderDraftGroup(context.Context, []*domain.WorkOrderDraft) error
-	DeleteWorkOrderDraftByID(context.Context, int64) error
 	ArchiveWorkOrderDraftByID(context.Context, int64) error
 	RestoreWorkOrderDraftByID(context.Context, int64) error
 	HardDeleteWorkOrderDraftByID(context.Context, int64) error
@@ -424,9 +423,6 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 	return u.repo.UpdateWorkOrderDraftGroup(ctx, drafts)
 }
 
-func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
-	return u.ArchiveWorkOrderDraftByID(ctx, id)
-}
 
 func (u *UseCases) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if id <= 0 {

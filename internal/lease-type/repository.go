@@ -110,10 +110,6 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	return nil
 }
 
-func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
-	return r.HardDeleteLeaseType(ctx, id)
-}
-
 func (r *Repository) ListArchivedLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
 	var total int64
 	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.LeaseType{}), "lease_types").

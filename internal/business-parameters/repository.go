@@ -154,10 +154,6 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 	})
 }
 
-func (r *Repository) Delete(ctx context.Context, id int64) error {
-	return r.HardDelete(ctx, id)
-}
-
 func (r *Repository) Archive(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "business parameter"); err != nil {
 		return err

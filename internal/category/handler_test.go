@@ -63,10 +63,6 @@ func (s *categoryHandlerUseCasesStub) HardDeleteCategory(_ context.Context, id i
 	return nil
 }
 
-func (s *categoryHandlerUseCasesStub) DeleteCategory(_ context.Context, id int64) error {
-	s.deleteCalls = append(s.deleteCalls, id)
-	return nil
-}
 
 func newCategoryHandlerContext(method, target, body string) (*gin.Context, *httptest.ResponseRecorder) {
 	rec := httptest.NewRecorder()
@@ -109,10 +105,4 @@ func TestHandler_CategoryCRUDRoutes(t *testing.T) {
 		t.Fatalf("expected update id 42, status %d calls %#v", updateCtx.Writer.Status(), stub.updateCalls)
 	}
 
-	deleteCtx, _ := newCategoryHandlerContext(http.MethodDelete, "/api/v1/categories/42", "")
-	deleteCtx.Params = gin.Params{{Key: "category_id", Value: "42"}}
-	h.DeleteCategory(deleteCtx)
-	if deleteCtx.Writer.Status() != http.StatusNoContent || len(stub.deleteCalls) != 1 || stub.deleteCalls[0] != 42 {
-		t.Fatalf("expected delete id 42, status %d calls %#v", deleteCtx.Writer.Status(), stub.deleteCalls)
-	}
 }

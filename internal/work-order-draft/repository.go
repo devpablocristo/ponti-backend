@@ -833,9 +833,6 @@ func (r *Repository) UpdateWorkOrderDraftGroup(ctx context.Context, drafts []*do
 	})
 }
 
-func (r *Repository) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
-	return r.ArchiveWorkOrderDraftByID(ctx, id)
-}
 
 func (r *Repository) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "work order draft"); err != nil {

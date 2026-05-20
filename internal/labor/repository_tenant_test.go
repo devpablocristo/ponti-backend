@@ -184,8 +184,8 @@ func TestLaborRepositoryTenantIsolation(t *testing.T) {
 		t.Fatalf("cross-tenant update changed labor 2 name to %q", name)
 	}
 
-	if err := repo.DeleteLabor(ctxA, 2); err == nil {
-		t.Fatalf("expected delete cross-tenant labor to fail")
+	if err := repo.HardDeleteLabor(ctxA, 2); err == nil {
+		t.Fatalf("expected hard delete cross-tenant labor to fail")
 	}
 	var deletedCount int64
 	if err := db.Raw(`SELECT COUNT(*) FROM labors WHERE id = 2 AND deleted_at IS NOT NULL`).Scan(&deletedCount).Error; err != nil {
