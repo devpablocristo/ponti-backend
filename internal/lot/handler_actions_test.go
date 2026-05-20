@@ -19,7 +19,7 @@ func TestLotIDActionHandlersCallExplicitUseCases(t *testing.T) {
 		wantCall string
 	}{
 		{
-			name: "legacy delete calls legacy archive alias",
+			name: "legacy delete calls legacy hard delete alias",
 			run: func(h *Handler, c *gin.Context) {
 				h.DeleteLot(c)
 			},

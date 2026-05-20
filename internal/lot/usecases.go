@@ -26,7 +26,7 @@ type RepositoryPort interface {
 	ArchiveLot(context.Context, int64) error
 	RestoreLot(context.Context, int64) error
 	HardDeleteLot(context.Context, int64) error
-	DeleteLot(context.Context, int64) error // legacy alias hacia ArchiveLot
+	DeleteLot(context.Context, int64) error // legacy alias hacia HardDeleteLot
 	GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
@@ -82,7 +82,7 @@ func (u *UseCases) ListArchivedLots(ctx context.Context, page, perPage int) ([]d
 	return u.repo.ListArchivedLots(ctx, page, perPage)
 }
 
-// DeleteLot mantiene compatibilidad: equivale a ArchiveLot.
+// DeleteLot mantiene compatibilidad: equivale a HardDeleteLot.
 func (u *UseCases) DeleteLot(ctx context.Context, id int64) error {
 	return u.repo.DeleteLot(ctx, id)
 }

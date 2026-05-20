@@ -527,10 +527,10 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 	})
 }
 
-// DeleteLot mantiene compatibilidad: alias hacia ArchiveLot (soft delete).
-// Deprecated: usar ArchiveLot explícitamente.
+// DeleteLot mantiene compatibilidad: alias hacia HardDeleteLot.
+// Deprecated: usar HardDeleteLot explícitamente.
 func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
-	return r.ArchiveLot(ctx, id)
+	return r.HardDeleteLot(ctx, id)
 }
 
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {

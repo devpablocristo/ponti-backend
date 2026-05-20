@@ -80,6 +80,7 @@ func (h *Handler) Routes() {
 		public.POST("/:field_id/archive", h.ArchiveField)
 		public.POST("/:field_id/restore", h.RestoreField)
 		public.DELETE("/:field_id/hard", h.HardDeleteField)
+		public.DELETE("/:field_id", h.HardDeleteField) // legacy alias hacia hard delete
 	}
 }
 

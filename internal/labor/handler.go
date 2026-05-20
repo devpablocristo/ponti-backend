@@ -75,6 +75,12 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
+	// NOTA (dual routing): la entidad labor expone dos grupos de rutas — el
+	// scoped (/projects/:project_id/labors) para operaciones contextualizadas
+	// y el global (/labors) para archive/restore/hard-delete y reportes. Esta
+	// asimetría está pendiente de armonización (ver docs/crudar-lifecycle.md).
+	// No agregar nuevas dualidades sin coordinar FE+BE.
+
 	// Endpoints de labores asociados a un proyecto específico
 	projectLaborsGroup := r.Group(baseURL+"/projects/:project_id/labors", h.mws.GetValidation()...)
 	{

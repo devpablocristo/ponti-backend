@@ -46,3 +46,51 @@ Rows affected by the same archive operation share:
 Restore must use that cause metadata. It must not restore children just because
 they belong to the restored parent.
 
+## Legacy DELETE endpoints
+
+The canonical endpoint for hard delete is `DELETE /v1/{resource}/{id}/hard`.
+Some resources also expose the bare `DELETE /v1/{resource}/{id}` as a legacy
+alias toward hard delete (kept for older clients):
+
+| Resource    | `DELETE /:id` exposed | Alias behavior |
+|-------------|-----------------------|----------------|
+| customer    | yes                   | hard delete    |
+| project     | yes                   | hard delete    |
+| lot         | yes                   | hard delete    |
+| work-order  | yes                   | hard delete    |
+| supply      | yes                   | hard delete    |
+| field       | yes                   | hard delete    |
+| manager     | yes                   | hard delete    |
+| investor    | no                    | —              |
+| campaign    | no                    | —              |
+| labor       | yes (dual)            | see below      |
+
+New code must call `DELETE /:id/hard` explicitly. The legacy alias exists only
+for backwards compatibility and may be removed in future versions.
+
+## Resolved asymmetries (2026-05-20)
+
+Three historical asymmetries between resources were corrected:
+
+- **lot.DELETE `/:id`** previously aliased to archive (soft delete). It now
+  aliases to hard delete, matching customer/project/work-order/supply.
+- **field.DELETE `/:id`** and **manager.DELETE `/:id`** did not exist; both
+  now expose the legacy alias toward hard delete for uniformity.
+
+## Pending asymmetry: labor dual routing
+
+The labor resource exposes two route groups:
+
+- `/v1/projects/:project_id/labors/*` — project-scoped operations (create,
+  list, update, project-archived listing, project-delete legacy).
+- `/v1/labors/*` — global operations (archive, restore, hard delete, metrics,
+  reporting, global-archived listing).
+
+Some endpoints exist in both groups with related but distinct semantics
+(archived listing, delete). Frontend currently calls a mix of the two plus
+some paths under `/v1/labors/projects/...` that do not exist server-side.
+
+Harmonization is pending a coordinated FE+BE change: pick the canonical
+group, migrate FE callers, deprecate the duplicates with a `Deprecation`
+response header, and remove them after a deprecation window.
+
