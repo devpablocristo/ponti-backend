@@ -199,6 +199,17 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			created_by TEXT,
 			created_at DATETIME
 		);
+		CREATE TABLE legacy_actor_map (
+			tenant_id TEXT,
+			source_table TEXT NOT NULL,
+			source_id INTEGER NOT NULL,
+			source_key TEXT NOT NULL,
+			source_text TEXT,
+			actor_id INTEGER NOT NULL,
+			confidence NUMERIC,
+			mapping_status TEXT,
+			PRIMARY KEY (tenant_id, source_table, source_key)
+		);
 	`).Error; err != nil {
 		t.Fatalf("create schema: %v", err)
 	}

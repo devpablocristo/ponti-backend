@@ -454,7 +454,104 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get project %d", id))
 	}
 
+	if err := hydrateLegacyActorIDs(r.db.Client().WithContext(ctx), &m); err != nil {
+		return nil, err
+	}
+
 	return m.ToDomain(), nil
+}
+
+// hydrateLegacyActorIDs populates the in-memory ActorID field of each manager
+// and investor (project-level, admin-cost, and field-level) by looking up the
+// legacy_actor_map. Customer.ActorID is already a real column, so it does not
+// need hydration. Without this hydration, the FE receives actor_id = nil for
+// every legacy manager/investor row that was created before the actor sync,
+// which makes the duplicate-name guard in the editor fire false positives
+// (the FE thinks the slot has no identity even though it does).
+func hydrateLegacyActorIDs(db *gorm.DB, m *models.Project) error {
+	managerIDs := make([]int64, 0, len(m.Managers))
+	for _, mgr := range m.Managers {
+		if mgr.ID > 0 {
+			managerIDs = append(managerIDs, mgr.ID)
+		}
+	}
+	investorIDs := make([]int64, 0)
+	for _, piv := range m.Investors {
+		if piv.InvestorID > 0 {
+			investorIDs = append(investorIDs, piv.InvestorID)
+		}
+	}
+	for _, aci := range m.AdminCostInvestors {
+		if aci.InvestorID > 0 {
+			investorIDs = append(investorIDs, aci.InvestorID)
+		}
+	}
+	for _, f := range m.Fields {
+		for _, fi := range f.FieldInvestors {
+			if fi.InvestorID > 0 {
+				investorIDs = append(investorIDs, fi.InvestorID)
+			}
+		}
+	}
+
+	managerActors, err := readLegacyActorIDs(db, actorsync.LegacyManagers, managerIDs)
+	if err != nil {
+		return err
+	}
+	investorActors, err := readLegacyActorIDs(db, actorsync.LegacyInvestors, investorIDs)
+	if err != nil {
+		return err
+	}
+
+	for i := range m.Managers {
+		if actorID, ok := managerActors[m.Managers[i].ID]; ok {
+			id := actorID
+			m.Managers[i].ActorID = &id
+		}
+	}
+	for i := range m.Investors {
+		if actorID, ok := investorActors[m.Investors[i].InvestorID]; ok {
+			id := actorID
+			m.Investors[i].Investor.ActorID = &id
+		}
+	}
+	for i := range m.AdminCostInvestors {
+		if actorID, ok := investorActors[m.AdminCostInvestors[i].InvestorID]; ok {
+			id := actorID
+			m.AdminCostInvestors[i].Investor.ActorID = &id
+		}
+	}
+	for i := range m.Fields {
+		for j := range m.Fields[i].FieldInvestors {
+			if actorID, ok := investorActors[m.Fields[i].FieldInvestors[j].InvestorID]; ok {
+				id := actorID
+				m.Fields[i].FieldInvestors[j].Investor.ActorID = &id
+			}
+		}
+	}
+	return nil
+}
+
+func readLegacyActorIDs(db *gorm.DB, sourceTable string, sourceIDs []int64) (map[int64]int64, error) {
+	result := make(map[int64]int64, len(sourceIDs))
+	if len(sourceIDs) == 0 {
+		return result, nil
+	}
+	type row struct {
+		SourceID int64
+		ActorID  int64
+	}
+	var rows []row
+	if err := db.Table("legacy_actor_map").
+		Where("source_table = ? AND source_id IN ?", sourceTable, sourceIDs).
+		Select("source_id, actor_id").
+		Find(&rows).Error; err != nil {
+		return nil, domainerr.Internal("failed to read legacy actor map")
+	}
+	for _, r := range rows {
+		result[r.SourceID] = r.ActorID
+	}
+	return result, nil
 }
 
 func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name string, campaignID int64) (*domain.Project, error) {
