@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -535,21 +536,21 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			"updated_by": d.UpdatedBy,
 		}
 
-		if existing.CustomerID != d.Customer.ID {
-			customer := &cusmod.Customer{
-				ID:      d.Customer.ID,
-				Name:    d.Customer.Name,
-				ActorID: d.Customer.ActorID,
-				Base: base.Base{
-					CreatedBy: d.UpdatedBy,
-					UpdatedBy: d.UpdatedBy,
-				},
-			}
-			custID, err := ensureCustomer(tx, customer)
-			if err != nil {
-				return err
-			}
-			d.Customer.ID = custID
+		customer := &cusmod.Customer{
+			ID:      d.Customer.ID,
+			Name:    d.Customer.Name,
+			ActorID: d.Customer.ActorID,
+			Base: base.Base{
+				CreatedBy: d.UpdatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
+		}
+		custID, err := ensureCustomer(tx, customer)
+		if err != nil {
+			return err
+		}
+		d.Customer.ID = custID
+		if existing.CustomerID != custID {
 			updates["customer_id"] = custID
 		}
 
@@ -1123,10 +1124,26 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 			query = query.Where("tenant_id = ?", tenantID)
 		}
 		if err := query.First(&existing, c.ID).Error; err == nil {
+			effectiveName := existing.Name
+			if strings.TrimSpace(c.Name) != "" && strings.TrimSpace(c.Name) != existing.Name {
+				newName := strings.TrimSpace(c.Name)
+				renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
+				if hasTenant {
+					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
+				}
+				if err := renameQuery.Updates(map[string]any{
+					"name":       newName,
+					"updated_at": time.Now(),
+					"updated_by": c.UpdatedBy,
+				}).Error; err != nil {
+					return 0, fmt.Errorf("failed to rename customer: %w", err)
+				}
+				effectiveName = newName
+			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyCustomers,
 				SourceID:    existing.ID,
-				Name:        existing.Name,
+				Name:        effectiveName,
 				ActorKind:   actorsync.KindOrganization,
 				Role:        actorsync.RoleCliente,
 				CreatedAt:   existing.CreatedAt,
@@ -1249,10 +1266,26 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 			query = query.Where("tenant_id = ?", tenantID)
 		}
 		if err := query.First(&existing, m.ID).Error; err == nil {
+			effectiveName := existing.Name
+			if strings.TrimSpace(m.Name) != "" && strings.TrimSpace(m.Name) != existing.Name {
+				newName := strings.TrimSpace(m.Name)
+				renameQuery := tx.Table("managers").Where("id = ?", existing.ID)
+				if hasTenant {
+					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
+				}
+				if err := renameQuery.Updates(map[string]any{
+					"name":       newName,
+					"updated_at": time.Now(),
+					"updated_by": m.UpdatedBy,
+				}).Error; err != nil {
+					return 0, fmt.Errorf("failed to rename manager: %w", err)
+				}
+				effectiveName = newName
+			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyManagers,
 				SourceID:    existing.ID,
-				Name:        existing.Name,
+				Name:        effectiveName,
 				ActorKind:   actorsync.KindPerson,
 				Role:        actorsync.RoleResponsable,
 				CreatedAt:   existing.CreatedAt,
@@ -1341,10 +1374,26 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 			query = query.Where("tenant_id = ?", tenantID)
 		}
 		if err := query.First(&existing, i.ID).Error; err == nil {
+			effectiveName := existing.Name
+			if strings.TrimSpace(i.Name) != "" && strings.TrimSpace(i.Name) != existing.Name {
+				newName := strings.TrimSpace(i.Name)
+				renameQuery := tx.Table("investors").Where("id = ?", existing.ID)
+				if hasTenant {
+					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
+				}
+				if err := renameQuery.Updates(map[string]any{
+					"name":       newName,
+					"updated_at": time.Now(),
+					"updated_by": i.UpdatedBy,
+				}).Error; err != nil {
+					return 0, fmt.Errorf("failed to rename investor: %w", err)
+				}
+				effectiveName = newName
+			}
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyInvestors,
 				SourceID:    existing.ID,
-				Name:        existing.Name,
+				Name:        effectiveName,
 				ActorKind:   actorsync.KindUnknown,
 				Role:        actorsync.RoleInversor,
 				CreatedAt:   existing.CreatedAt,
@@ -1493,24 +1542,21 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 
 	newManagerIDs := make(map[int64]struct{})
 	for i, m := range d.Managers {
-		if m.ID != 0 {
-			newManagerIDs[m.ID] = struct{}{}
-		} else {
-			manager := &manmod.Manager{
-				Name:    m.Name,
-				ActorID: m.ActorID,
-				Base: base.Base{
-					CreatedBy: d.UpdatedBy,
-					UpdatedBy: d.UpdatedBy,
-				},
-			}
-			mgrID, err := ensureManager(tx, manager)
-			if err != nil {
-				return err
-			}
-			newManagerIDs[mgrID] = struct{}{}
-			d.Managers[i].ID = mgrID
+		manager := &manmod.Manager{
+			ID:      m.ID,
+			Name:    m.Name,
+			ActorID: m.ActorID,
+			Base: base.Base{
+				CreatedBy: d.UpdatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
 		}
+		mgrID, err := ensureManager(tx, manager)
+		if err != nil {
+			return err
+		}
+		newManagerIDs[mgrID] = struct{}{}
+		d.Managers[i].ID = mgrID
 	}
 
 	for _, m := range d.Managers {
@@ -1559,23 +1605,20 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 
 	newInvestorIDs := make(map[int64]struct{})
 	for k, i := range d.Investors {
-		if i.ID != 0 {
-			newInvestorIDs[i.ID] = struct{}{}
-		} else {
-			invID, err := ensureInvestor(tx, &invmod.Investor{
-				Name:    i.Name,
-				ActorID: i.ActorID,
-				Base: base.Base{
-					CreatedBy: d.UpdatedBy,
-					UpdatedBy: d.UpdatedBy,
-				},
-			})
-			if err != nil {
-				return err
-			}
-			newInvestorIDs[invID] = struct{}{}
-			d.Investors[k].ID = invID
+		invID, err := ensureInvestor(tx, &invmod.Investor{
+			ID:      i.ID,
+			Name:    i.Name,
+			ActorID: i.ActorID,
+			Base: base.Base{
+				CreatedBy: d.UpdatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
+		})
+		if err != nil {
+			return err
 		}
+		newInvestorIDs[invID] = struct{}{}
+		d.Investors[k].ID = invID
 	}
 
 	for _, i := range d.Investors {
@@ -1832,23 +1875,20 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 
 	newAdCostInvIDs := make(map[int64]struct{})
 	for k, aci := range d.AdminCostInvestors {
-		if aci.ID != 0 {
-			newAdCostInvIDs[aci.ID] = struct{}{}
-		} else {
-			aciID, err := ensureInvestor(tx, &invmod.Investor{
-				Name:    aci.Name,
-				ActorID: aci.ActorID,
-				Base: base.Base{
-					CreatedBy: d.UpdatedBy,
-					UpdatedBy: d.UpdatedBy,
-				},
-			})
-			if err != nil {
-				return err
-			}
-			newAdCostInvIDs[aciID] = struct{}{}
-			d.AdminCostInvestors[k].ID = aciID
+		aciID, err := ensureInvestor(tx, &invmod.Investor{
+			ID:      aci.ID,
+			Name:    aci.Name,
+			ActorID: aci.ActorID,
+			Base: base.Base{
+				CreatedBy: d.UpdatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
+		})
+		if err != nil {
+			return err
 		}
+		newAdCostInvIDs[aciID] = struct{}{}
+		d.AdminCostInvestors[k].ID = aciID
 	}
 
 	for _, aci := range d.AdminCostInvestors {
@@ -1923,17 +1963,16 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 		newIDs := make(map[int64]struct{}, len(df.Investors))
 		for i := range df.Investors {
 			inv := &df.Investors[i]
-			if inv.ID == 0 {
-				id, err := ensureInvestor(tx, &invmod.Investor{
-					Name:    inv.Name,
-					ActorID: inv.ActorID,
-					Base:    base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
-				})
-				if err != nil {
-					return err
-				}
-				inv.ID = id
+			id, err := ensureInvestor(tx, &invmod.Investor{
+				ID:      inv.ID,
+				Name:    inv.Name,
+				ActorID: inv.ActorID,
+				Base:    base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
+			})
+			if err != nil {
+				return err
 			}
+			inv.ID = id
 			newIDs[inv.ID] = struct{}{}
 
 			if _, existed := existingFieldInvIDs[inv.ID]; !existed {

@@ -388,13 +388,37 @@ func attachCustomerToActor(tx *gorm.DB, tenantID string, customerID int64, actor
 		updates["deleted_at"] = nil
 		updates["deleted_by"] = nil
 	}
-	if strings.TrimSpace(name) != "" {
-		updates["name"] = strings.TrimSpace(name)
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName != "" {
+		updates["name"] = trimmedName
 	}
 	if err := tx.Table("customers").
 		Where("tenant_id = ? AND id = ?", tenantID, customerID).
 		Updates(updates).Error; err != nil {
 		return domainerr.Internal("failed to link customer to actor")
+	}
+	if trimmedName != "" {
+		if err := renameActorDisplayName(tx, actorID, trimmedName, updatedAt, updatedBy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func renameActorDisplayName(tx *gorm.DB, actorID int64, name string, updatedAt time.Time, updatedBy *string) error {
+	if actorID <= 0 || strings.TrimSpace(name) == "" {
+		return nil
+	}
+	if err := tx.Exec(`
+		UPDATE actors
+		SET display_name = ?,
+			normalized_name = public.normalize_actor_name(?),
+			updated_at = ?,
+			updated_by = ?
+		WHERE id = ?
+		  AND (display_name <> ? OR normalized_name <> public.normalize_actor_name(?))
+	`, name, name, updatedAt, updatedBy, actorID, name, name).Error; err != nil {
+		return domainerr.Internal("failed to rename actor")
 	}
 	return nil
 }
