@@ -41,6 +41,24 @@ var connectors = map[string]struct{}{
 	"las":  {},
 }
 
+// Tokens that render uppercase in display even though storage keeps them
+// lowercase: legal-entity suffixes and common Argentine agro acronyms.
+var uppercaseTokens = map[string]struct{}{
+	"srl":  {},
+	"sa":   {},
+	"sas":  {},
+	"saci": {},
+	"saca": {},
+	"sac":  {},
+	"sh":   {},
+	"sc":   {},
+	"scs":  {},
+	"inta": {},
+	"ypf":  {},
+	"afip": {},
+	"arba": {},
+}
+
 var stripDiacritics = transform.Chain(
 	norm.NFD,
 	runes.Remove(runes.In(unicode.Mn)),
@@ -81,20 +99,22 @@ func FormatProperName(value string) string {
 	words := strings.Split(canonical, " ")
 	out := make([]string, len(words))
 	for i, word := range words {
-		if i > 0 {
-			if _, ok := connectors[word]; ok {
-				out[i] = word
-				continue
-			}
-		}
-		out[i] = capitalize(word)
+		out[i] = formatWord(word, i)
 	}
 	return strings.Join(out, " ")
 }
 
-func capitalize(word string) string {
+func formatWord(word string, index int) string {
 	if word == "" {
 		return word
+	}
+	if _, ok := uppercaseTokens[word]; ok {
+		return strings.ToUpper(word)
+	}
+	if index > 0 {
+		if _, ok := connectors[word]; ok {
+			return word
+		}
 	}
 	runesSlice := []rune(word)
 	runesSlice[0] = unicode.ToUpper(runesSlice[0])

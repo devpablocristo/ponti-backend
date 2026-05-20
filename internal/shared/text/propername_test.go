@@ -30,8 +30,8 @@ func TestFormatProperName(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"agro lajitas srl", "Agro Lajitas Srl"},
-		{"AGRO LAJITAS SRL", "Agro Lajitas Srl"},
+		{"agro lajitas srl", "Agro Lajitas SRL"},
+		{"AGRO LAJITAS SRL", "Agro Lajitas SRL"},
 		{"juan de la torre", "Juan de la Torre"},
 		{"y griega", "Y Griega"},
 		{"María Ángeles", "Maria Angeles"},
@@ -39,6 +39,9 @@ func TestFormatProperName(t *testing.T) {
 		{"J.M. Perez", "J M Perez"},
 		{"JIMENES 25-26", "Jimenes 25 26"},
 		{"LOTE 1", "Lote 1"},
+		{"soalen sa", "Soalen SA"},
+		{"perez y gomez sh", "Perez y Gomez SH"},
+		{"inta pergamino", "INTA Pergamino"},
 		{"", ""},
 	}
 	for _, c := range cases {
