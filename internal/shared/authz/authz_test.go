@@ -88,6 +88,7 @@ func TestMaybeTenantScopeAllowsMissingTenantInTransitionMode(t *testing.T) {
 	scoped := MaybeTenantScope(context.Background(), db, "customers")
 	if scoped == nil {
 		t.Fatalf("expected db to be returned")
+		return
 	}
 	if scoped.Error != nil {
 		t.Fatalf("expected transition mode to allow missing tenant, got %v", scoped.Error)
