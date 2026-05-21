@@ -69,6 +69,10 @@ func (useCasesRepoStub) GetRawDirectCost(context.Context, int64) (decimal.Decima
 	return decimal.Zero, nil
 }
 
+func (useCasesRepoStub) GetInvestorNamesByWorkOrderIDs(context.Context, []int64) (map[int64]string, error) {
+	return map[int64]string{}, nil
+}
+
 func TestNormalizeInvestorPaymentStatus(t *testing.T) {
 	t.Parallel()
 

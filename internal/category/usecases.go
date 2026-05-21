@@ -8,7 +8,7 @@ import (
 
 type RepositoryPort interface {
 	CreateCategory(context.Context, *domain.Category) (int64, error)
-	ListCategories(context.Context, int, int) ([]domain.Category, int64, error)
+	ListCategories(ctx context.Context, filters domain.ListFilters, page, perPage int) ([]domain.Category, int64, error)
 	ListArchivedCategories(context.Context, int, int) ([]domain.Category, int64, error)
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
@@ -29,8 +29,8 @@ func (u *UseCases) CreateCategory(ctx context.Context, c *domain.Category) (int6
 	return u.repo.CreateCategory(ctx, c)
 }
 
-func (u *UseCases) ListCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
-	return u.repo.ListCategories(ctx, page, perPage)
+func (u *UseCases) ListCategories(ctx context.Context, filters domain.ListFilters, page, perPage int) ([]domain.Category, int64, error) {
+	return u.repo.ListCategories(ctx, filters, page, perPage)
 }
 
 func (u *UseCases) ListArchivedCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {

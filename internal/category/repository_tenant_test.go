@@ -56,7 +56,7 @@ func TestCategoryRepositoryTenantIsolation(t *testing.T) {
 	}
 
 	ctxA := categoryTenantContext(tenantA)
-	list, total, err := repo.ListCategories(ctxA, 1, 50)
+	list, total, err := repo.ListCategories(ctxA, domain.ListFilters{}, 1, 50)
 	if err != nil || total != 1 || len(list) != 1 || list[0].ID != 1 {
 		t.Fatalf("expected tenant A category only, total=%d list=%#v err=%v", total, list, err)
 	}
@@ -74,7 +74,7 @@ func TestCategoryRepositoryTenantIsolation(t *testing.T) {
 func TestCategoryRepositoryRequiresTenantInStrictMode(t *testing.T) {
 	t.Setenv("TENANT_STRICT_MODE", "true")
 	repo := NewRepository(categoryTenantGormEngine{client: setupCategoryTenantDB(t)})
-	if _, _, err := repo.ListCategories(context.Background(), 1, 50); err == nil {
+	if _, _, err := repo.ListCategories(context.Background(), domain.ListFilters{}, 1, 50); err == nil {
 		t.Fatalf("expected strict list without tenant to fail")
 	}
 	if _, err := repo.CreateCategory(context.Background(), &domain.Category{Name: "Herbicida", TypeID: 1}); err == nil {

@@ -58,20 +58,43 @@ type entrySupplyMovementsResponse struct {
 }
 
 func entrySupplyMovementsResponseFromDomain(dsm *domain.SupplyMovement) entrySupplyMovementsResponse {
+	var entryDate time.Time
+	if dsm.MovementDate != nil {
+		entryDate = *dsm.MovementDate
+	}
+	investorName := ""
+	if dsm.Investor != nil {
+		investorName = dsm.Investor.Name
+	}
+	providerName := ""
+	if dsm.Provider != nil {
+		providerName = dsm.Provider.Name
+	}
+	var (
+		supplyName, supplyUnit, supplyCategory, supplyType string
+		supplyPrice                                        decimal.Decimal
+	)
+	if dsm.Supply != nil {
+		supplyName = dsm.Supply.Name
+		supplyUnit = dsm.Supply.UnitName
+		supplyCategory = dsm.Supply.CategoryName
+		supplyType = dsm.Supply.Type.Name
+		supplyPrice = dsm.Supply.Price
+	}
 	return entrySupplyMovementsResponse{
 		ID:                   dsm.ID,
 		ProjectID:            dsm.ProjectId,
 		EntryType:            dsm.MovementType,
 		ReferenceNumber:      dsm.ReferenceNumber,
-		EntryDate:            *dsm.MovementDate,
-		InvestorName:         dsm.Investor.Name,
-		SupplyName:           dsm.Supply.Name,
-		Quantity:             fmt.Sprintf("%s %s", dsm.Quantity.String(), dsm.Supply.UnitName),
-		Category:             dsm.Supply.CategoryName,
-		Type:                 dsm.Supply.Type.Name,
-		PriceUSD:             dsm.Supply.Price,
-		TotalUSD:             dsm.Supply.Price.Mul(dsm.Quantity),
-		ProviderName:         dsm.Provider.Name,
+		EntryDate:            entryDate,
+		InvestorName:         investorName,
+		SupplyName:           supplyName,
+		Quantity:             fmt.Sprintf("%s %s", dsm.Quantity.String(), supplyUnit),
+		Category:             supplyCategory,
+		Type:                 supplyType,
+		PriceUSD:             supplyPrice,
+		TotalUSD:             supplyPrice.Mul(dsm.Quantity),
+		ProviderName:         providerName,
 		OriginProjectID:      dsm.OriginProjectID,
 		OriginProject:        dsm.OriginProjectName,
 		DestinationProjectID: dsm.DestinationProjectID,

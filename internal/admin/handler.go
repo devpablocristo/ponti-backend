@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -94,7 +93,7 @@ func (h *Handler) ListTenants(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": items})
+	sharedhandlers.RespondOK(c, items)
 }
 
 func (h *Handler) CreateTenant(c *gin.Context) {
@@ -112,7 +111,7 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{"id": id}})
+	sharedhandlers.RespondOK(c, gin.H{"id": id})
 }
 
 type createUserReq struct {
@@ -213,7 +212,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": resp})
+	sharedhandlers.RespondOK(c, resp)
 }
 
 func (h *Handler) ListUsers(c *gin.Context) {
@@ -231,7 +230,7 @@ func (h *Handler) ListUsers(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": rows})
+	sharedhandlers.RespondOK(c, rows)
 }
 
 type upsertMembershipReq struct {
@@ -287,7 +286,7 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"user_id": u.ID, "tenant_id": tenantID}})
+	sharedhandlers.RespondOK(c, gin.H{"user_id": u.ID, "tenant_id": tenantID})
 }
 
 type createInviteReq struct {
@@ -343,10 +342,10 @@ func (h *Handler) CreateInvite(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{
+	sharedhandlers.RespondOK(c, gin.H{
 		"invite": invite,
 		"token":  token,
-	}})
+	})
 }
 
 type acceptInviteReq struct {
@@ -374,7 +373,7 @@ func (h *Handler) AcceptInvite(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": invite})
+	sharedhandlers.RespondOK(c, invite)
 }
 
 type updateMembershipRoleReq struct {
@@ -404,7 +403,7 @@ func (h *Handler) UpdateMembershipRole(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func (h *Handler) ArchiveMembership(c *gin.Context) {
@@ -420,7 +419,7 @@ func (h *Handler) ArchiveMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	sharedhandlers.RespondNoContent(c)
 }
 
 func parseTenantAndMembership(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {

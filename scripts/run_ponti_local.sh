@@ -105,23 +105,23 @@ if ! grep -qE '^IDENTITY_PLATFORM_PROJECT_ID=' "$FRONTEND_DIR/api/.env" 2>/dev/n
 fi
 
 echo "Bajando contenedores antes de levantar..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
-docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans -v
+docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
+docker compose --progress quiet -f "$AI_DIR/docker-compose.yml" down --remove-orphans -v
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
   # A veces Vite/Yarn se quedan colgados y el stop falla; hacer down "best effort".
-  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
-  docker compose -f "$FRONTEND_DIR/docker-compose.yml" kill || true
-  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" kill || true
+  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
 fi
 
 echo "Verificando conflictos de puerto PostgreSQL..."
 stop_system_postgres
 
 echo "Levantando backend (DB + migraciones) con Docker..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d ponti-db
+docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" up -d ponti-db
 
 echo "Levantando backend API (docker)..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" up -d --build ponti-api
+docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" up -d --build --quiet-pull ponti-api
 
 if ! http_ok "http://localhost:8080/ping"; then
   echo "WARN: backend API aún no responde en :8080 (puede tardar por build/migrate inicial)." >&2
@@ -143,18 +143,18 @@ if [[ "$llm_provider" == "ollama" ]]; then
   fi
   if ollama_compose="$(resolve_ollama_compose)"; then
     echo "Levantando Ollama compartido (local-infra) con $ollama_compose..."
-    docker compose -f "$ollama_compose" up -d
+    docker compose --progress quiet -f "$ollama_compose" up -d
   else
     echo "ERROR: LLM_PROVIDER=ollama pero no se encontró un compose válido en $LOCAL_INFRA_DIR" >&2
     echo "Busqué en: docker-compose.ollama.yml, docker-compose.ollama.yaml, ollama/docker-compose.yml y ollama/docker-compose.yaml" >&2
     exit 1
   fi
 fi
-docker compose -f "$AI_DIR/docker-compose.yml" up -d "${ai_services[@]}"
+docker compose --progress quiet -f "$AI_DIR/docker-compose.yml" up -d --quiet-pull "${ai_services[@]}"
 
 echo "Levantando frontend con Docker Compose..."
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
-  docker compose -f "$FRONTEND_DIR/docker-compose.yml" up -d
+  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" up -d --quiet-pull
 else
   echo "ERROR: falta $FRONTEND_DIR/docker-compose.yml (el FE ahora usa docker-compose)" >&2
   exit 1

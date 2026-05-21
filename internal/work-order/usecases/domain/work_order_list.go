@@ -31,6 +31,7 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal
 	IsDigital         bool
 	Status            string
+	InvestorName      string // poblado por ExportWorkOrders, no por la vista.
 }
 
 // ArchivedWorkOrderFilter filtros opcionales para listar work-orders archivadas.

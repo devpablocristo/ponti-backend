@@ -27,6 +27,7 @@ type RepositoryPort interface {
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
+	GetInvestorNamesByWorkOrderIDs(context.Context, []int64) (map[int64]string, error)
 
 	GetHarvestAreaSnapshot(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
 }
@@ -268,6 +269,22 @@ func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFi
 
 	if len(items) == 0 {
 		return nil, domainerr.NotFound("there is no data to export")
+	}
+
+	// La vista `v4_report.workorder_list` no expone `investor_name`. Lo hidratamos
+	// vía un side-query por workorder.id → investor.name para que el CSV sea
+	// round-trippable (el import necesita INVERSOR).
+	ids := make([]int64, 0, len(items))
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	investorNames, err := u.repo.GetInvestorNamesByWorkOrderIDs(ctx, ids)
+	if err == nil {
+		for i := range items {
+			if name, ok := investorNames[items[i].ID]; ok {
+				items[i].InvestorName = name
+			}
+		}
 	}
 
 	return u.exporter.Export(ctx, items)

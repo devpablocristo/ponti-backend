@@ -7,7 +7,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// LaborListItem - Modelo que incluye campos calculados de la vista v4_report.labor_list
+// LaborListItem - Modelo que incluye campos calculados de la vista v4_report.labor_list.
+//
+// TableName se declara explícito para apuntar a la vista del schema `v4_report`,
+// ya que la convención GORM pluralizaría `labor_list_items` y rompería el query.
 type LaborListItem struct {
 	WorkOrderID            int64           `gorm:"column:workorder_id"`
 	WorkOrderNumber        string          `gorm:"column:workorder_number"`
@@ -42,4 +45,9 @@ type LaborListItem struct {
 	InvoiceCompany *string    `gorm:"column:invoice_company"`
 	InvoiceDate    *time.Time `gorm:"column:invoice_date"`
 	InvoiceStatus  *string    `gorm:"column:invoice_status"`
+}
+
+// TableName apunta a la vista materializada del schema v4_report.
+func (LaborListItem) TableName() string {
+	return "v4_report.labor_list"
 }

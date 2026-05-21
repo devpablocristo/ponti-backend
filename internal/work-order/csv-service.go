@@ -24,6 +24,7 @@ var workOrderHeaders = []string{
 	"LABOR",
 	"TIPO/CLASE",
 	"CONTRATISTA",
+	"INVERSOR",
 	"SUPERFICIE",
 	"INSUMO",
 	"CONSUMO",
@@ -63,6 +64,7 @@ func (e *CSVExporter) Export(_ context.Context, items []domain.WorkOrderListElem
 			it.LaborName,
 			it.TypeName,
 			it.Contractor,
+			it.InvestorName,
 			decToString(it.SurfaceHa, 2),
 			it.SupplyName,
 			decToString(it.Consumption, 2),
@@ -77,7 +79,7 @@ func (e *CSVExporter) Export(_ context.Context, items []domain.WorkOrderListElem
 	if len(items) > 0 {
 		rows = append(rows, []string{
 			"TOTAL",
-			"", "", "", "", "", "", "", "",
+			"", "", "", "", "", "", "", "", "",
 			decToString(totalSurfaceHa, 2),
 			"",
 			decToString(totalConsumption, 2),

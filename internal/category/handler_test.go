@@ -15,6 +15,7 @@ import (
 type categoryHandlerUseCasesStub struct {
 	listPage    int
 	listPerPage int
+	listTypeID  *int64
 	getCalls    []int64
 	deleteCalls []int64
 	updateCalls []domain.Category
@@ -26,9 +27,10 @@ func (s *categoryHandlerUseCasesStub) CreateCategory(_ context.Context, category
 	return 99, nil
 }
 
-func (s *categoryHandlerUseCasesStub) ListCategories(_ context.Context, page int, perPage int) ([]domain.Category, int64, error) {
+func (s *categoryHandlerUseCasesStub) ListCategories(_ context.Context, filters domain.ListFilters, page int, perPage int) ([]domain.Category, int64, error) {
 	s.listPage = page
 	s.listPerPage = perPage
+	s.listTypeID = filters.TypeID
 	return []domain.Category{{ID: 1, Name: "Semilla", TypeID: 2}}, 1, nil
 }
 

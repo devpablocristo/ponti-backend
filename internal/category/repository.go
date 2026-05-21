@@ -49,21 +49,27 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 	return model.ID, nil
 }
 
-func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]domain.Category, int64, error) {
+func (r *Repository) ListCategories(ctx context.Context, filters domain.ListFilters, page, perPage int) ([]domain.Category, int64, error) {
 	var total int64
 	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Category{}), "categories")
+	if filters.TypeID != nil {
+		base = base.Where("type_id = ?", *filters.TypeID)
+	}
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count categories")
 	}
 
 	var list []models.Category
 	offset := (page - 1) * perPage
-	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "categories").
+	query := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "categories")
+	if filters.TypeID != nil {
+		query = query.Where("type_id = ?", *filters.TypeID)
+	}
+	if err := query.
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
-		Find(&list).Error
-	if err != nil {
+		Find(&list).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to list categories")
 	}
 

@@ -9,15 +9,15 @@ AI_DIR="$ROOT_DIR/ponti-ai"
 
 echo "Bajando frontend..."
 if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
-  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 5 || true
+  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 5 || true
 fi
 
 echo "Bajando AI..."
 if [[ -f "$AI_DIR/docker-compose.yml" ]]; then
-  docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans || true
+  docker compose --progress quiet -f "$AI_DIR/docker-compose.yml" down --remove-orphans || true
 fi
 
 echo "Bajando backend..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
+docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
 
 echo "Stack local detenido."

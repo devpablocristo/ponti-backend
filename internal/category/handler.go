@@ -2,6 +2,7 @@ package category
 
 import (
 	"context"
+	"strconv"
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,7 @@ import (
 
 type UseCasesPort interface {
 	CreateCategory(context.Context, *domain.Category) (int64, error)
-	ListCategories(context.Context, int, int) ([]domain.Category, int64, error)
+	ListCategories(ctx context.Context, filters domain.ListFilters, page, perPage int) ([]domain.Category, int64, error)
 	ListArchivedCategories(context.Context, int, int) ([]domain.Category, int64, error)
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
@@ -88,7 +89,13 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 func (h *Handler) ListCategories(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	categories, total, err := h.ucs.ListCategories(c.Request.Context(), page, perPage)
+	var typeID *int64
+	if raw := c.Query("type_id"); raw != "" {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+			typeID = &parsed
+		}
+	}
+	categories, total, err := h.ucs.ListCategories(c.Request.Context(), domain.ListFilters{TypeID: typeID}, page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

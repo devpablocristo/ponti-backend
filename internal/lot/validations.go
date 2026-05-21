@@ -368,41 +368,6 @@ func ValidateLotUpdate() gin.HandlerFunc {
 			return
 		}
 
-		// // Para actualizaciones, validar solo campos que estén presentes
-		// validationErrors := &ValidationErrors{}
-
-		// // Solo validar campos que no estén vacíos
-		// if req.Name != "" {
-		// 	validateLotName(req.Name, validationErrors)
-		// }
-
-		// if req.FieldID > 0 {
-		// 	validateFieldID(req.FieldID, validationErrors)
-		// }
-
-		// if req.Hectares.GreaterThan(decimal.Zero) {
-		// 	validateHectares(req.Hectares, validationErrors)
-		// }
-
-		// if req.PreviousCropID > 0 {
-		// 	validateCropID(req.PreviousCropID, validationErrors, "previous_crop_id")
-		// }
-
-		// if req.CurrentCropID > 0 {
-		// 	validateCropID(req.CurrentCropID, validationErrors, "current_crop_id")
-		// }
-
-		// // Para actualizaciones, las fechas son opcionales
-		// if len(req.Dates) > 0 {
-		// 	validateLotDates(req.Dates, validationErrors)
-		// }
-
-		// if len(validationErrors.Errors) > 0 {
-		// 	c.JSON(http.StatusBadRequest, validationErrors)
-		// 	c.Abort()
-		// 	return
-		// }
-
 		// Set actor from context
 		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
 			req.UpdatedBy = &actor
@@ -411,13 +376,6 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		// Establecer timestamp actual para UpdatedAt
 		now := time.Now()
 		req.UpdatedAt = now
-
-		// Si hay errores de validación del Base, abortar
-		// if len(validationErrors.Errors) > 0 {
-		// 	c.JSON(http.StatusBadRequest, validationErrors)
-		// 	c.Abort()
-		// 	return
-		// }
 
 		c.Set("validated_lot", &req)
 		c.Next()

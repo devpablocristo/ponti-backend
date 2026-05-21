@@ -333,7 +333,93 @@ func (r *Repository) ListEntrySupplyMovements(ctx context.Context, filter domain
 		return nil, err
 	}
 
+	// Sumar consumos de OTs como filas virtuales con `MovementType = "Consumo OT"`.
+	// Esto unifica `/admin/supply-movements` (movimientos manuales) con los insumos
+	// consumidos por work_orders sin denormalizar el modelo de datos.
+	consumptions, err := r.listWorkOrderConsumptions(ctx, projectIDs)
+	if err != nil {
+		return nil, err
+	}
+	domainSupplyMovements = append(domainSupplyMovements, consumptions...)
+
 	return domainSupplyMovements, nil
+}
+
+// MovementTypeWorkOrderConsumption es el tipo virtual asignado a las filas que
+// representan insumos consumidos por work_orders. No existe en la columna
+// `movement_type` de la DB; se proyecta en runtime para que la lista de
+// `/admin/supply-movements` muestre todos los movimientos en un solo lugar.
+const MovementTypeWorkOrderConsumption = "Consumo OT"
+
+// listWorkOrderConsumptions devuelve los items de work_orders como
+// `SupplyMovement` virtuales. Usa IDs negativos para no colisionar con los IDs
+// reales de `supply_movements` y deja claro en el FE que son readonly.
+func (r *Repository) listWorkOrderConsumptions(ctx context.Context, projectIDs []int64) ([]*domain.SupplyMovement, error) {
+	type consumptionRow struct {
+		ItemID        int64           `gorm:"column:item_id"`
+		WorkOrderID   int64           `gorm:"column:workorder_id"`
+		WorkOrderNum  string          `gorm:"column:workorder_number"`
+		Date          *time.Time      `gorm:"column:date"`
+		ProjectID     int64           `gorm:"column:project_id"`
+		InvestorID    int64           `gorm:"column:investor_id"`
+		SupplyID      int64           `gorm:"column:supply_id"`
+		SupplyName    string          `gorm:"column:supply_name"`
+		TotalUsed     decimal.Decimal `gorm:"column:total_used"`
+		FinalDose     decimal.Decimal `gorm:"column:final_dose"`
+		ProjectName   string          `gorm:"column:project_name"`
+	}
+
+	db := r.getDB(ctx)
+	// El alias `woi` evita conflictos en los JOINs; le pasamos `woi.tenant_id`
+	// a `MaybeTenantScope` (que respeta strings con `.` sin agregarle el prefijo).
+	q := authz.MaybeTenantScope(ctx,
+		db.Table("workorder_items AS woi"),
+		"woi.tenant_id").
+		Select(`
+			woi.id AS item_id,
+			woi.workorder_id,
+			wo.number AS workorder_number,
+			wo.date,
+			wo.project_id,
+			wo.investor_id,
+			woi.supply_id,
+			woi.supply_name,
+			woi.total_used,
+			woi.final_dose,
+			p.name AS project_name
+		`).
+		Joins("JOIN workorders wo ON wo.id = woi.workorder_id AND wo.tenant_id = woi.tenant_id").
+		Joins("JOIN projects p ON p.id = wo.project_id AND p.tenant_id = woi.tenant_id").
+		Where("wo.deleted_at IS NULL")
+
+	if len(projectIDs) > 0 {
+		q = q.Where("wo.project_id IN ?", projectIDs)
+	}
+
+	var rows []consumptionRow
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, domainerr.Internal("failed to list work order consumptions")
+	}
+
+	out := make([]*domain.SupplyMovement, 0, len(rows))
+	for _, row := range rows {
+		projectName := row.ProjectName
+		out = append(out, &domain.SupplyMovement{
+			// ID negativo derivado de workorder_items.id para evitar colisión
+			// con `supply_movements.id` reales. El FE solo lo usa como key.
+			ID:                -row.ItemID,
+			Quantity:          row.TotalUsed,
+			MovementType:      MovementTypeWorkOrderConsumption,
+			MovementDate:      row.Date,
+			ReferenceNumber:   row.WorkOrderNum,
+			ProjectId:         row.ProjectID,
+			Supply:            &domain.Supply{ID: row.SupplyID, Name: row.SupplyName},
+			OriginProjectID:   &row.ProjectID,
+			OriginProjectName: &projectName,
+			IsEntry:           false,
+		})
+	}
+	return out, nil
 }
 
 type movementOriginRow struct {

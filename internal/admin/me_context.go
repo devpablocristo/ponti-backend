@@ -1,13 +1,14 @@
 package admin
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/security/go/contextkeys"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 func (h *Handler) registerMeContextRoute() {
@@ -18,7 +19,7 @@ func (h *Handler) registerMeContextRoute() {
 func (h *Handler) GetMeContext(c *gin.Context) {
 	actor, _ := c.Request.Context().Value(ctxkeys.Actor).(string)
 	if strings.TrimSpace(actor) == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "authentication context required"})
+		sharedhandlers.RespondError(c, domainerr.Unauthorized("authentication context required"))
 		return
 	}
 
@@ -36,7 +37,7 @@ func (h *Handler) GetMeContext(c *gin.Context) {
 		Where("idp_sub = ?", actor).
 		Limit(1).
 		Take(&user).Error; err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"message": "local user not found"})
+		sharedhandlers.RespondError(c, domainerr.Forbidden("local user not found"))
 		return
 	}
 
@@ -56,7 +57,7 @@ func (h *Handler) GetMeContext(c *gin.Context) {
 		Where("m.user_id = ? AND m.status = 'active'", user.ID).
 		Order("t.name ASC").
 		Find(&tenants).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "unable to load memberships"})
+		sharedhandlers.RespondError(c, domainerr.Internal("unable to load memberships"))
 		return
 	}
 
@@ -79,7 +80,7 @@ func (h *Handler) GetMeContext(c *gin.Context) {
 			Where("rp.role_id IN ?", roleIDs).
 			Order("p.name ASC").
 			Find(&perms).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "unable to load permissions"})
+			sharedhandlers.RespondError(c, domainerr.Internal("unable to load permissions"))
 			return
 		}
 		for _, perm := range perms {
@@ -99,7 +100,7 @@ func (h *Handler) GetMeContext(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	sharedhandlers.RespondOK(c, gin.H{
 		"user": gin.H{
 			"id":        user.ID,
 			"idp_sub":   user.IDPSub,

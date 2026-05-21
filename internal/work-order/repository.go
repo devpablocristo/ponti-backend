@@ -1031,3 +1031,31 @@ func (r *Repository) GetHarvestAreaSnapshot(
 
 	return result.IsHarvest, result.LotHectares, result.ExistingHarvestedArea, nil
 }
+
+// GetInvestorNamesByWorkOrderIDs devuelve un map[workorderID] → investor.name
+// para todos los IDs pedidos. Usado por `ExportWorkOrders` para enriquecer el
+// CSV con la columna INVERSOR sin tocar la vista `v4_report.workorder_list`.
+func (r *Repository) GetInvestorNamesByWorkOrderIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type row struct {
+		WorkOrderID  int64  `gorm:"column:workorder_id"`
+		InvestorName string `gorm:"column:investor_name"`
+	}
+	var rows []row
+	q := authz.MaybeTenantScope(ctx,
+		r.db.Client().WithContext(ctx).Table("workorders AS w"),
+		"w.tenant_id").
+		Select("w.id AS workorder_id, COALESCE(i.name, '') AS investor_name").
+		Joins("LEFT JOIN investors i ON i.id = w.investor_id AND i.tenant_id = w.tenant_id").
+		Where("w.id IN ?", ids)
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, domainerr.Internal("failed to load investor names")
+	}
+	for _, r := range rows {
+		out[r.WorkOrderID] = r.InvestorName
+	}
+	return out, nil
+}
