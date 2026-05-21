@@ -3,7 +3,7 @@ package pkgdotenv
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	pkgutils "github.com/devpablocristo/ponti-backend/internal/shared/utils"
 	"github.com/joho/godotenv"
@@ -34,7 +34,11 @@ func loadEnvFiles(filePaths []string, overload bool) error {
 		}
 	}
 
-	log.Printf("godotenv: searched=%v loaded=%v", filePaths, foundFiles)
+	slog.Default().Info("godotenv loaded files",
+		"event", "godotenv_loaded",
+		"searched", filePaths,
+		"loaded", foundFiles,
+	)
 
 	return nil
 }

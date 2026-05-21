@@ -10,7 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
@@ -409,9 +409,8 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	}
 
 	if err := base.
-		Select("MIN(id) as id, name").
-		Group("name").
-		Order("name ASC").
+		Select("id, name").
+		Order("name ASC, id ASC").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
@@ -554,10 +553,11 @@ func readLegacyActorIDs(db *gorm.DB, sourceTable string, sourceIDs []int64) (map
 	return result, nil
 }
 
-func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name string, campaignID int64) (*domain.Project, error) {
+func (r *Repository) GetProjectByNameCustomerAndCampaignID(ctx context.Context, name string, customerID, campaignID int64) (*domain.Project, error) {
 	var m models.Project
 	query := r.db.Client().WithContext(ctx).
 		Where("name = ?", name).
+		Where("customer_id = ?", customerID).
 		Where("campaign_id = ?", campaignID).
 		Where("deleted_at IS NULL")
 	query = authz.MaybeTenantScope(ctx, query, "projects")
@@ -642,7 +642,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 				UpdatedBy: d.UpdatedBy,
 			},
 		}
-		custID, err := ensureCustomer(tx, customer)
+		custID, err := ensureCustomerForUpdate(tx, customer)
 		if err != nil {
 			return err
 		}
@@ -651,20 +651,20 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			updates["customer_id"] = custID
 		}
 
-		if existing.CampaignID != d.Campaign.ID {
-			campaign := &casmod.Campaign{
-				ID:   d.Campaign.ID,
-				Name: d.Campaign.Name,
-				Base: base.Base{
-					CreatedBy: d.UpdatedBy,
-					UpdatedBy: d.UpdatedBy,
-				},
-			}
-			campID, err := ensureCampaign(tx, campaign)
-			if err != nil {
-				return err
-			}
-			d.Campaign.ID = campID
+		campaign := &casmod.Campaign{
+			ID:   d.Campaign.ID,
+			Name: d.Campaign.Name,
+			Base: base.Base{
+				CreatedBy: d.UpdatedBy,
+				UpdatedBy: d.UpdatedBy,
+			},
+		}
+		campID, err := ensureCampaignForUpdate(tx, campaign)
+		if err != nil {
+			return err
+		}
+		d.Campaign.ID = campID
+		if existing.CampaignID != campID {
 			updates["campaign_id"] = campID
 		}
 
@@ -1332,6 +1332,147 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	return c.ID, nil
 }
 
+// ensureCustomerForUpdate is the strict variant used by UpdateProject.
+// Behavior depends on the incoming identifier:
+//
+//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. It is NOT
+//     renamed even if `c.Name` differs from the stored value — to rename a
+//     customer, the caller must go through the dedicated customer endpoint.
+//     This avoids a casual project edit silently renaming a shared catalog
+//     row that affects other projects.
+//
+//   - If `c.ID == 0`: the FE signalled "this is a new customer association"
+//     (typically because the user typed free text in the picker instead of
+//     selecting from the dropdown). Look up by name; if a customer with that
+//     name exists, link to it (no rename either way). If not, create a new
+//     customer. This is the `freeSolo` + create-or-link-on-save flow.
+func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
+	tenantID, hasTenant := tenantIDFromTx(tx)
+	if hasTenant {
+		c.TenantID = tenantID
+	}
+
+	if c.ActorID != nil && *c.ActorID > 0 {
+		result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
+			CustomerID: c.ID,
+			ActorID:    c.ActorID,
+			Name:       c.Name,
+			CreatedAt:  c.CreatedAt,
+			UpdatedAt:  c.UpdatedAt,
+			CreatedBy:  c.CreatedBy,
+			UpdatedBy:  c.UpdatedBy,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if result != nil {
+			c.ActorID = &result.ActorID
+			return result.CustomerID, nil
+		}
+	}
+
+	if c.ID != 0 {
+		var existing cusmod.Customer
+		query := tx
+		if hasTenant {
+			query = query.Where("tenant_id = ?", tenantID)
+		}
+		if err := query.First(&existing, c.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, domainerr.Validation(fmt.Sprintf("customer %d not found", c.ID))
+			}
+			return 0, fmt.Errorf("failed to check customer: %w", err)
+		}
+		return existing.ID, nil
+	}
+
+	// c.ID == 0 → lookup by name (case-insensitive) or create. Consistent with
+	// the original ensureCustomer's by-name fallback: we match raw text but
+	// case-insensitively so "Beta Inc" and "beta inc" resolve to the same row.
+	if c.Name == "" {
+		return 0, domainerr.Validation("customer name is required")
+	}
+	var existing cusmod.Customer
+	query := tx.Where("LOWER(name) = LOWER(?)", c.Name)
+	if hasTenant {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	if err := query.First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check customer by name: %w", err)
+	}
+
+	if err := tx.Create(c).Error; err != nil {
+		return 0, fmt.Errorf("failed to create customer: %w", err)
+	}
+	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+		SourceTable: actorsync.LegacyCustomers,
+		SourceID:    c.ID,
+		Name:        c.Name,
+		ActorKind:   actorsync.KindOrganization,
+		Role:        actorsync.RoleCliente,
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+		CreatedBy:   c.CreatedBy,
+		UpdatedBy:   c.UpdatedBy,
+	}); err != nil {
+		return 0, err
+	}
+	return c.ID, nil
+}
+
+// ensureCampaignForUpdate is the strict variant used by UpdateProject.
+// Behavior:
+//
+//   - If `c.ID != 0`: strict lookup by ID. The campaign must exist. NOT
+//     renamed even if `c.Name` differs from the stored value.
+//
+//   - If `c.ID == 0`: the FE signalled "new campaign association". Look up
+//     by name; if a campaign with that name exists, link to it. If not,
+//     create a new campaign. Campaign codes (e.g. "2025-2026") are treated
+//     as catalog identifiers and stored verbatim (trimmed only).
+func ensureCampaignForUpdate(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
+	tenantID, hasTenant := tenantIDFromTx(tx)
+	if hasTenant {
+		c.TenantID = tenantID
+	}
+
+	if c.ID != 0 {
+		var existing casmod.Campaign
+		query := tx
+		if hasTenant {
+			query = query.Where("tenant_id = ?", tenantID)
+		}
+		if err := query.First(&existing, c.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, domainerr.Validation(fmt.Sprintf("campaign %d not found", c.ID))
+			}
+			return 0, fmt.Errorf("failed to check campaign: %w", err)
+		}
+		return existing.ID, nil
+	}
+
+	if c.Name == "" {
+		return 0, domainerr.Validation("campaign name is required")
+	}
+	var existing casmod.Campaign
+	query := tx.Where("name = ?", c.Name)
+	if hasTenant {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	if err := query.First(&existing).Error; err == nil {
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check campaign by name: %w", err)
+	}
+
+	if err := tx.Create(c).Error; err != nil {
+		return 0, fmt.Errorf("failed to create campaign: %w", err)
+	}
+	return c.ID, nil
+}
+
 func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	tenantID, hasTenant := tenantIDFromTx(tx)
 	if hasTenant {
@@ -1548,6 +1689,217 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	return i.ID, nil
 }
 
+// ensureManagerForUpdate is the strict variant used by UpdateProject.
+// Behavior:
+//
+//   - If `m.ID != 0`: strict lookup by ID. NOT renamed even if `m.Name` differs.
+//     Actor sync still runs to keep the legacy actor mirror up to date.
+//
+//   - If `m.ID == 0`: the FE signalled "new manager slot" (typed text). Lookup
+//     by canonicalized name; link if exists, create if not.
+func ensureManagerForUpdate(tx *gorm.DB, m *manmod.Manager) (int64, error) {
+	tenantID, hasTenant := tenantIDFromTx(tx)
+	if hasTenant {
+		m.TenantID = tenantID
+	}
+
+	if m.ActorID != nil && *m.ActorID > 0 {
+		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
+			SourceTable: actorsync.LegacyManagers,
+			ActorID:     m.ActorID,
+			Name:        m.Name,
+			ActorKind:   actorsync.KindPerson,
+			Role:        actorsync.RoleResponsable,
+			CreatedAt:   m.CreatedAt,
+			UpdatedAt:   m.UpdatedAt,
+			CreatedBy:   m.CreatedBy,
+			UpdatedBy:   m.UpdatedBy,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if id > 0 {
+			return id, nil
+		}
+	}
+
+	if m.ID != 0 {
+		var existing manmod.Manager
+		query := tx
+		if hasTenant {
+			query = query.Where("tenant_id = ?", tenantID)
+		}
+		if err := query.First(&existing, m.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, domainerr.Validation(fmt.Sprintf("manager %d not found", m.ID))
+			}
+			return 0, fmt.Errorf("failed to check manager: %w", err)
+		}
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyManagers,
+			SourceID:    existing.ID,
+			Name:        existing.Name,
+			ActorKind:   actorsync.KindPerson,
+			Role:        actorsync.RoleResponsable,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   m.UpdatedBy,
+		}); err != nil {
+			return 0, err
+		}
+		return existing.ID, nil
+	}
+
+	if m.Name == "" {
+		return 0, domainerr.Validation("manager name is required")
+	}
+	var existing manmod.Manager
+	query := tx.Where("LOWER(name) = LOWER(?)", m.Name)
+	if hasTenant {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	if err := query.First(&existing).Error; err == nil {
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyManagers,
+			SourceID:    existing.ID,
+			Name:        existing.Name,
+			ActorKind:   actorsync.KindPerson,
+			Role:        actorsync.RoleResponsable,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   m.UpdatedBy,
+		}); err != nil {
+			return 0, err
+		}
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check manager by name: %w", err)
+	}
+
+	if err := tx.Create(m).Error; err != nil {
+		return 0, fmt.Errorf("failed to create manager: %w", err)
+	}
+	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+		SourceTable: actorsync.LegacyManagers,
+		SourceID:    m.ID,
+		Name:        m.Name,
+		ActorKind:   actorsync.KindPerson,
+		Role:        actorsync.RoleResponsable,
+		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
+		CreatedBy:   m.CreatedBy,
+		UpdatedBy:   m.UpdatedBy,
+	}); err != nil {
+		return 0, err
+	}
+	return m.ID, nil
+}
+
+// ensureInvestorForUpdate is the strict variant used by UpdateProject.
+// Mirrors ensureManagerForUpdate semantics: id != 0 → strict no-rename;
+// id == 0 → lookup-by-name or create.
+func ensureInvestorForUpdate(tx *gorm.DB, i *invmod.Investor) (int64, error) {
+	tenantID, hasTenant := tenantIDFromTx(tx)
+	if hasTenant {
+		i.TenantID = tenantID
+	}
+
+	if i.ActorID != nil && *i.ActorID > 0 {
+		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
+			SourceTable: actorsync.LegacyInvestors,
+			ActorID:     i.ActorID,
+			Name:        i.Name,
+			ActorKind:   actorsync.KindUnknown,
+			Role:        actorsync.RoleInversor,
+			CreatedAt:   i.CreatedAt,
+			UpdatedAt:   i.UpdatedAt,
+			CreatedBy:   i.CreatedBy,
+			UpdatedBy:   i.UpdatedBy,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if id > 0 {
+			return id, nil
+		}
+	}
+
+	if i.ID != 0 {
+		var existing invmod.Investor
+		query := tx
+		if hasTenant {
+			query = query.Where("tenant_id = ?", tenantID)
+		}
+		if err := query.First(&existing, i.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, domainerr.Validation(fmt.Sprintf("investor %d not found", i.ID))
+			}
+			return 0, fmt.Errorf("failed to check investor: %w", err)
+		}
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyInvestors,
+			SourceID:    existing.ID,
+			Name:        existing.Name,
+			ActorKind:   actorsync.KindUnknown,
+			Role:        actorsync.RoleInversor,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   i.UpdatedBy,
+		}); err != nil {
+			return 0, err
+		}
+		return existing.ID, nil
+	}
+
+	if i.Name == "" {
+		return 0, domainerr.Validation("investor name is required")
+	}
+	var existing invmod.Investor
+	query := tx.Where("LOWER(name) = LOWER(?)", i.Name)
+	if hasTenant {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	if err := query.First(&existing).Error; err == nil {
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyInvestors,
+			SourceID:    existing.ID,
+			Name:        existing.Name,
+			ActorKind:   actorsync.KindUnknown,
+			Role:        actorsync.RoleInversor,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   i.UpdatedBy,
+		}); err != nil {
+			return 0, err
+		}
+		return existing.ID, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, fmt.Errorf("failed to check investor by name: %w", err)
+	}
+
+	if err := tx.Create(i).Error; err != nil {
+		return 0, fmt.Errorf("failed to create investor: %w", err)
+	}
+	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+		SourceTable: actorsync.LegacyInvestors,
+		SourceID:    i.ID,
+		Name:        i.Name,
+		ActorKind:   actorsync.KindUnknown,
+		Role:        actorsync.RoleInversor,
+		CreatedAt:   i.CreatedAt,
+		UpdatedAt:   i.UpdatedAt,
+		CreatedBy:   i.CreatedBy,
+		UpdatedBy:   i.UpdatedBy,
+	}); err != nil {
+		return 0, err
+	}
+	return i.ID, nil
+}
+
 func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
 	tenantID, hasTenant := tenantIDFromTx(tx)
 	if hasTenant {
@@ -1648,7 +2000,7 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 				UpdatedBy: d.UpdatedBy,
 			},
 		}
-		mgrID, err := ensureManager(tx, manager)
+		mgrID, err := ensureManagerForUpdate(tx, manager)
 		if err != nil {
 			return err
 		}
@@ -1702,7 +2054,7 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 
 	newInvestorIDs := make(map[int64]struct{})
 	for k, i := range d.Investors {
-		invID, err := ensureInvestor(tx, &invmod.Investor{
+		invID, err := ensureInvestorForUpdate(tx, &invmod.Investor{
 			ID:      i.ID,
 			Name:    i.Name,
 			ActorID: i.ActorID,
@@ -1972,7 +2324,7 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 
 	newAdCostInvIDs := make(map[int64]struct{})
 	for k, aci := range d.AdminCostInvestors {
-		aciID, err := ensureInvestor(tx, &invmod.Investor{
+		aciID, err := ensureInvestorForUpdate(tx, &invmod.Investor{
 			ID:      aci.ID,
 			Name:    aci.Name,
 			ActorID: aci.ActorID,
@@ -2060,7 +2412,7 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 		newIDs := make(map[int64]struct{}, len(df.Investors))
 		for i := range df.Investors {
 			inv := &df.Investors[i]
-			id, err := ensureInvestor(tx, &invmod.Investor{
+			id, err := ensureInvestorForUpdate(tx, &invmod.Investor{
 				ID:      inv.ID,
 				Name:    inv.Name,
 				ActorID: inv.ActorID,

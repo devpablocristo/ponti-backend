@@ -9,6 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+
 	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
@@ -42,7 +44,7 @@ func (r *ReportRepository) GetFieldCropMetrics(ctx context.Context, filters doma
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -64,7 +66,7 @@ func (r *ReportRepository) GetFieldCropMetrics(ctx context.Context, filters doma
 
 	// Ejecutar query
 	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&modelResults).Error; err != nil {
-		return nil, fmt.Errorf("error al obtener métricas: %w", err)
+		return nil, domainerr.Internal("error al obtener métricas: " + err.Error())
 	}
 
 	// Convertir modelos a dominio
@@ -82,7 +84,7 @@ func (r *ReportRepository) getFieldCropColumns(ctx context.Context, filters doma
 
 	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 	if len(projectIDs) == 0 {
 		return columns, nil
@@ -107,7 +109,7 @@ func (r *ReportRepository) getFieldCropColumns(ctx context.Context, filters doma
 	}
 	err = r.db.Client().WithContext(ctx).Raw(query, projectIDs, fieldID, fieldID).Scan(&columns).Error
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo columnas: %w", err)
+		return nil, domainerr.Internal("error obteniendo columnas: " + err.Error())
 	}
 
 	return columns, nil
@@ -396,7 +398,7 @@ func (r *ReportRepository) getSupplyCategories(ctx context.Context) (map[string]
 
 	rows, err := query.Rows()
 	if err != nil {
-		return nil, fmt.Errorf("error querying supply categories: %w", err)
+		return nil, domainerr.Internal("error querying supply categories: " + err.Error())
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -454,7 +456,7 @@ func (r *ReportRepository) getLaborCategories(ctx context.Context) (map[string]s
 
 	rows, err := query.Rows()
 	if err != nil {
-		return nil, fmt.Errorf("error querying labor categories: %w", err)
+		return nil, domainerr.Internal("error querying labor categories: " + err.Error())
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -497,7 +499,7 @@ func (r *ReportRepository) BuildFieldCrop(ctx context.Context, filters domain.Re
 	// Obtener información del proyecto
 	projectInfo, err := r.getProjectInfo(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
+		return nil, domainerr.Internal("error getting project information: " + err.Error())
 	}
 	if projectInfo.ProjectID == 0 {
 		return &domain.FieldCrop{}, nil
@@ -506,13 +508,13 @@ func (r *ReportRepository) BuildFieldCrop(ctx context.Context, filters domain.Re
 	// Obtener columnas (field-crop combinations)
 	columns, err := r.getFieldCropColumns(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo columnas: %w", err)
+		return nil, domainerr.Internal("error obteniendo columnas: " + err.Error())
 	}
 
 	// Obtener métricas básicas
 	metrics, err := r.GetFieldCropMetrics(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error getting metrics: %w", err)
+		return nil, domainerr.Internal("error getting metrics: " + err.Error())
 	}
 
 	// Construir filas del reporte
@@ -544,7 +546,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -583,7 +585,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 
 	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&results).Error
 	if err != nil {
-		return nil, fmt.Errorf("error consultando vista de aportes de inversores: %w", err)
+		return nil, domainerr.Internal("error consultando vista de aportes de inversores: " + err.Error())
 	}
 
 	if len(results) == 0 {
@@ -597,7 +599,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 	// Usar el mapper del modelo para convertir al domain
 	report, err := firstResult.ToDomainInvestorContributionReport()
 	if err != nil {
-		return nil, fmt.Errorf("error convirtiendo modelo a domain: %w", err)
+		return nil, domainerr.Internal("error convirtiendo modelo a domain: " + err.Error())
 	}
 
 	return report, nil
@@ -615,7 +617,7 @@ func (r *ReportRepository) GetSummaryResults(ctx context.Context, filters domain
 		FieldID:    filters.FieldID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -665,7 +667,7 @@ func (r *ReportRepository) GetSummaryResults(ctx context.Context, filters domain
 	// Ejecutar query
 	var models []models.SummaryResultsModel
 	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&models).Error; err != nil {
-		return nil, fmt.Errorf("error ejecutando query de resumen de resultados: %w", err)
+		return nil, domainerr.Internal("error ejecutando query de resumen de resultados: " + err.Error())
 	}
 
 	// Convertir a dominio
@@ -694,7 +696,7 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 	// Obtener project IDs relacionados con los filtros
 	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -727,7 +729,7 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 
 	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&projectInfo).Error
 	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
+		return nil, domainerr.Internal("error getting project information: " + err.Error())
 	}
 
 	return &projectInfo, nil

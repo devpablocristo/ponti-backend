@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/devpablocristo/platform/observability/go"
 
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
 func main() {
+	logger := observability.NewJSONLogger("ponti-backend")
+	slog.SetDefault(logger)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -19,19 +24,20 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 		<-sigChan
-		log.Println("Received termination signal. Shutting down the application...")
+		logger.Info("received termination signal", "event", "shutdown_signal")
 		cancel()
 	}()
 
 	deps, err := wire.Initialize()
 	if err != nil {
-		log.Fatalf("Error initializing dependencies: %s", err)
+		logger.Error("initializing dependencies failed", "error", err.Error())
+		os.Exit(1)
 	}
 
-	// Ejecutar el servidor HTTP.
-	if err := runHTTPServer(ctx, deps); err != nil {
-		log.Fatalf("Error running HTTP server: %v", err)
+	if err := runHTTPServer(ctx, logger, deps); err != nil {
+		logger.Error("running HTTP server failed", "error", err.Error())
+		os.Exit(1)
 	}
 
-	log.Println("Application terminated successfully.")
+	logger.Info("application terminated successfully", "event", "shutdown_complete")
 }

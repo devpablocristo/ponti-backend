@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"

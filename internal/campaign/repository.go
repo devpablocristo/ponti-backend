@@ -8,7 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"

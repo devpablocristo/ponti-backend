@@ -9,6 +9,8 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
@@ -112,34 +114,34 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	lotFilter := lotDomain.LotListFilter{ProjectID: projectID}
 	lots, _, _, _, err := u.lotRepo.ListLots(ctx, lotFilter, 1, 10000)
 	if err != nil {
-		return nil, fmt.Errorf("fetch lots: %w", err)
+		return nil, domainerr.Internal("fetch lots: " + err.Error())
 	}
 	sd.lots = lots
 
 	dashboardFilter := dashboardDomain.DashboardFilter{ProjectID: projectID}
 	dashboardData, err := u.dashboardRepo.GetDashboard(ctx, dashboardFilter)
 	if err != nil {
-		return nil, fmt.Errorf("fetch dashboard: %w", err)
+		return nil, domainerr.Internal("fetch dashboard: " + err.Error())
 	}
 	sd.dashboardData = dashboardData
 
 	reportFilter := reportDomain.ReportFilter{ProjectID: projectID}
 	fieldCropMetrics, err := u.reportRepo.GetFieldCropMetrics(ctx, reportFilter)
 	if err != nil {
-		return nil, fmt.Errorf("fetch field_crop_metrics: %w", err)
+		return nil, domainerr.Internal("fetch field_crop_metrics: " + err.Error())
 	}
 	sd.fieldCropMetrics = fieldCropMetrics
 
 	summaryFilter := reportDomain.SummaryResultsFilter{ProjectID: projectID}
 	summaryResults, err := u.reportRepo.GetSummaryResults(ctx, summaryFilter)
 	if err != nil {
-		return nil, fmt.Errorf("fetch summary_results: %w", err)
+		return nil, domainerr.Internal("fetch summary_results: " + err.Error())
 	}
 	sd.summaryResults = summaryResults
 
 	investorReport, err := u.reportRepo.GetInvestorContributionReport(ctx, reportFilter)
 	if err != nil {
-		return nil, fmt.Errorf("fetch investor_contribution_report: %w", err)
+		return nil, domainerr.Internal("fetch investor_contribution_report: " + err.Error())
 	}
 	sd.investorReport = investorReport
 
@@ -147,7 +149,7 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	woFilter := workOrderDomain.WorkOrderFilter{ProjectID: projectID}
 	woMetrics, err := u.workOrderRepo.GetMetrics(ctx, woFilter)
 	if err != nil {
-		return nil, fmt.Errorf("fetch workorder_metrics: %w", err)
+		return nil, domainerr.Internal("fetch workorder_metrics: " + err.Error())
 	}
 	sd.workOrderMetrics = woMetrics
 
@@ -157,7 +159,7 @@ func (u *UseCases) fetchSharedData(ctx context.Context, projectID *int64) (*shar
 	}
 	rawCost, err := u.workOrderRepo.GetRawDirectCost(ctx, rawProjectID)
 	if err != nil {
-		return nil, fmt.Errorf("fetch workorder_raw_direct_cost: %w", err)
+		return nil, domainerr.Internal("fetch workorder_raw_direct_cost: " + err.Error())
 	}
 	sd.workOrderRawCost = rawCost
 
@@ -196,7 +198,7 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 			}
 			check, err := fn(ctx)
 			if err != nil {
-				setErr(fmt.Errorf("control %d failed: %w", controlNumber, err))
+				setErr(domainerr.Internal(fmt.Sprintf("control %d failed: %s", controlNumber, err.Error())))
 				return
 			}
 			checks[index] = check

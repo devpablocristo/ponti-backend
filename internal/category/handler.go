@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/category/handler/dto"

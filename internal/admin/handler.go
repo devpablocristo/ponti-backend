@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"

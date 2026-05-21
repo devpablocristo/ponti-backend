@@ -11,7 +11,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 )
 

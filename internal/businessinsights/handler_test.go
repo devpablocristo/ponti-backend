@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

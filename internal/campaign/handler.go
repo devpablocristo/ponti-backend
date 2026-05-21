@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/campaign/handler/dto"

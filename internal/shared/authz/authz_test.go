@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	contextkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 func principalContext(role string, permissions []string) context.Context {

@@ -3,7 +3,6 @@ package report
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases"
@@ -55,7 +54,7 @@ func (uc *ReportUseCase) GetFieldCropReport(ctx context.Context, filters domain.
 	// Obtener reporte del repositorio
 	report, err := uc.repository.BuildFieldCrop(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error al obtener reporte de campo/cultivo: %w", err)
+		return nil, err
 	}
 
 	return report, nil
@@ -68,7 +67,7 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 	// Obtener datos desde el repository (que consulta la vista de la DB)
 	report, err := uc.repository.GetInvestorContributionReport(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo reporte de aportes de inversores: %w", err)
+		return nil, err
 	}
 
 	return report, nil
@@ -86,7 +85,7 @@ func (uc *ReportUseCase) GetSummaryResultsReport(ctx context.Context, filters do
 	// Obtener datos del repositorio
 	results, err := uc.repository.GetSummaryResults(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo resumen de resultados: %w", err)
+		return nil, err
 	}
 
 	// Retornar respuesta vacía si no hay resultados
@@ -110,7 +109,7 @@ func (uc *ReportUseCase) buildSummaryResponse(ctx context.Context, results []dom
 	// Obtener información del proyecto del primer resultado
 	projectInfo, err := uc.repository.GetProjectInfo(ctx, results[0].ProjectID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
+		return nil, err
 	}
 
 	// Calcular totales del proyecto

@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	categorymodels "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtypemodels "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"

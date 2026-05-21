@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"encoding/csv"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 )
 
 const (

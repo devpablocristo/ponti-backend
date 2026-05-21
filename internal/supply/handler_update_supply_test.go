@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"

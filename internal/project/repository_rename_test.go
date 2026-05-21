@@ -15,12 +15,12 @@ import (
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
-// TestUpdateProjectPropagatesRenameToLegacyTables verifies that when the FE
-// sends a project payload where customer/manager/investor names changed but
-// their IDs stayed the same, the BE updates the name columns in `customers`,
-// `managers` and `investors`. (Actor table propagation is verified in
-// integration tests against postgres; in sqlite, actorSyncDisabled() short-
-// circuits the actor sync paths.)
+// TestUpdateProjectPropagatesRenameToLegacyTables verifies that catalog
+// entities referenced from a project (customer, manager, investor) are NOT
+// renamed when the FE sends a project payload with a different name but the
+// same ID. Renaming any of these belongs to its own dedicated editor — doing
+// it inline from the project edit would silently rename a row that other
+// projects also reference.
 func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 	db := setupProjectTenantDB(t)
 	repo := NewRepository(projectTenantGormEngine{client: db})
@@ -81,37 +81,38 @@ func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 		t.Fatalf("update project: %v", err)
 	}
 
-	// Names are canonicalized at the repository boundary: incoming "AGRO
-	// LAJITAS" / "PEPITO" / "OLEGA SA RENAMED" are normalized to lowercase
-	// ASCII before they hit the legacy table.
+	// Catalog rows referenced by id are NOT renamed from the project edit.
+	// The seed values stay untouched even though the payload sent different
+	// names. To rename any of these the caller uses the dedicated editor.
 	var customerName string
 	if err := db.Raw(`SELECT name FROM customers WHERE id = 100`).Scan(&customerName).Error; err != nil {
 		t.Fatalf("read customer 100: %v", err)
 	}
-	if customerName != "agro lajitas" {
-		t.Fatalf("expected customer 100 renamed to agro lajitas, got %q", customerName)
+	if customerName != "AGRO LAJITAS 25-26" {
+		t.Fatalf("expected customer 100 untouched (AGRO LAJITAS 25-26), got %q", customerName)
 	}
 
 	var managerName string
 	if err := db.Raw(`SELECT name FROM managers WHERE id = 100`).Scan(&managerName).Error; err != nil {
 		t.Fatalf("read manager 100: %v", err)
 	}
-	if managerName != "pepito" {
-		t.Fatalf("expected manager 100 renamed to pepito, got %q", managerName)
+	if managerName != "GERO" {
+		t.Fatalf("expected manager 100 untouched (GERO), got %q", managerName)
 	}
 
 	var investorName string
 	if err := db.Raw(`SELECT name FROM investors WHERE id = 100`).Scan(&investorName).Error; err != nil {
 		t.Fatalf("read investor 100: %v", err)
 	}
-	if investorName != "olega sa renamed" {
-		t.Fatalf("expected investor 100 renamed to olega sa renamed, got %q", investorName)
+	if investorName != "OLEGA SA" {
+		t.Fatalf("expected investor 100 untouched (OLEGA SA), got %q", investorName)
 	}
 }
 
-// TestUpdateProjectCanonicalizesNames verifies that names with accents,
-// punctuation, mixed case and trailing whitespace land in the legacy
-// tables as canonical lowercase ASCII.
+// TestUpdateProjectCanonicalizesNames verifies that catalog entities
+// referenced from a project (customer, manager) are NOT renamed by the
+// project edit path even when the payload sends a differently-cased value.
+// The rename test (in their own editor) handles canonicalization.
 func TestUpdateProjectCanonicalizesNames(t *testing.T) {
 	db := setupProjectTenantDB(t)
 	repo := NewRepository(projectTenantGormEngine{client: db})
@@ -168,8 +169,8 @@ func TestUpdateProjectCanonicalizesNames(t *testing.T) {
 	if err := db.Raw(`SELECT name FROM managers WHERE id = 800`).Scan(&managerName).Error; err != nil {
 		t.Fatalf("read manager 800: %v", err)
 	}
-	if managerName != "maria angeles" {
-		t.Fatalf("expected canonical manager name, got %q", managerName)
+	if managerName != "gero" {
+		t.Fatalf("expected manager 800 untouched (gero), got %q", managerName)
 	}
 }
 

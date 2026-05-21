@@ -6,12 +6,12 @@ import (
 	"errors"
 	"time"
 
-	candidatesdomain "github.com/devpablocristo/core/notifications/go/candidates/usecases/domain"
+	candidatesdomain "github.com/devpablocristo/platform/notifications/go/candidates/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights/repository/models"
 )
 

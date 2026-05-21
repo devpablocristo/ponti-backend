@@ -4,10 +4,10 @@ package bparams
 import (
 	"context"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/business-parameters/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"

@@ -8,7 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"

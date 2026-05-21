@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httperr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 // RequireLocalDevAuthz is a lightweight auth middleware intended for local development.
@@ -54,14 +54,14 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		if tenantHeader == "" {
 			if cfg.RequireTenantHeader && !allowsImplicitTenant(c) {
 				denyLocalDevAuthzRequest(c, "tenant header required")
-				logAuthDecision(subject, "", c.FullPath(), permission, "DENY(local)", start)
+				logAuthDecision(c.Request.Context(), subject, "", c.FullPath(), permission, "DENY(local)", start)
 				return
 			}
 		} else {
 			parsed, err := uuid.Parse(tenantHeader)
 			if err != nil {
 				denyLocalDevAuthzRequest(c, "invalid tenant header")
-				logAuthDecision(subject, "", c.FullPath(), permission, "DENY(local)", start)
+				logAuthDecision(c.Request.Context(), subject, "", c.FullPath(), permission, "DENY(local)", start)
 				return
 			}
 			tenantID = parsed
@@ -109,7 +109,7 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		c.Set(string(ctxkeys.Scopes), []string{permissionAPIRead, permissionAPIWrite})
 
 		// Log as allow; real authorization is handled in usecases.
-		logAuthDecision(subject, tenantID.String(), c.FullPath(), permission, "ALLOW(local)", start)
+		logAuthDecision(c.Request.Context(), subject, tenantID.String(), c.FullPath(), permission, "ALLOW(local)", start)
 
 		// Use resolvedUserID if needed elsewhere via gin key.
 		_ = resolvedUserID

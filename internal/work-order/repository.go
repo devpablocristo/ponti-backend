@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"

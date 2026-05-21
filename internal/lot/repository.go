@@ -14,7 +14,7 @@ import (
 	gorm "gorm.io/gorm"
 
 	// pkg
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	// project
 	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"

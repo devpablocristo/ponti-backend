@@ -3,12 +3,12 @@ package pkggorm
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 // ConfigPort es la interfaz para manejar configuraciones del cliente GORM
@@ -74,7 +74,11 @@ func (r *Repository) Connect(config ConfigPort) error {
 		r.sqlDB = sqlDB
 	}
 
-	log.Printf("Gorm successfully connected to %s database: %s", config.GetDBType(), config.GetDBName())
+	slog.Default().Info("gorm connected",
+		"event", "gorm_connected",
+		"db_type", string(config.GetDBType()),
+		"db_name", config.GetDBName(),
+	)
 	return nil
 }
 

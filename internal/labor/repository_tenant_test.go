@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	contextkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/driver/sqlite"

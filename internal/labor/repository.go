@@ -5,9 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/devpablocristo/platform/observability/go"
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
@@ -21,7 +22,7 @@ import (
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/shopspring/decimal"
 )
@@ -656,13 +657,15 @@ func (r *Repository) getIVAPercentage(ctx context.Context) (decimal.Decimal, err
 		Where("key = ? AND deleted_at IS NULL", "iva_percentage").
 		Scan(&value).Error
 	if err != nil || value == "" {
-		slog.Warn("IVA percentage not found in business_parameters, using fallback 0.105",
+		observability.LoggerFromContext(ctx).Warn("IVA percentage not found in business_parameters, using fallback 0.105",
+			"event", "iva_percentage_missing",
 			"error", err, "key", "iva_percentage")
 		return decimal.NewFromFloat(0.105), nil
 	}
 	v, err := decimal.NewFromString(value)
 	if err != nil {
-		slog.Warn("IVA percentage value is not a valid decimal, using fallback 0.105",
+		observability.LoggerFromContext(ctx).Warn("IVA percentage value is not a valid decimal, using fallback 0.105",
+			"event", "iva_percentage_invalid",
 			"error", err, "raw_value", value)
 		return decimal.NewFromFloat(0.105), nil
 	}
@@ -816,7 +819,8 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		// Obtener porcentaje de IVA dinámicamente desde bparams
 		ivaPercentage, err := r.getIVAPercentage(ctx)
 		if err != nil {
-			slog.Warn("failed to get IVA percentage from bparams, using fallback 0.105",
+			observability.LoggerFromContext(ctx).Warn("failed to get IVA percentage from bparams, using fallback 0.105",
+				"event", "iva_percentage_lookup_failed",
 				"error", err)
 			ivaPercentage = decimal.NewFromFloat(0.105)
 		}

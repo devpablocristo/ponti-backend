@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/actor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"

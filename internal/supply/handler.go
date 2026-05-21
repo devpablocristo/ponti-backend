@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"

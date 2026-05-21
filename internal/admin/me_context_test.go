@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 func TestGetMeContextReturnsCurrentTenantMembershipsAndPermissions(t *testing.T) {

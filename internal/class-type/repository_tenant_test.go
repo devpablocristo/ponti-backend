@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	contextkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"

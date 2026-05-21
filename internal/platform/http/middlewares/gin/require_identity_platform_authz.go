@@ -2,10 +2,8 @@ package pkgmwr
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -14,10 +12,11 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/authn/go/jwks"
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httperr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/authn/go/jwks"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/observability/go"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 const (
@@ -133,26 +132,26 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 		tokenStr := extractBearer(c.GetHeader("Authorization"))
 		if tokenStr == "" {
 			denyAuthRequest(c, "missing bearer token")
-			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), "", "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 
 		claimsMap, err := verifier.VerifyToken(c.Request.Context(), tokenStr)
 		if err != nil {
 			denyAuthRequest(c, "invalid token")
-			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), "", "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 
 		claims := extractClaimsFromMap(claimsMap)
 		if claims.Subject == "" {
 			denyAuthRequest(c, "token missing subject")
-			logAuthDecision("", "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), "", "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 		if err := validateIdentityClaims(cfg, claims); err != nil {
 			denyAuthRequest(c, err.Error())
-			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), claims.Subject, "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 
@@ -161,7 +160,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			domErr := domainerr.Forbidden("unable to resolve user")
 			status, apiErr := httperr.Normalize(domErr)
 			c.AbortWithStatusJSON(status, apiErr)
-			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), claims.Subject, "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 
@@ -170,7 +169,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			domErr := domainerr.Forbidden("tenant header required")
 			status, apiErr := httperr.Normalize(domErr)
 			c.AbortWithStatusJSON(status, apiErr)
-			logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), claims.Subject, "", c.FullPath(), permission, "DENY", start)
 			return
 		}
 
@@ -189,7 +188,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 				domErr := domainerr.Forbidden("tenant membership required")
 				status, apiErr := httperr.Normalize(domErr)
 				c.AbortWithStatusJSON(status, apiErr)
-				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+				logAuthDecision(c.Request.Context(), claims.Subject, "", c.FullPath(), permission, "DENY", start)
 				return
 			}
 		}
@@ -198,7 +197,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 			domErr := domainerr.Forbidden("insufficient permissions")
 			status, apiErr := httperr.Normalize(domErr)
 			c.AbortWithStatusJSON(status, apiErr)
-			logAuthDecision(claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "DENY", start)
+			logAuthDecision(c.Request.Context(), claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "DENY", start)
 			return
 		}
 
@@ -222,7 +221,7 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 		c.Set(string(ctxkeys.Role), membership.RoleName)
 		c.Set(string(ctxkeys.Scopes), scopes)
 
-		logAuthDecision(claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "ALLOW", start)
+		logAuthDecision(c.Request.Context(), claims.Subject, membership.TenantID.String(), c.FullPath(), permission, "ALLOW", start)
 		c.Next()
 	}
 }
@@ -435,16 +434,14 @@ func denyAuthRequest(c *gin.Context, details string) {
 	c.AbortWithStatusJSON(status, apiErr)
 }
 
-func logAuthDecision(sub, tenantID, route, permission, result string, start time.Time) {
-	payload := map[string]any{
-		"user_id":             sub,
-		"tenant_id":           tenantID,
-		"route":               route,
-		"required_permission": permission,
-		"result":              result,
-		"timestamp":           time.Now().UTC().Format(time.RFC3339),
-		"latency_ms":          time.Since(start).Milliseconds(),
-	}
-	raw, _ := json.Marshal(payload)
-	log.Printf("authz_audit=%s", string(raw))
+func logAuthDecision(ctx context.Context, sub, tenantID, route, permission, result string, start time.Time) {
+	observability.LoggerFromContext(ctx).Info("authz decision",
+		"event", "authz_audit",
+		"user_id", sub,
+		"tenant_id", tenantID,
+		"route", route,
+		"required_permission", permission,
+		"result", result,
+		"latency_ms", time.Since(start).Milliseconds(),
+	)
 }

@@ -2,13 +2,13 @@ package ai
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 )
 
 // Client maneja llamadas a Ponti AI (`InsightService` + `CopilotAgent`).
@@ -44,7 +44,7 @@ func (c *Client) Do(
 	projectID string,
 ) (int, []byte, error) {
 	if c.caller.BaseURL == "" {
-		return 0, nil, fmt.Errorf("ai service url not configured")
+		return 0, nil, domainerr.Unavailable("ai service url not configured")
 	}
 	return c.caller.DoJSON(ctx, method, path, body,
 		httpclient.WithHeader("X-USER-ID", userID),
@@ -65,7 +65,7 @@ func (c *Client) DoStream(
 	projectID string,
 ) (*http.Response, error) {
 	if c.caller.BaseURL == "" {
-		return nil, fmt.Errorf("ai service url not configured")
+		return nil, domainerr.Unavailable("ai service url not configured")
 	}
 	u := strings.TrimSuffix(c.caller.BaseURL, "/")
 	if !strings.HasPrefix(path, "/") {

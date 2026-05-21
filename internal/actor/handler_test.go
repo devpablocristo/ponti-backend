@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/gin-gonic/gin"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"

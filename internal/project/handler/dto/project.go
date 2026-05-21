@@ -3,11 +3,12 @@ package dto
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	campdom "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
@@ -103,11 +104,11 @@ func (f *Field) UnmarshalJSON(data []byte) error {
 
 	leaseTypePercent, err := parseOptionalDecimal(aux.LeaseTypePercent)
 	if err != nil {
-		return fmt.Errorf("lease_type_percent: %w", err)
+		return domainerr.Validation("lease_type_percent: " + err.Error())
 	}
 	leaseTypeValue, err := parseOptionalDecimal(aux.LeaseTypeValue)
 	if err != nil {
-		return fmt.Errorf("lease_type_value: %w", err)
+		return domainerr.Validation("lease_type_value: " + err.Error())
 	}
 
 	f.ID = aux.ID
@@ -159,7 +160,7 @@ func parseOptionalDecimal(raw json.RawMessage) (*decimal.Decimal, error) {
 		return &d, nil
 	}
 
-	return nil, fmt.Errorf("invalid decimal value")
+	return nil, domainerr.Validation("invalid decimal value")
 }
 
 // MarshalJSON aplica redondeo de 3 decimales a los campos decimales

@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
@@ -18,7 +18,7 @@ type RepositoryPort interface {
 	ListProjectsByCustomerID(context.Context, int64, int, int) ([]domain.ListedProject, int64, error)
 	ListArchivedProjects(context.Context, int, int) ([]domain.Project, decimal.Decimal, int64, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
-	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
+	GetProjectByNameCustomerAndCampaignID(context.Context, string, int64, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
@@ -48,7 +48,7 @@ func NewUseCases(
 }
 
 func (u *UseCases) CreateProject(ctx context.Context, p *domain.Project) (int64, error) {
-	exist, err := u.repo.GetProjectByNameAndCampaignID(ctx, p.Name, p.Campaign.ID)
+	exist, err := u.repo.GetProjectByNameCustomerAndCampaignID(ctx, p.Name, p.Customer.ID, p.Campaign.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -84,7 +84,7 @@ func (u *UseCases) ListArchivedProjects(ctx context.Context, page, perPage int) 
 	return u.repo.ListArchivedProjects(ctx, page, perPage)
 }
 func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
-	exist, err := u.repo.GetProjectByNameAndCampaignID(ctx, p.Name, p.Campaign.ID)
+	exist, err := u.repo.GetProjectByNameCustomerAndCampaignID(ctx, p.Name, p.Customer.ID, p.Campaign.ID)
 	if err != nil {
 		return err
 	}

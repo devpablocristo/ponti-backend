@@ -96,6 +96,7 @@ func (m *Supply) getUnitName() string {
 		return "Bags" // unit_bags
 	default:
 		slog.Warn("unknown unit ID in supply, returning 'Unknown'",
+			"event", "unknown_unit_id",
 			"unit_id", m.UnitID, "supply_id", m.ID)
 		return "Unknown"
 	}

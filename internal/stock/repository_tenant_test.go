@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	contextkeys "github.com/devpablocristo/core/security/go/contextkeys"
+	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"

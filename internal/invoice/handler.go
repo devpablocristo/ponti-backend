@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/handler/dto"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"

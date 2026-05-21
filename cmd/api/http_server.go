@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime"
 	"strings"
@@ -14,17 +14,20 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
+	pkgmwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
 // runHTTPServer registra rutas en Gin y levanta el servidor HTTP.
-func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
+func runHTTPServer(ctx context.Context, logger *slog.Logger, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
 
+	// Observability primero: request-ID + logger en ctx + access log.
+	deps.GinEngine.GetRouter().Use(pkgmwr.Observability(logger))
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
@@ -75,11 +78,12 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	// Cada handler aplica sus middlewares de validación específicos.
 	registerHTTPRoutes(deps, biHandler)
 
-	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
-	log.Println("Version: ", deps.Config.Service.Version)
-	log.Println("--------------------------------")
-	log.Println("Database: ", deps.Config.DB.Name)
-	log.Println("--------------------------------")
+	logger.Info("starting HTTP server",
+		"event", "http_server_starting",
+		"port", deps.Config.HTTPServer.Port,
+		"version", deps.Config.Service.Version,
+		"database", deps.Config.DB.Name,
+	)
 
 	// Iniciar el servidor HTTP (ej: puerto 8080).
 	return deps.GinEngine.RunServer(ctx)

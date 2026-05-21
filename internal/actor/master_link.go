@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"gorm.io/gorm"
 
 	sharedtext "github.com/devpablocristo/ponti-backend/internal/shared/text"

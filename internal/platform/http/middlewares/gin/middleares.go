@@ -1,11 +1,11 @@
 package pkgmwr
 
 import (
-	"net/http"
 	"strings"
 	"time"
 
-	coreginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	coreginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -61,10 +61,8 @@ func isLocalLikeEnvironment(env string) bool {
 
 func RejectUnsafeLocalAuthz(env string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
-			"message": "AUTH_ENABLED=false is allowed only in local/test environments",
-			"env":     strings.TrimSpace(env),
-		})
+		err := domainerr.Unavailable("AUTH_ENABLED=false is allowed only in local/test environments")
+		coreginmw.Respond(c, err)
 	}
 }
 func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }

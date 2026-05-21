@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
