@@ -213,6 +213,16 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 		ctx = context.WithValue(ctx, ctxkeys.OrgID, membership.TenantID)
 		ctx = context.WithValue(ctx, ctxkeys.Role, membership.RoleName)
 		ctx = context.WithValue(ctx, ctxkeys.Scopes, scopes)
+
+		// Enriquecer el logger del context con identidad ya resuelta para que
+		// todos los logs downstream (handlers, repos) lleven user_id/tenant_id
+		// sin tener que leer ctxkeys manualmente.
+		enrichedLogger := observability.LoggerFromContext(ctx).With(
+			"user_id", claims.Subject,
+			"tenant_id", membership.TenantID.String(),
+			"role", membership.RoleName,
+		)
+		ctx = observability.ContextWithLogger(ctx, enrichedLogger)
 		c.Request = c.Request.WithContext(ctx)
 
 		// Also set gin keys for convenience.

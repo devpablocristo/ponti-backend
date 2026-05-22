@@ -219,6 +219,7 @@ func RequireActive(tx *gorm.DB, table string, label string, id int64) error {
 		return err
 	}
 	if archived {
+		observeRejectedArchivedRef(table)
 		if label == "" {
 			label = table
 		}

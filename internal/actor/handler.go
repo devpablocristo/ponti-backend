@@ -128,7 +128,7 @@ func (h *Handler) ListDuplicateCandidates(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	sharedhandlers.RespondOK(c, candidates)
+	sharedhandlers.RespondOK(c, dto.DuplicateCandidatesFromDomain(candidates))
 }
 
 func (h *Handler) GetActor(c *gin.Context) {
@@ -242,5 +242,5 @@ func (h *Handler) MergeActors(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	sharedhandlers.RespondOK(c, impact)
+	sharedhandlers.RespondOK(c, dto.MergeImpactFromDomain(impact))
 }

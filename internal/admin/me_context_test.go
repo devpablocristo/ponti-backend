@@ -13,7 +13,15 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/security/go/contextkeys"
+
+	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
 )
+
+func newMeContextTestHandler(t *testing.T, db *gorm.DB) *Handler {
+	t.Helper()
+	uc := NewUseCases(NewRepository(db), &idp.NoopAdmin{})
+	return &Handler{uc: uc}
+}
 
 func TestGetMeContextReturnsCurrentTenantMembershipsAndPermissions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -25,9 +33,9 @@ func TestGetMeContextReturnsCurrentTenantMembershipsAndPermissions(t *testing.T)
 	permissionID := uuid.New()
 
 	execMeContextSQL(t, db, `
-		INSERT INTO users (id, idp_sub, idp_email, email)
-		VALUES (?, ?, ?, ?)
-	`, userID.String(), "idp-user-1", "user@example.com", "user@example.com")
+		INSERT INTO users (id, username, idp_sub, idp_email, email)
+		VALUES (?, ?, ?, ?, ?)
+	`, userID.String(), "user", "idp-user-1", "user@example.com", "user@example.com")
 	execMeContextSQL(t, db, `
 		INSERT INTO auth_tenants (id, name)
 		VALUES (?, ?)
@@ -49,7 +57,7 @@ func TestGetMeContextReturnsCurrentTenantMembershipsAndPermissions(t *testing.T)
 		VALUES (?, ?)
 	`, roleID.String(), permissionID.String())
 
-	h := &Handler{db: db}
+	h := newMeContextTestHandler(t, db)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/me/context", nil)
@@ -103,7 +111,7 @@ func TestGetMeContextReturnsCurrentTenantMembershipsAndPermissions(t *testing.T)
 
 func TestGetMeContextRequiresActor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	h := &Handler{db: newMeContextTestDB(t)}
+	h := newMeContextTestHandler(t, newMeContextTestDB(t))
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/me/context", nil)
@@ -124,6 +132,7 @@ func newMeContextTestDB(t *testing.T) *gorm.DB {
 	statements := []string{
 		`CREATE TABLE users (
 			id TEXT PRIMARY KEY,
+			username TEXT NOT NULL DEFAULT '',
 			idp_sub TEXT NOT NULL,
 			idp_email TEXT NOT NULL,
 			email TEXT NOT NULL

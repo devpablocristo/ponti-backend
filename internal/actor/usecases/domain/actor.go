@@ -110,21 +110,21 @@ type MergeRequest struct {
 }
 
 type MergeImpact struct {
-	TargetActorID  int64            `json:"target_actor_id"`
-	SourceActorIDs []int64          `json:"source_actor_ids"`
-	Counts         map[string]int64 `json:"counts"`
-	Confirmed      bool             `json:"confirmed"`
+	TargetActorID  int64
+	SourceActorIDs []int64
+	Counts         map[string]int64
+	Confirmed      bool
 }
 
 type DuplicateActor struct {
-	ID          int64    `json:"id"`
-	DisplayName string   `json:"display_name"`
-	ActorKind   string   `json:"actor_kind"`
-	Roles       []string `json:"roles"`
+	ID          int64
+	DisplayName string
+	ActorKind   string
+	Roles       []string
 }
 
 type DuplicateCandidate struct {
-	GroupType string           `json:"group_type"`
-	GroupKey  string           `json:"group_key"`
-	Actors    []DuplicateActor `json:"actors"`
+	GroupType string
+	GroupKey  string
+	Actors    []DuplicateActor
 }

@@ -706,10 +706,10 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 	// Usar el primer proyecto para la información básica
 	projectID := projectIDs[0]
 
-	var projectInfo domain.ProjectInfo
+	var row models.ProjectInfo
 
 	query := `
-		SELECT 
+		SELECT
 			p.id as project_id,
 			p.name as project_name,
 			c.id as customer_id,
@@ -727,10 +727,11 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 		args = append(args, tenantID)
 	}
 
-	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&projectInfo).Error
+	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error
 	if err != nil {
 		return nil, domainerr.Internal("error getting project information: " + err.Error())
 	}
+	projectInfo := row.ToDomain()
 
 	return &projectInfo, nil
 }

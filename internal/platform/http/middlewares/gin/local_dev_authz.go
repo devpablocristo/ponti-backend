@@ -13,6 +13,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/observability/go"
 	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
@@ -100,6 +101,16 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		ctx = context.WithValue(ctx, ctxkeys.OrgID, tenantID)
 		ctx = context.WithValue(ctx, ctxkeys.Role, role)
 		ctx = context.WithValue(ctx, ctxkeys.Scopes, []string{permissionAPIRead, permissionAPIWrite})
+
+		// Enriquecer logger del context con identidad ya resuelta — mismo
+		// patrón que require_identity_platform_authz para que los logs
+		// downstream lleven user_id/tenant_id.
+		enrichedLogger := observability.LoggerFromContext(ctx).With(
+			"user_id", subject,
+			"tenant_id", tenantID.String(),
+			"role", role,
+		)
+		ctx = observability.ContextWithLogger(ctx, enrichedLogger)
 		c.Request = c.Request.WithContext(ctx)
 
 		// Also set gin keys for convenience.

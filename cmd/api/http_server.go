@@ -13,6 +13,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 
+	coreginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/devpablocristo/platform/observability/go"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
@@ -30,6 +31,17 @@ func runHTTPServer(ctx context.Context, logger *slog.Logger, metrics *observabil
 
 	// Observability primero: request-ID + logger en ctx + access log + RED metrics Prometheus.
 	deps.GinEngine.GetRouter().Use(pkgmwr.ObservabilityWithMetrics(logger, metrics))
+
+	// CORS explícito antes del routing. Origins extra se pasan via CORS_ORIGINS env.
+	deps.GinEngine.GetRouter().Use(coreginmw.NewCORS(coreginmw.CORSConfig{
+		Origins: deps.Config.HTTPServer.CORSOriginList(),
+	}))
+
+	// Rate limit por IP (sliding window 1 min). Si HTTP_RATE_LIMIT_PER_MINUTE=0
+	// (default), no se activa para no romper deploys que no lo hayan calibrado.
+	if rps := deps.Config.HTTPServer.RateLimitPerMinute; rps > 0 {
+		deps.GinEngine.GetRouter().Use(coreginmw.NewRateLimit(rps))
+	}
 
 	// Endpoint Prometheus en path dedicado (no /api/v1/.../metrics que está reservado
 	// para métricas de negocio en lot/work-order/labor handlers).

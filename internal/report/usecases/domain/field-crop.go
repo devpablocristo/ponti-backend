@@ -9,139 +9,141 @@ import (
 
 // ReportFilter representa los filtros para los reportes
 type ReportFilter struct {
-	CustomerID *int64 `json:"customer_id"`
-	ProjectID  *int64 `json:"project_id"`
-	CampaignID *int64 `json:"campaign_id"`
-	FieldID    *int64 `json:"field_id"`
+	CustomerID *int64
+	ProjectID  *int64
+	CampaignID *int64
+	FieldID    *int64
 }
 
-// ProjectInfo representa la información básica de un proyecto
+// ProjectInfo representa la información básica de un proyecto.
+// El mapping a columnas SQL vive en internal/report/repository/models/project_info.go;
+// el domain no conoce de persistencia.
 type ProjectInfo struct {
-	ProjectID    int64  `json:"project_id" gorm:"column:project_id"`
-	ProjectName  string `json:"project_name" gorm:"column:project_name"`
-	CustomerID   int64  `json:"customer_id" gorm:"column:customer_id"`
-	CustomerName string `json:"customer_name" gorm:"column:customer_name"`
-	CampaignID   int64  `json:"campaign_id" gorm:"column:campaign_id"`
-	CampaignName string `json:"campaign_name" gorm:"column:campaign_name"`
+	ProjectID    int64
+	ProjectName  string
+	CustomerID   int64
+	CustomerName string
+	CampaignID   int64
+	CampaignName string
 }
 
 // FieldCropMetric representa una métrica por campo y cultivo
 type FieldCropMetric struct {
-	ProjectID int64  `json:"project_id"`
-	FieldID   int64  `json:"field_id"`
-	FieldName string `json:"field_name"`
-	CropID    int64  `json:"crop_id"`
-	CropName  string `json:"crop_name"`
+	ProjectID int64
+	FieldID   int64
+	FieldName string
+	CropID    int64
+	CropName  string
 
 	// Información general
-	SurfaceHa       decimal.Decimal `json:"surface_ha"`
-	ProductionTn    decimal.Decimal `json:"production_tn"`
-	SownAreaHa      decimal.Decimal `json:"sown_area_ha"`
-	HarvestedAreaHa decimal.Decimal `json:"harvested_area_ha"`
+	SurfaceHa       decimal.Decimal
+	ProductionTn    decimal.Decimal
+	SownAreaHa      decimal.Decimal
+	HarvestedAreaHa decimal.Decimal
 
 	// Rendimiento
-	YieldTnHa decimal.Decimal `json:"yield_tn_ha"`
+	YieldTnHa decimal.Decimal
 
 	// Precios y comercialización
-	GrossPriceUsdTn     decimal.Decimal `json:"gross_price_usd_tn"`
-	FreightCostUsdTn    decimal.Decimal `json:"freight_cost_usd_tn"`
-	CommercialCostUsdTn decimal.Decimal `json:"commercial_cost_usd_tn"`
-	NetPriceUsdTn       decimal.Decimal `json:"net_price_usd_tn"`
+	GrossPriceUsdTn     decimal.Decimal
+	FreightCostUsdTn    decimal.Decimal
+	CommercialCostUsdTn decimal.Decimal
+	NetPriceUsdTn       decimal.Decimal
 
 	// Ingreso neto
-	NetIncomeUsd   decimal.Decimal `json:"net_income_usd"`
-	NetIncomeUsdHa decimal.Decimal `json:"net_income_usd_ha"`
+	NetIncomeUsd   decimal.Decimal
+	NetIncomeUsdHa decimal.Decimal
 
 	// Costos directos
-	LaborCostsUsd       decimal.Decimal `json:"labor_costs_usd"`
-	LaborCostsUsdHa     decimal.Decimal `json:"labor_costs_usd_ha"` // TODO: Confirmar en vista v4
-	SupplyCostsUsd      decimal.Decimal `json:"supply_costs_usd"`
-	SupplyCostsUsdHa    decimal.Decimal `json:"supply_costs_usd_ha"` // TODO: Confirmar en vista v4
-	TotalDirectCostsUsd decimal.Decimal `json:"total_direct_costs_usd"`
-	DirectCostsUsdHa    decimal.Decimal `json:"direct_costs_usd_ha"`
+	LaborCostsUsd       decimal.Decimal
+	LaborCostsUsdHa     decimal.Decimal // TODO: Confirmar en vista v4
+	SupplyCostsUsd      decimal.Decimal
+	SupplyCostsUsdHa    decimal.Decimal // TODO: Confirmar en vista v4
+	TotalDirectCostsUsd decimal.Decimal
+	DirectCostsUsdHa    decimal.Decimal
 
 	// Margen bruto
-	GrossMarginUsd   decimal.Decimal `json:"gross_margin_usd"`
-	GrossMarginUsdHa decimal.Decimal `json:"gross_margin_usd_ha"`
+	GrossMarginUsd   decimal.Decimal
+	GrossMarginUsdHa decimal.Decimal
 
 	// Arriendo
-	RentUsd   decimal.Decimal `json:"rent_usd"`
-	RentUsdHa decimal.Decimal `json:"rent_usd_ha"`
+	RentUsd   decimal.Decimal
+	RentUsdHa decimal.Decimal
 
 	// Costos administrativos
-	AdministrationUsd   decimal.Decimal `json:"administration_usd"`
-	AdministrationUsdHa decimal.Decimal `json:"administration_usd_ha"`
+	AdministrationUsd   decimal.Decimal
+	AdministrationUsdHa decimal.Decimal
 
 	// Resultado operativo
-	OperatingResultUsd   decimal.Decimal `json:"operating_result_usd"`
-	OperatingResultUsdHa decimal.Decimal `json:"operating_result_usd_ha"`
+	OperatingResultUsd   decimal.Decimal
+	OperatingResultUsdHa decimal.Decimal
 
 	// Total invertido
-	TotalInvestedUsd   decimal.Decimal `json:"total_invested_usd"`
-	TotalInvestedUsdHa decimal.Decimal `json:"total_invested_usd_ha"`
+	TotalInvestedUsd   decimal.Decimal
+	TotalInvestedUsdHa decimal.Decimal
 
 	// Métricas calculadas
-	ReturnPct              decimal.Decimal `json:"return_pct"`
-	IndifferenceYieldUsdTn decimal.Decimal `json:"indifference_yield_usd_tn"`
+	ReturnPct              decimal.Decimal
+	IndifferenceYieldUsdTn decimal.Decimal
 }
 
 // ===== TABLE DOMAIN MODELS =====
 
 // FieldCrop representa la tabla de reporte field-crop
 type FieldCrop struct {
-	ProjectID    int64             `json:"project_id"`
-	ProjectName  string            `json:"project_name"`
-	CustomerID   int64             `json:"customer_id"`
-	CustomerName string            `json:"customer_name"`
-	CampaignID   int64             `json:"campaign_id"`
-	CampaignName string            `json:"campaign_name"`
-	Columns      []FieldCropColumn `json:"columns"`
-	Rows         []FieldCropRow    `json:"rows"`
+	ProjectID    int64
+	ProjectName  string
+	CustomerID   int64
+	CustomerName string
+	CampaignID   int64
+	CampaignName string
+	Columns      []FieldCropColumn
+	Rows         []FieldCropRow
 }
 
 // FieldCropColumn representa una columna en la tabla
 type FieldCropColumn struct {
-	ID        string `json:"id"` // field_id-crop_id
-	FieldID   int64  `json:"field_id"`
-	FieldName string `json:"field_name"`
-	CropID    int64  `json:"crop_id"`
-	CropName  string `json:"crop_name"`
+	ID        string // field_id-crop_id
+	FieldID   int64
+	FieldName string
+	CropID    int64
+	CropName  string
 }
 
 // FieldCropRow representa una fila en la tabla
 type FieldCropRow struct {
-	Key       string                    `json:"key"`
-	Unit      string                    `json:"unit"`
-	ValueType string                    `json:"value_type"` // "number" or "text"
-	Values    map[string]FieldCropValue `json:"values"`
+	Key       string
+	Unit      string
+	ValueType string // "number" or "text"
+	Values    map[string]FieldCropValue
 }
 
 // FieldCropValue representa un valor en la tabla
 type FieldCropValue struct {
-	Number decimal.Decimal `json:"number"`
+	Number decimal.Decimal
 }
 
 // LaborMetric representa una métrica de labor
 type LaborMetric struct {
-	LaborID        int64           `json:"labor_id"`
-	LaborName      string          `json:"labor_name"`
-	CategoryID     int64           `json:"category_id"`
-	CategoryName   string          `json:"category_name"`
-	SurfaceHa      decimal.Decimal `json:"surface_ha"`
-	CostUsd        decimal.Decimal `json:"cost_usd"`
-	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
-	WorkOrderCount int64           `json:"workorder_count"`
+	LaborID        int64
+	LaborName      string
+	CategoryID     int64
+	CategoryName   string
+	SurfaceHa      decimal.Decimal
+	CostUsd        decimal.Decimal
+	CostPerHa      decimal.Decimal
+	WorkOrderCount int64
 }
 
 // SupplyMetric representa una métrica de supply
 type SupplyMetric struct {
-	SupplyID       int64           `json:"supply_id"`
-	SupplyName     string          `json:"supply_name"`
-	CategoryID     int64           `json:"category_id"`
-	CategoryName   string          `json:"category_name"`
-	SurfaceHa      decimal.Decimal `json:"surface_ha"`
-	QuantityUsed   decimal.Decimal `json:"quantity_used"`
-	CostUsd        decimal.Decimal `json:"cost_usd"`
-	CostPerHa      decimal.Decimal `json:"cost_per_ha"`
-	WorkOrderCount int64           `json:"workorder_count"`
+	SupplyID       int64
+	SupplyName     string
+	CategoryID     int64
+	CategoryName   string
+	SurfaceHa      decimal.Decimal
+	QuantityUsed   decimal.Decimal
+	CostUsd        decimal.Decimal
+	CostPerHa      decimal.Decimal
+	WorkOrderCount int64
 }

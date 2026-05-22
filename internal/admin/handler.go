@@ -3,23 +3,15 @@ package admin
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
-
-	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
 )
 
 type GinEnginePort interface {
@@ -37,16 +29,31 @@ type MiddlewaresEnginePort interface {
 	GetValidation() []gin.HandlerFunc
 }
 
+// UseCasesPort es el contrato que el Handler consume. Lo implementa
+// *UseCases pero queda como interface para facilitar tests con mocks.
+type UseCasesPort interface {
+	ListTenants(ctx context.Context) ([]Tenant, error)
+	CreateTenant(ctx context.Context, name string) (uuid.UUID, error)
+	CreateUser(ctx context.Context, in CreateUserInput) (*CreateUserOutput, error)
+	ListUsers(ctx context.Context, tenantID uuid.UUID) ([]UserMembership, error)
+	UpsertMembership(ctx context.Context, in UpsertMembershipInput) (userID uuid.UUID, tenantID uuid.UUID, err error)
+	CreateInvite(ctx context.Context, in CreateInviteInput) (*CreateInviteOutput, error)
+	AcceptInvite(ctx context.Context, token, actorSub string) (*TenantInvite, error)
+	UpdateMembershipRole(ctx context.Context, tenantID, membershipID uuid.UUID, roleName string) error
+	ArchiveMembership(ctx context.Context, tenantID, membershipID uuid.UUID) error
+	GetMeContext(ctx context.Context, actorSub string, currentTenantID uuid.UUID) (*MeContext, error)
+}
+
+// Handler delgada: solo mapea HTTP request/response y delega en UseCases.
 type Handler struct {
-	db  *gorm.DB
-	idp idp.AdminClient
+	uc  UseCasesPort
 	gsv GinEnginePort
 	acf ConfigAPIPort
 	mws MiddlewaresEnginePort
 }
 
-func NewHandler(db *gorm.DB, idpAdmin idp.AdminClient, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
-	return &Handler{db: db, idp: idpAdmin, gsv: s, acf: c, mws: m}
+func NewHandler(uc UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+	return &Handler{uc: uc, gsv: s, acf: c, mws: m}
 }
 
 func (h *Handler) Routes() {
@@ -87,8 +94,7 @@ func (h *Handler) ListTenants(c *gin.Context) {
 	if !requireAdminPermission(c, authz.PermissionAdminTenants) {
 		return
 	}
-	rp := newRepo(h.db)
-	items, err := rp.listTenants(c.Request.Context())
+	items, err := h.uc.ListTenants(c.Request.Context())
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -105,8 +111,7 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	rp := newRepo(h.db)
-	id, err := rp.ensureTenantByName(c.Request.Context(), req.Name)
+	id, err := h.uc.CreateTenant(c.Request.Context(), req.Name)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -123,24 +128,6 @@ type createUserReq struct {
 	SendResetLink bool   `json:"send_reset_link"`
 }
 
-type createUserResp struct {
-	User      *localUser `json:"user"`
-	TenantID  uuid.UUID  `json:"tenant_id"`
-	RoleName  string     `json:"role_name"`
-	ResetLink string     `json:"reset_link,omitempty"`
-}
-
-func usernameToEmail(v string) string {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return ""
-	}
-	if strings.Contains(v, "@") {
-		return v
-	}
-	return v + "@ponti.local"
-}
-
 func (h *Handler) CreateUser(c *gin.Context) {
 	if !requireAdminPermission(c, authz.PermissionAdminUsers) {
 		return
@@ -150,69 +137,19 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-
-	email := usernameToEmail(req.Email)
-	if email == "" {
-		email = usernameToEmail(req.Username)
-	}
-	password := strings.TrimSpace(req.Password)
-	if email == "" || password == "" {
-		sharedhandlers.RespondError(c, domainerr.Validation("email and password required"))
-		return
-	}
-
-	ctx := c.Request.Context()
-
-	// Create user in Identity Platform or fetch UID if already exists.
-	uid, err := h.idp.CreateUser(ctx, email, password)
-	if err != nil {
-		// If the user already exists, allow attaching membership by looking up UID.
-		if strings.Contains(strings.ToLower(err.Error()), "email") && strings.Contains(strings.ToLower(err.Error()), "exists") {
-			uid, err = h.idp.GetUserUIDByEmail(ctx, email)
-		}
-	}
-	if err != nil {
-		sharedhandlers.RespondError(c, domainerr.Validation("unable to create identity user"))
-		return
-	}
-
-	rp := newRepo(h.db)
-	u, err := rp.ensureLocalUserByIDPSub(ctx, uid, email)
+	out, err := h.uc.CreateUser(c.Request.Context(), CreateUserInput{
+		Email:         req.Email,
+		Username:      req.Username,
+		Password:      req.Password,
+		TenantName:    req.TenantName,
+		RoleName:      req.RoleName,
+		SendResetLink: req.SendResetLink,
+	})
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	roleID, err := rp.roleIDByName(ctx, req.RoleName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := rp.upsertMembership(ctx, u.ID, tenantID, roleID); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	resp := createUserResp{
-		User:     u,
-		TenantID: tenantID,
-		RoleName: strings.TrimSpace(req.RoleName),
-	}
-	if resp.RoleName == "" {
-		resp.RoleName = "viewer"
-	}
-	if req.SendResetLink {
-		if link, linkErr := h.idp.GeneratePasswordResetLink(ctx, email); linkErr == nil {
-			resp.ResetLink = link
-		}
-	}
-
-	sharedhandlers.RespondOK(c, resp)
+	sharedhandlers.RespondOK(c, out)
 }
 
 func (h *Handler) ListUsers(c *gin.Context) {
@@ -224,8 +161,7 @@ func (h *Handler) ListUsers(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	rp := newRepo(h.db)
-	rows, err := rp.listUsersForTenant(c.Request.Context(), orgID)
+	rows, err := h.uc.ListUsers(c.Request.Context(), orgID)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -249,44 +185,17 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-
-	email := usernameToEmail(req.Email)
-	if email == "" {
-		email = usernameToEmail(req.Username)
-	}
-	if email == "" {
-		sharedhandlers.RespondError(c, domainerr.Validation("email required"))
-		return
-	}
-
-	ctx := c.Request.Context()
-	uid, err := h.idp.GetUserUIDByEmail(ctx, email)
-	if err != nil {
-		sharedhandlers.RespondError(c, domainerr.Validation("identity user not found"))
-		return
-	}
-
-	rp := newRepo(h.db)
-	u, err := rp.ensureLocalUserByIDPSub(ctx, uid, email)
+	userID, tenantID, err := h.uc.UpsertMembership(c.Request.Context(), UpsertMembershipInput{
+		Email:      req.Email,
+		Username:   req.Username,
+		TenantName: req.TenantName,
+		RoleName:   req.RoleName,
+	})
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	roleID, err := rp.roleIDByName(ctx, req.RoleName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := rp.upsertMembership(ctx, u.ID, tenantID, roleID); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondOK(c, gin.H{"user_id": u.ID, "tenant_id": tenantID})
+	sharedhandlers.RespondOK(c, gin.H{"user_id": userID, "tenant_id": tenantID})
 }
 
 type createInviteReq struct {
@@ -309,43 +218,19 @@ func (h *Handler) CreateInvite(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	email := usernameToEmail(req.Email)
-	if email == "" {
-		sharedhandlers.RespondError(c, domainerr.Validation("email required"))
-		return
-	}
-	roleName := strings.TrimSpace(req.RoleName)
-	if roleName == "" {
-		roleName = "tenant_viewer"
-	}
-	now := time.Now().UTC()
-	expiresAt := now.Add(7 * 24 * time.Hour)
-	if req.ExpiresIn != "" {
-		if d, parseErr := time.ParseDuration(req.ExpiresIn); parseErr == nil && d > 0 {
-			expiresAt = now.Add(d)
-		}
-	}
-	token, err := newInviteToken()
-	if err != nil {
-		sharedhandlers.RespondError(c, domainerr.Internal("unable to create invite token"))
-		return
-	}
-	rp := newRepo(h.db)
-	roleID, err := rp.roleIDByName(c.Request.Context(), roleName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	invitedBy, _ := currentLocalUserID(c, h.db)
-	invite, err := rp.createInvite(c.Request.Context(), tenantID, email, roleID, hashInviteToken(token), expiresAt, invitedBy)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondOK(c, gin.H{
-		"invite": invite,
-		"token":  token,
+	actorSub, _ := sharedhandlers.ParseActor(c)
+	out, err := h.uc.CreateInvite(c.Request.Context(), CreateInviteInput{
+		TenantID:  tenantID,
+		Email:     req.Email,
+		RoleName:  req.RoleName,
+		ExpiresIn: req.ExpiresIn,
+		ActorSub:  actorSub,
 	})
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, out)
 }
 
 type acceptInviteReq struct {
@@ -358,18 +243,13 @@ func (h *Handler) AcceptInvite(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, err := currentLocalUserID(c, h.db)
+	actorSub, err := sharedhandlers.ParseActor(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	rp := newRepo(h.db)
-	invite, err := rp.acceptInvite(c.Request.Context(), hashInviteToken(req.Token), userID)
+	invite, err := h.uc.AcceptInvite(c.Request.Context(), req.Token, actorSub)
 	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := rp.upsertMembership(c.Request.Context(), userID, invite.TenantID, invite.RoleID); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -393,13 +273,7 @@ func (h *Handler) UpdateMembershipRole(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	rp := newRepo(h.db)
-	roleID, err := rp.roleIDByName(c.Request.Context(), req.RoleName)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := rp.updateMembershipRole(c.Request.Context(), tenantID, membershipID, roleID); err != nil {
+	if err := h.uc.UpdateMembershipRole(c.Request.Context(), tenantID, membershipID, req.RoleName); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -414,8 +288,7 @@ func (h *Handler) ArchiveMembership(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rp := newRepo(h.db)
-	if err := rp.archiveMembership(c.Request.Context(), tenantID, membershipID); err != nil {
+	if err := h.uc.ArchiveMembership(c.Request.Context(), tenantID, membershipID); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -434,35 +307,4 @@ func parseTenantAndMembership(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		return uuid.Nil, uuid.Nil, false
 	}
 	return tenantID, membershipID, true
-}
-
-func newInviteToken() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
-func hashInviteToken(token string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(token)))
-	return fmt.Sprintf("%x", sum[:])
-}
-
-func currentLocalUserID(c *gin.Context, db *gorm.DB) (uuid.UUID, error) {
-	actor, err := sharedhandlers.ParseActor(c)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	type row struct{ ID uuid.UUID }
-	var out row
-	if err := db.WithContext(c.Request.Context()).
-		Table("users").
-		Select("id").
-		Where("idp_sub = ?", actor).
-		Limit(1).
-		Take(&out).Error; err != nil {
-		return uuid.Nil, domainerr.Forbidden("local user not found")
-	}
-	return out.ID, nil
 }
