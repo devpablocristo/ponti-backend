@@ -105,7 +105,7 @@ func validateDate(o *domain.WorkOrder) error {
 	}
 	today := time.Now().Truncate(24 * time.Hour)
 	if o.Date.After(today) {
-		return domainerr.Validation("la fecha de la orden de trabajo no puede ser futura")
+		return domainerr.Validation("work order date cannot be in the future")
 	}
 	return nil
 }
@@ -316,7 +316,7 @@ func (u *UseCases) validateHarvestAreaLimit(ctx context.Context, o *domain.WorkO
 
 	totalHarvestedArea := existingHarvestedArea.Add(o.EffectiveArea)
 	if totalHarvestedArea.GreaterThan(lotHectares) {
-		return domainerr.Validation("la superficie de cosecha supera la superficie total del lote")
+		return domainerr.Validation("harvest area exceeds lot surface")
 	}
 
 	return nil

@@ -197,6 +197,48 @@ func RequireArchived(tx *gorm.DB, table string, label string, id int64) error {
 	return nil
 }
 
+// ActiveRef identifies a row that a caller wants to verify is *not* archived.
+// Used by RequireAllActive to batch-check multiple references (e.g. all the
+// foreign keys of a work order before insert).
+type ActiveRef struct {
+	Table string
+	Label string
+	ID    int64
+}
+
+// RequireActive returns a Conflict error if `id` references an archived row
+// in `table`. `id <= 0` is treated as "nothing to check" and returns nil so
+// callers can pass optional FKs without guarding upstream. `label` is the
+// English entity name used in the error message ("lot is archived").
+func RequireActive(tx *gorm.DB, table string, label string, id int64) error {
+	if id <= 0 {
+		return nil
+	}
+	archived, err := IsArchived(tx, table, id)
+	if err != nil {
+		return err
+	}
+	if archived {
+		if label == "" {
+			label = table
+		}
+		return domainerr.Conflict(fmt.Sprintf("%s is archived", label))
+	}
+	return nil
+}
+
+// RequireAllActive runs RequireActive over each reference and returns the
+// first violation. Order is preserved, so callers can use the slice order to
+// influence which entity surfaces in the error first.
+func RequireAllActive(tx *gorm.DB, refs []ActiveRef) error {
+	for _, r := range refs {
+		if err := RequireActive(tx, r.Table, r.Label, r.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func RootCause(tx *gorm.DB, tenantID uuid.UUID, rootEntity string, rootID int64, reason *string, deletedBy *string) (Cause, error) {
 	batch, err := CreateArchiveBatch(tx, tenantID, rootEntity, rootID, reason, deletedBy)
 	if err != nil {

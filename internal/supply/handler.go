@@ -536,7 +536,7 @@ func (h *Handler) CreateSupplyMovement(c *gin.Context) {
 			returnSupplyKey := fmt.Sprintf("%s|%s|%d", item.MovementType, strings.TrimSpace(item.Reference), item.SupplyID)
 			if _, exists := requestReturnSupplyKeys[returnSupplyKey]; exists {
 				message := fmt.Sprintf(
-					"El remito de devolución %s ya contiene el insumo %d dentro del request",
+					"return remito %s already includes supply %d in the request",
 					strings.TrimSpace(item.Reference),
 					item.SupplyID,
 				)

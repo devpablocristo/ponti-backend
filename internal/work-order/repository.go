@@ -57,6 +57,12 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 
 	// 3) crear todo en una transacción
 	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 3.0) bloquear si alguna dependencia (lot/field/project/...) está archivada.
+		// FKs de la DB no filtran por deleted_at; la integridad referencial activa
+		// se enforza acá para que la validación sea atómica con el insert.
+		if err := assertWorkOrderReferencesActive(tx, o); err != nil {
+			return err
+		}
 		// 3.1) insertar la cabecera para obtener model.ID
 		// Importante: evitamos que GORM intente crear también las asociaciones (Items) acá,
 		// porque abajo insertamos los items explícitamente. Si se insertan dos veces puede
@@ -185,6 +191,10 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 3.0) bloquear si alguna dependencia (lot/field/project/...) está archivada.
+		if err := assertWorkOrderReferencesActive(tx, o); err != nil {
+			return err
+		}
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
 		query := authz.MaybeTenantScope(ctx, tx.Preload("Items").Preload("InvestorSplits"), "workorders").Where("id = ?", model.ID)
@@ -560,6 +570,43 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// assertWorkOrderReferencesActive blocks Create/Update of a work order that
+// references archived entities. DB-level FKs accept archived rows (no
+// `WHERE deleted_at IS NULL`), so referential integrity for *active* rows is
+// enforced at application level. Returns a Conflict domainerr with a short
+// English label per entity ("lot is archived", "supply is archived", ...);
+// `translateBackendError` on the FE maps it to a Spanish toast.
+//
+// The check runs inside the caller's transaction to stay atomic with the
+// insert/update. Each lookup hits a small index (`idx_<table>_active` or
+// equivalent), so the cost is a handful of point queries.
+func assertWorkOrderReferencesActive(tx *gorm.DB, o *domain.WorkOrder) error {
+	if o == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: o.ProjectID},
+		{Table: "fields", Label: "field", ID: o.FieldID},
+		{Table: "lots", Label: "lot", ID: o.LotID},
+		{Table: "crops", Label: "crop", ID: o.CropID},
+		{Table: "labors", Label: "labor", ID: o.LaborID},
+	}
+	if o.InvestorID > 0 {
+		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: o.InvestorID})
+	}
+	for _, s := range o.InvestorSplits {
+		if s.InvestorID > 0 {
+			refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: s.InvestorID})
+		}
+	}
+	for _, it := range o.Items {
+		if it.SupplyID > 0 {
+			refs = append(refs, lifecycle.ActiveRef{Table: "supplies", Label: "supply", ID: it.SupplyID})
+		}
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }
 
 func indexSplitPaymentStatuses(

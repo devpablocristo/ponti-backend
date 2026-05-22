@@ -46,7 +46,7 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 			return 0, err
 		}
 		if isFirst {
-			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+			return 0, domainerr.Validation("no stock for this supply in the project")
 		}
 
 		stock.RealStockUnits = movement.Quantity
@@ -65,12 +65,12 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return 0, domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
+			return 0, domainerr.Validation("not enough stock to return the requested quantity")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return 0, domainerr.Validation("La devolución supera el stock disponible del insumo.")
+			return 0, domainerr.Validation("return exceeds available supply stock")
 		}
 
 		movement.StockId = stock.ID
@@ -154,7 +154,7 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 				return err
 			}
 			if closedIsFirst {
-				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+				return domainerr.Validation("no stock for this supply in the project")
 			}
 		}
 		return nil
@@ -175,12 +175,12 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
+			return domainerr.Validation("not enough stock to return the requested quantity")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return domainerr.Validation("La devolución supera el stock disponible del insumo.")
+			return domainerr.Validation("return exceeds available supply stock")
 		}
 	}
 
@@ -260,7 +260,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 				supplyLabel = strings.TrimSpace(movement.Supply.Name)
 			}
-			return domainerr.Newf(domainerr.KindConflict, "La devolución %s ya tiene el insumo %s cargado", reference, supplyLabel)
+			return domainerr.Newf(domainerr.KindConflict, "devolución %s already includes supply %s", reference, supplyLabel)
 		}
 		return nil
 	}
@@ -274,7 +274,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 		if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 			supplyLabel = strings.TrimSpace(movement.Supply.Name)
 		}
-		return domainerr.Newf(domainerr.KindConflict, "El remito %s ya tiene el insumo %s cargado", reference, supplyLabel)
+		return domainerr.Newf(domainerr.KindConflict, "remito %s already includes supply %s", reference, supplyLabel)
 	}
 
 	return nil
@@ -299,20 +299,20 @@ func (u *UseCases) resolveMovementReferences(ctx context.Context, movement *doma
 		return err
 	}
 	if supply.ProjectID != movement.ProjectId {
-		return domainerr.Newf(domainerr.KindValidation, "El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId)
+		return domainerr.Newf(domainerr.KindValidation, "supply %d does not belong to project %d", movement.Supply.ID, movement.ProjectId)
 	}
 	movement.Supply = supply
 
 	investor, err := u.repo.GetInvestor(ctx, movement.Investor.ID)
 	if err != nil {
-		return domainerr.Newf(domainerr.KindValidation, "El inversor %d no existe", movement.Investor.ID)
+		return domainerr.Newf(domainerr.KindValidation, "investor %d not found", movement.Investor.ID)
 	}
 	movement.Investor = investor
 
 	if movement.Provider.ID > 0 {
 		provider, err := u.repo.GetProvider(ctx, movement.Provider.ID)
 		if err != nil {
-			return domainerr.Newf(domainerr.KindValidation, "El proveedor %d no existe", movement.Provider.ID)
+			return domainerr.Newf(domainerr.KindValidation, "provider %d not found", movement.Provider.ID)
 		}
 		movement.Provider = provider
 		return nil
@@ -424,10 +424,10 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 	}
 
 	if supplyMovement.MovementType == domain.INTERNAL_MOVEMENT || supplyMovement.MovementType == domain.INTERNAL_MOVEMENT_IN {
-		return domainerr.Validation("no se permite editar movimientos internos")
+		return domainerr.Validation("internal movements cannot be edited")
 	}
 	if supplyMovement.MovementType == domain.STOCK {
-		return domainerr.Validation("no se permite editar movimientos de stock")
+		return domainerr.Validation("stock movements cannot be edited")
 	}
 
 	if err := u.resolveMovementReferences(ctx, supplyMovement); err != nil {
@@ -453,7 +453,7 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 	}
 	if isFirst {
 		if supplyMovement.MovementType != domain.OFFICIAL_INVOICE {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			return domainerr.Validation("no stock for this supply in the project")
 		}
 
 		stock = createStockDomainFromSupplyMovement(supplyMovement)

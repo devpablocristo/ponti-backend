@@ -514,7 +514,7 @@ func TestHandler_ImportSupplyMovements_ReturnsRowIndexFailures(t *testing.T) {
 				RowIndex: 3,
 				SupplyID: 99,
 				Code:     "duplicate_request",
-				Message:  "El remito R-1 ya contiene el insumo 99 dentro del request",
+				Message:  "remito R-1 already includes supply 99 in the import request",
 			}}, nil
 		},
 	}
@@ -698,7 +698,7 @@ func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T
 	stub := &handlerUseCasesStub{
 		validateMovementFn: func(_ context.Context, movement *domain.SupplyMovement) error {
 			if movement.ReferenceNumber == "REM-EXCEL" && movement.Supply != nil && movement.Supply.ID == 10 {
-				return domainerr.Conflict("El remito REM-EXCEL ya tiene el insumo 10 cargado")
+				return domainerr.Conflict("remito REM-EXCEL already includes supply 10")
 			}
 			return nil
 		},
@@ -745,7 +745,7 @@ func TestHandler_CreateSupplyMovement_StrictReturnsDuplicateFailure(t *testing.T
 		assert.Equal(t, 0, resp.Failures[0].Index)
 		assert.Equal(t, 2, resp.Failures[0].RowIndex)
 		assert.Equal(t, "validation_error", resp.Failures[0].Code)
-		assert.Equal(t, "El remito REM-EXCEL ya tiene el insumo 10 cargado", resp.Failures[0].Message)
+		assert.Equal(t, "remito REM-EXCEL already includes supply 10", resp.Failures[0].Message)
 	}
 }
 

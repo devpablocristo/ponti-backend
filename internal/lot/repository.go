@@ -512,9 +512,11 @@ func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check workorders")
 		}
 		if woCount > 0 {
-			// Prefijo machine-readable `BLOCKED_BY_WORKORDERS:<count>|` permite
-			// al FE detectar el caso sin parsear el texto en español.
-			return domainerr.Conflict(fmt.Sprintf("BLOCKED_BY_WORKORDERS:%d|El lote tiene %d orden(es) de trabajo asociada(s). Eliminá o archivá esas órdenes primero (Órdenes de Trabajo → Archivadas → Eliminar) y después podés eliminar el lote.", woCount, woCount))
+			// Machine-readable prefix `BLOCKED_BY_WORKORDERS:<count>|` lets the FE
+			// detect the case without parsing the text. The English text after
+			// the pipe is the fallback if a caller doesn't match the prefix —
+			// translateBackendError on the FE maps it to a Spanish toast.
+			return domainerr.Conflict(fmt.Sprintf("BLOCKED_BY_WORKORDERS:%d|lot has %d work orders; archive or hard-delete them first", woCount, woCount))
 		}
 
 		// Limpiar lot_dates físicamente (no son entidad de negocio independiente).
