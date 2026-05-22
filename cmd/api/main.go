@@ -1,3 +1,21 @@
+// Package main es el entrypoint del binario ponti-backend (Gin + GORM + Postgres).
+//
+// @title           Ponti Backend API
+// @version         1.0
+// @description     API de negocio para Ponti. ~50 endpoints REST cubiertos por handlers en internal/<module>/. Errores en inglés (ver docs/ERROR_CATALOG.md). Multi-tenant por header. Auth Bearer JWT (Firebase IDP).
+// @termsOfService  https://github.com/devpablocristo/ponti-backend
+//
+// @contact.name   Ponti Backend
+// @contact.url    https://github.com/devpablocristo/ponti-backend
+//
+// @license.name  Propietario
+//
+// @BasePath  /api/v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 "Bearer <JWT>" (Firebase Identity Platform).
 package main
 
 import (

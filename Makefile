@@ -13,8 +13,19 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
         run-api up-ponti-local down-ponti-local reset-local-db-from-prod e2e-changes \
-        migrate-create \
+        migrate-create openapi \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline actors-backfill-sync
+
+# --------------------------------------------------
+# OpenAPI / codegen
+# --------------------------------------------------
+# Genera docs/openapi/swagger.{yaml,json} desde anotaciones @Summary/@Router/@Success en handlers.
+# Requiere ~/go/bin/swag (instalar con: go install github.com/swaggo/swag/cmd/swag@latest).
+# El FE consume el yaml para generar tipos TS (ver ../ponti-frontend/ui/package.json: codegen:openapi).
+openapi:
+	@echo "Generating OpenAPI spec via swag..."
+	@~/go/bin/swag init -g cmd/api/main.go -o docs/openapi --parseDependency --parseInternal --outputTypes json,yaml
+	@echo "OK: docs/openapi/swagger.yaml updated. Now run 'yarn codegen:openapi' in ponti-frontend/ui."
 
 define compose_cmd
 GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
