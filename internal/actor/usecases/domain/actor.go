@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -13,6 +15,9 @@ const (
 	KindUnknown       = "unknown"
 )
 
+// ValidKinds es la tabla maestra de kinds aceptados. Se mantiene exportada
+// (compatibilidad con callers que la consumen como set) pero el chequeo
+// canónico es IsValidKind(...).
 var ValidKinds = map[string]struct{}{
 	KindNaturalPerson: {},
 	KindOrganization:  {},
@@ -20,6 +25,8 @@ var ValidKinds = map[string]struct{}{
 	KindUnknown:       {},
 }
 
+// ValidRoles es la tabla maestra de roles aceptados. El chequeo canónico
+// es IsValidRole(...).
 var ValidRoles = map[string]struct{}{
 	"cliente":      {},
 	"responsable":  {},
@@ -28,6 +35,55 @@ var ValidRoles = map[string]struct{}{
 	"proveedor":    {},
 	"contratista":  {},
 	"facturador":   {},
+}
+
+// IsValidKind devuelve true si kind es un ActorKind permitido. Encapsula la
+// lectura de ValidKinds para que los callers no toquen el map directamente.
+func IsValidKind(kind string) bool {
+	_, ok := ValidKinds[strings.TrimSpace(kind)]
+	return ok
+}
+
+// IsValidRole devuelve true si role es un rol permitido para un Actor.
+func IsValidRole(role string) bool {
+	_, ok := ValidRoles[strings.TrimSpace(role)]
+	return ok
+}
+
+// ErrInvalidActorKind se retorna cuando ActorKind no es un valor permitido.
+var ErrInvalidActorKind = errors.New("actor kind is not valid")
+
+// ErrInvalidActorRole se retorna cuando algún rol no es permitido.
+var ErrInvalidActorRole = errors.New("actor role is not valid")
+
+// Validate corre las invariantes de dominio del Actor:
+//   - ActorKind debe estar en ValidKinds.
+//   - Cada role en Roles debe estar en ValidRoles.
+// Es safe llamarla en Create/Update antes de persistir.
+func (a *Actor) Validate() error {
+	if a == nil {
+		return nil
+	}
+	if !IsValidKind(a.ActorKind) {
+		return ErrInvalidActorKind
+	}
+	for _, r := range a.Roles {
+		if !IsValidRole(r) {
+			return ErrInvalidActorRole
+		}
+	}
+	return nil
+}
+
+// IsArchived devuelve true si el actor está archivado (ArchivedAt no-nil).
+// Encapsula el chequeo "está vivo" para que los callers no decidan basados
+// en campos directos. El soft-delete por deleted_at se filtra a nivel de
+// query GORM (scope global), por eso no aparece como campo en el domain.
+func (a *Actor) IsArchived() bool {
+	if a == nil {
+		return true
+	}
+	return a.ArchivedAt != nil
 }
 
 type Actor struct {

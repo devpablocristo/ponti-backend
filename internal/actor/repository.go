@@ -101,7 +101,7 @@ func (r *Repository) ListActors(ctx context.Context, filters domain.ListFilters,
 		query = query.Where("deleted_at IS NULL")
 	}
 	if filters.Role != "" {
-		if _, ok := domain.ValidRoles[filters.Role]; !ok {
+		if !domain.IsValidRole(filters.Role) {
 			return nil, 0, domainerr.Validation("invalid actor role")
 		}
 		query = query.Where("EXISTS (SELECT 1 FROM actor_roles ar WHERE ar.actor_id = actors.id AND ar.role = ? AND ar.deleted_at IS NULL)", filters.Role)
@@ -388,7 +388,7 @@ func (r *Repository) AddRole(ctx context.Context, id int64, role string) error {
 	if err := sharedrepo.ValidateID(id, "actor"); err != nil {
 		return err
 	}
-	if _, ok := domain.ValidRoles[role]; !ok {
+	if !domain.IsValidRole(role) {
 		return domainerr.Validation("invalid actor role")
 	}
 	tenantID, err := requestTenantID(ctx)
@@ -649,12 +649,14 @@ func validateActor(actor *domain.Actor) error {
 	if actor.ActorKind == "" {
 		actor.ActorKind = domain.KindUnknown
 	}
-	if _, ok := domain.ValidKinds[actor.ActorKind]; !ok {
-		return domainerr.Validation("invalid actor_kind")
-	}
-	for _, role := range actor.Roles {
-		if _, ok := domain.ValidRoles[role]; !ok {
+	if err := actor.Validate(); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidActorKind):
+			return domainerr.Validation("invalid actor_kind")
+		case errors.Is(err, domain.ErrInvalidActorRole):
 			return domainerr.Validation("invalid actor role")
+		default:
+			return err
 		}
 	}
 	return nil
@@ -730,7 +732,7 @@ func (r *Repository) replaceProfiles(ctx context.Context, tx *gorm.DB, actor *do
 
 func (r *Repository) insertRoles(ctx context.Context, tx *gorm.DB, actorID int64, roles []string) error {
 	for _, role := range roles {
-		if _, ok := domain.ValidRoles[role]; !ok {
+		if !domain.IsValidRole(role) {
 			return domainerr.Validation("invalid actor role")
 		}
 		if err := tx.WithContext(ctx).
