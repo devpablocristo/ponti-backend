@@ -3,22 +3,27 @@ package models
 import (
 	"time"
 
+	"gorm.io/gorm"
+
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
+// Actor is the canonical identity row. Lifecycle is tracked exclusively via
+// `deleted_at` (embedded in sharedmodels.Base as gorm.DeletedAt). The
+// `archived_at` custom column was retired in migration 000231 — see
+// docs/crudar-lifecycle.md for the rationale.
 type Actor struct {
-	ID                int64      `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID          string     `gorm:"column:tenant_id;type:uuid;not null;index"`
-	ActorKind         string     `gorm:"column:actor_kind;type:text;not null"`
-	DisplayName       string     `gorm:"column:display_name;type:text;not null"`
-	NormalizedName    string     `gorm:"column:normalized_name;type:text;not null"`
-	PrimaryEmail      *string    `gorm:"column:primary_email"`
-	PrimaryPhone      *string    `gorm:"column:primary_phone"`
-	Notes             *string    `gorm:"column:notes"`
-	ArchivedAt        *time.Time `gorm:"column:archived_at"`
-	MergedIntoActorID *int64     `gorm:"column:merged_into_actor_id"`
+	ID                int64   `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID          string  `gorm:"column:tenant_id;type:uuid;not null;index"`
+	ActorKind         string  `gorm:"column:actor_kind;type:text;not null"`
+	DisplayName       string  `gorm:"column:display_name;type:text;not null"`
+	NormalizedName    string  `gorm:"column:normalized_name;type:text;not null"`
+	PrimaryEmail      *string `gorm:"column:primary_email"`
+	PrimaryPhone      *string `gorm:"column:primary_phone"`
+	Notes             *string `gorm:"column:notes"`
+	MergedIntoActorID *int64  `gorm:"column:merged_into_actor_id"`
 	sharedmodels.Base
 }
 
@@ -26,26 +31,32 @@ func (Actor) TableName() string {
 	return "actors"
 }
 
+// ActorRole keeps the legacy slim schema (actor_id + role + created_at) plus
+// the soft-delete column added in migration 000231. We intentionally do NOT
+// embed sharedmodels.Base here because the DB row has no updated_at /
+// created_by / etc. columns; adding them would require a wider migration
+// without operational value.
 type ActorRole struct {
-	ActorID    int64      `gorm:"column:actor_id;primaryKey"`
-	Role       string     `gorm:"column:role;primaryKey"`
-	CreatedAt  time.Time  `gorm:"column:created_at"`
-	ArchivedAt *time.Time `gorm:"column:archived_at"`
+	ActorID   int64          `gorm:"column:actor_id;primaryKey"`
+	Role      string         `gorm:"column:role;primaryKey"`
+	CreatedAt time.Time      `gorm:"column:created_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
 func (ActorRole) TableName() string {
 	return "actor_roles"
 }
 
+// ActorAlias — same lifecycle consolidation as ActorRole (see above).
 type ActorAlias struct {
-	ID              int64      `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID        string     `gorm:"column:tenant_id;type:uuid;not null"`
-	ActorID         int64      `gorm:"column:actor_id;not null"`
-	Alias           string     `gorm:"column:alias;not null"`
-	NormalizedAlias string     `gorm:"column:normalized_alias;not null"`
-	Source          *string    `gorm:"column:source"`
-	CreatedAt       time.Time  `gorm:"column:created_at"`
-	ArchivedAt      *time.Time `gorm:"column:archived_at"`
+	ID              int64          `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID        string         `gorm:"column:tenant_id;type:uuid;not null"`
+	ActorID         int64          `gorm:"column:actor_id;not null"`
+	Alias           string         `gorm:"column:alias;not null"`
+	NormalizedAlias string         `gorm:"column:normalized_alias;not null"`
+	Source          *string        `gorm:"column:source"`
+	CreatedAt       time.Time      `gorm:"column:created_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
 func (ActorAlias) TableName() string {
@@ -98,7 +109,10 @@ func (ActorOrganizationProfile) TableName() string {
 }
 
 func (a Actor) ToDomain() *domain.Actor {
-	archivedAt := a.ArchivedAt
+	// `ArchivedAt` in the domain layer is a derived getter from `DeletedAt`.
+	// FE and DTOs still consume `archived_at` for backwards compatibility; the
+	// DB column is `deleted_at`.
+	var archivedAt *time.Time
 	if a.DeletedAt.Valid {
 		t := a.DeletedAt.Time
 		archivedAt = &t
@@ -133,7 +147,6 @@ func FromDomain(d *domain.Actor) *Actor {
 		PrimaryEmail:      d.PrimaryEmail,
 		PrimaryPhone:      d.PrimaryPhone,
 		Notes:             d.Notes,
-		ArchivedAt:        d.ArchivedAt,
 		MergedIntoActorID: d.MergedIntoActorID,
 		Base: sharedmodels.Base{
 			CreatedAt: d.CreatedAt,

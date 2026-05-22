@@ -12,6 +12,7 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 )
 
 type GormEnginePort interface {
@@ -54,11 +55,17 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 		}
 	}
 
-	if err := r.db.Client().WithContext(ctx).Create(&modelList).Error; err != nil {
-		return domainerr.Internal("failed to bulk insert crop commercializations")
-	}
-
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := range items {
+			if err := assertCommercializationReferencesActive(tx, &items[i]); err != nil {
+				return err
+			}
+		}
+		if err := tx.Create(&modelList).Error; err != nil {
+			return domainerr.Internal("failed to bulk insert crop commercializations")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]domain.CropCommercialization, error) {
@@ -78,10 +85,10 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 		return nil, domainerr.Internal("failed to list crop commercialization")
 	}
 
-	if len(rows) == 0 {
-		return nil, domainerr.NotFound("no commercializations found for this project")
-	}
-
+	// Empty list is a valid state: a project that hasn't loaded its
+	// commercialization yet shows the form to create it. Returning 404 here
+	// (the previous behavior) made the FE log a noisy error on every visit
+	// to `Cargar Comercialización` for fresh projects.
 	out := make([]domain.CropCommercialization, len(rows))
 	for i, m := range rows {
 		out[i] = *m.ToDomain()
@@ -108,6 +115,15 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 		if err := sharedfilters.ValidateProjectAccess(ctx, tx, current.ProjectID); err != nil {
 			return err
 		}
+		// Use current.ProjectID as source of truth — payload only changes crop
+		// and pricing fields. CropID may differ, validate the new value.
+		toValidate := domain.CropCommercialization{
+			ProjectID: current.ProjectID,
+			CropID:    item.CropID,
+		}
+		if err := assertCommercializationReferencesActive(tx, &toValidate); err != nil {
+			return err
+		}
 
 		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.CropCommercialization{}), "crop_commercializations").
 			Where("id = ?", item.ID).
@@ -124,4 +140,19 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 		}
 		return nil
 	})
+}
+
+// assertCommercializationReferencesActive blocks Create/Update of a
+// commercialization that references an archived project or crop. Both are
+// required parents; if either is archived the commercialization row would
+// violate the hierarchical invariant.
+func assertCommercializationReferencesActive(tx *gorm.DB, c *domain.CropCommercialization) error {
+	if c == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: c.ProjectID},
+		{Table: "crops", Label: "crop", ID: c.CropID},
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

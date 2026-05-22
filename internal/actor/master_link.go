@@ -242,7 +242,7 @@ func resolveActorForName(tx *gorm.DB, tenantID string, actorID *int64, name stri
 		if row.ID == 0 {
 			return 0, "", domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", *actorID))
 		}
-		if err := tx.Exec(`UPDATE actors SET archived_at = NULL, updated_at = now() WHERE id = ?`, row.ID).Error; err != nil {
+		if err := tx.Exec(`UPDATE actors SET deleted_at = NULL, deleted_by = NULL, updated_at = now() WHERE id = ?`, row.ID).Error; err != nil {
 			return 0, "", domainerr.Internal("failed to restore actor")
 		}
 		return row.ID, row.DisplayName, nil
@@ -256,7 +256,7 @@ func resolveActorForName(tx *gorm.DB, tenantID string, actorID *int64, name stri
 		  AND deleted_at IS NULL
 		  AND merged_into_actor_id IS NULL
 		  AND normalized_name = public.normalize_actor_name(?)
-		ORDER BY CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END, id
+		ORDER BY id
 		LIMIT 2
 	`, tenantID, name).Scan(&rows).Error; err != nil {
 		return 0, "", domainerr.Internal("failed to search actor")
@@ -265,7 +265,7 @@ func resolveActorForName(tx *gorm.DB, tenantID string, actorID *int64, name stri
 		return 0, "", domainerr.New(domainerr.KindConflict, "multiple actors match this name; select one explicitly")
 	}
 	if len(rows) == 1 {
-		if err := tx.Exec(`UPDATE actors SET archived_at = NULL, updated_at = now() WHERE id = ?`, rows[0].ID).Error; err != nil {
+		if err := tx.Exec(`UPDATE actors SET deleted_at = NULL, deleted_by = NULL, updated_at = now() WHERE id = ?`, rows[0].ID).Error; err != nil {
 			return 0, "", domainerr.Internal("failed to restore actor")
 		}
 		return rows[0].ID, rows[0].DisplayName, nil
@@ -291,10 +291,10 @@ func ensureActorRole(tx *gorm.DB, actorID int64, role string) error {
 		return domainerr.Validation("actor role is required")
 	}
 	if err := tx.Exec(`
-		INSERT INTO actor_roles (actor_id, role, created_at, archived_at)
+		INSERT INTO actor_roles (actor_id, role, created_at, deleted_at)
 		VALUES (?, ?, now(), NULL)
 		ON CONFLICT (actor_id, role)
-		DO UPDATE SET archived_at = NULL
+		DO UPDATE SET deleted_at = NULL
 	`, actorID, role).Error; err != nil {
 		return domainerr.Internal("failed to ensure actor role")
 	}
@@ -311,7 +311,7 @@ func requireActorForLink(tx *gorm.DB, tenantID string, actorID int64) error {
 	if count == 0 {
 		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("actor with id %d does not exist", actorID))
 	}
-	return tx.Exec(`UPDATE actors SET archived_at = NULL, updated_at = now() WHERE id = ?`, actorID).Error
+	return tx.Exec(`UPDATE actors SET deleted_at = NULL, deleted_by = NULL, updated_at = now() WHERE id = ?`, actorID).Error
 }
 
 func findCustomerForActor(tx *gorm.DB, tenantID string, actorID int64) (customerActorRow, error) {

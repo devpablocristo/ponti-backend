@@ -54,6 +54,9 @@ func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx conte
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyReferencesActive(tx, s); err != nil {
+			return err
+		}
 		model := models.FromDomain(s)
 		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
 			return err
@@ -291,6 +294,9 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyReferencesActive(tx, s); err != nil {
+			return err
+		}
 		var count int64
 		supplyDB := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies")
 		if err := supplyDB.Where("id = ?", s.ID).Count(&count).Error; err != nil {
@@ -803,4 +809,19 @@ func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []
 	}
 
 	return nil
+}
+
+// assertSupplyReferencesActive blocks Create/Update of a supply that
+// references archived parents. ProjectID, CategoryID, UnitID and Type.ID are
+// the lifecycle-managed references; IDs <= 0 are no-ops (helper handles it).
+func assertSupplyReferencesActive(tx *gorm.DB, s *domain.Supply) error {
+	if s == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: s.ProjectID},
+		{Table: "categories", Label: "category", ID: s.CategoryID},
+		{Table: "types", Label: "type", ID: s.Type.ID},
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

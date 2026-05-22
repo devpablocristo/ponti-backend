@@ -57,6 +57,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		p.CreatedBy = &userID
 		p.UpdatedBy = &userID
 
+		if err := assertProjectReferencesActive(tx, p); err != nil {
+			return err
+		}
+
 		customer := &cusmod.Customer{
 			ID:       p.Customer.ID,
 			TenantID: tenantID,
@@ -629,6 +633,11 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		}
 
 		d.CreatedBy = existing.CreatedBy
+
+		if err := assertProjectReferencesActive(tx, d); err != nil {
+			return err
+		}
+
 		updates := map[string]any{
 			"updated_by": d.UpdatedBy,
 		}
@@ -757,62 +766,18 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		}
 		cause := lifecycle.CauseFromBatch(batch)
 
-		// clear managers
-		managerUpdate := tx.Table("project_managers").Where("project_id = ? AND deleted_at IS NULL", id)
-		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_managers", "tenant_id") {
-			managerUpdate = managerUpdate.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := managerUpdate.Updates(lifecycle.ArchiveUpdates(tx, "project_managers", archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal("failed to clear managers")
-		}
-
-		// clear investors
-		investorUpdate := tx.Table("project_investors").Where("project_id = ? AND deleted_at IS NULL", id)
-		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_investors", "tenant_id") {
-			investorUpdate = investorUpdate.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := investorUpdate.Updates(lifecycle.ArchiveUpdates(tx, "project_investors", archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal("failed to clear investors")
-		}
-
-		fieldIDs, err := lifecycle.ListScopedIDs(tx, "fields", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
-		if err != nil {
-			return domainerr.Internal("failed to get field ids")
-		}
-		lotIDs, err := projectLotIDs(tx, project.TenantID, fieldIDs, true, lifecycle.Cause{})
-		if err != nil {
-			return err
-		}
-		workOrderIDs, err := lifecycle.ListScopedIDs(tx, "workorders", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
-		if err != nil {
-			return err
-		}
-		draftIDs, err := lifecycle.ListScopedIDs(tx, "work_order_drafts", "id", project.TenantID, "project_id = ? AND deleted_at IS NULL", id)
-		if err != nil {
+		// Centralized cascade: walks the projects Policy graph (CascadeTables
+		// = project_managers, project_investors, admin_cost_investors,
+		// project_dollar_values, crop_commercializations; ChildEntities =
+		// fields → lots, workorders → items/splits, drafts, labors, supplies,
+		// supply_movements, stocks). Replaces the hand-rolled cascade that
+		// previously lived inline (with a known bug: pluck-after-archive
+		// missed workorder_items / work_order_draft_items).
+		if err := lifecycle.RunCascadeArchive(tx, "projects", id, project.TenantID, archivedAt, deletedBy, cause); err != nil {
 			return err
 		}
 
-		if err := archiveProjectGraphChildren(tx, project.TenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, archivedAt, deletedBy, cause); err != nil {
-			return err
-		}
-
-		if len(fieldIDs) > 0 {
-			if err := lifecycle.ArchiveScopedRows(tx, "lots", project.TenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
-				return domainerr.Internal("failed to soft delete lots")
-			}
-		}
-
-		if err := archiveProjectScopedTables(tx, id, archivedAt, deletedBy, cause); err != nil {
-			return err
-		}
-
-		if len(fieldIDs) > 0 {
-			if err := lifecycle.ArchiveScopedRows(tx, "fields", project.TenantID, archivedAt, deletedBy, cause, "id IN ?", fieldIDs); err != nil {
-				return domainerr.Internal("failed to soft delete fields")
-			}
-		}
-
-		// delete project
+		// Archive the project row itself.
 		deleteQuery := tx.Model(&models.Project{}).Where("id = ?", id)
 		if project.TenantID != uuid.Nil {
 			deleteQuery = deleteQuery.Where("tenant_id = ?", project.TenantID)
@@ -2466,4 +2431,70 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 		}
 	}
 	return nil
+}
+
+// assertProjectReferencesActive blocks Create/Update of a project that
+// references archived entities. A project is the hub that connects customer,
+// campaign, managers, investors, admin-cost investors, fields, lots, crops,
+// and field investors — any archived row in that graph breaks the invariant
+// that "archived = no existe" for the operational domain.
+//
+// Each `lifecycle.ActiveRef` is checked with a point query against the
+// `<table>.deleted_at` column. IDs <= 0 are no-ops (new rows that
+// ensure*-helpers will create), so the check is safe to call before the
+// ensure step. Nested actor IDs (manager.actor_id, investor.actor_id, etc.)
+// are validated only when present — they can be nil for legacy rows.
+//
+// Runs inside the caller's transaction so any violation aborts the entire
+// project create/update without partial state.
+func assertProjectReferencesActive(tx *gorm.DB, p *domain.Project) error {
+	if p == nil {
+		return nil
+	}
+	refs := make([]lifecycle.ActiveRef, 0, 16)
+
+	refs = append(refs,
+		lifecycle.ActiveRef{Table: "customers", Label: "customer", ID: p.Customer.ID},
+		lifecycle.ActiveRef{Table: "campaigns", Label: "campaign", ID: p.Campaign.ID},
+	)
+	if p.Customer.ActorID != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *p.Customer.ActorID})
+	}
+
+	for _, m := range p.Managers {
+		refs = append(refs, lifecycle.ActiveRef{Table: "managers", Label: "manager", ID: m.ID})
+		if m.ActorID != nil {
+			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *m.ActorID})
+		}
+	}
+	for _, inv := range p.Investors {
+		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: inv.ID})
+		if inv.ActorID != nil {
+			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *inv.ActorID})
+		}
+	}
+	for _, inv := range p.AdminCostInvestors {
+		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: inv.ID})
+		if inv.ActorID != nil {
+			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *inv.ActorID})
+		}
+	}
+	for _, f := range p.Fields {
+		// f.ID == 0 cuando es nuevo (ensureField lo crea). Solo validamos cuando existe.
+		refs = append(refs, lifecycle.ActiveRef{Table: "fields", Label: "field", ID: f.ID})
+		for _, fi := range f.Investors {
+			refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: fi.ID})
+			if fi.ActorID != nil {
+				refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *fi.ActorID})
+			}
+		}
+		for _, lot := range f.Lots {
+			refs = append(refs,
+				lifecycle.ActiveRef{Table: "lots", Label: "lot", ID: lot.ID},
+				lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.CurrentCrop.ID},
+				lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.PreviousCrop.ID},
+			)
+		}
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

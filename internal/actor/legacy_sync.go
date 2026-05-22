@@ -86,6 +86,18 @@ func SyncLegacyActor(tx *gorm.DB, input LegacyActorSync) (int64, error) {
 		return 0, err
 	}
 
+	// G3.2: when syncing as an ACTIVE row (ArchivedAt nil), the source legacy
+	// row must itself be active. Syncing from an archived source row would
+	// leave the legacy_actor_map pointing at active actor metadata while the
+	// source is archived — violating the hierarchical invariant.
+	// Archive flows (ArchivedAt != nil) intentionally skip this check: that
+	// path is propagating the archive downstream.
+	if input.ArchivedAt == nil {
+		if err := assertSourceRowActive(tx, input.SourceTable, input.SourceID); err != nil {
+			return 0, err
+		}
+	}
+
 	sourceKey := fmt.Sprintf("%d", input.SourceID)
 	var actorID int64
 	if err := tx.Table("legacy_actor_map").
@@ -98,12 +110,12 @@ func SyncLegacyActor(tx *gorm.DB, input LegacyActorSync) (int64, error) {
 	if actorID == 0 {
 		if err := tx.Raw(`
 			INSERT INTO actors (
-				tenant_id, actor_kind, display_name, normalized_name, archived_at, deleted_at,
+				tenant_id, actor_kind, display_name, normalized_name, deleted_at,
 				created_at, updated_at, created_by, updated_by, deleted_by
 			)
-			VALUES (?, ?, ?, public.normalize_actor_name(?), ?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, public.normalize_actor_name(?), ?, ?, ?, ?, ?, ?)
 			RETURNING id
-		`, tenantID, input.ActorKind, input.Name, input.Name, input.ArchivedAt, input.ArchivedAt, input.CreatedAt, input.UpdatedAt, input.CreatedBy, input.UpdatedBy, input.DeletedBy).
+		`, tenantID, input.ActorKind, input.Name, input.Name, input.ArchivedAt, input.CreatedAt, input.UpdatedAt, input.CreatedBy, input.UpdatedBy, input.DeletedBy).
 			Scan(&actorID).Error; err != nil {
 			return 0, domainerr.Internal("failed to create legacy actor")
 		}
@@ -248,26 +260,25 @@ func DeleteLegacyActor(tx *gorm.DB, sourceTable string, sourceID int64, role str
 	now := time.Now()
 	if err := tx.Exec(`
 		UPDATE actor_roles
-		SET archived_at = ?
+		SET deleted_at = ?
 		WHERE actor_id = ? AND role = ?
 	`, now, actorID, role).Error; err != nil {
 		return domainerr.Internal("failed to archive deleted legacy actor role")
 	}
 	var activeRoles int64
 	if err := tx.Table("actor_roles").
-		Where("actor_id = ? AND archived_at IS NULL", actorID).
+		Where("actor_id = ? AND deleted_at IS NULL", actorID).
 		Count(&activeRoles).Error; err != nil {
 		return domainerr.Internal("failed to check actor roles")
 	}
 	if activeRoles == 0 {
 		if err := tx.Exec(`
 			UPDATE actors
-			SET archived_at = COALESCE(archived_at, ?),
-				deleted_at = ?,
+			SET deleted_at = ?,
 				deleted_by = ?,
 				updated_at = ?
 			WHERE id = ?
-		`, now, now, deletedBy, now, actorID).Error; err != nil {
+		`, now, deletedBy, now, actorID).Error; err != nil {
 			return domainerr.Internal("failed to mark legacy actor deleted")
 		}
 	}
@@ -515,10 +526,10 @@ func RefreshStockActorColumns(tx *gorm.DB, stockID int64) error {
 
 func upsertActorRole(tx *gorm.DB, actorID int64, role string, archivedAt *time.Time) error {
 	if err := tx.Exec(`
-		INSERT INTO actor_roles (actor_id, role, archived_at)
+		INSERT INTO actor_roles (actor_id, role, deleted_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT (actor_id, role)
-		DO UPDATE SET archived_at = EXCLUDED.archived_at
+		DO UPDATE SET deleted_at = EXCLUDED.deleted_at
 	`, actorID, role, archivedAt).Error; err != nil {
 		return domainerr.Internal("failed to sync actor role")
 	}
@@ -527,16 +538,16 @@ func upsertActorRole(tx *gorm.DB, actorID int64, role string, archivedAt *time.T
 
 func refreshActorArchiveState(tx *gorm.DB, actorID int64, archivedAt *time.Time) error {
 	if archivedAt == nil {
-		return tx.Exec(`UPDATE actors SET archived_at = NULL, deleted_at = NULL, deleted_by = NULL WHERE id = ?`, actorID).Error
+		return tx.Exec(`UPDATE actors SET deleted_at = NULL, deleted_by = NULL WHERE id = ?`, actorID).Error
 	}
 	var activeRoles int64
 	if err := tx.Table("actor_roles").
-		Where("actor_id = ? AND archived_at IS NULL", actorID).
+		Where("actor_id = ? AND deleted_at IS NULL", actorID).
 		Count(&activeRoles).Error; err != nil {
 		return domainerr.Internal("failed to check actor roles")
 	}
 	if activeRoles == 0 {
-		return tx.Exec(`UPDATE actors SET archived_at = ?, deleted_at = ? WHERE id = ?`, archivedAt, archivedAt, actorID).Error
+		return tx.Exec(`UPDATE actors SET deleted_at = ? WHERE id = ?`, archivedAt, actorID).Error
 	}
 	return nil
 }
@@ -637,4 +648,33 @@ func defaultTenantIDTx(tx *gorm.DB) (string, error) {
 
 func actorSyncDisabled(tx *gorm.DB) bool {
 	return tx != nil && tx.Name() == "sqlite"
+}
+
+// assertSourceRowActive validates that the legacy source row pointed to by a
+// `legacy_actor_map` entry is itself active. Skips silently when the table
+// does not exist or has no `deleted_at` column (defensive for migrations and
+// tables that don't follow the standard).
+func assertSourceRowActive(tx *gorm.DB, sourceTable string, sourceID int64) error {
+	if tx == nil || sourceID <= 0 || sourceTable == "" {
+		return nil
+	}
+	if !tx.Migrator().HasTable(sourceTable) {
+		return nil
+	}
+	if !tx.Migrator().HasColumn(sourceTable, "deleted_at") {
+		return nil
+	}
+	var row struct {
+		DeletedAt *time.Time `gorm:"column:deleted_at"`
+	}
+	if err := tx.Table(sourceTable).
+		Select("deleted_at").
+		Where("id = ?", sourceID).
+		Scan(&row).Error; err != nil {
+		return domainerr.Internal("failed to check source row lifecycle")
+	}
+	if row.DeletedAt != nil {
+		return domainerr.Conflict(fmt.Sprintf("cannot sync actor for archived %s row", sourceTable))
+	}
+	return nil
 }

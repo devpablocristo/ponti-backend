@@ -217,6 +217,11 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			mapping_status TEXT,
 			PRIMARY KEY (tenant_id, source_table, source_key)
 		);
+		CREATE TABLE actors (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT,
+			deleted_at DATETIME
+		);
 	`).Error; err != nil {
 		t.Fatalf("create schema: %v", err)
 	}

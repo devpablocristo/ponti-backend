@@ -48,7 +48,6 @@ func setupActorTenantDB(t *testing.T) *gorm.DB {
 			primary_email TEXT,
 			primary_phone TEXT,
 			notes TEXT,
-			archived_at DATETIME,
 			merged_into_actor_id INTEGER,
 			created_at DATETIME,
 			updated_at DATETIME,
@@ -61,7 +60,7 @@ func setupActorTenantDB(t *testing.T) *gorm.DB {
 			actor_id INTEGER NOT NULL,
 			role TEXT NOT NULL,
 			created_at DATETIME,
-			archived_at DATETIME,
+			deleted_at DATETIME,
 			PRIMARY KEY (actor_id, role)
 		);
 		CREATE TABLE actor_aliases (
@@ -72,7 +71,7 @@ func setupActorTenantDB(t *testing.T) *gorm.DB {
 			normalized_alias TEXT NOT NULL,
 			source TEXT,
 			created_at DATETIME,
-			archived_at DATETIME
+			deleted_at DATETIME
 		);
 		CREATE TABLE actor_identifiers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,16 +121,16 @@ func TestActorRepositoryTenantIsolation(t *testing.T) {
 	if err := db.Exec(`
 		INSERT INTO actors (
 			id, tenant_id, actor_kind, display_name, normalized_name,
-			archived_at, created_at, updated_at, deleted_at
+			created_at, updated_at, deleted_at
 		) VALUES
-			(1, ?, 'organization', 'Actor A', 'actor a', NULL, ?, ?, NULL),
-			(2, ?, 'organization', 'Actor B', 'actor b', NULL, ?, ?, NULL),
-			(3, ?, 'organization', 'Actor B archived', 'actor b archived', ?, ?, ?, NULL);
-		INSERT INTO actor_roles (actor_id, role, created_at, archived_at) VALUES
+			(1, ?, 'organization', 'Actor A', 'actor a', ?, ?, NULL),
+			(2, ?, 'organization', 'Actor B', 'actor b', ?, ?, NULL),
+			(3, ?, 'organization', 'Actor B archived', 'actor b archived', ?, ?, ?);
+		INSERT INTO actor_roles (actor_id, role, created_at, deleted_at) VALUES
 			(1, 'cliente', ?, NULL),
 			(2, 'cliente', ?, NULL),
 			(3, 'cliente', ?, NULL);
-		INSERT INTO actor_aliases (id, tenant_id, actor_id, alias, normalized_alias, created_at, archived_at) VALUES
+		INSERT INTO actor_aliases (id, tenant_id, actor_id, alias, normalized_alias, created_at, deleted_at) VALUES
 			(1, ?, 1, 'Alias A', 'alias a', ?, NULL),
 			(2, ?, 2, 'Alias B', 'alias b', ?, NULL);
 		INSERT INTO actor_identifiers (
@@ -187,7 +186,7 @@ func TestActorRepositoryTenantIsolation(t *testing.T) {
 		t.Fatalf("expected archive cross-tenant actor to fail")
 	}
 	var archivedCount int64
-	if err := db.Raw(`SELECT COUNT(*) FROM actors WHERE id = 2 AND archived_at IS NOT NULL`).Scan(&archivedCount).Error; err != nil {
+	if err := db.Raw(`SELECT COUNT(*) FROM actors WHERE id = 2 AND deleted_at IS NOT NULL`).Scan(&archivedCount).Error; err != nil {
 		t.Fatalf("check archive side effect: %v", err)
 	}
 	if archivedCount != 0 {
@@ -197,7 +196,7 @@ func TestActorRepositoryTenantIsolation(t *testing.T) {
 	if err := repo.RestoreActor(ctxA, 3); err == nil {
 		t.Fatalf("expected restore cross-tenant actor to fail")
 	}
-	if err := db.Raw(`SELECT COUNT(*) FROM actors WHERE id = 3 AND archived_at IS NOT NULL`).Scan(&archivedCount).Error; err != nil {
+	if err := db.Raw(`SELECT COUNT(*) FROM actors WHERE id = 3 AND deleted_at IS NOT NULL`).Scan(&archivedCount).Error; err != nil {
 		t.Fatalf("check restore side effect: %v", err)
 	}
 	if archivedCount != 1 {

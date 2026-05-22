@@ -45,6 +45,9 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 	}
 	db := r.getDB(ctx)
 	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyMovementReferencesActive(tx, movement); err != nil {
+			return err
+		}
 		if movement.Investor != nil && movement.Investor.ID > 0 && strings.TrimSpace(movement.Investor.Name) != "" {
 			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 				SourceTable: actorsync.LegacyInvestors,
@@ -82,6 +85,36 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 		return 0, err
 	}
 	return model.ID, nil
+}
+
+// assertSupplyMovementReferencesActive blocks Create/Update of a movement that
+// references archived parents. Investor/Provider are optional (movement may
+// reference one, the other, or neither), so we only validate when present.
+// ProjectId and Supply.ID are required references; ProjectDestinationId is
+// optional (transfer-out movements).
+func assertSupplyMovementReferencesActive(tx *gorm.DB, m *domain.SupplyMovement) error {
+	if m == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: m.ProjectId},
+	}
+	if m.ProjectDestinationId > 0 {
+		refs = append(refs, lifecycle.ActiveRef{Table: "projects", Label: "destination project", ID: m.ProjectDestinationId})
+	}
+	if m.Supply != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "supplies", Label: "supply", ID: m.Supply.ID})
+	}
+	if m.Investor != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: m.Investor.ID})
+		if m.Investor.ActorID != nil {
+			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *m.Investor.ActorID})
+		}
+	}
+	if m.Provider != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "providers", Label: "provider", ID: m.Provider.ID})
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }
 
 func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error {
@@ -633,6 +666,9 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 	db := r.getDB(ctx)
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyMovementReferencesActive(tx, movement); err != nil {
+			return err
+		}
 		var previous models.SupplyMovement
 		if err := authz.MaybeTenantScope(ctx, tx, "supply_movements").
 			Where("id = ?", movement.ID).

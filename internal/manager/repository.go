@@ -36,6 +36,9 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 	}
 	var id int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertManagerReferencesActive(tx, m); err != nil {
+			return err
+		}
 		model := models.FromDomain(m)
 		model.Base = sharedmodels.Base{
 			CreatedBy: m.CreatedBy,
@@ -177,6 +180,9 @@ func (r *Repository) UpdateManager(ctx context.Context, m *domain.Manager) error
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertManagerReferencesActive(tx, m); err != nil {
+			return err
+		}
 		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Manager{}), "managers").Where("id = ?", m.ID)
 		if !m.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", m.UpdatedAt)
@@ -271,6 +277,20 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 			return domainerr.Conflict("manager already archived")
 		}
 
+		// Block when the manager still has active assignments. Archiving
+		// would leave project_managers rows pointing at an archived manager,
+		// violating "archived = no existe". User must remove the assignments
+		// (or archive the parent project, which cascades).
+		var activeAssignments int64
+		assignmentsQuery := authz.MaybeTenantScope(ctx, tx.Table("project_managers"), "project_managers").
+			Where("manager_id = ? AND deleted_at IS NULL", id)
+		if err := assignmentsQuery.Count(&activeAssignments).Error; err != nil {
+			return domainerr.Internal("failed to check project assignments")
+		}
+		if activeAssignments > 0 {
+			return domainerr.Conflict(fmt.Sprintf("manager has %d active project assignment(s); remove them first", activeAssignments))
+		}
+
 		archivedAt := time.Now()
 		cause, err := lifecycle.RootCause(tx, m.TenantID, "managers", id, nil, deletedBy)
 		if err != nil {
@@ -296,6 +316,20 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// assertManagerReferencesActive blocks Create/Update of a manager that
+// references an archived actor. Manager.ActorID is optional (legacy rows
+// can be nil) — only validate when present.
+func assertManagerReferencesActive(tx *gorm.DB, m *domain.Manager) error {
+	if m == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{}
+	if m.ActorID != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *m.ActorID})
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }
 
 // RestoreManager restaura un manager archivado.

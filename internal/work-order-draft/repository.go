@@ -45,6 +45,9 @@ func (r *Repository) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrd
 	}
 
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertWorkOrderDraftReferencesActive(tx, d); err != nil {
+			return err
+		}
 		if err := tx.Omit("Items", "InvestorSplits").Create(&model).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to create work order draft header", err)
 		}
@@ -101,7 +104,10 @@ func (r *Repository) CreateWorkOrderDraftBatch(ctx context.Context, drafts []*do
 	}
 
 	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, model := range modelsToCreate {
+		for i, model := range modelsToCreate {
+			if err := assertWorkOrderDraftReferencesActive(tx, drafts[i]); err != nil {
+				return err
+			}
 			if err := tx.Omit("Items", "InvestorSplits").Create(model).Error; err != nil {
 				return types.NewError(types.ErrInternal, "failed to create work order draft header", err)
 			}
@@ -658,6 +664,9 @@ func (r *Repository) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.Wor
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertWorkOrderDraftReferencesActive(tx, d); err != nil {
+			return err
+		}
 		return r.applyDraftUpdateWithinTx(ctx, tx, model)
 	})
 }
@@ -996,4 +1005,40 @@ func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID 
 	}
 
 	return nil
+}
+
+// assertWorkOrderDraftReferencesActive blocks Create/Update of a draft that
+// references archived entities. Same shape as WorkOrder's check — drafts are
+// pre-publish staging rows that share the same FKs.
+func assertWorkOrderDraftReferencesActive(tx *gorm.DB, d *domain.WorkOrderDraft) error {
+	if d == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: d.ProjectID},
+		{Table: "fields", Label: "field", ID: d.FieldID},
+		{Table: "lots", Label: "lot", ID: d.LotID},
+		{Table: "crops", Label: "crop", ID: d.CropID},
+		{Table: "labors", Label: "labor", ID: d.LaborID},
+	}
+	if d.CustomerID > 0 {
+		refs = append(refs, lifecycle.ActiveRef{Table: "customers", Label: "customer", ID: d.CustomerID})
+	}
+	if d.CampaignID != nil && *d.CampaignID > 0 {
+		refs = append(refs, lifecycle.ActiveRef{Table: "campaigns", Label: "campaign", ID: *d.CampaignID})
+	}
+	if d.InvestorID > 0 {
+		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: d.InvestorID})
+	}
+	for _, s := range d.InvestorSplits {
+		if s.InvestorID > 0 {
+			refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: s.InvestorID})
+		}
+	}
+	for _, it := range d.Items {
+		if it.SupplyID > 0 {
+			refs = append(refs, lifecycle.ActiveRef{Table: "supplies", Label: "supply", ID: it.SupplyID})
+		}
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

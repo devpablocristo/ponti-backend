@@ -50,8 +50,16 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 	} else if ok {
 		model.TenantID = tenantID
 	}
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, domainerr.Internal("failed to create labor")
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertLaborReferencesActive(tx, labor); err != nil {
+			return err
+		}
+		if err := tx.Create(model).Error; err != nil {
+			return domainerr.Internal("failed to create labor")
+		}
+		return nil
+	}); err != nil {
+		return 0, err
 	}
 	return model.ID, nil
 }
@@ -276,19 +284,24 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 		"updated_by":       labor.UpdatedBy,
 	}
 
-	result := r.db.Client().WithContext(ctx).
-		Model(&models.Labor{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
-		Where("id = ?", labor.ID).
-		Updates(updates)
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertLaborReferencesActive(tx, labor); err != nil {
+			return err
+		}
+		result := tx.
+			Model(&models.Labor{}).
+			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "labors") }).
+			Where("id = ?", labor.ID).
+			Updates(updates)
 
-	if result.Error != nil {
-		return domainerr.Internal("failed to update labor")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", labor.ID))
-	}
-	return nil
+		if result.Error != nil {
+			return domainerr.Internal("failed to update labor")
+		}
+		if result.RowsAffected == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("labor with id %d does not exist", labor.ID))
+		}
+		return nil
+	})
 }
 
 func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
@@ -889,4 +902,18 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		}
 	}
 	return list, nil
+}
+
+// assertLaborReferencesActive blocks Create/Update of a labor that references
+// an archived project or category. Both are required references — a labor
+// without a project belongs nowhere in the operational domain.
+func assertLaborReferencesActive(tx *gorm.DB, l *domain.Labor) error {
+	if l == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: l.ProjectId},
+		{Table: "categories", Label: "category", ID: l.CategoryId},
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

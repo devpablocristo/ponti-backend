@@ -36,6 +36,9 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 	}
 	var id int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertInvestorReferencesActive(tx, inv); err != nil {
+			return err
+		}
 		model := models.FromDomain(inv)
 		model.Base = sharedmodels.Base{
 			CreatedBy: inv.CreatedBy,
@@ -139,6 +142,9 @@ func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertInvestorReferencesActive(tx, inv); err != nil {
+			return err
+		}
 		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Investor{}), "investors").Where("id = ?", inv.ID)
 		if !inv.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", inv.UpdatedAt)
@@ -228,6 +234,38 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 		}
 		if inv.DeletedAt.Valid {
 			return domainerr.Conflict("investor already archived")
+		}
+
+		// Block when the investor still has active assignments across the
+		// pivot tables. Archive would leave any of them pointing at an
+		// archived row, breaking the invariant. The user must remove (or
+		// archive via cascade) the assignments first.
+		type pivot struct {
+			table  string
+			column string
+		}
+		pivots := []pivot{
+			{"project_investors", "investor_id"},
+			{"field_investors", "investor_id"},
+			{"workorder_investor_splits", "investor_id"},
+			{"work_order_draft_investor_splits", "investor_id"},
+			{"admin_cost_investors", "investor_id"},
+		}
+		var totalActive int64
+		for _, p := range pivots {
+			if !tx.Migrator().HasTable(p.table) {
+				continue
+			}
+			var n int64
+			q := authz.MaybeTenantScope(ctx, tx.Table(p.table), p.table).
+				Where(p.column+" = ? AND deleted_at IS NULL", id)
+			if err := q.Count(&n).Error; err != nil {
+				return domainerr.Internal(fmt.Sprintf("failed to check %s assignments", p.table))
+			}
+			totalActive += n
+		}
+		if totalActive > 0 {
+			return domainerr.Conflict(fmt.Sprintf("investor has %d active assignment(s); remove them first", totalActive))
 		}
 
 		archivedAt := time.Now()
@@ -350,4 +388,18 @@ func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// assertInvestorReferencesActive blocks Create/Update of an investor that
+// references an archived actor. Investor.ActorID is optional (legacy rows
+// can be nil) — only validate when present.
+func assertInvestorReferencesActive(tx *gorm.DB, inv *domain.Investor) error {
+	if inv == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{}
+	if inv.ActorID != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *inv.ActorID})
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

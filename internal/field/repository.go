@@ -33,6 +33,9 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertFieldReferencesActive(tx, f); err != nil {
+			return err
+		}
 		model := models.FromDomain(f)
 		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
 		if err != nil {
@@ -143,25 +146,30 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	if err := sharedrepo.ValidateID(f.ID, "field"); err != nil {
 		return err
 	}
-	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Field{}), "fields").
-		Where("id = ?", f.ID)
-	if !f.UpdatedAt.IsZero() {
-		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
-	}
-	result := updateTx.Updates(map[string]any{
-		"name":          f.Name,
-		"lease_type_id": f.LeaseType.ID,
-	})
-	if result.Error != nil {
-		return domainerr.Internal("failed to update field")
-	}
-	if result.RowsAffected == 0 {
-		if !f.UpdatedAt.IsZero() {
-			return domainerr.Conflict("field not found or outdated")
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertFieldReferencesActive(tx, f); err != nil {
+			return err
 		}
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", f.ID))
-	}
-	return nil
+		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Field{}), "fields").
+			Where("id = ?", f.ID)
+		if !f.UpdatedAt.IsZero() {
+			updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
+		}
+		result := updateTx.Updates(map[string]any{
+			"name":          f.Name,
+			"lease_type_id": f.LeaseType.ID,
+		})
+		if result.Error != nil {
+			return domainerr.Internal("failed to update field")
+		}
+		if result.RowsAffected == 0 {
+			if !f.UpdatedAt.IsZero() {
+				return domainerr.Conflict("field not found or outdated")
+			}
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", f.ID))
+		}
+		return nil
+	})
 }
 
 // HardDeleteField elimina definitivamente un campo.
@@ -291,4 +299,27 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// assertFieldReferencesActive blocks Create/Update of a field that references
+// archived parents. ProjectID is the required parent (a field cannot exist
+// without a project). Nested Lots may reference Crops; those are validated as
+// part of the same transaction so a field+lots create is atomic.
+func assertFieldReferencesActive(tx *gorm.DB, f *domain.Field) error {
+	if f == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: f.ProjectID},
+	}
+	if f.LeaseType != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "lease_types", Label: "lease type", ID: f.LeaseType.ID})
+	}
+	for _, lot := range f.Lots {
+		refs = append(refs,
+			lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.CurrentCrop.ID},
+			lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.PreviousCrop.ID},
+		)
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

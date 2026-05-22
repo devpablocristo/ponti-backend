@@ -17,6 +17,17 @@ import (
 // Reusa los helpers de platform/observability/go para mantener consistencia
 // con el resto del ecosistema.
 func Observability(logger *slog.Logger) gin.HandlerFunc {
+	return observabilityHandler(logger, nil)
+}
+
+// ObservabilityWithMetrics extiende Observability registrando RED metrics
+// Prometheus (counter, errors, duration histogram) por request usando el
+// helper Metrics de platform/observability/go.
+func ObservabilityWithMetrics(logger *slog.Logger, metrics *observability.Metrics) gin.HandlerFunc {
+	return observabilityHandler(logger, metrics)
+}
+
+func observabilityHandler(logger *slog.Logger, metrics *observability.Metrics) gin.HandlerFunc {
 	if logger == nil {
 		logger = observability.NewJSONLogger("unknown")
 	}
@@ -37,15 +48,31 @@ func Observability(logger *slog.Logger) gin.HandlerFunc {
 		c.Next()
 		duration := time.Since(start)
 
+		status := c.Writer.Status()
+		route := c.FullPath()
+
 		requestLogger.Info("http request completed",
 			"event", "http_request_completed",
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
-			"route", c.FullPath(),
-			"status", c.Writer.Status(),
+			"route", route,
+			"status", status,
 			"duration_ms", duration.Milliseconds(),
 			"remote_addr", c.ClientIP(),
 		)
+
+		if metrics != nil {
+			// platform/observability/go.routeLabel lee r.Pattern (formato
+			// "METHOD route") para etiquetar las métricas. Gin no lo setea,
+			// así que lo poblamos con FullPath para evitar que toda la
+			// cardinalidad caiga en "unmatched". FullPath queda vacío para
+			// rutas no matcheadas (404), en cuyo caso routeLabel devuelve
+			// "unmatched" intencionalmente.
+			if route != "" {
+				c.Request.Pattern = c.Request.Method + " " + route
+			}
+			metrics.ObserveHTTPRequest(c.Request, status, duration)
+		}
 	}
 }
 

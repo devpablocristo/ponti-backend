@@ -43,6 +43,9 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	var lotID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertLotReferencesActive(tx, l); err != nil {
+			return err
+		}
 		var existing models.Lot
 		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
 		if err != nil {
@@ -114,6 +117,9 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	model := models.FromDomain(l)
 	model.ID = l.ID
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertLotReferencesActive(tx, l); err != nil {
+			return err
+		}
 		// Unicidad de nombre dentro del field (si aplica renombrado)
 		lotDB := authz.MaybeTenantScope(ctx, tx, "lots")
 		if err := lotDB.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
@@ -360,6 +366,10 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 		if !l.DeletedAt.Valid {
 			return domainerr.Conflict("lot is not archived")
 		}
+		// Invariante jerárquico: el field padre del lot debe estar activo. Si el
+		// field está archivado, exigir restauración explícita en orden (project
+		// → field → lot) en lugar de reactivar el field sin que el usuario lo
+		// pida — eso puede revivir sus otros lots/cascadas en estado dudoso.
 		var fieldRow struct {
 			ProjectID int64      `gorm:"column:project_id"`
 			DeletedAt *time.Time `gorm:"column:deleted_at"`
@@ -371,20 +381,10 @@ func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check field")
 		}
 		if fieldRow.DeletedAt != nil {
-			var projectActive int64
-			if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
-				Where("id = ? AND deleted_at IS NULL", fieldRow.ProjectID).
-				Count(&projectActive).Error; err != nil {
-				return domainerr.Internal("failed to check project")
-			}
-			if projectActive == 0 {
+			if err := lifecycle.RequireActive(tx, "projects", "project", fieldRow.ProjectID); err != nil {
 				return domainerr.Conflict("cannot restore lot while project is archived; restore the project first")
 			}
-			if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
-				Where("id = ?", l.FieldID).
-				Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
-				return domainerr.Internal("failed to restore parent field")
-			}
+			return domainerr.Conflict("cannot restore lot while field is archived; restore the field first")
 		}
 		rowState, err := lifecycle.ReadRowState(tx, "lots", id)
 		if err != nil {
@@ -801,4 +801,20 @@ func mapLotsToDomain(lots []models.Lot) []domain.Lot {
 
 func actorFromContext(ctx context.Context) (string, error) {
 	return sharedmodels.ActorFromContext(ctx)
+}
+
+// assertLotReferencesActive blocks Create/Update of a lot that references
+// archived parents. FieldID is the required parent; PreviousCrop and
+// CurrentCrop are optional during updates (only present when the caller
+// chose to rotate the crop). IDs <= 0 are no-ops.
+func assertLotReferencesActive(tx *gorm.DB, l *domain.Lot) error {
+	if l == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "fields", Label: "field", ID: l.FieldID},
+		{Table: "crops", Label: "crop", ID: l.PreviousCrop.ID},
+		{Table: "crops", Label: "crop", ID: l.CurrentCrop.ID},
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }

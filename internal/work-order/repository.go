@@ -481,27 +481,19 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		if !wo.DeletedAt.Valid {
 			return domainerr.Conflict("work order is not archived")
 		}
-		// Cascade-up: si field/lot padres están archivados, restaurar solo sus rows
-		// (sin cascade-down a otros hijos). Si project está archivado, exigir que
-		// el usuario lo restaure manualmente.
-		var projectActive int64
-		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
-			Where("id = ? AND deleted_at IS NULL", wo.ProjectID).
-			Count(&projectActive).Error; err != nil {
-			return domainerr.Internal("failed to check project")
-		}
-		if projectActive == 0 {
+		// Invariante jerárquico: project, field y lot deben estar activos antes de
+		// poder restaurar una work order. No restauramos parents automáticamente
+		// porque restaurar un field/lot huérfano sin que el usuario lo pida puede
+		// revivir state inconsistente (los hermanos del field/lot pueden tener
+		// otra Cause). Mensaje exige restauración explícita y ordenada.
+		if err := lifecycle.RequireActive(tx, "projects", "project", wo.ProjectID); err != nil {
 			return domainerr.Conflict("cannot restore work order while project is archived; restore the project first")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("fields"), "fields").
-			Where("id = ? AND deleted_at IS NOT NULL", wo.FieldID).
-			Updates(lifecycle.RestoreUpdates(tx, "fields", restoredAt)).Error; err != nil {
-			return domainerr.Internal("failed to restore parent field")
+		if err := lifecycle.RequireActive(tx, "fields", "field", wo.FieldID); err != nil {
+			return domainerr.Conflict("cannot restore work order while field is archived; restore the field first")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("lots"), "lots").
-			Where("id = ? AND deleted_at IS NOT NULL", wo.LotID).
-			Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
-			return domainerr.Internal("failed to restore parent lot")
+		if err := lifecycle.RequireActive(tx, "lots", "lot", wo.LotID); err != nil {
+			return domainerr.Conflict("cannot restore work order while lot is archived; restore the lot first")
 		}
 		rowState, err := lifecycle.ReadRowState(tx, "workorders", id)
 		if err != nil {

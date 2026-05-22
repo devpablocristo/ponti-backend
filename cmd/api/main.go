@@ -16,6 +16,8 @@ func main() {
 	logger := observability.NewJSONLogger("ponti-backend")
 	slog.SetDefault(logger)
 
+	metrics := observability.NewMetrics(observability.DefaultMetricsConfig("ponti_backend"))
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -34,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := runHTTPServer(ctx, logger, deps); err != nil {
+	if err := runHTTPServer(ctx, logger, metrics, deps); err != nil {
 		logger.Error("running HTTP server failed", "error", err.Error())
 		os.Exit(1)
 	}

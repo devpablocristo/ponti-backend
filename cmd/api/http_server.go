@@ -13,6 +13,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/platform/observability/go"
+
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 	pkgmwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
@@ -21,13 +23,17 @@ import (
 )
 
 // runHTTPServer registra rutas en Gin y levanta el servidor HTTP.
-func runHTTPServer(ctx context.Context, logger *slog.Logger, deps *wire.Dependencies) error {
+func runHTTPServer(ctx context.Context, logger *slog.Logger, metrics *observability.Metrics, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
 
-	// Observability primero: request-ID + logger en ctx + access log.
-	deps.GinEngine.GetRouter().Use(pkgmwr.Observability(logger))
+	// Observability primero: request-ID + logger en ctx + access log + RED metrics Prometheus.
+	deps.GinEngine.GetRouter().Use(pkgmwr.ObservabilityWithMetrics(logger, metrics))
+
+	// Endpoint Prometheus en path dedicado (no /api/v1/.../metrics que está reservado
+	// para métricas de negocio en lot/work-order/labor handlers).
+	deps.GinEngine.GetRouter().GET("/observability/metrics", gin.WrapH(metrics.Handler()))
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)

@@ -37,6 +37,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 	}
 	var id int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertCustomerReferencesActive(tx, c); err != nil {
+			return err
+		}
 		result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
 			ActorID:   c.ActorID,
 			Name:      c.Name,
@@ -189,6 +192,9 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertCustomerReferencesActive(tx, c); err != nil {
+			return err
+		}
 		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Customer{}), "customers").Where("id = ?", c.ID)
 		if !c.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
@@ -251,6 +257,8 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return domainerr.Conflict("customer already archived")
 		}
 
+		// Capture active project IDs before cascade so we can refresh actor
+		// mirrors per project after the archive.
 		var activeProjectIDs []int64
 		activeProjectsQuery := tx.Table("projects").
 			Where("customer_id = ? AND deleted_at IS NULL", id)
@@ -267,7 +275,15 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return err
 		}
 		cause := lifecycle.CauseFromBatch(batch)
-		if err := archiveCustomerProjects(tx, activeProjectIDs, customer.TenantID, archivedAt, deletedBy, cause); err != nil {
+
+		// Centralized cascade: walks the Policies graph
+		// (customers→projects→{fields→lots, workorders, drafts, labors,
+		// supplies, supply_movements, stocks} + all CascadeTables like
+		// project_managers/investors/admin_cost_investors/field_investors/
+		// lot_dates/workorder_items/etc.) with this Cause. Replaces the
+		// hardcoded `archiveCustomerProjects` + `archiveCustomerProjectChildren`
+		// + `customerProjectScopedArchiveTables` triplet.
+		if err := lifecycle.RunCascadeArchive(tx, "customers", id, customer.TenantID, archivedAt, deletedBy, cause); err != nil {
 			return err
 		}
 
@@ -289,10 +305,19 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 		}); err != nil {
 			return err
 		}
+		for _, projectID := range activeProjectIDs {
+			if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }
 
+// customerProjectScopedArchiveTables is the list of pivots / project-scoped
+// tables consumed by the legacy `restoreCustomerProjectGraph` (the archive
+// side now goes through `lifecycle.RunCascadeArchive` via the Policies map).
+// Restore migration to `RunCascadeRestore` is a follow-up — see plan §10C.
 var customerProjectScopedArchiveTables = []string{
 	"project_managers",
 	"project_investors",
@@ -307,75 +332,9 @@ var customerProjectScopedArchiveTables = []string{
 	"admin_cost_investors",
 }
 
-func archiveCustomerProjects(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
-	if len(projectIDs) == 0 {
-		return nil
-	}
-
-	for _, table := range customerProjectScopedArchiveTables {
-		if err := archiveProjectScopedCustomerTable(tx, table, projectIDs, tenantID, archivedAt, deletedBy, cause); err != nil {
-			return err
-		}
-	}
-
-	fieldIDs, err := lifecycle.ListScopedIDs(tx, "fields", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
-	if err != nil {
-		return domainerr.Internal("failed to list project fields")
-	}
-	var lotIDs []int64
-	if len(fieldIDs) > 0 {
-		lotIDs, err = lifecycle.ListScopedIDs(tx, "lots", "id", tenantID, "field_id IN ? AND deleted_at IS NULL", fieldIDs)
-		if err != nil {
-			return err
-		}
-	}
-	workOrderIDs, err := lifecycle.ListScopedIDs(tx, "workorders", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
-	if err != nil {
-		return err
-	}
-	draftIDs, err := lifecycle.ListScopedIDs(tx, "work_order_drafts", "id", tenantID, "project_id IN ? AND deleted_at IS NULL", projectIDs)
-	if err != nil {
-		return err
-	}
-	if err := archiveCustomerProjectChildren(tx, tenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, archivedAt, deletedBy, cause); err != nil {
-		return err
-	}
-
-	if tx.Migrator().HasTable("fields") {
-		if len(fieldIDs) > 0 {
-			if tx.Migrator().HasTable("lots") {
-				if err := lifecycle.ArchiveScopedRows(tx, "lots", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
-					return domainerr.Internal("failed to archive project lots")
-				}
-			}
-
-			fieldUpdate := tx.Table("fields").Where("id IN ? AND deleted_at IS NULL", fieldIDs)
-			if tenantID != uuid.Nil && tx.Migrator().HasColumn("fields", "tenant_id") {
-				fieldUpdate = fieldUpdate.Where("tenant_id = ?", tenantID)
-			}
-			if err := fieldUpdate.Updates(lifecycle.ArchiveUpdates(tx, "fields", archivedAt, deletedBy, cause)).Error; err != nil {
-				return domainerr.Internal("failed to archive project fields")
-			}
-		}
-	}
-
-	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NULL", projectIDs)
-	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
-		projectUpdate = projectUpdate.Where("tenant_id = ?", tenantID)
-	}
-	if err := projectUpdate.Updates(lifecycle.ArchiveUpdates(tx, "projects", archivedAt, deletedBy, cause)).Error; err != nil {
-		return domainerr.Internal("failed to archive customer projects")
-	}
-
-	for _, projectID := range projectIDs {
-		if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
+// archiveCustomerProjectChildren — UNUSED after migration to RunCascadeArchive.
+// Kept only as the inner helper of the legacy restoreCustomerProjectGraph;
+// restore migration to RunCascadeRestore is a follow-up (see plan §10C).
 func archiveCustomerProjectChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
 	if len(fieldIDs) > 0 {
 		if err := lifecycle.ArchiveScopedRows(tx, "field_investors", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
@@ -529,12 +488,19 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 }
 
 func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
-	for _, table := range customerProjectScopedArchiveTables {
-		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
-			return err
-		}
-	}
-
+	// Pluck child IDs FIRST (filtering on `deleted_at IS NOT NULL` + Cause)
+	// so the restore of the project-scoped tables below doesn't wipe out the
+	// rows we need to find. Restore order:
+	//   1. List ids of fields/lots/workorders/drafts archived with this Cause.
+	//   2. Restore the project-scoped tables (workorders, drafts, labors,
+	//      supplies, etc.) en bulk by project_id.
+	//   3. Restore the items/splits using the captured IDs.
+	//   4. Restore fields/lots explicitly (they live outside project_id scope).
+	//
+	// Previously step 2 ran first, which left the captured-ID lookup with
+	// nothing to pluck (the rows it queried had just been moved to deleted_at
+	// IS NULL). That hid `workorder_items` from cascade restore — bug
+	// surfaced when `RunCascadeArchive` started archiving them properly.
 	fieldIDs, err := restoreCustomerProjectChildIDs(tx, "fields", "id", tenantID, cause, "project_id IN ?", projectIDs)
 	if err != nil {
 		return err
@@ -553,6 +519,12 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 	draftIDs, err := restoreCustomerProjectChildIDs(tx, "work_order_drafts", "id", tenantID, cause, "project_id IN ?", projectIDs)
 	if err != nil {
 		return err
+	}
+
+	for _, table := range customerProjectScopedArchiveTables {
+		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
+			return err
+		}
 	}
 
 	if len(fieldIDs) > 0 {
@@ -662,5 +634,22 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// assertCustomerReferencesActive blocks Create/Update of a customer that
+// references archived entities. The customer schema accepts archived actor
+// rows at the DB level (no `WHERE deleted_at IS NULL` on the FK), so we
+// enforce the invariant in the application layer inside the caller's
+// transaction. Returns a Conflict domainerr with the English label "actor is
+// archived" that `translateBackendError` maps to a Spanish toast on the FE.
+func assertCustomerReferencesActive(tx *gorm.DB, c *domain.Customer) error {
+	if c == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{}
+	if c.ActorID != nil {
+		refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *c.ActorID})
+	}
+	return lifecycle.RequireAllActive(tx, refs)
 }
 

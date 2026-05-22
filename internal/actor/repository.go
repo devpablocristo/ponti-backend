@@ -104,7 +104,7 @@ func (r *Repository) ListActors(ctx context.Context, filters domain.ListFilters,
 		if _, ok := domain.ValidRoles[filters.Role]; !ok {
 			return nil, 0, domainerr.Validation("invalid actor role")
 		}
-		query = query.Where("EXISTS (SELECT 1 FROM actor_roles ar WHERE ar.actor_id = actors.id AND ar.role = ? AND ar.archived_at IS NULL)", filters.Role)
+		query = query.Where("EXISTS (SELECT 1 FROM actor_roles ar WHERE ar.actor_id = actors.id AND ar.role = ? AND ar.deleted_at IS NULL)", filters.Role)
 	}
 	if strings.TrimSpace(filters.Query) != "" {
 		q := normalizeName(filters.Query)
@@ -114,7 +114,7 @@ func (r *Repository) ListActors(ctx context.Context, filters domain.ListFilters,
 			OR EXISTS (
 				SELECT 1 FROM actor_aliases aa
 				WHERE aa.actor_id = actors.id
-				  AND aa.archived_at IS NULL
+				  AND aa.deleted_at IS NULL
 				  AND aa.normalized_alias LIKE ?
 			)
 			OR EXISTS (
@@ -239,14 +239,24 @@ func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 		now := time.Now()
 		parsedTenantID, _ := uuid.Parse(tenantID)
 		deletedBy := &actorName
+
+		// G6: actors are referenced by many entities via `actor_id` (or
+		// `customer_actor_id`, `investor_actor_id`, etc.). Allowing the
+		// archive to succeed while active references exist would leave those
+		// references pointing at an archived row — violating "archived = no
+		// existe". Block the archive and tell the caller exactly how many
+		// references must be reassigned/archived first.
+		if count, err := countActiveActorReferences(tx, id); err != nil {
+			return err
+		} else if count > 0 {
+			return domainerr.Conflict(fmt.Sprintf("actor has %d active references; archive or reassign them first", count))
+		}
+
 		cause, err := lifecycle.RootCause(tx, parsedTenantID, "actors", id, nil, deletedBy)
 		if err != nil {
 			return err
 		}
 		updates := lifecycle.ArchiveUpdates(tx, "actors", now, deletedBy, cause)
-		if tx.Migrator().HasColumn("actors", "archived_at") {
-			updates["archived_at"] = now
-		}
 		updates["updated_by"] = actorName
 
 		res := tx.Model(&models.Actor{}).
@@ -258,8 +268,55 @@ func (r *Repository) ArchiveActor(ctx context.Context, id int64) error {
 		if res.RowsAffected == 0 {
 			return domainerr.Conflict("actor not found or already archived")
 		}
+
+		// G5: keep legacy_actor_map consistent with the actor lifecycle. If
+		// we leave the map pointing at an archived actor, downstream lookups
+		// (`ActorIDForLegacy`) will resolve a row that no longer exists in
+		// the operational domain.
+		if err := lifecycle.ArchiveScopedRows(tx, "legacy_actor_map", parsedTenantID, now, deletedBy, cause, "actor_id = ?", id); err != nil {
+			return err
+		}
 		return nil
 	})
+}
+
+// countActiveActorReferences counts non-archived rows that reference an actor
+// across the entities that link to it. Used by ArchiveActor to enforce the
+// BlockIfActiveChildren policy (see `lifecycle.policy.go`).
+func countActiveActorReferences(tx *gorm.DB, actorID int64) (int64, error) {
+	type ref struct {
+		table  string
+		column string
+	}
+	// Tables and columns that hold an actor FK across the schema. Each one
+	// gets a COUNT(*) WHERE column = actorID AND deleted_at IS NULL.
+	refs := []ref{
+		{"customers", "actor_id"},
+		{"managers", "actor_id"},
+		{"investors", "actor_id"},
+		{"providers", "actor_id"},
+		{"projects", "customer_actor_id"},
+		{"workorders", "investor_actor_id"},
+		{"workorders", "contractor_actor_id"},
+		{"workorder_investor_splits", "actor_id"},
+		{"stocks", "investor_actor_id"},
+		{"supply_movements", "investor_actor_id"},
+		{"supply_movements", "provider_actor_id"},
+	}
+	var total int64
+	for _, r := range refs {
+		if !tx.Migrator().HasTable(r.table) || !tx.Migrator().HasColumn(r.table, r.column) {
+			continue
+		}
+		var n int64
+		if err := tx.Table(r.table).
+			Where(r.column+" = ? AND deleted_at IS NULL", actorID).
+			Count(&n).Error; err != nil {
+			return 0, domainerr.Internal(fmt.Sprintf("failed to count %s references", r.table))
+		}
+		total += n
+	}
+	return total, nil
 }
 
 func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
@@ -278,9 +335,6 @@ func (r *Repository) RestoreActor(ctx context.Context, id int64) error {
 		}
 		cause := lifecycle.CauseFromRow(rowState, "actors", id)
 		updates := lifecycle.RestoreUpdates(tx, "actors", now)
-		if tx.Migrator().HasColumn("actors", "archived_at") {
-			updates["archived_at"] = nil
-		}
 
 		query := tx.Unscoped().
 			Model(&models.Actor{}).
@@ -460,7 +514,7 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 		WITH actor_roles_agg AS (
 			SELECT actor_id, string_agg(DISTINCT role, ',' ORDER BY role) AS roles
 			FROM actor_roles
-			WHERE archived_at IS NULL
+			WHERE deleted_at IS NULL
 			GROUP BY actor_id
 		),
 		active_actors AS (
@@ -489,7 +543,7 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 		alias_groups AS (
 			SELECT normalized_alias AS group_key
 			FROM actor_aliases
-			WHERE archived_at IS NULL
+			WHERE deleted_at IS NULL
 			  AND tenant_id = ?
 			  AND normalized_alias <> ''
 			GROUP BY normalized_alias
@@ -528,7 +582,7 @@ func (r *Repository) ListDuplicateCandidates(ctx context.Context) ([]domain.Dupl
 		UNION ALL
 		SELECT 'alias', ag.group_key, a.id, a.display_name, a.actor_kind, a.roles
 		FROM alias_groups ag
-		JOIN actor_aliases aa ON aa.normalized_alias = ag.group_key AND aa.archived_at IS NULL
+		JOIN actor_aliases aa ON aa.normalized_alias = ag.group_key AND aa.deleted_at IS NULL
 		JOIN active_actors a ON a.id = aa.actor_id
 		UNION ALL
 		SELECT 'razon_social', lg.group_key, a.id, a.display_name, a.actor_kind, a.roles
@@ -780,9 +834,11 @@ func (r *Repository) hydrateActors(ctx context.Context, actors []domain.Actor) e
 }
 
 func (r *Repository) hydrateActor(ctx context.Context, actor *domain.Actor) error {
+	// Roles/aliases lifecycle now lives on `deleted_at` (migration 000231).
+	// GORM auto-applies the soft-delete scope, so no explicit WHERE is needed.
 	var roles []models.ActorRole
 	if err := r.db.Client().WithContext(ctx).
-		Where("actor_id = ? AND archived_at IS NULL", actor.ID).
+		Where("actor_id = ?", actor.ID).
 		Order("role ASC").
 		Find(&roles).Error; err != nil {
 		return domainerr.Internal("failed to load actor roles")
@@ -794,13 +850,18 @@ func (r *Repository) hydrateActor(ctx context.Context, actor *domain.Actor) erro
 
 	var aliases []models.ActorAlias
 	if err := r.db.Client().WithContext(ctx).
-		Where("actor_id = ? AND archived_at IS NULL", actor.ID).
+		Where("actor_id = ?", actor.ID).
 		Order("alias ASC").
 		Find(&aliases).Error; err != nil {
 		return domainerr.Internal("failed to load actor aliases")
 	}
 	actor.Aliases = make([]domain.ActorAlias, 0, len(aliases))
 	for _, alias := range aliases {
+		var archivedAt *time.Time
+		if alias.DeletedAt.Valid {
+			t := alias.DeletedAt.Time
+			archivedAt = &t
+		}
 		actor.Aliases = append(actor.Aliases, domain.ActorAlias{
 			ID:              alias.ID,
 			TenantID:        alias.TenantID,
@@ -808,7 +869,7 @@ func (r *Repository) hydrateActor(ctx context.Context, actor *domain.Actor) erro
 			Alias:           alias.Alias,
 			NormalizedAlias: alias.NormalizedAlias,
 			Source:          alias.Source,
-			ArchivedAt:      alias.ArchivedAt,
+			ArchivedAt:      archivedAt,
 			CreatedAt:       alias.CreatedAt,
 		})
 	}
@@ -928,8 +989,8 @@ func (r *Repository) applyMerge(ctx context.Context, tx *gorm.DB, req domain.Mer
 	for _, sourceID := range req.SourceActorIDs {
 		if err := tx.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).
 			Exec(`
-				INSERT INTO actor_roles (actor_id, role, created_at, archived_at)
-				SELECT ?, role, now(), archived_at
+				INSERT INTO actor_roles (actor_id, role, created_at, deleted_at)
+				SELECT ?, role, now(), deleted_at
 				FROM actor_roles
 				WHERE actor_id = ?
 			`, req.TargetActorID, sourceID).Error; err != nil {
@@ -943,7 +1004,7 @@ func (r *Repository) applyMerge(ctx context.Context, tx *gorm.DB, req domain.Mer
 				SELECT 1 FROM actor_aliases target
 				WHERE target.actor_id = ?
 				  AND target.normalized_alias = actor_aliases.normalized_alias
-				  AND target.archived_at IS NULL
+				  AND target.deleted_at IS NULL
 			  )
 		`, req.TargetActorID, sourceID, req.TargetActorID).Error; err != nil {
 			return domainerr.Internal("failed to merge actor aliases")
@@ -1013,7 +1074,7 @@ func (r *Repository) applyMerge(ctx context.Context, tx *gorm.DB, req domain.Mer
 			Where("id = ?", sourceID).
 			Updates(map[string]any{
 				"merged_into_actor_id": req.TargetActorID,
-				"archived_at":          now,
+				"deleted_at":           now,
 				"updated_at":           now,
 			}).Error; err != nil {
 			return domainerr.Internal("failed to mark source actor as merged")

@@ -332,12 +332,17 @@ func TestUpdateProjectSwapsManagerByActorID(t *testing.T) {
 		INSERT INTO legacy_actor_map (tenant_id, source_table, source_id, source_key, source_text, actor_id, confidence, mapping_status) VALUES
 			(?, 'managers', 700, '700', 'OLD MGR', 9001, 1.0, 'auto_matched'),
 			(?, 'managers', 701, '701', 'NEW MGR', 9002, 1.0, 'auto_matched');
+		INSERT INTO actors (id, tenant_id, deleted_at) VALUES
+			(9001, ?, NULL),
+			(9002, ?, NULL);
 	`,
 		tenantID.String(),
 		tenantID.String(),
 		tenantID.String(), now, now,
 		tenantID.String(), now, now,
 		tenantID.String(), now, now,
+		tenantID.String(),
+		tenantID.String(),
 		tenantID.String(),
 		tenantID.String(),
 		tenantID.String(),
