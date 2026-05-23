@@ -4,14 +4,14 @@ go 1.26.3
 
 require (
 	firebase.google.com/go/v4 v4.19.0
-	github.com/devpablocristo/platform/authn/go v0.1.0
+	github.com/devpablocristo/platform/authn/go v0.2.0
 	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
-	github.com/devpablocristo/platform/errors/go v0.1.0
+	github.com/devpablocristo/platform/errors/go v0.2.0
 	github.com/devpablocristo/platform/http/gin/go v0.2.3
 	github.com/devpablocristo/platform/http/go v0.1.0
 	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
 	github.com/devpablocristo/platform/notifications/go v0.1.1
-	github.com/devpablocristo/platform/security/go v0.1.0
+	github.com/devpablocristo/platform/security/go v0.2.1
 	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
@@ -30,10 +30,11 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
-require github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+require github.com/golang-jwt/jwt/v5 v5.3.1
 
 require (
 	github.com/devpablocristo/platform/observability/go v0.2.1
+	github.com/devpablocristo/platform/persistence/gorm/go v0.1.0
 	github.com/prometheus/client_golang v1.23.2
 )
 

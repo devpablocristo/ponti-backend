@@ -2,14 +2,15 @@ package authz
 
 import (
 	"context"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	platformtenancy "github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	"github.com/devpablocristo/platform/security/go/contextkeys"
+	platformtenant "github.com/devpablocristo/platform/security/go/tenant"
 )
 
 const (
@@ -139,33 +140,41 @@ func TenantScope(ctx context.Context, db *gorm.DB, columnOrAlias string) (*gorm.
 	return db.Where(clause, args...), nil
 }
 
+// MaybeTenantScope delega en platform/persistence/gorm/go/tenancy.Scope.
+// Antes era una implementación local que aplicaba `tenant_id = ?` con
+// strict-mode aware fail-closed; ahora la lógica vive en platform y este
+// helper se mantiene como bridge para no romper los 35+ callers existentes.
+// Fase 7 del plan de unificación borra este forwarder.
 func MaybeTenantScope(ctx context.Context, db *gorm.DB, columnOrAlias string) *gorm.DB {
-	if db == nil {
-		return db
-	}
-	tenantID, ok := TenantFromContext(ctx)
-	if !ok {
-		if TenantStrictModeEnabled() {
-			err := domainerr.Forbidden("tenant context required")
-			if db.Config == nil {
-				db.Error = err
-			} else {
-				_ = db.AddError(err)
-			}
-		}
-		return db
-	}
-	column := normalizeTenantColumn(columnOrAlias)
-	return db.Where(column+" = ?", tenantID)
+	return platformtenancy.Scope(propagateTenant(ctx), db, columnOrAlias)
 }
 
+// TenantStrictModeEnabled delega en platform/security/go/tenant para que
+// runtime y este helper compartan la misma fuente de verdad. Mantener el
+// nombre legacy facilita la migración progresiva de callers.
 func TenantStrictModeEnabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("TENANT_STRICT_MODE"))) {
-	case "1", "t", "true", "yes", "y", "on":
-		return true
-	default:
-		return false
+	return platformtenant.StrictModeEnabled()
+}
+
+// propagateTenant garantiza que el contexto que llega a platform tenancy
+// tenga la key canónica seteada como string (platform/security/go/tenant
+// coerce uuid.UUID también, así que técnicamente no es necesario, pero
+// dejarlo explícito evita sorpresas si el caller maneja un wrapper de ctx).
+func propagateTenant(ctx context.Context) context.Context {
+	if ctx == nil {
+		return ctx
 	}
+	if _, ok := platformtenant.FromContext(ctx); ok {
+		return ctx
+	}
+	// Fallback: ponti escribe uuid.UUID directo en la key OrgID; si el ctx
+	// ya viene así, FromContext lo coerce. Este path solo aplica cuando hay
+	// keys legacy custom.
+	tenantID, ok := TenantFromContext(ctx)
+	if !ok {
+		return ctx
+	}
+	return platformtenant.WithID(ctx, platformtenant.FromUUID(tenantID))
 }
 
 func normalizeTenantColumn(columnOrAlias string) string {
