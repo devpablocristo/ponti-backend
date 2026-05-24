@@ -4,20 +4,19 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	aiusecases "github.com/devpablocristo/ponti-backend/internal/ai/usecases"
+	"github.com/devpablocristo/ponti-backend/internal/axis"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 	"github.com/google/wire"
 )
 
-// ProvideAIClient crea el cliente hacia Ponti AI (`InsightService` + `CopilotAgent`).
-func ProvideAIClient(cfg *config.AI) *ai.Client {
-	return ai.NewClient(cfg.ServiceURL, cfg.ServiceKey, cfg.TimeoutMS)
-}
-
-// ProvideAIUseCases construye los casos de uso de AI.
-func ProvideAIUseCases(client *ai.Client) *aiusecases.UseCases {
-	return aiusecases.NewUseCases(client)
+// ProvideAIUseCases construye los casos de uso de AI sobre el adapter de
+// Companion. El binary requiere `COMPANION_BASE_URL` + `COMPANION_INTERNAL_JWT_SECRET`
+// seteados — sin eso `ProvideCompanionClient` falla en wire y el binary no
+// arranca (intencional: cutover ya hecho a Companion, no hay fallback).
+func ProvideAIUseCases(companionClient *axis.CompanionClient) *aiusecases.UseCases {
+	return aiusecases.NewUseCases(ai.NewCompanionAdapter(companionClient))
 }
 
 // ProvideAIUseCasesPort adapta *UseCases a la interfaz de handler.
@@ -52,13 +51,15 @@ func ProvideAIMiddlewaresEnginePort(m *mwr.Middlewares) ai.MiddlewaresEnginePort
 	return m
 }
 
-// AISet expone todos los providers necesarios para AI.
+// AISet expone todos los providers necesarios para AI (Companion via adapter)
+// + Nexus client (opcional, usado cuando aparezca gating de tools).
 var AISet = wire.NewSet(
-	ProvideAIClient,
 	ProvideAIUseCases,
 	ProvideAIUseCasesPort,
 	ProvideAIHandler,
 	ProvideAIGinEnginePort,
 	ProvideAIConfigAPI,
 	ProvideAIMiddlewaresEnginePort,
+	ProvideCompanionClient,
+	ProvideNexusClient,
 )

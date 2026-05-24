@@ -290,9 +290,17 @@ func Initialize() (*Dependencies, error) {
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, useCasesPort2, stockConfigAPIPort, stockMiddlewaresEnginePort)
 	aiGinEnginePort := ProvideAIGinEnginePort(server)
-	ai := ProvideConfigAI(config)
-	client := ProvideAIClient(ai)
-	usecasesUseCases := ProvideAIUseCases(client)
+	companionCfg := ProvideConfigCompanion(config)
+	companionClient, err := ProvideCompanionClient(companionCfg)
+	if err != nil {
+		return nil, err
+	}
+	nexusCfg := ProvideConfigNexus(config)
+	_, err = ProvideNexusClient(nexusCfg) // Nexus opcional, descartado hasta ola 2
+	if err != nil {
+		return nil, err
+	}
+	usecasesUseCases := ProvideAIUseCases(companionClient)
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)

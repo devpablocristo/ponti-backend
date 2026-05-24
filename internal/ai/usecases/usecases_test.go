@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -38,29 +37,6 @@ func (f *fakeClient) DoStream(_ context.Context, _, _ string, _ io.Reader, _, _,
 	return nil, errors.New("not implemented in fake")
 }
 
-func TestIsAIServiceNotConfigured(t *testing.T) {
-	cases := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil err", nil, false},
-		{"url not configured", errors.New("ai service url not configured"), true},
-		{"key not configured", errors.New("ai service key not configured"), true},
-		{"wrapping ok", errors.New("client failed: ai service url not configured: tcp"), true},
-		{"random db err", errors.New("connection refused"), false},
-		{"empty msg", errors.New(""), false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := isAIServiceNotConfigured(tc.err); got != tc.want {
-				t.Fatalf("isAIServiceNotConfigured(%v) = %v, want %v", tc.err, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestChat_HappyPath_PassesThroughClient(t *testing.T) {
 	wantBody := []byte(`{"reply":"hola"}`)
 	client := &fakeClient{doStatus: 200, doBody: wantBody}
@@ -85,31 +61,7 @@ func TestChat_HappyPath_PassesThroughClient(t *testing.T) {
 	}
 }
 
-func TestChat_AINotConfigured_ReturnsDummy(t *testing.T) {
-	client := &fakeClient{doErr: errors.New("ai service url not configured")}
-	uc := NewUseCases(client)
-
-	status, raw, err := uc.Chat(context.Background(), "u", "t", "", nil)
-	if err != nil {
-		t.Fatalf("expected nil error for dummy fallback, got %v", err)
-	}
-	if status != 200 {
-		t.Fatalf("expected dummy status 200, got %d", status)
-	}
-
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		t.Fatalf("dummy body should be JSON, got %q (%v)", raw, err)
-	}
-	if payload["output_kind"] != "chat_reply" {
-		t.Fatalf("expected output_kind=chat_reply in dummy, got %v", payload["output_kind"])
-	}
-	if payload["routing_source"] != "read_fallback" {
-		t.Fatalf("expected routing_source=read_fallback, got %v", payload["routing_source"])
-	}
-}
-
-func TestChat_OtherError_PropagatesUnchanged(t *testing.T) {
+func TestChat_PropagatesUpstreamError(t *testing.T) {
 	client := &fakeClient{doErr: errors.New("upstream 500")}
 	uc := NewUseCases(client)
 
@@ -148,24 +100,6 @@ func TestListChatConversations_ClampsLimit(t *testing.T) {
 	}
 }
 
-func TestListChatConversations_DummyFallback(t *testing.T) {
-	client := &fakeClient{doErr: errors.New("ai service key not configured")}
-	uc := NewUseCases(client)
-
-	_, raw, err := uc.ListChatConversations(context.Background(), "u", "t", "", 100)
-	if err != nil {
-		t.Fatalf("expected nil for dummy fallback, got %v", err)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		t.Fatalf("dummy body should be JSON, got %q", raw)
-	}
-	items, ok := payload["items"].([]any)
-	if !ok || len(items) != 0 {
-		t.Fatalf("expected dummy items=[], got %v", payload["items"])
-	}
-}
-
 func TestGetChatConversation_TrimsAndForwardsID(t *testing.T) {
 	client := &fakeClient{doStatus: 200, doBody: []byte(`{}`)}
 	uc := NewUseCases(client)
@@ -177,22 +111,5 @@ func TestGetChatConversation_TrimsAndForwardsID(t *testing.T) {
 	wantPath := "/v1/chat/conversations/conv-42"
 	if client.calledPath != wantPath {
 		t.Fatalf("expected path %q, got %q", wantPath, client.calledPath)
-	}
-}
-
-func TestGetChatConversation_DummyFallback(t *testing.T) {
-	client := &fakeClient{doErr: errors.New("ai service url not configured")}
-	uc := NewUseCases(client)
-
-	_, raw, err := uc.GetChatConversation(context.Background(), "u", "t", "", "abc")
-	if err != nil {
-		t.Fatalf("expected nil for dummy fallback, got %v", err)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		t.Fatalf("dummy body should be JSON, got %q", raw)
-	}
-	if payload["id"] != "abc" {
-		t.Fatalf("expected id=abc in dummy, got %v", payload["id"])
 	}
 }

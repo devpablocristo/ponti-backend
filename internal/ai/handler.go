@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -105,7 +106,8 @@ func (h *Handler) ChatStream(c *gin.Context) {
 	}
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	if err := h.ucs.ChatStream(c.Request.Context(), userID, tenantID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
-		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
+		slog.ErrorContext(c.Request.Context(), "chat stream upstream failed", "error", err.Error())
+		sharedhandlers.RespondError(c, err)
 	}
 }
 
@@ -158,9 +160,10 @@ func (h *Handler) respondProxy(c *gin.Context, status int, body []byte, err erro
 }
 
 func (h *Handler) extractIDs(c *gin.Context) (string, string, string, error) {
-	if err := authz.RequirePermission(c.Request.Context(), authz.PermissionAIUse); err != nil {
-		return "", "", "", err
-	}
+	// El permiso explícito `ai.use` (modelo legacy de ponti-ai) se removió en
+	// el cutover a Companion. Hoy basta con que el usuario haya pasado el
+	// middleware de autenticación + tenant scope (api.read/api.write). Si en
+	// el futuro hace falta gating fino por user, agregar de nuevo este check.
 	principal, err := authz.PrincipalFromContext(c.Request.Context())
 	if err != nil {
 		return "", "", "", err

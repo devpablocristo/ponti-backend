@@ -51,14 +51,9 @@ func newAIHandlerTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestExtractIDsRequiresAIUsePermission(t *testing.T) {
-	handler := NewHandler(nil, nil, nil, nil, nil, false)
-	c := newAIHandlerTestContext([]string{authz.PermissionAPIRead}, aiTestTenantID, "10")
-
-	if _, _, _, err := handler.extractIDs(c); err == nil {
-		t.Fatal("expected missing ai.use permission to be rejected")
-	}
-}
+// Nota: el permiso explícito `ai.use` fue removido al deprecar ponti-ai y
+// migrar a Companion. Hoy basta con que el usuario haya pasado el middleware
+// de auth + tenant scope (api.read/api.write). El test asociado se eliminó.
 
 func TestExtractIDsRequiresProjectHeader(t *testing.T) {
 	handler := NewHandler(nil, nil, nil, nil, nil, false)
