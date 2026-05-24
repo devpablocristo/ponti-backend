@@ -14,6 +14,8 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -69,7 +71,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 	db := r.db.Client().WithContext(ctx)
 
 	if customerID != 0 || projectName != "" {
-		projectDB := authz.MaybeTenantScope(ctx, db.Model(&projectmod.Project{}), "projects")
+		projectDB := tenancy.Scope(ctx, db.Model(&projectmod.Project{}), "projects")
 		projectDB = projectDB.
 			Select("id, campaign_id").
 			Where("deleted_at IS NULL")
@@ -98,7 +100,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			ids[i] = f.CampaignID
 			mapProject[f.CampaignID] = f.ProjectID
 		}
-		campaignDB := authz.MaybeTenantScope(ctx, db.Model(&models.Campaign{}), "campaigns")
+		campaignDB := tenancy.Scope(ctx, db.Model(&models.Campaign{}), "campaigns")
 		if err := campaignDB.Where("id IN ? AND deleted_at IS NULL", ids).Find(&raw).Error; err != nil {
 			return nil, domainerr.Internal("failed to fetch filtered campaigns")
 		}
@@ -113,7 +115,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 	}
 
 	// Sin filtro
-	campaignDB := authz.MaybeTenantScope(ctx, db.Model(&models.Campaign{}), "campaigns")
+	campaignDB := tenancy.Scope(ctx, db.Model(&models.Campaign{}), "campaigns")
 	if err := campaignDB.Where("deleted_at IS NULL").Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list campaigns")
 	}
@@ -132,7 +134,7 @@ func (r *Repository) UpdateCampaign(ctx context.Context, c *domain.Campaign) err
 	if err := sharedrepo.ValidateID(c.ID, "campaign"); err != nil {
 		return err
 	}
-	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Campaign{}), "campaigns").
+	updateTx := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Model(&models.Campaign{}), "campaigns").
 		Where("id = ?", c.ID)
 	if !c.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
@@ -152,7 +154,7 @@ func (r *Repository) UpdateCampaign(ctx context.Context, c *domain.Campaign) err
 
 func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaign, error) {
 	var m models.Campaign
-	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "campaigns")
+	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "campaigns")
 	err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&m).
@@ -172,7 +174,7 @@ func (r *Repository) ListArchivedCampaigns(ctx context.Context, page, perPage in
 		Unscoped().
 		Model(&models.Campaign{}).
 		Where("deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "campaigns")
+	base = tenancy.Scope(ctx, base, "campaigns")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived campaigns")
@@ -209,7 +211,7 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		archivedAt := time.Now()
 		var c models.Campaign
-		campaignQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "campaigns")
+		campaignQuery := tenancy.Scope(ctx, tx.Unscoped(), "campaigns")
 		if err := campaignQuery.Where("id = ?", id).First(&c).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
@@ -224,7 +226,7 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Campaign{}), "campaigns").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Campaign{}), "campaigns").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "campaigns", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive campaign")
@@ -242,7 +244,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var c models.Campaign
-		campaignQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "campaigns")
+		campaignQuery := tenancy.Scope(ctx, tx.Unscoped(), "campaigns")
 		if err := campaignQuery.Where("id = ?", id).First(&c).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
@@ -253,7 +255,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 			return domainerr.Conflict("campaign is not archived")
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Campaign{}), "campaigns").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Campaign{}), "campaigns").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "campaigns", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore campaign")
@@ -271,7 +273,7 @@ func (r *Repository) HardDeleteCampaign(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		campaignDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("campaigns"), "campaigns")
+		campaignDB := tenancy.Scope(ctx, tx.Unscoped().Table("campaigns"), "campaigns")
 		if err := campaignDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check campaign existence")
 		}
@@ -283,7 +285,7 @@ func (r *Repository) HardDeleteCampaign(ctx context.Context, id int64) error {
 		}
 
 		var projCount int64
-		projectDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&projectmod.Project{}), "projects")
+		projectDB := tenancy.Scope(ctx, tx.Unscoped().Model(&projectmod.Project{}), "projects")
 		if err := projectDB.Where("campaign_id = ?", id).Count(&projCount).Error; err != nil {
 			return domainerr.Internal("failed to check projects")
 		}
@@ -291,7 +293,7 @@ func (r *Repository) HardDeleteCampaign(ctx context.Context, id int64) error {
 			return domainerr.Conflict(fmt.Sprintf("campaign has %d project(s); archive or hard-delete them first", projCount))
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "campaigns").Delete(&models.Campaign{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "campaigns").Delete(&models.Campaign{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete campaign")
 		}
 		return nil

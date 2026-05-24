@@ -9,6 +9,8 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -38,7 +40,7 @@ type providerRow struct {
 func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error) {
 	if r.db.Client().Name() == "sqlite" {
 		var providers []models.Provider
-		if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "providers").Find(&providers).Error; err != nil {
+		if err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "providers").Find(&providers).Error; err != nil {
 			return nil, domainerr.Internal("failed to list providers")
 		}
 		res := make([]domain.Provider, len(providers))
@@ -52,7 +54,7 @@ func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error
 	base := r.db.Client().WithContext(ctx).
 		Table("providers p").
 		Where("p.deleted_at IS NULL")
-	base = authz.MaybeTenantScope(ctx, base, "p")
+	base = tenancy.Scope(ctx, base, "p")
 	if err := base.
 		Select("p.id, p.name, lm.actor_id").
 		Joins("LEFT JOIN legacy_actor_map lm ON lm.source_table = 'providers' AND lm.source_id = p.id AND lm.tenant_id = p.tenant_id").
@@ -74,7 +76,7 @@ func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error
 func (r *Repository) ListArchivedProviders(ctx context.Context) ([]domain.Provider, error) {
 	if r.db.Client().Name() == "sqlite" {
 		var providers []models.Provider
-		if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Where("deleted_at IS NOT NULL"), "providers").Find(&providers).Error; err != nil {
+		if err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Unscoped().Where("deleted_at IS NOT NULL"), "providers").Find(&providers).Error; err != nil {
 			return nil, domainerr.Internal("failed to list archived providers")
 		}
 		res := make([]domain.Provider, len(providers))
@@ -89,7 +91,7 @@ func (r *Repository) ListArchivedProviders(ctx context.Context) ([]domain.Provid
 		Unscoped().
 		Table("providers p").
 		Where("p.deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "p")
+	base = tenancy.Scope(ctx, base, "p")
 	if err := base.
 		Select("p.id, p.name, lm.actor_id").
 		Joins("LEFT JOIN legacy_actor_map lm ON lm.source_table = 'providers' AND lm.source_id = p.id AND lm.tenant_id = p.tenant_id").
@@ -113,7 +115,7 @@ func (r *Repository) GetProvider(ctx context.Context, id int64) (*domain.Provide
 		return nil, err
 	}
 	var provider models.Provider
-	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
+	if err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerr.NotFound("provider not found")
 		}
@@ -145,7 +147,7 @@ func (r *Repository) UpdateProvider(ctx context.Context, provider *domain.Provid
 	if err := sharedrepo.ValidateID(provider.ID, "provider"); err != nil {
 		return err
 	}
-	result := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Provider{}), "providers").
+	result := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Model(&models.Provider{}), "providers").
 		Where("id = ?", provider.ID).
 		Updates(map[string]any{"name": provider.Name})
 	if result.Error != nil {
@@ -168,7 +170,7 @@ func (r *Repository) ArchiveProvider(ctx context.Context, id int64) error {
 	deletedBy := &actor
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var provider models.Provider
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("provider not found")
 			}
@@ -182,7 +184,7 @@ func (r *Repository) ArchiveProvider(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Model(&models.Provider{}), "providers").
+		result := tenancy.Scope(ctx, tx.Model(&models.Provider{}), "providers").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "providers", archivedAt, deletedBy, cause))
 		if result.Error != nil {
@@ -201,7 +203,7 @@ func (r *Repository) RestoreProvider(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var provider models.Provider
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "providers").Where("id = ?", id).First(&provider).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("provider not found")
 			}
@@ -210,7 +212,7 @@ func (r *Repository) RestoreProvider(ctx context.Context, id int64) error {
 		if !provider.DeletedAt.Valid {
 			return domainerr.Conflict("provider is not archived")
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Provider{}), "providers").
+		result := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Provider{}), "providers").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "providers", time.Now()))
 		if result.Error != nil {
@@ -228,7 +230,7 @@ func (r *Repository) HardDeleteProvider(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		providerDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("providers"), "providers")
+		providerDB := tenancy.Scope(ctx, tx.Unscoped().Table("providers"), "providers")
 		var count int64
 		if err := providerDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check provider existence")
@@ -240,7 +242,7 @@ func (r *Repository) HardDeleteProvider(ctx context.Context, id int64) error {
 			return err
 		}
 		var movements int64
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements").
 			Where("provider_id = ?", id).
 			Count(&movements).Error; err != nil {
 			return domainerr.Internal("failed to check provider usage")
@@ -248,7 +250,7 @@ func (r *Repository) HardDeleteProvider(ctx context.Context, id int64) error {
 		if movements > 0 {
 			return domainerr.Conflict(fmt.Sprintf("provider has %d supply movement reference(s); remove them first", movements))
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Unscoped(), "providers").Delete(&models.Provider{}, id)
+		result := tenancy.Scope(ctx, tx.Unscoped(), "providers").Delete(&models.Provider{}, id)
 		if result.Error != nil {
 			return domainerr.Internal("failed to hard delete provider")
 		}

@@ -8,6 +8,8 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
@@ -60,7 +62,7 @@ func withStockSupplyLookups(db *gorm.DB) *gorm.DB {
 func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*domain.Stock, error) {
 	gormDB := r.getDB(ctx)
 
-	stockQuery := withStockMovements(authz.MaybeTenantScope(ctx, gormDB.Model(&models.Stock{}), "stocks")).
+	stockQuery := withStockMovements(tenancy.Scope(ctx, gormDB.Model(&models.Stock{}), "stocks")).
 		Where("stocks.project_id = ?", projectID)
 
 	if !closeDate.IsZero() {
@@ -74,7 +76,7 @@ func (r *Repository) GetStocks(ctx context.Context, projectID int64, closeDate t
 	}
 
 	var supplies []supplymodels.Supply
-	if err := withStockSupplyLookups(authz.MaybeTenantScope(ctx, gormDB.Model(&supplymodels.Supply{}), "supplies")).
+	if err := withStockSupplyLookups(tenancy.Scope(ctx, gormDB.Model(&supplymodels.Supply{}), "supplies")).
 		Where("project_id = ?", projectID).
 		Order("LOWER(name) ASC").
 		Find(&supplies).Error; err != nil {
@@ -259,7 +261,7 @@ func keyFromStockModel(stock models.Stock) stockKey {
 
 func (r *Repository) loadMovementsByStockKey(ctx context.Context, projectID int64, closeDate time.Time) (map[stockKey][]supplymodels.SupplyMovement, error) {
 	var movements []supplymodels.SupplyMovement
-	query := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements").
+	query := tenancy.Scope(ctx, r.getDB(ctx), "supply_movements").
 		Where("project_id = ?", projectID).
 		Where("deleted_at IS NULL").
 		Order("movement_date ASC, id ASC")
@@ -285,7 +287,7 @@ func (r *Repository) loadMovementsByStockKey(ctx context.Context, projectID int6
 
 func (r *Repository) loadMovementsBySupplyID(ctx context.Context, projectID int64, closeDate time.Time) (map[int64][]supplymodels.SupplyMovement, error) {
 	var movements []supplymodels.SupplyMovement
-	query := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supply_movements").
+	query := tenancy.Scope(ctx, r.getDB(ctx), "supply_movements").
 		Where("project_id = ?", projectID).
 		Where("deleted_at IS NULL").
 		Order("movement_date ASC, id ASC")
@@ -313,7 +315,7 @@ func (r *Repository) loadConsumedByStockKey(ctx context.Context, projectID int64
 
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return nil, nil, domainerr.Forbidden("tenant context required")
+		return nil, nil, domainerr.TenantMissing()
 	}
 
 	var rows []consumedRow
@@ -373,7 +375,7 @@ func stockDateRange(date time.Time) (time.Time, time.Time) {
 // (supply, investor) activo al cerrar un período.
 func (r *Repository) GetActiveStocksByProjectID(ctx context.Context, projectID int64) ([]*domain.Stock, error) {
 	var stockModels []models.Stock
-	if err := withStockLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx), "stocks")).
+	if err := withStockLookups(tenancy.Scope(ctx, r.getDB(ctx), "stocks")).
 		Where("project_id = ? AND close_date IS NULL", projectID).
 		Find(&stockModels).Error; err != nil {
 		return nil, err
@@ -447,7 +449,7 @@ func (r *Repository) GetStocksPeriods(ctx context.Context, projectID int64) ([]s
 
 	err := r.getDB(ctx).
 		Model(&models.Stock{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") }).
 		Where("project_id = ? AND close_date IS NOT NULL", projectID).
 		Distinct("close_date").
 		Pluck("close_date", &rawPeriods).Error
@@ -504,7 +506,7 @@ func (r *Repository) UpdateCloseDateByProject(ctx context.Context, projectID int
 	stockUpdate := models.StockUpdateCloseDateFromDomain(stock)
 	result := r.getDB(ctx).
 		Model(&models.Stock{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") }).
 		Where("project_id = ?", projectID).
 		Where("close_date IS NULL").
 		Updates(stockUpdate)
@@ -525,7 +527,7 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 
 	updateTx := r.getDB(ctx).
 		Model(&models.Stock{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") }).
 		Where("id = ?", stockID)
 
 	if stock.Project != nil && stock.Project.ID > 0 {
@@ -560,7 +562,7 @@ func (r *Repository) UpdateRealStockUnits(ctx context.Context, stockID int64, st
 func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain.Stock, quantity decimal.Decimal) error {
 	updateTx := r.getDB(ctx).
 		Model(&models.Stock{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") }).
 		Where("id = ?", stockDomain.ID)
 	if !stockDomain.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", stockDomain.UpdatedAt)
@@ -580,7 +582,7 @@ func (r *Repository) UpdateUnitsConsumed(ctx context.Context, stockDomain domain
 
 func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
-	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
+	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") })).
 		First(&stockModel, stockID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -594,7 +596,7 @@ func (r *Repository) GetStockByID(ctx context.Context, stockID int64) (*domain.S
 func (r *Repository) GetLastStockByProjectID(ctx context.Context, projectID int64, supplyID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
-	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
+	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
 		Where("close_date is null").
@@ -651,7 +653,7 @@ func (r *Repository) GetLastClosedStockByProjectID(ctx context.Context, projectI
 func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projectID int64, supplyID int64, investorID int64) (*domain.Stock, bool, error) {
 	var stockModel models.Stock
 	gormDB := r.getDB(ctx)
-	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
+	err := withStockMovements(gormDB.Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("supply_id = ?", supplyID).
 		Where("investor_id = ?", investorID).
@@ -684,7 +686,7 @@ func (r *Repository) GetLastStockByProjectInvestorID(ctx context.Context, projec
 func (r *Repository) GetStockByPeriodAndProjectID(ctx context.Context, projectID int64) (*domain.Stock, error) {
 	var stockModel models.Stock
 
-	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") })).
+	err := withStockLookups(r.getDB(ctx).Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") })).
 		Where("project_id = ?", projectID).
 		Where("close_date IS NULL").
 		First(&stockModel).Error
@@ -704,7 +706,7 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 	gormDB := r.getDB(ctx)
 
 	query := withStockMovements(gormDB.
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "stocks") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "stocks") }).
 		Where("deleted_at IS NULL"))
 
 	if err := query.Find(&stockModel).Error; err != nil {
@@ -738,7 +740,7 @@ func (r *Repository) ListAllStocks(ctx context.Context) ([]*domain.Stock, error)
 func (r *Repository) loadAllMovementsByStockKey(ctx context.Context) (map[stockKey][]supplymodels.SupplyMovement, error) {
 	var movements []supplymodels.SupplyMovement
 	if err := r.getDB(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "supply_movements") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "supply_movements") }).
 		Where("deleted_at IS NULL").
 		Order("movement_date ASC, id ASC").
 		Find(&movements).Error; err != nil {
@@ -767,7 +769,7 @@ func (r *Repository) loadAllConsumedByStockKey(ctx context.Context) (map[stockKe
 
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return nil, domainerr.Forbidden("tenant context required")
+		return nil, domainerr.TenantMissing()
 	}
 
 	var rows []consumedRow

@@ -11,6 +11,8 @@ import (
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -89,7 +91,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 	db0 := r.db.Client().WithContext(ctx).
 		Table("customers c").
 		Where("c.deleted_at IS NULL")
-	db0 = authz.MaybeTenantScope(ctx, db0, "c")
+	db0 = tenancy.Scope(ctx, db0, "c")
 
 	// Conteo total
 	if err := db0.Count(&total).Error; err != nil {
@@ -128,7 +130,7 @@ func (r *Repository) ListArchivedCustomers(ctx context.Context, page, perPage in
 		Unscoped().
 		Table("customers c").
 		Where("c.deleted_at IS NOT NULL")
-	db0 = authz.MaybeTenantScope(ctx, db0, "c")
+	db0 = tenancy.Scope(ctx, db0, "c")
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived customers")
@@ -157,7 +159,7 @@ func (r *Repository) ListArchivedCustomers(ctx context.Context, page, perPage in
 
 func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Customer, error) {
 	var model models.Customer
-	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "customers")
+	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "customers")
 	err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&model).Error
@@ -195,7 +197,7 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 		if err := assertCustomerReferencesActive(tx, c); err != nil {
 			return err
 		}
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Customer{}), "customers").Where("id = ?", c.ID)
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.Customer{}), "customers").Where("id = ?", c.ID)
 		if !c.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
 		}
@@ -246,7 +248,7 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var customer models.Customer
-		customerQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers")
+		customerQuery := tenancy.Scope(ctx, tx.Unscoped(), "customers")
 		if err := customerQuery.Where("id = ?", id).First(&customer).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
@@ -287,7 +289,7 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 			return err
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Customer{}), "customers").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "customers", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive customer")
@@ -387,7 +389,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var customer models.Customer
-		customerQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers")
+		customerQuery := tenancy.Scope(ctx, tx.Unscoped(), "customers")
 		if err := customerQuery.Where("id = ?", id).First(&customer).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
@@ -408,7 +410,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			return err
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "customers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore customer")
@@ -594,7 +596,7 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var customer models.Customer
-		customerDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers")
+		customerDB := tenancy.Scope(ctx, tx.Unscoped(), "customers")
 		if err := customerDB.Where("id = ?", id).First(&customer).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer with id %d does not exist", id))
@@ -629,7 +631,7 @@ func (r *Repository) HardDeleteCustomer(ctx context.Context, id int64) error {
 		if err := actorsync.DeleteLegacyActor(tx, actorsync.LegacyCustomers, id, actorsync.RoleCliente, deletedBy); err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "customers").Delete(&models.Customer{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "customers").Delete(&models.Customer{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete customer")
 		}
 		return nil

@@ -12,6 +12,8 @@ import (
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -85,7 +87,7 @@ func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]dom
 	base := r.db.Client().WithContext(ctx).
 		Table("managers m").
 		Where("m.deleted_at IS NULL")
-	base = authz.MaybeTenantScope(ctx, base, "m")
+	base = tenancy.Scope(ctx, base, "m")
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count managers")
 	}
@@ -120,7 +122,7 @@ func (r *Repository) ListArchivedManagers(ctx context.Context, page, perPage int
 		Unscoped().
 		Table("managers m").
 		Where("m.deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "m")
+	base = tenancy.Scope(ctx, base, "m")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived managers")
@@ -155,7 +157,7 @@ func (r *Repository) GetManager(ctx context.Context, id int64) (*domain.Manager,
 		return nil, err
 	}
 	var model models.Manager
-	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "managers")
+	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "managers")
 	if err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&model).Error; err != nil {
@@ -183,7 +185,7 @@ func (r *Repository) UpdateManager(ctx context.Context, m *domain.Manager) error
 		if err := assertManagerReferencesActive(tx, m); err != nil {
 			return err
 		}
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Manager{}), "managers").Where("id = ?", m.ID)
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.Manager{}), "managers").Where("id = ?", m.ID)
 		if !m.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", m.UpdatedAt)
 		}
@@ -219,7 +221,7 @@ func (r *Repository) HardDeleteManager(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		managerDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("managers"), "managers")
+		managerDB := tenancy.Scope(ctx, tx.Unscoped().Table("managers"), "managers")
 		if err := managerDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check manager existence")
 		}
@@ -231,7 +233,7 @@ func (r *Repository) HardDeleteManager(ctx context.Context, id int64) error {
 		}
 
 		var pmCount int64
-		pmDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("project_managers"), "project_managers")
+		pmDB := tenancy.Scope(ctx, tx.Unscoped().Table("project_managers"), "project_managers")
 		if err := pmDB.Where("manager_id = ?", id).Count(&pmCount).Error; err != nil {
 			return domainerr.Internal("failed to check project assignments")
 		}
@@ -246,7 +248,7 @@ func (r *Repository) HardDeleteManager(ctx context.Context, id int64) error {
 		if err := actorsync.DeleteLegacyActor(tx, actorsync.LegacyManagers, id, actorsync.RoleResponsable, deletedBy); err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "managers").Delete(&models.Manager{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "managers").Delete(&models.Manager{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete manager")
 		}
 		return nil
@@ -266,7 +268,7 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var m models.Manager
-		managerQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "managers")
+		managerQuery := tenancy.Scope(ctx, tx.Unscoped(), "managers")
 		if err := managerQuery.Where("id = ?", id).First(&m).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager %d not found", id))
@@ -282,7 +284,7 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 		// violating "archived = no existe". User must remove the assignments
 		// (or archive the parent project, which cascades).
 		var activeAssignments int64
-		assignmentsQuery := authz.MaybeTenantScope(ctx, tx.Table("project_managers"), "project_managers").
+		assignmentsQuery := tenancy.Scope(ctx, tx.Table("project_managers"), "project_managers").
 			Where("manager_id = ? AND deleted_at IS NULL", id)
 		if err := assignmentsQuery.Count(&activeAssignments).Error; err != nil {
 			return domainerr.Internal("failed to check project assignments")
@@ -296,7 +298,7 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Manager{}), "managers").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Manager{}), "managers").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "managers", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive manager")
@@ -341,7 +343,7 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var m models.Manager
-		managerQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "managers")
+		managerQuery := tenancy.Scope(ctx, tx.Unscoped(), "managers")
 		if err := managerQuery.Where("id = ?", id).First(&m).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager %d not found", id))
@@ -352,7 +354,7 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 			return domainerr.Conflict("manager is not archived")
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Manager{}), "managers").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Manager{}), "managers").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "managers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore manager")

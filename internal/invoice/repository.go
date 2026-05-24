@@ -10,6 +10,8 @@ import (
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"gorm.io/gorm"
 )
@@ -49,7 +51,7 @@ func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID 
 	}
 
 	var row models.Invoice
-	db := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "invoices")
+	db := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "invoices")
 	if err := db.
 		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
 		Order(fmt.Sprintf("CASE WHEN investor_id = %d THEN 0 ELSE 1 END, id DESC", investorID)).
@@ -119,7 +121,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 				return err
 			}
 		}
-		result := authz.MaybeTenantScope(ctx, tx, "invoices").
+		result := tenancy.Scope(ctx, tx, "invoices").
 			Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", item.WorkOrderID, item.InvestorID).
 			Model(models.Invoice{}).
 			Updates(map[string]any{
@@ -138,7 +140,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
 			return invoiceNotFound(item.WorkOrderID, item.InvestorID)
 		}
 		var id int64
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Invoice{}), "invoices").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Invoice{}), "invoices").
 			Where("work_order_id = ? AND investor_id = ?", item.WorkOrderID, item.InvestorID).
 			Select("id").
 			Scan(&id).Error; err != nil {
@@ -161,7 +163,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page,
 	var total int64
 	query := r.db.Client().WithContext(ctx).
 		Model(&models.Invoice{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "invoices") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "invoices") }).
 		Joins("JOIN workorders ON workorders.id = invoices.work_order_id AND workorders.tenant_id = invoices.tenant_id AND workorders.deleted_at IS NULL").
 		Where("workorders.project_id = ?", projectID)
 
@@ -189,7 +191,7 @@ func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID i
 	}
 
 	result := r.db.Client().WithContext(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "invoices") }).
+		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "invoices") }).
 		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
 		Delete(&models.Invoice{})
 
@@ -208,7 +210,7 @@ func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID
 	}
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return false, domainerr.Forbidden("tenant context required")
+		return false, domainerr.TenantMissing()
 	}
 
 	type resultRow struct {

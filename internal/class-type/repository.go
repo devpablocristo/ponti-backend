@@ -12,7 +12,8 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
@@ -217,7 +218,7 @@ func (r *Repository) HardDeleteClassType(ctx context.Context, id int64) error {
 			{"supplies", "supply"},
 		} {
 			var n int64
-			if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Table(dep.table), dep.table).Where("type_id = ?", id).Count(&n).Error; err != nil {
+			if err := tenancy.Scope(ctx, tx.Unscoped().Table(dep.table), dep.table).Where("type_id = ?", id).Count(&n).Error; err != nil {
 				return domainerr.Internal("failed to check " + dep.table)
 			}
 			if n > 0 {

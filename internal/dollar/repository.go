@@ -10,6 +10,8 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/dollar/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
@@ -35,7 +37,7 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 		WithContext(ctx).
 		Model(&models.ProjectDollarValue{}).
 		Where("project_id = ?", projectID)
-	tx = authz.MaybeTenantScope(ctx, tx, "project_dollar_values")
+	tx = tenancy.Scope(ctx, tx, "project_dollar_values")
 
 	var rows []models.ProjectDollarValue
 	if err := tx.Find(&rows).Error; err != nil {
@@ -73,7 +75,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current models.ProjectDollarValue
-		if err := authz.MaybeTenantScope(ctx, tx, "project_dollar_values").
+		if err := tenancy.Scope(ctx, tx, "project_dollar_values").
 			Where("id = ?", item.ID).
 			First(&current).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -89,7 +91,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.ProjectDollarValue{}), "project_dollar_values").
+		if err := tenancy.Scope(ctx, tx.Model(&models.ProjectDollarValue{}), "project_dollar_values").
 			Where("id = ?", item.ID).
 			Updates(map[string]any{
 				"project_id":    item.ProjectID,
@@ -112,7 +114,7 @@ func (r *Repository) GetByComposite(ctx context.Context, projectID, year int64, 
 	}
 
 	var m models.ProjectDollarValue
-	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "project_dollar_values").
+	err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "project_dollar_values").
 		Where("project_id = ? AND year = ? AND month = ?", projectID, year, month).
 		First(&m).Error
 

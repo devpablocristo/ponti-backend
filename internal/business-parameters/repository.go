@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -31,7 +33,7 @@ func NewRepository(db GormEnginePort) *Repository {
 
 func (r *Repository) GetByKey(ctx context.Context, key string) (*domain.BusinessParameter, error) {
 	var m models.BusinessParameter
-	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "business_parameters").
+	err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "business_parameters").
 		Where("key = ?", key).
 		First(&m).Error
 
@@ -49,7 +51,7 @@ func (r *Repository) ListByCategory(ctx context.Context, category string) ([]dom
 		WithContext(ctx).
 		Model(&models.BusinessParameter{}).
 		Where("category = ?", category)
-	tx = authz.MaybeTenantScope(ctx, tx, "business_parameters")
+	tx = tenancy.Scope(ctx, tx, "business_parameters")
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -67,7 +69,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.BusinessParameter{})
-	tx = authz.MaybeTenantScope(ctx, tx, "business_parameters")
+	tx = tenancy.Scope(ctx, tx, "business_parameters")
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -87,7 +89,7 @@ func (r *Repository) ListArchived(ctx context.Context) ([]domain.BusinessParamet
 		Unscoped().
 		Model(&models.BusinessParameter{}).
 		Where("deleted_at IS NOT NULL")
-	tx = authz.MaybeTenantScope(ctx, tx, "business_parameters")
+	tx = tenancy.Scope(ctx, tx, "business_parameters")
 
 	var rows []models.BusinessParameter
 	if err := tx.Order("deleted_at DESC").Find(&rows).Error; err != nil {
@@ -121,7 +123,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").Where("id = ?", item.ID).Count(&count).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").Where("id = ?", item.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
 		if count == 0 {
@@ -129,7 +131,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").
 			Where("id = ?", item.ID)
 		if !item.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", item.UpdatedAt)
@@ -166,7 +168,7 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var item models.BusinessParameter
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "business_parameters").Where("id = ?", id).First(&item).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "business_parameters").Where("id = ?", id).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("business parameter not found")
 			}
@@ -180,7 +182,7 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").
+		result := tenancy.Scope(ctx, tx.Model(&models.BusinessParameter{}), "business_parameters").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "business_parameters", archivedAt, deletedBy, cause))
 		if result.Error != nil {
@@ -199,7 +201,7 @@ func (r *Repository) Restore(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var item models.BusinessParameter
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "business_parameters").Where("id = ?", id).First(&item).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "business_parameters").Where("id = ?", id).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("business parameter not found")
 			}
@@ -208,7 +210,7 @@ func (r *Repository) Restore(ctx context.Context, id int64) error {
 		if !item.DeletedAt.Valid {
 			return domainerr.Conflict("business parameter is not archived")
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.BusinessParameter{}), "business_parameters").
+		result := tenancy.Scope(ctx, tx.Unscoped().Model(&models.BusinessParameter{}), "business_parameters").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "business_parameters", time.Now()))
 		if result.Error != nil {
@@ -226,7 +228,7 @@ func (r *Repository) HardDelete(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		base := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("business_parameters"), "business_parameters")
+		base := tenancy.Scope(ctx, tx.Unscoped().Table("business_parameters"), "business_parameters")
 		var count int64
 		if err := base.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
@@ -237,7 +239,7 @@ func (r *Repository) HardDelete(ctx context.Context, id int64) error {
 		if err := lifecycle.RequireArchived(base, "business_parameters", "business parameter", id); err != nil {
 			return err
 		}
-		result := authz.MaybeTenantScope(ctx, tx.Unscoped(), "business_parameters").Delete(&models.BusinessParameter{}, id)
+		result := tenancy.Scope(ctx, tx.Unscoped(), "business_parameters").Delete(&models.BusinessParameter{}, id)
 		if result.Error != nil {
 			return domainerr.Internal("failed to hard delete business parameter")
 		}

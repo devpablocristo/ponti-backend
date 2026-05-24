@@ -12,6 +12,8 @@ import (
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -86,7 +88,7 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 	base := r.db.Client().WithContext(ctx).
 		Table("investors i").
 		Where("i.deleted_at IS NULL")
-	base = authz.MaybeTenantScope(ctx, base, "i")
+	base = tenancy.Scope(ctx, base, "i")
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count investors")
 	}
@@ -117,7 +119,7 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 
 func (r *Repository) GetInvestor(ctx context.Context, id int64) (*domain.Investor, error) {
 	var model models.Investor
-	db0 := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "investors")
+	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "investors")
 	if err := db0.
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&model).Error; err != nil {
@@ -145,7 +147,7 @@ func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 		if err := assertInvestorReferencesActive(tx, inv); err != nil {
 			return err
 		}
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Investor{}), "investors").Where("id = ?", inv.ID)
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.Investor{}), "investors").Where("id = ?", inv.ID)
 		if !inv.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", inv.UpdatedAt)
 		}
@@ -183,7 +185,7 @@ func (r *Repository) ListArchivedInvestors(ctx context.Context, page, perPage in
 		Unscoped().
 		Table("investors i").
 		Where("i.deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "i")
+	base = tenancy.Scope(ctx, base, "i")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived investors")
@@ -225,7 +227,7 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var inv models.Investor
-		investorQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "investors")
+		investorQuery := tenancy.Scope(ctx, tx.Unscoped(), "investors")
 		if err := investorQuery.Where("id = ?", id).First(&inv).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor %d not found", id))
@@ -257,7 +259,7 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 				continue
 			}
 			var n int64
-			q := authz.MaybeTenantScope(ctx, tx.Table(p.table), p.table).
+			q := tenancy.Scope(ctx, tx.Table(p.table), p.table).
 				Where(p.column+" = ? AND deleted_at IS NULL", id)
 			if err := q.Count(&n).Error; err != nil {
 				return domainerr.Internal(fmt.Sprintf("failed to check %s assignments", p.table))
@@ -273,7 +275,7 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Investor{}), "investors").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Investor{}), "investors").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "investors", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive investor")
@@ -303,7 +305,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var inv models.Investor
-		investorQuery := authz.MaybeTenantScope(ctx, tx.Unscoped(), "investors")
+		investorQuery := tenancy.Scope(ctx, tx.Unscoped(), "investors")
 		if err := investorQuery.Where("id = ?", id).First(&inv).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor %d not found", id))
@@ -314,7 +316,7 @@ func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 			return domainerr.Conflict("investor is not archived")
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Investor{}), "investors").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Investor{}), "investors").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "investors", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore investor")
@@ -344,7 +346,7 @@ func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		investorDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("investors"), "investors")
+		investorDB := tenancy.Scope(ctx, tx.Unscoped().Table("investors"), "investors")
 		if err := investorDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check investor existence")
 		}
@@ -367,7 +369,7 @@ func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
 		}
 		for _, d := range deps {
 			var n int64
-			depDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table(d.table), d.table)
+			depDB := tenancy.Scope(ctx, tx.Unscoped().Table(d.table), d.table)
 			if err := depDB.Where("investor_id = ?", id).Count(&n).Error; err != nil {
 				return domainerr.Internal(fmt.Sprintf("failed to check %s", d.table))
 			}
@@ -383,7 +385,7 @@ func (r *Repository) HardDeleteInvestor(ctx context.Context, id int64) error {
 		if err := actorsync.DeleteLegacyActor(tx, actorsync.LegacyInvestors, id, actorsync.RoleInversor, deletedBy); err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "investors").Delete(&models.Investor{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "investors").Delete(&models.Investor{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete investor")
 		}
 		return nil

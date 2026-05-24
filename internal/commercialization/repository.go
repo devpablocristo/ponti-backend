@@ -10,6 +10,8 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/commercialization/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
@@ -77,7 +79,7 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 		WithContext(ctx).
 		Model(&models.CropCommercialization{}).
 		Where("project_id = ?", projectID)
-	tx = authz.MaybeTenantScope(ctx, tx, "crop_commercializations")
+	tx = tenancy.Scope(ctx, tx, "crop_commercializations")
 
 	var rows []models.CropCommercialization
 
@@ -104,7 +106,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var current models.CropCommercialization
-		if err := authz.MaybeTenantScope(ctx, tx, "crop_commercializations").
+		if err := tenancy.Scope(ctx, tx, "crop_commercializations").
 			Where("id = ?", item.ID).
 			First(&current).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,7 +127,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.CropCommercializat
 			return err
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.CropCommercialization{}), "crop_commercializations").
+		if err := tenancy.Scope(ctx, tx.Model(&models.CropCommercialization{}), "crop_commercializations").
 			Where("id = ?", item.ID).
 			Updates(map[string]any{
 				"crop_id":         item.CropID,

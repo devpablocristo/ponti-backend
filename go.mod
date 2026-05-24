@@ -11,7 +11,7 @@ require (
 	github.com/devpablocristo/platform/http/go v0.1.0
 	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
 	github.com/devpablocristo/platform/notifications/go v0.1.1
-	github.com/devpablocristo/platform/security/go v0.2.1
+	github.com/devpablocristo/platform/security/go v0.2.2
 	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1

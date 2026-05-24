@@ -11,6 +11,8 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -51,14 +53,14 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 
 func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
-	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops")
+	base := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops")
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count crops")
 	}
 
 	var list []models.Crop
 	offset := (page - 1) * perPage
-	err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "crops").
+	err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "crops").
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -79,7 +81,7 @@ func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error
 		return nil, err
 	}
 	var model models.Crop
-	if err := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "crops").Where("id = ?", id).First(&model).Error; err != nil {
+	if err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "crops").Where("id = ?", id).First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "crop", id)
 	}
 	return model.ToDomain(), nil
@@ -92,7 +94,7 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	if err := sharedrepo.ValidateID(c.ID, "crop"); err != nil {
 		return err
 	}
-	updateTx := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops").
+	updateTx := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Model(&models.Crop{}), "crops").
 		Where("id = ?", c.ID)
 	if !c.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
@@ -112,7 +114,7 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 
 func (r *Repository) ListArchivedCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
-	base := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.Crop{}), "crops").
+	base := tenancy.Scope(ctx, r.db.Client().WithContext(ctx).Unscoped().Model(&models.Crop{}), "crops").
 		Where("deleted_at IS NOT NULL")
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived crops")
@@ -139,7 +141,7 @@ func (r *Repository) ArchiveCrop(ctx context.Context, id int64) error {
 	deletedBy := &actor
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var crop models.Crop
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "crops").Where("id = ?", id).First(&crop).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "crops").Where("id = ?", id).First(&crop).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
 			}
@@ -153,7 +155,7 @@ func (r *Repository) ArchiveCrop(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Crop{}), "crops").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Crop{}), "crops").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "crops", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive crop")
@@ -168,7 +170,7 @@ func (r *Repository) RestoreCrop(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var crop models.Crop
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "crops").Where("id = ?", id).First(&crop).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "crops").Where("id = ?", id).First(&crop).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
 			}
@@ -177,7 +179,7 @@ func (r *Repository) RestoreCrop(ctx context.Context, id int64) error {
 		if !crop.DeletedAt.Valid {
 			return domainerr.Conflict("crop is not archived")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Crop{}), "crops").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Crop{}), "crops").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "crops", time.Now())).Error; err != nil {
 			return domainerr.Internal("failed to restore crop")
@@ -191,7 +193,7 @@ func (r *Repository) HardDeleteCrop(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		cropDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("crops"), "crops")
+		cropDB := tenancy.Scope(ctx, tx.Unscoped().Table("crops"), "crops")
 		var count int64
 		if err := cropDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check crop existence")
@@ -212,7 +214,7 @@ func (r *Repository) HardDeleteCrop(ctx context.Context, id int64) error {
 			{"crop_commercializations", "crop_id = ?", "commercialization"},
 		} {
 			var n int64
-			query := authz.MaybeTenantScope(ctx, tx.Unscoped().Table(dep.table), dep.table)
+			query := tenancy.Scope(ctx, tx.Unscoped().Table(dep.table), dep.table)
 			if dep.table == "lots" {
 				query = query.Where(dep.where, id, id)
 			} else {
@@ -225,7 +227,7 @@ func (r *Repository) HardDeleteCrop(ctx context.Context, id int64) error {
 				return domainerr.Conflict(fmt.Sprintf("crop has %d %s reference(s); remove them first", n, dep.label))
 			}
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "crops").Delete(&models.Crop{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "crops").Delete(&models.Crop{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete crop")
 		}
 		return nil

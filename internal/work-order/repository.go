@@ -14,6 +14,8 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
@@ -138,7 +140,7 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 
 func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.WorkOrder, error) {
 	var m models.WorkOrder
-	db := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "workorders")
+	db := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "workorders")
 	if err := db.
 		Preload("Items", func(db *gorm.DB) *gorm.DB {
 			return db.Order("id ASC")
@@ -157,7 +159,7 @@ func (r *Repository) GetWorkOrderByID(ctx context.Context, id int64) (*domain.Wo
 
 func (r *Repository) GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error) {
 	var m models.WorkOrder
-	db := authz.MaybeTenantScope(ctx, r.db.Client().WithContext(ctx), "workorders")
+	db := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "workorders")
 	if err := db.
 		Where("number = ?", number).
 		Where("project_id = ?", projectID).
@@ -197,7 +199,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		}
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
-		query := authz.MaybeTenantScope(ctx, tx.Preload("Items").Preload("InvestorSplits"), "workorders").Where("id = ?", model.ID)
+		query := tenancy.Scope(ctx, tx.Preload("Items").Preload("InvestorSplits"), "workorders").Where("id = ?", model.ID)
 		if !o.Base.UpdatedAt.IsZero() {
 			query = query.Where("updated_at = ?", o.Base.UpdatedAt)
 		}
@@ -213,7 +215,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 
 		// 3.2) Eliminar todos los items antiguos
 		if err := tx.
-			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_items") }).
+			Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "workorder_items") }).
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete old items")
@@ -221,7 +223,7 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 
 		// 3.2b) Eliminar splits antiguos
 		if err := tx.
-			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_investor_splits") }).
+			Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "workorder_investor_splits") }).
 			Where("workorder_id = ?", model.ID).
 			Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete old investor splits")
@@ -304,7 +306,7 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("workorders"), "workorders")
+		workOrderDB := tenancy.Scope(ctx, tx.Unscoped().Table("workorders"), "workorders")
 		if err := workOrderDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check work order existence")
 		}
@@ -316,7 +318,7 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 		}
 
 		var invCount int64
-		invoiceDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("invoices"), "invoices")
+		invoiceDB := tenancy.Scope(ctx, tx.Unscoped().Table("invoices"), "invoices")
 		if err := invoiceDB.Where("work_order_id = ?", id).Count(&invCount).Error; err != nil {
 			return domainerr.Internal("failed to check invoices")
 		}
@@ -325,13 +327,13 @@ func (r *Repository) HardDeleteWorkOrder(ctx context.Context, id int64) error {
 		}
 
 		// Cascada de "owned children" (no son entidades de negocio independientes).
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorder_items").Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "workorder_items").Where("workorder_id = ?", id).Delete(&models.WorkOrderItem{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order items")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorder_investor_splits").Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "workorder_investor_splits").Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order investor splits")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders").Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "workorders").Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete work order")
 		}
 		return nil
@@ -430,7 +432,7 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		archivedAt := time.Now()
 		var wo models.WorkOrder
-		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
+		workOrderDB := tenancy.Scope(ctx, tx.Unscoped(), "workorders")
 		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
@@ -445,17 +447,17 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+		if err := tenancy.Scope(ctx, tx.Table("workorder_items"), "workorder_items").
 			Where("workorder_id = ? AND deleted_at IS NULL", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "workorder_items", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive work order items")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+		if err := tenancy.Scope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
 			Where("workorder_id = ? AND deleted_at IS NULL", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "workorder_investor_splits", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive work order investor splits")
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.WorkOrder{}), "workorders").
+		if err := tenancy.Scope(ctx, tx.Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "workorders", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive work order")
@@ -471,7 +473,7 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var wo models.WorkOrder
-		workOrderDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "workorders")
+		workOrderDB := tenancy.Scope(ctx, tx.Unscoped(), "workorders")
 		if err := workOrderDB.Where("id = ?", id).First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
@@ -501,18 +503,18 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		}
 		cause := lifecycle.CauseFromRow(rowState, "workorders", id)
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.WorkOrder{}), "workorders").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.WorkOrder{}), "workorders").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "workorders", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore work order")
 		}
-		itemsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_items"), "workorder_items").
+		itemsRestore := tenancy.Scope(ctx, tx.Table("workorder_items"), "workorder_items").
 			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
 		itemsRestore = lifecycle.ApplyCauseScope(itemsRestore, "workorder_items", cause)
 		if err := itemsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_items", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore work order items")
 		}
-		splitsRestore := authz.MaybeTenantScope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
+		splitsRestore := tenancy.Scope(ctx, tx.Table("workorder_investor_splits"), "workorder_investor_splits").
 			Where("workorder_id = ? AND deleted_at IS NOT NULL", id)
 		splitsRestore = lifecycle.ApplyCauseScope(splitsRestore, "workorder_investor_splits", cause)
 		if err := splitsRestore.Updates(lifecycle.RestoreUpdates(tx, "workorder_investor_splits", restoredAt)).Error; err != nil {
@@ -537,7 +539,7 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var workOrder models.WorkOrder
-		if err := authz.MaybeTenantScope(ctx, tx.Select("id"), "workorders").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Select("id"), "workorders").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -545,7 +547,7 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 		}
 
 		updateTx := tx.Model(&models.WorkOrderInvestorSplit{}).
-			Scopes(func(db *gorm.DB) *gorm.DB { return authz.MaybeTenantScope(ctx, db, "workorder_investor_splits") }).
+			Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "workorder_investor_splits") }).
 			Where("workorder_id = ? AND investor_id = ? AND deleted_at IS NULL", workOrderID, investorID).
 			Update("payment_status", paymentStatus)
 		if updateTx.Error != nil {
@@ -808,7 +810,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 		}, nil
 	}
 	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
-		return nil, domainerr.Forbidden("tenant context required")
+		return nil, domainerr.TenantMissing()
 	}
 
 	if filt.SupplyID != nil {
@@ -847,7 +849,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filt domain.WorkOrderFilter
 		return nil, domainerr.Internal("failed to get metrics")
 	}
 
-	orderCountQuery := authz.MaybeTenantScope(ctx, r.db.Client().
+	orderCountQuery := tenancy.Scope(ctx, r.db.Client().
 		WithContext(ctx).
 		Table("workorders"), "workorders").
 		Where("deleted_at IS NULL")
@@ -934,7 +936,7 @@ func (r *Repository) getSupplyFilteredMetrics(
 func (r *Repository) GetRawDirectCost(ctx context.Context, projectID int64) (decimal.Decimal, error) {
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return decimal.Zero, domainerr.Forbidden("tenant context required")
+		return decimal.Zero, domainerr.TenantMissing()
 	}
 
 	// Query RAW: suma directa desde workorders + workorder_items
@@ -1005,7 +1007,7 @@ func (r *Repository) GetHarvestAreaSnapshot(
 
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return false, decimal.Zero, decimal.Zero, domainerr.Forbidden("tenant context required")
+		return false, decimal.Zero, decimal.Zero, domainerr.TenantMissing()
 	}
 
 	laborTenantFilter := ""
@@ -1084,7 +1086,7 @@ func (r *Repository) GetInvestorNamesByWorkOrderIDs(ctx context.Context, ids []i
 		InvestorName string `gorm:"column:investor_name"`
 	}
 	var rows []row
-	q := authz.MaybeTenantScope(ctx,
+	q := tenancy.Scope(ctx,
 		r.db.Client().WithContext(ctx).Table("workorders AS w"),
 		"w.tenant_id").
 		Select("w.id AS workorder_id, COALESCE(i.name, '') AS investor_name").

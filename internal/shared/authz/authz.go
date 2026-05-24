@@ -5,10 +5,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	platformtenancy "github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	"github.com/devpablocristo/platform/security/go/contextkeys"
 	platformtenant "github.com/devpablocristo/platform/security/go/tenant"
 )
@@ -83,7 +81,7 @@ func PrincipalFromContext(ctx context.Context) (Principal, error) {
 		return Principal{}, domainerr.Forbidden("invalid actor")
 	}
 	if tenantID == uuid.Nil {
-		return Principal{}, domainerr.Forbidden("tenant context required")
+		return Principal{}, domainerr.TenantMissing()
 	}
 
 	return Principal{
@@ -115,77 +113,16 @@ func TenantFromContext(ctx context.Context) (uuid.UUID, bool) {
 func OptionalTenantOrStrict(ctx context.Context) (uuid.UUID, bool, error) {
 	tenantID, ok := TenantFromContext(ctx)
 	if !ok && TenantStrictModeEnabled() {
-		return uuid.Nil, false, domainerr.Forbidden("tenant context required")
+		return uuid.Nil, false, domainerr.TenantMissing()
 	}
 	return tenantID, ok, nil
 }
 
-func TenantWhere(ctx context.Context, columnOrAlias string) (string, []any, error) {
-	tenantID, err := RequireTenant(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-	column := normalizeTenantColumn(columnOrAlias)
-	return column + " = ?", []any{tenantID}, nil
-}
-
-func TenantScope(ctx context.Context, db *gorm.DB, columnOrAlias string) (*gorm.DB, error) {
-	if db == nil {
-		return nil, domainerr.Internal("database connection required")
-	}
-	clause, args, err := TenantWhere(ctx, columnOrAlias)
-	if err != nil {
-		return nil, err
-	}
-	return db.Where(clause, args...), nil
-}
-
-// MaybeTenantScope delega en platform/persistence/gorm/go/tenancy.Scope.
-// Antes era una implementación local que aplicaba `tenant_id = ?` con
-// strict-mode aware fail-closed; ahora la lógica vive en platform y este
-// helper se mantiene como bridge para no romper los 35+ callers existentes.
-// Fase 7 del plan de unificación borra este forwarder.
-func MaybeTenantScope(ctx context.Context, db *gorm.DB, columnOrAlias string) *gorm.DB {
-	return platformtenancy.Scope(propagateTenant(ctx), db, columnOrAlias)
-}
-
-// TenantStrictModeEnabled delega en platform/security/go/tenant para que
-// runtime y este helper compartan la misma fuente de verdad. Mantener el
-// nombre legacy facilita la migración progresiva de callers.
+// TenantStrictModeEnabled delega en platform/security/go/tenant. Es el
+// único forwarder que queda — los demás callers de scoping migraron a
+// `platform/persistence/gorm/go/tenancy.Scope` directo (Fase 7).
 func TenantStrictModeEnabled() bool {
 	return platformtenant.StrictModeEnabled()
-}
-
-// propagateTenant garantiza que el contexto que llega a platform tenancy
-// tenga la key canónica seteada como string (platform/security/go/tenant
-// coerce uuid.UUID también, así que técnicamente no es necesario, pero
-// dejarlo explícito evita sorpresas si el caller maneja un wrapper de ctx).
-func propagateTenant(ctx context.Context) context.Context {
-	if ctx == nil {
-		return ctx
-	}
-	if _, ok := platformtenant.FromContext(ctx); ok {
-		return ctx
-	}
-	// Fallback: ponti escribe uuid.UUID directo en la key OrgID; si el ctx
-	// ya viene así, FromContext lo coerce. Este path solo aplica cuando hay
-	// keys legacy custom.
-	tenantID, ok := TenantFromContext(ctx)
-	if !ok {
-		return ctx
-	}
-	return platformtenant.WithID(ctx, platformtenant.FromUUID(tenantID))
-}
-
-func normalizeTenantColumn(columnOrAlias string) string {
-	value := strings.TrimSpace(columnOrAlias)
-	if value == "" {
-		return "tenant_id"
-	}
-	if strings.Contains(value, ".") || strings.Contains(value, "(") || strings.Contains(value, " ") {
-		return value
-	}
-	return value + ".tenant_id"
 }
 
 func HasPermission(ctx context.Context, permission string) bool {

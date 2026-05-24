@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 )
 
@@ -50,7 +52,7 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 	}
 
 	if f.ProjectID != nil {
-		query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("projects p"), "p").
+		query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 			Where("p.id = ? AND p.deleted_at IS NULL", *f.ProjectID)
 		if f.CustomerID != nil {
 			query = query.Where("p.customer_id = ?", *f.CustomerID)
@@ -93,7 +95,7 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 		}
 	}
 
-	query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("projects p"), "p").
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 		Select("DISTINCT p.id").
 		Where("p.deleted_at IS NULL")
 
@@ -145,7 +147,7 @@ func ValidateProjectAccess(ctx context.Context, db *gorm.DB, projectID int64) er
 	}
 
 	var count int64
-	query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("projects p"), "p").
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 		Where("p.id = ? AND p.deleted_at IS NULL", projectID)
 	if err := query.Count(&count).Error; err != nil {
 		return domainerr.Internal("failed to validate project tenant")
@@ -164,7 +166,7 @@ func ValidateFieldBelongsToProject(ctx context.Context, db *gorm.DB, projectID i
 	}
 
 	var count int64
-	query := authz.MaybeTenantScope(ctx, db.WithContext(ctx).Table("fields f"), "f").
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("fields f"), "f").
 		Where("f.id = ? AND f.project_id = ? AND f.deleted_at IS NULL", fieldID, projectID).
 		Count(&count)
 	if err := query.Error; err != nil {

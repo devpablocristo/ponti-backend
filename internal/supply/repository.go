@@ -15,6 +15,8 @@ import (
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
@@ -147,7 +149,7 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 // --- GET ---
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
 	if err := withSupplyLookups(db).First(&m, id).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "supply", id)
 	}
@@ -160,7 +162,7 @@ func (r *Repository) GetSuppliesByIDs(ctx context.Context, ids []int64) ([]domai
 	}
 
 	var rows []models.Supply
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
 	if err := withSupplyLookups(db).
 		Where("id IN ?", ids).
 		Find(&rows).Error; err != nil {
@@ -181,7 +183,7 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 	}
 
 	var m models.Supply
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "supplies")
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
 	err := withSupplyLookups(db).
 		Where("project_id = ?", projectID).
 		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", normalizedName).
@@ -198,7 +200,7 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 
 func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain.Investor, error) {
 	var model investormodels.Investor
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "investors")
+	db := tenancy.Scope(ctx, r.getDB(ctx), "investors")
 	err := db.Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -211,7 +213,7 @@ func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain
 
 func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain.Provider, error) {
 	var model providermodels.Provider
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx), "providers")
+	db := tenancy.Scope(ctx, r.getDB(ctx), "providers")
 	err := db.Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -224,7 +226,7 @@ func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain
 
 func (r *Repository) ProjectExists(ctx context.Context, projectID int64) (bool, error) {
 	var count int64
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Table("projects"), "projects")
+	db := tenancy.Scope(ctx, r.getDB(ctx).Table("projects"), "projects")
 	if err := db.
 		Where("id = ? AND deleted_at IS NULL", projectID).
 		Count(&count).Error; err != nil {
@@ -240,7 +242,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
 	supplyID int64,
 ) (bool, error) {
 	var count int64
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
 	if err := db.
 		Where("project_id = ? AND reference_number = ? AND supply_id = ?", projectID, reference, supplyID).
 		Count(&count).Error; err != nil {
@@ -256,7 +258,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndType(
 	movementType string,
 ) (bool, error) {
 	var count int64
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
 	if err := db.
 		Where("project_id = ? AND reference_number = ? AND movement_type = ?", projectID, reference, movementType).
 		Count(&count).Error; err != nil {
@@ -273,7 +275,7 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceSupplyAndType(
 	movementType string,
 ) (bool, error) {
 	var count int64
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
 	if err := db.
 		Where(
 			"project_id = ? AND reference_number = ? AND supply_id = ? AND movement_type = ?",
@@ -298,7 +300,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			return err
 		}
 		var count int64
-		supplyDB := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies")
+		supplyDB := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies")
 		if err := supplyDB.Where("id = ?", s.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check supply existence")
 		}
@@ -316,7 +318,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"updated_by":       s.UpdatedBy,
 			"is_pending":       s.IsPending,
 		}
-		updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies").
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", s.ID)
 		if !s.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", s.UpdatedAt)
@@ -338,7 +340,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 // --- DELETE ---
 func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	var count int64
-	db := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&workOrderModels.WorkOrder{}), "workorders")
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&workOrderModels.WorkOrder{}), "workorders")
 	if err := db.
 		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
 		Where("workorder_items.supply_id = ? AND workorders.deleted_at IS NULL", supplyID).
@@ -369,7 +371,7 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		archivedAt := time.Now()
 		var supply models.Supply
-		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies")
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped(), "supplies")
 		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
@@ -384,7 +386,7 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		if err := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies").
+		if err := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
 			Updates(lifecycle.ArchiveUpdates(tx, "supplies", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive supply")
@@ -400,7 +402,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		restoredAt := time.Now()
 		var supply models.Supply
-		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies")
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped(), "supplies")
 		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
@@ -411,7 +413,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("supply is not archived")
 		}
 		var projectActive int64
-		if err := authz.MaybeTenantScope(ctx, tx.Table("projects"), "projects").
+		if err := tenancy.Scope(ctx, tx.Table("projects"), "projects").
 			Where("id = ? AND deleted_at IS NULL", supply.ProjectID).
 			Count(&projectActive).Error; err != nil {
 			return domainerr.Internal("failed to check project")
@@ -420,7 +422,7 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("cannot restore supply while project is archived")
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped().Model(&models.Supply{}), "supplies").
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "supplies", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore supply")
@@ -436,7 +438,7 @@ func (r *Repository) ListArchivedSupplies(ctx context.Context, page, perPage int
 		Unscoped().
 		Model(&models.Supply{}).
 		Where("supplies.deleted_at IS NOT NULL")
-	base = authz.MaybeTenantScope(ctx, base, "supplies")
+	base = tenancy.Scope(ctx, base, "supplies")
 
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived supplies")
@@ -468,7 +470,7 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		supplyDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("supplies"), "supplies")
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped().Table("supplies"), "supplies")
 		if err := supplyDB.Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check supply existence")
 		}
@@ -480,7 +482,7 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 		}
 
 		var movCount int64
-		movementDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements")
+		movementDB := tenancy.Scope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements")
 		if err := movementDB.Where("supply_id = ?", id).Count(&movCount).Error; err != nil {
 			return domainerr.Internal("failed to check supply_movements")
 		}
@@ -489,7 +491,7 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 		}
 
 		var stkCount int64
-		stockDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("stocks"), "stocks")
+		stockDB := tenancy.Scope(ctx, tx.Unscoped().Table("stocks"), "stocks")
 		if err := stockDB.Where("supply_id = ?", id).Count(&stkCount).Error; err != nil {
 			return domainerr.Internal("failed to check stocks")
 		}
@@ -498,7 +500,7 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 		}
 
 		var itemCount int64
-		itemDB := authz.MaybeTenantScope(ctx, tx.Unscoped().Table("workorder_items"), "workorder_items")
+		itemDB := tenancy.Scope(ctx, tx.Unscoped().Table("workorder_items"), "workorder_items")
 		if err := itemDB.Where("supply_id = ?", id).Count(&itemCount).Error; err != nil {
 			return domainerr.Internal("failed to check workorder_items")
 		}
@@ -506,7 +508,7 @@ func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict(fmt.Sprintf("supply has %d work order item(s); archive or hard-delete them first", itemCount))
 		}
 
-		if err := authz.MaybeTenantScope(ctx, tx.Unscoped(), "supplies").Delete(&models.Supply{}, "id = ?", id).Error; err != nil {
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "supplies").Delete(&models.Supply{}, "id = ?", id).Error; err != nil {
 			if isForeignKeyViolation(err) {
 				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
 			}
@@ -526,7 +528,7 @@ func (r *Repository) ListSuppliesPaginated(
 	var supplies []models.Supply
 	var total int64
 
-	db := withSupplyLookups(authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies"))
+	db := withSupplyLookups(tenancy.Scope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies"))
 
 	// Filtrado flexible
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
@@ -591,7 +593,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 				"project_id":       supplies[i].ProjectID,
 				"updated_by":       supplies[i].UpdatedBy,
 			}
-			updateTx := authz.MaybeTenantScope(ctx, tx.Model(&models.Supply{}), "supplies").
+			updateTx := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 				Where("id = ?", supplies[i].ID)
 			if !supplies[i].UpdatedAt.IsZero() {
 				updateTx = updateTx.Where("updated_at = ?", supplies[i].UpdatedAt)
@@ -612,7 +614,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 }
 
 func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFilter) ([]domain.Supply, int64, error) {
-	base := authz.MaybeTenantScope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies")
+	base := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies")
 
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
 		CustomerID: filter.CustomerID,
@@ -675,7 +677,7 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 
 	tenantID, hasTenant := authz.TenantFromContext(ctx)
 	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return domainerr.Forbidden("tenant context required")
+		return domainerr.TenantMissing()
 	}
 
 	supplyIDs := make([]int64, 0, len(supplies))
@@ -789,7 +791,7 @@ func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []
 		Select("supply_id, COALESCE(SUM(quantity), 0) AS total").
 		Where("deleted_at IS NULL AND is_entry = TRUE AND supply_id IN ?", supplyIDs).
 		Scopes(func(db *gorm.DB) *gorm.DB {
-			return authz.MaybeTenantScope(ctx, db, "supply_movements")
+			return tenancy.Scope(ctx, db, "supply_movements")
 		}).
 		Group("supply_id").
 		Scan(&rows).Error

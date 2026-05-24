@@ -23,6 +23,8 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -52,7 +54,7 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		}
 		tenantID, hasTenant := authz.TenantFromContext(ctx)
 		if !hasTenant && authz.TenantStrictModeEnabled() {
-			return domainerr.Forbidden("tenant context required")
+			return domainerr.TenantMissing()
 		}
 		p.CreatedBy = &userID
 		p.UpdatedBy = &userID
@@ -244,7 +246,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Model(&models.Project{}).
 		// Filtrar soft-deletes explícitamente para igualar remoto.
 		Where("deleted_at IS NULL")
-	db0 = authz.MaybeTenantScope(ctx, db0, "projects")
+	db0 = tenancy.Scope(ctx, db0, "projects")
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count projects")
@@ -277,11 +279,11 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	baseClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	baseClient = authz.MaybeTenantScope(ctx, baseClient, "projects")
+	baseClient = tenancy.Scope(ctx, baseClient, "projects")
 	sumClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	sumClient = authz.MaybeTenantScope(ctx, sumClient, "projects")
+	sumClient = tenancy.Scope(ctx, sumClient, "projects")
 	if name != "" {
 		baseClient = baseClient.Where("projects.name = ?", name)
 		sumClient = sumClient.Where("projects.name = ?", name)
@@ -346,13 +348,13 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Model(&models.Project{}).
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
-	baseClient = authz.MaybeTenantScope(ctx, baseClient, "projects")
+	baseClient = tenancy.Scope(ctx, baseClient, "projects")
 	sumClient := r.db.Client().WithContext(ctx).
 		Unscoped().
 		Model(&models.Project{}).
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
-	sumClient = authz.MaybeTenantScope(ctx, sumClient, "projects")
+	sumClient = tenancy.Scope(ctx, sumClient, "projects")
 
 	if err := baseClient.Count(&total).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to count archived projects")
@@ -402,7 +404,7 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 		WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	base = authz.MaybeTenantScope(ctx, base, "projects")
+	base = tenancy.Scope(ctx, base, "projects")
 
 	if customerID > 0 {
 		base = base.Where("customer_id = ?", customerID)
@@ -447,7 +449,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		Preload("Fields.FieldInvestors.Investor").
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop")
-	query = authz.MaybeTenantScope(ctx, query, "projects")
+	query = tenancy.Scope(ctx, query, "projects")
 	err := query.
 		First(&m, id).Error
 	if err != nil {
@@ -564,7 +566,7 @@ func (r *Repository) GetProjectByNameCustomerAndCampaignID(ctx context.Context, 
 		Where("customer_id = ?", customerID).
 		Where("campaign_id = ?", campaignID).
 		Where("deleted_at IS NULL")
-	query = authz.MaybeTenantScope(ctx, query, "projects")
+	query = tenancy.Scope(ctx, query, "projects")
 	err := query.
 		First(&m).Error
 	if err != nil {
@@ -582,7 +584,7 @@ func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) 
 	query := r.db.Client().WithContext(ctx).
 		Where("project_id = ?", projectID).
 		Where("deleted_at IS NULL")
-	query = authz.MaybeTenantScope(ctx, query, "fields")
+	query = tenancy.Scope(ctx, query, "fields")
 	err := query.
 		Find(&fields).Error
 	if err != nil {
@@ -622,7 +624,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			Preload("Fields.FieldInvestors.Investor").
 			Preload("Fields.Lots").
 			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
-		query = authz.MaybeTenantScope(ctx, query, "projects")
+		query = tenancy.Scope(ctx, query, "projects")
 		err := query.
 			First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -749,7 +751,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		archivedAt := time.Now()
 		var project models.Project
 		projectQuery := tx.Unscoped().Select("id", "tenant_id", "customer_id", "deleted_at").Where("id = ?", id)
-		projectQuery = authz.MaybeTenantScope(ctx, projectQuery, "projects")
+		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
 		if err := projectQuery.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
@@ -805,7 +807,7 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		// Verificar que el proyecto esté eliminado
 		var project models.Project
 		projectQuery := tx.Unscoped().Where("id = ?", id)
-		projectQuery = authz.MaybeTenantScope(ctx, projectQuery, "projects")
+		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
 		if err := projectQuery.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
@@ -1099,7 +1101,7 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		projectQuery := tx.Unscoped().Where("id = ?", id)
-		projectQuery = authz.MaybeTenantScope(ctx, projectQuery, "projects")
+		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
 		var project models.Project
 		if err := projectQuery.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
