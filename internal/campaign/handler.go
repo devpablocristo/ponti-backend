@@ -145,7 +145,11 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, campaigns)
+	out := make([]dto.Campaign, 0, len(campaigns))
+	for _, d := range campaigns {
+		out = append(out, *dto.FromDomain(d))
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) ListArchivedCampaigns(c *gin.Context) {
@@ -155,8 +159,12 @@ func (h *Handler) ListArchivedCampaigns(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
+	out := make([]dto.Campaign, 0, len(campaigns))
+	for _, d := range campaigns {
+		out = append(out, *dto.FromDomain(d))
+	}
 	sharedhandlers.RespondOK(c, gin.H{
-		"data":      campaigns,
+		"data":      out,
 		"page_info": types.NewPageInfo(page, perPage, total),
 	})
 }
