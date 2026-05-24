@@ -2454,3 +2454,44 @@ func assertProjectReferencesActive(tx *gorm.DB, p *domain.Project) error {
 	}
 	return lifecycle.RequireAllActive(tx, refs)
 }
+
+// GetRawAdminCostTotal calcula `projects.admin_cost × Σ(lots.hectares)` RAW desde tablas base.
+// Sirve como contraparte independiente del valor SSOT `dashboard.StructureExecutedUSD`
+// (que internamente usa `v4_ssot.admin_cost_total_for_project = admin_cost × total_hectares_for_project`).
+func (r *Repository) GetRawAdminCostTotal(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	projectTenant := ""
+	lotTenant := ""
+	args := []any{projectID}
+	if hasTenant {
+		projectTenant = " AND p.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	args = append(args, projectID)
+	if hasTenant {
+		lotTenant = " AND f.tenant_id = ? AND l.tenant_id = ?"
+		args = append(args, tenantID, tenantID)
+	}
+
+	q := fmt.Sprintf(`
+		SELECT
+			COALESCE((SELECT p.admin_cost FROM public.projects p WHERE p.id = ? AND p.deleted_at IS NULL %s), 0)
+			*
+			COALESCE((
+				SELECT SUM(l.hectares)
+				FROM public.lots l
+				JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+				WHERE f.project_id = ? AND l.deleted_at IS NULL %s
+			), 0) AS total
+	`, projectTenant, lotTenant)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw admin cost total: " + err.Error())
+	}
+	return total, nil
+}

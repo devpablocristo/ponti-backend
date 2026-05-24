@@ -735,3 +735,38 @@ func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.Re
 
 	return &projectInfo, nil
 }
+
+// GetRawNetIncome calcula el ingreso neto RAW desde tablas base, sin pasar por
+// v4_ssot/v4_calc/v4_report. Sirve como contraparte independiente del valor SSOT
+// `dashboard.IncomeUSD` (que internamente usa `v4_ssot.income_net_total_for_lot`).
+// Fórmula: Σ(lots.tons × crop_commercializations.net_price) cruzando proyecto y cultivo.
+func (r *ReportRepository) GetRawNetIncome(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND f.tenant_id = ? AND l.tenant_id = ? AND cc.tenant_id = ?"
+		args = append(args, tenantID, tenantID, tenantID)
+	}
+
+	q := fmt.Sprintf(`
+		SELECT COALESCE(SUM(COALESCE(l.tons, 0) * COALESCE(cc.net_price, 0)), 0) AS total
+		FROM public.lots l
+		JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+		JOIN public.crop_commercializations cc
+		  ON cc.project_id = f.project_id
+		 AND cc.crop_id = l.current_crop_id
+		 AND cc.deleted_at IS NULL
+		WHERE f.project_id = ? AND l.deleted_at IS NULL %s
+	`, tenantFilter)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw net income: " + err.Error())
+	}
+	return total, nil
+}

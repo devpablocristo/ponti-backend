@@ -10,34 +10,37 @@ import (
 	dashboard "github.com/devpablocristo/ponti-backend/internal/dashboard"
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	lot "github.com/devpablocristo/ponti-backend/internal/lot"
+	project "github.com/devpablocristo/ponti-backend/internal/project"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
-	stock "github.com/devpablocristo/ponti-backend/internal/stock"
+	supply "github.com/devpablocristo/ponti-backend/internal/supply"
 	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
 )
 
-// ProvideDataIntegrityUseCases construye los casos de uso de dataintegrity
+// ProvideDataIntegrityUseCases construye los casos de uso de dataintegrity.
 func ProvideDataIntegrityUseCases(
-	workOrderRepo dataintegrity.WorkOrderRepositoryPort,
 	dashboardRepo dataintegrity.DashboardRepositoryPort,
-	lotRepo dataintegrity.LotRepositoryPort,
+	workOrderRepo dataintegrity.WorkOrderRepositoryPort,
 	reportRepo dataintegrity.ReportRepositoryPort,
-	stockRepo dataintegrity.StockRepositoryPort,
+	supplyRepo dataintegrity.SupplyRepositoryPort,
+	projectRepo dataintegrity.ProjectRepositoryPort,
+	lotRepo dataintegrity.LotRepositoryPort,
 ) *dataintegrity.UseCases {
 	return dataintegrity.NewUseCases(
-		workOrderRepo,
 		dashboardRepo,
-		lotRepo,
+		workOrderRepo,
 		reportRepo,
-		stockRepo,
+		supplyRepo,
+		projectRepo,
+		lotRepo,
 	)
 }
 
-// ProvideDataIntegrityUseCasesPort adapta *dataintegrity.UseCases a la interfaz dataintegrity.UseCasesPort
+// ProvideDataIntegrityUseCasesPort adapta *dataintegrity.UseCases a la interfaz dataintegrity.UseCasesPort.
 func ProvideDataIntegrityUseCasesPort(uc *dataintegrity.UseCases) dataintegrity.UseCasesPort {
 	return uc
 }
 
-// ProvideDataIntegrityHandler construye el handler HTTP para Data Integrity
+// ProvideDataIntegrityHandler construye el handler HTTP para Data Integrity.
 func ProvideDataIntegrityHandler(
 	server dataintegrity.GinEnginePort,
 	useCases dataintegrity.UseCasesPort,
@@ -47,47 +50,56 @@ func ProvideDataIntegrityHandler(
 	return dataintegrity.NewHandler(useCases, server, cfg, middlewares)
 }
 
-// ProvideDataIntegrityConfigAPI extrae la configuración específica de API para Data Integrity
+// ProvideDataIntegrityConfigAPI extrae la configuración específica de API para Data Integrity.
 func ProvideDataIntegrityConfigAPI(cfg *config.Config) dataintegrity.ConfigAPIPort {
 	return &cfg.API
 }
 
-// ProvideDataIntegrityGinEnginePort adapta *pgin.Server a dataintegrity.GinEnginePort
+// ProvideDataIntegrityGinEnginePort adapta *pgin.Server a dataintegrity.GinEnginePort.
 func ProvideDataIntegrityGinEnginePort(s *pgin.Server) dataintegrity.GinEnginePort {
 	return s
 }
 
-// ProvideDataIntegrityMiddlewaresEnginePort adapta *mwr.Middlewares a dataintegrity.MiddlewaresEnginePort
+// ProvideDataIntegrityMiddlewaresEnginePort adapta *mwr.Middlewares a dataintegrity.MiddlewaresEnginePort.
 func ProvideDataIntegrityMiddlewaresEnginePort(m *mwr.Middlewares) dataintegrity.MiddlewaresEnginePort {
 	return m
 }
 
-// ProvideDataIntegrityWorkOrderRepositoryPort adapta workorder.RepositoryPort a dataintegrity.WorkOrderRepositoryPort.
-func ProvideDataIntegrityWorkOrderRepositoryPort(r workorder.RepositoryPort) dataintegrity.WorkOrderRepositoryPort {
-	return r
-}
-
-// ProvideDataIntegrityDashboardRepositoryPort adapta dashboard.RepositoryPort a dataintegrity.DashboardRepositoryPort
+// ProvideDataIntegrityDashboardRepositoryPort adapta dashboard.RepositoryPort.
 func ProvideDataIntegrityDashboardRepositoryPort(r dashboard.RepositoryPort) dataintegrity.DashboardRepositoryPort {
 	return r
 }
 
-// ProvideDataIntegrityLotRepositoryPort adapta lot.RepositoryPort a dataintegrity.LotRepositoryPort
-func ProvideDataIntegrityLotRepositoryPort(r lot.RepositoryPort) dataintegrity.LotRepositoryPort {
+// ProvideDataIntegrityWorkOrderRepositoryPort adapta workorder.RepositoryPort.
+// workorder.RepositoryPort ya incluye GetRawDirectCost, único método requerido por
+// la interfaz mínima del módulo data-integrity.
+func ProvideDataIntegrityWorkOrderRepositoryPort(r workorder.RepositoryPort) dataintegrity.WorkOrderRepositoryPort {
 	return r
 }
 
-// ProvideDataIntegrityReportRepositoryPort adapta report.ReportRepositoryPort a dataintegrity.ReportRepositoryPort
-func ProvideDataIntegrityReportRepositoryPort(r report.ReportRepositoryPort) dataintegrity.ReportRepositoryPort {
+// ProvideDataIntegrityReportRepositoryPort recibe el repo concreto porque GetRawNetIncome
+// vive en *report.ReportRepository pero no se expone en report.ReportRepositoryPort para
+// no contaminar la interfaz pública con métodos exclusivos de data-integrity.
+func ProvideDataIntegrityReportRepositoryPort(r *report.ReportRepository) dataintegrity.ReportRepositoryPort {
 	return r
 }
 
-// ProvideDataIntegrityStockRepositoryPort adapta stock.RepositoryPort a dataintegrity.StockRepositoryPort
-func ProvideDataIntegrityStockRepositoryPort(r stock.RepositoryPort) dataintegrity.StockRepositoryPort {
+// ProvideDataIntegritySupplyRepositoryPort recibe el repo concreto (ver razón en ReportRepositoryPort).
+func ProvideDataIntegritySupplyRepositoryPort(r *supply.Repository) dataintegrity.SupplyRepositoryPort {
 	return r
 }
 
-// DataIntegritySet expone todos los providers necesarios para Data Integrity
+// ProvideDataIntegrityProjectRepositoryPort recibe el repo concreto (ver razón en ReportRepositoryPort).
+func ProvideDataIntegrityProjectRepositoryPort(r *project.Repository) dataintegrity.ProjectRepositoryPort {
+	return r
+}
+
+// ProvideDataIntegrityLotRepositoryPort recibe el repo concreto (ver razón en ReportRepositoryPort).
+func ProvideDataIntegrityLotRepositoryPort(r *lot.Repository) dataintegrity.LotRepositoryPort {
+	return r
+}
+
+// DataIntegritySet expone todos los providers necesarios para Data Integrity.
 var DataIntegritySet = wire.NewSet(
 	ProvideDataIntegrityUseCases,
 	ProvideDataIntegrityUseCasesPort,
@@ -95,9 +107,10 @@ var DataIntegritySet = wire.NewSet(
 	ProvideDataIntegrityConfigAPI,
 	ProvideDataIntegrityGinEnginePort,
 	ProvideDataIntegrityMiddlewaresEnginePort,
-	ProvideDataIntegrityWorkOrderRepositoryPort,
 	ProvideDataIntegrityDashboardRepositoryPort,
-	ProvideDataIntegrityLotRepositoryPort,
+	ProvideDataIntegrityWorkOrderRepositoryPort,
 	ProvideDataIntegrityReportRepositoryPort,
-	ProvideDataIntegrityStockRepositoryPort,
+	ProvideDataIntegritySupplyRepositoryPort,
+	ProvideDataIntegrityProjectRepositoryPort,
+	ProvideDataIntegrityLotRepositoryPort,
 )

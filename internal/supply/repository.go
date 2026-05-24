@@ -827,3 +827,44 @@ func assertSupplyReferencesActive(tx *gorm.DB, s *domain.Supply) error {
 	}
 	return lifecycle.RequireAllActive(tx, refs)
 }
+
+// GetRawSupplyInvestment calcula la inversión total en insumos (semillas + agroquímicos +
+// fertilizantes) RAW desde tablas base, sin pasar por v4_ssot/v4_calc/v4_report. Replica
+// el filtro que aplican `seeds_invested_for_project_mb` y `agrochemicals_invested_for_project_mb`
+// (categorías de los 3 tipos de insumo) sobre `supply_movements` directamente.
+// Sirve como contraparte independiente de
+// `dashboard.SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD`.
+func (r *Repository) GetRawSupplyInvestment(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND sm.tenant_id = ? AND s.tenant_id = ? AND c.tenant_id = ?"
+		args = append(args, tenantID, tenantID, tenantID)
+	}
+
+	// type_id 1 = semillas, 2 = agroquímicos, 3 = fertilizantes (definido en public.types).
+	// movement_type whitelist coincide con seeds_invested_for_project_mb / agrochemicals_invested_for_project_mb.
+	q := fmt.Sprintf(`
+		SELECT COALESCE(SUM(COALESCE(sm.quantity, 0) * COALESCE(s.price, 0)), 0) AS total
+		FROM public.supply_movements sm
+		JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
+		JOIN public.categories c ON c.id = s.category_id AND c.deleted_at IS NULL
+		WHERE sm.project_id = ?
+		  AND sm.deleted_at IS NULL
+		  AND sm.is_entry = TRUE
+		  AND c.type_id IN (1, 2, 3)
+		  AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
+		  %s
+	`, tenantFilter)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw supply investment: " + err.Error())
+	}
+	return total, nil
+}

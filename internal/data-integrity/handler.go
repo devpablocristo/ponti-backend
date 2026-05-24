@@ -88,8 +88,8 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	}
 	filter.ProjectID = projectID
 
-	// Timeout 8 min para permitir completar los 14 controles (optimizados con cache)
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Minute)
+	// Cada control hace 2 queries cortas; 30s alcanza con holgura.
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	// Ejecutar caso de uso

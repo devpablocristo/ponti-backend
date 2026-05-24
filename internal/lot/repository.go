@@ -820,3 +820,40 @@ func assertLotReferencesActive(tx *gorm.DB, l *domain.Lot) error {
 	}
 	return lifecycle.RequireAllActive(tx, refs)
 }
+
+// GetRawLeaseExecuted calcula el arriendo ejecutado (solo tipos fijos 3 y 4) RAW desde
+// tablas base, sin pasar por v4_ssot/v4_calc/v4_report. Sirve como contraparte
+// independiente del valor SSOT `dashboard.RentExecutedUSD` (que internamente usa
+// `v4_ssot.lease_executed_for_project`, mismo CASE).
+// Fórmula: Σ CASE WHEN fields.lease_type_id IN (3,4) THEN fields.lease_type_value × lots.hectares ELSE 0.
+func (r *Repository) GetRawLeaseExecuted(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND f.tenant_id = ? AND l.tenant_id = ?"
+		args = append(args, tenantID, tenantID)
+	}
+
+	q := fmt.Sprintf(`
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN f.lease_type_id IN (3, 4) THEN COALESCE(f.lease_type_value, 0) * COALESCE(l.hectares, 0)
+				ELSE 0
+			END
+		), 0) AS total
+		FROM public.lots l
+		JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+		WHERE f.project_id = ? AND l.deleted_at IS NULL %s
+	`, tenantFilter)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw lease executed: " + err.Error())
+	}
+	return total, nil
+}
