@@ -53,11 +53,8 @@ type fakeRepo struct {
 	memberships []MeMembership
 	perms       []RolePermission
 
-	createCalls       int
 	createInviteCalls int
 	upsertCalls       int
-
-	errCreate error
 }
 
 func (r *fakeRepo) EnsureLocalUserByIDPSub(_ context.Context, idpSub, email string) (*LocalUser, error) {

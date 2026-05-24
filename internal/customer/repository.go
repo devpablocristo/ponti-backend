@@ -334,53 +334,6 @@ var customerProjectScopedArchiveTables = []string{
 	"admin_cost_investors",
 }
 
-// archiveCustomerProjectChildren — UNUSED after migration to RunCascadeArchive.
-// Kept only as the inner helper of the legacy restoreCustomerProjectGraph;
-// restore migration to RunCascadeRestore is a follow-up (see plan §10C).
-func archiveCustomerProjectChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
-	if len(fieldIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "field_investors", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
-			return err
-		}
-	}
-	if len(lotIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "lot_dates", tenantID, archivedAt, deletedBy, cause, "lot_id IN ?", lotIDs); err != nil {
-			return err
-		}
-	}
-	if len(workOrderIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "workorder_items", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.ArchiveScopedRows(tx, "workorder_investor_splits", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-	}
-	if len(draftIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func archiveProjectScopedCustomerTable(tx *gorm.DB, table string, projectIDs []int64, tenantID uuid.UUID, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
-	if !tx.Migrator().HasTable(table) {
-		return nil
-	}
-	update := tx.Table(table).Where("project_id IN ? AND deleted_at IS NULL", projectIDs)
-	if tenantID != uuid.Nil && tx.Migrator().HasColumn(table, "tenant_id") {
-		update = update.Where("tenant_id = ?", tenantID)
-	}
-	if err := update.Updates(lifecycle.ArchiveUpdates(tx, table, archivedAt, deletedBy, cause)).Error; err != nil {
-		return domainerr.Internal(fmt.Sprintf("failed to archive %s", table))
-	}
-	return nil
-}
-
 func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err

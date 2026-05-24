@@ -137,14 +137,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	out, err := h.uc.CreateUser(c.Request.Context(), CreateUserInput{
-		Email:         req.Email,
-		Username:      req.Username,
-		Password:      req.Password,
-		TenantName:    req.TenantName,
-		RoleName:      req.RoleName,
-		SendResetLink: req.SendResetLink,
-	})
+	out, err := h.uc.CreateUser(c.Request.Context(), CreateUserInput(req))
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -185,12 +178,7 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, tenantID, err := h.uc.UpsertMembership(c.Request.Context(), UpsertMembershipInput{
-		Email:      req.Email,
-		Username:   req.Username,
-		TenantName: req.TenantName,
-		RoleName:   req.RoleName,
-	})
+	userID, tenantID, err := h.uc.UpsertMembership(c.Request.Context(), UpsertMembershipInput(req))
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

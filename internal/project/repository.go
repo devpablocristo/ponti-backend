@@ -965,36 +965,6 @@ var projectScopedSoftDeleteTables = []projectScopedSoftDeleteTable{
 	{name: "admin_cost_investors", errorMessage: "failed to soft delete admin cost investors"},
 }
 
-func archiveProjectGraphChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
-	if len(fieldIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "field_investors", tenantID, archivedAt, deletedBy, cause, "field_id IN ?", fieldIDs); err != nil {
-			return err
-		}
-	}
-	if len(lotIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "lot_dates", tenantID, archivedAt, deletedBy, cause, "lot_id IN ?", lotIDs); err != nil {
-			return err
-		}
-	}
-	if len(workOrderIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "workorder_items", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.ArchiveScopedRows(tx, "workorder_investor_splits", tenantID, archivedAt, deletedBy, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-	}
-	if len(draftIDs) > 0 {
-		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_items", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.ArchiveScopedRows(tx, "work_order_draft_investor_splits", tenantID, archivedAt, deletedBy, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func restoreProjectGraphChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, restoredAt time.Time, cause lifecycle.Cause) error {
 	if len(fieldIDs) > 0 {
 		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
@@ -1054,22 +1024,6 @@ func restoreProjectChildIDs(tx *gorm.DB, table string, idColumn string, tenantID
 		return nil, domainerr.Internal("failed to list archived " + table)
 	}
 	return ids, nil
-}
-
-func archiveProjectScopedTables(tx *gorm.DB, projectID int64, archivedAt time.Time, deletedBy *string, cause lifecycle.Cause) error {
-	for _, table := range projectScopedSoftDeleteTables {
-		if !tx.Migrator().HasTable(table.name) {
-			continue
-		}
-		update := tx.Table(table.name).Where("project_id = ? AND deleted_at IS NULL", projectID)
-		if tenantID, ok := tenantIDFromTx(tx); ok && tx.Migrator().HasColumn(table.name, "tenant_id") {
-			update = update.Where("tenant_id = ?", tenantID)
-		}
-		if err := update.Updates(lifecycle.ArchiveUpdates(tx, table.name, archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal(table.errorMessage)
-		}
-	}
-	return nil
 }
 
 func restoreProjectScopedTables(tx *gorm.DB, projectID int64, restoredAt time.Time, cause lifecycle.Cause) error {
