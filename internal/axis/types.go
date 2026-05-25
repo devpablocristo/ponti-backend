@@ -6,34 +6,30 @@ package axis
 
 import "time"
 
-// ChatRequest matchea el DTO REAL de Companion en
-// `axis/companion/internal/tasks/handler/dto/dto.go::ChatRequest`. Solo 4
-// campos: `message`/`task_id`/`channel`/`product_surface`.
-//
-// IMPORTANTE: Companion decodifica con `dec.DisallowUnknownFields()`. Cualquier
-// campo extra rompe con `400 invalid json`. El OpenAPI declara `chat_id`,
-// `route_hint`, `confirmed_actions`, `handoff` pero el binario no los acepta.
-// Para continuar una conversación, mandar el UUID en `task_id` (Companion lo
-// usa para enganchar al task durable). El FE manda `chat_id` y el adapter lo
-// re-mapea a `task_id` antes de enviar.
+// ChatRequest matchea el DTO de Companion en
+// `axis/companion/internal/tasks/handler/dto/dto.go::ChatRequest`.
+// Para continuar una conversación durable, Ponti debe enviar `chat_id`; `task_id`
+// queda reservado para callers internos que conocen el UUID de la task.
 type ChatRequest struct {
 	Message        string `json:"message"`
 	TaskID         string `json:"task_id,omitempty"`
+	ChatID         string `json:"chat_id,omitempty"`
 	Channel        string `json:"channel,omitempty"`
 	ProductSurface string `json:"product_surface,omitempty"`
 }
 
 // ChatResponse matchea el schema `ChatResponse` del OpenAPI de Companion.
 type ChatResponse struct {
-	ChatID               string          `json:"chat_id,omitempty"`
-	Reply                string          `json:"reply"`
-	Blocks               []ChatBlock     `json:"blocks,omitempty"`
-	ToolCalls            []ChatToolCall  `json:"tool_calls,omitempty"`
-	PendingConfirmations []any           `json:"pending_confirmations,omitempty"`
-	Task                 Task            `json:"task"`
-	Messages             []Message       `json:"messages"`
-	RoutedAgent          string          `json:"routed_agent,omitempty"`
-	RoutingSource        string          `json:"routing_source,omitempty"`
+	ChatID               string         `json:"chat_id,omitempty"`
+	TaskID               string         `json:"task_id,omitempty"`
+	Reply                string         `json:"reply"`
+	Blocks               []ChatBlock    `json:"blocks,omitempty"`
+	ToolCalls            []ChatToolCall `json:"tool_calls,omitempty"`
+	PendingConfirmations []any          `json:"pending_confirmations,omitempty"`
+	Task                 Task           `json:"task"`
+	Messages             []Message      `json:"messages"`
+	RoutedAgent          string         `json:"routed_agent,omitempty"`
+	RoutingSource        string         `json:"routing_source,omitempty"`
 }
 
 // ChatBlock es un bloque del response (texto, código, etc.). Companion los usa
@@ -93,11 +89,25 @@ type ConversationSummary struct {
 	ProductSurface string    `json:"product_surface,omitempty"`
 }
 
+// ConversationMessage describe un mensaje persistido en agent_conversations.
+// Es el contrato canónico de Companion/platform para el historial.
+type ConversationMessage struct {
+	Role      string      `json:"role"`
+	Content   string      `json:"content"`
+	Timestamp time.Time   `json:"timestamp,omitempty"`
+	Blocks    []ChatBlock `json:"blocks,omitempty"`
+}
+
 // ConversationDetail es el response de `GET /v1/chat/conversations/{id}`.
 // Incluye los mensajes ordenados cronológicamente.
 type ConversationDetail struct {
-	ConversationSummary
-	Messages []Message `json:"messages"`
+	ID             string                `json:"id"`
+	Title          string                `json:"title"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+	CreatedAt      time.Time             `json:"created_at"`
+	MessageCount   int                   `json:"message_count,omitempty"`
+	ProductSurface string                `json:"product_surface,omitempty"`
+	Messages       []ConversationMessage `json:"messages"`
 }
 
 // CallContext lleva la identidad real del usuario final que origina el turno.

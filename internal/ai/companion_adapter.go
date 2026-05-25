@@ -11,6 +11,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 
@@ -161,28 +162,25 @@ func (a *CompanionAdapter) DoStream(
 }
 
 // chatWithOrphanFallback ejecuta `Chat` y, si Companion responde 404 NOT_FOUND
-// porque el `task_id` (= `chat_id` del FE) ya no existe en su DB, reintenta
-// SIN `task_id` para crear una conversación nueva. Eso evita que un FE con
-// state stale (chat_id huérfano tras reinicio de companion-postgres o cambio
-// de tenant) deje al usuario atrapado sin poder mandar mensajes.
-//
-// Si la primera llamada no traía task_id, no se retira nada extra y el error
-// se propaga tal cual.
+// porque el `chat_id` o `task_id` ya no existe en su DB, reintenta sin
+// identificadores para crear una conversación nueva. Eso evita que un FE con
+// state stale quede atrapado sin poder mandar mensajes.
 func (a *CompanionAdapter) chatWithOrphanFallback(ctx context.Context, call axis.CallContext, req axis.ChatRequest) (*axis.ChatResponse, error) {
 	resp, err := a.client.Chat(ctx, call, req)
 	if err == nil {
 		return resp, nil
 	}
-	// Solo aplica fallback si traíamos task_id y el error es NOT_FOUND.
-	if req.TaskID == "" {
+	// Solo aplica fallback si traíamos un identificador y el error es NOT_FOUND.
+	if req.TaskID == "" && req.ChatID == "" {
 		return nil, err
 	}
 	if !errors.Is(err, domainerrNotFound) && !isNotFoundError(err) {
 		return nil, err
 	}
-	// Retry sin task_id (crea conversación nueva).
+	// Retry sin identificadores (crea conversación nueva).
 	retried := req
 	retried.TaskID = ""
+	retried.ChatID = ""
 	return a.client.Chat(ctx, call, retried)
 }
 
@@ -228,27 +226,21 @@ func toChatRequest(body any, projectID string) (axis.ChatRequest, error) {
 	if v, ok := m["message"].(string); ok {
 		req.Message = v
 	}
-	// El FE manda `chat_id` (UUID de la conversación a continuar). Companion
-	// internamente usa `task_id` para anclar la conversación durable — el OpenAPI
-	// declara `chat_id` pero el binario solo lee `task_id`. Mapeamos acá:
-	// - Si llega `task_id` explícito, gana (callers internos directos).
-	// - Sino, usamos `chat_id` como `task_id`.
+	// El FE manda `chat_id` (UUID de la conversación durable). Companion lo usa
+	// para buscar la task asociada en agent_conversations. `task_id` queda sólo
+	// para callers internos directos que conocen el UUID de la task.
 	if v, ok := m["task_id"].(string); ok && v != "" {
 		req.TaskID = v
 	} else if v, ok := m["chat_id"].(string); ok {
-		req.TaskID = v
+		req.ChatID = v
 	}
 	if v, ok := m["channel"].(string); ok && v != "" {
 		req.Channel = v
 	} else {
 		req.Channel = "api"
 	}
-	// NOTA: `route_hint` está en el OpenAPI de Companion pero el binario actual
-	// rechaza el JSON cuando viene seteado (`invalid json`). Lo dejamos siempre
-	// en "" para no romper. Si en el futuro Companion vuelve a soportarlo,
-	// reactivar la lógica que tomaba `m["route_hint"]` y concatenaba project_id.
-	// `projectID` queda fuera del payload por ahora — Companion no tiene noción
-	// nativa de project y mandarlo en route_hint disparaba el bug.
+	// `projectID` queda fuera del payload por ahora: Companion no tiene noción
+	// nativa de project en el contrato conversacional.
 	_ = projectID
 	if req.Message == "" {
 		return axis.ChatRequest{}, errors.New("message is required")
@@ -294,7 +286,42 @@ func marshalCompanionList(list *axis.ConversationList) (int, []byte, error) {
 
 // marshalCompanionDetail convierte el detalle al shape del FE.
 func marshalCompanionDetail(detail *axis.ConversationDetail) (int, []byte, error) {
-	raw, err := json.Marshal(detail)
+	type frontendMessage struct {
+		Role      string           `json:"role"`
+		Content   string           `json:"content"`
+		Timestamp *time.Time       `json:"ts,omitempty"`
+		Blocks    []axis.ChatBlock `json:"blocks,omitempty"`
+	}
+	type frontendDetail struct {
+		ID        string            `json:"id"`
+		Title     string            `json:"title"`
+		Messages  []frontendMessage `json:"messages"`
+		CreatedAt time.Time         `json:"created_at"`
+		UpdatedAt time.Time         `json:"updated_at"`
+	}
+
+	messages := make([]frontendMessage, 0, len(detail.Messages))
+	for _, msg := range detail.Messages {
+		var ts *time.Time
+		if !msg.Timestamp.IsZero() {
+			t := msg.Timestamp
+			ts = &t
+		}
+		messages = append(messages, frontendMessage{
+			Role:      msg.Role,
+			Content:   msg.Content,
+			Timestamp: ts,
+			Blocks:    msg.Blocks,
+		})
+	}
+
+	raw, err := json.Marshal(frontendDetail{
+		ID:        detail.ID,
+		Title:     detail.Title,
+		Messages:  messages,
+		CreatedAt: detail.CreatedAt,
+		UpdatedAt: detail.UpdatedAt,
+	})
 	if err != nil {
 		return 0, nil, fmt.Errorf("marshal conversation detail: %w", err)
 	}

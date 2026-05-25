@@ -71,7 +71,7 @@ func TestChat_SignsJWTAndForwardsBody(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	resp, err := c.Chat(context.Background(),
 		CallContext{OrgID: "org-99", Actor: "user@ponti.local", Scopes: []string{"companion:tasks:write"}},
-		ChatRequest{Message: "hola", ProductSurface: "ponti"},
+		ChatRequest{Message: "hola", ChatID: "chat-99", ProductSurface: "ponti"},
 	)
 	if err != nil {
 		t.Fatalf("Chat: %v", err)
@@ -100,7 +100,7 @@ func TestChat_SignsJWTAndForwardsBody(t *testing.T) {
 		t.Fatalf("expected iss/aud, got iss=%v aud=%v", claims["iss"], claims["aud"])
 	}
 
-	if seenBody.Message != "hola" || seenBody.ProductSurface != "ponti" {
+	if seenBody.Message != "hola" || seenBody.ChatID != "chat-99" || seenBody.ProductSurface != "ponti" {
 		t.Fatalf("body not forwarded as expected: %+v", seenBody)
 	}
 }
@@ -130,9 +130,9 @@ func TestChat_DefaultsScopesWhenEmpty(t *testing.T) {
 
 func TestChat_MapsHTTPErrors(t *testing.T) {
 	cases := []struct {
-		name     string
-		status   int
-		wantMsg  string
+		name    string
+		status  int
+		wantMsg string
 	}{
 		{"unauthorized", 401, "authentication failed"},
 		{"forbidden", 403, "forbidden"},
@@ -216,5 +216,40 @@ func TestGetConversation_PathEscapesID(t *testing.T) {
 	}
 	if rawPath != "/v1/chat/conversations/abc%2Fdef" {
 		t.Fatalf("expected path-escaped, got %q", rawPath)
+	}
+}
+
+func TestGetConversation_DecodesCanonicalMessages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{
+			"id":"8ee190ab-80c8-4242-a03b-f00bd185a956",
+			"title":"historial",
+			"created_at":"2026-05-25T18:00:00Z",
+			"updated_at":"2026-05-25T18:01:00Z",
+			"messages":[
+				{"role":"user","content":"hola","timestamp":"2026-05-25T18:00:00Z"},
+				{"role":"assistant","content":"respuesta","timestamp":"2026-05-25T18:01:00Z"}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	out, err := c.GetConversation(context.Background(), CallContext{OrgID: "o", Actor: "a"}, "8ee190ab-80c8-4242-a03b-f00bd185a956")
+	if err != nil {
+		t.Fatalf("GetConversation: %v", err)
+	}
+	if out.ID != "8ee190ab-80c8-4242-a03b-f00bd185a956" || len(out.Messages) != 2 {
+		t.Fatalf("unexpected detail: %+v", out)
+	}
+	if out.Messages[0].Role != "user" || out.Messages[0].Content != "hola" {
+		t.Fatalf("first message not decoded: %+v", out.Messages[0])
+	}
+	if out.Messages[1].Role != "assistant" || out.Messages[1].Content != "respuesta" {
+		t.Fatalf("second message not decoded: %+v", out.Messages[1])
+	}
+	if out.Messages[0].Timestamp.IsZero() {
+		t.Fatalf("expected timestamp decoded: %+v", out.Messages[0])
 	}
 }

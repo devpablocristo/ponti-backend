@@ -64,6 +64,26 @@ func main() {
 	out, _ := json.MarshalIndent(resp, "", "  ")
 	fmt.Println(string(out))
 
+	if resp.ChatID != "" {
+		fmt.Println("\n=== POST /v1/chat (continue chat_id) ===")
+		follow, err := client.Chat(ctx, call, axis.ChatRequest{
+			ChatID:         resp.ChatID,
+			Message:        "continuacion smoke desde ponti-backend",
+			Channel:        "api",
+			ProductSurface: "ponti",
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Chat continue error: %v\n", err)
+			os.Exit(1)
+		}
+		if follow.ChatID != resp.ChatID {
+			fmt.Fprintf(os.Stderr, "Chat continue changed chat_id: got %s want %s\n", follow.ChatID, resp.ChatID)
+			os.Exit(1)
+		}
+		out, _ = json.MarshalIndent(follow, "", "  ")
+		fmt.Println(string(out))
+	}
+
 	fmt.Println("\n=== GET /v1/chat/conversations?limit=5 ===")
 	list, err := client.ListConversations(ctx, call, 5)
 	if err != nil {

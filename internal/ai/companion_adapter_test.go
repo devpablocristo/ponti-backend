@@ -86,9 +86,8 @@ func TestCompanionAdapter_Chat_RejectsEmptyMessage(t *testing.T) {
 	}
 }
 
-// Nota: el `route_hint` con project ID se removió porque el binario actual de
-// Companion rechaza el JSON cuando viene seteado (`invalid json`), aunque el
-// OpenAPI declara el campo. El adapter ya no lo envía; ver companion_adapter.go.
+// Nota: Ponti mantiene `route_hint` como detalle del FE, pero Companion todavía
+// no consume project context en el contrato conversacional.
 func TestCompanionAdapter_Chat_DoesNotSendRouteHint(t *testing.T) {
 	var hasRouteHint bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +108,37 @@ func TestCompanionAdapter_Chat_DoesNotSendRouteHint(t *testing.T) {
 		t.Fatalf("Do: %v", err)
 	}
 	if hasRouteHint {
-		t.Fatal("expected adapter NOT to send route_hint (companion rejects it)")
+		t.Fatal("expected adapter NOT to send route_hint")
+	}
+}
+
+func TestCompanionAdapter_Chat_SendsChatIDAsChatID(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &got)
+		w.WriteHeader(200)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"chat_id":  got["chat_id"],
+			"reply":    "ok",
+			"task":     map[string]any{"id": "task-1"},
+			"messages": []any{},
+		})
+	}))
+	defer srv.Close()
+
+	a := newAdapter(t, srv.URL)
+	_, _, err := a.Do(context.Background(), "POST", "/v1/chat",
+		map[string]any{"message": "seguimos", "chat_id": "8ee190ab-80c8-4242-a03b-f00bd185a956"},
+		"u", "o", "proj-77")
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if got["chat_id"] != "8ee190ab-80c8-4242-a03b-f00bd185a956" {
+		t.Fatalf("expected chat_id forwarded, got body %+v", got)
+	}
+	if _, ok := got["task_id"]; ok {
+		t.Fatalf("did not expect chat_id to be sent as task_id: %+v", got)
 	}
 }
 
@@ -148,6 +177,48 @@ func TestCompanionAdapter_GetConversation_RoutesByPath(t *testing.T) {
 	}
 	if status != 200 || gotPath != "/v1/chat/conversations/conv-1" {
 		t.Fatalf("unexpected status=%d path=%q", status, gotPath)
+	}
+}
+
+func TestCompanionAdapter_GetConversation_MapsCanonicalMessagesForFrontend(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{
+			"id":"8ee190ab-80c8-4242-a03b-f00bd185a956",
+			"title":"historial",
+			"created_at":"2026-05-25T18:00:00Z",
+			"updated_at":"2026-05-25T18:01:00Z",
+			"messages":[
+				{"role":"user","content":"hola","timestamp":"2026-05-25T18:00:00Z"},
+				{"role":"assistant","content":"respuesta","timestamp":"2026-05-25T18:01:00Z"}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	a := newAdapter(t, srv.URL)
+	status, body, err := a.Do(context.Background(), "GET", "/v1/chat/conversations/8ee190ab-80c8-4242-a03b-f00bd185a956", nil, "u", "o", "")
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if status != 200 {
+		t.Fatalf("expected 200, got %d", status)
+	}
+	var out struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+			TS      string `json:"ts"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(out.Messages) != 2 || out.Messages[0].Content != "hola" || out.Messages[1].Content != "respuesta" {
+		t.Fatalf("messages not mapped for frontend: %+v", out.Messages)
+	}
+	if out.Messages[0].TS == "" {
+		t.Fatalf("expected timestamp mapped to ts: %+v", out.Messages[0])
 	}
 }
 
