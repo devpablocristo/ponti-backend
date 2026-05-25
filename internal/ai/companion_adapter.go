@@ -21,9 +21,8 @@ import (
 // genéricas que el handler hace (`/v1/chat`, `/v1/chat/conversations*`) en
 // invocaciones tipadas al cliente Companion.
 //
-// El handler sigue invocando los métodos sin saber de Companion — el switch
-// vive en el wire. Esto permite cutover progresivo via env var
-// `AI_BACKEND=ponti-ai|companion` sin tocar el handler.
+// El handler sigue invocando los métodos sin saber de Companion; el cutover
+// vive en el wire y ya no hay cliente ponti-ai legacy.
 //
 // Notas críticas:
 //   - Companion NO tiene SSE: `DoStream` ejecuta el chat síncrono y emite un
@@ -51,7 +50,7 @@ func (a *CompanionAdapter) Do(
 	userID, tenantID, projectID string,
 ) (int, []byte, error) {
 	if a.client == nil {
-		return 0, nil, domainerr.Unavailable("ai service url not configured")
+		return 0, nil, domainerr.Unavailable("companion client not configured")
 	}
 	call := axis.CallContext{
 		OrgID: strings.TrimSpace(tenantID),
@@ -104,7 +103,7 @@ func (a *CompanionAdapter) DoStream(
 	userID, tenantID, projectID string,
 ) (*http.Response, error) {
 	if a.client == nil {
-		return nil, domainerr.Unavailable("ai service url not configured")
+		return nil, domainerr.Unavailable("companion client not configured")
 	}
 	if method != http.MethodPost || urlPath != "/v1/chat/stream" {
 		return nil, domainerr.NotFound(fmt.Sprintf("companion adapter: stream route not supported %s %s", method, urlPath))
@@ -306,7 +305,7 @@ func marshalCompanionDetail(detail *axis.ConversationDetail) (int, []byte, error
 // para que el handler maneje el caso fallback dummy igual que con ponti-ai.
 func mapAxisErr(err error) (int, []byte, error) {
 	if errors.Is(err, axis.ErrNotConfigured) {
-		return 0, nil, domainerr.Unavailable("ai service url not configured")
+		return 0, nil, domainerr.Unavailable("companion client not configured")
 	}
 	return 0, nil, err
 }

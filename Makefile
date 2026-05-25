@@ -127,7 +127,7 @@ db-adopt-baseline:
 # --------------------------------------------------
 dev:
 	@echo "Starting dev environment with hot reload (Air)..."
-	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/core/*."; fi
+	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/platform/*."; fi
 	$(compose_cmd) up --build -d ponti-db
 	@echo "Waiting for DB to be healthy..."
 	@until $(compose_cmd) exec ponti-db pg_isready -U $${DB_USER:-admin} -q 2>/dev/null; do sleep 1; done
@@ -141,7 +141,7 @@ dev-logs:
 # --------------------------------------------------
 up:
 	@echo "Starting services in background (compose up -d)..."
-	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/core/*."; fi
+	@if [ -z "$(GO_MODULES_TOKEN)" ]; then echo "WARN: GO_MODULES_TOKEN vacio. Si el cache de Go esta frio, ponti-api no podra bajar github.com/devpablocristo/platform/*."; fi
 	$(compose_cmd) up -d
 
 down:
