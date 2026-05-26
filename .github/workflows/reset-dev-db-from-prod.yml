@@ -230,7 +230,7 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV"
 
-      - name: Apply migrations on DEV (fresh schema)
+      - name: Apply migrations on DEV (restore-compatible schema)
         run: |
           set -euo pipefail
           db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
@@ -239,7 +239,7 @@ jobs:
             migrate/migrate:v4.17.1 \
             -path /migrations \
             -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_DEV}?sslmode=disable" \
-            up
+            goto 224
 
       - name: Restore data-only into DEV
         run: |
@@ -309,6 +309,29 @@ jobs:
             --exit-on-error \
             --use-list=/tmp/prod_data.filtered.list \
             /tmp/prod_data.dump
+
+      - name: Backfill tenant and apply final migrations
+        run: |
+          set -euo pipefail
+
+          # PROD data can still be legacy/data-only with NULL tenant_id values.
+          # Restore into the additive tenant schema (migration 224), backfill
+          # tenant_id, then apply strict tenant validation and later migrations.
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -v ON_ERROR_STOP=1 \
+            -f "$GITHUB_WORKSPACE/migrations_v4/000224_tenant_security_foundation.up.sql"
+
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_DEV}?sslmode=disable" \
+            up
 
       - name: Sync sequences after restore
         run: |
