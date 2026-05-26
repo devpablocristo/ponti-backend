@@ -367,14 +367,13 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			return restoreCustomerActiveProjectGraph(tx, id, customer.TenantID, restoredAt, cause)
 		}
 
-		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
-			return err
-		}
-
 		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "customers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore customer")
+		}
+		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
+			return err
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 			SourceTable: actorsync.LegacyCustomers,
@@ -442,10 +441,6 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 		return nil
 	}
 
-	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
-		return err
-	}
-
 	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NOT NULL", projectIDs)
 	projectUpdate = lifecycle.ApplyCauseScope(projectUpdate, "projects", cause)
 	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
@@ -453,6 +448,9 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 	}
 	if err := projectUpdate.Updates(lifecycle.RestoreUpdates(tx, "projects", restoredAt)).Error; err != nil {
 		return domainerr.Internal("failed to restore customer projects")
+	}
+	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
+		return err
 	}
 
 	for _, projectID := range projectIDs {
@@ -469,10 +467,10 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 	// so the restore of the project-scoped tables below doesn't wipe out the
 	// rows we need to find. Restore order:
 	//   1. List ids of fields/lots/workorders/drafts archived with this Cause.
-	//   2. Restore the project-scoped tables (workorders, drafts, labors,
+	//   2. Restore fields/lots explicitly before rows that reference them.
+	//   3. Restore the project-scoped tables (workorders, drafts, labors,
 	//      supplies, etc.) en bulk by project_id.
-	//   3. Restore the items/splits using the captured IDs.
-	//   4. Restore fields/lots explicitly (they live outside project_id scope).
+	//   4. Restore the items/splits using the captured IDs.
 	//
 	// Previously step 2 ran first, which left the captured-ID lookup with
 	// nothing to pluck (the rows it queried had just been moved to deleted_at
@@ -498,12 +496,6 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 		return err
 	}
 
-	for _, table := range customerProjectScopedArchiveTables {
-		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
-			return err
-		}
-	}
-
 	if len(fieldIDs) > 0 {
 		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
 			return err
@@ -517,6 +509,11 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 			return err
 		}
 		if err := lifecycle.RestoreScopedRows(tx, "lots", tenantID, restoredAt, cause, "id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	for _, table := range customerProjectScopedArchiveTables {
+		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
 			return err
 		}
 	}

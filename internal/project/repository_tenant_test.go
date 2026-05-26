@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,6 +127,19 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			archive_origin_id INTEGER,
 			archive_reason TEXT
 		);
+		CREATE TABLE lot_dates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			lot_id INTEGER NOT NULL,
+			deleted_at DATETIME
+		);
+		CREATE TABLE field_investors (
+			tenant_id TEXT NOT NULL,
+			field_id INTEGER NOT NULL,
+			investor_id INTEGER NOT NULL,
+			percentage INTEGER NOT NULL DEFAULT 0,
+			deleted_at DATETIME
+		);
 		CREATE TABLE managers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id TEXT NOT NULL,
@@ -195,6 +209,92 @@ func setupProjectTenantDB(t *testing.T) *gorm.DB {
 			archive_origin_entity TEXT,
 			archive_origin_id INTEGER,
 			archive_reason TEXT
+		);
+		CREATE TABLE labors (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			deleted_at DATETIME
+		);
+		CREATE TABLE workorders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			field_id INTEGER,
+			lot_id INTEGER,
+			labor_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE workorder_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			workorder_id INTEGER NOT NULL,
+			supply_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE workorder_investor_splits (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			workorder_id INTEGER NOT NULL,
+			investor_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE work_order_drafts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			field_id INTEGER,
+			lot_id INTEGER,
+			labor_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE work_order_draft_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			draft_id INTEGER NOT NULL,
+			supply_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE work_order_draft_investor_splits (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			draft_id INTEGER NOT NULL,
+			investor_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE supplies (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			deleted_at DATETIME
+		);
+		CREATE TABLE supply_movements (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			supply_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE stocks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			supply_id INTEGER,
+			deleted_at DATETIME
+		);
+		CREATE TABLE crop_commercializations (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME
+		);
+		CREATE TABLE project_dollar_values (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME
 		);
 		CREATE TABLE archive_batches (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -564,6 +664,165 @@ func TestHardDeleteProjectRequiresArchivedState(t *testing.T) {
 	}
 	if exists != 0 {
 		t.Fatalf("expected archived project to be hard deleted")
+	}
+}
+
+func TestHardDeleteProjectCascadesArchivedGraph(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(40, ?, 'Customer A', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(40, ?, '2025-2026');
+		INSERT INTO investors (id, tenant_id, name) VALUES
+			(40, ?, 'Investor');
+		INSERT INTO managers (id, tenant_id, name) VALUES
+			(40, ?, 'Manager');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(40, ?, 'Archived Project', 40, 40, 0, 0, ?, ?, ?);
+		INSERT INTO fields (id, tenant_id, name, project_id, lease_type_id, deleted_at) VALUES
+			(40, ?, 'Field', 40, 1, ?);
+		INSERT INTO lots (id, tenant_id, name, field_id, hectares, previous_crop_id, current_crop_id, season, deleted_at) VALUES
+			(40, ?, 'Lot', 40, 10, 1, 1, 'Invierno', ?);
+		INSERT INTO lot_dates (id, tenant_id, lot_id, deleted_at) VALUES
+			(40, ?, 40, NULL);
+		INSERT INTO field_investors (tenant_id, field_id, investor_id, percentage, deleted_at) VALUES
+			(?, 40, 40, 100, NULL);
+		INSERT INTO labors (id, tenant_id, project_id, name, deleted_at) VALUES
+			(40, ?, 40, 'Labor', ?);
+		INSERT INTO supplies (id, tenant_id, project_id, name, deleted_at) VALUES
+			(40, ?, 40, 'Supply', ?);
+		INSERT INTO workorders (id, tenant_id, project_id, field_id, lot_id, labor_id, deleted_at) VALUES
+			(40, ?, 40, 40, 40, 40, ?);
+		INSERT INTO workorder_items (id, tenant_id, workorder_id, supply_id, deleted_at) VALUES
+			(40, ?, 40, 40, NULL);
+		INSERT INTO workorder_investor_splits (id, tenant_id, workorder_id, investor_id, deleted_at) VALUES
+			(40, ?, 40, 40, NULL);
+		INSERT INTO work_order_drafts (id, tenant_id, project_id, field_id, lot_id, labor_id, deleted_at) VALUES
+			(40, ?, 40, 40, 40, 40, ?);
+		INSERT INTO work_order_draft_items (id, tenant_id, draft_id, supply_id, deleted_at) VALUES
+			(40, ?, 40, 40, NULL);
+		INSERT INTO work_order_draft_investor_splits (id, tenant_id, draft_id, investor_id, deleted_at) VALUES
+			(40, ?, 40, 40, NULL);
+		INSERT INTO supply_movements (id, tenant_id, project_id, supply_id, deleted_at) VALUES
+			(40, ?, 40, 40, ?);
+		INSERT INTO stocks (id, tenant_id, project_id, supply_id, deleted_at) VALUES
+			(40, ?, 40, 40, ?);
+		INSERT INTO crop_commercializations (id, tenant_id, project_id, deleted_at) VALUES
+			(40, ?, 40, ?);
+		INSERT INTO project_dollar_values (id, tenant_id, project_id, deleted_at) VALUES
+			(40, ?, 40, ?);
+		INSERT INTO project_managers (tenant_id, project_id, manager_id, deleted_at) VALUES
+			(?, 40, 40, ?);
+		INSERT INTO project_investors (tenant_id, project_id, investor_id, percentage, deleted_at) VALUES
+			(?, 40, 40, 100, ?);
+		INSERT INTO admin_cost_investors (tenant_id, project_id, investor_id, percentage, deleted_at) VALUES
+			(?, 40, 40, 100, ?);
+	`, tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now, now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+		tenantID.String(), now,
+	).Error; err != nil {
+		t.Fatalf("seed archived graph: %v", err)
+	}
+
+	if err := repo.HardDeleteProject(projectTenantContext(tenantID), 40); err != nil {
+		t.Fatalf("hard delete archived graph: %v", err)
+	}
+
+	tables := []string{
+		"projects",
+		"fields",
+		"lots",
+		"lot_dates",
+		"field_investors",
+		"labors",
+		"workorders",
+		"workorder_items",
+		"workorder_investor_splits",
+		"work_order_drafts",
+		"work_order_draft_items",
+		"work_order_draft_investor_splits",
+		"supplies",
+		"supply_movements",
+		"stocks",
+		"crop_commercializations",
+		"project_dollar_values",
+		"project_managers",
+		"project_investors",
+		"admin_cost_investors",
+	}
+	for _, table := range tables {
+		var n int64
+		if err := db.Raw(`SELECT COUNT(*) FROM `+table+` WHERE tenant_id = ?`, tenantID.String()).Scan(&n).Error; err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if n != 0 {
+			t.Fatalf("expected %s to be hard deleted, got %d rows", table, n)
+		}
+	}
+}
+
+func TestHardDeleteProjectBlocksActiveDependents(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(50, ?, 'Customer A', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(50, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(50, ?, 'Archived Project', 50, 50, 0, 0, ?, ?, ?);
+		INSERT INTO fields (id, tenant_id, name, project_id, lease_type_id, deleted_at) VALUES
+			(50, ?, 'Active Field', 50, 1, NULL);
+	`, tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now, now,
+		tenantID.String(),
+	).Error; err != nil {
+		t.Fatalf("seed active dependent: %v", err)
+	}
+
+	err := repo.HardDeleteProject(projectTenantContext(tenantID), 50)
+	if err == nil {
+		t.Fatalf("expected active dependent to block hard delete")
+	}
+	if !strings.Contains(err.Error(), "project has 1 active field(s); archive or hard-delete them first") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var projectCount int64
+	if err := db.Raw(`SELECT COUNT(*) FROM projects WHERE id = 50`).Scan(&projectCount).Error; err != nil {
+		t.Fatalf("count project: %v", err)
+	}
+	if projectCount != 1 {
+		t.Fatalf("project should not be deleted when active dependents exist")
 	}
 }
 
