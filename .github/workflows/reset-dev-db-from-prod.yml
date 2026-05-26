@@ -367,16 +367,30 @@ jobs:
       - name: Hardening post-restore (opcional)
         if: ${{ env.HARDENING_SQL_URI != '' }}
         run: |
-          set +e
-          gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$HARDENING_SQL_URI" \
-            --project="$GCP_PROJECT_ID" \
-            --database="$DB_NAME_DEV" \
-            --quiet
-          code=$?
-          set -e
-          if [[ "$code" -ne 0 ]]; then
-            echo "::warning::Hardening opcional falló (se continúa): código=$code"
+          set -euo pipefail
+
+          hardening_sql="/tmp/hardening_post_restore.sql"
+          if [[ "$HARDENING_SQL_URI" == gs://* ]]; then
+            gcloud storage cp "$HARDENING_SQL_URI" "$hardening_sql"
+          elif [[ -f "$HARDENING_SQL_URI" ]]; then
+            cp "$HARDENING_SQL_URI" "$hardening_sql"
+          elif [[ -f "$GITHUB_WORKSPACE/scripts/db/hardening_post_restore.sql" ]]; then
+            cp "$GITHUB_WORKSPACE/scripts/db/hardening_post_restore.sql" "$hardening_sql"
+          else
+            echo "::error::No se pudo resolver HARDENING_SQL_URI='$HARDENING_SQL_URI'"
+            exit 1
           fi
+
+          # Run through the existing Cloud SQL Proxy as the app DB user. Cloud
+          # SQL import executes as the service import user, which cannot grant
+          # privileges on app-owned tables such as fx_rates.
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -v ON_ERROR_STOP=1 \
+            -f "$hardening_sql"
 
       - name: Smoke tests (opcional)
         if: ${{ env.SMOKE_TEST_URL != '' }}
