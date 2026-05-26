@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
@@ -1154,6 +1156,9 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 					"updated_at": time.Now(),
 					"updated_by": c.UpdatedBy,
 				}).Error; err != nil {
+					if isUniqueNameViolation(err) {
+						return 0, domainerr.Conflict("customer already exists")
+					}
 					return 0, fmt.Errorf("failed to rename customer: %w", err)
 				}
 				effectiveName = canonicalIncoming
@@ -1314,6 +1319,9 @@ func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 				"updated_at": time.Now(),
 				"updated_by": c.UpdatedBy,
 			}).Error; err != nil {
+				if isUniqueNameViolation(err) {
+					return 0, domainerr.Conflict("customer already exists")
+				}
 				return 0, fmt.Errorf("failed to rename customer: %w", err)
 			}
 			effectiveName = canonicalIncoming
@@ -1368,6 +1376,20 @@ func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 		return 0, err
 	}
 	return c.ID, nil
+}
+
+func isUniqueNameViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "unique constraint failed")
 }
 
 // ensureCampaignForUpdate is the strict variant used by UpdateProject.

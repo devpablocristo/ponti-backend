@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -172,6 +173,37 @@ func TestCustomerRepositoryTenantIsolation(t *testing.T) {
 	}
 	if exists != 1 {
 		t.Fatalf("cross-tenant hard delete removed customer 2")
+	}
+}
+
+func TestUpdateCustomerDuplicateNameReturnsConflict(t *testing.T) {
+	db := setupCustomerTenantDB(t)
+	repo := NewRepository(customerTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX ux_customers_tenant_name_active
+			ON customers (tenant_id, name)
+			WHERE deleted_at IS NULL;
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(10, ?, 'EL SUEÑO', NULL),
+			(11, ?, 'SOALEN SRL', NULL);
+	`, tenantID.String(), tenantID.String()).Error; err != nil {
+		t.Fatalf("seed customers: %v", err)
+	}
+
+	err := repo.UpdateCustomer(customerTenantContext(tenantID), &domain.Customer{
+		ID:   11,
+		Name: "EL SUEÑO",
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate customer name to fail")
+	}
+	if !domainerr.IsKind(err, domainerr.KindConflict) {
+		t.Fatalf("expected conflict, got %T %v", err, err)
+	}
+	if err.Error() != "CONFLICT: customer already exists" {
+		t.Fatalf("expected domain message, got %q", err.Error())
 	}
 }
 
