@@ -88,44 +88,45 @@ func printReport(w io.Writer, report lifecycle.ArchiveCleanupReport, output stri
 		enc.SetIndent("", "  ")
 		return enc.Encode(report)
 	case "table":
-		printTableReport(w, report)
-		return nil
+		return printTableReport(w, report)
 	default:
 		return lifecycle.ErrArchiveCleanupUnsupportedOutput
 	}
 }
 
-func printTableReport(w io.Writer, report lifecycle.ArchiveCleanupReport) {
+func printTableReport(w io.Writer, report lifecycle.ArchiveCleanupReport) error {
 	tenant := "all"
 	if report.TenantID != "" {
 		tenant = report.TenantID
 	}
-	fmt.Fprintf(w, "Archive cleanup\n")
-	fmt.Fprintf(w, "mode: %s\n", report.Mode)
-	fmt.Fprintf(w, "tenant: %s\n", tenant)
-	fmt.Fprintf(w, "started_at: %s\n", report.StartedAt.Format(time.RFC3339))
-	fmt.Fprintf(w, "finished_at: %s\n", report.FinishedAt.Format(time.RFC3339))
+	var b strings.Builder
+	appendLine(&b, "Archive cleanup")
+	appendf(&b, "mode: %s\n", report.Mode)
+	appendf(&b, "tenant: %s\n", tenant)
+	appendf(&b, "started_at: %s\n", report.StartedAt.Format(time.RFC3339))
+	appendf(&b, "finished_at: %s\n", report.FinishedAt.Format(time.RFC3339))
 
-	fmt.Fprintln(w, "\nChecks")
+	appendLine(&b, "\nChecks")
 	if len(report.Checks) == 0 {
-		fmt.Fprintln(w, "  none")
+		appendLine(&b, "  none")
 	} else {
 		for _, check := range report.Checks {
-			fmt.Fprintf(w, "  %s %-38s table=%-30s rows=%d", check.CheckID, check.Description, check.Table, check.Rows)
+			appendf(&b, "  %s %-38s table=%-30s rows=%d", check.CheckID, check.Description, check.Table, check.Rows)
 			if len(check.SampleIDs) > 0 {
-				fmt.Fprintf(w, " sample=%s", strings.Join(check.SampleIDs, ","))
+				appendf(&b, " sample=%s", strings.Join(check.SampleIDs, ","))
 			}
-			fmt.Fprintln(w)
+			appendLine(&b, "")
 		}
 	}
 
-	fmt.Fprintln(w, "\nManual Review")
-	printChecksWithRows(w, report.Blockers)
+	appendLine(&b, "\nManual Review")
+	appendChecksWithRows(&b, report.Blockers)
 
-	fmt.Fprintln(w, "\nActions")
+	appendLine(&b, "\nActions")
 	if len(report.Actions) == 0 {
-		fmt.Fprintln(w, "  none")
-		return
+		appendLine(&b, "  none")
+		_, err := io.WriteString(w, b.String())
+		return err
 	}
 	for _, action := range report.Actions {
 		parent := ""
@@ -136,33 +137,43 @@ func printTableReport(w io.Writer, report lifecycle.ArchiveCleanupReport) {
 		if action.Cause.BatchID > 0 || action.Cause.OriginEntity != "" {
 			cause = fmt.Sprintf(" cause=%s:%d batch=%d", action.Cause.OriginEntity, action.Cause.OriginID, action.Cause.BatchID)
 		}
-		fmt.Fprintf(w, "  %s %-17s table=%-30s count=%d%s%s", action.CheckID, action.Operation, action.Table, action.Count, parent, cause)
+		appendf(&b, "  %s %-17s table=%-30s count=%d%s%s", action.CheckID, action.Operation, action.Table, action.Count, parent, cause)
 		if len(action.IDs) > 0 {
-			fmt.Fprintf(w, " ids=%s", joinIntSample(action.IDs))
+			appendf(&b, " ids=%s", joinIntSample(action.IDs))
 		}
 		if action.Reason != "" {
-			fmt.Fprintf(w, " reason=%q", action.Reason)
+			appendf(&b, " reason=%q", action.Reason)
 		}
-		fmt.Fprintln(w)
+		appendLine(&b, "")
 	}
+	_, err := io.WriteString(w, b.String())
+	return err
 }
 
-func printChecksWithRows(w io.Writer, checks []lifecycle.ArchiveCleanupCheck) {
+func appendChecksWithRows(b *strings.Builder, checks []lifecycle.ArchiveCleanupCheck) {
 	printed := false
 	for _, check := range checks {
 		if check.Rows == 0 {
 			continue
 		}
 		printed = true
-		fmt.Fprintf(w, "  %s %-38s table=%-30s rows=%d", check.CheckID, check.Description, check.Table, check.Rows)
+		appendf(b, "  %s %-38s table=%-30s rows=%d", check.CheckID, check.Description, check.Table, check.Rows)
 		if len(check.SampleIDs) > 0 {
-			fmt.Fprintf(w, " sample=%s", strings.Join(check.SampleIDs, ","))
+			appendf(b, " sample=%s", strings.Join(check.SampleIDs, ","))
 		}
-		fmt.Fprintln(w)
+		appendLine(b, "")
 	}
 	if !printed {
-		fmt.Fprintln(w, "  none")
+		appendLine(b, "  none")
 	}
+}
+
+func appendLine(b *strings.Builder, s string) {
+	_, _ = fmt.Fprintln(b, s)
+}
+
+func appendf(b *strings.Builder, format string, args ...any) {
+	_, _ = fmt.Fprintf(b, format, args...)
 }
 
 func joinIntSample(ids []int64) string {
