@@ -9,6 +9,8 @@ func TestCanonicalizeName(t *testing.T) {
 	}{
 		{"  AGRO LAJITAS  ", "agro lajitas"},
 		{"María Ángeles", "maria angeles"},
+		{"EL SUEÑO", "el sueño"},
+		{"ÑANDÚ", "ñandu"},
 		{"AGRO LAJITAS S.R.L.", "agro lajitas s r l"},
 		{"JIMENES 25-26", "jimenes 25 26"},
 		{"E.VEDOYA", "e vedoya"},
@@ -35,6 +37,8 @@ func TestFormatProperName(t *testing.T) {
 		{"juan de la torre", "Juan de la Torre"},
 		{"y griega", "Y Griega"},
 		{"María Ángeles", "Maria Angeles"},
+		{"EL SUEÑO", "El Sueño"},
+		{"ÑANDÚ", "Ñandu"},
 		{"E.VEDOYA", "E Vedoya"},
 		{"J.M. Perez", "J M Perez"},
 		{"JIMENES 25-26", "Jimenes 25 26"},

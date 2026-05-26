@@ -12,6 +12,7 @@ import (
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
@@ -23,7 +24,6 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
@@ -1256,11 +1256,9 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 // ensureCustomerForUpdate is the strict variant used by UpdateProject.
 // Behavior depends on the incoming identifier:
 //
-//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. It is NOT
-//     renamed even if `c.Name` differs from the stored value — to rename a
-//     customer, the caller must go through the dedicated customer endpoint.
-//     This avoids a casual project edit silently renaming a shared catalog
-//     row that affects other projects.
+//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. If the
+//     payload sends a non-empty name, update that customer row because the
+//     project editor exposes the shared customer name inline.
 //
 //   - If `c.ID == 0`: the FE signalled "this is a new customer association"
 //     (typically because the user typed free text in the picker instead of
@@ -1303,6 +1301,35 @@ func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 				return 0, domainerr.Validation(fmt.Sprintf("customer %d not found", c.ID))
 			}
 			return 0, fmt.Errorf("failed to check customer: %w", err)
+		}
+		effectiveName := existing.Name
+		canonicalIncoming := sharedtext.CanonicalizeName(c.Name)
+		if canonicalIncoming != "" && canonicalIncoming != existing.Name {
+			renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
+			if hasTenant {
+				renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
+			}
+			if err := renameQuery.Updates(map[string]any{
+				"name":       canonicalIncoming,
+				"updated_at": time.Now(),
+				"updated_by": c.UpdatedBy,
+			}).Error; err != nil {
+				return 0, fmt.Errorf("failed to rename customer: %w", err)
+			}
+			effectiveName = canonicalIncoming
+		}
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyCustomers,
+			SourceID:    existing.ID,
+			Name:        effectiveName,
+			ActorKind:   actorsync.KindOrganization,
+			Role:        actorsync.RoleCliente,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   c.UpdatedBy,
+		}); err != nil {
+			return 0, err
 		}
 		return existing.ID, nil
 	}
