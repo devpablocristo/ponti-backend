@@ -3,6 +3,7 @@
 
 DO $$
 DECLARE
+    default_tenant uuid;
     t text;
     constraint_name text;
     idx_name text;
@@ -45,6 +46,18 @@ DECLARE
         'project_dollar_values'
     ];
 BEGIN
+    SELECT id INTO default_tenant
+    FROM public.auth_tenants
+    WHERE name = 'default'
+    ORDER BY created_at NULLS LAST
+    LIMIT 1;
+
+    IF default_tenant IS NULL THEN
+        INSERT INTO public.auth_tenants (name, created_at, updated_at)
+        VALUES ('default', now(), now())
+        RETURNING id INTO default_tenant;
+    END IF;
+
     FOREACH t IN ARRAY tenant_tables LOOP
         IF to_regclass('public.' || t) IS NOT NULL
            AND EXISTS (
@@ -53,6 +66,7 @@ BEGIN
                 WHERE table_schema = 'public' AND table_name = t AND column_name = 'tenant_id'
            )
         THEN
+            EXECUTE format('UPDATE public.%I SET tenant_id = $1 WHERE tenant_id IS NULL', t) USING default_tenant;
             EXECUTE format('SELECT COUNT(*) FROM public.%I WHERE tenant_id IS NULL', t) INTO null_count;
             IF null_count > 0 THEN
                 RAISE EXCEPTION 'tenant strict validation failed: %.tenant_id has % null rows', t, null_count;
