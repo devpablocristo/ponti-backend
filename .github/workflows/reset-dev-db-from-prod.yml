@@ -263,6 +263,31 @@ jobs:
               EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE', r.tablename);
             END LOOP;
           END $$;
+
+          -- Some auth migrations seed catalog rows before restore. Make the
+          -- auth reset explicit so data-only restore never collides with
+          -- seed/bootstrap rows such as users.legacy_id=1.
+          DO $$
+          BEGIN
+            IF to_regclass('public.users') IS NOT NULL THEN
+              TRUNCATE TABLE public.users RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_memberships') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_memberships RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_role_permissions') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_role_permissions RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_tenants') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_tenants RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_roles') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_roles RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_permissions') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_permissions RESTART IDENTITY CASCADE;
+            END IF;
+          END $$;
           SQL
 
           PGPASSWORD="$DB_PASSWORD" psql \
@@ -285,15 +310,23 @@ jobs:
           tables = {x.strip() for x in pathlib.Path('/tmp/dev_tables.txt').read_text().splitlines() if x.strip()}
           seqs = {x.strip() for x in pathlib.Path('/tmp/dev_sequences.txt').read_text().splitlines() if x.strip()}
           out = []
+          seen_table_data = set()
+          seen_sequence_set = set()
           for line in pathlib.Path('/tmp/prod_data.list').read_text().splitlines():
             if " TABLE DATA public " in line:
               table = line.split(" TABLE DATA public ", 1)[1].split()[0]
               if table not in tables:
                 continue
+              if table in seen_table_data:
+                continue
+              seen_table_data.add(table)
             if " SEQUENCE SET public " in line:
               seq = line.split(" SEQUENCE SET public ", 1)[1].split()[0]
               if seq not in seqs:
                 continue
+              if seq in seen_sequence_set:
+                continue
+              seen_sequence_set.add(seq)
             out.append(line)
           pathlib.Path('/tmp/prod_data.filtered.list').write_text("\n".join(out) + "\n")
           PY

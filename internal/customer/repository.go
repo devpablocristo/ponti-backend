@@ -5,19 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -70,6 +72,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 			model.TenantID = tenantID
 		}
 		if err := tx.Create(model).Error; err != nil {
+			if isCustomerUniqueViolation(err) {
+				return domainerr.Conflict("customer already exists")
+			}
 			return domainerr.Internal("failed to create customer")
 		}
 		id = model.ID
@@ -203,6 +208,9 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 		}
 		result := updateTx.Updates(models.FromDomain(c))
 		if result.Error != nil {
+			if isCustomerUniqueViolation(result.Error) {
+				return domainerr.Conflict("customer already exists")
+			}
 			return domainerr.Internal("failed to update customer")
 		}
 		if result.RowsAffected == 0 {
@@ -406,6 +414,20 @@ func restoreCustomerActiveProjectGraph(tx *gorm.DB, customerID int64, tenantID u
 	return nil
 }
 
+func isCustomerUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "unique constraint failed")
+}
+
 func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
 	var projectIDs []int64
 	projectLookup := tx.Table("projects").Where("customer_id = ? AND deleted_at IS NOT NULL", customerID)
@@ -607,4 +629,3 @@ func assertCustomerReferencesActive(tx *gorm.DB, c *domain.Customer) error {
 	}
 	return lifecycle.RequireAllActive(tx, refs)
 }
-
