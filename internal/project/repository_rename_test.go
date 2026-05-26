@@ -15,12 +15,9 @@ import (
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
-// TestUpdateProjectPropagatesRenameToLegacyTables verifies that catalog
-// entities referenced from a project (customer, manager, investor) are NOT
-// renamed when the FE sends a project payload with a different name but the
-// same ID. Renaming any of these belongs to its own dedicated editor — doing
-// it inline from the project edit would silently rename a row that other
-// projects also reference.
+// TestUpdateProjectPropagatesRenameToLegacyTables verifies that the project
+// editor can rename the shared customer referenced by ID, while manager and
+// investor catalog rows remain unchanged unless their own editor handles them.
 func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 	db := setupProjectTenantDB(t)
 	repo := NewRepository(projectTenantGormEngine{client: db})
@@ -81,15 +78,12 @@ func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 		t.Fatalf("update project: %v", err)
 	}
 
-	// Catalog rows referenced by id are NOT renamed from the project edit.
-	// The seed values stay untouched even though the payload sent different
-	// names. To rename any of these the caller uses the dedicated editor.
 	var customerName string
 	if err := db.Raw(`SELECT name FROM customers WHERE id = 100`).Scan(&customerName).Error; err != nil {
 		t.Fatalf("read customer 100: %v", err)
 	}
-	if customerName != "AGRO LAJITAS 25-26" {
-		t.Fatalf("expected customer 100 untouched (AGRO LAJITAS 25-26), got %q", customerName)
+	if customerName != "agro lajitas" {
+		t.Fatalf("expected customer 100 renamed to agro lajitas, got %q", customerName)
 	}
 
 	var managerName string
