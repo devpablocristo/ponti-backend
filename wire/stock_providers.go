@@ -1,17 +1,12 @@
 package wire
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/devpablocristo/ponti-backend/cmd/config"
-	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 	"github.com/devpablocristo/ponti-backend/internal/project"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
-	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
 
 	"github.com/google/wire"
 )
@@ -25,39 +20,14 @@ func ProvideStockRepositoryPort(r *stock.Repository) stock.RepositoryPort {
 	return r
 }
 
-type StockExcelService struct {
-	*pkgexcel.Service
+// ProvideStockExporterPort entrega el exporter CSV.
+func ProvideStockExporterPort() stock.ExporterAdapterPort {
+	return stock.NewCSVExporter()
 }
 
-// ProvideStockPkgExcelService crea el engine de Excel ya configurado.
-func ProvideStockPkgExcelService() (*StockExcelService, error) {
-	fp := filepath.Join(os.TempDir(), stockExcel.DefaultFilename)
-	write := true
-	s, err := pkgexcel.Bootstrap(fp,
-		stockExcel.SheetName,
-		stockExcel.DateFormat,
-		&write,
-		stockExcel.ColumnWidths,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &StockExcelService{s}, nil
-}
-
-// ProvideStockXLSXEnginePort bindea el engine como interfaz XLSXEnginePort.
-func ProvideStockXLSXEnginePort(s *StockExcelService) stock.XLSXEnginePort {
-	return s
-}
-
-// ProvideStockExporterPort crea el adaptador de exportación que usa el engine.
-func ProvideStockExporterPort(eng stock.XLSXEnginePort) stock.ExporterAdapterPort {
-	return stock.NewExcelExporter(eng)
-}
-
-// ProvideStockUseCases agrupa repositorio y servicio.
-func ProvideStockUseCases(rep stock.RepositoryPort, excel stock.ExporterAdapterPort, projectUC project.UseCasesPort) *stock.UseCases {
-	return stock.NewUseCases(rep, excel, projectUC)
+// ProvideStockUseCases agrupa repositorio y exporter CSV.
+func ProvideStockUseCases(rep stock.RepositoryPort, exp stock.ExporterAdapterPort, projectUC project.UseCasesPort) *stock.UseCases {
+	return stock.NewUseCases(rep, exp, projectUC)
 }
 
 func ProvideStockUseCasesPort(uc *stock.UseCases) stock.UseCasesPort {
@@ -99,7 +69,5 @@ var StockSet = wire.NewSet(
 	ProvideStockGormEnginePort,
 	ProvideStockGinEnginePort,
 	ProvideStockMiddlewaresEnginePort,
-	ProvideStockPkgExcelService,
 	ProvideStockExporterPort,
-	ProvideStockXLSXEnginePort,
 )

@@ -5,20 +5,23 @@ import (
 )
 
 type Campaign struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	ProjectID int64  `json:"project_id"`
 }
 
 func (c Campaign) ToDomain() *domain.Campaign {
 	return &domain.Campaign{
-		ID:   c.ID,
-		Name: c.Name,
+		ID:        c.ID,
+		Name:      c.Name,
+		ProjectID: c.ProjectID,
 	}
 }
 
 func FromDomain(d domain.Campaign) *Campaign {
 	return &Campaign{
-		ID:   d.ID,
-		Name: d.Name,
+		ID:        d.ID,
+		Name:      d.Name,
+		ProjectID: d.ProjectID,
 	}
 }

@@ -1,4 +1,4 @@
-name: CI PR a develop
+name: CI PR
 
 on:
   pull_request:
@@ -21,7 +21,6 @@ permissions:
 
 env:
   GOPRIVATE: github.com/devpablocristo/*
-  CORE_GOVERNANCE_MODULE: github.com/devpablocristo/core/governance/go@v0.0.0-20260328151810-084828e80b26
 
 jobs:
   lint:
@@ -40,9 +39,7 @@ jobs:
           cache: false
 
       - name: Download Go modules
-        run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
-          go mod download
+        run: go mod download
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9
@@ -66,9 +63,7 @@ jobs:
           cache: false
 
       - name: Download Go modules
-        run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
-          go mod download
+        run: go mod download
 
       - name: Build
         run: go build ./...
@@ -89,12 +84,31 @@ jobs:
           cache: false
 
       - name: Download Go modules
-        run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
-          go mod download
+        run: go mod download
 
-      - name: Tests
-        run: go test ./...
+      - name: Tests with coverage
+        run: |
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+          go tool cover -func=coverage.out | tail -1
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+      - name: Coverage gate (warns, no fail por ahora)
+        # Baseline tentativo (post-refactor sept 2026): media de módulos
+        # con tests reales ≈ 30%. Subir el threshold cuando el equipo
+        # acumule más tests; por ahora warning-only para no bloquear PRs.
+        run: |
+          total=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}' | tr -d '%')
+          echo "Total coverage: ${total}%"
+          threshold=25
+          if awk "BEGIN { exit !(${total} < ${threshold}) }"; then
+            echo "::warning::Coverage ${total}% below threshold ${threshold}% (no enforcement yet)"
+          fi
 
   # Security scan opcional (no bloquea el PR)
   security-scan:
@@ -114,9 +128,7 @@ jobs:
           cache: false
 
       - name: Download Go modules
-        run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
-          go mod download
+        run: go mod download
 
       - name: Govulncheck
         run: |

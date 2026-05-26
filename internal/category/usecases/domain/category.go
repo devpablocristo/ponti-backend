@@ -11,3 +11,10 @@ type Category struct {
 
 	shareddomain.Base
 }
+
+// ListFilters contiene los filtros opcionales para `ListCategories`.
+// Conviene mantener la convención struct (alineada con `actor.ListFilters`)
+// para que futuros filtros se agreguen sin tocar signatures.
+type ListFilters struct {
+	TypeID *int64
+}

@@ -3,7 +3,7 @@ package leasetype
 import (
 	"context"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/lease-type/handler/dto"
@@ -14,9 +14,12 @@ import (
 type UseCasesPort interface {
 	CreateLeaseType(context.Context, *domain.LeaseType) (int64, error)
 	ListLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
+	ListArchivedLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
-	DeleteLeaseType(context.Context, int64) error
+	ArchiveLeaseType(context.Context, int64) error
+	RestoreLeaseType(context.Context, int64) error
+	HardDeleteLeaseType(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -32,7 +35,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -59,9 +61,12 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateLeaseType)
 		public.GET("", h.ListLeaseTypes)
+		public.GET("/archived", h.ListArchivedLeaseTypes)
 		public.GET("/:lease_type_id", h.GetLeaseType)
 		public.PUT("/:lease_type_id", h.UpdateLeaseType)
-		public.DELETE("/:lease_type_id", h.DeleteLeaseType)
+		public.POST("/:lease_type_id/archive", h.ArchiveLeaseType)
+		public.POST("/:lease_type_id/restore", h.RestoreLeaseType)
+		public.DELETE("/:lease_type_id/hard", h.HardDeleteLeaseType)
 	}
 }
 
@@ -81,6 +86,16 @@ func (h *Handler) CreateLeaseType(c *gin.Context) {
 func (h *Handler) ListLeaseTypes(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
 	leaseTypes, total, err := h.ucs.ListLeaseTypes(c.Request.Context(), page, perPage)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewListLeaseTypesResponse(leaseTypes, page, perPage, total))
+}
+
+func (h *Handler) ListArchivedLeaseTypes(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	leaseTypes, total, err := h.ucs.ListArchivedLeaseTypes(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -119,13 +134,26 @@ func (h *Handler) UpdateLeaseType(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteLeaseType(c *gin.Context) {
+func (h *Handler) ArchiveLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.ArchiveLeaseType)
+}
+
+func (h *Handler) RestoreLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.RestoreLeaseType)
+}
+
+func (h *Handler) HardDeleteLeaseType(c *gin.Context) {
+	h.runLeaseTypeIDAction(c, h.ucs.HardDeleteLeaseType)
+}
+
+
+func (h *Handler) runLeaseTypeIDAction(c *gin.Context, action func(context.Context, int64) error) {
 	id, err := ginmw.ParseParamID(c, "lease_type_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

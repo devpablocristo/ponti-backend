@@ -5,7 +5,7 @@ import "github.com/shopspring/decimal"
 
 // IntegrityReport contiene el resultado de todas las validaciones de coherencia (17 controles)
 type IntegrityReport struct {
-	Checks []IntegrityCheck `json:"checks"`
+	Checks []IntegrityCheck
 }
 
 // IntegrityCheck representa un control individual de coherencia de datos.
@@ -14,34 +14,37 @@ type IntegrityReport struct {
 //   - RecalcA: recálculo independiente por camino A
 //   - RecalcB: recálculo independiente por camino B (opcional)
 type IntegrityCheck struct {
-	ControlNumber int    `json:"control_number"` // 1-9
-	DataToVerify  string `json:"data_to_verify"` // Dato a verificar
-	Description   string `json:"description"`    // Descripción breve del control
-	ControlRule   string `json:"control_rule"`   // Regla de control
+	ControlNumber  int    // 1-17
+	DataToVerify   string // Dato a verificar
+	Description    string // Descripción breve del control
+	ControlRule    string // Regla de control
+	CheckType      string // STRONG, WEAK, FORMULA_ALIGNMENT
+	Severity       string // INFO, WARNING, ERROR
+	Recommendation string // Qué hacer si el control requiere acción
 
 	// SYSTEM VALUE (lo que el usuario ve en pantalla)
-	SystemCalculation string          `json:"system_calculation"`
-	SystemValue       decimal.Decimal `json:"system_value"`
-	SystemSource      string          `json:"system_source"`
-	SystemMeaning     string          `json:"system_meaning"` // Qué representa y cómo se calcula
+	SystemCalculation string
+	SystemValue       decimal.Decimal
+	SystemSource      string
+	SystemMeaning     string // Qué representa y cómo se calcula
 
 	// RECALC A (primer recálculo independiente)
-	RecalcACalculation string          `json:"recalc_a_calculation"`
-	RecalcAValue       decimal.Decimal `json:"recalc_a_value"`
-	RecalcASource      string          `json:"recalc_a_source"`
-	RecalcAMeaning     string          `json:"recalc_a_meaning"` // Qué representa y cómo se calcula
+	RecalcACalculation string
+	RecalcAValue       decimal.Decimal
+	RecalcASource      string
+	RecalcAMeaning     string // Qué representa y cómo se calcula
 
 	// RECALC B (segundo recálculo independiente, opcional)
-	RecalcBCalculation *string          `json:"recalc_b_calculation,omitempty"`
-	RecalcBValue       *decimal.Decimal `json:"recalc_b_value,omitempty"`
-	RecalcBSource      *string          `json:"recalc_b_source,omitempty"`
-	RecalcBMeaning     *string          `json:"recalc_b_meaning,omitempty"` // Qué representa y cómo se calcula
+	RecalcBCalculation *string
+	RecalcBValue       *decimal.Decimal
+	RecalcBSource      *string
+	RecalcBMeaning     *string // Qué representa y cómo se calcula
 
 	// RESULTADO
-	DifferenceA decimal.Decimal  `json:"difference_a"`           // SystemValue - RecalcAValue
-	DifferenceB *decimal.Decimal `json:"difference_b,omitempty"` // SystemValue - RecalcBValue (nil si RecalcB no aplica)
-	Status      string           `json:"status"`                 // OK, ERROR
-	Tolerance   decimal.Decimal  `json:"tolerance"`
+	DifferenceA decimal.Decimal  // SystemValue - RecalcAValue
+	DifferenceB *decimal.Decimal // SystemValue - RecalcBValue (nil si RecalcB no aplica)
+	Status      string           // OK, ERROR, WARNING, SKIPPED
+	Tolerance   decimal.Decimal
 }
 
 // CostsCheckFilter contiene los filtros para la validación de costos

@@ -38,6 +38,22 @@ func (s *exportLotsUseCasesStub) DeleteLot(context.Context, int64) error {
 	return nil
 }
 
+func (s *exportLotsUseCasesStub) ArchiveLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) RestoreLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) HardDeleteLot(context.Context, int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *exportLotsUseCasesStub) ListLotsByField(context.Context, int64) ([]domain.Lot, error) {
 	return nil, nil
 }
@@ -54,7 +70,7 @@ func (s *exportLotsUseCasesStub) ListLotsByProjectFieldAndCrop(context.Context, 
 	return nil, nil
 }
 
-func (s *exportLotsUseCasesStub) GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error) {
+func (s *exportLotsUseCasesStub) GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error) {
 	return nil, nil
 }
 
@@ -66,7 +82,7 @@ func (s *exportLotsUseCasesStub) ExportLots(_ context.Context, filter domain.Lot
 	s.filter = filter
 	s.page = page
 	s.pageSize = pageSize
-	return []byte("xlsx"), nil
+	return []byte("csv"), nil
 }
 
 func TestExportLotsIgnoresRequestedPageAndUsesBackendLimit(t *testing.T) {
@@ -97,7 +113,7 @@ func TestExportLotsIgnoresRequestedPageAndUsesBackendLimit(t *testing.T) {
 	if stub.filter.ProjectID == nil || *stub.filter.ProjectID != 30 {
 		t.Fatalf("project filter = %#v, want 30", stub.filter.ProjectID)
 	}
-	if got := recorder.Header().Get("Content-Type"); got != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+	if got := recorder.Header().Get("Content-Type"); got != "text/csv; charset=utf-8" {
 		t.Fatalf("content type = %q", got)
 	}
 }

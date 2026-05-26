@@ -4,11 +4,13 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/google/uuid"
 	decimal "github.com/shopspring/decimal"
 )
 
 type CropCommercialization struct {
 	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
+	TenantID       uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	ProjectID      int64           `gorm:"not null;index;column:project_id"`
 	CropID         int64           `gorm:"not null;column:crop_id"`
 	BoardPrice     decimal.Decimal `gorm:"type:numeric(12,2);not null;column:board_price"`

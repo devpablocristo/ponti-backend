@@ -10,6 +10,7 @@ import (
 	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	actor "github.com/devpablocristo/ponti-backend/internal/actor"
 	admin "github.com/devpablocristo/ponti-backend/internal/admin"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -45,6 +46,7 @@ type Dependencies struct {
 	GormRepo                  *gorm.Repository
 	Middlewares               *mwr.Middlewares
 	WordsSuggester            *sug.WordsSuggester
+	ActorHandler              *actor.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
@@ -81,6 +83,7 @@ func Initialize() (*Dependencies, error) {
 		GinSet,
 		MiddlewareSet,
 		SuggesterSet,
+		ActorSet,
 		CustomerSet,
 		CampaignSet,
 		DashboardSet,

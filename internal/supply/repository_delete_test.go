@@ -16,7 +16,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	categorymodels "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtypemodels "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
@@ -182,7 +182,7 @@ func TestDeleteSupply_ReturnsConflictWhenHistoricalReferencesExist(t *testing.T)
 
 	defer cleanupDeleteSupplyTestData(t, db, movement.ID, stock.ID, supply.ID, provider.ID, investor.ID, project.ID, campaign.ID, customer.ID, category.ID, classType.ID)
 
-	err = repo.DeleteSupply(ctx, supply.ID)
+	err = repo.HardDeleteSupply(ctx, supply.ID)
 	require.Error(t, err)
 	assert.True(t, domainerr.IsConflict(err))
 	assert.Contains(t, err.Error(), "historical references")

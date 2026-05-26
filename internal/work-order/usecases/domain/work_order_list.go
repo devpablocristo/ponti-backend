@@ -31,6 +31,12 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal
 	IsDigital         bool
 	Status            string
+	InvestorName      string // poblado por ExportWorkOrders, no por la vista.
+}
+
+// ArchivedWorkOrderFilter filtros opcionales para listar work-orders archivadas.
+type ArchivedWorkOrderFilter struct {
+	LotID int64 // si > 0, solo WOs del lote indicado
 }
 
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.

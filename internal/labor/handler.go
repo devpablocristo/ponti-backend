@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"strconv"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	labexcel "github.com/devpablocristo/ponti-backend/internal/labor/excel"
 	"github.com/devpablocristo/ponti-backend/internal/labor/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
@@ -21,12 +21,15 @@ import (
 type UseCasesPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
-	DeleteLabor(context.Context, int64) error
+	ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
+	ArchiveLabor(context.Context, int64) error
+	RestoreLabor(context.Context, int64) error
+	HardDeleteLabor(context.Context, int64) error
 	UpdateLabor(context.Context, *domain.Labor) error
 	CountWorkOrdersByLaborID(context.Context, int64) (int64, error)
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
-	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListGroupLaborByWorkOrder(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
 	ExportAllGroupLabors(context.Context, int64) ([]byte, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
@@ -46,7 +49,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsulates all dependencies for the LeaseType HTTP handler.
@@ -56,6 +58,8 @@ type Handler struct {
 	acf ConfigAPIPort
 	mws MiddlewaresEnginePort
 }
+
+type laborIDAction func(context.Context, int64) error
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{
@@ -70,12 +74,31 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL()
 
+	// NOTA (dual routing): labor expone dos grupos de rutas con SEMÁNTICA
+	// DISTINTA — no hay duplicación, solo separación de concerns:
+	//
+	//   /projects/:project_id/labors   → CRUD scoped al proyecto: crear,
+	//                                    listar, editar, listar archivadas
+	//                                    del proyecto, exportar.
+	//   /labors                        → Operaciones globales: archive,
+	//                                    restore, hard-delete, listing
+	//                                    cross-project (ListArchivedLaborsGlobal,
+	//                                    ListGroupLabor), metrics, exportes
+	//                                    agregados.
+	//
+	// Auditoría (2026-05-22): ningún endpoint vive en ambos grupos con
+	// behavior distinto. La dualidad es estructural, no histórica.
+	//
+	// Mover archive/restore/hard-delete al grupo scoped sería más consistente
+	// con otros recursos pero requiere coordinar FE+BE en un PR aparte. No
+	// agregar nuevas dualidades sin esa coordinación.
+
 	// Endpoints de labores asociados a un proyecto específico
 	projectLaborsGroup := r.Group(baseURL+"/projects/:project_id/labors", h.mws.GetValidation()...)
 	{
 		projectLaborsGroup.POST("", h.CreateLabor)
 		projectLaborsGroup.GET("", h.ListLabor)
-		projectLaborsGroup.DELETE("/:labor_id", h.DeleteLabor)
+		projectLaborsGroup.GET("/archived", h.ListArchivedLabors)
 		projectLaborsGroup.PUT("/:labor_id", h.UpdateLabor)
 		projectLaborsGroup.GET("/:labor_id/workorders-count", h.CountWorkOrdersByLaborID)
 		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
@@ -85,12 +108,16 @@ func (h *Handler) Routes() {
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
 	workOrderLaborsGroup := r.Group(baseURL+"/labors", h.mws.GetValidation()...)
 	{
-		workOrderLaborsGroup.DELETE("/:labor_id", h.DeleteLaborByID)
-		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
+		workOrderLaborsGroup.GET("/archived", h.ListArchivedLaborsGlobal)
+		workOrderLaborsGroup.POST("/:labor_id/archive", h.ArchiveLabor)
+		workOrderLaborsGroup.POST("/:labor_id/restore", h.RestoreLabor)
+		workOrderLaborsGroup.DELETE("/:labor_id/hard", h.HardDeleteLabor)
+		workOrderLaborsGroup.GET("/group", h.ListGroupLabor)
 		workOrderLaborsGroup.GET("/group/:project_id", h.ListGroupLaborByProject)
 		workOrderLaborsGroup.GET("/export/:project_id", h.ExportGroupLaborXLSX)
 		workOrderLaborsGroup.GET("/export/all", h.ExportAllGroupLabors)
 		workOrderLaborsGroup.GET("/metrics", h.GetMetrics)
+		workOrderLaborsGroup.GET("/:work_order_id", h.ListLaborByWorkOrder)
 	}
 }
 
@@ -164,6 +191,54 @@ func (h *Handler) ListLabor(c *gin.Context) {
 	sharedhandlers.RespondOK(c, resp)
 }
 
+func (h *Handler) ListArchivedLabors(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
+
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	items, total, err := h.ucs.ListArchivedLabors(c.Request.Context(), page, perPage, projectID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewListLaborsResponse(items, page, perPage, total)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+// ListArchivedLaborsGlobal lista labors archivados de todos los proyectos del tenant.
+// Usado por el drawer "Labores archivadas" cuando no hay proyecto seleccionado.
+func (h *Handler) ListArchivedLaborsGlobal(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "1000"))
+
+	items, total, err := h.ucs.ListArchivedLabors(c.Request.Context(), page, perPage, 0)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewListLaborsResponse(items, page, perPage, total)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) ArchiveLabor(c *gin.Context) {
+	h.runLaborIDAction(c, h.ucs.ArchiveLabor)
+}
+
+func (h *Handler) RestoreLabor(c *gin.Context) {
+	h.runLaborIDAction(c, h.ucs.RestoreLabor)
+}
+
+func (h *Handler) HardDeleteLabor(c *gin.Context) {
+	h.runLaborIDAction(c, h.ucs.HardDeleteLabor)
+}
+
 func (h *Handler) UpdateLabor(c *gin.Context) {
 	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
 	if err != nil {
@@ -205,24 +280,6 @@ func (h *Handler) UpdateLabor(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteLabor(c *gin.Context) {
-	if _, err := sharedhandlers.ParseProjectIDParam(c, "project_id"); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-
-	id, err := ginmw.ParseParamID(c, "labor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
-}
-
 func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
@@ -237,13 +294,13 @@ func (h *Handler) CountWorkOrdersByLaborID(c *gin.Context) {
 	sharedhandlers.RespondOK(c, gin.H{"count": count})
 }
 
-func (h *Handler) DeleteLaborByID(c *gin.Context) {
+func (h *Handler) runLaborIDAction(c *gin.Context, action laborIDAction) {
 	id, err := ginmw.ParseParamID(c, "labor_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteLabor(c.Request.Context(), id); err != nil {
+	if err := action(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -296,26 +353,20 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 		return
 	}
 
+	filter := domain.LaborFilter{ProjectID: &projectID}
 	fieldIDParam := c.Query("field_id")
-	if fieldIDParam == "" && projectID == 0 {
-		domErr := domainerr.Validation("field_id or project_id is required")
-		sharedhandlers.RespondError(c, domErr)
-		return
-	}
-
-	var fieldID int64
 	if fieldIDParam != "" {
 		parsedFieldID, err := ginmw.ParseOptionalInt64Query(c, "field_id")
 		if err != nil {
 			sharedhandlers.RespondError(c, err)
 			return
 		}
-		fieldID = *parsedFieldID
+		filter.FieldID = parsedFieldID
 	}
 
 	input := types.NewInput(c.Request)
 
-	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, projectID, fieldID)
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, filter)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -324,6 +375,29 @@ func (h *Handler) ListGroupLaborByProject(c *gin.Context) {
 	resp := dto.FromDomainList(pageInfo, list)
 
 	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) ListGroupLabor(c *gin.Context) {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	input := types.NewInput(c.Request)
+	filter := domain.LaborFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	}
+	list, pageInfo, err := h.ucs.ListGroupLaborByWorkOrder(c.Request.Context(), input, filter)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
 }
 
 func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
@@ -362,11 +436,9 @@ func (h *Handler) ExportGroupLaborXLSX(c *gin.Context) {
 		return
 	}
 
-	filename := labexcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
@@ -401,11 +473,9 @@ func (h *Handler) ExportProjectLabors(c *gin.Context) {
 		return
 	}
 
-	filename := "labores_base_datos.xlsx"
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVTableExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }
 
 func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
@@ -426,9 +496,7 @@ func (h *Handler) ExportAllGroupLabors(c *gin.Context) {
 		return
 	}
 
-	filename := "labores_base_datos.xlsx"
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVTableExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

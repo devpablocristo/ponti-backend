@@ -10,17 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
+	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	stockExcel "github.com/devpablocristo/ponti-backend/internal/stock/excel"
 	"github.com/devpablocristo/ponti-backend/internal/stock/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 )
 
 type UseCasesPort interface {
 	GetStocksSummary(context.Context, int64, time.Time) ([]*domain.Stock, error)
+	GetStocksSummaryByFilter(context.Context, domain.StockFilter, time.Time) ([]*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	CreateStock(context.Context, *domain.Stock) (int64, error)
 	UpdateCloseDateByProject(context.Context, int64, int64, int64, *domain.Stock) error
@@ -44,7 +45,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 type Handler struct {
 	ucs UseCasesPort
@@ -79,24 +79,48 @@ func (h *Handler) Routes() {
 		public.PUT("/close-date", h.UpdateStocksCloseDate)
 		public.PUT("/real-stock/:stock_id", h.UpdateRealStock)
 	}
+
+	global := r.Group(baseURL+"/stocks", h.mws.GetValidation()...)
+	{
+		global.GET("/summary", h.getStocksSummaryByFilter)
+	}
+}
+
+func parseStockProjectID(c *gin.Context) (int64, bool) {
+	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return 0, false
+	}
+	return projectID, true
+}
+
+func parseStockID(c *gin.Context) (int64, bool) {
+	stockIDRaw := c.Param("stock_id")
+	stockID, err := strconv.ParseInt(stockIDRaw, 10, 64)
+	if err != nil || stockID <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("Para cargar stock de campo, primero cargá un ingreso del insumo."))
+		return 0, false
+	}
+	return stockID, true
 }
 
 func (h *Handler) getStocksSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
+	projectID, ok := parseStockProjectID(c)
+	if !ok {
 		return
 	}
 
 	cutoffDateStr := c.Query("cutoff_date")
 	var cutoffDate time.Time
 	if cutoffDateStr != "" {
-		cutoffDate, err = time.Parse("2006-01-02", cutoffDateStr)
+		parsedDate, err := time.Parse("2006-01-02", cutoffDateStr)
 		if err != nil {
 			sharedhandlers.RespondError(c, err)
 			return
 		}
+		cutoffDate = parsedDate
 	}
 
 	stocks, err := h.ucs.GetStocksSummary(ctx, projectID, cutoffDate)
@@ -109,11 +133,44 @@ func (h *Handler) getStocksSummary(c *gin.Context) {
 	sharedhandlers.RespondOK(c, resp)
 }
 
-func (h *Handler) getStocksPeriods(c *gin.Context) {
+func (h *Handler) getStocksSummaryByFilter(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	cutoffDateStr := c.Query("cutoff_date")
+	var cutoffDate time.Time
+	if cutoffDateStr != "" {
+		parsedDate, err := time.Parse("2006-01-02", cutoffDateStr)
+		if err != nil {
+			sharedhandlers.RespondError(c, err)
+			return
+		}
+		cutoffDate = parsedDate
+	}
+
+	stocks, err := h.ucs.GetStocksSummaryByFilter(ctx, domain.StockFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	}, cutoffDate)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	resp := dto.NewGetStocksListed(stocks)
+	sharedhandlers.RespondOK(c, resp)
+}
+
+func (h *Handler) getStocksPeriods(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectID, ok := parseStockProjectID(c)
+	if !ok {
 		return
 	}
 
@@ -152,9 +209,8 @@ func (h *Handler) UpdateStocksCloseDate(c *gin.Context) {
 		return
 	}
 
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
+	projectID, ok := parseStockProjectID(c)
+	if !ok {
 		return
 	}
 
@@ -192,16 +248,13 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 		return
 	}
 
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
+	projectID, ok := parseStockProjectID(c)
+	if !ok {
 		return
 	}
 
-	stockIDRaw := c.Param("stock_id")
-	stockID, err := strconv.ParseInt(stockIDRaw, 10, 64)
-	if err != nil || stockID <= 0 {
-		sharedhandlers.RespondError(c, domainerr.Validation("Para cargar stock de campo, primero cargá un ingreso del insumo."))
+	stockID, ok := parseStockID(c)
+	if !ok {
 		return
 	}
 
@@ -287,9 +340,8 @@ func getYearPeriod(c *gin.Context) (int64, error) {
 // Ruta nueva: /api/v1/projects/:project_id/stocks/export
 func (h *Handler) ExportStocksByProject(c *gin.Context) {
 	ctx := c.Request.Context()
-	projectID, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
+	projectID, ok := parseStockProjectID(c)
+	if !ok {
 		return
 	}
 
@@ -299,9 +351,7 @@ func (h *Handler) ExportStocksByProject(c *gin.Context) {
 		return
 	}
 
-	filename := stockExcel.DefaultFilename
-
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
-	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+	c.Header("Content-Type", csvexport.ContentType)
+	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
+	c.Data(http.StatusOK, csvexport.ContentType, data)
 }

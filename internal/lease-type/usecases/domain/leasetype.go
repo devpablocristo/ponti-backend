@@ -3,8 +3,8 @@ package domain
 import shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 
 type LeaseType struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID   int64
+	Name string
 
 	shareddomain.Base
 }

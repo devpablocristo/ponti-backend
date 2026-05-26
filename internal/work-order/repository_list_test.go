@@ -4,12 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	domain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
+
+var workOrderListTestTenantID = uuid.MustParse("00000000-0000-0000-0000-000000000301")
+
+func workOrderListTestContext() context.Context {
+	return context.WithValue(context.Background(), ctxkeys.OrgID, workOrderListTestTenantID)
+}
 
 type listTestGormEngine struct {
 	client *gorm.DB
@@ -30,11 +38,13 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 	statements := []string{
 		`CREATE TABLE projects (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000301',
 			deleted_at DATETIME
 		);`,
 		`ATTACH DATABASE ':memory:' AS v4_report;`,
 		`CREATE TABLE v4_report.workorder_list (
 			id INTEGER,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000301',
 			number TEXT,
 			project_id INTEGER,
 			field_id INTEGER,
@@ -46,17 +56,20 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 		);`,
 		`CREATE TABLE supplies (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000301',
 			name TEXT,
 			deleted_at DATETIME
 		);`,
 		`CREATE TABLE workorder_items (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000301',
 			workorder_id INTEGER,
 			supply_id INTEGER,
 			deleted_at DATETIME
 		);`,
 		`CREATE TABLE work_order_draft_items (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000301',
 			draft_id INTEGER,
 			supply_id INTEGER,
 			deleted_at DATETIME
@@ -93,7 +106,7 @@ func TestRepository_ListWorkOrders_OrdersByLatestDateFirst(t *testing.T) {
 
 	projectID := int64(30)
 	rows, pageInfo, err := repo.ListWorkOrders(
-		context.Background(),
+		workOrderListTestContext(),
 		domain.WorkOrderFilter{ProjectID: &projectID},
 		types.Input{Page: 1, PageSize: 10},
 	)
@@ -129,7 +142,7 @@ func TestRepository_ListWorkOrders_FiltersDigitalDrafts(t *testing.T) {
 	isDigital := true
 	status := "draft"
 	rows, pageInfo, err := repo.ListWorkOrders(
-		context.Background(),
+		workOrderListTestContext(),
 		domain.WorkOrderFilter{
 			ProjectID: &projectID,
 			IsDigital: &isDigital,
@@ -159,7 +172,7 @@ func TestRepository_ListWorkOrders_FiltersSupplyForPublishedAndDigitalDrafts(t *
 	projectID := int64(30)
 	supplyID := int64(100)
 	rows, pageInfo, err := repo.ListWorkOrders(
-		context.Background(),
+		workOrderListTestContext(),
 		domain.WorkOrderFilter{
 			ProjectID: &projectID,
 			SupplyID:  &supplyID,
@@ -187,7 +200,7 @@ func TestRepository_ListWorkOrderFilterRows_ReturnsAllRowsWithoutPagination(t *t
 
 	projectID := int64(30)
 	rows, err := repo.ListWorkOrderFilterRows(
-		context.Background(),
+		workOrderListTestContext(),
 		domain.WorkOrderFilter{ProjectID: &projectID},
 	)
 	if err != nil {

@@ -9,12 +9,14 @@ import (
 type Customer struct {
 	ID         int64
 	Name       string
+	ActorID    *int64
 	ArchivedAt *time.Time
 
 	shareddomain.Base
 }
 
 type ListedCustomer struct {
-	ID   int64
-	Name string
+	ID      int64
+	Name    string
+	ActorID *int64
 }

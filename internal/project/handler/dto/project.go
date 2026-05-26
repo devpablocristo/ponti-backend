@@ -3,11 +3,12 @@ package dto
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	campdom "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
@@ -18,6 +19,7 @@ import (
 	lotdom "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	managerdom "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/text"
 )
 
 type Project struct {
@@ -37,8 +39,9 @@ type Project struct {
 }
 
 type Customer struct {
-	ID   int64  `json:"id,omitempty"`
-	Name string `json:"name" binding:"required"`
+	ID      int64  `json:"id,omitempty"`
+	ActorID *int64 `json:"actor_id,omitempty"`
+	Name    string `json:"name" binding:"required"`
 }
 
 type Campaign struct {
@@ -48,19 +51,22 @@ type Campaign struct {
 
 // Manager DTO
 type Manager struct {
-	ID   int64  `json:"id,omitempty"`
-	Name string `json:"name" binding:"required"`
+	ID      int64  `json:"id,omitempty"`
+	ActorID *int64 `json:"actor_id,omitempty"`
+	Name    string `json:"name" binding:"required"`
 }
 
 // Investor DTO
 type Investor struct {
 	ID         int64  `json:"id,omitempty"`
+	ActorID    *int64 `json:"actor_id,omitempty"`
 	Name       string `json:"name" binding:"required"`
 	Percentage int    `json:"percentage" binding:"required"`
 }
 
 type AdminCostInvestor struct {
 	ID         int64  `json:"id,omitempty"`
+	ActorID    *int64 `json:"actor_id,omitempty"`
 	Name       string `json:"name" binding:"required"`
 	Percentage int    `json:"percentage" binding:"required"`
 }
@@ -98,11 +104,11 @@ func (f *Field) UnmarshalJSON(data []byte) error {
 
 	leaseTypePercent, err := parseOptionalDecimal(aux.LeaseTypePercent)
 	if err != nil {
-		return fmt.Errorf("lease_type_percent: %w", err)
+		return domainerr.Validation("lease_type_percent: " + err.Error())
 	}
 	leaseTypeValue, err := parseOptionalDecimal(aux.LeaseTypeValue)
 	if err != nil {
-		return fmt.Errorf("lease_type_value: %w", err)
+		return domainerr.Validation("lease_type_value: " + err.Error())
 	}
 
 	f.ID = aux.ID
@@ -154,7 +160,7 @@ func parseOptionalDecimal(raw json.RawMessage) (*decimal.Decimal, error) {
 		return &d, nil
 	}
 
-	return nil, fmt.Errorf("invalid decimal value")
+	return nil, domainerr.Validation("invalid decimal value")
 }
 
 // MarshalJSON aplica redondeo de 3 decimales a los campos decimales
@@ -205,14 +211,18 @@ type Lot struct {
 
 func (r *Project) ToDomain() *domain.Project {
 	d := &domain.Project{
-		Name: strings.TrimSpace(r.ProjectName),
+		Name: text.CanonicalizeName(r.ProjectName),
 		Customer: customerdom.Customer{
-			ID:   r.Customer.ID,
-			Name: r.Customer.Name,
+			ID:      r.Customer.ID,
+			Name:    text.CanonicalizeName(r.Customer.Name),
+			ActorID: r.Customer.ActorID,
 		},
+		// Campaign codes (e.g. "2025-2026") are catalog identifiers, not free-
+		// text names — keep them trimmed but not canonicalized so they round-
+		// trip through the catalog matcher unchanged.
 		Campaign: campdom.Campaign{
 			ID:   r.Campaign.ID,
-			Name: r.Campaign.Name,
+			Name: strings.TrimSpace(r.Campaign.Name),
 		},
 		AdminCost:   r.AdminCost,
 		PlannedCost: r.PlannedCost,
@@ -220,26 +230,26 @@ func (r *Project) ToDomain() *domain.Project {
 
 	for _, mgr := range r.ProjectManagers {
 		d.Managers = append(d.Managers,
-			managerdom.Manager{ID: mgr.ID, Name: mgr.Name},
+			managerdom.Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: text.CanonicalizeName(mgr.Name)},
 		)
 	}
 
 	for _, inv := range r.Investors {
 		d.Investors = append(d.Investors,
-			investordom.Investor{ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage},
+			investordom.Investor{ID: inv.ID, ActorID: inv.ActorID, Name: text.CanonicalizeName(inv.Name), Percentage: inv.Percentage},
 		)
 	}
 
 	for _, aci := range r.AdminCostInvestors {
 		d.AdminCostInvestors = append(d.AdminCostInvestors,
-			investordom.Investor{ID: aci.ID, Name: aci.Name, Percentage: aci.Percentage},
+			investordom.Investor{ID: aci.ID, ActorID: aci.ActorID, Name: text.CanonicalizeName(aci.Name), Percentage: aci.Percentage},
 		)
 	}
 
 	for _, f := range r.Fields {
 		fld := fielddom.Field{
 			ID:               f.ID,
-			Name:             f.Name,
+			Name:             text.CanonicalizeName(f.Name),
 			LeaseType:        &leasetypedom.LeaseType{ID: f.LeaseTypeID},
 			LeaseTypePercent: f.LeaseTypePercent,
 			LeaseTypeValue:   f.LeaseTypeValue,
@@ -247,24 +257,25 @@ func (r *Project) ToDomain() *domain.Project {
 		for _, fi := range f.Investors {
 			fld.Investors = append(fld.Investors, investordom.Investor{
 				ID:         fi.ID,
-				Name:       fi.Name,
+				ActorID:    fi.ActorID,
+				Name:       text.CanonicalizeName(fi.Name),
 				Percentage: fi.Percentage,
 			})
 		}
 		for _, lt := range f.Lots {
 			fld.Lots = append(fld.Lots, lotdom.Lot{
 				ID:       lt.ID,
-				Name:     lt.Name,
+				Name:     text.CanonicalizeName(lt.Name),
 				Hectares: lt.Hectares,
 				PreviousCrop: cropdom.Crop{
 					ID:   lt.PreviousCropID,
-					Name: lt.PreviousCropName,
+					Name: text.CanonicalizeName(lt.PreviousCropName),
 				},
 				CurrentCrop: cropdom.Crop{
 					ID:   lt.CurrentCropID,
-					Name: lt.CurrentCropName,
+					Name: text.CanonicalizeName(lt.CurrentCropName),
 				},
-				Season: lt.Season,
+				Season: text.CanonicalizeName(lt.Season),
 			})
 		}
 
@@ -278,7 +289,7 @@ func FromDomain(d *domain.Project) *Project {
 	r := &Project{
 		ID:          d.ID,
 		ProjectName: d.Name,
-		Customer:    Customer{ID: d.Customer.ID, Name: d.Customer.Name},
+		Customer:    Customer{ID: d.Customer.ID, ActorID: d.Customer.ActorID, Name: d.Customer.Name},
 		Campaign:    Campaign{ID: d.Campaign.ID, Name: d.Campaign.Name},
 		AdminCost:   d.AdminCost,
 		PlannedCost: d.PlannedCost,
@@ -289,19 +300,19 @@ func FromDomain(d *domain.Project) *Project {
 
 	for _, mgr := range d.Managers {
 		r.ProjectManagers = append(r.ProjectManagers,
-			Manager{ID: mgr.ID, Name: mgr.Name},
+			Manager{ID: mgr.ID, ActorID: mgr.ActorID, Name: mgr.Name},
 		)
 	}
 
 	for _, inv := range d.Investors {
 		r.Investors = append(r.Investors,
-			Investor{ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage},
+			Investor{ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage},
 		)
 	}
 
 	for _, aci := range d.AdminCostInvestors {
 		r.AdminCostInvestors = append(r.AdminCostInvestors, AdminCostInvestor{
-			ID: aci.ID, Name: aci.Name, Percentage: aci.Percentage,
+			ID: aci.ID, ActorID: aci.ActorID, Name: aci.Name, Percentage: aci.Percentage,
 		})
 	}
 
@@ -331,6 +342,7 @@ func FromDomain(d *domain.Project) *Project {
 		for _, fi := range fld.Investors {
 			dtoF.Investors = append(dtoF.Investors, Investor{
 				ID:         fi.ID,
+				ActorID:    fi.ActorID,
 				Name:       fi.Name,
 				Percentage: fi.Percentage,
 			})
@@ -351,7 +363,7 @@ func FieldsFromDomain(d fielddom.Field) Field {
 
 	for _, inv := range d.Investors {
 		r.Investors = append(r.Investors, Investor{
-			ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage,
+			ID: inv.ID, ActorID: inv.ActorID, Name: inv.Name, Percentage: inv.Percentage,
 		})
 	}
 	for _, ld := range d.Lots {

@@ -12,6 +12,7 @@ type InvestorResponse struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
 	Percentage int        `json:"percentage"`
+	ActorID    *int64     `json:"actor_id,omitempty"`
 	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
@@ -21,6 +22,7 @@ func InvestorFromDomain(d *domain.Investor) InvestorResponse {
 		ID:         d.ID,
 		Name:       d.Name,
 		Percentage: d.Percentage,
+		ActorID:    d.ActorID,
 		ArchivedAt: d.ArchivedAt,
 	}
 }

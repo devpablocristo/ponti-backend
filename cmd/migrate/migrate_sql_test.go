@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/devpablocristo/platform/observability/go"
+
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 )
 
@@ -50,7 +52,8 @@ func TestMigrationLock(t *testing.T) {
 	defer cancel()
 
 	// Adquirir lock
-	unlock1, err := acquireMigrationLock(ctx, sqlDB, dbConfig.Name)
+	logger := observability.NewJSONLogger("ponti-migrate-test")
+	unlock1, err := acquireMigrationLock(ctx, logger, sqlDB, dbConfig.Name)
 	require.NoError(t, err)
 
 	// Intentar adquirir el mismo lock desde otra "conexión" (debería fallar)

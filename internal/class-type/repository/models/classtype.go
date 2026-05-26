@@ -6,9 +6,14 @@ import (
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
+// ClassType ("supply types": fertilizer, seed, etc.) is a GLOBAL catalog
+// shared across tenants — the DB table has no `tenant_id` column. The
+// previous tenanted shape (the now-removed `TenantID uuid.UUID` field)
+// caused `SELECT ... FROM types WHERE tenant_id = ?` to fail with
+// "column does not exist", producing a 500 on every `/api/v1/types` call.
 type ClassType struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
-	Name string `gorm:"type:varchar(50);unique;not null"`
+	Name string `gorm:"type:varchar(50);not null"`
 
 	sharedmodels.Base
 }

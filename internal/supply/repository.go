@@ -10,13 +10,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -38,6 +42,10 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
+func withSupplyLookups(db *gorm.DB) *gorm.DB {
+	return db.Preload("Category").Preload("Type")
+}
+
 func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(shareddb.WithTx(ctx, tx))
@@ -48,7 +56,15 @@ func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx conte
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyReferencesActive(tx, s); err != nil {
+			return err
+		}
 		model := models.FromDomain(s)
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
+			model.TenantID = tenantID
+		}
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create supply")
 		}
@@ -61,6 +77,7 @@ func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64,
 func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, name string) (int64, error) {
 	type pendingSupplyInsert struct {
 		ID             int64           `gorm:"column:id;primaryKey"`
+		TenantID       any             `gorm:"column:tenant_id"`
 		ProjectID      int64           `gorm:"column:project_id"`
 		Name           string          `gorm:"column:name"`
 		Price          decimal.Decimal `gorm:"column:price"`
@@ -89,6 +106,11 @@ func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, n
 			CreatedBy:      userID,
 			UpdatedBy:      userID,
 		}
+		if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+			return err
+		} else if ok {
+			row.TenantID = tenantID
+		}
 
 		if err := tx.Table("supplies").Create(&row).Error; err != nil {
 			return types.NewError(types.ErrInternal, "failed to create pending supply", err)
@@ -106,9 +128,16 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		modelsSlice := make([]*models.Supply, len(supplies))
+		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
+		if err != nil {
+			return err
+		}
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
 			modelsSlice[i].CreatedBy = &userID
+			if hasTenant {
+				modelsSlice[i].TenantID = tenantID
+			}
 		}
 		if err := tx.Create(modelsSlice).Error; err != nil {
 			return domainerr.Internal("failed to bulk create supplies")
@@ -120,10 +149,8 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 // --- GET ---
 func (r *Repository) GetSupply(ctx context.Context, id int64) (*domain.Supply, error) {
 	var m models.Supply
-	if err := r.getDB(ctx).
-		Preload("Category").
-		Preload("Type").
-		First(&m, id).Error; err != nil {
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
+	if err := withSupplyLookups(db).First(&m, id).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "supply", id)
 	}
 	return m.ToDomain(), nil
@@ -135,9 +162,8 @@ func (r *Repository) GetSuppliesByIDs(ctx context.Context, ids []int64) ([]domai
 	}
 
 	var rows []models.Supply
-	if err := r.getDB(ctx).
-		Preload("Category").
-		Preload("Type").
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
+	if err := withSupplyLookups(db).
 		Where("id IN ?", ids).
 		Find(&rows).Error; err != nil {
 		return nil, domainerr.Internal("failed to get supplies by ids")
@@ -157,9 +183,8 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 	}
 
 	var m models.Supply
-	err := r.getDB(ctx).
-		Preload("Category").
-		Preload("Type").
+	db := tenancy.Scope(ctx, r.getDB(ctx), "supplies")
+	err := withSupplyLookups(db).
 		Where("project_id = ?", projectID).
 		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", normalizedName).
 		First(&m).Error
@@ -175,7 +200,8 @@ func (r *Repository) GetSupplyByProjectAndName(ctx context.Context, projectID in
 
 func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain.Investor, error) {
 	var model investormodels.Investor
-	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
+	db := tenancy.Scope(ctx, r.getDB(ctx), "investors")
+	err := db.Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("investor with id %d not found", id))
@@ -187,7 +213,8 @@ func (r *Repository) GetInvestor(ctx context.Context, id int64) (*investordomain
 
 func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain.Provider, error) {
 	var model providermodels.Provider
-	err := r.getDB(ctx).Where("id = ?", id).First(&model).Error
+	db := tenancy.Scope(ctx, r.getDB(ctx), "providers")
+	err := db.Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider with id %d not found", id))
@@ -199,8 +226,8 @@ func (r *Repository) GetProvider(ctx context.Context, id int64) (*providerdomain
 
 func (r *Repository) ProjectExists(ctx context.Context, projectID int64) (bool, error) {
 	var count int64
-	if err := r.getDB(ctx).
-		Table("projects").
+	db := tenancy.Scope(ctx, r.getDB(ctx).Table("projects"), "projects")
+	if err := db.
 		Where("id = ? AND deleted_at IS NULL", projectID).
 		Count(&count).Error; err != nil {
 		return false, domainerr.Internal("failed to check destination project")
@@ -215,8 +242,8 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndSupply(
 	supplyID int64,
 ) (bool, error) {
 	var count int64
-	if err := r.getDB(ctx).
-		Model(&models.SupplyMovement{}).
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	if err := db.
 		Where("project_id = ? AND reference_number = ? AND supply_id = ?", projectID, reference, supplyID).
 		Count(&count).Error; err != nil {
 		return false, domainerr.Internal("failed to check duplicate supply movement")
@@ -231,8 +258,8 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceAndType(
 	movementType string,
 ) (bool, error) {
 	var count int64
-	if err := r.getDB(ctx).
-		Model(&models.SupplyMovement{}).
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	if err := db.
 		Where("project_id = ? AND reference_number = ? AND movement_type = ?", projectID, reference, movementType).
 		Count(&count).Error; err != nil {
 		return false, domainerr.Internal("failed to check duplicate supply movement by type")
@@ -248,8 +275,8 @@ func (r *Repository) ExistsSupplyMovementByProjectReferenceSupplyAndType(
 	movementType string,
 ) (bool, error) {
 	var count int64
-	if err := r.getDB(ctx).
-		Model(&models.SupplyMovement{}).
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.SupplyMovement{}), "supply_movements")
+	if err := db.
 		Where(
 			"project_id = ? AND reference_number = ? AND supply_id = ? AND movement_type = ?",
 			projectID,
@@ -269,8 +296,12 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := assertSupplyReferencesActive(tx, s); err != nil {
+			return err
+		}
 		var count int64
-		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
+		supplyDB := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies")
+		if err := supplyDB.Where("id = ?", s.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check supply existence")
 		}
 		if count == 0 {
@@ -287,7 +318,7 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 			"updated_by":       s.UpdatedBy,
 			"is_pending":       s.IsPending,
 		}
-		updateTx := tx.Model(&models.Supply{}).
+		updateTx := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", s.ID)
 		if !s.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", s.UpdatedAt)
@@ -309,8 +340,8 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 // --- DELETE ---
 func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
 	var count int64
-	if err := r.getDB(ctx).
-		Model(&workOrderModels.WorkOrder{}).
+	db := tenancy.Scope(ctx, r.getDB(ctx).Model(&workOrderModels.WorkOrder{}), "workorders")
+	if err := db.
 		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
 		Where("workorder_items.supply_id = ? AND workorders.deleted_at IS NULL", supplyID).
 		Count(&count).Error; err != nil {
@@ -322,32 +353,6 @@ func (r *Repository) GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64
 	return count, nil
 }
 
-func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
-	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
-		return err
-	}
-	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Unscoped().Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return domainerr.Internal("failed to check supply existence")
-		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-		}
-		result := tx.Unscoped().Delete(&models.Supply{}, id)
-		if result.Error != nil {
-			if isForeignKeyViolation(result.Error) {
-				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
-			}
-			return domainerr.Internal("failed to delete supply")
-		}
-		if result.RowsAffected == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-		}
-		return nil
-	})
-}
-
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
@@ -357,9 +362,17 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
 		return err
 	}
+	actor, err := sharedmodels.ActorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	deletedBy := &actor
+
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		archivedAt := time.Now()
 		var supply models.Supply
-		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped(), "supplies")
+		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
@@ -369,11 +382,13 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("supply already archived")
 		}
 
-		if err := tx.Model(&models.Supply{}).
+		cause, err := lifecycle.RootCause(tx, supply.TenantID, "supplies", id, nil, deletedBy)
+		if err != nil {
+			return err
+		}
+		if err := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": time.Now(),
-			}).Error; err != nil {
+			Updates(lifecycle.ArchiveUpdates(tx, "supplies", archivedAt, deletedBy, cause)).Error; err != nil {
 			return domainerr.Internal("failed to archive supply")
 		}
 		return nil
@@ -385,8 +400,10 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		restoredAt := time.Now()
 		var supply models.Supply
-		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped(), "supplies")
+		if err := supplyDB.Where("id = ?", id).First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
@@ -395,14 +412,107 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		if !supply.DeletedAt.Valid {
 			return domainerr.Conflict("supply is not archived")
 		}
+		var projectActive int64
+		if err := tenancy.Scope(ctx, tx.Table("projects"), "projects").
+			Where("id = ? AND deleted_at IS NULL", supply.ProjectID).
+			Count(&projectActive).Error; err != nil {
+			return domainerr.Internal("failed to check project")
+		}
+		if projectActive == 0 {
+			return domainerr.Conflict("cannot restore supply while project is archived")
+		}
 
-		if err := tx.Unscoped().Model(&models.Supply{}).
+		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Supply{}), "supplies").
 			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
+			Updates(lifecycle.RestoreUpdates(tx, "supplies", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore supply")
+		}
+		return nil
+	})
+}
+
+// ListArchivedSupplies lista supplies archivados.
+func (r *Repository) ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error) {
+	var total int64
+	base := r.getDB(ctx).
+		Unscoped().
+		Model(&models.Supply{}).
+		Where("supplies.deleted_at IS NOT NULL")
+	base = tenancy.Scope(ctx, base, "supplies")
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count archived supplies")
+	}
+
+	var list []models.Supply
+	offset := (page - 1) * perPage
+	if err := withSupplyLookups(base).
+		Offset(offset).
+		Limit(perPage).
+		Order("supplies.deleted_at DESC").
+		Find(&list).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list archived supplies")
+	}
+
+	out := make([]domain.Supply, len(list))
+	for i := range list {
+		out[i] = *list[i].ToDomain()
+	}
+	return out, total, nil
+}
+
+// HardDeleteSupply elimina definitivamente un supply.
+// Bloquea con 409 si tiene supply_movements (activos o archivados).
+func (r *Repository) HardDeleteSupply(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "supply"); err != nil {
+		return err
+	}
+
+	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		supplyDB := tenancy.Scope(ctx, tx.Unscoped().Table("supplies"), "supplies")
+		if err := supplyDB.Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check supply existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
+		}
+		if err := lifecycle.RequireArchived(supplyDB, "supplies", "supply", id); err != nil {
+			return err
+		}
+
+		var movCount int64
+		movementDB := tenancy.Scope(ctx, tx.Unscoped().Table("supply_movements"), "supply_movements")
+		if err := movementDB.Where("supply_id = ?", id).Count(&movCount).Error; err != nil {
+			return domainerr.Internal("failed to check supply_movements")
+		}
+		if movCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d movement(s); archive or hard-delete them first", movCount))
+		}
+
+		var stkCount int64
+		stockDB := tenancy.Scope(ctx, tx.Unscoped().Table("stocks"), "stocks")
+		if err := stockDB.Where("supply_id = ?", id).Count(&stkCount).Error; err != nil {
+			return domainerr.Internal("failed to check stocks")
+		}
+		if stkCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d stock record(s); archive or hard-delete them first", stkCount))
+		}
+
+		var itemCount int64
+		itemDB := tenancy.Scope(ctx, tx.Unscoped().Table("workorder_items"), "workorder_items")
+		if err := itemDB.Where("supply_id = ?", id).Count(&itemCount).Error; err != nil {
+			return domainerr.Internal("failed to check workorder_items")
+		}
+		if itemCount > 0 {
+			return domainerr.Conflict(fmt.Sprintf("supply has %d work order item(s); archive or hard-delete them first", itemCount))
+		}
+
+		if err := tenancy.Scope(ctx, tx.Unscoped(), "supplies").Delete(&models.Supply{}, "id = ?", id).Error; err != nil {
+			if isForeignKeyViolation(err) {
+				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
+			}
+			return domainerr.Internal("failed to delete supply")
 		}
 		return nil
 	})
@@ -418,9 +528,7 @@ func (r *Repository) ListSuppliesPaginated(
 	var supplies []models.Supply
 	var total int64
 
-	db := r.getDB(ctx).Model(&models.Supply{}).
-		Preload("Category").
-		Preload("Type")
+	db := withSupplyLookups(tenancy.Scope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies"))
 
 	// Filtrado flexible
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
@@ -485,7 +593,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 				"project_id":       supplies[i].ProjectID,
 				"updated_by":       supplies[i].UpdatedBy,
 			}
-			updateTx := tx.Model(&models.Supply{}).
+			updateTx := tenancy.Scope(ctx, tx.Model(&models.Supply{}), "supplies").
 				Where("id = ?", supplies[i].ID)
 			if !supplies[i].UpdatedAt.IsZero() {
 				updateTx = updateTx.Where("updated_at = ?", supplies[i].UpdatedAt)
@@ -506,7 +614,7 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 }
 
 func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFilter) ([]domain.Supply, int64, error) {
-	base := r.getDB(ctx).Model(&models.Supply{})
+	base := tenancy.Scope(ctx, r.getDB(ctx).Model(&models.Supply{}), "supplies")
 
 	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
 		CustomerID: filter.CustomerID,
@@ -529,10 +637,7 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	}
 
 	var rows []models.Supply
-	db := base.
-		Preload("Category").
-		Preload("Type").
-		Order("name")
+	db := withSupplyLookups(base).Order("name")
 
 	if err := db.Find(&rows).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to list all supplies")
@@ -570,6 +675,11 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 		return nil
 	}
 
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return domainerr.TenantMissing()
+	}
+
 	supplyIDs := make([]int64, 0, len(supplies))
 	for i := range supplies {
 		supplyIDs = append(supplyIDs, supplies[i].ID)
@@ -579,6 +689,7 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 		WITH latest AS (
 			SELECT DISTINCT ON (sm.supply_id)
 				sm.supply_id,
+				sm.tenant_id,
 				sm.id AS movement_id,
 				sm.movement_type,
 				sm.reference_number,
@@ -602,7 +713,7 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 			src.project_id AS source_project_id,
 			pj.name AS source_project
 		FROM latest l
-		LEFT JOIN providers pv ON pv.id = l.provider_id
+		LEFT JOIN providers pv ON pv.id = l.provider_id AND pv.tenant_id = l.tenant_id
 		LEFT JOIN LATERAL (
 			SELECT sm_out.project_id
 			FROM supply_movements sm_out
@@ -613,14 +724,20 @@ func (r *Repository) attachOriginsToSupplies(ctx context.Context, supplies []dom
 			  AND sm_out.investor_id = l.investor_id
 			  AND sm_out.provider_id = l.provider_id
 			  AND sm_out.quantity = (l.quantity * -1)
+			  AND sm_out.tenant_id = l.tenant_id
 			ORDER BY sm_out.id DESC
 			LIMIT 1
 		) src ON l.movement_type = 'Movimiento interno entrada'
-		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL
+		LEFT JOIN projects pj ON pj.id = src.project_id AND pj.deleted_at IS NULL AND pj.tenant_id = l.tenant_id
 	`
+	args := []any{supplyIDs}
+	if hasTenant {
+		query += " WHERE l.tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
 	var rows []supplyOriginRow
-	if err := r.getDB(ctx).Raw(query, supplyIDs).Scan(&rows).Error; err != nil {
+	if err := r.getDB(ctx).Raw(query, args...).Scan(&rows).Error; err != nil {
 		return domainerr.Internal("failed to resolve supply origins")
 	}
 
@@ -673,6 +790,9 @@ func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []
 		Table("supply_movements").
 		Select("supply_id, COALESCE(SUM(quantity), 0) AS total").
 		Where("deleted_at IS NULL AND is_entry = TRUE AND supply_id IN ?", supplyIDs).
+		Scopes(func(db *gorm.DB) *gorm.DB {
+			return tenancy.Scope(ctx, db, "supply_movements")
+		}).
 		Group("supply_id").
 		Scan(&rows).Error
 	if err != nil {
@@ -691,4 +811,60 @@ func (r *Repository) attachQuantitiesToSupplies(ctx context.Context, supplies []
 	}
 
 	return nil
+}
+
+// assertSupplyReferencesActive blocks Create/Update of a supply that
+// references archived parents. ProjectID, CategoryID, UnitID and Type.ID are
+// the lifecycle-managed references; IDs <= 0 are no-ops (helper handles it).
+func assertSupplyReferencesActive(tx *gorm.DB, s *domain.Supply) error {
+	if s == nil {
+		return nil
+	}
+	refs := []lifecycle.ActiveRef{
+		{Table: "projects", Label: "project", ID: s.ProjectID},
+		{Table: "categories", Label: "category", ID: s.CategoryID},
+		{Table: "types", Label: "type", ID: s.Type.ID},
+	}
+	return lifecycle.RequireAllActive(tx, refs)
+}
+
+// GetRawSupplyInvestment calcula la inversión total en insumos (semillas + agroquímicos +
+// fertilizantes) RAW desde tablas base, sin pasar por v4_ssot/v4_calc/v4_report. Replica
+// el filtro que aplican `seeds_invested_for_project_mb` y `agrochemicals_invested_for_project_mb`
+// (categorías de los 3 tipos de insumo) sobre `supply_movements` directamente.
+// Sirve como contraparte independiente de
+// `dashboard.SemillasInvertidosUSD + AgroquimicosInvertidosUSD + FertilizantesInvertidosUSD`.
+func (r *Repository) GetRawSupplyInvestment(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND sm.tenant_id = ? AND s.tenant_id = ? AND c.tenant_id = ?"
+		args = append(args, tenantID, tenantID, tenantID)
+	}
+
+	// type_id 1 = semillas, 2 = agroquímicos, 3 = fertilizantes (definido en public.types).
+	// movement_type whitelist coincide con seeds_invested_for_project_mb / agrochemicals_invested_for_project_mb.
+	q := fmt.Sprintf(`
+		SELECT COALESCE(SUM(COALESCE(sm.quantity, 0) * COALESCE(s.price, 0)), 0) AS total
+		FROM public.supply_movements sm
+		JOIN public.supplies s ON s.id = sm.supply_id AND s.deleted_at IS NULL
+		JOIN public.categories c ON c.id = s.category_id AND c.deleted_at IS NULL
+		WHERE sm.project_id = ?
+		  AND sm.deleted_at IS NULL
+		  AND sm.is_entry = TRUE
+		  AND c.type_id IN (1, 2, 3)
+		  AND sm.movement_type IN ('Stock', 'Remito oficial', 'Movimiento interno', 'Movimiento interno entrada')
+		  %s
+	`, tenantFilter)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw supply investment: " + err.Error())
+	}
+	return total, nil
 }

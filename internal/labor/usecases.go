@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -13,12 +13,15 @@ import (
 type RepositoryPort interface {
 	CreateLabor(context.Context, *domain.Labor) (int64, error)
 	ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
-	DeleteLabor(context.Context, int64) error
+	ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error)
+	ArchiveLabor(context.Context, int64) error
+	RestoreLabor(context.Context, int64) error
+	HardDeleteLabor(context.Context, int64) error
 	GetWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error)
 	UpdateLabor(context.Context, *domain.Labor) error
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
-	ListGroupLabor(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
+	ListGroupLabor(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error)
 	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 	GetLabor(context.Context, int64) (*domain.Labor, error)
@@ -38,15 +41,13 @@ type ProjectUseCasesPort interface {
 
 type UseCases struct {
 	repo      RepositoryPort
-	excel     ExporterAdapterPort
+	exporter  ExporterAdapterPort
 	projectUC ProjectUseCasesPort
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter, projectUC: projectUC}
 }
-
-
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {
@@ -85,8 +86,20 @@ func (u *UseCases) ListLabor(ctx context.Context, page, perPage int, projectID i
 	return u.repo.ListLabor(ctx, page, perPage, projectID)
 }
 
-func (u *UseCases) DeleteLabor(ctx context.Context, laborID int64) error {
-	return u.repo.DeleteLabor(ctx, laborID)
+func (u *UseCases) ArchiveLabor(ctx context.Context, laborID int64) error {
+	return u.repo.ArchiveLabor(ctx, laborID)
+}
+
+func (u *UseCases) RestoreLabor(ctx context.Context, laborID int64) error {
+	return u.repo.RestoreLabor(ctx, laborID)
+}
+
+func (u *UseCases) HardDeleteLabor(ctx context.Context, laborID int64) error {
+	return u.repo.HardDeleteLabor(ctx, laborID)
+}
+
+func (u *UseCases) ListArchivedLabors(ctx context.Context, page, perPage int, projectID int64) ([]domain.ListedLabor, int64, error) {
+	return u.repo.ListArchivedLabors(ctx, page, perPage, projectID)
 }
 
 func (u *UseCases) CountWorkOrdersByLaborID(ctx context.Context, laborID int64) (int64, error) {
@@ -126,8 +139,8 @@ func (u *UseCases) ListLaborByWorkOrder(ctx context.Context, workOrderID int64) 
 	return u.repo.ListByWorkOrder(ctx, workOrderID)
 }
 
-func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Input, projectID int64, fieldID int64) ([]domain.LaborListItem, types.PageInfo, error) {
-	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, projectID, fieldID)
+func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Input, filter domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error) {
+	rawItems, pageInfo, err := u.repo.ListGroupLabor(ctx, inp, filter)
 
 	// Mapear directamente - NO hacer cálculos manuales (ya vienen de la vista)
 	items := make([]domain.LaborListItem, len(rawItems))
@@ -139,11 +152,18 @@ func (u *UseCases) ListGroupLaborByWorkOrder(ctx context.Context, inp types.Inpu
 }
 
 func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid, fid int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
-	items, _, err := u.ListGroupLaborByWorkOrder(ctx, in, pid, fid)
+	filter := domain.LaborFilter{}
+	if pid > 0 {
+		filter.ProjectID = &pid
+	}
+	if fid > 0 {
+		filter.FieldID = &fid
+	}
+	items, _, err := u.ListGroupLaborByWorkOrder(ctx, in, filter)
 	if err != nil {
 		return nil, domainerr.Internal("list group labor")
 	}
@@ -152,11 +172,11 @@ func (u *UseCases) ExportGroupLaborXLSX(ctx context.Context, in types.Input, pid
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }
 
 func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -169,7 +189,7 @@ func (u *UseCases) ExportAllGroupLabors(ctx context.Context, projectID int64) ([
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.ExportTable(ctx, items)
+	return u.exporter.ExportTable(ctx, items)
 }
 
 func (u *UseCases) GetMetrics(ctx context.Context, f domain.LaborFilter) (*domain.LaborMetrics, error) {

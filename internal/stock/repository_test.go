@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -20,6 +22,12 @@ type stockTestGormEngine struct {
 
 func (e *stockTestGormEngine) Client() *gorm.DB { return e.client }
 
+var stockTestTenantID = uuid.MustParse("00000000-0000-0000-0000-000000000401")
+
+func stockTestContext() context.Context {
+	return context.WithValue(context.Background(), ctxkeys.OrgID, stockTestTenantID)
+}
+
 func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 	t.Helper()
 
@@ -30,6 +38,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 
 	stmt := `CREATE TABLE stocks (
 		id INTEGER PRIMARY KEY,
+		tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 		project_id INTEGER NOT NULL,
 		supply_id INTEGER NULL,
 		investor_id INTEGER NULL,
@@ -55,12 +64,14 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 	stmts := []string{
 		`ATTACH DATABASE ':memory:' AS v4_report;`,
 		`CREATE TABLE v4_report.stock_consumed_by_supply (
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			project_id INTEGER NOT NULL,
 			supply_id INTEGER NOT NULL,
 			consumed TEXT NOT NULL
 		);`,
 		`CREATE TABLE projects (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			name TEXT,
 			customer_id INTEGER,
 			campaign_id INTEGER,
@@ -75,6 +86,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 		);`,
 		`CREATE TABLE types (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			name TEXT,
 			created_at DATETIME NULL,
 			updated_at DATETIME NULL,
@@ -85,6 +97,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 		);`,
 		`CREATE TABLE categories (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			name TEXT,
 			type_id INTEGER,
 			created_at DATETIME NULL,
@@ -96,6 +109,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 		);`,
 		`CREATE TABLE supplies (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			project_id INTEGER,
 			name TEXT,
 			price TEXT,
@@ -113,6 +127,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 		);`,
 		`CREATE TABLE investors (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 			name TEXT,
 			created_at DATETIME NULL,
 			updated_at DATETIME NULL,
@@ -123,6 +138,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 		);`,
 		`CREATE TABLE supply_movements (
 				id INTEGER PRIMARY KEY,
+				tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 				stock_id INTEGER,
 				quantity TEXT,
 			movement_type TEXT,
@@ -143,6 +159,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 			);`,
 		`CREATE TABLE workorders (
 				id INTEGER PRIMARY KEY,
+				tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 				project_id INTEGER,
 				investor_id INTEGER,
 				date DATETIME NULL,
@@ -150,6 +167,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 			);`,
 		`CREATE TABLE workorder_items (
 				id INTEGER PRIMARY KEY,
+				tenant_id TEXT DEFAULT '00000000-0000-0000-0000-000000000401',
 				workorder_id INTEGER,
 				supply_id INTEGER,
 				total_used TEXT,
@@ -167,7 +185,7 @@ func newStockTestRepo(t *testing.T) (*Repository, *gorm.DB) {
 
 func TestRepository_GetStocks_UsesCurrentSupplyInvestorRollup(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	seedClosedAndActiveStockRollup(t, db)
@@ -186,7 +204,7 @@ func TestRepository_GetStocks_UsesCurrentSupplyInvestorRollup(t *testing.T) {
 
 func TestRepository_GetStocks_ActiveUsesLatestStockAsReference(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	err := db.Exec(
@@ -211,7 +229,7 @@ func TestRepository_GetStocks_ActiveUsesLatestStockAsReference(t *testing.T) {
 
 func TestRepository_GetStocks_ActiveBuildsInvestorRowFromMovementsAndConsumption(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	err := db.Exec(
@@ -257,7 +275,7 @@ func TestRepository_GetStocks_ActiveBuildsInvestorRowFromMovementsAndConsumption
 
 func TestRepository_GetStocks_ActiveCompensatesSameProjectSupplyAcrossInvestors(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	err := db.Exec(
@@ -302,7 +320,7 @@ func TestRepository_GetStocks_ActiveCompensatesSameProjectSupplyAcrossInvestors(
 
 func TestRepository_GetStocks_CutoffDateTimeline(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	date := func(month time.Month, day int) time.Time {
 		return time.Date(2026, month, day, 0, 0, 0, 0, time.UTC)
 	}
@@ -381,7 +399,7 @@ func TestRepository_GetStocks_CutoffDateTimeline(t *testing.T) {
 
 func TestRepository_GetStocks_ClosedStockMatchesPontiDocumentExample(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	date := func(month time.Month, day int) time.Time {
 		return time.Date(2026, month, day, 0, 0, 0, 0, time.UTC)
 	}
@@ -450,7 +468,7 @@ func TestRepository_GetStocks_ClosedStockMatchesPontiDocumentExample(t *testing.
 
 func TestRepository_GetStocks_ClosedFilterIncludesBackdatedActiveMovement(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	closeDate := time.Date(2026, time.April, 15, 0, 0, 0, 0, time.UTC)
 	backdated := time.Date(2026, time.April, 15, 18, 30, 0, 0, time.UTC)
 
@@ -487,7 +505,7 @@ func TestRepository_GetStocks_ClosedFilterIncludesBackdatedActiveMovement(t *tes
 
 func TestRepository_GetStocks_ClosedPeriodUsesProjectSupplyAndCutoffDate(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	closeDate := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
 
 	seedStockLookupReferences(t, db)
@@ -537,7 +555,7 @@ func TestRepository_GetStocks_ClosedPeriodUsesProjectSupplyAndCutoffDate(t *test
 
 func TestRepository_GetLastStockByProjectInvestorID_UsesCurrentSupplyInvestorRollup(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	seedClosedAndActiveStockRollup(t, db)
@@ -556,7 +574,7 @@ func TestRepository_GetLastStockByProjectInvestorID_UsesCurrentSupplyInvestorRol
 
 func TestRepository_UpdateRealStockUnits_ScopesByProject(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	currentVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 	err := db.Exec(
@@ -585,7 +603,7 @@ func TestRepository_UpdateRealStockUnits_ScopesByProject(t *testing.T) {
 
 func TestRepository_UpdateRealStockUnits_AllowsClosedStock(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
 	currentVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
@@ -619,7 +637,7 @@ func TestRepository_UpdateRealStockUnits_AllowsClosedStock(t *testing.T) {
 
 func TestRepository_UpdateRealStockUnits_RejectsStaleVersion(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	currentVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 	staleVersion := currentVersion.Add(-time.Minute)
 
@@ -652,7 +670,7 @@ func TestRepository_UpdateRealStockUnits_RejectsStaleVersion(t *testing.T) {
 
 func TestRepository_UpdateRealStockUnits_AllowsMatchingProjectAndVersion(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	currentVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 	actor := "user@example.com"
 
@@ -694,7 +712,7 @@ func TestRepository_UpdateRealStockUnits_AllowsMatchingProjectAndVersion(t *test
 
 func TestRepository_UpdateUnitsConsumed_AllowsClosedStock(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 	closedAt := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
 	currentVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
@@ -728,7 +746,7 @@ func TestRepository_UpdateUnitsConsumed_AllowsClosedStock(t *testing.T) {
 
 func TestRepository_GetLastStockByProjectInvestorID_FiltersByInvestor(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	err := db.Exec(
@@ -761,7 +779,7 @@ func TestRepository_GetLastStockByProjectInvestorID_FiltersByInvestor(t *testing
 
 func TestRepository_GetLastStockByProjectInvestorID_ReturnsFirstWhenInvestorHasNoActiveStock(t *testing.T) {
 	repo, db := newStockTestRepo(t)
-	ctx := context.Background()
+	ctx := stockTestContext()
 
 	seedStockLookupReferences(t, db)
 	err := db.Exec(
