@@ -7,19 +7,18 @@
 # Requiere: .env (destino local). PROD se infiere con defaults seguros y gcloud.
 #
 # Uso:
-#   cp .env.example .env
-#   editar .env
+#   editar .env con variables reales
 #   DRY_RUN=1 ./scripts/db/reset-local-db-from-prod.sh
 #   ./scripts/db/reset-local-db-from-prod.sh
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ENV_FILE="${BACKEND_DIR}/.env"
+CORE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ENV_FILE="${CORE_DIR}/.env"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "[ERROR] Falta ${ENV_FILE}."
-  echo "[ERROR] Copia el ejemplo: cp .env.example .env"
+  echo "[ERROR] Creá ${ENV_FILE} con las variables reales."
   exit 1
 fi
 set -a
@@ -594,7 +593,7 @@ run_local_migrations_to_target() {
   db_password_enc="$(urlencode_pass "${DB_PASSWORD}")"
   local migrate_common=(
     docker run --rm --network host
-    -v "${BACKEND_DIR}/migrations_v4:/migrations:ro"
+    -v "${CORE_DIR}/migrations_v4:/migrations:ro"
     migrate/migrate:v4.17.1
     -path /migrations
     -database "postgres://${DB_USER}:${db_password_enc}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}"
@@ -717,7 +716,7 @@ PY
 run_post_restore_steps() {
   if [[ "${POST_RESTORE_TENANT_BACKFILL}" == "1" ]]; then
     log "Reejecutando backfill tenant post-restore sobre local..."
-    run_pg_cmd env PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
+    run_pg_cmd env PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -f "${CORE_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
   fi
 
   if [[ "${RUN_FINAL_MIGRATIONS}" == "1" ]]; then
@@ -725,7 +724,7 @@ run_post_restore_steps() {
     local db_password_enc
     db_password_enc="$(urlencode_pass "${DB_PASSWORD}")"
     docker run --rm --network host \
-      -v "${BACKEND_DIR}/migrations_v4:/migrations:ro" \
+      -v "${CORE_DIR}/migrations_v4:/migrations:ro" \
       migrate/migrate:v4.17.1 \
       -path /migrations \
       -database "postgres://${DB_USER}:${db_password_enc}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSL_MODE}" \
@@ -734,7 +733,7 @@ run_post_restore_steps() {
 
   if [[ "${ACTORS_BACKFILL_SYNC}" == "1" ]]; then
     log "Reejecutando backfill/sync de actors sobre local..."
-    run_pg_cmd env PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
+    run_pg_cmd env PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -f "${CORE_DIR}/scripts/db/actors_backfill_sync.sql"
   fi
 }
 

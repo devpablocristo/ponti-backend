@@ -60,7 +60,7 @@ Hexagonal pragmática. Layout canónico por módulo (`internal/<module>/`):
 make up-ponti-local
 
 # Solo backend
-cd ponti-backend && docker compose up -d
+cd core && docker compose up -d
 
 # Tests
 go test ./...

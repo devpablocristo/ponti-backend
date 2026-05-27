@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Levanta el stack local de Ponti (backend + frontend).
+# Levanta el stack local de Ponti (core + web).
 #
 # Importante: el servicio AI vive en `axis/companion` (repo paralelo en
 # `/home/<user>/Proyectos/pablo/axis/`). Este script asume que el stack axis
@@ -8,9 +8,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
-FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
+CORE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$CORE_DIR/.." && pwd)"
+WEB_DIR="${PONTI_WEB_DIR:-$ROOT_DIR/web}"
 
 require_dir() {
   local dir="$1"
@@ -21,8 +21,8 @@ require_dir() {
   fi
 }
 
-require_dir "$BACKEND_DIR" "backend"
-require_dir "$FRONTEND_DIR" "frontend"
+require_dir "$CORE_DIR" "core"
+require_dir "$WEB_DIR" "web"
 
 http_ok() {
   local url="$1"
@@ -40,16 +40,12 @@ except Exception:
 PY
 }
 
-ensure_env_file() {
+require_env_file() {
   local dir="$1"
   if [[ -f "$dir/.env" ]]; then
     return 0
   fi
-  if [[ -f "$dir/.env.example" ]]; then
-    cp "$dir/.env.example" "$dir/.env"
-    return 0
-  fi
-  echo "ERROR: falta $dir/.env y $dir/.env.example" >&2
+  echo "ERROR: falta $dir/.env. Crealo con las variables reales; no se autogenera desde .env.example." >&2
   exit 1
 }
 
@@ -60,30 +56,30 @@ stop_system_postgres() {
   fi
 }
 
-ensure_env_file "$BACKEND_DIR"
-ensure_env_file "$FRONTEND_DIR/api"
+require_env_file "$CORE_DIR"
+require_env_file "$WEB_DIR/api"
 
 # Importante: este script NO setea defaults de infraestructura ni modifica .env.
 # La configuración debe vivir en los archivos `.env` de cada servicio (local)
 # o en las variables de entorno del ambiente (dev/staging/prod).
 set -a
-source "$BACKEND_DIR/.env"
+source "$CORE_DIR/.env"
 set +a
 
 if [[ "${DB_PORT:-5432}" == "5432" ]]; then
   if ss -tlnp 2>/dev/null | grep -qE '(:5432|\.5432)\s'; then
-    echo "ERROR: 5432 está ocupado. Para correr el stack local, setea DB_PORT=5433 en $BACKEND_DIR/.env" >&2
+    echo "ERROR: 5432 está ocupado. Para correr el stack local, setea DB_PORT=5433 en $CORE_DIR/.env" >&2
     exit 1
   fi
 fi
 
 # Validación mínima de coherencia local:
 # - El BFF usa siempre Identity Platform (sin dev-mode de auth).
-if ! grep -qE '^IDENTITY_PLATFORM_API_KEY=' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
-  echo "WARN: falta IDENTITY_PLATFORM_API_KEY en $FRONTEND_DIR/api/.env. Login local puede fallar."
+if ! grep -qE '^IDENTITY_PLATFORM_API_KEY=' "$WEB_DIR/api/.env" 2>/dev/null; then
+  echo "WARN: falta IDENTITY_PLATFORM_API_KEY en $WEB_DIR/api/.env. Login local puede fallar."
 fi
-if ! grep -qE '^IDENTITY_PLATFORM_PROJECT_ID=' "$FRONTEND_DIR/api/.env" 2>/dev/null; then
-  echo "WARN: falta IDENTITY_PLATFORM_PROJECT_ID en $FRONTEND_DIR/api/.env. Login local puede fallar."
+if ! grep -qE '^IDENTITY_PLATFORM_PROJECT_ID=' "$WEB_DIR/api/.env" 2>/dev/null; then
+  echo "WARN: falta IDENTITY_PLATFORM_PROJECT_ID en $WEB_DIR/api/.env. Login local puede fallar."
 fi
 
 # Check de axis (companion + nexus) — viven en repo paralelo. Si no están UP,
@@ -100,35 +96,35 @@ if [[ -n "${NEXUS_BASE_URL:-}" ]]; then
 fi
 
 echo "Bajando contenedores antes de levantar..."
-docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
-if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
-  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
-  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" kill || true
-  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+docker compose --progress quiet -f "$CORE_DIR/docker-compose.yml" down --remove-orphans
+if [[ -f "$WEB_DIR/docker-compose.yml" ]]; then
+  docker compose --progress quiet -f "$WEB_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
+  docker compose --progress quiet -f "$WEB_DIR/docker-compose.yml" kill || true
+  docker compose --progress quiet -f "$WEB_DIR/docker-compose.yml" down --remove-orphans --timeout 1 || true
 fi
 
 echo "Verificando conflictos de puerto PostgreSQL..."
 stop_system_postgres
 
-echo "Levantando backend (DB + migraciones) con Docker..."
-docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" up -d ponti-db
+echo "Levantando core (DB + migraciones) con Docker..."
+docker compose --progress quiet -f "$CORE_DIR/docker-compose.yml" up -d ponti-db
 
-echo "Levantando backend API (docker)..."
-docker compose --progress quiet -f "$BACKEND_DIR/docker-compose.yml" up -d --build --quiet-pull ponti-api
+echo "Levantando core API (docker)..."
+docker compose --progress quiet -f "$CORE_DIR/docker-compose.yml" up -d --build --quiet-pull ponti-api
 
 if ! http_ok "http://localhost:8080/ping"; then
-  echo "WARN: backend API aún no responde en :8080 (puede tardar por build/migrate inicial)." >&2
+  echo "WARN: core API aún no responde en :8080 (puede tardar por build/migrate inicial)." >&2
 fi
 
-echo "Levantando frontend con Docker Compose..."
-if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
-  docker compose --progress quiet -f "$FRONTEND_DIR/docker-compose.yml" up -d --quiet-pull
+echo "Levantando web con Docker Compose..."
+if [[ -f "$WEB_DIR/docker-compose.yml" ]]; then
+  docker compose --progress quiet -f "$WEB_DIR/docker-compose.yml" up -d --quiet-pull
 else
-  echo "ERROR: falta $FRONTEND_DIR/docker-compose.yml (el FE ahora usa docker-compose)" >&2
+  echo "ERROR: falta $WEB_DIR/docker-compose.yml (web usa docker-compose)" >&2
   exit 1
 fi
 
 echo "Todos los servicios fueron lanzados. Mostrando logs (Ctrl+C para salir)..."
-docker compose -f "$BACKEND_DIR/docker-compose.yml" logs -f &
-docker compose -f "$FRONTEND_DIR/docker-compose.yml" logs -f &
+docker compose -f "$CORE_DIR/docker-compose.yml" logs -f &
+docker compose -f "$WEB_DIR/docker-compose.yml" logs -f &
 wait

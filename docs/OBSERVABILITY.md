@@ -115,17 +115,17 @@ Para ver spans en Jaeger/Tempo localmente, agregar al docker-compose un OTLP col
 
 ### Cómo activar tracing en dev sin tocar código
 ```bash
-# en .env del ponti-backend
+# en .env del core
 OTEL_EXPORTER=stdout
 OTEL_SAMPLE_RATIO=1.0
 ENVIRONMENT=local
 ```
-Restart: `docker compose -f ponti-backend/docker-compose.yml up -d --force-recreate ponti-api` (force-recreate es necesario para releer .env).
+Restart: `docker compose -f core/docker-compose.yml up -d --force-recreate ponti-api` (force-recreate es necesario para releer .env).
 
 ### Cómo confirmar que está activo
 ```bash
 curl http://localhost:8080/api/v1/ping
-docker logs ponti-backend-ponti-api-1 | grep http_request_completed | tail -1
+docker logs core-ponti-api-1 | grep http_request_completed | tail -1
 ```
 Si el log tiene `"trace_id":"..."`, está activo. Si no, está en no-op.
 

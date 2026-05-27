@@ -11,7 +11,7 @@ generados no deben quedar commiteados.
 | `docker_cleanup.sh` | Limpieza interactiva y destructiva de Docker local. |
 | `down_ponti_local.sh` | Baja el stack local Ponti completo. |
 | `entrypoint.sh` | Entrypoint de la imagen Docker de produccion. |
-| `run_ponti_local.sh` | Levanta backend, frontend y AI en local. |
+| `run_ponti_local.sh` | Levanta core, web y axis en local. |
 | `smoke_release.sh` | Smoke test de release usado por deploys. |
 
 ## DB

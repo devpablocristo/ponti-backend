@@ -13,18 +13,18 @@ TLDR:
 ### Requisitos
 - Docker + Docker Compose
 - Go (para ejecutar la API)
-- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.19.0` para alinear con frontend.
+- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.19.0` para alinear con web.
 
 ### Configuración
 - Usamos **un solo** archivo `.env` para local.
 - No hay configuración por ambiente dentro del código.
-- Ejemplo base en `.env.example`.
+- `.env.example` queda sólo como referencia; las variables reales van en `.env`.
 - Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar los módulos privados de `github.com/devpablocristo/platform/*`.
 - En CI/deploy el token ya no viaja por `ARG`: el build prod consume un secret BuildKit (`go_modules_token`).
 - `.dockerignore` excluye `.env`, artefactos y el árbol `pkg/` legacy del contexto de build prod.
 
 ```bash
-cp .env.example .env
+# editar .env con las variables reales
 ```
 
 ### Levantar servicios
@@ -57,7 +57,7 @@ X-USER-ID: 123
 Flujo seguro y cerrado:
 ```
 FE (UI)
- → BFF (ponti-frontend/api, valida JWT)
+ → BFF (web/api, valida JWT)
  → Backend Go (proxy seguro)
  → Ponti AI (`InsightService` + `CopilotAgent`, READ-ONLY)
 ```

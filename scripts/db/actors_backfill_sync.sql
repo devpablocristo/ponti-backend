@@ -24,10 +24,10 @@ BEGIN
     FOR rec IN SELECT id, name, created_at, updated_at, deleted_at, created_by::text AS created_by, updated_by::text AS updated_by, deleted_by::text AS deleted_by FROM public.customers LOOP
         v_source_key := rec.id::text;
         IF NOT EXISTS (SELECT 1 FROM public.legacy_actor_map m WHERE m.tenant_id = tenant AND m.source_table = 'customers' AND m.source_key = v_source_key) THEN
-            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, archived_at, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
-            VALUES (tenant, 'organization', rec.name, public.normalize_actor_name(rec.name), rec.deleted_at, rec.created_at, rec.updated_at, NULL, rec.created_by, rec.updated_by, rec.deleted_by)
+            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
+            VALUES (tenant, 'organization', rec.name, public.normalize_actor_name(rec.name), rec.created_at, rec.updated_at, rec.deleted_at, rec.created_by, rec.updated_by, rec.deleted_by)
             RETURNING id INTO actor_id;
-            INSERT INTO public.actor_roles (actor_id, role, archived_at) VALUES (actor_id, 'cliente', rec.deleted_at) ON CONFLICT DO NOTHING;
+            INSERT INTO public.actor_roles (actor_id, role, deleted_at) VALUES (actor_id, 'cliente', rec.deleted_at) ON CONFLICT DO NOTHING;
             INSERT INTO public.legacy_actor_map (tenant_id, source_table, source_id, source_text, source_key, actor_id, confidence, mapping_status)
             VALUES (tenant, 'customers', rec.id, rec.name, v_source_key, actor_id, 1.0, 'created_new');
         END IF;
@@ -36,10 +36,10 @@ BEGIN
     FOR rec IN SELECT id, name, created_at, updated_at, deleted_at, created_by::text AS created_by, updated_by::text AS updated_by, deleted_by::text AS deleted_by FROM public.investors LOOP
         v_source_key := rec.id::text;
         IF NOT EXISTS (SELECT 1 FROM public.legacy_actor_map m WHERE m.tenant_id = tenant AND m.source_table = 'investors' AND m.source_key = v_source_key) THEN
-            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, archived_at, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
-            VALUES (tenant, 'unknown', rec.name, public.normalize_actor_name(rec.name), rec.deleted_at, rec.created_at, rec.updated_at, NULL, rec.created_by, rec.updated_by, rec.deleted_by)
+            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
+            VALUES (tenant, 'unknown', rec.name, public.normalize_actor_name(rec.name), rec.created_at, rec.updated_at, rec.deleted_at, rec.created_by, rec.updated_by, rec.deleted_by)
             RETURNING id INTO actor_id;
-            INSERT INTO public.actor_roles (actor_id, role, archived_at) VALUES (actor_id, 'inversor', rec.deleted_at) ON CONFLICT DO NOTHING;
+            INSERT INTO public.actor_roles (actor_id, role, deleted_at) VALUES (actor_id, 'inversor', rec.deleted_at) ON CONFLICT DO NOTHING;
             INSERT INTO public.legacy_actor_map (tenant_id, source_table, source_id, source_text, source_key, actor_id, confidence, mapping_status)
             VALUES (tenant, 'investors', rec.id, rec.name, v_source_key, actor_id, 1.0, 'created_new');
         END IF;
@@ -48,10 +48,10 @@ BEGIN
     FOR rec IN SELECT id, name, created_at, updated_at, deleted_at, created_by::text AS created_by, updated_by::text AS updated_by, deleted_by::text AS deleted_by FROM public.managers LOOP
         v_source_key := rec.id::text;
         IF NOT EXISTS (SELECT 1 FROM public.legacy_actor_map m WHERE m.tenant_id = tenant AND m.source_table = 'managers' AND m.source_key = v_source_key) THEN
-            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, archived_at, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
-            VALUES (tenant, 'natural_person', rec.name, public.normalize_actor_name(rec.name), rec.deleted_at, rec.created_at, rec.updated_at, NULL, rec.created_by, rec.updated_by, rec.deleted_by)
+            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
+            VALUES (tenant, 'natural_person', rec.name, public.normalize_actor_name(rec.name), rec.created_at, rec.updated_at, rec.deleted_at, rec.created_by, rec.updated_by, rec.deleted_by)
             RETURNING id INTO actor_id;
-            INSERT INTO public.actor_roles (actor_id, role, archived_at) VALUES (actor_id, 'responsable', rec.deleted_at) ON CONFLICT DO NOTHING;
+            INSERT INTO public.actor_roles (actor_id, role, deleted_at) VALUES (actor_id, 'responsable', rec.deleted_at) ON CONFLICT DO NOTHING;
             INSERT INTO public.legacy_actor_map (tenant_id, source_table, source_id, source_text, source_key, actor_id, confidence, mapping_status)
             VALUES (tenant, 'managers', rec.id, rec.name, v_source_key, actor_id, 1.0, 'created_new');
         END IF;
@@ -60,10 +60,10 @@ BEGIN
     FOR rec IN SELECT id, name, created_at, updated_at, deleted_at, created_by::text AS created_by, updated_by::text AS updated_by, deleted_by::text AS deleted_by FROM public.providers LOOP
         v_source_key := rec.id::text;
         IF NOT EXISTS (SELECT 1 FROM public.legacy_actor_map m WHERE m.tenant_id = tenant AND m.source_table = 'providers' AND m.source_key = v_source_key) THEN
-            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, archived_at, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
-            VALUES (tenant, 'organization', rec.name, public.normalize_actor_name(rec.name), rec.deleted_at, rec.created_at, rec.updated_at, NULL, rec.created_by, rec.updated_by, rec.deleted_by)
+            INSERT INTO public.actors (tenant_id, actor_kind, display_name, normalized_name, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)
+            VALUES (tenant, 'organization', rec.name, public.normalize_actor_name(rec.name), rec.created_at, rec.updated_at, rec.deleted_at, rec.created_by, rec.updated_by, rec.deleted_by)
             RETURNING id INTO actor_id;
-            INSERT INTO public.actor_roles (actor_id, role, archived_at) VALUES (actor_id, 'proveedor', rec.deleted_at) ON CONFLICT DO NOTHING;
+            INSERT INTO public.actor_roles (actor_id, role, deleted_at) VALUES (actor_id, 'proveedor', rec.deleted_at) ON CONFLICT DO NOTHING;
             INSERT INTO public.legacy_actor_map (tenant_id, source_table, source_id, source_text, source_key, actor_id, confidence, mapping_status)
             VALUES (tenant, 'providers', rec.id, rec.name, v_source_key, actor_id, 1.0, 'created_new');
         END IF;

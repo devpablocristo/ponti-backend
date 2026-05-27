@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
@@ -242,26 +243,23 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 		// pivot tables. Archive would leave any of them pointing at an
 		// archived row, breaking the invariant. The user must remove (or
 		// archive via cascade) the assignments first.
-		type pivot struct {
-			table  string
-			column string
-		}
-		pivots := []pivot{
-			{"project_investors", "investor_id"},
-			{"field_investors", "investor_id"},
-			{"workorder_investor_splits", "investor_id"},
-			{"work_order_draft_investor_splits", "investor_id"},
-			{"admin_cost_investors", "investor_id"},
+		pivots := []investorAssignmentPivot{
+			{table: "project_investors", column: "investor_id"},
+			{table: "field_investors", column: "investor_id"},
+			{table: "workorder_investor_splits", column: "investor_id"},
+			{
+				table:            "work_order_draft_investor_splits",
+				column:           "investor_id",
+				parentTable:      "work_order_drafts",
+				parentJoinColumn: "draft_id",
+				parentIDColumn:   "id",
+			},
+			{table: "admin_cost_investors", column: "investor_id"},
 		}
 		var totalActive int64
 		for _, p := range pivots {
-			if !tx.Migrator().HasTable(p.table) {
-				continue
-			}
-			var n int64
-			q := tenancy.Scope(ctx, tx.Table(p.table), p.table).
-				Where(p.column+" = ? AND deleted_at IS NULL", id)
-			if err := q.Count(&n).Error; err != nil {
+			n, err := countActiveInvestorAssignments(tx, inv, p)
+			if err != nil {
 				return domainerr.Internal(fmt.Sprintf("failed to check %s assignments", p.table))
 			}
 			totalActive += n
@@ -295,6 +293,51 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+type investorAssignmentPivot struct {
+	table            string
+	column           string
+	parentTable      string
+	parentJoinColumn string
+	parentIDColumn   string
+}
+
+func countActiveInvestorAssignments(tx *gorm.DB, inv models.Investor, p investorAssignmentPivot) (int64, error) {
+	if tx == nil || p.table == "" || p.column == "" || !tx.Migrator().HasTable(p.table) {
+		return 0, nil
+	}
+
+	query := tx.Table(p.table).Where(p.column+" = ?", inv.ID)
+	if tx.Migrator().HasColumn(p.table, "deleted_at") {
+		query = query.Where(p.table + ".deleted_at IS NULL")
+	}
+	if inv.TenantID != uuid.Nil {
+		if tx.Migrator().HasColumn(p.table, "tenant_id") {
+			query = query.Where(p.table+".tenant_id = ?", inv.TenantID)
+		} else if p.parentTable != "" &&
+			p.parentJoinColumn != "" &&
+			p.parentIDColumn != "" &&
+			tx.Migrator().HasTable(p.parentTable) &&
+			tx.Migrator().HasColumn(p.parentTable, "tenant_id") {
+			query = query.Joins(
+				fmt.Sprintf(
+					"JOIN %s ON %s.%s = %s.%s",
+					p.parentTable,
+					p.parentTable,
+					p.parentIDColumn,
+					p.table,
+					p.parentJoinColumn,
+				),
+			).Where(p.parentTable+".tenant_id = ?", inv.TenantID)
+		}
+	}
+
+	var n int64
+	if err := query.Count(&n).Error; err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
