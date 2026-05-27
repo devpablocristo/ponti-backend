@@ -16,7 +16,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	categorymodels "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	classtypemodels "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"

@@ -8,7 +8,7 @@ import (
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/devpablocristo/core/validate/go/stringutil"
+	"github.com/devpablocristo/platform/validate/go/stringutil"
 )
 
 // IsNumeric returns true if the string contains only digits.

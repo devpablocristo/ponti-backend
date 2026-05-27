@@ -14,7 +14,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 // ConfigPort es la interfaz para manejar configuraciones del cliente GORM

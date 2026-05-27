@@ -3,7 +3,7 @@ package sharedhandlers
 import (
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 )
 
 // ParsePaginationParams devuelve page y perPage con defaults seguros.

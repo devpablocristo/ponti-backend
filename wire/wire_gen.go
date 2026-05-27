@@ -37,7 +37,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
-	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 )
 
 // Injectors from wire.go:
@@ -305,9 +305,12 @@ func Initialize() (*Dependencies, error) {
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, useCasesPort2, stockConfigAPIPort, stockMiddlewaresEnginePort)
 	aiGinEnginePort := ProvideAIGinEnginePort(server)
-	ai := ProvideConfigAI(config)
-	client := ProvideAIClient(ai)
-	usecasesUseCases := ProvideAIUseCases(client)
+	companion := ProvideConfigCompanion(config)
+	companionClient, err := ProvideCompanionClient(companion)
+	if err != nil {
+		return nil, err
+	}
+	usecasesUseCases := ProvideAIUseCases(companionClient)
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)

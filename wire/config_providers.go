@@ -25,9 +25,14 @@ func ProvideConfigAPI(cfg *config.Config) *config.API {
 	return &cfg.API
 }
 
-// ProvideConfigAI ...
-func ProvideConfigAI(cfg *config.Config) *config.AI {
-	return &cfg.AI
+// ProvideConfigCompanion expone la sección Companion del config.
+func ProvideConfigCompanion(cfg *config.Config) *config.Companion {
+	return &cfg.Companion
+}
+
+// ProvideConfigNexus expone la sección Nexus del config.
+func ProvideConfigNexus(cfg *config.Config) *config.Nexus {
+	return &cfg.Nexus
 }
 
 // ConfigSet ...
@@ -36,5 +41,6 @@ var ConfigSet = wire.NewSet(
 	ProvideConfigDB,
 	ProvideConfigSuggester,
 	ProvideConfigAPI,
-	ProvideConfigAI,
+	ProvideConfigCompanion,
+	ProvideConfigNexus,
 )

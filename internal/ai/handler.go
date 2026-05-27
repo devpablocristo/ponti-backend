@@ -1,5 +1,5 @@
-// Package ai expone endpoints HTTP que proxyean al copilot conversacional
-// de Ponti AI (`POST /v1/chat`, `POST /v1/chat/stream`, conversaciones).
+// Package ai expone endpoints HTTP que proxyean al asistente conversacional
+// de Axis Companion (`POST /v1/chat`, `POST /v1/chat/stream`, conversaciones).
 package ai
 
 import (
@@ -13,15 +13,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
-	Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
-	ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error)
-	GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error)
-	ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error
+	Chat(ctx context.Context, userID, tenantID, projectID string, body any) (int, []byte, error)
+	ListChatConversations(ctx context.Context, userID, tenantID, projectID string, limit int) (int, []byte, error)
+	GetChatConversation(ctx context.Context, userID, tenantID, projectID, conversationID string) (int, []byte, error)
+	ChatStream(ctx context.Context, userID, tenantID, projectID string, body io.Reader, w http.ResponseWriter) error
 }
 
 type GinEnginePort interface {
@@ -67,12 +67,12 @@ func (h *Handler) Chat(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, projectID, err := extractIDs(c)
+	userID, tenantID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, projectID, body)
+	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, tenantID, projectID, body)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -81,7 +81,7 @@ func (h *Handler) ChatStream(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, projectID, err := extractIDs(c)
+	userID, tenantID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -100,13 +100,13 @@ func (h *Handler) ChatStream(c *gin.Context) {
 		return
 	}
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	if err := h.ucs.ChatStream(c.Request.Context(), userID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
+	if err := h.ucs.ChatStream(c.Request.Context(), userID, tenantID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
 		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
 	}
 }
 
 func (h *Handler) ListChatConversations(c *gin.Context) {
-	userID, projectID, err := extractIDs(c)
+	userID, tenantID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -117,7 +117,7 @@ func (h *Handler) ListChatConversations(c *gin.Context) {
 			limit = n
 		}
 	}
-	status, raw, err := h.ucs.ListChatConversations(c.Request.Context(), userID, projectID, limit)
+	status, raw, err := h.ucs.ListChatConversations(c.Request.Context(), userID, tenantID, projectID, limit)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -127,12 +127,12 @@ func (h *Handler) GetChatConversation(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("conversation_id is required"))
 		return
 	}
-	userID, projectID, err := extractIDs(c)
+	userID, tenantID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	status, raw, err := h.ucs.GetChatConversation(c.Request.Context(), userID, projectID, conversationID)
+	status, raw, err := h.ucs.GetChatConversation(c.Request.Context(), userID, tenantID, projectID, conversationID)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -153,14 +153,18 @@ func (h *Handler) respondProxy(c *gin.Context, status int, body []byte, err erro
 	c.JSON(status, payload)
 }
 
-func extractIDs(c *gin.Context) (string, string, error) {
-	userID := strings.TrimSpace(c.GetHeader("X-USER-ID"))
+func extractIDs(c *gin.Context) (string, string, string, error) {
+	userID, err := sharedhandlers.ParseActor(c)
+	if err != nil {
+		return "", "", "", err
+	}
+	orgID, err := sharedhandlers.ParseOrgID(c)
+	if err != nil {
+		return "", "", "", err
+	}
 	projectID := strings.TrimSpace(c.GetHeader("X-PROJECT-ID"))
-	if userID == "" {
-		return "", "", domainerr.Validation("The field 'user_id' is required")
-	}
 	if projectID == "" {
-		return "", "", domainerr.Validation("The field 'project_id' is required")
+		return "", "", "", domainerr.Validation("The field 'project_id' is required")
 	}
-	return userID, projectID, nil
+	return userID, orgID.String(), projectID, nil
 }

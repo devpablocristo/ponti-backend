@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"

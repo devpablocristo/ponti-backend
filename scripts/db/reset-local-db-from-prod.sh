@@ -213,7 +213,7 @@ cleanup_proxy() {
 }
 
 start_proxy() {
-  # Solo reutilizar si NUESTRO contenedor proxy está corriendo (evita confundir con ponti-ai u otros)
+  # Solo reutilizar si NUESTRO contenedor proxy está corriendo (evita confundir con otros)
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PROXY_CONTAINER_NAME}$"; then
     if PGPASSWORD="$SRC_PASS" pg_isready -h "127.0.0.1" -p "${SRC_PROXY_PORT}" -U "${SRC_USER}" >/dev/null 2>&1; then
       log "Proxy ya activo (${PROXY_CONTAINER_NAME}), reutilizando"
@@ -481,12 +481,20 @@ log "OK. Secuencias sincronizadas."
 
 if [[ "$POST_RESTORE_TENANT_BACKFILL" == "1" ]]; then
   log "Reejecutando backfill tenant post-restore..."
-  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
+  if [[ -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql" ]]; then
+    PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/migrations_v4/000224_tenant_security_foundation.up.sql"
+  else
+    warn "No existe migrations_v4/000224_tenant_security_foundation.up.sql en esta rama; se saltea backfill tenant."
+  fi
 fi
 
 if [[ "$ACTORS_BACKFILL_SYNC" == "1" ]]; then
   log "Reejecutando backfill/sync de actors..."
-  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
+  if [[ -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql" ]]; then
+    PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "${BACKEND_DIR}/scripts/db/actors_backfill_sync.sql"
+  else
+    warn "No existe scripts/db/actors_backfill_sync.sql en esta rama; se saltea sync de actors."
+  fi
 fi
 
 if [[ "$RUN_FINAL_MIGRATIONS" == "1" ]]; then

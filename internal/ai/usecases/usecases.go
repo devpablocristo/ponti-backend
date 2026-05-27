@@ -1,64 +1,45 @@
-// Package usecases contiene casos de uso del proxy AI (chat con copilot).
+// Package usecases contiene los casos de uso del proxy AI.
+//
+// La ruta activa es Axis Companion, inyectado vía `ai.CompanionAdapter` que
+// implementa `ClientPort`.
 package usecases
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
+// ClientPort es la interfaz que el handler usa para hablar con el upstream AI.
+// La implementa `ai.CompanionAdapter` traduciendo cada llamada al cliente
+// tipado de Companion en `internal/axis`.
 type ClientPort interface {
-	Do(ctx context.Context, method, path string, body any, userID, projectID string) (int, []byte, error)
-	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, projectID string) (*http.Response, error)
+	Do(ctx context.Context, method, path string, body any, userID, tenantID, projectID string) (int, []byte, error)
+	DoStream(ctx context.Context, method, path string, body io.Reader, contentType string, userID, tenantID, projectID string) (*http.Response, error)
 }
 
+// UseCases orquesta el chat conversacional contra Companion. No tiene lógica
+// extra hoy — sólo route + clamp del limit en listados — pero queda como
+// punto de extensión si después se agrega cache, métricas custom, retries
+// específicos, o el cliente Nexus para gating.
 type UseCases struct {
 	client ClientPort
 }
 
+// NewUseCases construye los casos de uso. `client` debe estar ya configurado
+// (sin URL no se construye y el binary falla en wire).
 func NewUseCases(client ClientPort) *UseCases {
 	return &UseCases{client: client}
 }
 
-// isAIServiceNotConfigured indica si el error es por AI no configurada (URL/KEY vacíos).
-func isAIServiceNotConfigured(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "ai service url not configured") ||
-		strings.Contains(s, "ai service key not configured")
-}
-
-// dummyOrReal ejecuta la llamada al cliente; si AI no está configurada, devuelve respuestas dummy.
-func (u *UseCases) dummyOrReal(ctx context.Context, method, path string, body any, userID, projectID string, dummyResp any) (int, []byte, error) {
-	status, raw, err := u.client.Do(ctx, method, path, body, userID, projectID)
-	if err == nil {
-		return status, raw, nil
-	}
-	if !isAIServiceNotConfigured(err) {
-		return 0, nil, err
-	}
-	b, _ := json.Marshal(dummyResp)
-	return 200, b, nil
-}
-
-// ChatStream proxea POST /v1/chat/stream hacia ponti-ai (SSE); escribe headers y cuerpo en w.
-func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error {
-	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, projectID)
+// ChatStream proxea POST /v1/chat/stream. El adapter compone SSE sintético
+// (start + done) sobre el response síncrono de Companion — el FE no nota la
+// diferencia salvo por la falta de tokens progresivos.
+func (u *UseCases) ChatStream(ctx context.Context, userID, tenantID, projectID string, body io.Reader, w http.ResponseWriter) error {
+	resp, err := u.client.DoStream(ctx, http.MethodPost, "/v1/chat/stream", body, "application/json", userID, tenantID, projectID)
 	if err != nil {
-		if isAIServiceNotConfigured(err) {
-			w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
-			w.Header().Set("Cache-Control", "no-cache")
-			w.Header().Set("X-Accel-Buffering", "no")
-			w.WriteHeader(http.StatusOK)
-			_, _ = fmt.Fprintf(w, "event: error\ndata: {\"message\":\"ai_not_configured\"}\n\n")
-			return nil
-		}
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -72,23 +53,11 @@ func (u *UseCases) ChatStream(ctx context.Context, userID, projectID string, bod
 	return err
 }
 
-func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error) {
-	return u.dummyOrReal(ctx, "POST", "/v1/chat", body, userID, projectID, map[string]any{
-		"request_id":            "dummy",
-		"output_kind":           "chat_reply",
-		"content_language":      "es",
-		"chat_id":               "",
-		"reply":                 "Asistente AI no configurado.",
-		"tokens_used":           0,
-		"tool_calls":            []any{},
-		"pending_confirmations": []any{},
-		"blocks":                []any{},
-		"routed_agent":          "general",
-		"routing_source":        "read_fallback",
-	})
+func (u *UseCases) Chat(ctx context.Context, userID, tenantID, projectID string, body any) (int, []byte, error) {
+	return u.client.Do(ctx, "POST", "/v1/chat", body, userID, tenantID, projectID)
 }
 
-func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error) {
+func (u *UseCases) ListChatConversations(ctx context.Context, userID, tenantID, projectID string, limit int) (int, []byte, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -96,18 +65,10 @@ func (u *UseCases) ListChatConversations(ctx context.Context, userID, projectID 
 		limit = 200
 	}
 	path := "/v1/chat/conversations?limit=" + strconv.Itoa(limit)
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
-		"items": []any{},
-	})
+	return u.client.Do(ctx, "GET", path, nil, userID, tenantID, projectID)
 }
 
-func (u *UseCases) GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error) {
+func (u *UseCases) GetChatConversation(ctx context.Context, userID, tenantID, projectID, conversationID string) (int, []byte, error) {
 	path := "/v1/chat/conversations/" + strings.TrimSpace(conversationID)
-	return u.dummyOrReal(ctx, "GET", path, nil, userID, projectID, map[string]any{
-		"id":         conversationID,
-		"title":      "dummy",
-		"messages":   []any{},
-		"created_at": "",
-		"updated_at": "",
-	})
+	return u.client.Do(ctx, "GET", path, nil, userID, tenantID, projectID)
 }

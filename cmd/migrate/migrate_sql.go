@@ -103,6 +103,12 @@ func acquireMigrationLockWithTimeout(ctx context.Context, sqlDB *sql.DB, databas
 
 	log.Printf("Attempting to acquire migration lock for database: %s (lock_id: %d)", databaseName, lockID)
 
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reserve migration lock connection (database: %s, lock_id: %d): %w",
+			databaseName, lockID, err)
+	}
+
 	startTime := time.Now()
 	deadline := startTime.Add(timeout)
 
@@ -111,15 +117,17 @@ func acquireMigrationLockWithTimeout(ctx context.Context, sqlDB *sql.DB, databas
 		// Verificar timeout
 		if time.Now().After(deadline) {
 			waitTime := time.Since(startTime)
+			_ = conn.Close()
 			return nil, fmt.Errorf("timeout waiting for migration lock (database: %s, lock_id: %d, waited: %v)",
 				databaseName, lockID, waitTime)
 		}
 
 		// Intentar adquirir el lock de forma no bloqueante
 		var acquired bool
-		err := sqlDB.QueryRowContext(ctx,
+		err := conn.QueryRowContext(ctx,
 			"SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired)
 		if err != nil {
+			_ = conn.Close()
 			return nil, fmt.Errorf("failed to try acquire migration lock (database: %s, lock_id: %d): %w",
 				databaseName, lockID, err)
 		}
@@ -136,7 +144,8 @@ func acquireMigrationLockWithTimeout(ctx context.Context, sqlDB *sql.DB, databas
 
 			// Retornar función de unlock con defer garantizado
 			unlock := func() {
-				_, _ = sqlDB.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
+				_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
+				_ = conn.Close()
 				log.Printf("🔓 Migration lock released for database: %s (lock_id: %d)", databaseName, lockID)
 			}
 

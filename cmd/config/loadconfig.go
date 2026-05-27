@@ -20,7 +20,8 @@ type Config struct {
 	Auth           Auth           // Configuración de autenticación/autorización
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
-	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
+	Companion      Companion      // Configuración del cliente Companion (axis/companion)
+	Nexus          Nexus          // Configuración del cliente Nexus (axis/nexus)
 	Review         Review         // Configuración de Nexus Review / approvals
 }
 

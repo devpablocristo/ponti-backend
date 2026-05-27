@@ -18,4 +18,4 @@ WORKDIR /app
 # go mod download se ejecuta al iniciar el container, no en build.
 EXPOSE 8080
 
-CMD ["sh", "-c", "if [ -n \"$GO_MODULES_TOKEN\" ]; then git config --global url.\"https://${GO_MODULES_TOKEN}@github.com/\".insteadOf \"https://github.com/\"; fi && go mod download && CGO_ENABLED=1 go build -buildvcs=false -o /tmp/migrate_binary ./cmd/migrate/ && /tmp/migrate_binary && air -c .air.toml"]
+CMD ["sh", "-c", "if [ -n \"$PLATFORM_REPO_TOKEN\" ]; then git config --global url.\"https://${PLATFORM_REPO_TOKEN}@github.com/\".insteadOf \"https://github.com/\"; fi && go mod download && CGO_ENABLED=1 go build -buildvcs=false -o /tmp/migrate_binary ./cmd/migrate/ && /tmp/migrate_binary && air -c .air.toml"]

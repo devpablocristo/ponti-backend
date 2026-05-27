@@ -4,19 +4,15 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	aiusecases "github.com/devpablocristo/ponti-backend/internal/ai/usecases"
+	"github.com/devpablocristo/ponti-backend/internal/axis"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	"github.com/google/wire"
 )
 
-// ProvideAIClient crea el cliente hacia Ponti AI (`InsightService` + `CopilotAgent`).
-func ProvideAIClient(cfg *config.AI) *ai.Client {
-	return ai.NewClient(cfg.ServiceURL, cfg.ServiceKey, cfg.TimeoutMS)
-}
-
 // ProvideAIUseCases construye los casos de uso de AI.
-func ProvideAIUseCases(client *ai.Client) *aiusecases.UseCases {
-	return aiusecases.NewUseCases(client)
+func ProvideAIUseCases(companionClient *axis.CompanionClient) *aiusecases.UseCases {
+	return aiusecases.NewUseCases(ai.NewCompanionAdapter(companionClient))
 }
 
 // ProvideAIUseCasesPort adapta *UseCases a la interfaz de handler.
@@ -51,7 +47,7 @@ func ProvideAIMiddlewaresEnginePort(m *mwr.Middlewares) ai.MiddlewaresEnginePort
 
 // AISet expone todos los providers necesarios para AI.
 var AISet = wire.NewSet(
-	ProvideAIClient,
+	ProvideCompanionClient,
 	ProvideAIUseCases,
 	ProvideAIUseCasesPort,
 	ProvideAIHandler,

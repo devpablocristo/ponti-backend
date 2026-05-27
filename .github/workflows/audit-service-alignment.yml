@@ -60,7 +60,7 @@ jobs:
           ENV_NAME = "${{ matrix.env_name }}"
           PROJECT_ID = "${{ matrix.project_id }}"
           REGION = "${{ matrix.region }}"
-          SERVICES = ["ponti-frontend", "ponti-backend", "ponti-ai"]
+          SERVICES = ["ponti-frontend", "ponti-backend"]
 
           def describe(service: str):
               cmd = [
@@ -113,7 +113,7 @@ jobs:
               for name, value in vars_map.items():
                   if not value:
                       continue
-                  if name.endswith("_URL") or name in {"BASE_MANAGER_API", "AI_SERVICE_URL"}:
+                  if name.endswith("_URL") or name in {"BASE_MANAGER_API", "COMPANION_BASE_URL", "NEXUS_BASE_URL"}:
                       if "---" in value:
                           errors.append(f"[{ENV_NAME}] {svc}: {name} points to tagged URL ({value})")
 
@@ -147,4 +147,3 @@ jobs:
 
           print("\\nAlignment OK.")
           PY
-

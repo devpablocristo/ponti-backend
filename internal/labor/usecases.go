@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -45,8 +45,6 @@ type UseCases struct {
 func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
 }
-
-
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {

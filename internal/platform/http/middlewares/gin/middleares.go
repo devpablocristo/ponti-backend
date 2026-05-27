@@ -3,7 +3,7 @@ package pkgmwr
 import (
 	"time"
 
-	coreginmw "github.com/devpablocristo/core/http/gin/go"
+	platformginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -29,7 +29,7 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 			ExcludedPaths:  []string{"/health", "/ping", "/swagger/spec", "/swagger/ui/index.html"},
 		}),
 	}
-	validation := []gin.HandlerFunc{coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
+	validation := []gin.HandlerFunc{platformginmw.RequireAPIKeyFromEnv("X_API_KEY")}
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {

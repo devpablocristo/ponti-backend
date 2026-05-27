@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
   cmd = "CGO_ENABLED=1 go build -buildvcs=false -o ./tmp/main ./cmd/api/"
-  bin = "./tmp/main"
+  entrypoint = "./tmp/main"
   delay = 1000
   exclude_dir = ["tmp", "bin", "vendor", "node_modules", "migrations_v4", "scripts", ".git", ".cursor"]
   exclude_regex = ["_test\\.go$"]
