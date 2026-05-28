@@ -6,7 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
+
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 )
 
 // WorkspaceFilter define filtros comunes de workspace.
@@ -44,9 +47,12 @@ func ApplyWorkspaceFilters(q *gorm.DB, f WorkspaceFilter, cols WorkspaceFilterCo
 
 // ResolveProjectIDs devuelve project_ids aplicando customer/campaign/field si project_id no viene definido.
 func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]int64, error) {
+	if _, _, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return nil, err
+	}
+
 	if f.ProjectID != nil {
-		query := db.WithContext(ctx).
-			Table("projects p").
+		query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 			Where("p.id = ? AND p.deleted_at IS NULL", *f.ProjectID)
 		if f.CustomerID != nil {
 			query = query.Where("p.customer_id = ?", *f.CustomerID)
@@ -55,10 +61,18 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 			query = query.Where("p.campaign_id = ?", *f.CampaignID)
 		}
 		if f.FieldID != nil {
-			query = query.Where(
-				"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)",
-				*f.FieldID,
-			)
+			if tenantID, ok := authz.TenantFromContext(ctx); ok {
+				query = query.Where(
+					"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.tenant_id = ? AND f.deleted_at IS NULL)",
+					*f.FieldID,
+					tenantID,
+				)
+			} else {
+				query = query.Where(
+					"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)",
+					*f.FieldID,
+				)
+			}
 		}
 
 		var count int64
@@ -73,11 +87,15 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 	}
 
 	if f.CustomerID == nil && f.CampaignID == nil && f.FieldID == nil {
-		return nil, nil
+		if _, ok := authz.TenantFromContext(ctx); ok {
+			// In strict tenant mode, no business filters means "all projects for this tenant",
+			// not "all projects in the database".
+		} else {
+			return nil, nil
+		}
 	}
 
-	query := db.WithContext(ctx).
-		Table("projects p").
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
 		Select("DISTINCT p.id").
 		Where("p.deleted_at IS NULL")
 
@@ -88,18 +106,57 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 		query = query.Where("p.campaign_id = ?", *f.CampaignID)
 	}
 	if f.FieldID != nil {
-		query = query.Where(
-			"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)",
-			*f.FieldID,
-		)
+		if tenantID, ok := authz.TenantFromContext(ctx); ok {
+			query = query.Where(
+				"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.tenant_id = ? AND f.deleted_at IS NULL)",
+				*f.FieldID,
+				tenantID,
+			)
+		} else {
+			query = query.Where(
+				"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)",
+				*f.FieldID,
+			)
+		}
 	}
 
 	var projectIDs []int64
 	if err := query.Pluck("p.id", &projectIDs).Error; err != nil {
 		return nil, domainerr.Internal("failed to resolve project IDs")
 	}
+	if len(projectIDs) == 0 {
+		if _, ok := authz.TenantFromContext(ctx); ok {
+			return []int64{0}, nil
+		}
+	}
 
 	return projectIDs, nil
+}
+
+// ValidateProjectAccess valida que un project_id pertenezca al tenant activo cuando hay contexto tenant.
+// En modo de transición sin tenant preserva compatibilidad; en modo strict falla cerrado.
+func ValidateProjectAccess(ctx context.Context, db *gorm.DB, projectID int64) error {
+	if projectID <= 0 {
+		return domainerr.Validation("project_id is required")
+	}
+
+	if _, hasTenant, err := authz.OptionalTenantOrStrict(ctx); err != nil {
+		return err
+	} else if !hasTenant {
+		return nil
+	}
+
+	var count int64
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("projects p"), "p").
+		Where("p.id = ? AND p.deleted_at IS NULL", projectID)
+	if err := query.Count(&count).Error; err != nil {
+		return domainerr.Internal("failed to validate project tenant")
+	}
+	if count == 0 {
+		return domainerr.NotFound("project not found")
+	}
+
+	return nil
 }
 
 // ValidateFieldBelongsToProject valida que field_id pertenezca al project_id.
@@ -109,10 +166,10 @@ func ValidateFieldBelongsToProject(ctx context.Context, db *gorm.DB, projectID i
 	}
 
 	var count int64
-	if err := db.WithContext(ctx).
-		Table("fields f").
+	query := tenancy.Scope(ctx, db.WithContext(ctx).Table("fields f"), "f").
 		Where("f.id = ? AND f.project_id = ? AND f.deleted_at IS NULL", fieldID, projectID).
-		Count(&count).Error; err != nil {
+		Count(&count)
+	if err := query.Error; err != nil {
 		return domainerr.Internal("failed to validate field against project")
 	}
 	if count == 0 {

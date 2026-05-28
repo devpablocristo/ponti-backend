@@ -1,0 +1,273 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API de negocio para Ponti. ~50 endpoints REST cubiertos por handlers en internal/\u003cmodule\u003e/. Errores en inglés (ver docs/ERROR_CATALOG.md). Multi-tenant por header. Auth Bearer JWT (Firebase IDP).",
+        "title": "Ponti Backend API",
+        "termsOfService": "https://github.com/devpablocristo/ponti-backend",
+        "contact": {
+            "name": "Ponti Backend",
+            "url": "https://github.com/devpablocristo/ponti-backend"
+        },
+        "license": {
+            "name": "Propietario"
+        },
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/data-integrity/costs-check": {
+            "get": {
+                "description": "Valida que el valor de costos directos totales sea consistente en todos los módulos",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "data-integrity"
+                ],
+                "summary": "Validar coherencia de costos directos",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Project ID",
+                        "name": "project_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_devpablocristo_ponti-backend_internal_data-integrity_handler_dto.IntegrityReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/me/context": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Endpoint de arranque del frontend. Lee el JWT del header Authorization, identifica al usuario local, y devuelve los tenants donde tiene membership con sus roles + permisos. Si X-Tenant-ID está presente, marca ese tenant como `is_current=true`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Bootstrap del FE: usuario + tenants + roles + permisos",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_admin.MeContext"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication context required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "local user not found / tenant context required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "internal",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_devpablocristo_ponti-backend_internal_data-integrity_handler_dto.IntegrityCheckDTO": {
+            "type": "object",
+            "properties": {
+                "check_type": {
+                    "type": "string"
+                },
+                "control_number": {
+                    "type": "integer"
+                },
+                "control_rule": {
+                    "type": "string"
+                },
+                "data_to_verify": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "difference_a": {
+                    "type": "string"
+                },
+                "difference_b": {
+                    "type": "string"
+                },
+                "recalc_a_calculation": {
+                    "type": "string"
+                },
+                "recalc_a_meaning": {
+                    "type": "string"
+                },
+                "recalc_a_source": {
+                    "type": "string"
+                },
+                "recalc_a_value": {
+                    "type": "string"
+                },
+                "recalc_b_calculation": {
+                    "type": "string"
+                },
+                "recalc_b_meaning": {
+                    "type": "string"
+                },
+                "recalc_b_source": {
+                    "type": "string"
+                },
+                "recalc_b_value": {
+                    "type": "string"
+                },
+                "recommendation": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "system_calculation": {
+                    "type": "string"
+                },
+                "system_meaning": {
+                    "type": "string"
+                },
+                "system_source": {
+                    "type": "string"
+                },
+                "system_value": {
+                    "type": "string"
+                },
+                "tolerance": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_devpablocristo_ponti-backend_internal_data-integrity_handler_dto.IntegrityReportResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_devpablocristo_ponti-backend_internal_data-integrity_handler_dto.IntegrityCheckDTO"
+                    }
+                }
+            }
+        },
+        "internal_admin.MeContext": {
+            "type": "object",
+            "properties": {
+                "current_tenant_id": {
+                    "type": "string"
+                },
+                "tenants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_admin.MeTenant"
+                    }
+                },
+                "user": {
+                    "$ref": "#/definitions/internal_admin.MeUser"
+                }
+            }
+        },
+        "internal_admin.MeTenant": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_admin.MeUser": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "idp_email": {
+                    "type": "string"
+                },
+                "idp_sub": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "\"Bearer \u003cJWT\u003e\" (Firebase Identity Platform).",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

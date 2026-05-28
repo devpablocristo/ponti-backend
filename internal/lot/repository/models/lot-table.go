@@ -4,9 +4,11 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/shopspring/decimal"
 )
 
 type LotTable struct {
@@ -40,6 +42,7 @@ type LotTable struct {
 
 type LotDates struct {
 	ID          int64      `gorm:"column:id"`
+	TenantID    uuid.UUID  `gorm:"column:tenant_id;type:uuid;index"`
 	LotID       int64      `gorm:"lot_id"`
 	SowingDate  *time.Time `gorm:"sowing_date"`
 	HarvestDate *time.Time `gorm:"harvest_date"`

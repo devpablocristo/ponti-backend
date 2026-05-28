@@ -10,7 +10,7 @@ import (
 
 	// project
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 )
 
@@ -20,10 +20,13 @@ type RepositoryPort interface {
 	ListLotsByProject(context.Context, int64) ([]domain.Lot, error)
 	ListLotsByProjectAndField(context.Context, int64, int64) ([]domain.Lot, error)
 	ListLotsByProjectFieldAndCrop(context.Context, int64, int64, int64, string) ([]domain.Lot, error)
+	ListArchivedLots(context.Context, int, int) ([]domain.LotTable, int64, error)
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
-	DeleteLot(context.Context, int64) error
-	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
+	ArchiveLot(context.Context, int64) error
+	RestoreLot(context.Context, int64) error
+	HardDeleteLot(context.Context, int64) error
+	GetMetrics(context.Context, domain.LotListFilter) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
 }
@@ -34,12 +37,12 @@ type ExporterAdapterPort interface {
 }
 
 type UseCases struct {
-	repo  RepositoryPort
-	excel ExporterAdapterPort
+	repo     RepositoryPort
+	exporter ExporterAdapterPort
 }
 
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter}
 }
 
 func (u *UseCases) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
@@ -62,8 +65,20 @@ func (u *UseCases) UpdateLotTons(ctx context.Context, id int64, tons decimal.Dec
 	return u.repo.UpdateLotTons(ctx, id, tons)
 }
 
-func (u *UseCases) DeleteLot(ctx context.Context, id int64) error {
-	return u.repo.DeleteLot(ctx, id)
+func (u *UseCases) ArchiveLot(ctx context.Context, id int64) error {
+	return u.repo.ArchiveLot(ctx, id)
+}
+
+func (u *UseCases) RestoreLot(ctx context.Context, id int64) error {
+	return u.repo.RestoreLot(ctx, id)
+}
+
+func (u *UseCases) HardDeleteLot(ctx context.Context, id int64) error {
+	return u.repo.HardDeleteLot(ctx, id)
+}
+
+func (u *UseCases) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.LotTable, int64, error) {
+	return u.repo.ListArchivedLots(ctx, page, perPage)
 }
 
 func (u *UseCases) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
@@ -80,9 +95,9 @@ func (u *UseCases) ListLotsByProjectFieldAndCrop(ctx context.Context, projectID,
 
 func (u *UseCases) GetMetrics(
 	ctx context.Context,
-	projectID, fieldID, cropID int64,
+	filter domain.LotListFilter,
 ) (*domain.LotMetrics, error) {
-	return u.repo.GetMetrics(ctx, projectID, fieldID, cropID)
+	return u.repo.GetMetrics(ctx, filter)
 }
 
 func (u *UseCases) ListLots(
@@ -94,7 +109,7 @@ func (u *UseCases) ListLots(
 }
 
 func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -107,5 +122,5 @@ func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, 
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }

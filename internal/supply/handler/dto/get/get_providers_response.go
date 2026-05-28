@@ -5,8 +5,9 @@ import (
 )
 
 type Provider struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	ActorID *int64 `json:"actor_id,omitempty"`
 }
 
 func NewGetProvidersResponse(providersDomain []domain.Provider) []Provider {
@@ -16,8 +17,9 @@ func NewGetProvidersResponse(providersDomain []domain.Provider) []Provider {
 		providers = append(
 			providers,
 			Provider{
-				ID:   provider.ID,
-				Name: provider.Name,
+				ID:      provider.ID,
+				Name:    provider.Name,
+				ActorID: provider.ActorID,
 			},
 		)
 	}

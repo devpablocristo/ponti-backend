@@ -11,6 +11,7 @@ type Manager struct {
 	ID         int64
 	Name       string
 	Type       string
+	ActorID    *int64
 	ArchivedAt *time.Time
 	shareddomain.Base
 }

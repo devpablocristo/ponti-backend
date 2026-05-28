@@ -1,9 +1,11 @@
 package pkgmwr
 
 import (
+	"strings"
 	"time"
 
-	coreginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	coreginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -11,7 +13,6 @@ import (
 type Middlewares struct {
 	global     []gin.HandlerFunc
 	validation []gin.HandlerFunc
-	protected  []gin.HandlerFunc
 }
 
 type BuildConfig struct {
@@ -33,10 +34,12 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {
-		validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
+		if isLocalLikeEnvironment(cfg.Auth.Environment) {
+			validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
+		} else {
+			validation = append(validation, RejectUnsafeLocalAuthz(cfg.Auth.Environment))
+		}
 	}
-	protected := []gin.HandlerFunc{}
-
 	if cfg.Auth.CacheTTL <= 0 {
 		cfg.Auth.CacheTTL = 5 * time.Minute
 	}
@@ -44,9 +47,23 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	return &Middlewares{
 		global:     global,
 		validation: validation,
-		protected:  protected,
+	}
+}
+
+func isLocalLikeEnvironment(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "", "local", "localhost", "dev", "development", "test", "testing":
+		return true
+	default:
+		return false
+	}
+}
+
+func RejectUnsafeLocalAuthz(env string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := domainerr.Unavailable("AUTH_ENABLED=false is allowed only in local/test environments")
+		coreginmw.Respond(c, err)
 	}
 }
 func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }
 func (m *Middlewares) GetValidation() []gin.HandlerFunc { return m.validation }
-func (m *Middlewares) GetProtected() []gin.HandlerFunc  { return m.protected }

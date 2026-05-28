@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
@@ -47,6 +47,7 @@ type RepositoryPort interface {
 	GetStockByPeriodAndProjectID(context.Context, int64) (*domain.Stock, error)
 	GetStocksPeriods(context.Context, int64) ([]string, error)
 	ListAllStocks(context.Context) ([]*domain.Stock, error)
+	ListStocksByFilter(context.Context, domain.StockFilter, time.Time) ([]*domain.Stock, error)
 	UpdateUnitsConsumed(context.Context, domain.Stock, decimal.Decimal) error
 	ExecuteInTransaction(context.Context, func(context.Context) error) error
 }
@@ -62,14 +63,14 @@ type ProjectUseCasesPort interface {
 
 type UseCases struct {
 	repo      RepositoryPort
-	excel     ExporterAdapterPort
+	exporter  ExporterAdapterPort
 	projectUC ProjectUseCasesPort
 	notifier  BusinessInsightsNotifier
 }
 
 // NewUseCases crea una instancia de casos de uso para stock.
-func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
-	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
+func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, projectUC ProjectUseCasesPort) *UseCases {
+	return &UseCases{repo: repo, exporter: exporter, projectUC: projectUC}
 }
 
 // SetBusinessInsightsNotifier conecta el notifier despues de wire (la
@@ -84,6 +85,10 @@ func (u *UseCases) GetStocksSummary(ctx context.Context, projectID int64, closeD
 		return nil, err
 	}
 	return u.repo.GetStocks(ctx, projectID, closeDate)
+}
+
+func (u *UseCases) GetStocksSummaryByFilter(ctx context.Context, filter domain.StockFilter, closeDate time.Time) ([]*domain.Stock, error) {
+	return u.repo.ListStocksByFilter(ctx, filter, closeDate)
 }
 
 func (u *UseCases) GetStocksPeriods(ctx context.Context, projectID int64) ([]string, error) {
@@ -263,7 +268,7 @@ func startNewStockPeriod(monthPeriod int64, yearPeriod int64) (int64, int64) {
 
 // ExportStocksByProject exporta stocks filtrados por proyecto (stocks activos sin close_date)
 func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -281,7 +286,7 @@ func (u *UseCases) ExportStocksByProject(ctx context.Context, projectID int64) (
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.Export(ctx, items)
+	return u.exporter.Export(ctx, items)
 }
 
 func (u *UseCases) validateProject(ctx context.Context, projectID int64) error {

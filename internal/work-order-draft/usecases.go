@@ -23,12 +23,15 @@ type RepositoryPort interface {
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
 	ListRelatedDigitalWorkOrderDraftsByBaseNumber(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	ListWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
+	ListArchivedWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListOccupiedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	ListOccupiedWorkOrderNumbersByProjectExcludingDraft(context.Context, int64, int64) ([]string, error)
 	ListPublishedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
 	UpdateWorkOrderDraftByID(context.Context, *domain.WorkOrderDraft) error
 	UpdateWorkOrderDraftGroup(context.Context, []*domain.WorkOrderDraft) error
-	DeleteWorkOrderDraftByID(context.Context, int64) error
+	ArchiveWorkOrderDraftByID(context.Context, int64) error
+	RestoreWorkOrderDraftByID(context.Context, int64) error
+	HardDeleteWorkOrderDraftByID(context.Context, int64) error
 	MarkWorkOrderDraftAsPublished(context.Context, int64, int64) error
 	ListDigitalWorkOrderDraftGroups(context.Context, string, string, types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error)
 }
@@ -140,9 +143,6 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 		}
 		if lot.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 			return nil, types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
-		}
-		if len(lot.Items) == 0 {
-			return nil, types.NewError(types.ErrValidation, "at least one item is required for each lot", nil)
 		}
 		if _, exists := seenLots[lot.LotID]; exists {
 			return nil, types.NewError(types.ErrValidation, "duplicate lot_id in lots", nil)
@@ -283,6 +283,10 @@ func (u *UseCases) ListDigitalWorkOrderDrafts(ctx context.Context, number string
 	return u.repo.ListWorkOrderDrafts(ctx, number, status, &isDigital, inp)
 }
 
+func (u *UseCases) ListArchivedWorkOrderDrafts(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
+	return u.repo.ListArchivedWorkOrderDrafts(ctx, number, status, nil, inp)
+}
+
 func (u *UseCases) ListDigitalWorkOrderDraftGroups(ctx context.Context, number string, status string, inp types.Input) ([]domain.WorkOrderDraftGroupListItem, types.PageInfo, error) {
 	return u.repo.ListDigitalWorkOrderDraftGroups(ctx, number, status, inp)
 }
@@ -394,7 +398,6 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			if finalDose.LessThanOrEqual(decimal.Zero) {
 				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
 			}
-
 			draft.Items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
 				TotalUsed: item.TotalUsed,
@@ -416,7 +419,8 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 	return u.repo.UpdateWorkOrderDraftGroup(ctx, drafts)
 }
 
-func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+
+func (u *UseCases) ArchiveWorkOrderDraftByID(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return types.NewInvalidIDError("invalid work order draft id", nil)
 	}
@@ -430,7 +434,21 @@ func (u *UseCases) DeleteWorkOrderDraftByID(ctx context.Context, id int64) error
 		return types.NewError(types.ErrConflict, "published work order drafts cannot be deleted", nil)
 	}
 
-	return u.repo.DeleteWorkOrderDraftByID(ctx, id)
+	return u.repo.ArchiveWorkOrderDraftByID(ctx, id)
+}
+
+func (u *UseCases) RestoreWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+	return u.repo.RestoreWorkOrderDraftByID(ctx, id)
+}
+
+func (u *UseCases) HardDeleteWorkOrderDraftByID(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return types.NewInvalidIDError("invalid work order draft id", nil)
+	}
+	return u.repo.HardDeleteWorkOrderDraftByID(ctx, id)
 }
 
 func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, error) {
@@ -468,6 +486,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		LotID:          draft.LotID,
 		CropID:         draft.CropID,
 		LaborID:        draft.LaborID,
+		IsDigital:      draft.IsDigital,
 		Contractor:     draft.Contractor,
 		Observations:   draft.Observations,
 		Date:           draft.Date,
@@ -481,7 +500,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		workOrder.Items[i] = workorderdomain.WorkOrderItem{
 			SupplyID:   item.SupplyID,
 			SupplyName: item.SupplyName,
-			TotalUsed:  item.TotalUsed,
+			TotalUsed:  publishedTotalUsed(draft, item),
 			FinalDose:  item.FinalDose,
 		}
 	}
@@ -503,6 +522,17 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 	}
 
 	return workOrderID, nil
+}
+
+func publishedTotalUsed(draft *domain.WorkOrderDraft, item domain.WorkOrderDraftItem) decimal.Decimal {
+	if draft != nil &&
+		draft.IsDigital &&
+		item.FinalDose.GreaterThan(decimal.Zero) &&
+		draft.EffectiveArea.GreaterThan(decimal.Zero) {
+		return item.FinalDose.Mul(draft.EffectiveArea).Round(2)
+	}
+
+	return item.TotalUsed
 }
 
 func (u *UseCases) validateDraftSuppliesReadyForPublish(ctx context.Context, draft *domain.WorkOrderDraft) error {
@@ -568,9 +598,6 @@ func validateDraft(d *domain.WorkOrderDraft) error {
 	}
 	if d.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
-	}
-	if len(d.Items) == 0 {
-		return types.NewError(types.ErrValidation, "at least one item is required", nil)
 	}
 
 	seenSupplyIDs := make(map[int64]struct{})

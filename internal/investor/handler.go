@@ -3,7 +3,7 @@ package investor
 import (
 	"context"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/investor/handler/dto"
@@ -14,11 +14,12 @@ import (
 type UseCasesPort interface {
 	CreateInvestor(context.Context, *domain.Investor) (int64, error)
 	ListInvestors(context.Context, int, int) ([]domain.Investor, int64, error)
+	ListArchivedInvestors(context.Context, int, int) ([]domain.Investor, int64, error)
 	GetInvestor(context.Context, int64) (*domain.Investor, error)
 	UpdateInvestor(context.Context, *domain.Investor) error
-	DeleteInvestor(context.Context, int64) error
 	ArchiveInvestor(context.Context, int64) error
 	RestoreInvestor(context.Context, int64) error
+	HardDeleteInvestor(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -34,7 +35,6 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
-	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -53,6 +53,19 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	}
 }
 
+func (h *Handler) runInvestorIDAction(c *gin.Context, action func(context.Context, int64) error) {
+	id, err := ginmw.ParseParamID(c, "investor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := action(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/investors"
@@ -61,11 +74,12 @@ func (h *Handler) Routes() {
 	{
 		public.POST("", h.CreateInvestor)
 		public.GET("", h.ListInvestors)
+		public.GET("/archived", h.ListArchivedInvestors)
 		public.GET("/:investor_id", h.GetInvestor)
 		public.PUT("/:investor_id", h.UpdateInvestor)
-		public.DELETE("/:investor_id", h.DeleteInvestor)
 		public.POST("/:investor_id/archive", h.ArchiveInvestor)
 		public.POST("/:investor_id/restore", h.RestoreInvestor)
+		public.DELETE("/:investor_id/hard", h.HardDeleteInvestor)
 	}
 }
 
@@ -123,41 +137,24 @@ func (h *Handler) UpdateInvestor(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) DeleteInvestor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "investor_id")
+func (h *Handler) ListArchivedInvestors(c *gin.Context) {
+	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
+	investors, total, err := h.ucs.ListArchivedInvestors(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := h.ucs.DeleteInvestor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	sharedhandlers.RespondOK(c, dto.NewListInvestorsResponse(investors, page, perPage, total))
+}
+
+func (h *Handler) HardDeleteInvestor(c *gin.Context) {
+	h.runInvestorIDAction(c, h.ucs.HardDeleteInvestor)
 }
 
 func (h *Handler) ArchiveInvestor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "investor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.ArchiveInvestor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runInvestorIDAction(c, h.ucs.ArchiveInvestor)
 }
 
 func (h *Handler) RestoreInvestor(c *gin.Context) {
-	id, err := ginmw.ParseParamID(c, "investor_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := h.ucs.RestoreInvestor(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
+	h.runInvestorIDAction(c, h.ucs.RestoreInvestor)
 }

@@ -9,8 +9,11 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+
 	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
@@ -37,11 +40,11 @@ func NewReportRepository(db GormEnginePort) *ReportRepository {
 // ===== REPORTE POR CAMPO/CULTIVO =====
 
 // GetFieldCropMetrics obtiene las métricas por campo y cultivo.
-func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]domain.FieldCropMetric, error) {
+func (r *ReportRepository) GetFieldCropMetrics(ctx context.Context, filters domain.ReportFilter) ([]domain.FieldCropMetric, error) {
 	// Obtener project IDs relacionados con los filtros
-	projectIDs, err := r.getRelatedProjectIDs(filters)
+	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -62,8 +65,8 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 	}
 
 	// Ejecutar query
-	if err := r.db.Client().Raw(query, args...).Scan(&modelResults).Error; err != nil {
-		return nil, fmt.Errorf("error al obtener métricas: %w", err)
+	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&modelResults).Error; err != nil {
+		return nil, domainerr.Internal("error al obtener métricas: " + err.Error())
 	}
 
 	// Convertir modelos a dominio
@@ -76,8 +79,16 @@ func (r *ReportRepository) GetFieldCropMetrics(filters domain.ReportFilter) ([]d
 }
 
 // getFieldCropColumns obtiene las columnas (field-crop combinations).
-func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]domain.FieldCropColumn, error) {
+func (r *ReportRepository) getFieldCropColumns(ctx context.Context, filters domain.ReportFilter) ([]domain.FieldCropColumn, error) {
 	var columns []domain.FieldCropColumn
+
+	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
+	if err != nil {
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
+	}
+	if len(projectIDs) == 0 {
+		return columns, nil
+	}
 
 	query := fmt.Sprintf(`
 		SELECT DISTINCT
@@ -87,20 +98,25 @@ func (r *ReportRepository) getFieldCropColumns(filters domain.ReportFilter) ([]d
 			current_crop_id as crop_id,
 			crop_name
 		FROM %s
-		WHERE project_id = ?
+		WHERE project_id IN ?
+		  AND (?::bigint IS NULL OR field_id = ?)
 		ORDER BY field_id, current_crop_id
 	`, db.FieldCropView("cultivos"))
 
-	err := r.db.Client().Raw(query, *filters.ProjectID).Scan(&columns).Error
+	var fieldID any
+	if filters.FieldID != nil {
+		fieldID = *filters.FieldID
+	}
+	err = r.db.Client().WithContext(ctx).Raw(query, projectIDs, fieldID, fieldID).Scan(&columns).Error
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo columnas: %w", err)
+		return nil, domainerr.Internal("error obteniendo columnas: " + err.Error())
 	}
 
 	return columns, nil
 }
 
 // buildReportRows construye las filas del reporte.
-func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, columns []domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildReportRows(ctx context.Context, metrics []domain.FieldCropMetric, columns []domain.FieldCropColumn) []domain.FieldCropRow {
 	// Crear mapas de métricas y columnas
 	metricMap := r.createMetricMap(metrics)
 	columnMap := r.createColumnMap(columns)
@@ -109,8 +125,8 @@ func (r *ReportRepository) buildReportRows(metrics []domain.FieldCropMetric, col
 	rows := r.buildMainRows(metricMap, columnMap)
 
 	// Agregar filas detalladas de supplies y labors
-	rows = append(rows, r.buildSupplyDetailRows(columnMap)...)
-	rows = append(rows, r.buildLaborDetailRows(columnMap)...)
+	rows = append(rows, r.buildSupplyDetailRows(ctx, columnMap)...)
+	rows = append(rows, r.buildLaborDetailRows(ctx, columnMap)...)
 
 	return rows
 }
@@ -150,7 +166,7 @@ func (r *ReportRepository) buildMainRows(
 }
 
 // buildSupplyDetailRows construye las filas detalladas de insumos desde v4_report.field_crop_insumos.
-func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildSupplyDetailRows(ctx context.Context, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Consultar vista v4_report.field_crop_insumos
 	var supplyDetails []models.FieldCropSupplyDetailModel
 
@@ -161,7 +177,7 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 	}
 
 	// Construir query
-	query := r.db.Client().Model(&models.FieldCropSupplyDetailModel{})
+	query := r.db.Client().WithContext(ctx).Model(&models.FieldCropSupplyDetailModel{})
 	if len(fieldIDs) > 0 {
 		fieldIDList := make([]int64, 0, len(fieldIDs))
 		for fid := range fieldIDs {
@@ -173,7 +189,7 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 	// Ejecutar query
 	if err := query.Find(&supplyDetails).Error; err != nil {
 		// Si hay error, retornar filas vacías
-		return r.buildEmptySupplyRows(columnMap)
+		return r.buildEmptySupplyRows(ctx, columnMap)
 	}
 
 	// Mapear resultados: field_id-crop_id -> SupplyDetailModel
@@ -200,7 +216,7 @@ func (r *ReportRepository) buildSupplyDetailRows(columnMap map[string]domain.Fie
 }
 
 // buildLaborDetailRows construye las filas detalladas de labores desde v4_report.field_crop_labores.
-func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildLaborDetailRows(ctx context.Context, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Consultar vista v4_report.field_crop_labores
 	var laborDetails []models.FieldCropLaborDetailModel
 
@@ -211,7 +227,7 @@ func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.Fiel
 	}
 
 	// Construir query
-	query := r.db.Client().Model(&models.FieldCropLaborDetailModel{})
+	query := r.db.Client().WithContext(ctx).Model(&models.FieldCropLaborDetailModel{})
 	if len(fieldIDs) > 0 {
 		fieldIDList := make([]int64, 0, len(fieldIDs))
 		for fid := range fieldIDs {
@@ -223,7 +239,7 @@ func (r *ReportRepository) buildLaborDetailRows(columnMap map[string]domain.Fiel
 	// Ejecutar query
 	if err := query.Find(&laborDetails).Error; err != nil {
 		// Si hay error, retornar filas vacías
-		return r.buildEmptyLaborRows(columnMap)
+		return r.buildEmptyLaborRows(ctx, columnMap)
 	}
 
 	// Mapear resultados: field_id-crop_id -> LaborDetailModel
@@ -303,9 +319,9 @@ func (r *ReportRepository) buildLaborRow(
 }
 
 // buildEmptySupplyRows construye filas vacías de insumos.
-func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildEmptySupplyRows(ctx context.Context, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Cargar categorías de insumos desde la base de datos
-	supplyCategories, err := r.getSupplyCategories()
+	supplyCategories, err := r.getSupplyCategories(ctx)
 	if err != nil {
 		// Fallback a categorías por defecto si hay error (usando categorías de 000013 + migración 000131)
 		supplyCategories = map[string]string{
@@ -339,9 +355,9 @@ func (r *ReportRepository) buildEmptySupplyRows(columnMap map[string]domain.Fiel
 }
 
 // buildEmptyLaborRows construye filas vacías de labores.
-func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
+func (r *ReportRepository) buildEmptyLaborRows(ctx context.Context, columnMap map[string]domain.FieldCropColumn) []domain.FieldCropRow {
 	// Cargar categorías de labores desde la base de datos
-	laborCategories, err := r.getLaborCategories()
+	laborCategories, err := r.getLaborCategories(ctx)
 	if err != nil {
 		// Fallback a categorías por defecto si hay error (usando solo categorías de 000013)
 		laborCategories = map[string]string{
@@ -372,18 +388,17 @@ func (r *ReportRepository) buildEmptyLaborRows(columnMap map[string]domain.Field
 }
 
 // getSupplyCategories obtiene las categorías de insumos desde la base de datos.
-func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
-	query := `
-		SELECT c.id, c.name, c.type_id
-		FROM categories c
-		WHERE c.deleted_at IS NULL 
-		AND c.type_id IN (1, 2, 3)
-		ORDER BY c.type_id, c.name
-	`
+func (r *ReportRepository) getSupplyCategories(ctx context.Context) (map[string]string, error) {
+	// categories is a global catalog table; it is intentionally not tenant-scoped.
+	query := r.db.Client().WithContext(ctx).Table("categories c").
+		Select("c.id, c.name, c.type_id").
+		Where("c.deleted_at IS NULL").
+		Where("c.type_id IN ?", []int64{1, 2, 3}).
+		Order("c.type_id, c.name")
 
-	rows, err := r.db.Client().Raw(query).Rows()
+	rows, err := query.Rows()
 	if err != nil {
-		return nil, fmt.Errorf("error querying supply categories: %w", err)
+		return nil, domainerr.Internal("error querying supply categories: " + err.Error())
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -431,18 +446,17 @@ func (r *ReportRepository) getSupplyCategories() (map[string]string, error) {
 }
 
 // getLaborCategories obtiene las categorías de labores desde la base de datos.
-func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
-	query := `
-		SELECT c.id, c.name, c.type_id
-		FROM categories c
-		WHERE c.deleted_at IS NULL 
-		AND c.type_id = 4
-		ORDER BY c.name
-	`
+func (r *ReportRepository) getLaborCategories(ctx context.Context) (map[string]string, error) {
+	// categories is a global catalog table; it is intentionally not tenant-scoped.
+	query := r.db.Client().WithContext(ctx).Table("categories c").
+		Select("c.id, c.name, c.type_id").
+		Where("c.deleted_at IS NULL").
+		Where("c.type_id = ?", 4).
+		Order("c.name")
 
-	rows, err := r.db.Client().Raw(query).Rows()
+	rows, err := query.Rows()
 	if err != nil {
-		return nil, fmt.Errorf("error querying labor categories: %w", err)
+		return nil, domainerr.Internal("error querying labor categories: " + err.Error())
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -481,27 +495,30 @@ func (r *ReportRepository) getLaborCategories() (map[string]string, error) {
 // ===== FUNCIONES AUXILIARES =====
 
 // BuildFieldCrop construye la tabla completa del reporte field-crop.
-func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.FieldCrop, error) {
+func (r *ReportRepository) BuildFieldCrop(ctx context.Context, filters domain.ReportFilter) (*domain.FieldCrop, error) {
 	// Obtener información del proyecto
-	projectInfo, err := r.getProjectInfo(filters)
+	projectInfo, err := r.getProjectInfo(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
+		return nil, domainerr.Internal("error getting project information: " + err.Error())
+	}
+	if projectInfo.ProjectID == 0 {
+		return &domain.FieldCrop{}, nil
 	}
 
 	// Obtener columnas (field-crop combinations)
-	columns, err := r.getFieldCropColumns(filters)
+	columns, err := r.getFieldCropColumns(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo columnas: %w", err)
+		return nil, domainerr.Internal("error obteniendo columnas: " + err.Error())
 	}
 
 	// Obtener métricas básicas
-	metrics, err := r.GetFieldCropMetrics(filters)
+	metrics, err := r.GetFieldCropMetrics(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error getting metrics: %w", err)
+		return nil, domainerr.Internal("error getting metrics: " + err.Error())
 	}
 
 	// Construir filas del reporte
-	rows := r.buildReportRows(metrics, columns)
+	rows := r.buildReportRows(ctx, metrics, columns)
 
 	// Asignar valores directamente (no son opcionales en el frontend)
 	return &domain.FieldCrop{
@@ -517,19 +534,19 @@ func (r *ReportRepository) BuildFieldCrop(filters domain.ReportFilter) (*domain.
 }
 
 // GetProjectInfo obtiene información del proyecto por ID.
-func (r *ReportRepository) GetProjectInfo(projectID int64) (*domain.ProjectInfo, error) {
+func (r *ReportRepository) GetProjectInfo(ctx context.Context, projectID int64) (*domain.ProjectInfo, error) {
 	filters := domain.ReportFilter{
 		ProjectID: &projectID,
 	}
-	return r.getProjectInfo(filters)
+	return r.getProjectInfo(ctx, filters)
 }
 
 // GetInvestorContributionReport obtiene el reporte de aportes de inversores.
 func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, filter domain.ReportFilter) (*domain.InvestorContributionReport, error) {
 	// Obtener project IDs relacionados con los filtros
-	projectIDs, err := r.getRelatedProjectIDs(filter)
+	projectIDs, err := r.getRelatedProjectIDs(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -566,9 +583,9 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 
 	var results []models.InvestorContributionDataModel
 
-	err = r.db.Client().Raw(query, args...).Scan(&results).Error
+	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&results).Error
 	if err != nil {
-		return nil, fmt.Errorf("error consultando vista de aportes de inversores: %w", err)
+		return nil, domainerr.Internal("error consultando vista de aportes de inversores: " + err.Error())
 	}
 
 	if len(results) == 0 {
@@ -582,7 +599,7 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 	// Usar el mapper del modelo para convertir al domain
 	report, err := firstResult.ToDomainInvestorContributionReport()
 	if err != nil {
-		return nil, fmt.Errorf("error convirtiendo modelo a domain: %w", err)
+		return nil, domainerr.Internal("error convirtiendo modelo a domain: " + err.Error())
 	}
 
 	return report, nil
@@ -591,16 +608,16 @@ func (r *ReportRepository) GetInvestorContributionReport(ctx context.Context, fi
 // ===== REPORTE DE RESUMEN DE RESULTADOS =====
 
 // GetSummaryResults obtiene el resumen de resultados por cultivo.
-func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter) ([]domain.SummaryResults, error) {
+func (r *ReportRepository) GetSummaryResults(ctx context.Context, filters domain.SummaryResultsFilter) ([]domain.SummaryResults, error) {
 	// Obtener project IDs relacionados con los filtros
-	projectIDs, err := r.getRelatedProjectIDs(domain.ReportFilter{
+	projectIDs, err := r.getRelatedProjectIDs(ctx, domain.ReportFilter{
 		ProjectID:  filters.ProjectID,
 		CustomerID: filters.CustomerID,
 		CampaignID: filters.CampaignID,
 		FieldID:    filters.FieldID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -649,8 +666,8 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 
 	// Ejecutar query
 	var models []models.SummaryResultsModel
-	if err := r.db.Client().Raw(query, args...).Scan(&models).Error; err != nil {
-		return nil, fmt.Errorf("error ejecutando query de resumen de resultados: %w", err)
+	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&models).Error; err != nil {
+		return nil, domainerr.Internal("error ejecutando query de resumen de resultados: " + err.Error())
 	}
 
 	// Convertir a dominio
@@ -665,18 +682,8 @@ func (r *ReportRepository) GetSummaryResults(filters domain.SummaryResultsFilter
 // ===== FUNCIONES AUXILIARES =====
 
 // getRelatedProjectIDs encuentra los IDs de proyectos relacionados con los filtros.
-func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]int64, error) {
-	// Si no hay filtros, devolver todos los proyectos
-	if filter.ProjectID == nil && filter.CustomerID == nil && filter.CampaignID == nil && filter.FieldID == nil {
-		query := `SELECT DISTINCT p.id FROM projects p WHERE p.deleted_at IS NULL`
-		var projectIDs []int64
-		if err := r.db.Client().Raw(query).Scan(&projectIDs).Error; err != nil {
-			return nil, fmt.Errorf("error al obtener todos los proyectos: %w", err)
-		}
-		return projectIDs, nil
-	}
-
-	return sharedfilters.ResolveProjectIDs(context.Background(), r.db.Client(), sharedfilters.WorkspaceFilter{
+func (r *ReportRepository) getRelatedProjectIDs(ctx context.Context, filter domain.ReportFilter) ([]int64, error) {
+	return sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
 		CustomerID: filter.CustomerID,
 		ProjectID:  filter.ProjectID,
 		CampaignID: filter.CampaignID,
@@ -685,11 +692,11 @@ func (r *ReportRepository) getRelatedProjectIDs(filter domain.ReportFilter) ([]i
 }
 
 // getProjectInfo obtiene la información básica del proyecto.
-func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.ProjectInfo, error) {
+func (r *ReportRepository) getProjectInfo(ctx context.Context, filters domain.ReportFilter) (*domain.ProjectInfo, error) {
 	// Obtener project IDs relacionados con los filtros
-	projectIDs, err := r.getRelatedProjectIDs(filters)
+	projectIDs, err := r.getRelatedProjectIDs(ctx, filters)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo proyectos relacionados: %w", err)
+		return nil, domainerr.Internal("error obteniendo proyectos relacionados: " + err.Error())
 	}
 
 	if len(projectIDs) == 0 {
@@ -699,10 +706,10 @@ func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.
 	// Usar el primer proyecto para la información básica
 	projectID := projectIDs[0]
 
-	var projectInfo domain.ProjectInfo
+	var row models.ProjectInfo
 
 	query := `
-		SELECT 
+		SELECT
 			p.id as project_id,
 			p.name as project_name,
 			c.id as customer_id,
@@ -710,15 +717,56 @@ func (r *ReportRepository) getProjectInfo(filters domain.ReportFilter) (*domain.
 			camp.id as campaign_id,
 			camp.name as campaign_name
 		FROM projects p
-		LEFT JOIN customers c ON p.customer_id = c.id
-		LEFT JOIN campaigns camp ON p.campaign_id = camp.id
+		LEFT JOIN customers c ON p.customer_id = c.id AND c.tenant_id = p.tenant_id
+		LEFT JOIN campaigns camp ON p.campaign_id = camp.id AND camp.tenant_id = p.tenant_id
 		WHERE p.id = ? AND p.deleted_at IS NULL
 	`
-
-	err = r.db.Client().Raw(query, projectID).Scan(&projectInfo).Error
-	if err != nil {
-		return nil, fmt.Errorf("error getting project information: %w", err)
+	args := []any{projectID}
+	if tenantID, ok := authz.TenantFromContext(ctx); ok {
+		query += " AND p.tenant_id = ?"
+		args = append(args, tenantID)
 	}
 
+	err = r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error
+	if err != nil {
+		return nil, domainerr.Internal("error getting project information: " + err.Error())
+	}
+	projectInfo := row.ToDomain()
+
 	return &projectInfo, nil
+}
+
+// GetRawNetIncome calcula el ingreso neto RAW desde tablas base, sin pasar por
+// v4_ssot/v4_calc/v4_report. Sirve como contraparte independiente del valor SSOT
+// `dashboard.IncomeUSD` (que internamente usa `v4_ssot.income_net_total_for_lot`).
+// Fórmula: Σ(lots.tons × crop_commercializations.net_price) cruzando proyecto y cultivo.
+func (r *ReportRepository) GetRawNetIncome(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	tenantID, hasTenant := authz.TenantFromContext(ctx)
+	if !hasTenant && authz.TenantStrictModeEnabled() {
+		return decimal.Zero, domainerr.TenantMissing()
+	}
+
+	tenantFilter := ""
+	args := []any{projectID}
+	if hasTenant {
+		tenantFilter = " AND f.tenant_id = ? AND l.tenant_id = ? AND cc.tenant_id = ?"
+		args = append(args, tenantID, tenantID, tenantID)
+	}
+
+	q := fmt.Sprintf(`
+		SELECT COALESCE(SUM(COALESCE(l.tons, 0) * COALESCE(cc.net_price, 0)), 0) AS total
+		FROM public.lots l
+		JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+		JOIN public.crop_commercializations cc
+		  ON cc.project_id = f.project_id
+		 AND cc.crop_id = l.current_crop_id
+		 AND cc.deleted_at IS NULL
+		WHERE f.project_id = ? AND l.deleted_at IS NULL %s
+	`, tenantFilter)
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw net income: " + err.Error())
+	}
+	return total, nil
 }

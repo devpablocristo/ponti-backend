@@ -1,12 +1,8 @@
 package wire
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/google/wire"
 
-	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
@@ -14,7 +10,6 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 
 	lot "github.com/devpablocristo/ponti-backend/internal/lot"
-	lotExcel "github.com/devpablocristo/ponti-backend/internal/lot/excel"
 )
 
 // ProvideLotRepository crea la implementación concreta de lot.Repository.
@@ -27,37 +22,12 @@ func ProvideLotRepositoryPort(r *lot.Repository) lot.RepositoryPort {
 	return r
 }
 
-type LotExcelService struct {
-	*pkgexcel.Service
+// ProvideLotExporterPort entrega el exporter CSV.
+func ProvideLotExporterPort() lot.ExporterAdapterPort {
+	return lot.NewCSVExporter()
 }
 
-// Crea el engine de Excel ya configurado
-func ProvideLotPkgExcelService() (*LotExcelService, error) {
-	fp := filepath.Join(os.TempDir(), lotExcel.DefaultFilename)
-	write := true
-	s, err := pkgexcel.Bootstrap(fp,
-		lotExcel.SheetName,
-		lotExcel.DateFormat,
-		&write,
-		lotExcel.ColumnWidths,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &LotExcelService{s}, nil
-}
-
-// bindea el engine como la interfaz XLSXEnginePort
-func ProvideLotXLSXEnginePort(s *LotExcelService) lot.XLSXEnginePort {
-	return s
-}
-
-// Crea el adaptador de exportación que usa el engine
-func ProvideLotExporterPort(eng lot.XLSXEnginePort) lot.ExporterAdapterPort {
-	return lot.NewExcelExporter(eng)
-}
-
-// ProvideLotUseCases agrupa repositorio y servicio de crop en lot.UseCases.
+// ProvideLotUseCases agrupa repositorio y exporter CSV en lot.UseCases.
 func ProvideLotUseCases(
 	rep lot.RepositoryPort,
 	exp lot.ExporterAdapterPort,
@@ -111,7 +81,5 @@ var LotSet = wire.NewSet(
 	ProvideLotGormEnginePort,
 	ProvideLotGinEnginePort,
 	ProvideLotMiddlewaresEnginePort,
-	ProvideLotPkgExcelService,
 	ProvideLotExporterPort,
-	ProvideLotXLSXEnginePort,
 )

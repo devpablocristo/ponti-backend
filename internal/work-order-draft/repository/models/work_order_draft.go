@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
@@ -22,6 +23,7 @@ import (
 
 type WorkOrderDraft struct {
 	ID                   int64                         `gorm:"primaryKey;column:id"`
+	TenantID             uuid.UUID                     `gorm:"column:tenant_id;type:uuid;index"`
 	Number               string                        `gorm:"column:number;not null"`
 	Date                 time.Time                     `gorm:"column:date;type:date;not null"`
 	CustomerID           int64                         `gorm:"column:customer_id;not null"`

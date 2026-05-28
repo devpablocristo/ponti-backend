@@ -5,13 +5,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+var invoiceTestTenantID = uuid.MustParse("00000000-0000-0000-0000-000000000101")
+
+func invoiceTestContext() context.Context {
+	return context.WithValue(context.Background(), ctxkeys.OrgID, invoiceTestTenantID)
+}
 
 type testGormEngine struct {
 	client *gorm.DB
@@ -30,6 +38,7 @@ func newInvoiceTestRepo(t *testing.T) *Repository {
 	stmts := []string{
 		`CREATE TABLE invoices (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NULL,
 			work_order_id INTEGER NOT NULL,
 			investor_id INTEGER NULL,
 			number TEXT NOT NULL,
@@ -45,11 +54,13 @@ func newInvoiceTestRepo(t *testing.T) *Repository {
 		);`,
 		`CREATE TABLE workorders (
 			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NULL,
 			investor_id INTEGER NOT NULL,
 			deleted_at DATETIME NULL
 		);`,
 		`CREATE TABLE workorder_investor_splits (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NULL,
 			workorder_id INTEGER NOT NULL,
 			investor_id INTEGER NOT NULL,
 			percentage NUMERIC NOT NULL,
@@ -69,11 +80,12 @@ func newInvoiceTestRepo(t *testing.T) *Repository {
 
 func TestRepository_GetByWorkOrderAndInvestor_PrefersInvestorSpecificInvoice(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 	now := time.Now()
 
 	assert.NoError(t, db.Create(&models.Invoice{
+		TenantID:    invoiceTestTenantID,
 		WorkOrderID: 10,
 		InvestorID:  0,
 		Number:      "LEG-1",
@@ -82,6 +94,7 @@ func TestRepository_GetByWorkOrderAndInvestor_PrefersInvestorSpecificInvoice(t *
 		Status:      "Pendiente",
 	}).Error)
 	assert.NoError(t, db.Create(&models.Invoice{
+		TenantID:    invoiceTestTenantID,
 		WorkOrderID: 10,
 		InvestorID:  7,
 		Number:      "INV-7",
@@ -98,13 +111,13 @@ func TestRepository_GetByWorkOrderAndInvestor_PrefersInvestorSpecificInvoice(t *
 
 func TestRepository_GetByWorkOrderAndInvestor_FallsBackToLegacyInvoice(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 	now := time.Now()
 
 	assert.NoError(t, db.Exec(
-		`INSERT INTO invoices (work_order_id, investor_id, number, company, date, status) VALUES (?, NULL, ?, ?, ?, ?)`,
-		22, "LEG-22", "Legacy SA", now, "Pendiente",
+		`INSERT INTO invoices (tenant_id, work_order_id, investor_id, number, company, date, status) VALUES (?, ?, NULL, ?, ?, ?, ?)`,
+		invoiceTestTenantID.String(), 22, "LEG-22", "Legacy SA", now, "Pendiente",
 	).Error)
 
 	item, err := repo.GetByWorkOrderAndInvestor(ctx, 22, 9)
@@ -117,13 +130,13 @@ func TestRepository_GetByWorkOrderAndInvestor_FallsBackToLegacyInvoice(t *testin
 
 func TestRepository_InvestorBelongsToWorkOrder_UsesSplitWhenExists(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 
-	assert.NoError(t, db.Exec(`INSERT INTO workorders (id, investor_id) VALUES (?, ?)`, 30, 100).Error)
+	assert.NoError(t, db.Exec(`INSERT INTO workorders (id, tenant_id, investor_id) VALUES (?, ?, ?)`, 30, invoiceTestTenantID.String(), 100).Error)
 	assert.NoError(t, db.Exec(
-		`INSERT INTO workorder_investor_splits (workorder_id, investor_id, percentage, payment_status) VALUES (?, ?, ?, ?)`,
-		30, 7, decimal.NewFromInt(50), "Pendiente",
+		`INSERT INTO workorder_investor_splits (tenant_id, workorder_id, investor_id, percentage, payment_status) VALUES (?, ?, ?, ?, ?)`,
+		invoiceTestTenantID.String(), 30, 7, decimal.NewFromInt(50), "Pendiente",
 	).Error)
 
 	ok, err := repo.InvestorBelongsToWorkOrder(ctx, 30, 7)
@@ -137,10 +150,10 @@ func TestRepository_InvestorBelongsToWorkOrder_UsesSplitWhenExists(t *testing.T)
 
 func TestRepository_InvestorBelongsToWorkOrder_UsesWorkOrderInvestorWhenNoSplits(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 
-	assert.NoError(t, db.Exec(`INSERT INTO workorders (id, investor_id) VALUES (?, ?)`, 40, 11).Error)
+	assert.NoError(t, db.Exec(`INSERT INTO workorders (id, tenant_id, investor_id) VALUES (?, ?, ?)`, 40, invoiceTestTenantID.String(), 11).Error)
 
 	ok, err := repo.InvestorBelongsToWorkOrder(ctx, 40, 11)
 	assert.NoError(t, err)
@@ -153,13 +166,13 @@ func TestRepository_InvestorBelongsToWorkOrder_UsesWorkOrderInvestorWhenNoSplits
 
 func TestRepository_Update_UpgradesLegacyInvoiceToInvestorSpecific(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 	now := time.Now()
 
 	assert.NoError(t, db.Exec(
-		`INSERT INTO invoices (work_order_id, investor_id, number, company, date, status) VALUES (?, NULL, ?, ?, ?, ?)`,
-		50, "LEG-50", "Legacy SA", now, "Pendiente",
+		`INSERT INTO invoices (tenant_id, work_order_id, investor_id, number, company, date, status) VALUES (?, ?, NULL, ?, ?, ?, ?)`,
+		invoiceTestTenantID.String(), 50, "LEG-50", "Legacy SA", now, "Pendiente",
 	).Error)
 
 	err := repo.Update(ctx, &domain.Invoice{
@@ -182,13 +195,13 @@ func TestRepository_Update_UpgradesLegacyInvoiceToInvestorSpecific(t *testing.T)
 
 func TestRepository_Delete_RemovesLegacyInvoiceForInvestorFallback(t *testing.T) {
 	repo := newInvoiceTestRepo(t)
-	ctx := context.Background()
+	ctx := invoiceTestContext()
 	db := repo.db.Client()
 	now := time.Now()
 
 	assert.NoError(t, db.Exec(
-		`INSERT INTO invoices (work_order_id, investor_id, number, company, date, status) VALUES (?, NULL, ?, ?, ?, ?)`,
-		60, "LEG-60", "Legacy SA", now, "Pendiente",
+		`INSERT INTO invoices (tenant_id, work_order_id, investor_id, number, company, date, status) VALUES (?, ?, NULL, ?, ?, ?, ?)`,
+		invoiceTestTenantID.String(), 60, "LEG-60", "Legacy SA", now, "Pendiente",
 	).Error)
 
 	err := repo.Delete(ctx, 60, 9)

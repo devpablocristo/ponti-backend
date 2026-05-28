@@ -1,15 +1,24 @@
 package lot
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+var lotDateTestTenantID = uuid.MustParse("00000000-0000-0000-0000-000000000201")
+
+func lotDateTestContext() context.Context {
+	return context.WithValue(context.Background(), ctxkeys.OrgID, lotDateTestTenantID)
+}
 
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -27,7 +36,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestUpsertLotDateBySequence_CreateWhenMissing(t *testing.T) {
-	db := newTestDB(t)
+	db := newTestDB(t).WithContext(lotDateTestContext())
 	now := time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC)
 	userID := "test@example.com"
 	sowing := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -56,7 +65,7 @@ func TestUpsertLotDateBySequence_CreateWhenMissing(t *testing.T) {
 }
 
 func TestUpsertLotDateBySequence_ReactivatesDeletedAndDeduplicates(t *testing.T) {
-	db := newTestDB(t)
+	db := newTestDB(t).WithContext(lotDateTestContext())
 	now := time.Date(2026, 2, 14, 12, 0, 0, 0, time.UTC)
 	userID := "test@example.com"
 
@@ -65,6 +74,7 @@ func TestUpsertLotDateBySequence_ReactivatesDeletedAndDeduplicates(t *testing.T)
 	newSowing := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
 
 	older := models.LotDates{
+		TenantID:    lotDateTestTenantID,
 		LotID:       20,
 		Sequence:    2,
 		SowingDate:  &oldSowing,
@@ -79,6 +89,7 @@ func TestUpsertLotDateBySequence_ReactivatesDeletedAndDeduplicates(t *testing.T)
 	}
 
 	latest := models.LotDates{
+		TenantID:    lotDateTestTenantID,
 		LotID:       20,
 		Sequence:    2,
 		SowingDate:  &midSowing,

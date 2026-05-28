@@ -1,12 +1,8 @@
 package wire
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/google/wire"
 
-	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
@@ -14,7 +10,6 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	stock "github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
-	supplyExcel "github.com/devpablocristo/ponti-backend/internal/supply/excel"
 )
 
 // ProvideSupplyRepository crea la implementación concreta de supply.Repository.
@@ -27,34 +22,9 @@ func ProvideSupplyRepositoryPort(r *supply.Repository) supply.RepositoryPort {
 	return r
 }
 
-type SupplyExcelService struct {
-	*pkgexcel.Service
-}
-
-// Crea el engine de Excel ya configurado
-func ProvideSupplyPkgExcelService() (*SupplyExcelService, error) {
-	fp := filepath.Join(os.TempDir(), supplyExcel.DefaultFilename)
-	write := true
-	s, err := pkgexcel.Bootstrap(fp,
-		supplyExcel.SheetName,
-		supplyExcel.DateFormat,
-		&write,
-		supplyExcel.ColumnWidths,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &SupplyExcelService{s}, nil
-}
-
-// bindea el engine como la interfaz XLSXEnginePort
-func ProvideSupplyXLSXEnginePort(s *SupplyExcelService) supply.XLSXEnginePort {
-	return s
-}
-
-// Crea el adaptador de exportación que usa el engine
-func ProvideSupplyExporterPort(eng supply.XLSXEnginePort) supply.ExporterAdapterPort {
-	return supply.NewExcelExporter(eng)
+// ProvideSupplyExporterPort entrega el exporter CSV.
+func ProvideSupplyExporterPort() supply.ExporterAdapterPort {
+	return supply.NewCSVExporter()
 }
 
 // ProvideSupplyUseCases agrupa repositorios en supply.UseCases.
@@ -116,8 +86,6 @@ var SupplySet = wire.NewSet(
 	ProvideSupplyGormEnginePort,
 	ProvideSupplyGinEnginePort,
 	ProvideSupplyMiddlewaresEnginePort,
-	ProvideSupplyPkgExcelService,
-	ProvideSupplyExporterPort,
-	ProvideSupplyXLSXEnginePort,
 	ProvideSupplyStockUseCasesPort,
+	ProvideSupplyExporterPort,
 )

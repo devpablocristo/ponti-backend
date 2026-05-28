@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
@@ -39,11 +39,4 @@ func ParseOrgID(c *gin.Context) (uuid.UUID, error) {
 		return uuid.Nil, domainerr.Forbidden(fmt.Sprintf("invalid org_id: %s", "org_id is not a valid uuid"))
 	}
 	return id, nil
-}
-
-// ParseUserID es un alias temporal de ParseActor para backward compatibility.
-// Retorna el actor como string. Los callers que necesitan int64 deben migrar.
-// Deprecated: usar ParseActor.
-func ParseUserID(c *gin.Context) (string, error) {
-	return ParseActor(c)
 }

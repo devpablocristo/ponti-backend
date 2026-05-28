@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
@@ -14,12 +14,12 @@ import (
 
 type stubReview struct {
 	calls    int
-	response reviewclient.SubmitResponse
+	response governanceclient.SubmitResponse
 	err      error
-	lastBody reviewclient.SubmitRequestBody
+	lastBody governanceclient.SubmitRequestBody
 }
 
-func (s *stubReview) SubmitRequest(_ context.Context, _ string, body reviewclient.SubmitRequestBody) (reviewclient.SubmitResponse, error) {
+func (s *stubReview) SubmitRequest(_ context.Context, _ string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error) {
 	s.calls++
 	s.lastBody = body
 	return s.response, s.err
@@ -55,7 +55,7 @@ func (s *stubRepo) MarkNotified(_ context.Context, tenantID, candidateID string,
 
 func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 	repo := &stubRepo{shouldNotify: true}
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	review := &stubReview{response: governanceclient.SubmitResponse{
 		RequestID:      "req-1",
 		Decision:       "allow",
 		DecisionReason: "Policy 'ponti-stock-negative-notify'",
@@ -86,7 +86,7 @@ func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 
 func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
 	repo := &stubRepo{}
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	review := &stubReview{response: governanceclient.SubmitResponse{
 		RequestID:      "req-2",
 		Decision:       "allow",
 		DecisionReason: "No policy matched; default for risk low",
@@ -128,7 +128,7 @@ func TestNotifyStockNegative_PositiveStock_SkipsReview(t *testing.T) {
 
 func TestNotifyStockNegative_DedupBucketConsistent(t *testing.T) {
 	repo := &stubRepo{shouldNotify: false} // segunda invocacion: no re-notifica
-	review := &stubReview{response: reviewclient.SubmitResponse{
+	review := &stubReview{response: governanceclient.SubmitResponse{
 		Decision:       "allow",
 		DecisionReason: "Policy 'p'",
 	}}

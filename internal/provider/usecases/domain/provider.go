@@ -6,7 +6,8 @@ import (
 )
 
 type Provider struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID      int64
+	Name    string
+	ActorID *int64
 	shareddomain.Base
 }

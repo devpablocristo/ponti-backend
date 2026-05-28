@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
-	candidatesdomain "github.com/devpablocristo/core/notifications/go/candidates/usecases/domain"
+	candidatesdomain "github.com/devpablocristo/platform/notifications/go/candidates/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights/repository/models"
 )
 
@@ -34,7 +34,7 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	}
 	tenantID, err := uuid.Parse(in.TenantID)
 	if err != nil {
-		return CandidateRecord{}, false, fmt.Errorf("parse tenant_id: %w", err)
+		return CandidateRecord{}, false, domainerr.Validation("invalid tenant_id")
 	}
 
 	var row models.CandidateModel
@@ -97,7 +97,7 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 		if err := r.db.WithContext(ctx).
 			Where("insight_id = ?", row.ID).
 			Delete(&models.ReadModel{}).Error; err != nil {
-			return CandidateRecord{}, false, fmt.Errorf("clear reads on reopen: %w", err)
+			return CandidateRecord{}, false, domainerr.Internal("failed to clear reads on reopen")
 		}
 	}
 	return toCandidateRecord(row), shouldNotify, nil
@@ -112,7 +112,7 @@ func (r *Repository) ResolveByEntity(ctx context.Context, tenantID, eventType, e
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return 0, fmt.Errorf("parse tenant_id: %w", err)
+		return 0, domainerr.Validation("invalid tenant_id")
 	}
 	res := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
 		Where("tenant_id = ? AND event_type = ? AND entity_type = ? AND entity_id = ? AND status <> ?",
@@ -136,20 +136,27 @@ func (r *Repository) ResolveByID(ctx context.Context, tenantID, candidateID, act
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return domainerr.Validation("invalid tenant_id")
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
-		return fmt.Errorf("parse candidate_id: %w", err)
+		return domainerr.Validation("invalid candidate_id")
 	}
-	return r.db.WithContext(ctx).Model(&models.CandidateModel{}).
+	res := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
 		Where("id = ? AND tenant_id = ?", id, tID).
 		Updates(map[string]any{
 			"status":      candidatesdomain.StatusResolved,
 			"resolved_at": now.UTC(),
 			"last_actor":  actor,
 			"updated_at":  now.UTC(),
-		}).Error
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.NotFound("candidate not found")
+	}
+	return nil
 }
 
 // ReopenByID reactiva un candidato resuelto y limpia las marcas "leida" para
@@ -160,21 +167,25 @@ func (r *Repository) ReopenByID(ctx context.Context, tenantID, candidateID, acto
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return domainerr.Validation("invalid tenant_id")
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
-		return fmt.Errorf("parse candidate_id: %w", err)
+		return domainerr.Validation("invalid candidate_id")
 	}
-	if err := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
+	res := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
 		Where("id = ? AND tenant_id = ?", id, tID).
 		Updates(map[string]any{
 			"status":      candidatesdomain.StatusNotified,
 			"resolved_at": nil,
 			"last_actor":  actor,
 			"updated_at":  now.UTC(),
-		}).Error; err != nil {
-		return err
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.NotFound("candidate not found")
 	}
 	return r.db.WithContext(ctx).
 		Where("insight_id = ?", id).
@@ -188,11 +199,11 @@ func (r *Repository) MarkRead(ctx context.Context, tenantID, candidateID, userID
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return domainerr.Validation("invalid tenant_id")
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
-		return fmt.Errorf("parse candidate_id: %w", err)
+		return domainerr.Validation("invalid candidate_id")
 	}
 	// Validar que el candidato pertenece al tenant antes de insertar la lectura.
 	var exists int64
@@ -202,7 +213,7 @@ func (r *Repository) MarkRead(ctx context.Context, tenantID, candidateID, userID
 		return err
 	}
 	if exists == 0 {
-		return fmt.Errorf("candidate not found")
+		return domainerr.NotFound("candidate not found")
 	}
 	read := models.ReadModel{InsightID: id, UserID: userID, ReadAt: now.UTC()}
 	return r.db.WithContext(ctx).
@@ -217,11 +228,11 @@ func (r *Repository) MarkRead(ctx context.Context, tenantID, candidateID, userID
 func (r *Repository) MarkUnread(ctx context.Context, tenantID, candidateID, userID string) error {
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return domainerr.Validation("invalid tenant_id")
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
-		return fmt.Errorf("parse candidate_id: %w", err)
+		return domainerr.Validation("invalid candidate_id")
 	}
 	var exists int64
 	if err := r.db.WithContext(ctx).Model(&models.CandidateModel{}).
@@ -230,7 +241,7 @@ func (r *Repository) MarkUnread(ctx context.Context, tenantID, candidateID, user
 		return err
 	}
 	if exists == 0 {
-		return fmt.Errorf("candidate not found")
+		return domainerr.NotFound("candidate not found")
 	}
 	return r.db.WithContext(ctx).
 		Where("insight_id = ? AND user_id = ?", id, userID).
@@ -259,7 +270,7 @@ func (r *Repository) ListByTenantForUser(ctx context.Context, tenantID, userID s
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return nil, fmt.Errorf("parse tenant_id: %w", err)
+		return nil, domainerr.Validation("invalid tenant_id")
 	}
 	q := r.db.WithContext(ctx).Where("tenant_id = ?", tID)
 	if !opts.IncludeResolved {
@@ -308,11 +319,11 @@ func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID str
 	}
 	tID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return fmt.Errorf("parse tenant_id: %w", err)
+		return domainerr.Validation("invalid tenant_id")
 	}
 	id, err := uuid.Parse(candidateID)
 	if err != nil {
-		return fmt.Errorf("parse candidate_id: %w", err)
+		return domainerr.Validation("invalid candidate_id")
 	}
 	updates := map[string]any{
 		"status":           candidatesdomain.StatusNotified,

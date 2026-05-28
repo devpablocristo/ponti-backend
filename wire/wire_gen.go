@@ -8,6 +8,7 @@ package wire
 
 import (
 	"github.com/devpablocristo/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/internal/actor"
 	"github.com/devpablocristo/ponti-backend/internal/admin"
 	"github.com/devpablocristo/ponti-backend/internal/ai"
 	"github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -37,7 +38,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
-	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 )
 
 // Injectors from wire.go:
@@ -63,15 +64,24 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	ginEnginePort := ProvideCustomerGinEnginePort(server)
-	gormEnginePort := ProvideCustomerGormEnginePort(repository)
-	customerRepository := ProvideCustomerRepository(gormEnginePort)
-	repositoryPort := ProvideCustomerRepositoryPort(customerRepository)
-	useCases := ProvideCustomerUseCases(repositoryPort)
-	useCasesPort := ProvideCustomerUseCasesPort(useCases)
-	configAPIPort := ProvideCustomerConfigAPI(config)
-	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
-	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	ginEnginePort := ProvideActorGinEnginePort(server)
+	gormEnginePort := ProvideActorGormEnginePort(repository)
+	actorRepository := ProvideActorRepository(gormEnginePort)
+	repositoryPort := ProvideActorRepositoryPort(actorRepository)
+	useCases := ProvideActorUseCases(repositoryPort)
+	useCasesPort := ProvideActorUseCasesPort(useCases)
+	configAPIPort := ProvideActorConfigAPI(config)
+	middlewaresEnginePort := ProvideActorMiddlewaresEnginePort(middlewares)
+	handler := ProvideActorHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	customerGinEnginePort := ProvideCustomerGinEnginePort(server)
+	customerGormEnginePort := ProvideCustomerGormEnginePort(repository)
+	customerRepository := ProvideCustomerRepository(customerGormEnginePort)
+	customerRepositoryPort := ProvideCustomerRepositoryPort(customerRepository)
+	customerUseCases := ProvideCustomerUseCases(customerRepositoryPort)
+	customerUseCasesPort := ProvideCustomerUseCasesPort(customerUseCases)
+	customerConfigAPIPort := ProvideCustomerConfigAPI(config)
+	customerMiddlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
+	customerHandler := ProvideCustomerHandler(customerGinEnginePort, customerUseCasesPort, customerConfigAPIPort, customerMiddlewaresEnginePort)
 	campaignGinEnginePort := ProvideCampaignGinEnginePort(server)
 	campaignGormEnginePort := ProvideCampaignGormEnginePort(repository)
 	campaignRepository := ProvideCampaignRepository(campaignGormEnginePort)
@@ -99,16 +109,23 @@ func Initialize() (*Dependencies, error) {
 	lotGormEnginePort := ProvideLotGormEnginePort(repository)
 	lotRepository := ProvideLotRepository(lotGormEnginePort)
 	lotRepositoryPort := ProvideLotRepositoryPort(lotRepository)
-	dataintegrityLotRepositoryPort := ProvideDataIntegrityLotRepositoryPort(lotRepositoryPort)
+	dataintegrityLotRepositoryPort := ProvideDataIntegrityLotRepositoryPort(lotRepository)
 	reportGormEnginePort := ProvideReportGormEnginePort(repository)
 	reportRepository := ProvideReportRepository(reportGormEnginePort)
 	reportRepositoryPort := ProvideReportRepositoryPort(reportRepository)
-	dataintegrityReportRepositoryPort := ProvideDataIntegrityReportRepositoryPort(reportRepositoryPort)
+	dataintegrityReportRepositoryPort := ProvideDataIntegrityReportRepositoryPort(reportRepository)
 	stockGormEnginePort := ProvideStockGormEnginePort(repository)
 	stockRepository := ProvideStockRepository(stockGormEnginePort)
 	stockRepositoryPort := ProvideStockRepositoryPort(stockRepository)
-	dataintegrityStockRepositoryPort := ProvideDataIntegrityStockRepositoryPort(stockRepositoryPort)
-	dataintegrityUseCases := ProvideDataIntegrityUseCases(workOrderRepositoryPort, dataintegrityDashboardRepositoryPort, dataintegrityLotRepositoryPort, dataintegrityReportRepositoryPort, dataintegrityStockRepositoryPort)
+	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
+	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
+	supplyRepositoryPort := ProvideSupplyRepositoryPort(supplyRepository)
+	dataintegritySupplyRepositoryPort := ProvideDataIntegritySupplyRepositoryPort(supplyRepository)
+	projectGormEnginePort := ProvideProjectGormEnginePort(repository)
+	projectRepository := ProvideProjectRepository(projectGormEnginePort)
+	projectRepositoryPort := ProvideProjectRepositoryPort(projectRepository)
+	dataintegrityProjectRepositoryPort := ProvideDataIntegrityProjectRepositoryPort(projectRepository)
+	dataintegrityUseCases := ProvideDataIntegrityUseCases(dataintegrityDashboardRepositoryPort, workOrderRepositoryPort, dataintegrityReportRepositoryPort, dataintegritySupplyRepositoryPort, dataintegrityProjectRepositoryPort, dataintegrityLotRepositoryPort)
 	dataintegrityUseCasesPort := ProvideDataIntegrityUseCasesPort(dataintegrityUseCases)
 	dataintegrityConfigAPIPort := ProvideDataIntegrityConfigAPI(config)
 	dataintegrityMiddlewaresEnginePort := ProvideDataIntegrityMiddlewaresEnginePort(middlewares)
@@ -132,12 +149,7 @@ func Initialize() (*Dependencies, error) {
 	cropMiddlewaresEnginePort := ProvideCropMiddlewaresEnginePort(middlewares)
 	cropHandler := ProvideCropHandler(cropGinEnginePort, cropUseCasesPort, cropConfigAPIPort, cropMiddlewaresEnginePort)
 	lotGinEnginePort := ProvideLotGinEnginePort(server)
-	lotExcelService, err := ProvideLotPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	xlsxEnginePort := ProvideLotXLSXEnginePort(lotExcelService)
-	exporterAdapterPort := ProvideLotExporterPort(xlsxEnginePort)
+	exporterAdapterPort := ProvideLotExporterPort()
 	lotUseCases := ProvideLotUseCases(lotRepositoryPort, exporterAdapterPort)
 	lotUseCasesPort := ProvideLotUseCasesPort(lotUseCases)
 	lotConfigAPIPort := ProvideLotConfigAPI(config)
@@ -162,9 +174,6 @@ func Initialize() (*Dependencies, error) {
 	managerMiddlewaresEnginePort := ProvideManagerMiddlewaresEnginePort(middlewares)
 	managerHandler := ProvideManagerHandler(managerGinEnginePort, managerUseCasesPort, managerConfigAPIPort, managerMiddlewaresEnginePort)
 	projectGinEnginePort := ProvideProjectGinEnginePort(server)
-	projectGormEnginePort := ProvideProjectGormEnginePort(repository)
-	projectRepository := ProvideProjectRepository(projectGormEnginePort)
-	projectRepositoryPort := ProvideProjectRepositoryPort(projectRepository)
 	wordsSuggesterPort := ProvideProjectSuggesterPort(pkgsuggesterWordsSuggester)
 	projectUseCases := ProvideProjectUseCases(projectRepositoryPort, wordsSuggesterPort)
 	projectUseCasesPort := ProvideProjectUseCasesPort(projectUseCases)
@@ -196,21 +205,8 @@ func Initialize() (*Dependencies, error) {
 	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
 	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
 	supplyGinEnginePort := ProvideSupplyGinEnginePort(server)
-	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
-	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
-	supplyRepositoryPort := ProvideSupplyRepositoryPort(supplyRepository)
-	supplyExcelService, err := ProvideSupplyPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	supplyXLSXEnginePort := ProvideSupplyXLSXEnginePort(supplyExcelService)
-	supplyExporterAdapterPort := ProvideSupplyExporterPort(supplyXLSXEnginePort)
-	stockExcelService, err := ProvideStockPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	stockXLSXEnginePort := ProvideStockXLSXEnginePort(stockExcelService)
-	stockExporterAdapterPort := ProvideStockExporterPort(stockXLSXEnginePort)
+	supplyExporterAdapterPort := ProvideSupplyExporterPort()
+	stockExporterAdapterPort := ProvideStockExporterPort()
 	stockUseCases := ProvideStockUseCases(stockRepositoryPort, stockExporterAdapterPort, projectUseCasesPort)
 	stockUseCasesPort := ProvideSupplyStockUseCasesPort(stockUseCases)
 	supplyUseCases := ProvideSupplyUseCases(supplyRepositoryPort, supplyExporterAdapterPort, stockUseCasesPort)
@@ -255,12 +251,7 @@ func Initialize() (*Dependencies, error) {
 	dollarMiddlewaresEnginePort := ProvideDollarMiddlewaresEnginePort(middlewares)
 	dollarHandler := ProvideDollarHandler(dollarGinEnginePort, useCasePort, dollarConfigAPIPort, dollarMiddlewaresEnginePort)
 	workorderGinEnginePort := ProvideWorkOrderGinEnginePort(server)
-	service, err := ProvidePkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	workorderXLSXEnginePort := ProvideXLSXEnginePort(service)
-	workorderExporterAdapterPort := ProvideExporterPort(workorderXLSXEnginePort)
+	workorderExporterAdapterPort := ProvideWorkOrderExporterPort()
 	workorderUseCases := ProvideWorkOrderUseCases(workorderRepositoryPort, workorderExporterAdapterPort)
 	workorderUseCasesPort := ProvideWorkOrderUseCasesPort(workorderUseCases)
 	workorderConfigAPIPort := ProvideWorkOrderConfigAPI(config)
@@ -270,12 +261,7 @@ func Initialize() (*Dependencies, error) {
 	laborGormEnginePort := ProvideLaborGormEnginePort(repository)
 	laborRepository := ProvideLaborRepository(laborGormEnginePort)
 	laborRepositoryPort := ProvideLaborRepositoryPort(laborRepository)
-	laborExcelService, err := ProvideLaborPkgExcelService()
-	if err != nil {
-		return nil, err
-	}
-	laborXLSXEnginePort := ProvideLaborXLSXEnginePort(laborExcelService)
-	laborExporterAdapterPort := ProvideLaborExporterPort(laborXLSXEnginePort)
+	laborExporterAdapterPort := ProvideLaborExporterPort()
 	laborUseCases := ProvideLaborUseCases(laborRepositoryPort, laborExporterAdapterPort, projectUseCasesPort)
 	laborUseCasesPort := ProvideLaborUseCasesPort(laborUseCases)
 	laborConfigAPIPort := ProvideLaborConfigAPI(config)
@@ -305,13 +291,21 @@ func Initialize() (*Dependencies, error) {
 	stockMiddlewaresEnginePort := ProvideStockMiddlewaresEnginePort(middlewares)
 	stockHandler := ProvideStockHandler(stockGinEnginePort, useCasesPort2, stockConfigAPIPort, stockMiddlewaresEnginePort)
 	aiGinEnginePort := ProvideAIGinEnginePort(server)
-	ai := ProvideConfigAI(config)
-	client := ProvideAIClient(ai)
-	usecasesUseCases := ProvideAIUseCases(client)
+	companionCfg := ProvideConfigCompanion(config)
+	companionClient, err := ProvideCompanionClient(companionCfg)
+	if err != nil {
+		return nil, err
+	}
+	nexusCfg := ProvideConfigNexus(config)
+	_, err = ProvideNexusClient(nexusCfg) // Nexus opcional, descartado hasta ola 2
+	if err != nil {
+		return nil, err
+	}
+	usecasesUseCases := ProvideAIUseCases(companionClient)
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
-	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort)
+	aiHandler := ProvideAIHandler(aiGinEnginePort, aiUseCasesPort, aiConfigAPIPort, aiMiddlewaresEnginePort, repository, config)
 	app, err := ProvideFirebaseApp(config)
 	if err != nil {
 		return nil, err
@@ -323,7 +317,9 @@ func Initialize() (*Dependencies, error) {
 	wireGinEnginePort := ProvideGinEnginePort(server)
 	api := ProvideConfigAPI(config)
 	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
-	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
+	adminRepository := ProvideAdminRepository(repository)
+	adminUseCases := ProvideAdminUseCases(adminRepository, adminClient)
+	adminHandler := ProvideAdminHandler(adminUseCases, wireGinEnginePort, api, wireMiddlewaresEnginePort)
 	workorderdraftGinEnginePort := ProvideWorkOrderDraftGinEnginePort(server)
 	workorderdraftGormEngine := ProvideWorkOrderDraftGormEnginePort(repository)
 	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)
@@ -341,7 +337,8 @@ func Initialize() (*Dependencies, error) {
 		GormRepo:                  repository,
 		Middlewares:               middlewares,
 		WordsSuggester:            pkgsuggesterWordsSuggester,
-		CustomerHandler:           handler,
+		ActorHandler:              handler,
+		CustomerHandler:           customerHandler,
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
 		DataIntegrityHandler:      dataintegrityHandler,
@@ -380,6 +377,7 @@ type Dependencies struct {
 	GormRepo                  *pkggorm.Repository
 	Middlewares               *pkgmwr.Middlewares
 	WordsSuggester            *pkgsuggester.WordsSuggester
+	ActorHandler              *actor.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler

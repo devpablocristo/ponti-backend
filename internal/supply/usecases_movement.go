@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	projdom "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
@@ -46,7 +46,7 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 			return 0, err
 		}
 		if isFirst {
-			return 0, domainerr.Validation("no existe stock para este insumo en el proyecto")
+			return 0, domainerr.Validation("no stock for this supply in the project")
 		}
 
 		stock.RealStockUnits = movement.Quantity
@@ -65,12 +65,12 @@ func (u *UseCases) createSupplyMovementInternal(ctx context.Context, movement *d
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return 0, domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
+			return 0, domainerr.Validation("not enough stock to return the requested quantity")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return 0, domainerr.Validation("La devolución supera el stock disponible del insumo.")
+			return 0, domainerr.Validation("return exceeds available supply stock")
 		}
 
 		movement.StockId = stock.ID
@@ -154,7 +154,7 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 				return err
 			}
 			if closedIsFirst {
-				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+				return domainerr.Validation("no stock for this supply in the project")
 			}
 		}
 		return nil
@@ -175,12 +175,12 @@ func (u *UseCases) validateSupplyMovementResolved(ctx context.Context, movement 
 
 	if movement.MovementType == domain.RETURN_MOVEMENT {
 		if isFirst {
-			return domainerr.Validation("No hay stock suficiente para devolver la cantidad solicitada.")
+			return domainerr.Validation("not enough stock to return the requested quantity")
 		}
 
 		available := stock.GetStockUnits()
 		if available.LessThan(movement.Quantity) {
-			return domainerr.Validation("La devolución supera el stock disponible del insumo.")
+			return domainerr.Validation("return exceeds available supply stock")
 		}
 	}
 
@@ -260,7 +260,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 			if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 				supplyLabel = strings.TrimSpace(movement.Supply.Name)
 			}
-			return domainerr.Newf(domainerr.KindConflict, "La devolución %s ya tiene el insumo %s cargado", reference, supplyLabel)
+			return domainerr.Newf(domainerr.KindConflict, "devolución %s already includes supply %s", reference, supplyLabel)
 		}
 		return nil
 	}
@@ -274,7 +274,7 @@ func (u *UseCases) validateDuplicateReferenceSupply(ctx context.Context, movemen
 		if movement.Supply != nil && strings.TrimSpace(movement.Supply.Name) != "" {
 			supplyLabel = strings.TrimSpace(movement.Supply.Name)
 		}
-		return domainerr.Newf(domainerr.KindConflict, "El remito %s ya tiene el insumo %s cargado", reference, supplyLabel)
+		return domainerr.Newf(domainerr.KindConflict, "remito %s already includes supply %s", reference, supplyLabel)
 	}
 
 	return nil
@@ -299,20 +299,20 @@ func (u *UseCases) resolveMovementReferences(ctx context.Context, movement *doma
 		return err
 	}
 	if supply.ProjectID != movement.ProjectId {
-		return domainerr.Newf(domainerr.KindValidation, "El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId)
+		return domainerr.Newf(domainerr.KindValidation, "supply %d does not belong to project %d", movement.Supply.ID, movement.ProjectId)
 	}
 	movement.Supply = supply
 
 	investor, err := u.repo.GetInvestor(ctx, movement.Investor.ID)
 	if err != nil {
-		return domainerr.Newf(domainerr.KindValidation, "El inversor %d no existe", movement.Investor.ID)
+		return domainerr.Newf(domainerr.KindValidation, "investor %d not found", movement.Investor.ID)
 	}
 	movement.Investor = investor
 
 	if movement.Provider.ID > 0 {
 		provider, err := u.repo.GetProvider(ctx, movement.Provider.ID)
 		if err != nil {
-			return domainerr.Newf(domainerr.KindValidation, "El proveedor %d no existe", movement.Provider.ID)
+			return domainerr.Newf(domainerr.KindValidation, "provider %d not found", movement.Provider.ID)
 		}
 		movement.Provider = provider
 		return nil
@@ -414,16 +414,20 @@ func (u *UseCases) GetEntriesSupplyMovementsByProjectID(ctx context.Context, pro
 	return u.repo.GetEntriesSupplyMovementsByProjectID(ctx, projectID)
 }
 
+func (u *UseCases) ListEntrySupplyMovements(ctx context.Context, filter domain.SupplyFilter) ([]*domain.SupplyMovement, error) {
+	return u.repo.ListEntrySupplyMovements(ctx, filter)
+}
+
 func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *domain.SupplyMovement) error {
 	if supplyMovement == nil {
 		return domainerr.Validation("invalid supply movement")
 	}
 
 	if supplyMovement.MovementType == domain.INTERNAL_MOVEMENT || supplyMovement.MovementType == domain.INTERNAL_MOVEMENT_IN {
-		return domainerr.Validation("no se permite editar movimientos internos")
+		return domainerr.Validation("internal movements cannot be edited")
 	}
 	if supplyMovement.MovementType == domain.STOCK {
-		return domainerr.Validation("no se permite editar movimientos de stock")
+		return domainerr.Validation("stock movements cannot be edited")
 	}
 
 	if err := u.resolveMovementReferences(ctx, supplyMovement); err != nil {
@@ -449,7 +453,7 @@ func (u *UseCases) UpdateSupplyMovement(ctx context.Context, supplyMovement *dom
 	}
 	if isFirst {
 		if supplyMovement.MovementType != domain.OFFICIAL_INVOICE {
-			return domainerr.Validation("no existe stock para este insumo en el proyecto")
+			return domainerr.Validation("no stock for this supply in the project")
 		}
 
 		stock = createStockDomainFromSupplyMovement(supplyMovement)
@@ -469,6 +473,32 @@ func (u *UseCases) GetSupplyMovementByID(ctx context.Context, id int64) (*domain
 
 func (u *UseCases) DeleteSupplyMovement(ctx context.Context, projectID, supplyID int64) error {
 	return u.repo.DeleteSupplyMovement(ctx, projectID, supplyID)
+}
+
+func (u *UseCases) ListArchivedSupplyMovements(ctx context.Context, projectID int64) ([]*domain.SupplyMovement, error) {
+	// projectID = 0 → listar movimientos archivados de todos los proyectos del tenant.
+	return u.repo.ListArchivedSupplyMovements(ctx, projectID)
+}
+
+func (u *UseCases) ArchiveSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.ArchiveSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) RestoreSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.RestoreSupplyMovement(ctx, projectID, movementID)
+}
+
+func (u *UseCases) HardDeleteSupplyMovement(ctx context.Context, projectID, movementID int64) error {
+	if projectID <= 0 || movementID <= 0 {
+		return domainerr.Validation("project_id and movement_id are required")
+	}
+	return u.repo.HardDeleteSupplyMovement(ctx, projectID, movementID)
 }
 
 func (u *UseCases) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
@@ -658,7 +688,7 @@ func (u *UseCases) validateInternalMovementOut(ctx context.Context, movement *do
 }
 
 func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, projectID int64) ([]byte, error) {
-	if u.excel == nil {
+	if u.exporter == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -671,7 +701,7 @@ func (u *UseCases) ExportSupplyMovementsByProjectID(ctx context.Context, project
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	return u.excel.ExportSupplyMovements(ctx, items)
+	return u.exporter.ExportSupplyMovements(ctx, items)
 }
 
 // errorMessage extracts the human-readable message from a domainerr.Error,

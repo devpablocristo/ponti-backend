@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
@@ -175,7 +175,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyID:        movement.Supply.ID,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         fmt.Sprintf("El insumo %d no pertenece al proyecto %d", movement.Supply.ID, movement.ProjectId),
+				Message:         fmt.Sprintf("supply %d does not belong to project %d", movement.Supply.ID, movement.ProjectId),
 			})
 			continue
 		}
@@ -190,7 +190,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "validation_error",
-				Message:         fmt.Sprintf("El inversor %d no existe", movement.Investor.ID),
+				Message:         fmt.Sprintf("investor %d not found", movement.Investor.ID),
 			})
 			continue
 		}
@@ -237,7 +237,7 @@ func (u *UseCases) validateSupplyMovementImport(
 				SupplyName:      movement.Supply.Name,
 				ReferenceNumber: movement.ReferenceNumber,
 				Code:            "duplicate_request",
-				Message:         fmt.Sprintf("El remito %s ya contiene el insumo %s dentro del request", reference, supplyLabel),
+				Message:         fmt.Sprintf("remito %s already includes supply %s in the import request", reference, supplyLabel),
 			})
 			continue
 		}
@@ -283,7 +283,7 @@ func (u *UseCases) validateImportMovementBusinessRules(ctx context.Context, move
 				return err
 			}
 			if closedIsFirst {
-				return domainerr.Validation("no existe stock para este insumo en el proyecto")
+				return domainerr.Validation("no stock for this supply in the project")
 			}
 		}
 		return nil
@@ -303,7 +303,7 @@ func (u *UseCases) resolveImportProvider(ctx context.Context, provider *provider
 	if provider.ID > 0 {
 		resolved, err := u.repo.GetProvider(ctx, provider.ID)
 		if err != nil {
-			return nil, domainerr.New(domainerr.KindValidation, fmt.Sprintf("El proveedor %d no existe", provider.ID))
+			return nil, domainerr.New(domainerr.KindValidation, fmt.Sprintf("provider %d not found", provider.ID))
 		}
 		return resolved, nil
 	}

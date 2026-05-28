@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	classdomain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	projectdomain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
@@ -777,7 +777,7 @@ func TestImportSupplyMovements_FailsOnDuplicateInDB(t *testing.T) {
 		assert.Equal(t, 0, failures[0].Index)
 		assert.Equal(t, 2, failures[0].RowIndex)
 		assert.Equal(t, "duplicate_db", failures[0].Code)
-		assert.Equal(t, "El remito REM-123 ya tiene el insumo Urea cargado", failures[0].Message)
+		assert.Equal(t, "remito REM-123 already includes supply Urea", failures[0].Message)
 	}
 }
 
@@ -938,7 +938,7 @@ func TestImportSupplyMovements_FailsWhenSupplyBelongsToOtherProject(t *testing.T
 		assert.Equal(t, 2, failures[0].RowIndex)
 		assert.Equal(t, int64(10), failures[0].SupplyID)
 		assert.Equal(t, "validation_error", failures[0].Code)
-		assert.Equal(t, "El insumo 10 no pertenece al proyecto 18", failures[0].Message)
+		assert.Equal(t, "supply 10 does not belong to project 18", failures[0].Message)
 	}
 }
 
@@ -1155,7 +1155,7 @@ func TestValidateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
 		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
+		assert.Equal(t, "remito REM-DUP already includes supply 157", domainErr.Message())
 	}
 }
 
@@ -1188,7 +1188,7 @@ func TestCreateSupplyMovement_FailsOnDuplicateInDB(t *testing.T) {
 	var domainErr domainerr.Error
 	if assert.True(t, errors.As(err, &domainErr)) {
 		assert.Equal(t, domainerr.KindConflict, domainErr.Kind())
-		assert.Equal(t, "El remito REM-DUP ya tiene el insumo 157 cargado", domainErr.Message())
+		assert.Equal(t, "remito REM-DUP already includes supply 157", domainErr.Message())
 	}
 }
 
@@ -1525,7 +1525,7 @@ func TestUpdateSupplyMovement_RejectsInternalMovements(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "movimientos internos")
+	assert.Contains(t, err.Error(), "internal movements cannot be edited")
 }
 
 func mustTime(t *testing.T, value string) time.Time {
@@ -1574,5 +1574,5 @@ func TestUpdateSupplyMovement_NonOfficialInvoiceRejectsTargetSupplyWithoutStock(
 	})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no existe stock para este insumo en el proyecto")
+	assert.Contains(t, err.Error(), "no stock for this supply in the project")
 }

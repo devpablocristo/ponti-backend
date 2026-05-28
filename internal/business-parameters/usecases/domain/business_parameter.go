@@ -1,10 +1,11 @@
 package domain
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
@@ -23,7 +24,7 @@ type BusinessParameter struct {
 // GetValueAsDecimal convierte el valor a decimal.Decimal
 func (ap *BusinessParameter) GetValueAsDecimal() (decimal.Decimal, error) {
 	if ap.Type != "decimal" {
-		return decimal.Zero, fmt.Errorf("parameter %s is not of type decimal", ap.Key)
+		return decimal.Zero, domainerr.Validation("parameter " + ap.Key + " is not of type decimal")
 	}
 	val, err := strconv.ParseFloat(ap.Value, 64)
 	if err != nil {
@@ -35,7 +36,7 @@ func (ap *BusinessParameter) GetValueAsDecimal() (decimal.Decimal, error) {
 // GetValueAsInteger convierte el valor a int64
 func (ap *BusinessParameter) GetValueAsInteger() (int64, error) {
 	if ap.Type != "integer" {
-		return 0, fmt.Errorf("parameter %s is not of type integer", ap.Key)
+		return 0, domainerr.Validation("parameter " + ap.Key + " is not of type integer")
 	}
 	return strconv.ParseInt(ap.Value, 10, 64)
 }
@@ -43,7 +44,7 @@ func (ap *BusinessParameter) GetValueAsInteger() (int64, error) {
 // GetValueAsBoolean convierte el valor a bool
 func (ap *BusinessParameter) GetValueAsBoolean() (bool, error) {
 	if ap.Type != "boolean" {
-		return false, fmt.Errorf("parameter %s is not of type boolean", ap.Key)
+		return false, domainerr.Validation("parameter " + ap.Key + " is not of type boolean")
 	}
 	return strconv.ParseBool(ap.Value)
 }
