@@ -49,6 +49,9 @@ func (r *Repository) CreateActor(ctx context.Context, actor *domain.Actor) (int6
 
 		model := models.FromDomain(actor)
 		if err := tx.Create(model).Error; err != nil {
+			if isUniqueViolation(err) {
+				return domainerr.Conflict("actor already exists")
+			}
 			return domainerr.Internal("failed to create actor")
 		}
 		returning = model.ID
@@ -205,6 +208,9 @@ func (r *Repository) UpdateActor(ctx context.Context, actor *domain.Actor) error
 		}
 		res := tx.Model(&models.Actor{}).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", actor.ID, tenantID).Updates(updates)
 		if res.Error != nil {
+			if isUniqueViolation(res.Error) {
+				return domainerr.Conflict("actor already exists")
+			}
 			return domainerr.Internal("failed to update actor")
 		}
 		if res.RowsAffected == 0 {
@@ -1146,5 +1152,7 @@ func isUniqueViolation(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint")
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "sqlstate 23505")
 }
