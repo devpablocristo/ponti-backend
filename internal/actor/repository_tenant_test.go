@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	domain "github.com/devpablocristo/ponti-backend/internal/actor/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -56,6 +57,9 @@ func setupActorTenantDB(t *testing.T) *gorm.DB {
 			updated_by TEXT,
 			deleted_by TEXT
 		);
+		CREATE UNIQUE INDEX ux_actors_tenant_normalized_name_active
+			ON actors (tenant_id, normalized_name)
+			WHERE deleted_at IS NULL AND merged_into_actor_id IS NULL;
 		CREATE TABLE actor_roles (
 			actor_id INTEGER NOT NULL,
 			role TEXT NOT NULL,
@@ -253,5 +257,139 @@ func TestActorRepositoryTenantIsolation(t *testing.T) {
 	}
 	if createdTenant != tenantA.String() {
 		t.Fatalf("created actor tenant_id = %q, want %q", createdTenant, tenantA.String())
+	}
+}
+
+func TestCreateActorDuplicateNormalizedNameReturnsConflict(t *testing.T) {
+	db := setupActorTenantDB(t)
+	repo := NewRepository(actorTenantGormEngine{client: db})
+
+	tenantA := uuid.New()
+	tenantB := uuid.New()
+	now := time.Now().UTC()
+	ctxA := actorTenantContext(tenantA)
+
+	firstID, err := repo.CreateActor(ctxA, &domain.Actor{
+		ActorKind:   domain.KindOrganization,
+		DisplayName: "El Sueño 25 26",
+		Roles:       []string{"cliente"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create first actor: %v", err)
+	}
+
+	_, err = repo.CreateActor(ctxA, &domain.Actor{
+		ActorKind:   domain.KindNaturalPerson,
+		DisplayName: "el sueño 25 26",
+		Roles:       []string{"proveedor"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate actor name to fail")
+	}
+	if !domainerr.IsKind(err, domainerr.KindConflict) {
+		t.Fatalf("expected conflict, got %T %v", err, err)
+	}
+	if err.Error() != "CONFLICT: actor already exists" {
+		t.Fatalf("expected domain message, got %q", err.Error())
+	}
+
+	if _, err := repo.CreateActor(actorTenantContext(tenantB), &domain.Actor{
+		ActorKind:   domain.KindNaturalPerson,
+		DisplayName: "el sueño 25 26",
+		Roles:       []string{"proveedor"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	}); err != nil {
+		t.Fatalf("same normalized name in another tenant should be allowed: %v", err)
+	}
+
+	if err := db.Exec(`UPDATE actors SET deleted_at = ? WHERE id = ?`, now, firstID).Error; err != nil {
+		t.Fatalf("archive first actor: %v", err)
+	}
+	recreatedID, err := repo.CreateActor(ctxA, &domain.Actor{
+		ActorKind:   domain.KindOrganization,
+		DisplayName: "EL SUEÑO 25 26",
+		Roles:       []string{"cliente"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("same normalized name after archive should be allowed: %v", err)
+	}
+
+	mergedID, err := repo.CreateActor(ctxA, &domain.Actor{
+		ActorKind:   domain.KindOrganization,
+		DisplayName: "Actor Fusionado",
+		Roles:       []string{"responsable"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create actor to merge: %v", err)
+	}
+	if err := db.Exec(`UPDATE actors SET merged_into_actor_id = ? WHERE id = ?`, recreatedID, mergedID).Error; err != nil {
+		t.Fatalf("mark actor as merged: %v", err)
+	}
+	if _, err := repo.CreateActor(ctxA, &domain.Actor{
+		ActorKind:   domain.KindNaturalPerson,
+		DisplayName: "actor fusionado",
+		Roles:       []string{"responsable"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	}); err != nil {
+		t.Fatalf("same normalized name after merge should be allowed: %v", err)
+	}
+}
+
+func TestUpdateActorDuplicateNormalizedNameReturnsConflict(t *testing.T) {
+	db := setupActorTenantDB(t)
+	repo := NewRepository(actorTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	ctx := actorTenantContext(tenantID)
+
+	firstID, err := repo.CreateActor(ctx, &domain.Actor{
+		ActorKind:   domain.KindOrganization,
+		DisplayName: "Actor Uno",
+		Roles:       []string{"cliente"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create first actor: %v", err)
+	}
+	secondID, err := repo.CreateActor(ctx, &domain.Actor{
+		ActorKind:   domain.KindNaturalPerson,
+		DisplayName: "Actor Dos",
+		Roles:       []string{"proveedor"},
+		Base:        shareddomain.Base{CreatedAt: now, UpdatedAt: now},
+	})
+	if err != nil {
+		t.Fatalf("create second actor: %v", err)
+	}
+
+	err = repo.UpdateActor(ctx, &domain.Actor{
+		ID:          secondID,
+		ActorKind:   domain.KindNaturalPerson,
+		DisplayName: "actor uno",
+		Roles:       []string{"proveedor"},
+		Base:        shareddomain.Base{UpdatedAt: now},
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate actor name update to fail")
+	}
+	if !domainerr.IsKind(err, domainerr.KindConflict) {
+		t.Fatalf("expected conflict, got %T %v", err, err)
+	}
+	if err.Error() != "CONFLICT: actor already exists" {
+		t.Fatalf("expected domain message, got %q", err.Error())
+	}
+
+	if err := repo.UpdateActor(ctx, &domain.Actor{
+		ID:          firstID,
+		ActorKind:   domain.KindOrganization,
+		DisplayName: "ACTOR UNO",
+		Roles:       []string{"cliente"},
+		Base:        shareddomain.Base{UpdatedAt: now},
+	}); err != nil {
+		t.Fatalf("keeping the actor own normalized name should be allowed: %v", err)
 	}
 }
