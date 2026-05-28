@@ -5,19 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -70,6 +72,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 			model.TenantID = tenantID
 		}
 		if err := tx.Create(model).Error; err != nil {
+			if isCustomerUniqueViolation(err) {
+				return domainerr.Conflict("customer already exists")
+			}
 			return domainerr.Internal("failed to create customer")
 		}
 		id = model.ID
@@ -203,6 +208,9 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 		}
 		result := updateTx.Updates(models.FromDomain(c))
 		if result.Error != nil {
+			if isCustomerUniqueViolation(result.Error) {
+				return domainerr.Conflict("customer already exists")
+			}
 			return domainerr.Internal("failed to update customer")
 		}
 		if result.RowsAffected == 0 {
@@ -359,14 +367,13 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 			return restoreCustomerActiveProjectGraph(tx, id, customer.TenantID, restoredAt, cause)
 		}
 
-		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
-			return err
-		}
-
 		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Customer{}), "customers").
 			Where("id = ?", id).
 			Updates(lifecycle.RestoreUpdates(tx, "customers", restoredAt)).Error; err != nil {
 			return domainerr.Internal("failed to restore customer")
+		}
+		if err := restoreCustomerProjects(tx, id, customer.TenantID, restoredAt, cause); err != nil {
+			return err
 		}
 		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
 			SourceTable: actorsync.LegacyCustomers,
@@ -406,6 +413,20 @@ func restoreCustomerActiveProjectGraph(tx *gorm.DB, customerID int64, tenantID u
 	return nil
 }
 
+func isCustomerUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "unique constraint failed")
+}
+
 func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, restoredAt time.Time, cause lifecycle.Cause) error {
 	var projectIDs []int64
 	projectLookup := tx.Table("projects").Where("customer_id = ? AND deleted_at IS NOT NULL", customerID)
@@ -420,10 +441,6 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 		return nil
 	}
 
-	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
-		return err
-	}
-
 	projectUpdate := tx.Table("projects").Where("id IN ? AND deleted_at IS NOT NULL", projectIDs)
 	projectUpdate = lifecycle.ApplyCauseScope(projectUpdate, "projects", cause)
 	if tenantID != uuid.Nil && tx.Migrator().HasColumn("projects", "tenant_id") {
@@ -431,6 +448,9 @@ func restoreCustomerProjects(tx *gorm.DB, customerID int64, tenantID uuid.UUID, 
 	}
 	if err := projectUpdate.Updates(lifecycle.RestoreUpdates(tx, "projects", restoredAt)).Error; err != nil {
 		return domainerr.Internal("failed to restore customer projects")
+	}
+	if err := restoreCustomerProjectGraph(tx, projectIDs, tenantID, restoredAt, cause); err != nil {
+		return err
 	}
 
 	for _, projectID := range projectIDs {
@@ -447,10 +467,10 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 	// so the restore of the project-scoped tables below doesn't wipe out the
 	// rows we need to find. Restore order:
 	//   1. List ids of fields/lots/workorders/drafts archived with this Cause.
-	//   2. Restore the project-scoped tables (workorders, drafts, labors,
+	//   2. Restore fields/lots explicitly before rows that reference them.
+	//   3. Restore the project-scoped tables (workorders, drafts, labors,
 	//      supplies, etc.) en bulk by project_id.
-	//   3. Restore the items/splits using the captured IDs.
-	//   4. Restore fields/lots explicitly (they live outside project_id scope).
+	//   4. Restore the items/splits using the captured IDs.
 	//
 	// Previously step 2 ran first, which left the captured-ID lookup with
 	// nothing to pluck (the rows it queried had just been moved to deleted_at
@@ -476,12 +496,6 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 		return err
 	}
 
-	for _, table := range customerProjectScopedArchiveTables {
-		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
-			return err
-		}
-	}
-
 	if len(fieldIDs) > 0 {
 		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
 			return err
@@ -495,6 +509,11 @@ func restoreCustomerProjectGraph(tx *gorm.DB, projectIDs []int64, tenantID uuid.
 			return err
 		}
 		if err := lifecycle.RestoreScopedRows(tx, "lots", tenantID, restoredAt, cause, "id IN ?", lotIDs); err != nil {
+			return err
+		}
+	}
+	for _, table := range customerProjectScopedArchiveTables {
+		if err := restoreProjectScopedCustomerTable(tx, table, projectIDs, tenantID, restoredAt, cause); err != nil {
 			return err
 		}
 	}
@@ -607,4 +626,3 @@ func assertCustomerReferencesActive(tx *gorm.DB, c *domain.Customer) error {
 	}
 	return lifecycle.RequireAllActive(tx, refs)
 }
-

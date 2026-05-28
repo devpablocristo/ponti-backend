@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -175,6 +176,37 @@ func TestCustomerRepositoryTenantIsolation(t *testing.T) {
 	}
 }
 
+func TestUpdateCustomerDuplicateNameReturnsConflict(t *testing.T) {
+	db := setupCustomerTenantDB(t)
+	repo := NewRepository(customerTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX ux_customers_tenant_name_active
+			ON customers (tenant_id, name)
+			WHERE deleted_at IS NULL;
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(10, ?, 'EL SUEÑO', NULL),
+			(11, ?, 'SOALEN SRL', NULL);
+	`, tenantID.String(), tenantID.String()).Error; err != nil {
+		t.Fatalf("seed customers: %v", err)
+	}
+
+	err := repo.UpdateCustomer(customerTenantContext(tenantID), &domain.Customer{
+		ID:   11,
+		Name: "EL SUEÑO",
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate customer name to fail")
+	}
+	if !domainerr.IsKind(err, domainerr.KindConflict) {
+		t.Fatalf("expected conflict, got %T %v", err, err)
+	}
+	if err.Error() != "CONFLICT: customer already exists" {
+		t.Fatalf("expected domain message, got %q", err.Error())
+	}
+}
+
 func TestArchiveCustomerArchivesActiveProjects(t *testing.T) {
 	db := setupCustomerTenantDB(t)
 	repo := NewRepository(customerTenantGormEngine{client: db})
@@ -183,14 +215,62 @@ func TestArchiveCustomerArchivesActiveProjects(t *testing.T) {
 	now := time.Now().UTC()
 
 	if err := db.Exec(`
+		CREATE TABLE fields (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
+		);
+		CREATE TABLE lots (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			field_id INTEGER NOT NULL,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
+		);
+		CREATE TABLE workorders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id TEXT NOT NULL,
+			project_id INTEGER NOT NULL,
+			field_id INTEGER,
+			lot_id INTEGER,
+			deleted_at DATETIME,
+			archive_batch_id INTEGER,
+			archive_origin_entity TEXT,
+			archive_origin_id INTEGER,
+			archive_reason TEXT
+		);
+	`).Error; err != nil {
+		t.Fatalf("create workorders table: %v", err)
+	}
+
+	if err := db.Exec(`
 		INSERT INTO customers (id, tenant_id, name, created_at, updated_at, deleted_at) VALUES
 			(10, ?, 'Customer With Projects', ?, ?, NULL);
 		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, created_at, updated_at, deleted_at) VALUES
 			(20, ?, 'Project One', 10, 1, ?, ?, NULL),
 			(21, ?, 'Project Two', 10, 1, ?, ?, NULL);
+		INSERT INTO fields (id, tenant_id, name, project_id, deleted_at) VALUES
+			(30, ?, 'Field One', 20, NULL);
+		INSERT INTO lots (id, tenant_id, name, field_id, deleted_at) VALUES
+			(40, ?, 'Lot One', 30, NULL);
+		INSERT INTO workorders (id, tenant_id, project_id, field_id, lot_id, deleted_at) VALUES
+			(50, ?, 20, 30, 40, NULL);
 	`, tenantID.String(), now, now,
 		tenantID.String(), now, now,
 		tenantID.String(), now, now,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
 	).Error; err != nil {
 		t.Fatalf("seed customer projects: %v", err)
 	}
@@ -215,6 +295,94 @@ func TestArchiveCustomerArchivesActiveProjects(t *testing.T) {
 		t.Fatalf("expected customer archived, got %d", archivedCustomer)
 	}
 
+	if err := db.Exec(`
+		CREATE TRIGGER projects_restore_requires_active_customer
+		BEFORE UPDATE OF deleted_at ON projects
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM customers
+		    WHERE customers.id = NEW.customer_id
+		      AND customers.tenant_id = NEW.tenant_id
+		      AND customers.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active project row references archived customer');
+		END;
+
+		CREATE TRIGGER fields_restore_requires_active_project
+		BEFORE UPDATE OF deleted_at ON fields
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM projects
+		    WHERE projects.id = NEW.project_id
+		      AND projects.tenant_id = NEW.tenant_id
+		      AND projects.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active field row references archived project');
+		END;
+
+		CREATE TRIGGER lots_restore_requires_active_field
+		BEFORE UPDATE OF deleted_at ON lots
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM fields
+		    WHERE fields.id = NEW.field_id
+		      AND fields.tenant_id = NEW.tenant_id
+		      AND fields.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active lot row references archived field');
+		END;
+
+		CREATE TRIGGER workorders_restore_requires_active_project
+		BEFORE UPDATE OF deleted_at ON workorders
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM projects
+		    WHERE projects.id = NEW.project_id
+		      AND projects.tenant_id = NEW.tenant_id
+		      AND projects.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active workorder row references archived project');
+		END;
+
+		CREATE TRIGGER workorders_restore_requires_active_field
+		BEFORE UPDATE OF deleted_at ON workorders
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM fields
+		    WHERE fields.id = NEW.field_id
+		      AND fields.tenant_id = NEW.tenant_id
+		      AND fields.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active workorder row references archived field');
+		END;
+
+		CREATE TRIGGER workorders_restore_requires_active_lot
+		BEFORE UPDATE OF deleted_at ON workorders
+		WHEN NEW.deleted_at IS NULL
+		  AND EXISTS (
+		    SELECT 1
+		    FROM lots
+		    WHERE lots.id = NEW.lot_id
+		      AND lots.tenant_id = NEW.tenant_id
+		      AND lots.deleted_at IS NOT NULL
+		  )
+		BEGIN
+		  SELECT RAISE(ABORT, 'active workorder row references archived lot');
+		END;
+	`).Error; err != nil {
+		t.Fatalf("create restore invariant triggers: %v", err)
+	}
+
 	archived, total, err := repo.ListArchivedCustomers(customerTenantContext(tenantID), 1, 100)
 	if err != nil {
 		t.Fatalf("list archived customers: %v", err)
@@ -233,6 +401,14 @@ func TestArchiveCustomerArchivesActiveProjects(t *testing.T) {
 	}
 	if restoredProjects != 2 {
 		t.Fatalf("expected both customer projects restored, got %d", restoredProjects)
+	}
+
+	var restoredWorkorders int64
+	if err := db.Raw(`SELECT COUNT(*) FROM workorders WHERE id = 50 AND deleted_at IS NULL`).Scan(&restoredWorkorders).Error; err != nil {
+		t.Fatalf("count restored workorders: %v", err)
+	}
+	if restoredWorkorders != 1 {
+		t.Fatalf("expected customer project workorders restored, got %d", restoredWorkorders)
 	}
 }
 

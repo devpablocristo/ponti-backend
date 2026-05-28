@@ -38,7 +38,7 @@ Salida: `docs/openapi/swagger.yaml`, `docs/openapi/swagger.json`, `docs/openapi/
 ### Frontend — openapi-typescript
 
 ```bash
-cd ../ponti-frontend/ui
+cd ../web/ui
 yarn install  # ya incluye openapi-typescript@7 + swagger2openapi@7 como devDependencies
 
 yarn codegen:openapi
@@ -101,7 +101,7 @@ type MeContextResponse = Paths["/me/context"]["get"]["responses"]["200"]["conten
 No hay big-bang. Cada módulo se migra cuando se toque:
 
 1. Anotar el handler con comentarios swaggo.
-2. Correr `make openapi && (cd ../ponti-frontend/ui && yarn codegen:openapi)`.
+2. Correr `make openapi && (cd ../web/ui && yarn codegen:openapi)`.
 3. Reemplazar el tipo hand-written en FE por el generado.
 4. PR.
 
@@ -117,11 +117,11 @@ Ejemplo de migración hecho en este sprint: `src/pages/login/context/TenantConte
 ## Verificación
 
 ```bash
-# desde ponti-backend/
+# desde core/
 make openapi
 go build ./...
 
-# desde ponti-frontend/ui/
+# desde web/ui/
 yarn codegen:openapi
 yarn tsc -b
 ```

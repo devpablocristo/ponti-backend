@@ -21,11 +21,11 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 # --------------------------------------------------
 # Genera docs/openapi/swagger.{yaml,json} desde anotaciones @Summary/@Router/@Success en handlers.
 # Requiere ~/go/bin/swag (instalar con: go install github.com/swaggo/swag/cmd/swag@latest).
-# El FE consume el yaml para generar tipos TS (ver ../ponti-frontend/ui/package.json: codegen:openapi).
+# El FE consume el yaml para generar tipos TS (ver ../web/ui/package.json: codegen:openapi).
 openapi:
 	@echo "Generating OpenAPI spec via swag..."
 	@~/go/bin/swag init -g cmd/api/main.go -o docs/openapi --parseDependency --parseInternal --outputTypes json,yaml
-	@echo "OK: docs/openapi/swagger.yaml updated. Now run 'yarn codegen:openapi' in ponti-frontend/ui."
+	@echo "OK: docs/openapi/swagger.yaml updated. Now run 'yarn codegen:openapi' in web/ui."
 
 define compose_cmd
 GO_MODULES_TOKEN="$(GO_MODULES_TOKEN)" docker compose -f $(DOCKER_COMPOSE_YML)
@@ -70,11 +70,11 @@ run-api:
 	@go run ./cmd/api/
 
 up-ponti-local:
-	@echo "Starting full local stack (backend + frontend + ai)..."
+	@echo "Starting full local stack (core + web + axis)..."
 	@bash ./scripts/run_ponti_local.sh
 
 down-ponti-local:
-	@echo "Stopping full local stack (backend + frontend + ai)..."
+	@echo "Stopping full local stack (core + web + axis)..."
 	@bash ./scripts/down_ponti_local.sh
 
 # --------------------------------------------------

@@ -230,7 +230,7 @@ jobs:
             --project="$GCP_PROJECT_ID" \
             --instance="$DB_INSTANCE_NAME_DEV"
 
-      - name: Apply migrations on DEV (fresh schema)
+      - name: Apply migrations on DEV (restore-compatible schema)
         run: |
           set -euo pipefail
           db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
@@ -239,7 +239,7 @@ jobs:
             migrate/migrate:v4.17.1 \
             -path /migrations \
             -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_DEV}?sslmode=disable" \
-            up
+            goto 224
 
       - name: Restore data-only into DEV
         run: |
@@ -263,6 +263,31 @@ jobs:
               EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE', r.tablename);
             END LOOP;
           END $$;
+
+          -- Some auth migrations seed catalog rows before restore. Make the
+          -- auth reset explicit so data-only restore never collides with
+          -- seed/bootstrap rows such as users.legacy_id=1.
+          DO $$
+          BEGIN
+            IF to_regclass('public.users') IS NOT NULL THEN
+              TRUNCATE TABLE public.users RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_memberships') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_memberships RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_role_permissions') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_role_permissions RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_tenants') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_tenants RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_roles') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_roles RESTART IDENTITY CASCADE;
+            END IF;
+            IF to_regclass('public.auth_permissions') IS NOT NULL THEN
+              TRUNCATE TABLE public.auth_permissions RESTART IDENTITY CASCADE;
+            END IF;
+          END $$;
           SQL
 
           PGPASSWORD="$DB_PASSWORD" psql \
@@ -285,15 +310,23 @@ jobs:
           tables = {x.strip() for x in pathlib.Path('/tmp/dev_tables.txt').read_text().splitlines() if x.strip()}
           seqs = {x.strip() for x in pathlib.Path('/tmp/dev_sequences.txt').read_text().splitlines() if x.strip()}
           out = []
+          seen_table_data = set()
+          seen_sequence_set = set()
           for line in pathlib.Path('/tmp/prod_data.list').read_text().splitlines():
             if " TABLE DATA public " in line:
               table = line.split(" TABLE DATA public ", 1)[1].split()[0]
               if table not in tables:
                 continue
+              if table in seen_table_data:
+                continue
+              seen_table_data.add(table)
             if " SEQUENCE SET public " in line:
               seq = line.split(" SEQUENCE SET public ", 1)[1].split()[0]
               if seq not in seqs:
                 continue
+              if seq in seen_sequence_set:
+                continue
+              seen_sequence_set.add(seq)
             out.append(line)
           pathlib.Path('/tmp/prod_data.filtered.list').write_text("\n".join(out) + "\n")
           PY
@@ -309,6 +342,29 @@ jobs:
             --exit-on-error \
             --use-list=/tmp/prod_data.filtered.list \
             /tmp/prod_data.dump
+
+      - name: Backfill tenant and apply final migrations
+        run: |
+          set -euo pipefail
+
+          # PROD data can still be legacy/data-only with NULL tenant_id values.
+          # Restore into the additive tenant schema (migration 224), backfill
+          # tenant_id, then apply strict tenant validation and later migrations.
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -v ON_ERROR_STOP=1 \
+            -f "$GITHUB_WORKSPACE/migrations_v4/000224_tenant_security_foundation.up.sql"
+
+          db_password_enc="$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['DB_PASSWORD'], safe=''))")"
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE/migrations_v4:/migrations:ro" \
+            migrate/migrate:v4.17.1 \
+            -path /migrations \
+            -database "postgres://${DB_USER}:${db_password_enc}@127.0.0.1:${CLOUDSQL_PROXY_PORT}/${DB_NAME_DEV}?sslmode=disable" \
+            up
 
       - name: Sync sequences after restore
         run: |
@@ -344,16 +400,30 @@ jobs:
       - name: Hardening post-restore (opcional)
         if: ${{ env.HARDENING_SQL_URI != '' }}
         run: |
-          set +e
-          gcloud sql import sql "$DB_INSTANCE_NAME_DEV" "$HARDENING_SQL_URI" \
-            --project="$GCP_PROJECT_ID" \
-            --database="$DB_NAME_DEV" \
-            --quiet
-          code=$?
-          set -e
-          if [[ "$code" -ne 0 ]]; then
-            echo "::warning::Hardening opcional falló (se continúa): código=$code"
+          set -euo pipefail
+
+          hardening_sql="/tmp/hardening_post_restore.sql"
+          if [[ "$HARDENING_SQL_URI" == gs://* ]]; then
+            gcloud storage cp "$HARDENING_SQL_URI" "$hardening_sql"
+          elif [[ -f "$HARDENING_SQL_URI" ]]; then
+            cp "$HARDENING_SQL_URI" "$hardening_sql"
+          elif [[ -f "$GITHUB_WORKSPACE/scripts/db/hardening_post_restore.sql" ]]; then
+            cp "$GITHUB_WORKSPACE/scripts/db/hardening_post_restore.sql" "$hardening_sql"
+          else
+            echo "::error::No se pudo resolver HARDENING_SQL_URI='$HARDENING_SQL_URI'"
+            exit 1
           fi
+
+          # Run through the existing Cloud SQL Proxy as the app DB user. Cloud
+          # SQL import executes as the service import user, which cannot grant
+          # privileges on app-owned tables such as fx_rates.
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h 127.0.0.1 \
+            -p "$CLOUDSQL_PROXY_PORT" \
+            -U "$DB_USER" \
+            -d "$DB_NAME_DEV" \
+            -v ON_ERROR_STOP=1 \
+            -f "$hardening_sql"
 
       - name: Smoke tests (opcional)
         if: ${{ env.SMOKE_TEST_URL != '' }}

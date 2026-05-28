@@ -3,9 +3,9 @@
 // season, actor display name). The semantics match the frontend helpers in
 // ui/src/lib/properName.ts.
 //
-// CanonicalizeName produces the storage form: lowercase ASCII, only
-// [a-z0-9 ]. Diacritics are stripped, any other character collapses to a
-// single space, then whitespace is collapsed and trimmed.
+// CanonicalizeName produces the storage form: lowercase Spanish text, only
+// [a-z0-9ñ ]. Diacritics are stripped, except ñ/Ñ; any other character
+// collapses to a single space, then whitespace is collapsed and trimmed.
 //
 // FormatProperName produces the display form: canonicalizes first, then
 // title-cases each word except Spanish connectors (de, del, con, ...) which
@@ -16,8 +16,6 @@ import (
 	"strings"
 	"unicode"
 
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -59,25 +57,16 @@ var uppercaseTokens = map[string]struct{}{
 	"arba": {},
 }
 
-var stripDiacritics = transform.Chain(
-	norm.NFD,
-	runes.Remove(runes.In(unicode.Mn)),
-	norm.NFC,
-)
-
 // CanonicalizeName returns the canonical storage form of an entity name.
 func CanonicalizeName(value string) string {
-	stripped, _, err := transform.String(stripDiacritics, value)
-	if err != nil {
-		stripped = value
-	}
+	stripped := stripDiacriticsPreservingEnye(value)
 	lower := strings.ToLower(stripped)
 
 	var b strings.Builder
 	b.Grow(len(lower))
 	lastWasSpace := true
 	for _, r := range lower {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == 'ñ' {
 			b.WriteRune(r)
 			lastWasSpace = false
 			continue
@@ -88,6 +77,29 @@ func CanonicalizeName(value string) string {
 		}
 	}
 	return strings.TrimRight(b.String(), " ")
+}
+
+func stripDiacriticsPreservingEnye(value string) string {
+	normalized := norm.NFD.String(value)
+	out := make([]rune, 0, len(normalized))
+	for _, r := range normalized {
+		if unicode.Is(unicode.Mn, r) {
+			if r == '\u0303' && len(out) > 0 {
+				last := out[len(out)-1]
+				if last == 'n' {
+					out[len(out)-1] = 'ñ'
+					continue
+				}
+				if last == 'N' {
+					out[len(out)-1] = 'Ñ'
+					continue
+				}
+			}
+			continue
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }
 
 // FormatProperName returns the display form of an entity name.

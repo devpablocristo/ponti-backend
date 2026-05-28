@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
@@ -15,12 +16,9 @@ import (
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 )
 
-// TestUpdateProjectPropagatesRenameToLegacyTables verifies that catalog
-// entities referenced from a project (customer, manager, investor) are NOT
-// renamed when the FE sends a project payload with a different name but the
-// same ID. Renaming any of these belongs to its own dedicated editor — doing
-// it inline from the project edit would silently rename a row that other
-// projects also reference.
+// TestUpdateProjectPropagatesRenameToLegacyTables verifies that the project
+// editor can rename the shared customer referenced by ID, while manager and
+// investor catalog rows remain unchanged unless their own editor handles them.
 func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 	db := setupProjectTenantDB(t)
 	repo := NewRepository(projectTenantGormEngine{client: db})
@@ -81,15 +79,12 @@ func TestUpdateProjectPropagatesRenameToLegacyTables(t *testing.T) {
 		t.Fatalf("update project: %v", err)
 	}
 
-	// Catalog rows referenced by id are NOT renamed from the project edit.
-	// The seed values stay untouched even though the payload sent different
-	// names. To rename any of these the caller uses the dedicated editor.
 	var customerName string
 	if err := db.Raw(`SELECT name FROM customers WHERE id = 100`).Scan(&customerName).Error; err != nil {
 		t.Fatalf("read customer 100: %v", err)
 	}
-	if customerName != "AGRO LAJITAS 25-26" {
-		t.Fatalf("expected customer 100 untouched (AGRO LAJITAS 25-26), got %q", customerName)
+	if customerName != "agro lajitas" {
+		t.Fatalf("expected customer 100 renamed to agro lajitas, got %q", customerName)
 	}
 
 	var managerName string
@@ -264,6 +259,52 @@ func TestUpdateProjectSwapsCustomer(t *testing.T) {
 	}
 	if custID != 401 {
 		t.Fatalf("expected project customer_id swapped to 401, got %d", custID)
+	}
+}
+
+func TestUpdateProjectRenamingCustomerToDuplicateReturnsConflict(t *testing.T) {
+	db := setupProjectTenantDB(t)
+	repo := NewRepository(projectTenantGormEngine{client: db})
+
+	tenantID := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX ux_customers_tenant_name_active
+			ON customers (tenant_id, lower(name))
+			WHERE deleted_at IS NULL;
+		INSERT INTO customers (id, tenant_id, name, deleted_at) VALUES
+			(900, ?, 'EL SUENO', NULL),
+			(901, ?, 'SOALEN SRL', NULL);
+		INSERT INTO campaigns (id, tenant_id, name) VALUES
+			(900, ?, '2025-2026');
+		INSERT INTO projects (id, tenant_id, name, customer_id, campaign_id, admin_cost, planned_cost, created_at, updated_at, deleted_at) VALUES
+			(900, ?, 'METAN', 901, 900, 0, 0, ?, ?, NULL);
+	`,
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(),
+		tenantID.String(), now, now,
+	).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	err := repo.UpdateProject(projectTenantContext(tenantID), &domain.Project{
+		ID:          900,
+		Name:        "METAN",
+		AdminCost:   decimal.Zero,
+		PlannedCost: decimal.Zero,
+		Customer:    custdom.Customer{ID: 901, Name: "EL SUENO"},
+		Campaign:    campdom.Campaign{ID: 900, Name: "2025-2026"},
+		Base:        shareddomain.Base{UpdatedAt: now},
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate customer rename to fail")
+	}
+	if !domainerr.IsKind(err, domainerr.KindConflict) {
+		t.Fatalf("expected conflict, got %T %v", err, err)
+	}
+	if err.Error() != "CONFLICT: customer already exists" {
+		t.Fatalf("expected domain message, got %q", err.Error())
 	}
 }
 

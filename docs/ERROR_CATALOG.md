@@ -91,5 +91,5 @@ Cuando agregues un nuevo `domainerr.X("nuevo pattern")`, considerá:
 
 - Helpers BE: `github.com/devpablocristo/platform/errors/go/domainerr` (lib compartida).
 - Mapper HTTP centralizado: `internal/shared/handlers/errors.go` → `platform/http/gin/go`.
-- Catálogo FE: [`ui/src/lib/translateBackendError.ts`](../../ponti-frontend/ui/src/lib/translateBackendError.ts).
+- Catálogo FE: [`ui/src/lib/translateBackendError.ts`](../../web/ui/src/lib/translateBackendError.ts).
 - Lifecycle CRUDAR: [docs/crudar-lifecycle.md](./crudar-lifecycle.md), [docs/archive-restore-policy.md](./archive-restore-policy.md).

@@ -2,9 +2,11 @@ package investor
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -15,6 +17,45 @@ import (
 
 type investorGormEngine struct {
 	client *gorm.DB
+}
+
+func TestArchiveInvestorCountsDraftSplitsWithoutTenantColumn(t *testing.T) {
+	db := setupInvestorTenantDB(t)
+	repo := NewRepository(investorGormEngine{client: db})
+
+	tenantA := uuid.New()
+	now := time.Now().UTC()
+	if err := db.Exec(`
+		INSERT INTO investors (id, tenant_id, name, created_at, updated_at, deleted_at)
+		VALUES (1, ?, 'Investor A', ?, ?, NULL);
+		CREATE TABLE work_order_drafts (
+			id INTEGER PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			deleted_at DATETIME
+		);
+		CREATE TABLE work_order_draft_investor_splits (
+			id INTEGER PRIMARY KEY,
+			draft_id INTEGER NOT NULL,
+			investor_id INTEGER NOT NULL,
+			deleted_at DATETIME
+		);
+		INSERT INTO work_order_drafts (id, tenant_id, deleted_at) VALUES (10, ?, NULL);
+		INSERT INTO work_order_draft_investor_splits (id, draft_id, investor_id, deleted_at)
+		VALUES (20, 10, 1, NULL);
+	`, tenantA.String(), now, now, tenantA.String()).Error; err != nil {
+		t.Fatalf("seed draft split schema: %v", err)
+	}
+
+	err := repo.ArchiveInvestor(investorTenantContext(tenantA), 1)
+	if err == nil {
+		t.Fatalf("expected archive to be blocked by draft split")
+	}
+	if !domainerr.IsConflict(err) {
+		t.Fatalf("expected conflict, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "active assignment") {
+		t.Fatalf("expected active assignment message, got %q", err.Error())
+	}
 }
 
 func (e investorGormEngine) Client() *gorm.DB {

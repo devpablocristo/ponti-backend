@@ -2,6 +2,7 @@ package dataintegrity
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	contextkeys "github.com/devpablocristo/platform/security/go/contextkeys"
@@ -24,6 +25,7 @@ func dataIntegrityTenantContext(tenantID uuid.UUID) context.Context {
 type tenantCapture struct {
 	t        *testing.T
 	tenantID uuid.UUID
+	mu       sync.Mutex
 	calls    []string
 }
 
@@ -33,6 +35,8 @@ func (c *tenantCapture) assertTenant(ctx context.Context, call string) {
 	if got != c.tenantID {
 		c.t.Fatalf("%s received wrong tenant context: got %s want %s", call, got, c.tenantID)
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.calls = append(c.calls, call)
 }
 

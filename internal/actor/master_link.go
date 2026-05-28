@@ -2,11 +2,13 @@ package actor
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	sharedtext "github.com/devpablocristo/ponti-backend/internal/shared/text"
@@ -397,6 +399,9 @@ func attachCustomerToActor(tx *gorm.DB, tenantID string, customerID int64, actor
 	if err := tx.Table("customers").
 		Where("tenant_id = ? AND id = ?", tenantID, customerID).
 		Updates(updates).Error; err != nil {
+		if isCustomerLinkUniqueViolation(err) {
+			return domainerr.Conflict("customer actor link already exists")
+		}
 		return domainerr.Internal("failed to link customer to actor")
 	}
 	if canonicalName != "" {
@@ -405,6 +410,19 @@ func attachCustomerToActor(tx *gorm.DB, tenantID string, customerID int64, actor
 		}
 	}
 	return nil
+}
+
+func isCustomerLinkUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key value") ||
+		strings.Contains(msg, "unique constraint")
 }
 
 func renameActorDisplayName(tx *gorm.DB, actorID int64, name string, updatedAt time.Time, updatedBy *string) error {

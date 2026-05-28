@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
@@ -23,7 +26,6 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
@@ -1043,11 +1045,9 @@ func restoreProjectScopedTables(tx *gorm.DB, projectID int64, restoredAt time.Ti
 	return nil
 }
 
-// HardDeleteProject elimina definitivamente un proyecto.
-// Bloquea con 409 si hay dependientes (fields, workorders, supply_movements,
-// stocks, labors, crop_commercializations, project_dollar_values, project_managers,
-// project_investors, admin_cost_investors), activos o archivados.
-// El usuario debe hard-deletear o limpiar los dependientes primero.
+// HardDeleteProject elimina definitivamente un proyecto archivado y su grafo
+// archivado. Si queda algún dependiente activo, bloquea con 409: hard-delete no
+// debe ocultar un estado operacional activo.
 func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "project"); err != nil {
 		return err
@@ -1067,38 +1067,15 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 			return domainerr.Conflict("project must be archived before hard delete")
 		}
 
-		// Validar dependientes (incluso archivados): si hay alguno, bloquear con detalle.
-		type dep struct {
-			table string
-			label string
+		graph, err := collectProjectHardDeleteGraph(tx, id, project.TenantID)
+		if err != nil {
+			return err
 		}
-		deps := []dep{
-			{"fields", "field(s)"},
-			{"workorders", "work order(s)"},
-			{"supply_movements", "supply movement(s)"},
-			{"stocks", "stock record(s)"},
-			{"labors", "labor record(s)"},
-			{"crop_commercializations", "commercialization record(s)"},
-			{"project_dollar_values", "dollar value record(s)"},
-			{"project_managers", "manager assignment(s)"},
-			{"project_investors", "investor assignment(s)"},
-			{"admin_cost_investors", "admin cost investor record(s)"},
+		if err := blockActiveProjectHardDeleteGraph(tx, id, project.TenantID, graph); err != nil {
+			return err
 		}
-		for _, d := range deps {
-			if !tx.Migrator().HasTable(d.table) {
-				continue
-			}
-			var n int64
-			depQuery := tx.Unscoped().Table(d.table).Where("project_id = ?", id)
-			if project.TenantID != uuid.Nil && tx.Migrator().HasColumn(d.table, "tenant_id") {
-				depQuery = depQuery.Where("tenant_id = ?", project.TenantID)
-			}
-			if err := depQuery.Count(&n).Error; err != nil {
-				return domainerr.Internal(fmt.Sprintf("failed to check %s", d.table))
-			}
-			if n > 0 {
-				return domainerr.Conflict(fmt.Sprintf("project has %d %s; archive or hard-delete them first", n, d.label))
-			}
+		if err := hardDeleteArchivedProjectGraph(tx, id, project.TenantID, graph); err != nil {
+			return err
 		}
 
 		deleteQuery := tx.Unscoped()
@@ -1110,6 +1087,174 @@ func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+type projectHardDeleteGraph struct {
+	fieldIDs     []int64
+	lotIDs       []int64
+	workOrderIDs []int64
+	draftIDs     []int64
+	supplyIDs    []int64
+}
+
+type projectHardDeleteActiveRef struct {
+	table string
+	label string
+	where string
+	args  []any
+}
+
+func collectProjectHardDeleteGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID) (projectHardDeleteGraph, error) {
+	var graph projectHardDeleteGraph
+	var err error
+
+	graph.fieldIDs, err = listProjectHardDeleteIDs(tx, "fields", "id", tenantID, "project_id = ?", projectID)
+	if err != nil {
+		return graph, err
+	}
+	graph.lotIDs, err = listProjectHardDeleteIDs(tx, "lots", "id", tenantID, "field_id IN ?", graph.fieldIDs)
+	if err != nil {
+		return graph, err
+	}
+	graph.workOrderIDs, err = listProjectHardDeleteIDs(tx, "workorders", "id", tenantID, "project_id = ?", projectID)
+	if err != nil {
+		return graph, err
+	}
+	graph.draftIDs, err = listProjectHardDeleteIDs(tx, "work_order_drafts", "id", tenantID, "project_id = ?", projectID)
+	if err != nil {
+		return graph, err
+	}
+	graph.supplyIDs, err = listProjectHardDeleteIDs(tx, "supplies", "id", tenantID, "project_id = ?", projectID)
+	if err != nil {
+		return graph, err
+	}
+	return graph, nil
+}
+
+func blockActiveProjectHardDeleteGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID, graph projectHardDeleteGraph) error {
+	refs := []projectHardDeleteActiveRef{
+		{table: "fields", label: "field(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "lots", label: "lot(s)", where: "field_id IN ?", args: []any{graph.fieldIDs}},
+		{table: "workorders", label: "work order(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "work_order_drafts", label: "work order draft(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "labors", label: "labor record(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "supplies", label: "supply record(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "supply_movements", label: "supply movement(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "stocks", label: "stock record(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "crop_commercializations", label: "commercialization record(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_dollar_values", label: "dollar value record(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_managers", label: "manager assignment(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_investors", label: "investor assignment(s)", where: "project_id = ?", args: []any{projectID}},
+		{table: "admin_cost_investors", label: "admin cost investor record(s)", where: "project_id = ?", args: []any{projectID}},
+	}
+	for _, ref := range refs {
+		n, err := countProjectHardDeleteRows(tx, ref.table, tenantID, true, ref.where, ref.args...)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			return domainerr.Conflict(fmt.Sprintf("project has %d active %s; archive or hard-delete them first", n, ref.label))
+		}
+	}
+
+	invoiceCount, err := countProjectHardDeleteRows(tx, "invoices", tenantID, false, "work_order_id IN ?", graph.workOrderIDs)
+	if err != nil {
+		return err
+	}
+	if invoiceCount > 0 {
+		return domainerr.Conflict(fmt.Sprintf("project has %d invoice(s); hard-delete them first", invoiceCount))
+	}
+	return nil
+}
+
+func hardDeleteArchivedProjectGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID, graph projectHardDeleteGraph) error {
+	deletes := []projectHardDeleteActiveRef{
+		{table: "work_order_draft_items", where: "draft_id IN ?", args: []any{graph.draftIDs}},
+		{table: "work_order_draft_investor_splits", where: "draft_id IN ?", args: []any{graph.draftIDs}},
+		{table: "workorder_items", where: "workorder_id IN ?", args: []any{graph.workOrderIDs}},
+		{table: "workorder_investor_splits", where: "workorder_id IN ?", args: []any{graph.workOrderIDs}},
+		{table: "lot_dates", where: "lot_id IN ?", args: []any{graph.lotIDs}},
+		{table: "field_investors", where: "field_id IN ?", args: []any{graph.fieldIDs}},
+		{table: "work_order_drafts", where: "id IN ?", args: []any{graph.draftIDs}},
+		{table: "workorders", where: "id IN ?", args: []any{graph.workOrderIDs}},
+		{table: "supply_movements", where: "project_id = ?", args: []any{projectID}},
+		{table: "stocks", where: "project_id = ?", args: []any{projectID}},
+		{table: "labors", where: "project_id = ?", args: []any{projectID}},
+		{table: "supplies", where: "project_id = ?", args: []any{projectID}},
+		{table: "crop_commercializations", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_dollar_values", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_managers", where: "project_id = ?", args: []any{projectID}},
+		{table: "project_investors", where: "project_id = ?", args: []any{projectID}},
+		{table: "admin_cost_investors", where: "project_id = ?", args: []any{projectID}},
+		{table: "lots", where: "id IN ?", args: []any{graph.lotIDs}},
+		{table: "fields", where: "id IN ?", args: []any{graph.fieldIDs}},
+	}
+	for _, d := range deletes {
+		if err := deleteProjectHardDeleteRows(tx, d.table, tenantID, d.where, d.args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func listProjectHardDeleteIDs(tx *gorm.DB, table string, idColumn string, tenantID uuid.UUID, where string, args ...any) ([]int64, error) {
+	if !tx.Migrator().HasTable(table) || !tx.Migrator().HasColumn(table, idColumn) || hasEmptyHardDeleteArg(args) {
+		return []int64{}, nil
+	}
+	query := tx.Unscoped().Table(table).Where(where, args...)
+	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
+	var ids []int64
+	if err := query.Pluck(idColumn, &ids).Error; err != nil {
+		return nil, domainerr.Internal("failed to list " + table)
+	}
+	return ids, nil
+}
+
+func countProjectHardDeleteRows(tx *gorm.DB, table string, tenantID uuid.UUID, activeOnly bool, where string, args ...any) (int64, error) {
+	if !tx.Migrator().HasTable(table) || hasEmptyHardDeleteArg(args) {
+		return 0, nil
+	}
+	query := tx.Unscoped().Table(table).Where(where, args...)
+	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
+	if activeOnly && tx.Migrator().HasColumn(table, "deleted_at") {
+		query = query.Where("deleted_at IS NULL")
+	}
+	var n int64
+	if err := query.Count(&n).Error; err != nil {
+		return 0, domainerr.Internal("failed to check " + table)
+	}
+	return n, nil
+}
+
+func deleteProjectHardDeleteRows(tx *gorm.DB, table string, tenantID uuid.UUID, where string, args ...any) error {
+	if !tx.Migrator().HasTable(table) || hasEmptyHardDeleteArg(args) {
+		return nil
+	}
+	query := tx.Unscoped().Table(table).Where(where, args...)
+	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
+	if err := query.Delete(map[string]any{}).Error; err != nil {
+		return domainerr.Internal("failed to hard delete " + table)
+	}
+	return nil
+}
+
+func scopeProjectHardDeleteTenant(root *gorm.DB, query *gorm.DB, table string, tenantID uuid.UUID) *gorm.DB {
+	if tenantID != uuid.Nil && root.Migrator().HasColumn(table, "tenant_id") {
+		return query.Where("tenant_id = ?", tenantID)
+	}
+	return query
+}
+
+func hasEmptyHardDeleteArg(args []any) bool {
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case []int64:
+			if len(v) == 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // --- HELPERS ---
@@ -1154,6 +1299,9 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 					"updated_at": time.Now(),
 					"updated_by": c.UpdatedBy,
 				}).Error; err != nil {
+					if isUniqueNameViolation(err) {
+						return 0, domainerr.Conflict("customer already exists")
+					}
 					return 0, fmt.Errorf("failed to rename customer: %w", err)
 				}
 				effectiveName = canonicalIncoming
@@ -1256,11 +1404,9 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 // ensureCustomerForUpdate is the strict variant used by UpdateProject.
 // Behavior depends on the incoming identifier:
 //
-//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. It is NOT
-//     renamed even if `c.Name` differs from the stored value — to rename a
-//     customer, the caller must go through the dedicated customer endpoint.
-//     This avoids a casual project edit silently renaming a shared catalog
-//     row that affects other projects.
+//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. If the
+//     payload sends a non-empty name, update that customer row because the
+//     project editor exposes the shared customer name inline.
 //
 //   - If `c.ID == 0`: the FE signalled "this is a new customer association"
 //     (typically because the user typed free text in the picker instead of
@@ -1304,6 +1450,38 @@ func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 			}
 			return 0, fmt.Errorf("failed to check customer: %w", err)
 		}
+		effectiveName := existing.Name
+		canonicalIncoming := sharedtext.CanonicalizeName(c.Name)
+		if canonicalIncoming != "" && canonicalIncoming != existing.Name {
+			renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
+			if hasTenant {
+				renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
+			}
+			if err := renameQuery.Updates(map[string]any{
+				"name":       canonicalIncoming,
+				"updated_at": time.Now(),
+				"updated_by": c.UpdatedBy,
+			}).Error; err != nil {
+				if isUniqueNameViolation(err) {
+					return 0, domainerr.Conflict("customer already exists")
+				}
+				return 0, fmt.Errorf("failed to rename customer: %w", err)
+			}
+			effectiveName = canonicalIncoming
+		}
+		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
+			SourceTable: actorsync.LegacyCustomers,
+			SourceID:    existing.ID,
+			Name:        effectiveName,
+			ActorKind:   actorsync.KindOrganization,
+			Role:        actorsync.RoleCliente,
+			CreatedAt:   existing.CreatedAt,
+			UpdatedAt:   time.Now(),
+			CreatedBy:   existing.CreatedBy,
+			UpdatedBy:   c.UpdatedBy,
+		}); err != nil {
+			return 0, err
+		}
 		return existing.ID, nil
 	}
 
@@ -1341,6 +1519,20 @@ func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 		return 0, err
 	}
 	return c.ID, nil
+}
+
+func isUniqueNameViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "unique constraint failed")
 }
 
 // ensureCampaignForUpdate is the strict variant used by UpdateProject.
