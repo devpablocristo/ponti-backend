@@ -39,7 +39,12 @@ El frontend puede bloquear errores temprano, pero el backend y la base de datos 
 - La base debe tener un indice unico parcial:
   `tenant_id, normalized_name WHERE deleted_at IS NULL AND merged_into_actor_id IS NULL`.
 - El indice reemplaza el indice no unico legacy sobre esos mismos campos.
-- Si hay datos duplicados activos en una base de desarrollo, la migracion debe fallar y los datos deben consolidarse antes de continuar.
+- Si hay datos duplicados activos en una base de desarrollo, la migracion debe consolidarlos antes de crear el indice:
+  - conserva como canonico el actor activo de menor `id` dentro de cada `(tenant_id, normalized_name)`;
+  - copia roles y metadatos no conflictivos al canonico;
+  - mueve referencias operativas que no generen conflictos;
+  - marca los duplicados como fusionados con `merged_into_actor_id` y `deleted_at`;
+  - registra la fusion en `actor_merge_log`.
 
 ## Tests SDD
 
