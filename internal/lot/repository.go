@@ -602,6 +602,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 			YieldTnPerHa:    decimal.Zero,
 			CostPerHectare:  decimal.Zero,
 			SuperficieTotal: decimal.Zero,
+			TotalTons:		 decimal.Zero,
 		}, nil
 	}
 	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
@@ -614,6 +615,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
 		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
 		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
+		TotalTons       decimal.Decimal `gorm:"column:total_tons"`
 	}
 
 	view := shareddb.ReportView("lot_metrics")
@@ -645,7 +647,8 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(seeded_area_ha), 0)) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
-			COALESCE(SUM(hectares), 0) AS superficie_total
+			COALESCE(SUM(hectares), 0) AS superficie_total,
+			COALESCE(SUM(tons), 0) AS total_tons
 		FROM %s
 		WHERE %s
 	`, view, strings.Join(where, " AND "))
@@ -661,6 +664,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 		YieldTnPerHa:    row.YieldTnPerHa,
 		CostPerHectare:  row.CostPerHa,
 		SuperficieTotal: row.SuperficieTotal,
+		TotalTons:       row.TotalTons,
 	}, nil
 }
 

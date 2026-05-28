@@ -14,6 +14,7 @@ func TestLotMetricsJSONContract(t *testing.T) {
 		YieldTnPerHa:    decimal.RequireFromString("1.2345"),
 		CostPerHectare:  decimal.RequireFromString("363.38"),
 		SuperficieTotal: decimal.RequireFromString("1697.70"),
+		TotalTons:       decimal.RequireFromString("305.49"),
 	})
 	if err != nil {
 		t.Fatalf("marshal lot metrics: %v", err)
@@ -30,6 +31,7 @@ func TestLotMetricsJSONContract(t *testing.T) {
 		"yield_tn_per_ha":  "1.23",
 		"cost_per_hectare": "363",
 		"superficie_total": "1698",
+		"total_tons":       "305",
 	}
 	for key, want := range expected {
 		if got[key] != want {

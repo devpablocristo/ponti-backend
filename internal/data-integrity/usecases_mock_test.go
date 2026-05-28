@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 	decimal "github.com/shopspring/decimal"
 )
@@ -163,6 +164,22 @@ func (m *MockSupplyRepositoryPort) GetRawSupplyInvestment(ctx context.Context, p
 func (mr *MockSupplyRepositoryPortMockRecorder) GetRawSupplyInvestment(ctx, projectID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawSupplyInvestment", reflect.TypeOf((*MockSupplyRepositoryPort)(nil).GetRawSupplyInvestment), ctx, projectID)
+}
+
+// ListTentativePrices mocks base method.
+func (m *MockSupplyRepositoryPort) ListTentativePrices(ctx context.Context, filter supplyDomain.SupplyFilter, limit int) ([]supplyDomain.TentativePriceItem, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTentativePrices", ctx, filter, limit)
+	ret0, _ := ret[0].([]supplyDomain.TentativePriceItem)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListTentativePrices indicates an expected call of ListTentativePrices.
+func (mr *MockSupplyRepositoryPortMockRecorder) ListTentativePrices(ctx, filter, limit interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTentativePrices", reflect.TypeOf((*MockSupplyRepositoryPort)(nil).ListTentativePrices), ctx, filter, limit)
 }
 
 // MockProjectRepositoryPort is a mock of ProjectRepositoryPort interface.

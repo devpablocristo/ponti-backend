@@ -51,3 +51,22 @@ type IntegrityCheck struct {
 type CostsCheckFilter struct {
 	ProjectID *int64
 }
+
+type TentativePricesFilter struct {
+	CustomerID *int64
+	ProjectID  *int64
+	CampaignID *int64
+	FieldID    *int64
+}
+
+type TentativePriceItem struct {
+	SupplyID     int64
+	Name         string
+	CategoryName string
+	Price        decimal.Decimal
+}
+
+type TentativePricesReport struct {
+	Count int64
+	Items []TentativePriceItem
+}

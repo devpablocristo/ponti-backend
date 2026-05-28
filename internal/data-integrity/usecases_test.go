@@ -11,6 +11,7 @@ import (
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 // dashboardWith arma un *DashboardData mínimo con los valores económicos que necesitan
@@ -104,8 +105,8 @@ func TestCheckCostsCoherence_ErrorWhenDiffExceedsTolerance(t *testing.T) {
 
 	// Forzamos divergencia >1 USD en direct cost y rent. Los demás coinciden.
 	dash.EXPECT().GetDashboard(gomock.Any(), gomock.Any()).Return(dashData, nil)
-	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(dec(950), nil)         // 50 USD off
-	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(dec(5000), nil)     // OK
+	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(dec(950), nil)     // 50 USD off
+	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(dec(5000), nil) // OK
 	supply.EXPECT().GetRawSupplyInvestment(gomock.Any(), projectID).Return(dec(400), nil)
 	project.EXPECT().GetRawAdminCostTotal(gomock.Any(), projectID).Return(dec(800), nil)
 	lot.EXPECT().GetRawLeaseExecuted(gomock.Any(), projectID).Return(dec(700), nil) // -100 off
@@ -158,6 +159,51 @@ func TestCheckCostsCoherence_DiffWithinTolerance(t *testing.T) {
 	}
 	assert.Equal(t, checkStatusOK, byCtl[1].Status)
 	assert.Equal(t, "0.50", byCtl[1].DifferenceA.StringFixed(2))
+}
+
+func TestGetTentativePrices_DelegatesToSupplyRepository(t *testing.T) {
+	uc, _, _, _, supply, _, _, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
+
+	customerID := int64(1)
+	projectID := int64(2)
+	campaignID := int64(3)
+	fieldID := int64(4)
+
+	supply.EXPECT().
+		ListTentativePrices(
+			gomock.Any(),
+			supplyDomain.SupplyFilter{
+				CustomerID: &customerID,
+				ProjectID:  &projectID,
+				CampaignID: &campaignID,
+				FieldID:    &fieldID,
+			},
+			10,
+		).
+		Return([]supplyDomain.TentativePriceItem{
+			{
+				SupplyID:     123,
+				Name:         "Glifosato",
+				CategoryName: "Herbicidas",
+				Price:        decimal.RequireFromString("4.50"),
+			},
+		}, int64(7), nil)
+
+	report, err := uc.GetTentativePrices(context.Background(), domain.TentativePricesFilter{
+		CustomerID: &customerID,
+		ProjectID:  &projectID,
+		CampaignID: &campaignID,
+		FieldID:    &fieldID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, report)
+	assert.Equal(t, int64(7), report.Count)
+	require.Len(t, report.Items, 1)
+	assert.Equal(t, int64(123), report.Items[0].SupplyID)
+	assert.Equal(t, "Glifosato", report.Items[0].Name)
+	assert.Equal(t, "Herbicidas", report.Items[0].CategoryName)
+	assert.Equal(t, "4.50", report.Items[0].Price.StringFixed(2))
 }
 
 // TestCheckCostsCoherence_RequiresProjectID verifica que sin project_id devuelve validation error

@@ -18,6 +18,7 @@ import (
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 const (
@@ -50,6 +51,7 @@ type ReportRepositoryPort interface {
 // (∑supply_movements.quantity × supplies.price, filtrado por categoría y tipo de movimiento).
 type SupplyRepositoryPort interface {
 	GetRawSupplyInvestment(ctx context.Context, projectID int64) (decimal.Decimal, error)
+	ListTentativePrices(ctx context.Context, filter supplyDomain.SupplyFilter, limit int) ([]supplyDomain.TentativePriceItem, int64, error)
 }
 
 // ProjectRepositoryPort expone el cálculo RAW del costo administrativo total
@@ -168,6 +170,33 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 	}
 
 	return &domain.IntegrityReport{Checks: checks}, nil
+}
+
+func (u *UseCases) GetTentativePrices(ctx context.Context, filter domain.TentativePricesFilter) (*domain.TentativePricesReport, error) {
+	items, count, err := u.supplyRepo.ListTentativePrices(ctx, supplyDomain.SupplyFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	}, 10)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]domain.TentativePriceItem, len(items))
+	for i := range items {
+		out[i] = domain.TentativePriceItem{
+			SupplyID:     items[i].SupplyID,
+			Name:         items[i].Name,
+			CategoryName: items[i].CategoryName,
+			Price:        items[i].Price,
+		}
+	}
+
+	return &domain.TentativePricesReport{
+		Count: count,
+		Items: out,
+	}, nil
 }
 
 // dashboardSummary extrae el Summary del DashboardData con guardia nil.

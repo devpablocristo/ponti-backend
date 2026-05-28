@@ -14,7 +14,8 @@ import (
 )
 
 type dataIntegrityHandlerUseCasesStub struct {
-	filters []domain.CostsCheckFilter
+	filters                []domain.CostsCheckFilter
+	tentativePricesFilters []domain.TentativePricesFilter
 }
 
 func (s *dataIntegrityHandlerUseCasesStub) CheckCostsCoherence(_ context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error) {
@@ -37,6 +38,21 @@ func (s *dataIntegrityHandlerUseCasesStub) CheckCostsCoherence(_ context.Context
 				DifferenceA:        decimal.Zero,
 				Status:             "OK",
 				Tolerance:          decimal.Zero,
+			},
+		},
+	}, nil
+}
+
+func (s *dataIntegrityHandlerUseCasesStub) GetTentativePrices(_ context.Context, filter domain.TentativePricesFilter) (*domain.TentativePricesReport, error) {
+	s.tentativePricesFilters = append(s.tentativePricesFilters, filter)
+	return &domain.TentativePricesReport{
+		Count: 1,
+		Items: []domain.TentativePriceItem{
+			{
+				SupplyID:     123,
+				Name:         "Glifosato",
+				CategoryName: "Herbicidas",
+				Price:        decimal.RequireFromString("4.5"),
 			},
 		},
 	}, nil
@@ -77,5 +93,32 @@ func TestHandler_CheckCostsCoherence_RequiresProjectID(t *testing.T) {
 
 	if ctx.Writer.Status() != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, ctx.Writer.Status())
+	}
+}
+
+func TestHandler_GetTentativePrices_ParsesWorkspaceFilters(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stub := &dataIntegrityHandlerUseCasesStub{}
+	h := &Handler{ucs: stub}
+	ctx, rec := newDataIntegrityHandlerContext(http.MethodGet, "/api/v1/data-integrity/tentative-prices?customer_id=1&project_id=2&campaign_id=3&field_id=4")
+
+	h.GetTentativePrices(ctx)
+
+	if ctx.Writer.Status() != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, ctx.Writer.Status(), rec.Body.String())
+	}
+	if len(stub.tentativePricesFilters) != 1 {
+		t.Fatalf("expected one tentative prices filter, got %#v", stub.tentativePricesFilters)
+	}
+	filter := stub.tentativePricesFilters[0]
+	if filter.CustomerID == nil || *filter.CustomerID != 1 ||
+		filter.ProjectID == nil || *filter.ProjectID != 2 ||
+		filter.CampaignID == nil || *filter.CampaignID != 3 ||
+		filter.FieldID == nil || *filter.FieldID != 4 {
+		t.Fatalf("unexpected filter: %#v", filter)
+	}
+	if !strings.Contains(rec.Body.String(), `"price":"4.50"`) {
+		t.Fatalf("expected formatted price in response, got %s", rec.Body.String())
 	}
 }

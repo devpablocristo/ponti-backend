@@ -11,6 +11,7 @@ import (
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
 
 func dataIntegrityTenantContext(tenantID uuid.UUID) context.Context {
@@ -74,6 +75,11 @@ type captureSupplyRepo struct{ capture *tenantCapture }
 func (r captureSupplyRepo) GetRawSupplyInvestment(ctx context.Context, _ int64) (decimal.Decimal, error) {
 	r.capture.assertTenant(ctx, "supply-raw")
 	return decimal.Zero, nil
+}
+
+func (r captureSupplyRepo) ListTentativePrices(ctx context.Context, _ supplyDomain.SupplyFilter, _ int) ([]supplyDomain.TentativePriceItem, int64, error) {
+	r.capture.assertTenant(ctx, "supply-tentative-prices")
+	return nil, 0, nil
 }
 
 type captureProjectRepo struct{ capture *tenantCapture }

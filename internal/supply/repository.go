@@ -11,11 +11,11 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
 
 	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
@@ -657,6 +657,69 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 	}
 
 	return out, total, nil
+}
+
+func (r *Repository) ListTentativePrices(
+	ctx context.Context,
+	filter domain.SupplyFilter,
+	limit int,
+) ([]domain.TentativePriceItem, int64, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(projectIDs) == 0 && (filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil) {
+		return []domain.TentativePriceItem{}, 0, nil
+	}
+
+	base := tenancy.Scope(ctx, r.getDB(ctx).Table("supplies s"), "s").
+		Joins("LEFT JOIN categories c ON c.id = s.category_id AND c.deleted_at IS NULL").
+		Where("s.deleted_at IS NULL").
+		Where("s.is_partial_price = ?", true)
+	if len(projectIDs) > 0 {
+		base = base.Where("s.project_id IN ?", projectIDs)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to count tentative supply prices")
+	}
+
+	type row struct {
+		SupplyID     int64           `gorm:"column:supply_id"`
+		Name         string          `gorm:"column:name"`
+		CategoryName string          `gorm:"column:category_name"`
+		Price        decimal.Decimal `gorm:"column:price"`
+	}
+	var rows []row
+	if err := base.
+		Select("s.id AS supply_id, s.name, COALESCE(c.name, '') AS category_name, s.price").
+		Order("s.name").
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, domainerr.Internal("failed to list tentative supply prices")
+	}
+
+	items := make([]domain.TentativePriceItem, len(rows))
+	for i := range rows {
+		items[i] = domain.TentativePriceItem{
+			SupplyID:     rows[i].SupplyID,
+			Name:         rows[i].Name,
+			CategoryName: rows[i].CategoryName,
+			Price:        rows[i].Price,
+		}
+	}
+
+	return items, total, nil
 }
 
 type supplyOriginRow struct {
