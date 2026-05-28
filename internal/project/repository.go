@@ -1476,3 +1476,28 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 	}
 	return nil
 }
+
+// GetRawAdminCostTotal calcula `projects.admin_cost × Σ(lots.hectares)` RAW desde tablas base.
+// Sirve como contraparte independiente del valor SSOT `dashboard.StructureExecutedUSD`
+// (que internamente usa `v4_ssot.admin_cost_total_for_project = admin_cost × total_hectares_for_project`).
+func (r *Repository) GetRawAdminCostTotal(ctx context.Context, projectID int64) (decimal.Decimal, error) {
+	args := []any{projectID, projectID}
+
+	q := `
+		SELECT
+			COALESCE((SELECT p.admin_cost FROM public.projects p WHERE p.id = ? AND p.deleted_at IS NULL), 0)
+			*
+			COALESCE((
+				SELECT SUM(l.hectares)
+				FROM public.lots l
+				JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
+				WHERE f.project_id = ? AND l.deleted_at IS NULL
+			), 0) AS total
+	`
+
+	var total decimal.Decimal
+	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
+		return decimal.Zero, domainerr.Internal("failed to get raw admin cost total: " + err.Error())
+	}
+	return total, nil
+}

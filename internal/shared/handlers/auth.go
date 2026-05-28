@@ -40,10 +40,3 @@ func ParseOrgID(c *gin.Context) (uuid.UUID, error) {
 	}
 	return id, nil
 }
-
-// ParseUserID es un alias temporal de ParseActor para backward compatibility.
-// Retorna el actor como string. Los callers que necesitan int64 deben migrar.
-// Deprecated: usar ParseActor.
-func ParseUserID(c *gin.Context) (string, error) {
-	return ParseActor(c)
-}

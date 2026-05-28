@@ -11,6 +11,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/observability/go"
 	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
@@ -47,6 +50,24 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 			subject = "local-dev-user"
 		}
 
+		tenantHeader := strings.TrimSpace(c.GetHeader(cfg.TenantHeader))
+		var tenantID uuid.UUID
+		if tenantHeader == "" {
+			if cfg.RequireTenantHeader && !allowsImplicitTenant(c) {
+				denyLocalDevAuthzRequest(c, "tenant header required")
+				logAuthDecision(c.Request.Context(), subject, "", c.FullPath(), permission, "DENY(local)", start)
+				return
+			}
+		} else {
+			parsed, err := uuid.Parse(tenantHeader)
+			if err != nil {
+				denyLocalDevAuthzRequest(c, "invalid tenant header")
+				logAuthDecision(c.Request.Context(), subject, "", c.FullPath(), permission, "DENY(local)", start)
+				return
+			}
+			tenantID = parsed
+		}
+
 		// Resolve the user in the DB if possible to get a valid UUID user.
 		var resolvedUserID uuid.UUID
 		if db != nil {
@@ -55,15 +76,9 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		// Resolve tenant ID from header; parse as UUID or default.
-		tenantHeader := strings.TrimSpace(c.GetHeader(cfg.TenantHeader))
-		var tenantID uuid.UUID
-		if tenantHeader != "" {
-			if parsed, err := uuid.Parse(tenantHeader); err == nil {
-				tenantID = parsed
-			}
-		}
-		// If no valid tenant UUID was provided, try to look up the "default" tenant.
+		// If no tenant UUID was provided, try to look up the "default" tenant for
+		// legacy local-dev compatibility. Strict tenant-scoped routes are denied
+		// above before reaching this fallback.
 		if tenantID == uuid.Nil && db != nil {
 			type tRow struct{ ID uuid.UUID }
 			var t tRow
@@ -73,6 +88,12 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		}
 
 		role := "admin"
+		if resolvedUserID != uuid.Nil && tenantID != uuid.Nil && db != nil {
+			if membership, err := ensureMembershipForTenantID(c.Request.Context(), db, resolvedUserID, tenantID, cfg.DefaultRole); err == nil {
+				role = membership.RoleName
+				tenantID = membership.TenantID
+			}
+		}
 
 		// Inject core/saas/go context keys.
 		ctx := c.Request.Context()
@@ -80,6 +101,16 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		ctx = context.WithValue(ctx, ctxkeys.OrgID, tenantID)
 		ctx = context.WithValue(ctx, ctxkeys.Role, role)
 		ctx = context.WithValue(ctx, ctxkeys.Scopes, []string{permissionAPIRead, permissionAPIWrite})
+
+		// Enriquecer logger del context con identidad ya resuelta — mismo
+		// patrón que require_identity_platform_authz para que los logs
+		// downstream lleven user_id/tenant_id.
+		enrichedLogger := observability.LoggerFromContext(ctx).With(
+			"user_id", subject,
+			"tenant_id", tenantID.String(),
+			"role", role,
+		)
+		ctx = observability.ContextWithLogger(ctx, enrichedLogger)
 		c.Request = c.Request.WithContext(ctx)
 
 		// Also set gin keys for convenience.
@@ -89,7 +120,7 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		c.Set(string(ctxkeys.Scopes), []string{permissionAPIRead, permissionAPIWrite})
 
 		// Log as allow; real authorization is handled in usecases.
-		logAuthDecision(subject, tenantID.String(), c.FullPath(), permission, "ALLOW(local)", start)
+		logAuthDecision(c.Request.Context(), subject, tenantID.String(), c.FullPath(), permission, "ALLOW(local)", start)
 
 		// Use resolvedUserID if needed elsewhere via gin key.
 		_ = resolvedUserID
@@ -97,6 +128,12 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 		// Allow
 		c.Next()
 	}
+}
+
+func denyLocalDevAuthzRequest(c *gin.Context, details string) {
+	domErr := domainerr.Forbidden(details)
+	status, apiErr := httperr.Normalize(domErr)
+	c.AbortWithStatusJSON(status, apiErr)
 }
 
 func decodeTokenPayload(token string) map[string]any {

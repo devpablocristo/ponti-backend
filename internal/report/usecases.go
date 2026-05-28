@@ -15,18 +15,18 @@ import (
 
 // ReportRepositoryPort define la interfaz del repositorio (Puerto de salida).
 type ReportRepositoryPort interface {
-	GetFieldCropMetrics(domain.ReportFilter) ([]domain.FieldCropMetric, error)
-	GetProjectInfo(int64) (*domain.ProjectInfo, error)
-	BuildFieldCrop(domain.ReportFilter) (*domain.FieldCrop, error)
+	GetFieldCropMetrics(context.Context, domain.ReportFilter) ([]domain.FieldCropMetric, error)
+	GetProjectInfo(context.Context, int64) (*domain.ProjectInfo, error)
+	BuildFieldCrop(context.Context, domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
-	GetSummaryResults(domain.SummaryResultsFilter) ([]domain.SummaryResults, error)
+	GetSummaryResults(context.Context, domain.SummaryResultsFilter) ([]domain.SummaryResults, error)
 }
 
 // ReportUseCasePort define la interfaz del caso de uso (Puerto de entrada).
 type ReportUseCasePort interface {
-	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
+	GetFieldCropReport(context.Context, domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
-	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
+	GetSummaryResultsReport(context.Context, domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
 // ===== USE CASE IMPLEMENTATION =====
@@ -50,10 +50,10 @@ func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 // ===== REPORTE POR CAMPO/CULTIVO =====
 
 // GetFieldCropReport obtiene el reporte por campo/cultivo.
-func (uc *ReportUseCase) GetFieldCropReport(filters domain.ReportFilter) (*domain.FieldCrop, error) {
+func (uc *ReportUseCase) GetFieldCropReport(ctx context.Context, filters domain.ReportFilter) (*domain.FieldCrop, error) {
 
 	// Obtener reporte del repositorio
-	report, err := uc.repository.BuildFieldCrop(filters)
+	report, err := uc.repository.BuildFieldCrop(ctx, filters)
 	if err != nil {
 		return nil, fmt.Errorf("error al obtener reporte de campo/cultivo: %w", err)
 	}
@@ -77,14 +77,14 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 // ===== REPORTE DE RESUMEN DE RESULTADOS =====
 
 // GetSummaryResultsReport obtiene el reporte de resumen de resultados.
-func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
+func (uc *ReportUseCase) GetSummaryResultsReport(ctx context.Context, filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
 	// Validar workspace completo: customer_id + project_id + campaign_id
 	if err := uc.validator.ValidateRequiredWorkspaceFilter(filters); err != nil {
 		return nil, err
 	}
 
 	// Obtener datos del repositorio
-	results, err := uc.repository.GetSummaryResults(filters)
+	results, err := uc.repository.GetSummaryResults(ctx, filters)
 	if err != nil {
 		return nil, fmt.Errorf("error obteniendo resumen de resultados: %w", err)
 	}
@@ -95,7 +95,7 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 	}
 
 	// Construir respuesta con datos
-	return uc.buildSummaryResponse(results)
+	return uc.buildSummaryResponse(ctx, results)
 }
 
 // ===== FUNCIONES PRIVADAS (DRY) =====
@@ -106,9 +106,9 @@ func (uc *ReportUseCase) buildEmptySummaryResponse() *domain.SummaryResultsRespo
 }
 
 // buildSummaryResponse construye la respuesta completa con datos usando el mapper.
-func (uc *ReportUseCase) buildSummaryResponse(results []domain.SummaryResults) (*domain.SummaryResultsResponse, error) {
+func (uc *ReportUseCase) buildSummaryResponse(ctx context.Context, results []domain.SummaryResults) (*domain.SummaryResultsResponse, error) {
 	// Obtener información del proyecto del primer resultado
-	projectInfo, err := uc.repository.GetProjectInfo(results[0].ProjectID)
+	projectInfo, err := uc.repository.GetProjectInfo(ctx, results[0].ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting project information: %w", err)
 	}

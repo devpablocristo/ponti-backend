@@ -9,6 +9,7 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/commercialization/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/commercialization/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
 
 type GormEnginePort interface {
@@ -27,6 +28,9 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 	if len(items) == 0 {
 		return nil
 	}
+	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), items[0].ProjectID); err != nil {
+		return err
+	}
 
 	modelList := make([]models.CropCommercialization, len(items))
 	for i, item := range items {
@@ -41,6 +45,9 @@ func (r *Repository) CreateBulk(ctx context.Context, items []domain.CropCommerci
 }
 
 func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]domain.CropCommercialization, error) {
+	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), projectID); err != nil {
+		return nil, err
+	}
 
 	tx := r.db.Client().
 		WithContext(ctx).
@@ -51,10 +58,6 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 
 	if err := tx.Find(&rows).Error; err != nil {
 		return nil, domainerr.Internal("failed to list crop commercialization")
-	}
-
-	if len(rows) == 0 {
-		return nil, domainerr.NotFound("no commercializations found for this project")
 	}
 
 	out := make([]domain.CropCommercialization, len(rows))
@@ -68,6 +71,9 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 func (r *Repository) Update(ctx context.Context, item *domain.CropCommercialization) error {
 	if item.ID == 0 {
 		return domainerr.Validation("invalid ID")
+	}
+	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), item.ProjectID); err != nil {
+		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {

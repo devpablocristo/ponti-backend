@@ -10,399 +10,222 @@ import (
 	"github.com/stretchr/testify/require"
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
-	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
-	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 )
 
-func TestUseCases_control1LotesVsDashboard(t *testing.T) {
-	tests := []struct {
-		name               string
-		mockLots           []lotDomain.LotTable
-		mockDashboardData  *dashboardDomain.DashboardData
-		mockSummaryResults []reportDomain.SummaryResults
-		expectedStatus     string
-		expectedDiffA      string
-		expectedSystemVal  string
-		hasDiffB           bool
-		expectedDiffB      string
-	}{
-		{
-			name: "OK - todos los valores iguales",
-			mockLots: []lotDomain.LotTable{
-				{
-					CostUsdPerHa: decimal.NewFromFloat(1000.50),
-					Hectares:     decimal.NewFromFloat(10.0),
-				},
-				{
-					CostUsdPerHa: decimal.NewFromFloat(845.439),
-					Hectares:     decimal.NewFromFloat(10.0),
-				},
+// dashboardWith arma un *DashboardData mínimo con los valores económicos que necesitan
+// los 5 controles, evitando boilerplate en cada test.
+func dashboardWith(directCosts, income, semillas, agroq, fert, structure, rent decimal.Decimal) *dashboardDomain.DashboardData {
+	return &dashboardDomain.DashboardData{
+		ManagementBalance: &dashboardDomain.DashboardManagementBalance{
+			Summary: &dashboardDomain.DashboardBalanceSummary{
+				DirectCostsExecutedUSD:     directCosts,
+				IncomeUSD:                  income,
+				SemillasInvertidosUSD:      semillas,
+				AgroquimicosInvertidosUSD:  agroq,
+				FertilizantesInvertidosUSD: fert,
+				StructureExecutedUSD:       structure,
+				RentExecutedUSD:            rent,
 			},
-			mockDashboardData: &dashboardDomain.DashboardData{
-				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
-					Summary: &dashboardDomain.DashboardBalanceSummary{
-						DirectCostsExecutedUSD: decimal.NewFromFloat(18459.39),
-					},
-				},
-			},
-			mockSummaryResults: []reportDomain.SummaryResults{
-				{TotalDirectCostsUsd: decimal.NewFromFloat(18459.39)},
-			},
-			expectedStatus:    "OK",
-			expectedDiffA:     "0.00",
-			expectedSystemVal: "18459.39",
-			hasDiffB:          true,
-			expectedDiffB:     "0.00",
 		},
-		{
-			name: "OK - diferencia dentro de tolerancia",
-			mockLots: []lotDomain.LotTable{
-				{
-					CostUsdPerHa: decimal.NewFromFloat(1845.439),
-					Hectares:     decimal.NewFromFloat(10.0),
-				},
-			},
-			mockDashboardData: &dashboardDomain.DashboardData{
-				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
-					Summary: &dashboardDomain.DashboardBalanceSummary{
-						DirectCostsExecutedUSD: decimal.NewFromFloat(18455.17),
-					},
-				},
-			},
-			mockSummaryResults: []reportDomain.SummaryResults{
-				{TotalDirectCostsUsd: decimal.NewFromFloat(18455.17)},
-			},
-			expectedStatus:    "OK",
-			expectedDiffA:     "0.78",
-			expectedSystemVal: "18455.17",
-			hasDiffB:          true,
-			expectedDiffB:     "0.00",
-		},
-		{
-			name: "ERROR - diferencia fuera de tolerancia",
-			mockLots: []lotDomain.LotTable{
-				{
-					CostUsdPerHa: decimal.NewFromFloat(2000.00),
-					Hectares:     decimal.NewFromFloat(10.0),
-				},
-			},
-			mockDashboardData: &dashboardDomain.DashboardData{
-				ManagementBalance: &dashboardDomain.DashboardManagementBalance{
-					Summary: &dashboardDomain.DashboardBalanceSummary{
-						DirectCostsExecutedUSD: decimal.NewFromFloat(18460.00),
-					},
-				},
-			},
-			mockSummaryResults: []reportDomain.SummaryResults{
-				{TotalDirectCostsUsd: decimal.NewFromFloat(18460.00)},
-			},
-			expectedStatus:    "ERROR",
-			expectedDiffA:     "-1540.00",
-			expectedSystemVal: "18460.00",
-			hasDiffB:          true,
-			expectedDiffB:     "0.00",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			useCases := NewUseCases(
-				NewMockWorkOrderRepositoryPort(ctrl),
-				NewMockDashboardRepositoryPort(ctrl),
-				NewMockLotRepositoryPort(ctrl),
-				NewMockReportRepositoryPort(ctrl),
-				NewMockStockRepositoryPort(ctrl),
-			)
-
-			sd := &sharedData{
-				lots:           tt.mockLots,
-				dashboardData:  tt.mockDashboardData,
-				summaryResults: tt.mockSummaryResults,
-			}
-
-			ctx := context.Background()
-			result, err := useCases.control1LotesVsDashboard(ctx, sd)
-
-			require.NoError(t, err)
-			assert.Equal(t, 1, result.ControlNumber)
-			assert.Equal(t, tt.expectedStatus, result.Status)
-			assert.Equal(t, tt.expectedDiffA, result.DifferenceA.StringFixed(2))
-			assert.Equal(t, tt.expectedSystemVal, result.SystemValue.StringFixed(2))
-			assert.Equal(t, "v4_report.dashboard_management_balance", result.SystemSource)
-			assert.Equal(t, "v4_report.lot_list", result.RecalcASource)
-
-			if tt.hasDiffB {
-				require.NotNil(t, result.DifferenceB)
-				assert.Equal(t, tt.expectedDiffB, result.DifferenceB.StringFixed(2))
-			}
-		})
 	}
 }
 
-func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
-	tests := []struct {
-		name               string
-		mockLots           []lotDomain.LotTable
-		mockDashboardData  *dashboardDomain.DashboardData
-		mockSummaryResults []reportDomain.SummaryResults
-		expectedStatus     string
-		expectedDiffA      string
-		hasDiffB           bool
-		expectedDiffB      string
-	}{
-		{
-			name: "OK - 3 valores coinciden",
-			mockLots: []lotDomain.LotTable{
-				{
-					OperatingResultPerHa: decimal.NewFromFloat(500.00),
-					Hectares:             decimal.NewFromFloat(10.0),
-				},
-			},
-			mockDashboardData: &dashboardDomain.DashboardData{
-				Metrics: &dashboardDomain.DashboardMetrics{
-					OperatingResult: &dashboardDomain.DashboardOperatingResult{
-						ResultUSD: decimal.NewFromFloat(5000.00),
-					},
-				},
-			},
-			mockSummaryResults: []reportDomain.SummaryResults{
-				{TotalOperatingResultUsd: decimal.NewFromFloat(5000.00)},
-			},
-			expectedStatus: "OK",
-			expectedDiffA:  "0.00",
-			hasDiffB:       true,
-			expectedDiffB:  "0.00",
-		},
-		{
-			name: "ERROR - RecalcB fuera de tolerancia",
-			mockLots: []lotDomain.LotTable{
-				{
-					OperatingResultPerHa: decimal.NewFromFloat(500.00),
-					Hectares:             decimal.NewFromFloat(10.0),
-				},
-			},
-			mockDashboardData: &dashboardDomain.DashboardData{
-				Metrics: &dashboardDomain.DashboardMetrics{
-					OperatingResult: &dashboardDomain.DashboardOperatingResult{
-						ResultUSD: decimal.NewFromFloat(5000.00),
-					},
-				},
-			},
-			mockSummaryResults: []reportDomain.SummaryResults{
-				{TotalOperatingResultUsd: decimal.NewFromFloat(5005.00)},
-			},
-			expectedStatus: "ERROR",
-			expectedDiffA:  "0.00",
-			hasDiffB:       true,
-			expectedDiffB:  "-5.00",
-		},
-	}
+func newUseCasesWithMocks(t *testing.T) (
+	*UseCases,
+	*MockDashboardRepositoryPort,
+	*MockWorkOrderRepositoryPort,
+	*MockReportRepositoryPort,
+	*MockSupplyRepositoryPort,
+	*MockProjectRepositoryPort,
+	*MockLotRepositoryPort,
+	*gomock.Controller,
+) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+	dash := NewMockDashboardRepositoryPort(ctrl)
+	wo := NewMockWorkOrderRepositoryPort(ctrl)
+	report := NewMockReportRepositoryPort(ctrl)
+	supply := NewMockSupplyRepositoryPort(ctrl)
+	project := NewMockProjectRepositoryPort(ctrl)
+	lot := NewMockLotRepositoryPort(ctrl)
 
-			useCases := NewUseCases(
-				NewMockWorkOrderRepositoryPort(ctrl),
-				NewMockDashboardRepositoryPort(ctrl),
-				NewMockLotRepositoryPort(ctrl),
-				NewMockReportRepositoryPort(ctrl),
-				NewMockStockRepositoryPort(ctrl),
-			)
+	uc := NewUseCases(dash, wo, report, supply, project, lot)
+	return uc, dash, wo, report, supply, project, lot, ctrl
+}
 
-			sd := &sharedData{
-				lots:           tt.mockLots,
-				dashboardData:  tt.mockDashboardData,
-				summaryResults: tt.mockSummaryResults,
-			}
+func dec(v float64) decimal.Decimal {
+	return decimal.NewFromFloat(v)
+}
 
-			ctx := context.Background()
-			result, err := useCases.control13LotesResultadoVsDashboard(ctx, sd)
+// TestCheckCostsCoherence_AllOK verifica que con SSOT == RAW para los 5 controles,
+// todos devuelven status OK con difference_a = 0.
+func TestCheckCostsCoherence_AllOK(t *testing.T) {
+	uc, dash, wo, report, supply, project, lot, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
 
-			require.NoError(t, err)
-			assert.Equal(t, 13, result.ControlNumber)
-			assert.Equal(t, tt.expectedStatus, result.Status)
-			assert.Equal(t, tt.expectedDiffA, result.DifferenceA.StringFixed(2))
+	projectID := int64(42)
+	dashData := dashboardWith(
+		dec(1000), // direct costs
+		dec(5000), // income
+		dec(200),  // semillas
+		dec(150),  // agroquímicos
+		dec(50),   // fertilizantes
+		dec(800),  // structure (admin)
+		dec(600),  // rent executed
+	)
 
-			if tt.hasDiffB {
-				require.NotNil(t, result.DifferenceB)
-				assert.Equal(t, tt.expectedDiffB, result.DifferenceB.StringFixed(2))
-			}
-		})
+	dash.EXPECT().GetDashboard(gomock.Any(), gomock.Any()).Return(dashData, nil)
+	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(dec(1000), nil)
+	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(dec(5000), nil)
+	supply.EXPECT().GetRawSupplyInvestment(gomock.Any(), projectID).Return(dec(400), nil) // 200+150+50
+	project.EXPECT().GetRawAdminCostTotal(gomock.Any(), projectID).Return(dec(800), nil)
+	lot.EXPECT().GetRawLeaseExecuted(gomock.Any(), projectID).Return(dec(600), nil)
+
+	report1, err := uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{ProjectID: &projectID})
+	require.NoError(t, err)
+	require.Len(t, report1.Checks, 5)
+	for i, check := range report1.Checks {
+		assert.Equal(t, checkStatusOK, check.Status, "control %d should be OK, got %s", i+1, check.Status)
+		assert.Equal(t, "0.00", check.DifferenceA.StringFixed(2), "control %d diff should be 0", i+1)
+		assert.Equal(t, checkTypeStrong, check.CheckType)
 	}
 }
 
+// TestCheckCostsCoherence_ErrorWhenDiffExceedsTolerance verifica que diferencias > 1 USD
+// fuerzan status ERROR sin warning intermedio.
+func TestCheckCostsCoherence_ErrorWhenDiffExceedsTolerance(t *testing.T) {
+	uc, dash, wo, report, supply, project, lot, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
+
+	projectID := int64(7)
+	dashData := dashboardWith(dec(1000), dec(5000), dec(200), dec(150), dec(50), dec(800), dec(600))
+
+	// Forzamos divergencia >1 USD en direct cost y rent. Los demás coinciden.
+	dash.EXPECT().GetDashboard(gomock.Any(), gomock.Any()).Return(dashData, nil)
+	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(dec(950), nil)     // 50 USD off
+	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(dec(5000), nil) // OK
+	supply.EXPECT().GetRawSupplyInvestment(gomock.Any(), projectID).Return(dec(400), nil)
+	project.EXPECT().GetRawAdminCostTotal(gomock.Any(), projectID).Return(dec(800), nil)
+	lot.EXPECT().GetRawLeaseExecuted(gomock.Any(), projectID).Return(dec(700), nil) // -100 off
+
+	report1, err := uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{ProjectID: &projectID})
+	require.NoError(t, err)
+	require.Len(t, report1.Checks, 5)
+
+	// Mapeamos por ControlNumber porque los goroutines no garantizan orden de finalización.
+	byCtl := make(map[int]domain.IntegrityCheck, len(report1.Checks))
+	for _, c := range report1.Checks {
+		byCtl[c.ControlNumber] = c
+	}
+
+	assert.Equal(t, checkStatusError, byCtl[1].Status, "control 1 (direct costs) must be ERROR")
+	assert.Equal(t, "50.00", byCtl[1].DifferenceA.StringFixed(2))
+	assert.Equal(t, checkSeverityError, byCtl[1].Severity)
+
+	assert.Equal(t, checkStatusOK, byCtl[2].Status, "control 2 (net income) must be OK")
+	assert.Equal(t, checkStatusOK, byCtl[3].Status, "control 3 (supplies) must be OK")
+	assert.Equal(t, checkStatusOK, byCtl[4].Status, "control 4 (admin) must be OK")
+
+	assert.Equal(t, checkStatusError, byCtl[5].Status, "control 5 (rent) must be ERROR")
+	assert.Equal(t, "-100.00", byCtl[5].DifferenceA.StringFixed(2))
+}
+
+// TestCheckCostsCoherence_DiffWithinTolerance verifica que una diferencia ≤ 1 USD
+// (caused by numeric rounding) no rompe el control.
+func TestCheckCostsCoherence_DiffWithinTolerance(t *testing.T) {
+	uc, dash, wo, report, supply, project, lot, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
+
+	projectID := int64(1)
+	dashData := dashboardWith(dec(1000.50), dec(5000), dec(200), dec(150), dec(50), dec(800), dec(600))
+
+	dash.EXPECT().GetDashboard(gomock.Any(), gomock.Any()).Return(dashData, nil)
+	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(dec(1000), nil) // 0.50 off, dentro
+	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(dec(5000), nil)
+	supply.EXPECT().GetRawSupplyInvestment(gomock.Any(), projectID).Return(dec(400), nil)
+	project.EXPECT().GetRawAdminCostTotal(gomock.Any(), projectID).Return(dec(800), nil)
+	lot.EXPECT().GetRawLeaseExecuted(gomock.Any(), projectID).Return(dec(600), nil)
+
+	report1, err := uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{ProjectID: &projectID})
+	require.NoError(t, err)
+	require.Len(t, report1.Checks, 5)
+
+	byCtl := make(map[int]domain.IntegrityCheck, len(report1.Checks))
+	for _, c := range report1.Checks {
+		byCtl[c.ControlNumber] = c
+	}
+	assert.Equal(t, checkStatusOK, byCtl[1].Status)
+	assert.Equal(t, "0.50", byCtl[1].DifferenceA.StringFixed(2))
+}
+
+// TestCheckCostsCoherence_RequiresProjectID verifica que sin project_id devuelve validation error
+// sin tocar la base.
+func TestCheckCostsCoherence_RequiresProjectID(t *testing.T) {
+	uc, _, _, _, _, _, _, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
+
+	_, err := uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{})
+	require.Error(t, err)
+
+	zero := int64(0)
+	_, err = uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{ProjectID: &zero})
+	require.Error(t, err)
+}
+
+// TestCheckCostsCoherence_PropagatesRepoError verifica que un error de cualquier repo RAW
+// se propaga arriba (cancela los demás controles y aborta).
+func TestCheckCostsCoherence_PropagatesRepoError(t *testing.T) {
+	uc, dash, wo, report, supply, project, lot, ctrl := newUseCasesWithMocks(t)
+	defer ctrl.Finish()
+
+	projectID := int64(99)
+	dashData := dashboardWith(dec(0), dec(0), dec(0), dec(0), dec(0), dec(0), dec(0))
+
+	dash.EXPECT().GetDashboard(gomock.Any(), gomock.Any()).Return(dashData, nil)
+	wo.EXPECT().GetRawDirectCost(gomock.Any(), projectID).Return(decimal.Zero, assert.AnError).AnyTimes()
+	report.EXPECT().GetRawNetIncome(gomock.Any(), projectID).Return(decimal.Zero, nil).AnyTimes()
+	supply.EXPECT().GetRawSupplyInvestment(gomock.Any(), projectID).Return(decimal.Zero, nil).AnyTimes()
+	project.EXPECT().GetRawAdminCostTotal(gomock.Any(), projectID).Return(decimal.Zero, nil).AnyTimes()
+	lot.EXPECT().GetRawLeaseExecuted(gomock.Any(), projectID).Return(decimal.Zero, nil).AnyTimes()
+
+	_, err := uc.CheckCostsCoherence(context.Background(), domain.CostsCheckFilter{ProjectID: &projectID})
+	require.Error(t, err)
+}
+
+// TestBuildCheck cubre las dos ramas de la decisión de status (OK vs ERROR) y los bordes
+// numéricos de la tolerancia.
 func TestBuildCheck(t *testing.T) {
 	tests := []struct {
-		name           string
-		controlNumber  int
-		systemValue    decimal.Decimal
-		recalcAValue   decimal.Decimal
-		recalcBValue   *decimal.Decimal
-		tolerance      decimal.Decimal
-		expectedStatus string
-		expectedDiffA  string
-		hasDiffB       bool
-		expectedDiffB  string
+		name            string
+		systemValue     decimal.Decimal
+		recalcAValue    decimal.Decimal
+		expectedStatus  string
+		expectedDiffA   string
+		expectedSeverty string
 	}{
-		{
-			name:           "OK - diferencia cero, sin RecalcB",
-			controlNumber:  1,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "OK",
-			expectedDiffA:  "0.00",
-			hasDiffB:       false,
-		},
-		{
-			name:           "OK - diferencia dentro de tolerancia positiva",
-			controlNumber:  2,
-			systemValue:    decimal.NewFromFloat(100.50),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "OK",
-			expectedDiffA:  "0.50",
-			hasDiffB:       false,
-		},
-		{
-			name:           "OK - diferencia dentro de tolerancia negativa",
-			controlNumber:  3,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(100.80),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "OK",
-			expectedDiffA:  "-0.80",
-			hasDiffB:       false,
-		},
-		{
-			name:           "OK - diferencia exacta en límite de tolerancia",
-			controlNumber:  4,
-			systemValue:    decimal.NewFromFloat(101.00),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "OK",
-			expectedDiffA:  "1.00",
-			hasDiffB:       false,
-		},
-		{
-			name:           "ERROR - diferencia fuera de tolerancia",
-			controlNumber:  5,
-			systemValue:    decimal.NewFromFloat(105.00),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "ERROR",
-			expectedDiffA:  "5.00",
-			hasDiffB:       false,
-		},
-		{
-			name:           "ERROR - diferencia negativa fuera de tolerancia",
-			controlNumber:  6,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(105.00),
-			recalcBValue:   nil,
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "ERROR",
-			expectedDiffA:  "-5.00",
-			hasDiffB:       false,
-		},
-		{
-			name:           "OK - 3 valores coinciden",
-			controlNumber:  1,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   decPtr(decimal.NewFromFloat(100.00)),
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "OK",
-			expectedDiffA:  "0.00",
-			hasDiffB:       true,
-			expectedDiffB:  "0.00",
-		},
-		{
-			name:           "ERROR - RecalcB fuera de tolerancia",
-			controlNumber:  1,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(100.00),
-			recalcBValue:   decPtr(decimal.NewFromFloat(105.00)),
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "ERROR",
-			expectedDiffA:  "0.00",
-			hasDiffB:       true,
-			expectedDiffB:  "-5.00",
-		},
-		{
-			name:           "ERROR - RecalcA OK pero RecalcB falla",
-			controlNumber:  1,
-			systemValue:    decimal.NewFromFloat(100.00),
-			recalcAValue:   decimal.NewFromFloat(100.50),
-			recalcBValue:   decPtr(decimal.NewFromFloat(103.00)),
-			tolerance:      decimal.NewFromInt(1),
-			expectedStatus: "ERROR",
-			expectedDiffA:  "-0.50",
-			hasDiffB:       true,
-			expectedDiffB:  "-3.00",
-		},
+		{"OK - diferencia cero", dec(100), dec(100), checkStatusOK, "0.00", checkSeverityInfo},
+		{"OK - diferencia positiva dentro de tolerancia", dec(100.50), dec(100), checkStatusOK, "0.50", checkSeverityInfo},
+		{"OK - diferencia negativa dentro de tolerancia", dec(100), dec(100.80), checkStatusOK, "-0.80", checkSeverityInfo},
+		{"OK - diferencia exacta en límite", dec(101), dec(100), checkStatusOK, "1.00", checkSeverityInfo},
+		{"ERROR - excede tolerancia positiva", dec(105), dec(100), checkStatusError, "5.00", checkSeverityError},
+		{"ERROR - excede tolerancia negativa", dec(100), dec(105), checkStatusError, "-5.00", checkSeverityError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var recalcBCalc *string
-			var recalcBSrc *string
-			var recalcBMeaning *string
-			if tt.recalcBValue != nil {
-				recalcBCalc = strPtr("RecalcB calc")
-				recalcBSrc = strPtr("RecalcB source")
-				recalcBMeaning = strPtr("RecalcB meaning")
-			}
-
 			result := buildCheck(
-				tt.controlNumber,
-				"Data",
-				"Description",
-				"Rule",
-				"System calc",
-				tt.systemValue,
-				"System source",
-				"System meaning",
-				"RecalcA calc",
-				tt.recalcAValue,
-				"RecalcA source",
-				"RecalcA meaning",
-				recalcBCalc,
-				tt.recalcBValue,
-				recalcBSrc,
-				recalcBMeaning,
-				tt.tolerance,
+				1,
+				"Data", "Description", "Rule",
+				"System calc", tt.systemValue, "System source", "System meaning",
+				"RecalcA calc", tt.recalcAValue, "RecalcA source", "RecalcA meaning",
 			)
-
-			assert.Equal(t, tt.controlNumber, result.ControlNumber)
 			assert.Equal(t, tt.expectedStatus, result.Status)
+			assert.Equal(t, tt.expectedSeverty, result.Severity)
 			assert.Equal(t, tt.expectedDiffA, result.DifferenceA.StringFixed(2))
-			assert.Equal(t, tt.systemValue, result.SystemValue)
-			assert.Equal(t, tt.recalcAValue, result.RecalcAValue)
-
-			if tt.hasDiffB {
-				require.NotNil(t, result.DifferenceB)
-				assert.Equal(t, tt.expectedDiffB, result.DifferenceB.StringFixed(2))
-				require.NotNil(t, result.RecalcBValue)
-				assert.Equal(t, *tt.recalcBValue, *result.RecalcBValue)
-			} else {
-				assert.Nil(t, result.DifferenceB)
-				assert.Nil(t, result.RecalcBValue)
-			}
+			assert.Equal(t, checkTypeStrong, result.CheckType)
+			assert.Equal(t, defaultTolerance, result.Tolerance)
 		})
 	}
-}
-
-func decPtr(d decimal.Decimal) *decimal.Decimal {
-	return &d
 }
