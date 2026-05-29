@@ -13,18 +13,18 @@ TLDR:
 ### Requisitos
 - Docker + Docker Compose
 - Go (para ejecutar la API)
-- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.19.0` para alinear con web.
+- Si trabajás con tooling Node alrededor del stack Ponti, usar `20.19.0` para alinear con frontend.
 
 ### Configuración
 - Usamos **un solo** archivo `.env` para local.
 - No hay configuración por ambiente dentro del código.
-- `.env.example` queda sólo como referencia; las variables reales van en `.env`.
-- Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar los módulos privados de `github.com/devpablocristo/platform/*`.
+- Ejemplo base en `.env.example`.
+- Si el cache de Go está vacío o usás Docker dev, configurá `GO_MODULES_TOKEN` para bajar los módulos privados de `github.com/devpablocristo/core/*`.
 - En CI/deploy el token ya no viaja por `ARG`: el build prod consume un secret BuildKit (`go_modules_token`).
 - `.dockerignore` excluye `.env`, artefactos y el árbol `pkg/` legacy del contexto de build prod.
 
 ```bash
-# editar .env con las variables reales
+cp .env.example .env
 ```
 
 ### Levantar servicios
@@ -42,9 +42,10 @@ Esto levanta:
 go run ./cmd/api
 ```
 
-### Resetear DB local desde PROD
+### Sincronizar DB local con dev remoto
 ```bash
-make reset-local-db-from-prod
+SRC_FROM_CLOUD_RUN=1 SRC_FORCE_CLOUD_RUN=1 SRC_SERVICE_NAME=ponti-backend \
+SRC_PROJECT_ID=<gcp_project_id> SRC_REGION=<gcp_region> make staging-db-2-local-db
 ```
 
 ## Headers requeridos
@@ -57,7 +58,7 @@ X-USER-ID: 123
 Flujo seguro y cerrado:
 ```
 FE (UI)
- → BFF (web/api, valida JWT)
+ → BFF (ponti-frontend/api, valida JWT)
  → Backend Go (proxy seguro)
  → Ponti AI (`InsightService` + `CopilotAgent`, READ-ONLY)
 ```

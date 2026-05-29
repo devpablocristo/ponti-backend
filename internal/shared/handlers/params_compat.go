@@ -3,7 +3,7 @@ package sharedhandlers
 import (
 	"strconv"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 // ParseParamID mantiene compatibilidad con handlers viejos que aún reciben el valor ya extraído.

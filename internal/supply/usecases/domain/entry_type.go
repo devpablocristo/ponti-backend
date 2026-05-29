@@ -7,3 +7,4 @@ const (
 	INTERNAL_MOVEMENT_IN = "Movimiento interno entrada"
 	RETURN_MOVEMENT      = "Devolución"
 )
+

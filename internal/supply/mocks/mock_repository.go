@@ -126,36 +126,6 @@ func (mr *MockRepositoryPortMockRecorder) DeleteSupply(arg0, arg1 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupply", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupply), arg0, arg1)
 }
 
-// HardDeleteSupply mocks base method.
-func (m *MockRepositoryPort) HardDeleteSupply(arg0 context.Context, arg1 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HardDeleteSupply", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// HardDeleteSupply indicates an expected call of HardDeleteSupply.
-func (mr *MockRepositoryPortMockRecorder) HardDeleteSupply(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HardDeleteSupply", reflect.TypeOf((*MockRepositoryPort)(nil).HardDeleteSupply), arg0, arg1)
-}
-
-// ListArchivedSupplies mocks base method.
-func (m *MockRepositoryPort) ListArchivedSupplies(arg0 context.Context, arg1, arg2 int) ([]domain1.Supply, int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListArchivedSupplies", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]domain1.Supply)
-	ret1, _ := ret[1].(int64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// ListArchivedSupplies indicates an expected call of ListArchivedSupplies.
-func (mr *MockRepositoryPortMockRecorder) ListArchivedSupplies(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListArchivedSupplies", reflect.TypeOf((*MockRepositoryPort)(nil).ListArchivedSupplies), arg0, arg1, arg2)
-}
-
 // DeleteSupplyMovement mocks base method.
 func (m *MockRepositoryPort) DeleteSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
 	m.ctrl.T.Helper()
@@ -168,63 +138,6 @@ func (m *MockRepositoryPort) DeleteSupplyMovement(arg0 context.Context, arg1, ar
 func (mr *MockRepositoryPortMockRecorder) DeleteSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).DeleteSupplyMovement), arg0, arg1, arg2)
-}
-
-// ListArchivedSupplyMovements mocks base method.
-func (m *MockRepositoryPort) ListArchivedSupplyMovements(arg0 context.Context, arg1 int64) ([]*domain1.SupplyMovement, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListArchivedSupplyMovements", arg0, arg1)
-	ret0, _ := ret[0].([]*domain1.SupplyMovement)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListArchivedSupplyMovements indicates an expected call of ListArchivedSupplyMovements.
-func (mr *MockRepositoryPortMockRecorder) ListArchivedSupplyMovements(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListArchivedSupplyMovements", reflect.TypeOf((*MockRepositoryPort)(nil).ListArchivedSupplyMovements), arg0, arg1)
-}
-
-// ArchiveSupplyMovement mocks base method.
-func (m *MockRepositoryPort) ArchiveSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ArchiveSupplyMovement", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ArchiveSupplyMovement indicates an expected call of ArchiveSupplyMovement.
-func (mr *MockRepositoryPortMockRecorder) ArchiveSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ArchiveSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).ArchiveSupplyMovement), arg0, arg1, arg2)
-}
-
-// RestoreSupplyMovement mocks base method.
-func (m *MockRepositoryPort) RestoreSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RestoreSupplyMovement", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RestoreSupplyMovement indicates an expected call of RestoreSupplyMovement.
-func (mr *MockRepositoryPortMockRecorder) RestoreSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestoreSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).RestoreSupplyMovement), arg0, arg1, arg2)
-}
-
-// HardDeleteSupplyMovement mocks base method.
-func (m *MockRepositoryPort) HardDeleteSupplyMovement(arg0 context.Context, arg1, arg2 int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HardDeleteSupplyMovement", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// HardDeleteSupplyMovement indicates an expected call of HardDeleteSupplyMovement.
-func (mr *MockRepositoryPortMockRecorder) HardDeleteSupplyMovement(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HardDeleteSupplyMovement", reflect.TypeOf((*MockRepositoryPort)(nil).HardDeleteSupplyMovement), arg0, arg1, arg2)
 }
 
 // ArchiveSupply mocks base method.
@@ -478,21 +391,6 @@ func (m *MockRepositoryPort) ListAllSupplies(arg0 context.Context, arg1 domain1.
 func (mr *MockRepositoryPortMockRecorder) ListAllSupplies(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllSupplies", reflect.TypeOf((*MockRepositoryPort)(nil).ListAllSupplies), arg0, arg1)
-}
-
-// ListEntrySupplyMovements mocks base method.
-func (m *MockRepositoryPort) ListEntrySupplyMovements(arg0 context.Context, arg1 domain1.SupplyFilter) ([]*domain1.SupplyMovement, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEntrySupplyMovements", arg0, arg1)
-	ret0, _ := ret[0].([]*domain1.SupplyMovement)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListEntrySupplyMovements indicates an expected call of ListEntrySupplyMovements.
-func (mr *MockRepositoryPortMockRecorder) ListEntrySupplyMovements(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEntrySupplyMovements", reflect.TypeOf((*MockRepositoryPort)(nil).ListEntrySupplyMovements), arg0, arg1)
 }
 
 // ListSuppliesPaginated mocks base method.

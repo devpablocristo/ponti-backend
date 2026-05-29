@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"strconv"
 
-	ginmw "github.com/devpablocristo/platform/http/gin/go"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
-	"github.com/devpablocristo/ponti-backend/internal/shared/csvexport"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
@@ -23,10 +23,9 @@ type UseCasesPort interface {
 	DuplicateWorkOrder(context.Context, string) (string, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
-	HardDeleteWorkOrder(context.Context, int64) error
+	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
-	ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
@@ -46,6 +45,7 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
@@ -60,19 +60,6 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
 }
 
-func (h *Handler) runWorkOrderIDAction(c *gin.Context, action func(context.Context, int64) error) {
-	id, err := ginmw.ParseParamID(c, "work_order_id")
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	if err := action(c.Request.Context(), id); err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondNoContent(c)
-}
-
 // Routes registra las rutas del módulo work orders.
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
@@ -82,15 +69,14 @@ func (h *Handler) Routes() {
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
-		grp.GET("/archived", h.ListArchivedWorkOrders)
 		grp.GET("/filter-rows", h.ListWorkOrderFilterRows)
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
 		grp.GET("/:work_order_id", h.GetWorkOrderByID)
 		grp.PUT("/:work_order_id", h.UpdateWorkOrderByID)
+		grp.DELETE("/:work_order_id", h.DeleteWorkOrderByID)
 		grp.POST("/:work_order_id/archive", h.ArchiveWorkOrder)
 		grp.POST("/:work_order_id/restore", h.RestoreWorkOrder)
-		grp.DELETE("/:work_order_id/hard", h.HardDeleteWorkOrder)
 		grp.PATCH("/:work_order_id/investors/:investor_id/payment-status", h.UpdateInvestorPaymentStatus)
 		grp.POST("/:work_order_id/duplicate", h.DuplicateWorkOrder)
 	}
@@ -189,6 +175,21 @@ func (h *Handler) UpdateInvestorPaymentStatus(c *gin.Context) {
 		return
 	}
 
+	sharedhandlers.RespondNoContent(c)
+}
+
+// DeleteWorkOrderByID elimina una orden de trabajo.
+func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	if err := h.ucs.DeleteWorkOrderByID(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	sharedhandlers.RespondNoContent(c)
 }
 
@@ -297,47 +298,37 @@ func (h *Handler) ExportWorkOrders(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", csvexport.ContentType)
-	c.Header("Content-Disposition", `attachment; filename="`+CSVExportFilename+`"`)
-	c.Data(http.StatusOK, csvexport.ContentType, data)
+	filename := workOrderExcel.DefaultFilename
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 // ArchiveWorkOrder ejecuta soft delete (archivado) de la work order.
 func (h *Handler) ArchiveWorkOrder(c *gin.Context) {
-	h.runWorkOrderIDAction(c, h.ucs.ArchiveWorkOrder)
-}
-
-// RestoreWorkOrder restaura una work order archivada.
-func (h *Handler) RestoreWorkOrder(c *gin.Context) {
-	h.runWorkOrderIDAction(c, h.ucs.RestoreWorkOrder)
-}
-
-// HardDeleteWorkOrder elimina definitivamente una work order.
-func (h *Handler) HardDeleteWorkOrder(c *gin.Context) {
-	h.runWorkOrderIDAction(c, h.ucs.HardDeleteWorkOrder)
-}
-
-// ListArchivedWorkOrders lista work orders archivadas paginadas.
-// Acepta query param `lot_id` opcional para filtrar por lote.
-func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
-	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	filter := domain.ArchivedWorkOrderFilter{}
-	if raw := c.Query("lot_id"); raw != "" {
-		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
-			filter.LotID = parsed
-		}
-	}
-	items, total, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), page, perPage, filter)
+	id, err := ginmw.ParseParamID(c, "work_order_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	dtos := make([]dto.WorkOrderListElement, len(items))
-	for i := range items {
-		dtos[i] = *dto.FromDomainListElement(&items[i])
+	if err := h.ucs.ArchiveWorkOrder(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
 	}
-	sharedhandlers.RespondOK(c, gin.H{
-		"data":      dtos,
-		"page_info": types.NewPageInfo(page, perPage, total),
-	})
+	sharedhandlers.RespondNoContent(c)
+}
+
+// RestoreWorkOrder restaura una work order archivada.
+func (h *Handler) RestoreWorkOrder(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "work_order_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreWorkOrder(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }

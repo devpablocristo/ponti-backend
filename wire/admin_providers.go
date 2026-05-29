@@ -30,27 +30,18 @@ func ProvideIdentityAdmin(cfg *config.Config, app *firebase.App) (adminidp.Admin
 	return adminidp.NewFirebaseAdmin(app)
 }
 
-func ProvideAdminRepository(repo *pgorm.Repository) *admin.Repository {
-	return admin.NewRepository(repo.Client())
-}
-
-func ProvideAdminUseCases(repo *admin.Repository, idpAdmin adminidp.AdminClient) *admin.UseCases {
-	return admin.NewUseCases(repo, idpAdmin)
-}
-
 func ProvideAdminHandler(
-	uc *admin.UseCases,
+	repo *pgorm.Repository,
+	idpAdmin adminidp.AdminClient,
 	srv GinEnginePort,
 	acf *config.API,
 	mws MiddlewaresEnginePort,
 ) *admin.Handler {
-	return admin.NewHandler(uc, srv, acf, mws)
+	return admin.NewHandler(repo.Client(), idpAdmin, srv, acf, mws)
 }
 
 var AdminSet = wire.NewSet(
 	ProvideFirebaseApp,
 	ProvideIdentityAdmin,
-	ProvideAdminRepository,
-	ProvideAdminUseCases,
 	ProvideAdminHandler,
 )

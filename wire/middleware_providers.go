@@ -15,6 +15,7 @@ import (
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 func ProvideMiddlewares(cfg *config.Config, repo *pgorm.Repository) *mwr.Middlewares {
@@ -31,18 +32,16 @@ func ProvideMiddlewares(cfg *config.Config, repo *pgorm.Repository) *mwr.Middlew
 	return mwr.NewDefaultMiddlewares(mwr.BuildConfig{
 		DB: repo.Client(),
 		Auth: mwr.IdentityAuthConfig{
-			Enabled:             cfg.Auth.Enabled,
-			Environment:         cfg.Service.Env,
-			ProjectID:           cfg.Auth.IdentityProjectID,
-			Issuer:              issuer,
-			Audience:            audience,
-			JWKSURL:             cfg.Auth.IdentityJWKSURL,
-			CacheTTL:            time.Duration(cfg.Auth.IdentityJWKSCacheTTL) * time.Second,
-			TenantHeader:        cfg.Auth.TenantHeader,
-			RequireTenantHeader: cfg.Auth.RequireTenantHeader,
-			AutoProvision:       cfg.Auth.AutoProvision,
-			DefaultTenant:       cfg.Auth.DefaultTenantName,
-			DefaultRole:         cfg.Auth.DefaultRoleName,
+			Enabled:       cfg.Auth.Enabled,
+			ProjectID:     cfg.Auth.IdentityProjectID,
+			Issuer:        issuer,
+			Audience:      audience,
+			JWKSURL:       cfg.Auth.IdentityJWKSURL,
+			CacheTTL:      time.Duration(cfg.Auth.IdentityJWKSCacheTTL) * time.Second,
+			TenantHeader:  cfg.Auth.TenantHeader,
+			AutoProvision: cfg.Auth.AutoProvision,
+			DefaultTenant: cfg.Auth.DefaultTenantName,
+			DefaultRole:   cfg.Auth.DefaultRoleName,
 		},
 	})
 }

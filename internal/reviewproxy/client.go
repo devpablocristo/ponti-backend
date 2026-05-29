@@ -1,13 +1,13 @@
 // Package reviewproxy consume Nexus Review desde ponti-backend.
-// Usa el client generico de core/governance/go/governanceclient.
+// Usa el client generico de core/governance/go/reviewclient.
 package reviewproxy
 
 import (
-	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
+	"github.com/devpablocristo/core/governance/go/reviewclient"
 )
 
 // Client es un alias del client generico de core.
-type Client = governanceclient.Client
+type Client = reviewclient.Client
 
 // NewClient construye un client para Nexus Review.
-var NewClient = governanceclient.NewClient
+var NewClient = reviewclient.NewClient

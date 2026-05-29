@@ -2,12 +2,10 @@ package models
 
 import (
 	"encoding/json"
-
-	"github.com/shopspring/decimal"
-
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"fmt"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	"github.com/shopspring/decimal"
 )
 
 // ===== MODELOS PARA APORTES DE INVERSORES =====
@@ -135,7 +133,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	if m.InvestorHeadersJSON != "" && m.InvestorHeadersJSON != "null" {
 		var headers []InvestorHeaderModel
 		if err := json.Unmarshal([]byte(m.InvestorHeadersJSON), &headers); err != nil {
-			return nil, domainerr.Internal("error deserializando investor_headers: " + err.Error() + " (JSON: " + m.InvestorHeadersJSON + ")")
+			return nil, fmt.Errorf("error deserializando investor_headers: %w (JSON: %s)", err, m.InvestorHeadersJSON)
 		}
 		report.InvestorHeaders = m.mapInvestorHeadersToDomain(headers)
 	}
@@ -144,7 +142,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	if m.GeneralProjectDataJSON != "" {
 		var generalData GeneralProjectDataModel
 		if err := json.Unmarshal([]byte(m.GeneralProjectDataJSON), &generalData); err != nil {
-			return nil, domainerr.Internal("error deserializando general_project_data: " + err.Error())
+			return nil, fmt.Errorf("error deserializando general_project_data: %w", err)
 		}
 		report.General = domain.GeneralProjectData{
 			SurfaceTotalHa: generalData.SurfaceTotalHa,
@@ -159,7 +157,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	if m.ContributionCategoriesJSON != "" {
 		var contributions []ContributionCategoryModel
 		if err := json.Unmarshal([]byte(m.ContributionCategoriesJSON), &contributions); err != nil {
-			return nil, domainerr.Internal("error deserializando contribution_categories: " + err.Error())
+			return nil, fmt.Errorf("error deserializando contribution_categories: %w", err)
 		}
 		report.Contributions = m.mapContributionsToDomain(contributions)
 
@@ -171,7 +169,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	if m.InvestorContributionComparisonJSON != "" {
 		var comparisons []InvestorContributionComparisonModel
 		if err := json.Unmarshal([]byte(m.InvestorContributionComparisonJSON), &comparisons); err != nil {
-			return nil, domainerr.Internal("error deserializando investor_contribution_comparison: " + err.Error())
+			return nil, fmt.Errorf("error deserializando investor_contribution_comparison: %w", err)
 		}
 		report.Comparison = m.mapComparisonsToDomain(comparisons)
 		applyActualSharePctToHeaders(report.InvestorHeaders, comparisons)
@@ -181,7 +179,7 @@ func (m *InvestorContributionDataModel) ToDomainInvestorContributionReport() (*d
 	if m.HarvestSettlementJSON != "" {
 		var harvest HarvestSettlementModel
 		if err := json.Unmarshal([]byte(m.HarvestSettlementJSON), &harvest); err != nil {
-			return nil, domainerr.Internal("error deserializando harvest_settlement: " + err.Error())
+			return nil, fmt.Errorf("error deserializando harvest_settlement: %w", err)
 		}
 		report.Harvest = m.mapHarvestToDomain(harvest)
 	}

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"hash/fnv"
-	"log/slog"
+	"log"
 	"strings"
 	"time"
 
@@ -17,7 +17,7 @@ import (
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 )
 
-func runMigrations(logger *slog.Logger, dbConfig config.DB, migConfig config.Migrations) error {
+func runMigrations(dbConfig config.DB, migConfig config.Migrations) error {
 	// Nota: el backend no conoce estrategias de deploy. Las migraciones corren siempre en public.
 	dsn := buildPostgresDSN(dbConfig)
 	sqlDB, err := sql.Open("postgres", dsn)
@@ -26,25 +26,25 @@ func runMigrations(logger *slog.Logger, dbConfig config.DB, migConfig config.Mig
 	}
 	defer func() { _ = sqlDB.Close() }()
 
-	return runMigrationsWithInstance(logger, sqlDB, dbConfig, migConfig)
+	return runMigrationsWithInstance(sqlDB, dbConfig, migConfig)
 }
 
-func runMigrationsWithInstance(logger *slog.Logger, sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
+func runMigrationsWithInstance(sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	return runMigrationsWithContext(ctx, logger, sqlDB, dbConfig, migConfig)
+	return runMigrationsWithContext(ctx, sqlDB, dbConfig, migConfig)
 }
 
-func runMigrationsWithContext(ctx context.Context, logger *slog.Logger, sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
+func runMigrationsWithContext(ctx context.Context, sqlDB *sql.DB, dbConfig config.DB, migConfig config.Migrations) error {
 	// Adquirir lock de migración para evitar ejecuciones concurrentes.
-	unlock, err := acquireMigrationLock(ctx, logger, sqlDB, dbConfig.Name)
+	unlock, err := acquireMigrationLock(ctx, sqlDB, dbConfig.Name)
 	if err != nil {
 		return fmt.Errorf("failed to acquire migration lock: %w", err)
 	}
 	defer unlock()
 
-	logger.Info("migration lock acquired", "event", "migration_lock_acquired", "database", dbConfig.Name)
+	log.Printf("Migration lock acquired for database: %s", dbConfig.Name)
 
 	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{
 		DatabaseName: dbConfig.Name,
@@ -72,10 +72,7 @@ func runMigrationsWithContext(ctx context.Context, logger *slog.Logger, sqlDB *s
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
-	logger.Info("migrations completed",
-		"event", "migrations_completed",
-		"database", dbConfig.Name,
-	)
+	log.Printf("Migrations completed successfully for database: %s", dbConfig.Name)
 	return nil
 }
 
@@ -96,19 +93,15 @@ func buildPostgresDSN(cfg config.DB) string {
 // acquireMigrationLock adquiere un lock de migración usando pg_advisory_lock.
 // El lock ID se deriva del nombre de la base de datos para evitar ejecuciones concurrentes
 // de migraciones dentro de la misma DB.
-func acquireMigrationLock(ctx context.Context, logger *slog.Logger, sqlDB *sql.DB, databaseName string) (func(), error) {
-	return acquireMigrationLockWithTimeout(ctx, logger, sqlDB, databaseName, 5*time.Minute)
+func acquireMigrationLock(ctx context.Context, sqlDB *sql.DB, databaseName string) (func(), error) {
+	return acquireMigrationLockWithTimeout(ctx, sqlDB, databaseName, 5*time.Minute)
 }
 
 // acquireMigrationLockWithTimeout adquiere un lock con timeout configurable
-func acquireMigrationLockWithTimeout(ctx context.Context, logger *slog.Logger, sqlDB *sql.DB, databaseName string, timeout time.Duration) (func(), error) {
+func acquireMigrationLockWithTimeout(ctx context.Context, sqlDB *sql.DB, databaseName string, timeout time.Duration) (func(), error) {
 	lockID := hashDatabaseName(databaseName)
 
-	logger.Info("attempting migration lock",
-		"event", "migration_lock_attempt",
-		"database", databaseName,
-		"lock_id", lockID,
-	)
+	log.Printf("Attempting to acquire migration lock for database: %s (lock_id: %d)", databaseName, lockID)
 
 	startTime := time.Now()
 	deadline := startTime.Add(timeout)
@@ -133,21 +126,18 @@ func acquireMigrationLockWithTimeout(ctx context.Context, logger *slog.Logger, s
 
 		if acquired {
 			waitTime := time.Since(startTime)
-			logger.Info("migration lock acquired",
-				"event", "migration_lock_acquired",
-				"database", databaseName,
-				"lock_id", lockID,
-				"waited_ms", waitTime.Milliseconds(),
-			)
+			if waitTime > 100*time.Millisecond {
+				log.Printf("✅ Migration lock acquired for database: %s (lock_id: %d, waited: %v)",
+					databaseName, lockID, waitTime)
+			} else {
+				log.Printf("✅ Migration lock acquired immediately for database: %s (lock_id: %d)",
+					databaseName, lockID)
+			}
 
 			// Retornar función de unlock con defer garantizado
 			unlock := func() {
 				_, _ = sqlDB.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
-				logger.Info("migration lock released",
-					"event", "migration_lock_released",
-					"database", databaseName,
-					"lock_id", lockID,
-				)
+				log.Printf("🔓 Migration lock released for database: %s (lock_id: %d)", databaseName, lockID)
 			}
 
 			return unlock, nil
@@ -165,12 +155,8 @@ func acquireMigrationLockWithTimeout(ctx context.Context, logger *slog.Logger, s
 			// Después de 10 segundos: esperar 1s y log cada 5s
 			time.Sleep(1 * time.Second)
 			if int(waitTime.Seconds())%5 == 0 {
-				logger.Info("waiting for migration lock",
-					"event", "migration_lock_waiting",
-					"database", databaseName,
-					"lock_id", lockID,
-					"waited_ms", waitTime.Milliseconds(),
-				)
+				log.Printf("⏳ Waiting for migration lock (database: %s, lock_id: %d, waited: %v)...",
+					databaseName, lockID, waitTime)
 			}
 		}
 	}

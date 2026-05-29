@@ -3,7 +3,7 @@ package pkggin
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -85,7 +85,7 @@ func (s *Server) RunServer(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		slog.Default().Info("context canceled, shutting down HTTP server", "event", "http_server_shutdown_started")
+		log.Println("Context canceled. Shutting down HTTP Server...")
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

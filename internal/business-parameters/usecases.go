@@ -3,7 +3,7 @@ package bparams
 import (
 	"context"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
 
@@ -11,12 +11,9 @@ type RepositoryPort interface {
 	GetByKey(ctx context.Context, key string) (*domain.BusinessParameter, error)
 	ListByCategory(ctx context.Context, category string) ([]domain.BusinessParameter, error)
 	ListAll(ctx context.Context) ([]domain.BusinessParameter, error)
-	ListArchived(ctx context.Context) ([]domain.BusinessParameter, error)
 	Create(ctx context.Context, item *domain.BusinessParameter) (int64, error)
 	Update(ctx context.Context, item *domain.BusinessParameter) error
-	Archive(ctx context.Context, id int64) error
-	Restore(ctx context.Context, id int64) error
-	HardDelete(ctx context.Context, id int64) error
+	Delete(ctx context.Context, id int64) error
 }
 
 type UseCases struct {
@@ -49,10 +46,6 @@ func (u *UseCases) GetAllParameters(ctx context.Context) ([]domain.BusinessParam
 	return u.repository.ListAll(ctx)
 }
 
-func (u *UseCases) GetArchivedParameters(ctx context.Context) ([]domain.BusinessParameter, error) {
-	return u.repository.ListArchived(ctx)
-}
-
 func (u *UseCases) CreateParameter(ctx context.Context, param *domain.BusinessParameter) (int64, error) {
 	if param.Key == "" || param.Value == "" || param.Type == "" || param.Category == "" {
 		return 0, domainerr.Validation("missing required fields")
@@ -73,24 +66,10 @@ func (u *UseCases) UpdateParameter(ctx context.Context, param *domain.BusinessPa
 	return u.repository.Update(ctx, param)
 }
 
-func (u *UseCases) ArchiveParameter(ctx context.Context, id int64) error {
+func (u *UseCases) DeleteParameter(ctx context.Context, id int64) error {
 	if id == 0 {
 		return domainerr.Validation("invalid id")
 	}
-	return u.repository.Archive(ctx, id)
-}
 
-func (u *UseCases) RestoreParameter(ctx context.Context, id int64) error {
-	if id == 0 {
-		return domainerr.Validation("invalid id")
-	}
-	return u.repository.Restore(ctx, id)
+	return u.repository.Delete(ctx, id)
 }
-
-func (u *UseCases) HardDeleteParameter(ctx context.Context, id int64) error {
-	if id == 0 {
-		return domainerr.Validation("invalid id")
-	}
-	return u.repository.HardDelete(ctx, id)
-}
-

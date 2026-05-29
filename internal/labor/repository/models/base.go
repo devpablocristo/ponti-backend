@@ -1,17 +1,14 @@
 package models
 
 import (
-	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
-
 	catmod "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 type Labor struct {
 	ID              int64           `gorm:"primaryKey;autoIncrement"`
-	TenantID        uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	Name            string          `gorm:"type:varchar(255);not null;column:name"`
 	ContractorName  string          `gorm:"type:varchar(255);not null;column:contractor_name"`
 	Price           decimal.Decimal `gorm:"not null;column:price"`

@@ -3,8 +3,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
-
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -12,7 +10,6 @@ import (
 
 type Invoice struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID    uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
 	WorkOrderID int64     `gorm:"not null;uniqueIndex:uq_invoices_work_order_investor;column:work_order_id"`
 	InvestorID  int64     `gorm:"not null;uniqueIndex:uq_invoices_work_order_investor;index;column:investor_id"`
 	Number      string    `gorm:"not null;column:number"`

@@ -6,20 +6,17 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 )
 
-// IntegrityReportResponse representa la respuesta del endpoint de integridad (17 controles)
+// IntegrityReportResponse representa la respuesta del endpoint de integridad (9 controles)
 type IntegrityReportResponse struct {
 	Checks []IntegrityCheckDTO `json:"checks"`
 }
 
 // IntegrityCheckDTO representa un control individual de coherencia de datos
 type IntegrityCheckDTO struct {
-	ControlNumber  int    `json:"control_number"`
-	DataToVerify   string `json:"data_to_verify"`
-	Description    string `json:"description"`
-	ControlRule    string `json:"control_rule"`
-	CheckType      string `json:"check_type"`
-	Severity       string `json:"severity"`
-	Recommendation string `json:"recommendation"`
+	ControlNumber int    `json:"control_number"`
+	DataToVerify  string `json:"data_to_verify"`
+	Description   string `json:"description"`
+	ControlRule   string `json:"control_rule"`
 
 	SystemCalculation string `json:"system_calculation"`
 	SystemValue       string `json:"system_value"`
@@ -52,9 +49,6 @@ func ToIntegrityReportResponse(report *domain.IntegrityReport) *IntegrityReportR
 			DataToVerify:       check.DataToVerify,
 			Description:        check.Description,
 			ControlRule:        check.ControlRule,
-			CheckType:          check.CheckType,
-			Severity:           check.Severity,
-			Recommendation:     check.Recommendation,
 			SystemCalculation:  check.SystemCalculation,
 			SystemValue:        formatDecimal(check.SystemValue),
 			SystemSource:       check.SystemSource,

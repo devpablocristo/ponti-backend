@@ -8,7 +8,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
@@ -19,15 +19,13 @@ type RepositoryPort interface {
 	GetWorkOrderByNumberAndProjectID(ctx context.Context, number string, projectID int64) (*domain.WorkOrder, error)
 	UpdateWorkOrderByID(context.Context, *domain.WorkOrder) error
 	UpdateInvestorPaymentStatus(context.Context, int64, int64, string) error
-	HardDeleteWorkOrder(context.Context, int64) error
+	DeleteWorkOrderByID(context.Context, int64) error
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
-	ListArchivedWorkOrders(context.Context, int, int, domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error)
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
-	GetInvestorNamesByWorkOrderIDs(context.Context, []int64) (map[int64]string, error)
 
 	GetHarvestAreaSnapshot(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
 }
@@ -38,13 +36,13 @@ type ExporterAdapterPort interface {
 }
 
 type UseCases struct {
-	repo     RepositoryPort
-	exporter ExporterAdapterPort
+	repo  RepositoryPort
+	excel ExporterAdapterPort
 }
 
 // NewUseCases crea una instancia de casos de uso para work orders.
-func NewUseCases(r RepositoryPort, exporter ExporterAdapterPort) *UseCases {
-	return &UseCases{repo: r, exporter: exporter}
+func NewUseCases(r RepositoryPort, excel ExporterAdapterPort) *UseCases {
+	return &UseCases{repo: r, excel: excel}
 }
 
 func (u *UseCases) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
@@ -105,7 +103,7 @@ func validateDate(o *domain.WorkOrder) error {
 	}
 	today := time.Now().Truncate(24 * time.Hour)
 	if o.Date.After(today) {
-		return domainerr.Validation("work order date cannot be in the future")
+		return domainerr.Validation("la fecha de la orden de trabajo no puede ser futura")
 	}
 	return nil
 }
@@ -223,8 +221,8 @@ func normalizeInvestorPaymentStatus(status string, allowEmpty bool) (string, err
 		return "", domainerr.Validation("invalid investor payment status")
 	}
 }
-func (u *UseCases) HardDeleteWorkOrder(ctx context.Context, id int64) error {
-	return u.repo.HardDeleteWorkOrder(ctx, id)
+func (u *UseCases) DeleteWorkOrderByID(ctx context.Context, id int64) error {
+	return u.repo.DeleteWorkOrderByID(ctx, id)
 }
 
 func (u *UseCases) ArchiveWorkOrder(ctx context.Context, id int64) error {
@@ -233,10 +231,6 @@ func (u *UseCases) ArchiveWorkOrder(ctx context.Context, id int64) error {
 
 func (u *UseCases) RestoreWorkOrder(ctx context.Context, id int64) error {
 	return u.repo.RestoreWorkOrder(ctx, id)
-}
-
-func (u *UseCases) ListArchivedWorkOrders(ctx context.Context, page, perPage int, filter domain.ArchivedWorkOrderFilter) ([]domain.WorkOrderListElement, int64, error) {
-	return u.repo.ListArchivedWorkOrders(ctx, page, perPage, filter)
 }
 
 // ListWorkOrders delega al repositorio.
@@ -249,6 +243,9 @@ func (u *UseCases) ListWorkOrders(
 }
 
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	if filt.ProjectID == nil && filt.FieldID == nil {
+		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
+	}
 	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 
@@ -258,7 +255,7 @@ func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkOrderFilter) (*d
 }
 
 func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFilter, inp types.Input) ([]byte, error) {
-	if u.exporter == nil {
+	if u.excel == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -271,23 +268,7 @@ func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFi
 		return nil, domainerr.NotFound("there is no data to export")
 	}
 
-	// La vista `v4_report.workorder_list` no expone `investor_name`. Lo hidratamos
-	// vía un side-query por workorder.id → investor.name para que el CSV sea
-	// round-trippable (el import necesita INVERSOR).
-	ids := make([]int64, 0, len(items))
-	for _, it := range items {
-		ids = append(ids, it.ID)
-	}
-	investorNames, err := u.repo.GetInvestorNamesByWorkOrderIDs(ctx, ids)
-	if err == nil {
-		for i := range items {
-			if name, ok := investorNames[items[i].ID]; ok {
-				items[i].InvestorName = name
-			}
-		}
-	}
-
-	return u.exporter.Export(ctx, items)
+	return u.excel.Export(ctx, items)
 }
 
 func (u *UseCases) validateHarvestAreaLimit(ctx context.Context, o *domain.WorkOrder, excludeWorkOrderID int64) error {
@@ -316,7 +297,7 @@ func (u *UseCases) validateHarvestAreaLimit(ctx context.Context, o *domain.WorkO
 
 	totalHarvestedArea := existingHarvestedArea.Add(o.EffectiveArea)
 	if totalHarvestedArea.GreaterThan(lotHectares) {
-		return domainerr.Validation("harvest area exceeds lot surface")
+		return domainerr.Validation("la superficie de cosecha supera la superficie total del lote")
 	}
 
 	return nil

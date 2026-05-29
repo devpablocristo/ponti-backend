@@ -4,7 +4,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
@@ -22,8 +21,7 @@ import (
 // WorkOrder GORM model con todas las relaciones.
 type WorkOrder struct {
 	ID             int64                    `gorm:"primaryKey;column:id"`
-	TenantID       uuid.UUID                `gorm:"column:tenant_id;type:uuid;index"`
-	Number         string                   `gorm:"column:number"`
+	Number         string                   `gorm:"column:number;uniqueIndex"`
 	ProjectID      int64                    `gorm:"not null"`
 	Project        projectmod.Project       `gorm:"foreignKey:ProjectID"`
 	FieldID        int64                    `gorm:"not null"`
@@ -53,7 +51,6 @@ func (WorkOrder) TableName() string { return "workorders" }
 // WorkOrderItem GORM model.
 type WorkOrderItem struct {
 	ID          int64            `gorm:"primaryKey;autoIncrement"`
-	TenantID    uuid.UUID        `gorm:"column:tenant_id;type:uuid;index"`
 	WorkOrderID int64            `gorm:"column:workorder_id;index"`
 	SupplyID    int64            `gorm:"not null"`
 	SupplyName  string           `gorm:"column:supply_name;not null"`

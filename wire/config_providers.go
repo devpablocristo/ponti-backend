@@ -25,16 +25,16 @@ func ProvideConfigAPI(cfg *config.Config) *config.API {
 	return &cfg.API
 }
 
-// ProvideConfigCompanion expone la sección Companion del config.
-func ProvideConfigCompanion(cfg *config.Config) *config.Companion {
-	return &cfg.Companion
+// ProvideConfigAI ...
+func ProvideConfigAI(cfg *config.Config) *config.AI {
+	return &cfg.AI
 }
 
-// ConfigSet expone todos los providers de config para wire.
+// ConfigSet ...
 var ConfigSet = wire.NewSet(
 	ProvideAllConfigs,
 	ProvideConfigDB,
 	ProvideConfigSuggester,
 	ProvideConfigAPI,
-	ProvideConfigCompanion,
+	ProvideConfigAI,
 )

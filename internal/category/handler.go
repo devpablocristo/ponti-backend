@@ -2,9 +2,8 @@ package category
 
 import (
 	"context"
-	"strconv"
 
-	ginmw "github.com/devpablocristo/platform/http/gin/go"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/category/handler/dto"
@@ -14,13 +13,10 @@ import (
 
 type UseCasesPort interface {
 	CreateCategory(context.Context, *domain.Category) (int64, error)
-	ListCategories(ctx context.Context, filters domain.ListFilters, page, perPage int) ([]domain.Category, int64, error)
-	ListArchivedCategories(context.Context, int, int) ([]domain.Category, int64, error)
+	ListCategories(context.Context, int, int) ([]domain.Category, int64, error)
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
-	ArchiveCategory(context.Context, int64) error
-	RestoreCategory(context.Context, int64) error
-	HardDeleteCategory(context.Context, int64) error
+	DeleteCategory(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -36,6 +32,7 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsula las dependencias del handler HTTP de Category.
@@ -65,12 +62,9 @@ func (h *Handler) Routes() {
 	{
 		group.POST("", h.CreateCategory)
 		group.GET("", h.ListCategories)
-		group.GET("/archived", h.ListArchivedCategories)
 		group.GET("/:category_id", h.GetCategory)
 		group.PUT("/:category_id", h.UpdateCategory)
-		group.POST("/:category_id/archive", h.ArchiveCategory)
-		group.POST("/:category_id/restore", h.RestoreCategory)
-		group.DELETE("/:category_id/hard", h.HardDeleteCategory)
+		group.DELETE("/:category_id", h.DeleteCategory)
 	}
 }
 
@@ -89,23 +83,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 func (h *Handler) ListCategories(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	var typeID *int64
-	if raw := c.Query("type_id"); raw != "" {
-		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
-			typeID = &parsed
-		}
-	}
-	categories, total, err := h.ucs.ListCategories(c.Request.Context(), domain.ListFilters{TypeID: typeID}, page, perPage)
-	if err != nil {
-		sharedhandlers.RespondError(c, err)
-		return
-	}
-	sharedhandlers.RespondOK(c, dto.NewListCategoriesResponse(categories, page, perPage, total))
-}
-
-func (h *Handler) ListArchivedCategories(c *gin.Context) {
-	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	categories, total, err := h.ucs.ListArchivedCategories(c.Request.Context(), page, perPage)
+	categories, total, err := h.ucs.ListCategories(c.Request.Context(), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -144,25 +122,13 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
-func (h *Handler) ArchiveCategory(c *gin.Context) {
-	h.runCategoryIDAction(c, h.ucs.ArchiveCategory)
-}
-
-func (h *Handler) RestoreCategory(c *gin.Context) {
-	h.runCategoryIDAction(c, h.ucs.RestoreCategory)
-}
-
-func (h *Handler) HardDeleteCategory(c *gin.Context) {
-	h.runCategoryIDAction(c, h.ucs.HardDeleteCategory)
-}
-
-func (h *Handler) runCategoryIDAction(c *gin.Context, action func(context.Context, int64) error) {
+func (h *Handler) DeleteCategory(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "category_id")
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	if err := action(c.Request.Context(), id); err != nil {
+	if err := h.ucs.DeleteCategory(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

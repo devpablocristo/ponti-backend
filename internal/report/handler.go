@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
@@ -16,9 +16,9 @@ import (
 
 // UseCasesPort define la interfaz para los casos de uso.
 type UseCasesPort interface {
-	GetFieldCropReport(context.Context, domain.ReportFilter) (*domain.FieldCrop, error)
+	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
-	GetSummaryResultsReport(context.Context, domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
+	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
 }
 
 // GinEnginePort define la interfaz para el motor Gin.
@@ -37,6 +37,7 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 // ReportHandler maneja las peticiones HTTP para reportes.
@@ -160,7 +161,7 @@ func (h *ReportHandler) parseSummaryFilters(c *gin.Context) (domain.SummaryResul
 func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, filters interface{}) (interface{}, error) {
 	switch reportType {
 	case "field-crop":
-		report, err := h.ucs.GetFieldCropReport(c.Request.Context(), filters.(domain.ReportFilter))
+		report, err := h.ucs.GetFieldCropReport(filters.(domain.ReportFilter))
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +175,7 @@ func (h *ReportHandler) buildReportByType(c *gin.Context, reportType string, fil
 		return dto.FromDomainInvestorReport(report), nil
 
 	case "summary-results":
-		report, err := h.ucs.GetSummaryResultsReport(c.Request.Context(), filters.(domain.SummaryResultsFilter))
+		report, err := h.ucs.GetSummaryResultsReport(filters.(domain.SummaryResultsFilter))
 		if err != nil {
 			return nil, err
 		}

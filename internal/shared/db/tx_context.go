@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 
-	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
+	gormdb "github.com/devpablocristo/core/databases/postgres/go"
 	"gorm.io/gorm"
 )
 

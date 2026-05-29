@@ -2,16 +2,22 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CORE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ROOT_DIR="$(cd "$CORE_DIR/.." && pwd)"
-WEB_DIR="${PONTI_WEB_DIR:-$ROOT_DIR/web}"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
+FRONTEND_DIR="$ROOT_DIR/ponti-frontend"
+AI_DIR="$ROOT_DIR/ponti-ai"
 
-echo "Bajando web..."
-if [[ -f "$WEB_DIR/docker-compose.yml" ]]; then
-  docker compose --progress quiet -f "$WEB_DIR/docker-compose.yml" down --remove-orphans --timeout 5 || true
+echo "Bajando frontend..."
+if [[ -f "$FRONTEND_DIR/docker-compose.yml" ]]; then
+  docker compose -f "$FRONTEND_DIR/docker-compose.yml" down --remove-orphans --timeout 5 || true
 fi
 
-echo "Bajando core..."
-docker compose --progress quiet -f "$CORE_DIR/docker-compose.yml" down --remove-orphans
+echo "Bajando AI..."
+if [[ -f "$AI_DIR/docker-compose.yml" ]]; then
+  docker compose -f "$AI_DIR/docker-compose.yml" down --remove-orphans || true
+fi
 
-echo "Stack local detenido. Nota: axis (companion + nexus) sigue corriendo aparte (gestionar desde /home/pablocristo/Proyectos/pablo/axis/)."
+echo "Bajando backend..."
+docker compose -f "$BACKEND_DIR/docker-compose.yml" down --remove-orphans
+
+echo "Stack local detenido."

@@ -7,24 +7,21 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 type UseCasesPort interface {
-	Chat(ctx context.Context, userID, tenantID, projectID string, body any) (int, []byte, error)
-	ListChatConversations(ctx context.Context, userID, tenantID, projectID string, limit int) (int, []byte, error)
-	GetChatConversation(ctx context.Context, userID, tenantID, projectID, conversationID string) (int, []byte, error)
-	ChatStream(ctx context.Context, userID, tenantID, projectID string, body io.Reader, w http.ResponseWriter) error
+	Chat(ctx context.Context, userID, projectID string, body any) (int, []byte, error)
+	ListChatConversations(ctx context.Context, userID, projectID string, limit int) (int, []byte, error)
+	GetChatConversation(ctx context.Context, userID, projectID, conversationID string) (int, []byte, error)
+	ChatStream(ctx context.Context, userID, projectID string, body io.Reader, w http.ResponseWriter) error
 }
 
 type GinEnginePort interface {
@@ -41,16 +38,14 @@ type MiddlewaresEnginePort interface {
 }
 
 type Handler struct {
-	ucs           UseCasesPort
-	gsv           GinEnginePort
-	acf           ConfigAPIPort
-	mws           MiddlewaresEnginePort
-	db            *gorm.DB
-	aiTenantScope bool
+	ucs UseCasesPort
+	gsv GinEnginePort
+	acf ConfigAPIPort
+	mws MiddlewaresEnginePort
 }
 
-func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort, db *gorm.DB, aiTenantScope bool) *Handler {
-	return &Handler{ucs: u, gsv: s, acf: c, mws: m, db: db, aiTenantScope: aiTenantScope}
+func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
+	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
 }
 
 func (h *Handler) Routes() {
@@ -72,12 +67,12 @@ func (h *Handler) Chat(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, tenantID, projectID, err := h.extractIDs(c)
+	userID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, tenantID, projectID, body)
+	status, raw, err := h.ucs.Chat(c.Request.Context(), userID, projectID, body)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -86,7 +81,7 @@ func (h *Handler) ChatStream(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
 		return
 	}
-	userID, tenantID, projectID, err := h.extractIDs(c)
+	userID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -105,14 +100,13 @@ func (h *Handler) ChatStream(c *gin.Context) {
 		return
 	}
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	if err := h.ucs.ChatStream(c.Request.Context(), userID, tenantID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
-		slog.ErrorContext(c.Request.Context(), "chat stream upstream failed", "error", err.Error())
-		sharedhandlers.RespondError(c, err)
+	if err := h.ucs.ChatStream(c.Request.Context(), userID, projectID, bytes.NewReader(body), c.Writer); err != nil && !c.Writer.Written() {
+		sharedhandlers.RespondError(c, domainerr.Internal("ai service unavailable"))
 	}
 }
 
 func (h *Handler) ListChatConversations(c *gin.Context) {
-	userID, tenantID, projectID, err := h.extractIDs(c)
+	userID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -123,7 +117,7 @@ func (h *Handler) ListChatConversations(c *gin.Context) {
 			limit = n
 		}
 	}
-	status, raw, err := h.ucs.ListChatConversations(c.Request.Context(), userID, tenantID, projectID, limit)
+	status, raw, err := h.ucs.ListChatConversations(c.Request.Context(), userID, projectID, limit)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -133,12 +127,12 @@ func (h *Handler) GetChatConversation(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("conversation_id is required"))
 		return
 	}
-	userID, tenantID, projectID, err := h.extractIDs(c)
+	userID, projectID, err := extractIDs(c)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	status, raw, err := h.ucs.GetChatConversation(c.Request.Context(), userID, tenantID, projectID, conversationID)
+	status, raw, err := h.ucs.GetChatConversation(c.Request.Context(), userID, projectID, conversationID)
 	h.respondProxy(c, status, raw, err)
 }
 
@@ -159,45 +153,14 @@ func (h *Handler) respondProxy(c *gin.Context, status int, body []byte, err erro
 	c.JSON(status, payload)
 }
 
-func (h *Handler) extractIDs(c *gin.Context) (string, string, string, error) {
-	// El permiso explícito `ai.use` (modelo legacy de ponti-ai) se removió en
-	// el cutover a Companion. Hoy basta con que el usuario haya pasado el
-	// middleware de autenticación + tenant scope (api.read/api.write). Si en
-	// el futuro hace falta gating fino por user, agregar de nuevo este check.
-	principal, err := authz.PrincipalFromContext(c.Request.Context())
-	if err != nil {
-		return "", "", "", err
-	}
+func extractIDs(c *gin.Context) (string, string, error) {
+	userID := strings.TrimSpace(c.GetHeader("X-USER-ID"))
 	projectID := strings.TrimSpace(c.GetHeader("X-PROJECT-ID"))
+	if userID == "" {
+		return "", "", domainerr.Validation("The field 'user_id' is required")
+	}
 	if projectID == "" {
-		return "", "", "", domainerr.Validation("The field 'project_id' is required")
+		return "", "", domainerr.Validation("The field 'project_id' is required")
 	}
-	if err := h.validateProjectTenant(c.Request.Context(), principal.TenantID.String(), projectID); err != nil {
-		return "", "", "", err
-	}
-	return principal.Actor, principal.TenantID.String(), projectID, nil
-}
-
-func (h *Handler) validateProjectTenant(ctx context.Context, tenantID string, projectID string) error {
-	if !h.aiTenantScope {
-		return nil
-	}
-	if h.db == nil {
-		return domainerr.Forbidden("tenant-scoped AI is not configured")
-	}
-	type row struct{ One int }
-	var out row
-	err := h.db.WithContext(ctx).
-		Table("projects").
-		Select("1 AS one").
-		Where("CAST(id AS TEXT) = ? AND CAST(tenant_id AS TEXT) = ? AND deleted_at IS NULL", projectID, tenantID).
-		Limit(1).
-		Scan(&out).Error
-	if err != nil {
-		return domainerr.Forbidden("project is not available for this tenant")
-	}
-	if out.One != 1 {
-		return domainerr.Forbidden("project is not available for this tenant")
-	}
-	return nil
+	return userID, projectID, nil
 }

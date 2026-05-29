@@ -18,10 +18,10 @@ import (
 	prjmodels "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 )
 
-// TestHardDeleteCustomer_BlocksWhenCustomerHasProjects verifica que DeleteCustomer (hard)
-// conserva la regla actual: no elimina clientes con proyectos activos o archivados.
+// TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects verifica que DeleteCustomer (hard)
+// completa correctamente eliminando primero los proyectos del customer en cascada.
 // Requiere TEST_DB_HOST o DB_HOST para ejecutarse.
-func TestHardDeleteCustomer_BlocksWhenCustomerHasProjects(t *testing.T) {
+func TestHardDeleteCustomer_SucceedsWithCascadeWhenCustomerHasProjects(t *testing.T) {
 	host := getEnvOrDefault("TEST_DB_HOST", os.Getenv("DB_HOST"))
 	if host == "" {
 		t.Skip("Skipping integration test: TEST_DB_HOST or DB_HOST not set")
@@ -82,15 +82,16 @@ func TestHardDeleteCustomer_BlocksWhenCustomerHasProjects(t *testing.T) {
 
 	require.NoError(t, tx.Commit().Error)
 
-	// Act: HardDeleteCustomer debe bloquear si hay proyectos asociados.
-	err = repo.HardDeleteCustomer(ctx, customerID)
+	// Act: DeleteCustomer (hard) debe completar (cascade delete de proyectos primero)
+	err = repo.DeleteCustomer(ctx, customerID)
 
-	// Assert: debe fallar y preservar el customer.
-	require.Error(t, err)
+	// Assert: debe completar sin error
+	require.NoError(t, err)
 
+	// Verificar que el customer fue eliminado
 	var count int64
 	db.Unscoped().Model(&models.Customer{}).Where("id = ?", customerID).Count(&count)
-	assert.Equal(t, int64(1), count, "customer debe preservarse")
+	assert.Equal(t, int64(0), count, "customer debe estar eliminado")
 }
 
 type gormEngineAdapter struct {

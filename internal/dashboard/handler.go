@@ -29,6 +29,7 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetProtected() []gin.HandlerFunc
 }
 
 // Handler encapsulates all dependencies for the Dashboard HTTP handler.
@@ -65,6 +66,10 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	// Parse query parameters for filters
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

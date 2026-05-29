@@ -4,13 +4,11 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/google/uuid"
 )
 
 type LeaseType struct {
-	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
-	Name     string    `gorm:"size:100;not null;column:name"`
+	ID   int64  `gorm:"primaryKey;autoIncrement;column:id"`
+	Name string `gorm:"size:100;not null;unique;column:name"`
 
 	sharedmodels.Base
 }

@@ -10,12 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
-	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httperr"
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/devpablocristo/platform/validate/go"
+	"github.com/devpablocristo/core/validate/go"
 )
 
 // ValidationError representa un error de validación específico
@@ -154,11 +154,11 @@ func ValidateSeason(season string, fieldName string) error {
 		return validate.Err(fieldName, "cannot be empty")
 	}
 
-	// Acepta formato de campaña (YYYY o YYYY-YYYY) o id de estación ("1"-"4": Otoño, Invierno, Primavera, Verano).
-	seasonPattern := `^(\d{4}(-\d{4})?|[1-4])$`
+	// Validar formato de temporada (ej: "2024-2025", "2025")
+	seasonPattern := `^(\d{4}(-\d{4})?)$`
 	matched, _ := regexp.MatchString(seasonPattern, season)
 	if !matched {
-		return validate.Err(fieldName, "invalid season format. Use YYYY, YYYY-YYYY, or season id 1-4")
+		return validate.Err(fieldName, "invalid season format. Use format: YYYY or YYYY-YYYY")
 	}
 
 	return nil
@@ -368,6 +368,41 @@ func ValidateLotUpdate() gin.HandlerFunc {
 			return
 		}
 
+		// // Para actualizaciones, validar solo campos que estén presentes
+		// validationErrors := &ValidationErrors{}
+
+		// // Solo validar campos que no estén vacíos
+		// if req.Name != "" {
+		// 	validateLotName(req.Name, validationErrors)
+		// }
+
+		// if req.FieldID > 0 {
+		// 	validateFieldID(req.FieldID, validationErrors)
+		// }
+
+		// if req.Hectares.GreaterThan(decimal.Zero) {
+		// 	validateHectares(req.Hectares, validationErrors)
+		// }
+
+		// if req.PreviousCropID > 0 {
+		// 	validateCropID(req.PreviousCropID, validationErrors, "previous_crop_id")
+		// }
+
+		// if req.CurrentCropID > 0 {
+		// 	validateCropID(req.CurrentCropID, validationErrors, "current_crop_id")
+		// }
+
+		// // Para actualizaciones, las fechas son opcionales
+		// if len(req.Dates) > 0 {
+		// 	validateLotDates(req.Dates, validationErrors)
+		// }
+
+		// if len(validationErrors.Errors) > 0 {
+		// 	c.JSON(http.StatusBadRequest, validationErrors)
+		// 	c.Abort()
+		// 	return
+		// }
+
 		// Set actor from context
 		if actor, err := sharedmodels.ActorFromContext(c); err == nil {
 			req.UpdatedBy = &actor
@@ -376,6 +411,13 @@ func ValidateLotUpdate() gin.HandlerFunc {
 		// Establecer timestamp actual para UpdatedAt
 		now := time.Now()
 		req.UpdatedAt = now
+
+		// Si hay errores de validación del Base, abortar
+		// if len(validationErrors.Errors) > 0 {
+		// 	c.JSON(http.StatusBadRequest, validationErrors)
+		// 	c.Abort()
+		// 	return
+		// }
 
 		c.Set("validated_lot", &req)
 		c.Next()

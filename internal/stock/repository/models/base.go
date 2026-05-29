@@ -4,8 +4,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
-
 	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	projmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -18,7 +16,6 @@ import (
 
 type Stock struct {
 	ID                int64                      `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID          uuid.UUID                  `gorm:"column:tenant_id;type:uuid;index"`
 	ProjectID         int64                      `gorm:"not null;index;column:project_id"`
 	Project           projmod.Project            `gorm:"foreignKey:ProjectID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	SupplyID          int64                      `gorm:"not null;index;column:supply_id"`
@@ -48,47 +45,47 @@ func (m *Stock) ToDomain() *domain.Stock {
 	}
 
 	return &domain.Stock{
-		ID:                m.ID,
-		Project:           m.Project.ToDomain(),
-		Supply:            m.Supply.ToDomain(),
-		CloseDate:         m.CloseDate,
-		RealStockUnits:    m.RealStockUnits,
-		YearPeriod:        m.YearPeriod,
-		MonthPeriod:       m.MonthPeriod,
-		Investor:          m.Investor.ToDomain(),
-		SupplyMovements:   supplyMovementsDomains,
-		Consumed:          m.Consumed,
-		UnitsTransferred:  m.UnitsConsumed,
-		HasRealStockCount: m.HasRealStockCount,
-		Base: shareddomain.Base{
-			CreatedAt: m.CreatedAt,
-			UpdatedAt: m.UpdatedAt,
-			CreatedBy: m.CreatedBy,
-			UpdatedBy: m.UpdatedBy,
-		},
-	}
+	ID:                m.ID,
+	Project:           m.Project.ToDomain(),
+	Supply:            m.Supply.ToDomain(),
+	CloseDate:         m.CloseDate,
+	RealStockUnits:    m.RealStockUnits,
+	YearPeriod:        m.YearPeriod,
+	MonthPeriod:       m.MonthPeriod,
+	Investor:          m.Investor.ToDomain(),
+	SupplyMovements:   supplyMovementsDomains,
+	Consumed:          m.Consumed,
+	UnitsTransferred:  m.UnitsConsumed,
+	HasRealStockCount: m.HasRealStockCount,
+	Base: shareddomain.Base{
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+		CreatedBy: m.CreatedBy,
+		UpdatedBy: m.UpdatedBy,
+	},
+}
 }
 
 // FromDomain convierte la entidad de dominio Stock al modelo de persistencia
 func FromDomain(d *domain.Stock) *Stock {
 	return &Stock{
-		ID:                d.ID,
-		ProjectID:         d.Project.ID,
-		SupplyID:          d.Supply.ID,
-		InvestorID:        d.Investor.ID,
-		RealStockUnits:    d.RealStockUnits,
-		HasRealStockCount: d.HasRealStockCount,
-		YearPeriod:        d.YearPeriod,
-		MonthPeriod:       d.MonthPeriod,
-		InitialStock:      d.InitialStock,
-		CloseDate:         d.CloseDate,
-		SupplyMovements:   []supplymod.SupplyMovement{},
-		Base: sharedmodels.Base{
-			CreatedAt: d.CreatedAt,
-			UpdatedAt: d.UpdatedAt,
-			CreatedBy: d.CreatedBy,
-			UpdatedBy: d.UpdatedBy,
-		},
-	}
+	ID:                d.ID,
+	ProjectID:         d.Project.ID,
+	SupplyID:          d.Supply.ID,
+	InvestorID:        d.Investor.ID,
+	RealStockUnits:    d.RealStockUnits,
+	HasRealStockCount: d.HasRealStockCount,
+	YearPeriod:        d.YearPeriod,
+	MonthPeriod:       d.MonthPeriod,
+	InitialStock:      d.InitialStock,
+	CloseDate:         d.CloseDate,
+	SupplyMovements:   []supplymod.SupplyMovement{},
+	Base: sharedmodels.Base{
+		CreatedAt: d.CreatedAt,
+		UpdatedAt: d.UpdatedAt,
+		CreatedBy: d.CreatedBy,
+		UpdatedBy: d.UpdatedBy,
+	},
+}
 
 }

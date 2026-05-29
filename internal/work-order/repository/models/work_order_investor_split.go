@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -10,7 +9,6 @@ import (
 // Se usa para "Dividir aporte" sin duplicar workorders.
 type WorkOrderInvestorSplit struct {
 	ID            int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID      uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	WorkOrderID   int64           `gorm:"column:workorder_id;index;not null"`
 	InvestorID    int64           `gorm:"column:investor_id;index;not null"`
 	Percentage    decimal.Decimal `gorm:"column:percentage;not null"`

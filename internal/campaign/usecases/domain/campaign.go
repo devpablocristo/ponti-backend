@@ -5,9 +5,10 @@ import (
 )
 
 type Campaign struct {
-	ID        int64
-	Name      string
-	ProjectID int64
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	ProjectID int64  `json:"project_id"`
 
-	shareddomain.Base
+	shareddomain.Base // Embedding Base struct for common fields
+
 }

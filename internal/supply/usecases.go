@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -29,22 +29,16 @@ type RepositoryPort interface {
 	ExistsSupplyMovementByProjectReferenceSupplyAndType(context.Context, int64, string, int64, string) (bool, error)
 	GetWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error)
 	UpdateSupply(context.Context, *domain.Supply) error
-	HardDeleteSupply(context.Context, int64) error
-	ListArchivedSupplies(context.Context, int, int) ([]domain.Supply, int64, error)
+	DeleteSupply(context.Context, int64) error
 	ListSuppliesPaginated(context.Context, domain.SupplyFilter, string, int, int) ([]domain.Supply, int64, error)
 	ListAllSupplies(context.Context, domain.SupplyFilter) ([]domain.Supply, int64, error)
 	UpdateSuppliesBulk(context.Context, []domain.Supply) error
 	CreateProvider(context.Context, *providerdomain.Provider) (int64, error)
 	CreateSupplyMovement(context.Context, *domain.SupplyMovement) (int64, error)
 	GetEntriesSupplyMovementsByProjectID(context.Context, int64) ([]*domain.SupplyMovement, error)
-	ListEntrySupplyMovements(context.Context, domain.SupplyFilter) ([]*domain.SupplyMovement, error)
 	UpdateSupplyMovement(context.Context, *domain.SupplyMovement) error
 	GetSupplyMovementByID(context.Context, int64) (*domain.SupplyMovement, error)
 	DeleteSupplyMovement(context.Context, int64, int64) error
-	ListArchivedSupplyMovements(context.Context, int64) ([]*domain.SupplyMovement, error)
-	ArchiveSupplyMovement(context.Context, int64, int64) error
-	RestoreSupplyMovement(context.Context, int64, int64) error
-	HardDeleteSupplyMovement(context.Context, int64, int64) error
 	GetProviders(context.Context) ([]providerdomain.Provider, error)
 	ArchiveSupply(context.Context, int64) error
 	RestoreSupply(context.Context, int64) error
@@ -66,7 +60,7 @@ type StockUseCasesPort interface {
 
 type UseCases struct {
 	repo          RepositoryPort
-	exporter      ExporterAdapterPort
+	excel         ExporterAdapterPort
 	stockUseCases StockUseCasesPort
 }
 
@@ -80,10 +74,10 @@ type SupplyMovementImportFailure struct {
 	Message         string
 }
 
-func NewUseCases(repo RepositoryPort, exporter ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
+func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, stockUseCases StockUseCasesPort) *UseCases {
 	return &UseCases{
 		repo:          repo,
-		exporter:      exporter,
+		excel:         excel,
 		stockUseCases: stockUseCases,
 	}
 }
@@ -223,8 +217,8 @@ func (u *UseCases) CompletePendingSupply(ctx context.Context, s *domain.Supply) 
 	return u.repo.UpdateSupply(ctx, s)
 }
 
-func (u *UseCases) HardDeleteSupply(ctx context.Context, id int64) error {
-	return u.repo.HardDeleteSupply(ctx, id)
+func (u *UseCases) DeleteSupply(ctx context.Context, id int64) error {
+	return u.repo.DeleteSupply(ctx, id)
 }
 
 func (u *UseCases) ArchiveSupply(ctx context.Context, id int64) error {
@@ -233,10 +227,6 @@ func (u *UseCases) ArchiveSupply(ctx context.Context, id int64) error {
 
 func (u *UseCases) RestoreSupply(ctx context.Context, id int64) error {
 	return u.repo.RestoreSupply(ctx, id)
-}
-
-func (u *UseCases) ListArchivedSupplies(ctx context.Context, page, perPage int) ([]domain.Supply, int64, error) {
-	return u.repo.ListArchivedSupplies(ctx, page, perPage)
 }
 
 func (u *UseCases) CountWorkOrdersBySupplyID(ctx context.Context, supplyID int64) (int64, error) {
@@ -283,7 +273,7 @@ func (u *UseCases) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Sup
 }
 
 func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.SupplyFilter) ([]byte, error) {
-	if u.exporter == nil {
+	if u.excel == nil {
 		return nil, domainerr.Internal("exporter not configured")
 	}
 
@@ -305,5 +295,5 @@ func (u *UseCases) ExportTableSupplies(ctx context.Context, filter domain.Supply
 		itemPointers[i] = &items[i]
 	}
 
-	return u.exporter.ExportSupplies(ctx, itemPointers)
+	return u.excel.ExportSupplies(ctx, itemPointers)
 }

@@ -3,7 +3,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
@@ -17,7 +16,6 @@ import (
 
 type Field struct {
 	ID               int64            `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID         uuid.UUID        `gorm:"column:tenant_id;type:uuid;index"`
 	Name             string           `gorm:"size:100;not null;column:name"`
 	ProjectID        int64            `gorm:"not null;index;column:project_id"`
 	LeaseTypeID      int64            `gorm:"not null;column:lease_type_id"`
@@ -30,10 +28,9 @@ type Field struct {
 }
 
 type FieldInvestor struct {
-	TenantID   uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
-	FieldID    int64     `gorm:"primaryKey;autoIncrement:false;column:field_id"`
-	InvestorID int64     `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
-	Percentage int       `gorm:"not null;column:percentage"`
+	FieldID    int64 `gorm:"primaryKey;autoIncrement:false;column:field_id"`
+	InvestorID int64 `gorm:"primaryKey;autoIncrement:false;column:investor_id"`
+	Percentage int   `gorm:"not null;column:percentage"`
 	sharedmodels.Base
 
 	Investor invdom.Investor `gorm:"foreignKey:InvestorID;references:ID"`

@@ -7,8 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 
-	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
 func TestSupplyRequest_ToDomain_IsPartialPrice_DefaultsToFalseWhenOmitted(t *testing.T) {

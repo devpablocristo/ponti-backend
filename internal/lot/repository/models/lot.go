@@ -3,19 +3,16 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
-
 	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
 	cropdom "github.com/devpablocristo/ponti-backend/internal/crop/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	"github.com/shopspring/decimal"
 )
 
 type Lot struct {
 	ID             int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID       uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	Name           string          `gorm:"type:varchar(100);not null;column:name"`
 	FieldID        int64           `gorm:"not null;index;constraint:OnDelete:CASCADE;column:field_id"`
 	Hectares       decimal.Decimal `gorm:"type:numeric(18,6);not null;column:hectares"`

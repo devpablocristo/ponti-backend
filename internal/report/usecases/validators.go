@@ -2,7 +2,7 @@
 package usecases
 
 import (
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"fmt"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 )
@@ -19,7 +19,7 @@ func NewReportFilterValidator() *ReportFilterValidator {
 // customer_id, project_id y campaign_id son obligatorios; field_id es opcional.
 func (v *ReportFilterValidator) ValidateRequiredWorkspaceFilter(filter domain.SummaryResultsFilter) error {
 	if filter.ProjectID == nil || filter.CustomerID == nil || filter.CampaignID == nil {
-		return domainerr.Validation("customer_id, project_id and campaign_id are required")
+		return fmt.Errorf("customer_id, project_id and campaign_id are required")
 	}
 	return nil
 }

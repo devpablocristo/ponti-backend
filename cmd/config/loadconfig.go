@@ -20,11 +20,8 @@ type Config struct {
 	Auth           Auth           // Configuración de autenticación/autorización
 	WordsSuggester WordsSuggester // Configuración del suggester
 	Migrations     Migrations     // Configuración de migraciones
-	Companion      Companion      // Configuración del cliente Companion (axis/companion)
-	Nexus          Nexus          // Configuración del cliente Nexus (axis/nexus) — opcional, usado para gating de acciones sensibles
+	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
 	Review         Review         // Configuración de Nexus Review / approvals
-	Reporting      Reporting      // Configuración de lectura de reportes legacy/actors
-	Security       Security       // Feature flags de auth/multi-tenant/auditoría
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

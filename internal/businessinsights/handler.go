@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 

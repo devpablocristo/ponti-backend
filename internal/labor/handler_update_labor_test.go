@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/platform/security/go/contextkeys"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -18,14 +18,8 @@ import (
 type laborHandlerUseCasesStub struct {
 	getLaborFn      func(ctx context.Context, id int64) (*domain.Labor, error)
 	updateLaborFn   func(ctx context.Context, labor *domain.Labor) error
-	archiveLaborFn  func(ctx context.Context, id int64) error
-	restoreLaborFn  func(ctx context.Context, id int64) error
-	hardDeleteFn    func(ctx context.Context, id int64) error
 	getLaborCalls   []int64
 	updateLaborCall []domain.Labor
-	archiveCalls    []int64
-	restoreCalls    []int64
-	hardDeleteCalls []int64
 }
 
 func (s *laborHandlerUseCasesStub) CreateLabor(context.Context, *domain.Labor) (int64, error) {
@@ -41,30 +35,7 @@ func (s *laborHandlerUseCasesStub) GetLabor(ctx context.Context, id int64) (*dom
 func (s *laborHandlerUseCasesStub) ListLabor(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
 	return nil, 0, nil
 }
-func (s *laborHandlerUseCasesStub) ListArchivedLabors(context.Context, int, int, int64) ([]domain.ListedLabor, int64, error) {
-	return nil, 0, nil
-}
-func (s *laborHandlerUseCasesStub) ArchiveLabor(ctx context.Context, id int64) error {
-	s.archiveCalls = append(s.archiveCalls, id)
-	if s.archiveLaborFn != nil {
-		return s.archiveLaborFn(ctx, id)
-	}
-	return nil
-}
-func (s *laborHandlerUseCasesStub) RestoreLabor(ctx context.Context, id int64) error {
-	s.restoreCalls = append(s.restoreCalls, id)
-	if s.restoreLaborFn != nil {
-		return s.restoreLaborFn(ctx, id)
-	}
-	return nil
-}
-func (s *laborHandlerUseCasesStub) HardDeleteLabor(ctx context.Context, id int64) error {
-	s.hardDeleteCalls = append(s.hardDeleteCalls, id)
-	if s.hardDeleteFn != nil {
-		return s.hardDeleteFn(ctx, id)
-	}
-	return nil
-}
+func (s *laborHandlerUseCasesStub) DeleteLabor(context.Context, int64) error { return nil }
 func (s *laborHandlerUseCasesStub) UpdateLabor(ctx context.Context, labor *domain.Labor) error {
 	s.updateLaborCall = append(s.updateLaborCall, *labor)
 	if s.updateLaborFn != nil {
@@ -81,7 +52,7 @@ func (s *laborHandlerUseCasesStub) ListLaborCategoriesByTypeID(context.Context, 
 func (s *laborHandlerUseCasesStub) ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error) {
 	return nil, nil
 }
-func (s *laborHandlerUseCasesStub) ListGroupLaborByWorkOrder(context.Context, types.Input, domain.LaborFilter) ([]domain.LaborListItem, types.PageInfo, error) {
+func (s *laborHandlerUseCasesStub) ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
 }
 func (s *laborHandlerUseCasesStub) ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error) {
@@ -180,50 +151,5 @@ func TestHandler_UpdateLabor_ExplicitIsPartialPrice_DoesNotFetchCurrent(t *testi
 	}
 	if stub.updateLaborCall[0].IsPartialPrice {
 		t.Fatalf("expected IsPartialPrice=false from explicit payload")
-	}
-}
-
-func TestHandler_LaborArchiveRestoreHardDeleteRoutes(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	tests := []struct {
-		name  string
-		run   func(*Handler, *gin.Context)
-		calls func(*laborHandlerUseCasesStub) []int64
-	}{
-		{
-			name:  "archive",
-			run:   (*Handler).ArchiveLabor,
-			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.archiveCalls },
-		},
-		{
-			name:  "restore",
-			run:   (*Handler).RestoreLabor,
-			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.restoreCalls },
-		},
-		{
-			name:  "hard delete",
-			run:   (*Handler).HardDeleteLabor,
-			calls: func(s *laborHandlerUseCasesStub) []int64 { return s.hardDeleteCalls },
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stub := &laborHandlerUseCasesStub{}
-			h := &Handler{ucs: stub}
-			ctx, _ := newLaborHandlerJSONContext(http.MethodPost, "/api/v1/labors/42", "")
-			ctx.Params = gin.Params{{Key: "labor_id", Value: "42"}}
-
-			tt.run(h, ctx)
-
-			if ctx.Writer.Status() != http.StatusNoContent {
-				t.Fatalf("expected status %d, got %d", http.StatusNoContent, ctx.Writer.Status())
-			}
-			calls := tt.calls(stub)
-			if len(calls) != 1 || calls[0] != 42 {
-				t.Fatalf("expected action to be called with id 42, got %#v", calls)
-			}
-		})
 	}
 }

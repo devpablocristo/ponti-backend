@@ -3,8 +3,6 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
-
 	investormod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	provmod "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
@@ -15,7 +13,6 @@ import (
 
 type SupplyMovement struct {
 	ID                   int64           `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID             uuid.UUID       `gorm:"column:tenant_id;type:uuid;index"`
 	StockId              int64           `gorm:"not null;column:stock_id"`
 	Quantity             decimal.Decimal `gorm:"not null;column:quantity"`
 	MovementType         string          `gorm:"type:text;check:movement_type IN ('Stock','Movimiento interno','Remito oficial', 'Movimiento interno entrada', 'Devolución');not null;column:movement_type"`

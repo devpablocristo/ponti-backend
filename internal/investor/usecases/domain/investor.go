@@ -10,7 +10,6 @@ type Investor struct {
 	ID         int64
 	Name       string
 	Percentage int
-	ActorID    *int64
 	ArchivedAt *time.Time
 	shareddomain.Base
 }

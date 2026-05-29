@@ -9,12 +9,11 @@ import (
 type RepositoryPort interface {
 	CreateInvestor(context.Context, *domain.Investor) (int64, error)
 	ListInvestors(context.Context, int, int) ([]domain.Investor, int64, error)
-	ListArchivedInvestors(context.Context, int, int) ([]domain.Investor, int64, error)
 	GetInvestor(context.Context, int64) (*domain.Investor, error)
 	UpdateInvestor(context.Context, *domain.Investor) error
+	DeleteInvestor(context.Context, int64) error
 	ArchiveInvestor(context.Context, int64) error
 	RestoreInvestor(context.Context, int64) error
-	HardDeleteInvestor(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -33,10 +32,6 @@ func (u *UseCases) ListInvestors(ctx context.Context, page, perPage int) ([]doma
 	return u.repo.ListInvestors(ctx, page, perPage)
 }
 
-func (u *UseCases) ListArchivedInvestors(ctx context.Context, page, perPage int) ([]domain.Investor, int64, error) {
-	return u.repo.ListArchivedInvestors(ctx, page, perPage)
-}
-
 func (u *UseCases) GetInvestor(ctx context.Context, id int64) (*domain.Investor, error) {
 	return u.repo.GetInvestor(ctx, id)
 }
@@ -45,14 +40,14 @@ func (u *UseCases) UpdateInvestor(ctx context.Context, inv *domain.Investor) err
 	return u.repo.UpdateInvestor(ctx, inv)
 }
 
+func (u *UseCases) DeleteInvestor(ctx context.Context, id int64) error {
+	return u.repo.DeleteInvestor(ctx, id)
+}
+
 func (u *UseCases) ArchiveInvestor(ctx context.Context, id int64) error {
 	return u.repo.ArchiveInvestor(ctx, id)
 }
 
 func (u *UseCases) RestoreInvestor(ctx context.Context, id int64) error {
 	return u.repo.RestoreInvestor(ctx, id)
-}
-
-func (u *UseCases) HardDeleteInvestor(ctx context.Context, id int64) error {
-	return u.repo.HardDeleteInvestor(ctx, id)
 }

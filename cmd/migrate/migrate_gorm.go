@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"log"
 	"time"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -31,8 +31,8 @@ import (
 )
 
 // runGormMigrations corre AutoMigrate de GORM sobre todos los modelos.
-func runGormMigrations(ctx context.Context, logger *slog.Logger, repo *gormRepo.Repository) error {
-	logger.Info("starting GORM migrations", "event", "gorm_migrations_started")
+func runGormMigrations(ctx context.Context, repo *gormRepo.Repository) error {
+	log.Println("Starting GORM migrations...")
 
 	// Verify DB connection
 	sqlDB, err := repo.Client().DB()
@@ -72,14 +72,11 @@ func runGormMigrations(ctx context.Context, logger *slog.Logger, repo *gormRepo.
 
 	start := time.Now()
 	for _, m := range modelsList {
-		logger.Info("migrating model", "event", "gorm_migrate_model", "model", fmt.Sprintf("%T", m))
+		fmt.Printf("Migrating model: %T\n", m)
 		if err := repo.AutoMigrate(m); err != nil {
 			return fmt.Errorf("failed to migrate %T: %w", m, err)
 		}
 	}
-	logger.Info("GORM migrations completed",
-		"event", "gorm_migrations_completed",
-		"duration_ms", time.Since(start).Milliseconds(),
-	)
+	log.Printf("GORM migrations completed successfully in %s.", time.Since(start))
 	return nil
 }

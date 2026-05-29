@@ -5,15 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"gorm.io/gorm"
 
 	models "github.com/devpablocristo/ponti-backend/internal/dollar/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/dollar/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
-
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
-	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 )
 
 type GormEnginePort interface {
@@ -29,15 +25,10 @@ func NewRepository(db GormEnginePort) *Repository {
 }
 
 func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]domain.DollarAverage, error) {
-	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), projectID); err != nil {
-		return nil, err
-	}
-
 	tx := r.db.Client().
 		WithContext(ctx).
 		Model(&models.ProjectDollarValue{}).
 		Where("project_id = ?", projectID)
-	tx = tenancy.Scope(ctx, tx, "project_dollar_values")
 
 	var rows []models.ProjectDollarValue
 	if err := tx.Find(&rows).Error; err != nil {
@@ -52,16 +43,7 @@ func (r *Repository) ListByProject(ctx context.Context, projectID int64) ([]doma
 }
 
 func (r *Repository) Create(ctx context.Context, item *domain.DollarAverage) (int64, error) {
-	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), item.ProjectID); err != nil {
-		return 0, err
-	}
-
 	m := models.FromDomain(item)
-	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
-		return 0, err
-	} else if ok {
-		m.TenantID = tenantID
-	}
 	if err := r.db.Client().WithContext(ctx).Create(m).Error; err != nil {
 		return 0, domainerr.Internal("failed to create dollar value")
 	}
@@ -74,24 +56,16 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var current models.ProjectDollarValue
-		if err := tenancy.Scope(ctx, tx, "project_dollar_values").
-			Where("id = ?", item.ID).
-			First(&current).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.NotFound("project dollar value not found")
-			}
+		var count int64
+		if err := tx.Model(&models.ProjectDollarValue{}).Where("id = ?", item.ID).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
-		if err := sharedfilters.ValidateProjectAccess(ctx, tx, current.ProjectID); err != nil {
-			return err
-		}
-		if err := sharedfilters.ValidateProjectAccess(ctx, tx, item.ProjectID); err != nil {
-			return err
+		if count == 0 {
+			return domainerr.NotFound("project dollar value not found")
 		}
 
 		// Map ONLY the updatable fields (GORM will update Base automatically)
-		if err := tenancy.Scope(ctx, tx.Model(&models.ProjectDollarValue{}), "project_dollar_values").
+		if err := tx.Model(&models.ProjectDollarValue{}).
 			Where("id = ?", item.ID).
 			Updates(map[string]any{
 				"project_id":    item.ProjectID,
@@ -109,12 +83,8 @@ func (r *Repository) Update(ctx context.Context, item *domain.DollarAverage) err
 }
 
 func (r *Repository) GetByComposite(ctx context.Context, projectID, year int64, month string) (*domain.DollarAverage, error) {
-	if err := sharedfilters.ValidateProjectAccess(ctx, r.db.Client(), projectID); err != nil {
-		return nil, err
-	}
-
 	var m models.ProjectDollarValue
-	err := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "project_dollar_values").
+	err := r.db.Client().WithContext(ctx).
 		Where("project_id = ? AND year = ? AND month = ?", projectID, year, month).
 		First(&m).Error
 

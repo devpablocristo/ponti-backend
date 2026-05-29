@@ -4,17 +4,15 @@ import (
 	domain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/google/uuid"
 )
 
 type BusinessParameter struct {
-	ID          int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID    uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
-	Key         string    `gorm:"size:100;not null"`
-	Value       string    `gorm:"size:255;not null"`
-	Type        string    `gorm:"size:20;not null"` // decimal, integer, string, boolean
-	Category    string    `gorm:"size:50;not null"` // units, calculations, business_rules
-	Description string    `gorm:"type:text"`
+	ID          int64  `gorm:"primaryKey;autoIncrement;column:id"`
+	Key         string `gorm:"uniqueIndex;size:100;not null"`
+	Value       string `gorm:"size:255;not null"`
+	Type        string `gorm:"size:20;not null"` // decimal, integer, string, boolean
+	Category    string `gorm:"size:50;not null"` // units, calculations, business_rules
+	Description string `gorm:"type:text"`
 
 	sharedmodels.Base
 }

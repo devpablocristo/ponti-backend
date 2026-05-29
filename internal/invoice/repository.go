@@ -6,13 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
-	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
-
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	"gorm.io/gorm"
 )
 
@@ -28,31 +24,16 @@ func NewRepository(db GormEnginePort) *Repository {
 	return &Repository{db: db}
 }
 
-func validateInvoiceTarget(workOrderID int64, investorID int64) error {
+func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID int64, investorID int64) (*domain.Invoice, error) {
 	if workOrderID == 0 {
-		return domainerr.Validation("invalid WorkOrderID")
+		return nil, domainerr.Validation("invalid WorkOrderID")
 	}
 	if investorID == 0 {
-		return domainerr.Validation("invalid InvestorID")
-	}
-	return nil
-}
-
-func invoiceNotFound(workOrderID int64, investorID int64) error {
-	return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
-		"invoice for work order %d and investor %d does not exist",
-		workOrderID, investorID,
-	))
-}
-
-func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID int64, investorID int64) (*domain.Invoice, error) {
-	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
-		return nil, err
+		return nil, domainerr.Validation("invalid InvestorID")
 	}
 
 	var row models.Invoice
-	db := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "invoices")
-	if err := db.
+	if err := r.db.Client().WithContext(ctx).
 		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
 		Order(fmt.Sprintf("CASE WHEN investor_id = %d THEN 0 ELSE 1 END, id DESC", investorID)).
 		First(&row).Error; err != nil {
@@ -66,93 +47,52 @@ func (r *Repository) GetByWorkOrderAndInvestor(ctx context.Context, workOrderID 
 }
 
 func (r *Repository) Create(ctx context.Context, item *domain.Invoice) (int64, error) {
-	if err := validateInvoiceTarget(item.WorkOrderID, item.InvestorID); err != nil {
-		return 0, err
+	if item.WorkOrderID == 0 {
+		return 0, domainerr.Validation("invalid WorkOrderID")
+	}
+	if item.InvestorID == 0 {
+		return 0, domainerr.Validation("invalid InvestorID")
 	}
 
 	m := models.FromDomain(item)
-	if tenantID, ok, err := authz.OptionalTenantOrStrict(ctx); err != nil {
-		return 0, err
-	} else if ok {
-		m.TenantID = tenantID
-	}
-	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if item.Company != "" {
-			if _, err := actorsync.SyncLegacyTextActor(tx, actorsync.LegacyTextActorSync{
-				SourceTable: actorsync.LegacyInvoiceCompany,
-				Name:        item.Company,
-				ActorKind:   actorsync.KindOrganization,
-				Role:        actorsync.RoleFacturador,
-				CreatedBy:   item.CreatedBy,
-				UpdatedBy:   item.UpdatedBy,
-			}); err != nil {
-				return err
-			}
-		}
-		if err := tx.Create(&m).Error; err != nil {
-			return domainerr.Internal("fail to create invoice")
-		}
-		if err := actorsync.RefreshInvoiceActorColumns(tx, m.ID); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return 0, err
+	if err := r.db.Client().WithContext(ctx).Create(&m).Error; err != nil {
+		return 0, domainerr.Internal("fail to create invoice")
 	}
 	return m.ID, nil
 }
 
 func (r *Repository) Update(ctx context.Context, item *domain.Invoice) error {
-	if err := validateInvoiceTarget(item.WorkOrderID, item.InvestorID); err != nil {
-		return err
+	if item.WorkOrderID == 0 {
+		return domainerr.Validation("invalid WorkOrderID")
+	}
+	if item.InvestorID == 0 {
+		return domainerr.Validation("invalid InvestorID")
 	}
 
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		updatedAt := time.Now()
-		if item.Company != "" {
-			if _, err := actorsync.SyncLegacyTextActor(tx, actorsync.LegacyTextActorSync{
-				SourceTable: actorsync.LegacyInvoiceCompany,
-				Name:        item.Company,
-				ActorKind:   actorsync.KindOrganization,
-				Role:        actorsync.RoleFacturador,
-				UpdatedAt:   updatedAt,
-				UpdatedBy:   item.UpdatedBy,
-			}); err != nil {
-				return err
-			}
-		}
-		result := tenancy.Scope(ctx, tx, "invoices").
-			Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", item.WorkOrderID, item.InvestorID).
-			Model(models.Invoice{}).
-			Updates(map[string]any{
-				"investor_id": item.InvestorID,
-				"number":      item.Number,
-				"company":     item.Company,
-				"date":        item.Date,
-				"status":      item.Status,
-				"updated_at":  updatedAt,
-				"updated_by":  item.UpdatedBy,
-			})
-		if result.Error != nil {
-			return domainerr.Internal("failed to update invoice")
-		}
-		if result.RowsAffected == 0 {
-			return invoiceNotFound(item.WorkOrderID, item.InvestorID)
-		}
-		var id int64
-		if err := tenancy.Scope(ctx, tx.Model(&models.Invoice{}), "invoices").
-			Where("work_order_id = ? AND investor_id = ?", item.WorkOrderID, item.InvestorID).
-			Select("id").
-			Scan(&id).Error; err != nil {
-			return domainerr.Internal("failed to resolve invoice")
-		}
-		if id > 0 {
-			if err := actorsync.RefreshInvoiceActorColumns(tx, id); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	result := r.db.Client().WithContext(ctx).
+		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", item.WorkOrderID, item.InvestorID).
+		Model(models.Invoice{}).
+		Updates(map[string]any{
+			"investor_id": item.InvestorID,
+			"number":      item.Number,
+			"company":     item.Company,
+			"date":        item.Date,
+			"status":      item.Status,
+			"updated_at":  time.Now(),
+			"updated_by":  item.UpdatedBy,
+		})
+
+	if result.Error != nil {
+		return domainerr.Internal("failed to update invoice")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
+			"invoice for work order %d and investor %d does not exist",
+			item.WorkOrderID, item.InvestorID,
+		))
+	}
+
+	return nil
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page, perPage int) ([]domain.Invoice, int64, error) {
@@ -163,8 +103,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page,
 	var total int64
 	query := r.db.Client().WithContext(ctx).
 		Model(&models.Invoice{}).
-		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "invoices") }).
-		Joins("JOIN workorders ON workorders.id = invoices.work_order_id AND workorders.tenant_id = invoices.tenant_id AND workorders.deleted_at IS NULL").
+		Joins("JOIN workorders ON workorders.id = invoices.work_order_id").
 		Where("workorders.project_id = ?", projectID)
 
 	if err := query.Count(&total).Error; err != nil {
@@ -186,12 +125,14 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64, page,
 }
 
 func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID int64) error {
-	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
-		return err
+	if workOrderID == 0 {
+		return domainerr.Validation("invalid WorkOrderID")
+	}
+	if investorID == 0 {
+		return domainerr.Validation("invalid InvestorID")
 	}
 
 	result := r.db.Client().WithContext(ctx).
-		Scopes(func(db *gorm.DB) *gorm.DB { return tenancy.Scope(ctx, db, "invoices") }).
 		Where("work_order_id = ? AND (investor_id = ? OR investor_id IS NULL)", workOrderID, investorID).
 		Delete(&models.Invoice{})
 
@@ -199,18 +140,20 @@ func (r *Repository) Delete(ctx context.Context, workOrderID int64, investorID i
 		return domainerr.Internal("failed to delete invoice")
 	}
 	if result.RowsAffected == 0 {
-		return invoiceNotFound(workOrderID, investorID)
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf(
+			"invoice for work order %d and investor %d does not exist",
+			workOrderID, investorID,
+		))
 	}
 	return nil
 }
 
 func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID int64, investorID int64) (bool, error) {
-	if err := validateInvoiceTarget(workOrderID, investorID); err != nil {
-		return false, err
+	if workOrderID == 0 {
+		return false, domainerr.Validation("invalid WorkOrderID")
 	}
-	tenantID, hasTenant := authz.TenantFromContext(ctx)
-	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return false, domainerr.TenantMissing()
+	if investorID == 0 {
+		return false, domainerr.Validation("invalid InvestorID")
 	}
 
 	type resultRow struct {
@@ -242,40 +185,9 @@ func (r *Repository) InvestorBelongsToWorkOrder(ctx context.Context, workOrderID
 			)
 		END AS is_valid
 	`
-	args := []any{workOrderID, workOrderID, investorID, workOrderID, investorID}
-	if hasTenant {
-		query = `
-			WITH split_count AS (
-			SELECT COUNT(*) AS total
-			FROM workorder_investor_splits
-			WHERE workorder_id = ?
-			  AND tenant_id = ?
-			  AND deleted_at IS NULL
-		)
-		SELECT CASE
-			WHEN (SELECT total FROM split_count) > 0 THEN EXISTS (
-				SELECT 1
-				FROM workorder_investor_splits
-				WHERE workorder_id = ?
-				  AND tenant_id = ?
-				  AND investor_id = ?
-				  AND deleted_at IS NULL
-			)
-			ELSE EXISTS (
-				SELECT 1
-				FROM workorders
-				WHERE id = ?
-				  AND tenant_id = ?
-				  AND investor_id = ?
-				  AND deleted_at IS NULL
-			)
-		END AS is_valid
-	`
-		args = []any{workOrderID, tenantID, workOrderID, tenantID, investorID, workOrderID, tenantID, investorID}
-	}
 
 	if err := r.db.Client().WithContext(ctx).
-		Raw(query, args...).
+		Raw(query, workOrderID, workOrderID, investorID, workOrderID, investorID).
 		Scan(&row).Error; err != nil {
 		return false, domainerr.Internal("failed to validate invoice investor")
 	}

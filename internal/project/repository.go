@@ -4,18 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 	gorm "gorm.io/gorm"
 
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
-	actorsync "github.com/devpablocristo/ponti-backend/internal/actor"
 	casmod "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	cropmod "github.com/devpablocristo/ponti-backend/internal/crop/repository/models"
 	cusmod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
@@ -26,12 +21,8 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
-
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
-	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
-	sharedtext "github.com/devpablocristo/ponti-backend/internal/shared/text"
 )
 
 type GormEnginePort interface {
@@ -54,22 +45,12 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		if err != nil {
 			return err
 		}
-		tenantID, hasTenant := authz.TenantFromContext(ctx)
-		if !hasTenant && authz.TenantStrictModeEnabled() {
-			return domainerr.TenantMissing()
-		}
 		p.CreatedBy = &userID
 		p.UpdatedBy = &userID
 
-		if err := assertProjectReferencesActive(tx, p); err != nil {
-			return err
-		}
-
 		customer := &cusmod.Customer{
-			ID:       p.Customer.ID,
-			TenantID: tenantID,
-			Name:     p.Customer.Name,
-			ActorID:  p.Customer.ActorID,
+			ID:   p.Customer.ID,
+			Name: p.Customer.Name,
 			Base: base.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
@@ -82,9 +63,8 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		p.Customer.ID = custID
 
 		campaign := &casmod.Campaign{
-			ID:       p.Campaign.ID,
-			TenantID: tenantID,
-			Name:     p.Campaign.Name,
+			ID:   p.Campaign.ID,
+			Name: p.Campaign.Name,
 			Base: base.Base{
 				CreatedBy: p.CreatedBy,
 				UpdatedBy: p.UpdatedBy,
@@ -98,10 +78,8 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 
 		for i := range p.Managers {
 			manager := &manmod.Manager{
-				ID:       p.Managers[i].ID,
-				TenantID: tenantID,
-				Name:     p.Managers[i].Name,
-				ActorID:  p.Managers[i].ActorID,
+				ID:   p.Managers[i].ID,
+				Name: p.Managers[i].Name,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -116,10 +94,8 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 
 		for i := range p.Investors {
 			investor := &invmod.Investor{
-				ID:       p.Investors[i].ID,
-				TenantID: tenantID,
-				Name:     p.Investors[i].Name,
-				ActorID:  p.Investors[i].ActorID,
+				ID:   p.Investors[i].ID,
+				Name: p.Investors[i].Name,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -134,10 +110,8 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 
 		for aci := range p.AdminCostInvestors {
 			AdminCostInv := &invmod.Investor{
-				ID:       p.AdminCostInvestors[aci].ID,
-				TenantID: tenantID,
-				Name:     p.AdminCostInvestors[aci].Name,
-				ActorID:  p.AdminCostInvestors[aci].ActorID,
+				ID:   p.AdminCostInvestors[aci].ID,
+				Name: p.AdminCostInvestors[aci].Name,
 				Base: base.Base{
 					CreatedBy: p.CreatedBy,
 					UpdatedBy: p.UpdatedBy,
@@ -173,10 +147,8 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			}
 			for fi := range p.Fields[key].Investors {
 				id, err := ensureInvestor(tx, &invmod.Investor{
-					ID:       p.Fields[key].Investors[fi].ID,
-					TenantID: tenantID,
-					Name:     p.Fields[key].Investors[fi].Name,
-					ActorID:  p.Fields[key].Investors[fi].ActorID,
+					ID:   p.Fields[key].Investors[fi].ID,
+					Name: p.Fields[key].Investors[fi].Name,
 					Base: base.Base{
 						CreatedBy: p.CreatedBy,
 						UpdatedBy: p.UpdatedBy,
@@ -190,39 +162,10 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 		}
 
 		projectModel := models.FromDomain(p)
-		if hasTenant {
-			applyTenantToProjectModel(projectModel, tenantID)
-		}
-		managerIDs := make([]int64, 0, len(projectModel.Managers))
-		for _, manager := range projectModel.Managers {
-			managerIDs = append(managerIDs, manager.ID)
-		}
-		projectModel.Managers = nil
-		if err := tx.Omit("Managers").Create(&projectModel).Error; err != nil {
+		if err := tx.Create(&projectModel).Error; err != nil {
 			return fmt.Errorf("failed to create project: %w", err)
 		}
 		projectID = projectModel.ID
-		for _, managerID := range managerIDs {
-			if hasTenant {
-				if err := tx.Exec(
-					`INSERT INTO project_managers (tenant_id, project_id, manager_id, created_by, updated_by)
-					 VALUES (?, ?, ?, ?, ?)
-					 ON CONFLICT (project_id, manager_id)
-					 DO UPDATE SET tenant_id = EXCLUDED.tenant_id, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
-					tenantID, projectID, managerID, p.CreatedBy, p.UpdatedBy,
-				).Error; err != nil {
-					return domainerr.Internal("failed to add manager")
-				}
-			} else if err := tx.Exec(
-				"INSERT INTO project_managers (project_id, manager_id, created_by, updated_by) VALUES (?, ?, ?, ?)",
-				projectID, managerID, p.CreatedBy, p.UpdatedBy,
-			).Error; err != nil {
-				return domainerr.Internal("failed to add manager")
-			}
-		}
-		if err := actorsync.RefreshProjectActorMirrors(tx, projectID); err != nil {
-			return err
-		}
 		return nil
 	})
 	if err != nil {
@@ -248,7 +191,6 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Model(&models.Project{}).
 		// Filtrar soft-deletes explícitamente para igualar remoto.
 		Where("deleted_at IS NULL")
-	db0 = tenancy.Scope(ctx, db0, "projects")
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count projects")
@@ -281,11 +223,9 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	baseClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	baseClient = tenancy.Scope(ctx, baseClient, "projects")
 	sumClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	sumClient = tenancy.Scope(ctx, sumClient, "projects")
 	if name != "" {
 		baseClient = baseClient.Where("projects.name = ?", name)
 		sumClient = sumClient.Where("projects.name = ?", name)
@@ -307,8 +247,8 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	var totalHectares decimal.Decimal
 
 	if err := sumClient.
-		Joins("JOIN fields ON fields.project_id = projects.id AND fields.tenant_id = projects.tenant_id AND fields.deleted_at IS NULL").
-		Joins("JOIN lots ON lots.field_id = fields.id AND lots.tenant_id = projects.tenant_id AND lots.deleted_at IS NULL").
+		Joins("JOIN fields ON fields.project_id = projects.id AND fields.deleted_at IS NULL").
+		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to calculate total hectares")
@@ -350,13 +290,11 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Model(&models.Project{}).
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
-	baseClient = tenancy.Scope(ctx, baseClient, "projects")
 	sumClient := r.db.Client().WithContext(ctx).
 		Unscoped().
 		Model(&models.Project{}).
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
-	sumClient = tenancy.Scope(ctx, sumClient, "projects")
 
 	if err := baseClient.Count(&total).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to count archived projects")
@@ -364,8 +302,8 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 
 	var totalHectares decimal.Decimal
 	if err := sumClient.
-		Joins("JOIN fields ON fields.project_id = projects.id AND fields.tenant_id = projects.tenant_id AND fields.deleted_at IS NULL").
-		Joins("JOIN lots ON lots.field_id = fields.id AND lots.tenant_id = projects.tenant_id AND lots.deleted_at IS NULL").
+		Joins("JOIN fields ON fields.project_id = projects.id AND fields.deleted_at IS NULL").
+		Joins("JOIN lots ON lots.field_id = fields.id AND lots.deleted_at IS NULL").
 		Select("COALESCE(SUM(lots.hectares), 0)").
 		Scan(&totalHectares).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to calculate total hectares for archived projects")
@@ -406,7 +344,6 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 		WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
-	base = tenancy.Scope(ctx, base, "projects")
 
 	if customerID > 0 {
 		base = base.Where("customer_id = ?", customerID)
@@ -417,8 +354,9 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	}
 
 	if err := base.
-		Select("id, name").
-		Order("name ASC, id ASC").
+		Select("MIN(id) as id, name").
+		Group("name").
+		Order("name ASC").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Scan(&projects).Error; err != nil {
@@ -435,7 +373,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	}
 
 	var m models.Project
-	query := r.db.Client().WithContext(ctx).
+	err := r.db.Client().WithContext(ctx).
 		Preload("Customer").
 		Preload("Campaign").
 		Preload("Managers").
@@ -450,9 +388,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		}).
 		Preload("Fields.FieldInvestors.Investor").
 		Preload("Fields.Lots.PreviousCrop").
-		Preload("Fields.Lots.CurrentCrop")
-	query = tenancy.Scope(ctx, query, "projects")
-	err := query.
+		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -461,115 +397,15 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get project %d", id))
 	}
 
-	if err := hydrateLegacyActorIDs(r.db.Client().WithContext(ctx), &m); err != nil {
-		return nil, err
-	}
-
 	return m.ToDomain(), nil
 }
 
-// hydrateLegacyActorIDs populates the in-memory ActorID field of each manager
-// and investor (project-level, admin-cost, and field-level) by looking up the
-// legacy_actor_map. Customer.ActorID is already a real column, so it does not
-// need hydration. Without this hydration, the FE receives actor_id = nil for
-// every legacy manager/investor row that was created before the actor sync,
-// which makes the duplicate-name guard in the editor fire false positives
-// (the FE thinks the slot has no identity even though it does).
-func hydrateLegacyActorIDs(db *gorm.DB, m *models.Project) error {
-	managerIDs := make([]int64, 0, len(m.Managers))
-	for _, mgr := range m.Managers {
-		if mgr.ID > 0 {
-			managerIDs = append(managerIDs, mgr.ID)
-		}
-	}
-	investorIDs := make([]int64, 0)
-	for _, piv := range m.Investors {
-		if piv.InvestorID > 0 {
-			investorIDs = append(investorIDs, piv.InvestorID)
-		}
-	}
-	for _, aci := range m.AdminCostInvestors {
-		if aci.InvestorID > 0 {
-			investorIDs = append(investorIDs, aci.InvestorID)
-		}
-	}
-	for _, f := range m.Fields {
-		for _, fi := range f.FieldInvestors {
-			if fi.InvestorID > 0 {
-				investorIDs = append(investorIDs, fi.InvestorID)
-			}
-		}
-	}
-
-	managerActors, err := readLegacyActorIDs(db, actorsync.LegacyManagers, managerIDs)
-	if err != nil {
-		return err
-	}
-	investorActors, err := readLegacyActorIDs(db, actorsync.LegacyInvestors, investorIDs)
-	if err != nil {
-		return err
-	}
-
-	for i := range m.Managers {
-		if actorID, ok := managerActors[m.Managers[i].ID]; ok {
-			id := actorID
-			m.Managers[i].ActorID = &id
-		}
-	}
-	for i := range m.Investors {
-		if actorID, ok := investorActors[m.Investors[i].InvestorID]; ok {
-			id := actorID
-			m.Investors[i].Investor.ActorID = &id
-		}
-	}
-	for i := range m.AdminCostInvestors {
-		if actorID, ok := investorActors[m.AdminCostInvestors[i].InvestorID]; ok {
-			id := actorID
-			m.AdminCostInvestors[i].Investor.ActorID = &id
-		}
-	}
-	for i := range m.Fields {
-		for j := range m.Fields[i].FieldInvestors {
-			if actorID, ok := investorActors[m.Fields[i].FieldInvestors[j].InvestorID]; ok {
-				id := actorID
-				m.Fields[i].FieldInvestors[j].Investor.ActorID = &id
-			}
-		}
-	}
-	return nil
-}
-
-func readLegacyActorIDs(db *gorm.DB, sourceTable string, sourceIDs []int64) (map[int64]int64, error) {
-	result := make(map[int64]int64, len(sourceIDs))
-	if len(sourceIDs) == 0 {
-		return result, nil
-	}
-	type row struct {
-		SourceID int64
-		ActorID  int64
-	}
-	var rows []row
-	if err := db.Table("legacy_actor_map").
-		Where("source_table = ? AND source_id IN ?", sourceTable, sourceIDs).
-		Select("source_id, actor_id").
-		Find(&rows).Error; err != nil {
-		return nil, domainerr.Internal("failed to read legacy actor map")
-	}
-	for _, r := range rows {
-		result[r.SourceID] = r.ActorID
-	}
-	return result, nil
-}
-
-func (r *Repository) GetProjectByNameCustomerAndCampaignID(ctx context.Context, name string, customerID, campaignID int64) (*domain.Project, error) {
+func (r *Repository) GetProjectByNameAndCampaignID(ctx context.Context, name string, campaignID int64) (*domain.Project, error) {
 	var m models.Project
-	query := r.db.Client().WithContext(ctx).
+	err := r.db.Client().WithContext(ctx).
 		Where("name = ?", name).
-		Where("customer_id = ?", customerID).
 		Where("campaign_id = ?", campaignID).
-		Where("deleted_at IS NULL")
-	query = tenancy.Scope(ctx, query, "projects")
-	err := query.
+		Where("deleted_at IS NULL").
 		First(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -583,11 +419,8 @@ func (r *Repository) GetProjectByNameCustomerAndCampaignID(ctx context.Context, 
 
 func (r *Repository) GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error) {
 	var fields []fieldmod.Field
-	query := r.db.Client().WithContext(ctx).
+	err := r.db.Client().WithContext(ctx).
 		Where("project_id = ?", projectID).
-		Where("deleted_at IS NULL")
-	query = tenancy.Scope(ctx, query, "fields")
-	err := query.
 		Find(&fields).Error
 	if err != nil {
 		return nil, domainerr.New(domainerr.KindInternal, fmt.Sprintf("failed to get fields for project %d", projectID))
@@ -618,16 +451,14 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar existencia y optimistic locking dentro de la transacción
 		var existing models.Project
-		query := tx.
+		err := tx.
 			Preload("Managers").
 			Preload("Investors.Investor").
 			Preload("AdminCostInvestors.Investor").
 			Preload("Fields").
 			Preload("Fields.FieldInvestors.Investor").
 			Preload("Fields.Lots").
-			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
-		query = tenancy.Scope(ctx, query, "projects")
-		err := query.
+			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
 			First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFound("project not found or outdated")
@@ -637,47 +468,41 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		}
 
 		d.CreatedBy = existing.CreatedBy
-
-		if err := assertProjectReferencesActive(tx, d); err != nil {
-			return err
-		}
-
 		updates := map[string]any{
 			"updated_by": d.UpdatedBy,
 		}
 
-		customer := &cusmod.Customer{
-			ID:      d.Customer.ID,
-			Name:    d.Customer.Name,
-			ActorID: d.Customer.ActorID,
-			Base: base.Base{
-				CreatedBy: d.UpdatedBy,
-				UpdatedBy: d.UpdatedBy,
-			},
-		}
-		custID, err := ensureCustomerForUpdate(tx, customer)
-		if err != nil {
-			return err
-		}
-		d.Customer.ID = custID
-		if existing.CustomerID != custID {
+		if existing.CustomerID != d.Customer.ID {
+			customer := &cusmod.Customer{
+				ID:   d.Customer.ID,
+				Name: d.Customer.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			}
+			custID, err := ensureCustomer(tx, customer)
+			if err != nil {
+				return err
+			}
+			d.Customer.ID = custID
 			updates["customer_id"] = custID
 		}
 
-		campaign := &casmod.Campaign{
-			ID:   d.Campaign.ID,
-			Name: d.Campaign.Name,
-			Base: base.Base{
-				CreatedBy: d.UpdatedBy,
-				UpdatedBy: d.UpdatedBy,
-			},
-		}
-		campID, err := ensureCampaignForUpdate(tx, campaign)
-		if err != nil {
-			return err
-		}
-		d.Campaign.ID = campID
-		if existing.CampaignID != campID {
+		if existing.CampaignID != d.Campaign.ID {
+			campaign := &casmod.Campaign{
+				ID:   d.Campaign.ID,
+				Name: d.Campaign.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			}
+			campID, err := ensureCampaign(tx, campaign)
+			if err != nil {
+				return err
+			}
+			d.Campaign.ID = campID
 			updates["campaign_id"] = campID
 		}
 
@@ -694,12 +519,9 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 		}
 
 		if len(updates) > 0 {
-			updateQuery := tx.Model(&models.Project{}).
-				Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
-			if existing.TenantID != uuid.Nil {
-				updateQuery = updateQuery.Where("tenant_id = ?", existing.TenantID)
-			}
-			result := updateQuery.Updates(updates)
+			result := tx.Model(&models.Project{}).
+				Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
+				Updates(updates)
 			if result.Error != nil {
 				return domainerr.Internal("failed to update project")
 			}
@@ -729,10 +551,6 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			return err
 		}
 
-		if err := actorsync.RefreshProjectActorMirrors(tx, d.ID); err != nil {
-			return err
-		}
-
 		return nil
 	})
 }
@@ -747,50 +565,118 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	deletedBy := &userID
+	var deletedBy *string
+	deletedBy = &userID
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		archivedAt := time.Now()
 		var project models.Project
-		projectQuery := tx.Unscoped().Select("id", "tenant_id", "customer_id", "deleted_at").Where("id = ?", id)
-		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
-		if err := projectQuery.First(&project).Error; err != nil {
+		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
 			return domainerr.Internal("failed to load project")
 		}
-		if project.DeletedAt.Valid {
-			return domainerr.Conflict("project already archived")
+
+		var count int64
+		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check project existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 		}
 
-		batch, err := lifecycle.CreateArchiveBatch(tx, project.TenantID, "projects", id, nil, deletedBy)
-		if err != nil {
-			return err
-		}
-		cause := lifecycle.CauseFromBatch(batch)
-
-		// Centralized cascade: walks the projects Policy graph (CascadeTables
-		// = project_managers, project_investors, admin_cost_investors,
-		// project_dollar_values, crop_commercializations; ChildEntities =
-		// fields → lots, workorders → items/splits, drafts, labors, supplies,
-		// supply_movements, stocks). Replaces the hand-rolled cascade that
-		// previously lived inline (with a known bug: pluck-after-archive
-		// missed workorder_items / work_order_draft_items).
-		if err := lifecycle.RunCascadeArchive(tx, "projects", id, project.TenantID, archivedAt, deletedBy, cause); err != nil {
-			return err
+		if deletedBy != nil {
+			var userCount int64
+			if err := tx.Table("users").
+				Where("id = ?", *deletedBy).
+				Count(&userCount).Error; err != nil {
+				return domainerr.Internal("failed to validate deleted_by")
+			}
+			if userCount == 0 {
+				deletedBy = nil
+			}
 		}
 
-		// Archive the project row itself.
-		deleteQuery := tx.Model(&models.Project{}).Where("id = ?", id)
-		if project.TenantID != uuid.Nil {
-			deleteQuery = deleteQuery.Where("tenant_id = ?", project.TenantID)
+		// clear managers
+		if err := tx.Exec("UPDATE project_managers SET deleted_at = ?, deleted_by = ? WHERE project_id = ?", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to clear managers")
 		}
-		if err := deleteQuery.Updates(lifecycle.ArchiveUpdates(tx, "projects", archivedAt, deletedBy, cause)).Error; err != nil {
+
+		// clear investors
+		if err := tx.Model(&models.ProjectInvestor{}).Where("project_id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
+			return domainerr.Internal("failed to clear investors")
+		}
+
+		// clear fields
+		var fieldIDs []int64
+		if err := tx.Model(&fieldmod.Field{}).
+			Where("project_id = ?", id).
+			Pluck("id", &fieldIDs).Error; err != nil {
+			return domainerr.Internal("failed to get field ids")
+		}
+
+		if len(fieldIDs) > 0 {
+			if err := tx.Model(&lotmod.Lot{}).
+				Where("field_id IN ?", fieldIDs).
+				Updates(map[string]any{
+					"deleted_at": time.Now(),
+					"deleted_by": deletedBy,
+				}).Error; err != nil {
+				return domainerr.Internal("failed to soft delete lots")
+			}
+		}
+
+		// clear workorders
+		if err := tx.Exec("UPDATE workorders SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete workorders")
+		}
+
+		// clear supply_movements
+		if err := tx.Exec("UPDATE supply_movements SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete supply_movements")
+		}
+
+		// clear stocks
+		if err := tx.Exec("UPDATE stocks SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete stocks")
+		}
+
+		// clear crop_commercializations
+		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete commercializations")
+		}
+
+		// clear project_dollar_values
+		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete dollar values")
+		}
+
+		// clear admin_cost_investors
+		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = ?, deleted_by = ? WHERE project_id = ? AND deleted_at IS NULL", time.Now(), deletedBy, id).Error; err != nil {
+			return domainerr.Internal("failed to soft delete admin cost investors")
+		}
+
+		if err := tx.Model(&fieldmod.Field{}).
+			Where("id IN ?", fieldIDs).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": deletedBy,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to soft delete fields")
+		}
+
+		// delete project
+		if err := tx.Model(&models.Project{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": deletedBy,
+		}).Error; err != nil {
 			return domainerr.Internal("failed to delete project")
 		}
 
-		if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
 			return err
 		}
 
@@ -805,113 +691,92 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		restoredAt := time.Now()
 		// Verificar que el proyecto esté eliminado
 		var project models.Project
-		projectQuery := tx.Unscoped().Where("id = ?", id)
-		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
-		if err := projectQuery.First(&project).Error; err != nil {
+		if err := tx.Unscoped().Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
 			return domainerr.Internal("failed to check project")
 		}
 
-		rowState, err := lifecycle.ReadRowState(tx, "projects", id)
-		if err != nil {
-			return err
-		}
-		cause := lifecycle.CauseFromRow(rowState, "projects", id)
-
 		if !project.DeletedAt.Valid {
-			if err := restoreActiveProjectGraph(tx, project.TenantID, id, restoredAt, cause); err != nil {
-				return err
-			}
-			if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
-				return err
-			}
-			return nil
-		}
-
-		var activeCustomerCount int64
-		customerQuery := tx.Model(&cusmod.Customer{}).Where("id = ? AND deleted_at IS NULL", project.CustomerID)
-		if project.TenantID != uuid.Nil {
-			customerQuery = customerQuery.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := customerQuery.Count(&activeCustomerCount).Error; err != nil {
-			return domainerr.Internal("failed to check customer")
-		}
-		if activeCustomerCount == 0 {
-			return domainerr.Conflict("project parent customer is archived")
+			return domainerr.Validation("project is not deleted, cannot restore")
 		}
 
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)
-		restoreQuery := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id)
-		if project.TenantID != uuid.Nil {
-			restoreQuery = restoreQuery.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := restoreQuery.Updates(lifecycle.RestoreUpdates(tx, "projects", restoredAt)).Error; err != nil {
+		if err := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id).Updates(map[string]any{
+			"deleted_at": nil,
+			"updated_at": time.Now(),
+		}).Error; err != nil {
 			return domainerr.Internal("failed to restore project")
 		}
 
 		// Restaurar managers
-		managerRestore := tx.Table("project_managers").Where("project_id = ? AND deleted_at IS NOT NULL", id)
-		managerRestore = lifecycle.ApplyCauseScope(managerRestore, "project_managers", cause)
-		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_managers", "tenant_id") {
-			managerRestore = managerRestore.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := managerRestore.Updates(lifecycle.RestoreUpdates(tx, "project_managers", restoredAt)).Error; err != nil {
+		if err := tx.Exec("UPDATE project_managers SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
 			return domainerr.Internal("failed to restore managers")
 		}
 
 		// Restaurar investors
-		investorRestore := tx.Table("project_investors").Where("project_id = ? AND deleted_at IS NOT NULL", id)
-		investorRestore = lifecycle.ApplyCauseScope(investorRestore, "project_investors", cause)
-		if project.TenantID != uuid.Nil && tx.Migrator().HasColumn("project_investors", "tenant_id") {
-			investorRestore = investorRestore.Where("tenant_id = ?", project.TenantID)
-		}
-		if err := investorRestore.Updates(lifecycle.RestoreUpdates(tx, "project_investors", restoredAt)).Error; err != nil {
+		if err := tx.Exec("UPDATE project_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
 			return domainerr.Internal("failed to restore investors")
 		}
 
-		fieldIDs, err := restoreProjectFieldIDs(tx, project.TenantID, id, cause)
-		if err != nil {
+		// Restaurar fields (obtener IDs primero)
+		var fieldIDs []int64
+		if err := tx.Unscoped().Model(&fieldmod.Field{}).
+			Where("project_id = ? AND deleted_at IS NOT NULL", id).
+			Pluck("id", &fieldIDs).Error; err != nil {
 			return domainerr.Internal("failed to get field ids")
-		}
-		lotIDs, err := projectLotIDs(tx, project.TenantID, fieldIDs, false, cause)
-		if err != nil {
-			return err
-		}
-		workOrderIDs, err := restoreProjectChildIDs(tx, "workorders", "id", project.TenantID, cause, "project_id = ?", id)
-		if err != nil {
-			return err
-		}
-		draftIDs, err := restoreProjectChildIDs(tx, "work_order_drafts", "id", project.TenantID, cause, "project_id = ?", id)
-		if err != nil {
-			return err
 		}
 
 		// Restaurar fields
-		if err := lifecycle.RestoreScopedRows(tx, "fields", project.TenantID, restoredAt, cause, "project_id = ?", id); err != nil {
+		if err := tx.Exec("UPDATE fields SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
 			return domainerr.Internal("failed to restore fields")
 		}
 
 		// Restaurar lots (solo los que pertenecen a los fields de este proyecto)
 		if len(fieldIDs) > 0 {
-			if err := lifecycle.RestoreScopedRows(tx, "lots", project.TenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
+			if err := tx.Exec("UPDATE lots SET deleted_at = NULL, updated_at = ? WHERE field_id IN ? AND deleted_at IS NOT NULL", time.Now(), fieldIDs).Error; err != nil {
 				return domainerr.Internal("failed to restore lots")
 			}
 		}
 
-		if err := restoreProjectGraphChildren(tx, project.TenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, restoredAt, cause); err != nil {
-			return err
+		// Restaurar workorders
+		if err := tx.Exec("UPDATE workorders SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore workorders")
 		}
 
-		if err := restoreProjectScopedTables(tx, id, restoredAt, cause); err != nil {
-			return err
+		// Restaurar supply_movements
+		if err := tx.Exec("UPDATE supply_movements SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore supply_movements")
 		}
 
-		if err := actorsync.RefreshProjectActorMirrors(tx, id); err != nil {
+		// Restaurar stocks
+		if err := tx.Exec("UPDATE stocks SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore stocks")
+		}
+
+		// Restaurar crop_commercializations
+		if err := tx.Exec("UPDATE crop_commercializations SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore commercializations")
+		}
+
+		// Restaurar project_dollar_values
+		if err := tx.Exec("UPDATE project_dollar_values SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore dollar values")
+		}
+
+		// Restaurar admin_cost_investors
+		if err := tx.Exec("UPDATE admin_cost_investors SET deleted_at = NULL, updated_at = ? WHERE project_id = ? AND deleted_at IS NOT NULL", time.Now(), id).Error; err != nil {
+			return domainerr.Internal("failed to restore admin cost investors")
+		}
+
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
+			deletedBy = &userID
+		}
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
 			return err
 		}
 
@@ -919,430 +784,137 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	})
 }
 
-func restoreActiveProjectGraph(tx *gorm.DB, tenantID uuid.UUID, projectID int64, restoredAt time.Time, cause lifecycle.Cause) error {
-	fieldIDs, err := restoreProjectFieldIDs(tx, tenantID, projectID, cause)
-	if err != nil {
-		return domainerr.Internal("failed to get field ids")
-	}
-	lotIDs, err := projectLotIDs(tx, tenantID, fieldIDs, false, cause)
-	if err != nil {
-		return err
-	}
-	workOrderIDs, err := restoreProjectChildIDs(tx, "workorders", "id", tenantID, cause, "project_id = ?", projectID)
-	if err != nil {
-		return err
-	}
-	draftIDs, err := restoreProjectChildIDs(tx, "work_order_drafts", "id", tenantID, cause, "project_id = ?", projectID)
-	if err != nil {
-		return err
-	}
-	if err := lifecycle.RestoreScopedRows(tx, "fields", tenantID, restoredAt, cause, "project_id = ?", projectID); err != nil {
-		return domainerr.Internal("failed to restore fields")
-	}
-	if len(fieldIDs) > 0 {
-		if err := lifecycle.RestoreScopedRows(tx, "lots", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
-			return domainerr.Internal("failed to restore lots")
-		}
-	}
-	if err := restoreProjectGraphChildren(tx, tenantID, fieldIDs, lotIDs, workOrderIDs, draftIDs, restoredAt, cause); err != nil {
-		return err
-	}
-	return restoreProjectScopedTables(tx, projectID, restoredAt, cause)
-}
-
-type projectScopedSoftDeleteTable struct {
-	name         string
-	errorMessage string
-}
-
-var projectScopedSoftDeleteTables = []projectScopedSoftDeleteTable{
-	{name: "workorders", errorMessage: "failed to soft delete workorders"},
-	{name: "work_order_drafts", errorMessage: "failed to soft delete work order drafts"},
-	{name: "labors", errorMessage: "failed to soft delete labors"},
-	{name: "supplies", errorMessage: "failed to soft delete supplies"},
-	{name: "supply_movements", errorMessage: "failed to soft delete supply_movements"},
-	{name: "stocks", errorMessage: "failed to soft delete stocks"},
-	{name: "crop_commercializations", errorMessage: "failed to soft delete commercializations"},
-	{name: "project_dollar_values", errorMessage: "failed to soft delete dollar values"},
-	{name: "admin_cost_investors", errorMessage: "failed to soft delete admin cost investors"},
-}
-
-func restoreProjectGraphChildren(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, lotIDs []int64, workOrderIDs []int64, draftIDs []int64, restoredAt time.Time, cause lifecycle.Cause) error {
-	if len(fieldIDs) > 0 {
-		if err := lifecycle.RestoreScopedRows(tx, "field_investors", tenantID, restoredAt, cause, "field_id IN ?", fieldIDs); err != nil {
-			return err
-		}
-	}
-	if len(lotIDs) > 0 {
-		if err := lifecycle.RestoreScopedRows(tx, "lot_dates", tenantID, restoredAt, cause, "lot_id IN ?", lotIDs); err != nil {
-			return err
-		}
-	}
-	if len(workOrderIDs) > 0 {
-		if err := lifecycle.RestoreScopedRows(tx, "workorder_items", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.RestoreScopedRows(tx, "workorder_investor_splits", tenantID, restoredAt, cause, "workorder_id IN ?", workOrderIDs); err != nil {
-			return err
-		}
-	}
-	if len(draftIDs) > 0 {
-		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_items", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-		if err := lifecycle.RestoreScopedRows(tx, "work_order_draft_investor_splits", tenantID, restoredAt, cause, "draft_id IN ?", draftIDs); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func restoreProjectFieldIDs(tx *gorm.DB, tenantID uuid.UUID, projectID int64, cause lifecycle.Cause) ([]int64, error) {
-	return restoreProjectChildIDs(tx, "fields", "id", tenantID, cause, "project_id = ?", projectID)
-}
-
-func projectLotIDs(tx *gorm.DB, tenantID uuid.UUID, fieldIDs []int64, active bool, cause lifecycle.Cause) ([]int64, error) {
-	if len(fieldIDs) == 0 {
-		return []int64{}, nil
-	}
-	where := "field_id IN ? AND deleted_at IS NULL"
-	if !active {
-		return restoreProjectChildIDs(tx, "lots", "id", tenantID, cause, "field_id IN ?", fieldIDs)
-	}
-	return lifecycle.ListScopedIDs(tx, "lots", "id", tenantID, where, fieldIDs)
-}
-
-func restoreProjectChildIDs(tx *gorm.DB, table string, idColumn string, tenantID uuid.UUID, cause lifecycle.Cause, where string, args ...any) ([]int64, error) {
-	if !tx.Migrator().HasTable(table) {
-		return []int64{}, nil
-	}
-	query := tx.Table(table).Where(where, args...).Where("deleted_at IS NOT NULL")
-	query = lifecycle.ApplyCauseScope(query, table, cause)
-	if tenantID != uuid.Nil && tx.Migrator().HasColumn(table, "tenant_id") {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	var ids []int64
-	if err := query.Pluck(idColumn, &ids).Error; err != nil {
-		return nil, domainerr.Internal("failed to list archived " + table)
-	}
-	return ids, nil
-}
-
-func restoreProjectScopedTables(tx *gorm.DB, projectID int64, restoredAt time.Time, cause lifecycle.Cause) error {
-	for _, table := range projectScopedSoftDeleteTables {
-		if !tx.Migrator().HasTable(table.name) {
-			continue
-		}
-		update := tx.Table(table.name).Where("project_id = ? AND deleted_at IS NOT NULL", projectID)
-		update = lifecycle.ApplyCauseScope(update, table.name, cause)
-		if tenantID, ok := tenantIDFromTx(tx); ok && tx.Migrator().HasColumn(table.name, "tenant_id") {
-			update = update.Where("tenant_id = ?", tenantID)
-		}
-		if err := update.Updates(lifecycle.RestoreUpdates(tx, table.name, restoredAt)).Error; err != nil {
-			return domainerr.Internal("failed to restore " + table.name)
-		}
-	}
-	return nil
-}
-
-// HardDeleteProject elimina definitivamente un proyecto archivado y su grafo
-// archivado. Si queda algún dependiente activo, bloquea con 409: hard-delete no
-// debe ocultar un estado operacional activo.
-func (r *Repository) HardDeleteProject(ctx context.Context, id int64) error {
+// DeleteProject elimina físicamente un proyecto y todas sus entidades relacionadas.
+func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "project"); err != nil {
 		return err
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		projectQuery := tx.Unscoped().Where("id = ?", id)
-		projectQuery = tenancy.Scope(ctx, projectQuery, "projects")
+		// Verificar que el proyecto existe (con Unscoped para incluir eliminados)
 		var project models.Project
-		if err := projectQuery.First(&project).Error; err != nil {
+		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
+			return domainerr.Internal("failed to load project")
+		}
+
+		var count int64
+		if err := tx.Unscoped().Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check project existence")
 		}
-		if !project.DeletedAt.Valid {
-			return domainerr.Conflict("project must be archived before hard delete")
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 		}
 
-		graph, err := collectProjectHardDeleteGraph(tx, id, project.TenantID)
-		if err != nil {
-			return err
-		}
-		if err := blockActiveProjectHardDeleteGraph(tx, id, project.TenantID, graph); err != nil {
-			return err
-		}
-		if err := hardDeleteArchivedProjectGraph(tx, id, project.TenantID, graph); err != nil {
-			return err
+		// Obtener field IDs antes de eliminar
+		var fieldIDs []int64
+		if err := tx.Unscoped().Model(&fieldmod.Field{}).
+			Where("project_id = ?", id).
+			Pluck("id", &fieldIDs).Error; err != nil {
+			return domainerr.Internal("failed to get field ids")
 		}
 
-		deleteQuery := tx.Unscoped()
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
-			deleteQuery = deleteQuery.Where("tenant_id = ?", tenantID)
+		// Eliminar workorder_items primero (dependen de workorders)
+		if err := tx.Exec(`
+			DELETE FROM workorder_items 
+			WHERE workorder_id IN (
+				SELECT id FROM workorders WHERE project_id = ?
+			)
+		`, id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete workorder_items")
 		}
-		if err := deleteQuery.Delete(&models.Project{}, "id = ?", id).Error; err != nil {
-			return domainerr.Internal("failed to hard delete project")
+
+		// Eliminar workorders
+		if err := tx.Exec("DELETE FROM workorders WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete workorders")
 		}
-		return nil
-	})
-}
 
-type projectHardDeleteGraph struct {
-	fieldIDs     []int64
-	lotIDs       []int64
-	workOrderIDs []int64
-	draftIDs     []int64
-	supplyIDs    []int64
-}
-
-type projectHardDeleteActiveRef struct {
-	table string
-	label string
-	where string
-	args  []any
-}
-
-func collectProjectHardDeleteGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID) (projectHardDeleteGraph, error) {
-	var graph projectHardDeleteGraph
-	var err error
-
-	graph.fieldIDs, err = listProjectHardDeleteIDs(tx, "fields", "id", tenantID, "project_id = ?", projectID)
-	if err != nil {
-		return graph, err
-	}
-	graph.lotIDs, err = listProjectHardDeleteIDs(tx, "lots", "id", tenantID, "field_id IN ?", graph.fieldIDs)
-	if err != nil {
-		return graph, err
-	}
-	graph.workOrderIDs, err = listProjectHardDeleteIDs(tx, "workorders", "id", tenantID, "project_id = ?", projectID)
-	if err != nil {
-		return graph, err
-	}
-	graph.draftIDs, err = listProjectHardDeleteIDs(tx, "work_order_drafts", "id", tenantID, "project_id = ?", projectID)
-	if err != nil {
-		return graph, err
-	}
-	graph.supplyIDs, err = listProjectHardDeleteIDs(tx, "supplies", "id", tenantID, "project_id = ?", projectID)
-	if err != nil {
-		return graph, err
-	}
-	return graph, nil
-}
-
-func blockActiveProjectHardDeleteGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID, graph projectHardDeleteGraph) error {
-	refs := []projectHardDeleteActiveRef{
-		{table: "fields", label: "field(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "lots", label: "lot(s)", where: "field_id IN ?", args: []any{graph.fieldIDs}},
-		{table: "workorders", label: "work order(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "work_order_drafts", label: "work order draft(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "labors", label: "labor record(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "supplies", label: "supply record(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "supply_movements", label: "supply movement(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "stocks", label: "stock record(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "crop_commercializations", label: "commercialization record(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_dollar_values", label: "dollar value record(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_managers", label: "manager assignment(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_investors", label: "investor assignment(s)", where: "project_id = ?", args: []any{projectID}},
-		{table: "admin_cost_investors", label: "admin cost investor record(s)", where: "project_id = ?", args: []any{projectID}},
-	}
-	for _, ref := range refs {
-		n, err := countProjectHardDeleteRows(tx, ref.table, tenantID, true, ref.where, ref.args...)
-		if err != nil {
-			return err
+		// Eliminar supply_movements (tiene RESTRICT, debe eliminarse antes)
+		if err := tx.Exec("DELETE FROM supply_movements WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete supply_movements")
 		}
-		if n > 0 {
-			return domainerr.Conflict(fmt.Sprintf("project has %d active %s; archive or hard-delete them first", n, ref.label))
+
+		// Eliminar stocks (tiene RESTRICT, debe eliminarse antes)
+		if err := tx.Exec("DELETE FROM stocks WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete stocks")
 		}
-	}
 
-	invoiceCount, err := countProjectHardDeleteRows(tx, "invoices", tenantID, false, "work_order_id IN ?", graph.workOrderIDs)
-	if err != nil {
-		return err
-	}
-	if invoiceCount > 0 {
-		return domainerr.Conflict(fmt.Sprintf("project has %d invoice(s); hard-delete them first", invoiceCount))
-	}
-	return nil
-}
-
-func hardDeleteArchivedProjectGraph(tx *gorm.DB, projectID int64, tenantID uuid.UUID, graph projectHardDeleteGraph) error {
-	deletes := []projectHardDeleteActiveRef{
-		{table: "work_order_draft_items", where: "draft_id IN ?", args: []any{graph.draftIDs}},
-		{table: "work_order_draft_investor_splits", where: "draft_id IN ?", args: []any{graph.draftIDs}},
-		{table: "workorder_items", where: "workorder_id IN ?", args: []any{graph.workOrderIDs}},
-		{table: "workorder_investor_splits", where: "workorder_id IN ?", args: []any{graph.workOrderIDs}},
-		{table: "lot_dates", where: "lot_id IN ?", args: []any{graph.lotIDs}},
-		{table: "field_investors", where: "field_id IN ?", args: []any{graph.fieldIDs}},
-		{table: "work_order_drafts", where: "id IN ?", args: []any{graph.draftIDs}},
-		{table: "workorders", where: "id IN ?", args: []any{graph.workOrderIDs}},
-		{table: "supply_movements", where: "project_id = ?", args: []any{projectID}},
-		{table: "stocks", where: "project_id = ?", args: []any{projectID}},
-		{table: "labors", where: "project_id = ?", args: []any{projectID}},
-		{table: "supplies", where: "project_id = ?", args: []any{projectID}},
-		{table: "crop_commercializations", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_dollar_values", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_managers", where: "project_id = ?", args: []any{projectID}},
-		{table: "project_investors", where: "project_id = ?", args: []any{projectID}},
-		{table: "admin_cost_investors", where: "project_id = ?", args: []any{projectID}},
-		{table: "lots", where: "id IN ?", args: []any{graph.lotIDs}},
-		{table: "fields", where: "id IN ?", args: []any{graph.fieldIDs}},
-	}
-	for _, d := range deletes {
-		if err := deleteProjectHardDeleteRows(tx, d.table, tenantID, d.where, d.args...); err != nil {
-			return err
+		// Eliminar crop_commercializations
+		if err := tx.Exec("DELETE FROM crop_commercializations WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete commercializations")
 		}
-	}
-	return nil
-}
 
-func listProjectHardDeleteIDs(tx *gorm.DB, table string, idColumn string, tenantID uuid.UUID, where string, args ...any) ([]int64, error) {
-	if !tx.Migrator().HasTable(table) || !tx.Migrator().HasColumn(table, idColumn) || hasEmptyHardDeleteArg(args) {
-		return []int64{}, nil
-	}
-	query := tx.Unscoped().Table(table).Where(where, args...)
-	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
-	var ids []int64
-	if err := query.Pluck(idColumn, &ids).Error; err != nil {
-		return nil, domainerr.Internal("failed to list " + table)
-	}
-	return ids, nil
-}
+		// Eliminar project_dollar_values (tiene RESTRICT, debe eliminarse antes)
+		if err := tx.Exec("DELETE FROM project_dollar_values WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete dollar values")
+		}
 
-func countProjectHardDeleteRows(tx *gorm.DB, table string, tenantID uuid.UUID, activeOnly bool, where string, args ...any) (int64, error) {
-	if !tx.Migrator().HasTable(table) || hasEmptyHardDeleteArg(args) {
-		return 0, nil
-	}
-	query := tx.Unscoped().Table(table).Where(where, args...)
-	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
-	if activeOnly && tx.Migrator().HasColumn(table, "deleted_at") {
-		query = query.Where("deleted_at IS NULL")
-	}
-	var n int64
-	if err := query.Count(&n).Error; err != nil {
-		return 0, domainerr.Internal("failed to check " + table)
-	}
-	return n, nil
-}
-
-func deleteProjectHardDeleteRows(tx *gorm.DB, table string, tenantID uuid.UUID, where string, args ...any) error {
-	if !tx.Migrator().HasTable(table) || hasEmptyHardDeleteArg(args) {
-		return nil
-	}
-	query := tx.Unscoped().Table(table).Where(where, args...)
-	query = scopeProjectHardDeleteTenant(tx, query, table, tenantID)
-	if err := query.Delete(map[string]any{}).Error; err != nil {
-		return domainerr.Internal("failed to hard delete " + table)
-	}
-	return nil
-}
-
-func scopeProjectHardDeleteTenant(root *gorm.DB, query *gorm.DB, table string, tenantID uuid.UUID) *gorm.DB {
-	if tenantID != uuid.Nil && root.Migrator().HasColumn(table, "tenant_id") {
-		return query.Where("tenant_id = ?", tenantID)
-	}
-	return query
-}
-
-func hasEmptyHardDeleteArg(args []any) bool {
-	for _, arg := range args {
-		switch v := arg.(type) {
-		case []int64:
-			if len(v) == 0 {
-				return true
+		// Eliminar field_investors (tiene CASCADE pero lo hacemos explícitamente)
+		if len(fieldIDs) > 0 {
+			if err := tx.Exec("DELETE FROM field_investors WHERE field_id IN ?", fieldIDs).Error; err != nil {
+				return domainerr.Internal("failed to hard delete field_investors")
 			}
 		}
-	}
-	return false
+
+		// Eliminar lots (dependen de fields)
+		if len(fieldIDs) > 0 {
+			if err := tx.Exec("DELETE FROM lots WHERE field_id IN ?", fieldIDs).Error; err != nil {
+				return domainerr.Internal("failed to hard delete lots")
+			}
+		}
+
+		// Eliminar fields
+		if err := tx.Exec("DELETE FROM fields WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete fields")
+		}
+
+		// Eliminar project_managers (tabla many-to-many)
+		if err := tx.Exec("DELETE FROM project_managers WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete project_managers")
+		}
+
+		// Eliminar project_investors (tiene CASCADE pero lo hacemos explícitamente)
+		if err := tx.Exec("DELETE FROM project_investors WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete project_investors")
+		}
+
+		// Eliminar admin_cost_investors (tiene CASCADE pero lo hacemos explícitamente)
+		if err := tx.Exec("DELETE FROM admin_cost_investors WHERE project_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete admin_cost_investors")
+		}
+
+		// Finalmente eliminar el proyecto
+		if err := tx.Unscoped().Exec("DELETE FROM projects WHERE id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to hard delete project")
+		}
+
+		var deletedBy *string
+		if userID, err := actorFromContext(ctx); err == nil {
+			deletedBy = &userID
+		}
+		if err := syncCustomerArchiveState(tx, project.CustomerID, deletedBy); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // --- HELPERS ---
 
 func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		c.TenantID = tenantID
-	}
-	result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
-		CustomerID: c.ID,
-		ActorID:    c.ActorID,
-		Name:       c.Name,
-		CreatedAt:  c.CreatedAt,
-		UpdatedAt:  c.UpdatedAt,
-		CreatedBy:  c.CreatedBy,
-		UpdatedBy:  c.UpdatedBy,
-	})
-	if err != nil {
-		return 0, err
-	}
-	if result != nil {
-		c.ActorID = &result.ActorID
-		return result.CustomerID, nil
-	}
 	if c.ID != 0 {
 		var existing cusmod.Customer
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, c.ID).Error; err == nil {
-			effectiveName := existing.Name
-			canonicalIncoming := sharedtext.CanonicalizeName(c.Name)
-			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
-				renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
-				if hasTenant {
-					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
-				}
-				if err := renameQuery.Updates(map[string]any{
-					"name":       canonicalIncoming,
-					"updated_at": time.Now(),
-					"updated_by": c.UpdatedBy,
-				}).Error; err != nil {
-					if isUniqueNameViolation(err) {
-						return 0, domainerr.Conflict("customer already exists")
-					}
-					return 0, fmt.Errorf("failed to rename customer: %w", err)
-				}
-				effectiveName = canonicalIncoming
-			}
-			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-				SourceTable: actorsync.LegacyCustomers,
-				SourceID:    existing.ID,
-				Name:        effectiveName,
-				ActorKind:   actorsync.KindOrganization,
-				Role:        actorsync.RoleCliente,
-				CreatedAt:   existing.CreatedAt,
-				UpdatedAt:   time.Now(),
-				CreatedBy:   existing.CreatedBy,
-				UpdatedBy:   c.UpdatedBy,
-			}); err != nil {
-				return 0, err
-			}
+		if err := tx.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check customer: %w", err)
 		}
 	}
 	var existing cusmod.Customer
-	query := tx.Where("name = ?", c.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyCustomers,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindOrganization,
-			Role:        actorsync.RoleCliente,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   c.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check customer: %w", err)
@@ -1351,45 +923,20 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create customer: %w", err)
 	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyCustomers,
-		SourceID:    c.ID,
-		Name:        c.Name,
-		ActorKind:   actorsync.KindOrganization,
-		Role:        actorsync.RoleCliente,
-		CreatedAt:   c.CreatedAt,
-		UpdatedAt:   c.UpdatedAt,
-		CreatedBy:   c.CreatedBy,
-		UpdatedBy:   c.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
 	return c.ID, nil
 }
 
 func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		c.TenantID = tenantID
-	}
 	if c.ID != 0 {
 		var existing casmod.Campaign
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, c.ID).Error; err == nil {
+		if err := tx.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check campaign: %w", err)
 		}
 	}
 	var existing casmod.Campaign
-	query := tx.Where("name = ?", c.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check campaign: %w", err)
@@ -1401,275 +948,17 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	return c.ID, nil
 }
 
-// ensureCustomerForUpdate is the strict variant used by UpdateProject.
-// Behavior depends on the incoming identifier:
-//
-//   - If `c.ID != 0`: strict lookup by ID. The customer must exist. If the
-//     payload sends a non-empty name, update that customer row because the
-//     project editor exposes the shared customer name inline.
-//
-//   - If `c.ID == 0`: the FE signalled "this is a new customer association"
-//     (typically because the user typed free text in the picker instead of
-//     selecting from the dropdown). Look up by name; if a customer with that
-//     name exists, link to it (no rename either way). If not, create a new
-//     customer. This is the `freeSolo` + create-or-link-on-save flow.
-func ensureCustomerForUpdate(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		c.TenantID = tenantID
-	}
-
-	if c.ActorID != nil && *c.ActorID > 0 {
-		result, err := actorsync.EnsureCustomerFromActor(tx, actorsync.EnsureCustomerInput{
-			CustomerID: c.ID,
-			ActorID:    c.ActorID,
-			Name:       c.Name,
-			CreatedAt:  c.CreatedAt,
-			UpdatedAt:  c.UpdatedAt,
-			CreatedBy:  c.CreatedBy,
-			UpdatedBy:  c.UpdatedBy,
-		})
-		if err != nil {
-			return 0, err
-		}
-		if result != nil {
-			c.ActorID = &result.ActorID
-			return result.CustomerID, nil
-		}
-	}
-
-	if c.ID != 0 {
-		var existing cusmod.Customer
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, c.ID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return 0, domainerr.Validation(fmt.Sprintf("customer %d not found", c.ID))
-			}
-			return 0, fmt.Errorf("failed to check customer: %w", err)
-		}
-		effectiveName := existing.Name
-		canonicalIncoming := sharedtext.CanonicalizeName(c.Name)
-		if canonicalIncoming != "" && canonicalIncoming != existing.Name {
-			renameQuery := tx.Table("customers").Where("id = ?", existing.ID)
-			if hasTenant {
-				renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
-			}
-			if err := renameQuery.Updates(map[string]any{
-				"name":       canonicalIncoming,
-				"updated_at": time.Now(),
-				"updated_by": c.UpdatedBy,
-			}).Error; err != nil {
-				if isUniqueNameViolation(err) {
-					return 0, domainerr.Conflict("customer already exists")
-				}
-				return 0, fmt.Errorf("failed to rename customer: %w", err)
-			}
-			effectiveName = canonicalIncoming
-		}
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyCustomers,
-			SourceID:    existing.ID,
-			Name:        effectiveName,
-			ActorKind:   actorsync.KindOrganization,
-			Role:        actorsync.RoleCliente,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   c.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
-		return existing.ID, nil
-	}
-
-	// c.ID == 0 → lookup by name (case-insensitive) or create. Consistent with
-	// the original ensureCustomer's by-name fallback: we match raw text but
-	// case-insensitively so "Beta Inc" and "beta inc" resolve to the same row.
-	if c.Name == "" {
-		return 0, domainerr.Validation("customer name is required")
-	}
-	var existing cusmod.Customer
-	query := tx.Where("LOWER(name) = LOWER(?)", c.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check customer by name: %w", err)
-	}
-
-	if err := tx.Create(c).Error; err != nil {
-		return 0, fmt.Errorf("failed to create customer: %w", err)
-	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyCustomers,
-		SourceID:    c.ID,
-		Name:        c.Name,
-		ActorKind:   actorsync.KindOrganization,
-		Role:        actorsync.RoleCliente,
-		CreatedAt:   c.CreatedAt,
-		UpdatedAt:   c.UpdatedAt,
-		CreatedBy:   c.CreatedBy,
-		UpdatedBy:   c.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
-	return c.ID, nil
-}
-
-func isUniqueNameViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return true
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate key") ||
-		strings.Contains(msg, "unique constraint") ||
-		strings.Contains(msg, "unique constraint failed")
-}
-
-// ensureCampaignForUpdate is the strict variant used by UpdateProject.
-// Behavior:
-//
-//   - If `c.ID != 0`: strict lookup by ID. The campaign must exist. NOT
-//     renamed even if `c.Name` differs from the stored value.
-//
-//   - If `c.ID == 0`: the FE signalled "new campaign association". Look up
-//     by name; if a campaign with that name exists, link to it. If not,
-//     create a new campaign. Campaign codes (e.g. "2025-2026") are treated
-//     as catalog identifiers and stored verbatim (trimmed only).
-func ensureCampaignForUpdate(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		c.TenantID = tenantID
-	}
-
-	if c.ID != 0 {
-		var existing casmod.Campaign
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, c.ID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return 0, domainerr.Validation(fmt.Sprintf("campaign %d not found", c.ID))
-			}
-			return 0, fmt.Errorf("failed to check campaign: %w", err)
-		}
-		return existing.ID, nil
-	}
-
-	if c.Name == "" {
-		return 0, domainerr.Validation("campaign name is required")
-	}
-	var existing casmod.Campaign
-	query := tx.Where("name = ?", c.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check campaign by name: %w", err)
-	}
-
-	if err := tx.Create(c).Error; err != nil {
-		return 0, fmt.Errorf("failed to create campaign: %w", err)
-	}
-	return c.ID, nil
-}
-
 func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		m.TenantID = tenantID
-	}
-	if m.ActorID != nil && *m.ActorID > 0 {
-		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
-			SourceTable: actorsync.LegacyManagers,
-			ActorID:     m.ActorID,
-			Name:        m.Name,
-			ActorKind:   actorsync.KindPerson,
-			Role:        actorsync.RoleResponsable,
-			CreatedAt:   m.CreatedAt,
-			UpdatedAt:   m.UpdatedAt,
-			CreatedBy:   m.CreatedBy,
-			UpdatedBy:   m.UpdatedBy,
-		})
-		if err != nil {
-			return 0, err
-		}
-		if id > 0 {
-			return id, nil
-		}
-	}
 	if m.ID != 0 {
 		var existing manmod.Manager
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, m.ID).Error; err == nil {
-			effectiveName := existing.Name
-			canonicalIncoming := sharedtext.CanonicalizeName(m.Name)
-			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
-				renameQuery := tx.Table("managers").Where("id = ?", existing.ID)
-				if hasTenant {
-					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
-				}
-				if err := renameQuery.Updates(map[string]any{
-					"name":       canonicalIncoming,
-					"updated_at": time.Now(),
-					"updated_by": m.UpdatedBy,
-				}).Error; err != nil {
-					return 0, fmt.Errorf("failed to rename manager: %w", err)
-				}
-				effectiveName = canonicalIncoming
-			}
-			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-				SourceTable: actorsync.LegacyManagers,
-				SourceID:    existing.ID,
-				Name:        effectiveName,
-				ActorKind:   actorsync.KindPerson,
-				Role:        actorsync.RoleResponsable,
-				CreatedAt:   existing.CreatedAt,
-				UpdatedAt:   time.Now(),
-				CreatedBy:   existing.CreatedBy,
-				UpdatedBy:   m.UpdatedBy,
-			}); err != nil {
-				return 0, err
-			}
+		if err := tx.First(&existing, m.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check manager: %w", err)
 		}
 	}
 	var existing manmod.Manager
-	query := tx.Where("name = ?", m.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyManagers,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindPerson,
-			Role:        actorsync.RoleResponsable,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   m.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
+	if err := tx.Where("name = ?", m.Name).First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check manager: %w", err)
@@ -1678,106 +967,20 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	if err := tx.Create(m).Error; err != nil {
 		return 0, fmt.Errorf("failed to create manager: %w", err)
 	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyManagers,
-		SourceID:    m.ID,
-		Name:        m.Name,
-		ActorKind:   actorsync.KindPerson,
-		Role:        actorsync.RoleResponsable,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
-		CreatedBy:   m.CreatedBy,
-		UpdatedBy:   m.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
 	return m.ID, nil
 }
 
 func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		i.TenantID = tenantID
-	}
-	if i.ActorID != nil && *i.ActorID > 0 {
-		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
-			SourceTable: actorsync.LegacyInvestors,
-			ActorID:     i.ActorID,
-			Name:        i.Name,
-			ActorKind:   actorsync.KindUnknown,
-			Role:        actorsync.RoleInversor,
-			CreatedAt:   i.CreatedAt,
-			UpdatedAt:   i.UpdatedAt,
-			CreatedBy:   i.CreatedBy,
-			UpdatedBy:   i.UpdatedBy,
-		})
-		if err != nil {
-			return 0, err
-		}
-		if id > 0 {
-			return id, nil
-		}
-	}
 	if i.ID != 0 {
 		var existing invmod.Investor
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, i.ID).Error; err == nil {
-			effectiveName := existing.Name
-			canonicalIncoming := sharedtext.CanonicalizeName(i.Name)
-			if canonicalIncoming != "" && canonicalIncoming != existing.Name {
-				renameQuery := tx.Table("investors").Where("id = ?", existing.ID)
-				if hasTenant {
-					renameQuery = renameQuery.Where("tenant_id = ?", tenantID)
-				}
-				if err := renameQuery.Updates(map[string]any{
-					"name":       canonicalIncoming,
-					"updated_at": time.Now(),
-					"updated_by": i.UpdatedBy,
-				}).Error; err != nil {
-					return 0, fmt.Errorf("failed to rename investor: %w", err)
-				}
-				effectiveName = canonicalIncoming
-			}
-			if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-				SourceTable: actorsync.LegacyInvestors,
-				SourceID:    existing.ID,
-				Name:        effectiveName,
-				ActorKind:   actorsync.KindUnknown,
-				Role:        actorsync.RoleInversor,
-				CreatedAt:   existing.CreatedAt,
-				UpdatedAt:   time.Now(),
-				CreatedBy:   existing.CreatedBy,
-				UpdatedBy:   i.UpdatedBy,
-			}); err != nil {
-				return 0, err
-			}
+		if err := tx.First(&existing, i.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check investor: %w", err)
 		}
 	}
 	var existing invmod.Investor
-	query := tx.Where("name = ?", i.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyInvestors,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindUnknown,
-			Role:        actorsync.RoleInversor,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   i.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
+	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check investor: %w", err)
@@ -1786,245 +989,13 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create investor: %w", err)
 	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyInvestors,
-		SourceID:    i.ID,
-		Name:        i.Name,
-		ActorKind:   actorsync.KindUnknown,
-		Role:        actorsync.RoleInversor,
-		CreatedAt:   i.CreatedAt,
-		UpdatedAt:   i.UpdatedAt,
-		CreatedBy:   i.CreatedBy,
-		UpdatedBy:   i.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
-	return i.ID, nil
-}
-
-// ensureManagerForUpdate is the strict variant used by UpdateProject.
-// Behavior:
-//
-//   - If `m.ID != 0`: strict lookup by ID. NOT renamed even if `m.Name` differs.
-//     Actor sync still runs to keep the legacy actor mirror up to date.
-//
-//   - If `m.ID == 0`: the FE signalled "new manager slot" (typed text). Lookup
-//     by canonicalized name; link if exists, create if not.
-func ensureManagerForUpdate(tx *gorm.DB, m *manmod.Manager) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		m.TenantID = tenantID
-	}
-
-	if m.ActorID != nil && *m.ActorID > 0 {
-		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
-			SourceTable: actorsync.LegacyManagers,
-			ActorID:     m.ActorID,
-			Name:        m.Name,
-			ActorKind:   actorsync.KindPerson,
-			Role:        actorsync.RoleResponsable,
-			CreatedAt:   m.CreatedAt,
-			UpdatedAt:   m.UpdatedAt,
-			CreatedBy:   m.CreatedBy,
-			UpdatedBy:   m.UpdatedBy,
-		})
-		if err != nil {
-			return 0, err
-		}
-		if id > 0 {
-			return id, nil
-		}
-	}
-
-	if m.ID != 0 {
-		var existing manmod.Manager
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, m.ID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return 0, domainerr.Validation(fmt.Sprintf("manager %d not found", m.ID))
-			}
-			return 0, fmt.Errorf("failed to check manager: %w", err)
-		}
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyManagers,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindPerson,
-			Role:        actorsync.RoleResponsable,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   m.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
-		return existing.ID, nil
-	}
-
-	if m.Name == "" {
-		return 0, domainerr.Validation("manager name is required")
-	}
-	var existing manmod.Manager
-	query := tx.Where("LOWER(name) = LOWER(?)", m.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyManagers,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindPerson,
-			Role:        actorsync.RoleResponsable,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   m.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check manager by name: %w", err)
-	}
-
-	if err := tx.Create(m).Error; err != nil {
-		return 0, fmt.Errorf("failed to create manager: %w", err)
-	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyManagers,
-		SourceID:    m.ID,
-		Name:        m.Name,
-		ActorKind:   actorsync.KindPerson,
-		Role:        actorsync.RoleResponsable,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
-		CreatedBy:   m.CreatedBy,
-		UpdatedBy:   m.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
-	return m.ID, nil
-}
-
-// ensureInvestorForUpdate is the strict variant used by UpdateProject.
-// Mirrors ensureManagerForUpdate semantics: id != 0 → strict no-rename;
-// id == 0 → lookup-by-name or create.
-func ensureInvestorForUpdate(tx *gorm.DB, i *invmod.Investor) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		i.TenantID = tenantID
-	}
-
-	if i.ActorID != nil && *i.ActorID > 0 {
-		id, err := actorsync.EnsureLegacyEntityFromActor(tx, actorsync.EnsureLegacyEntityInput{
-			SourceTable: actorsync.LegacyInvestors,
-			ActorID:     i.ActorID,
-			Name:        i.Name,
-			ActorKind:   actorsync.KindUnknown,
-			Role:        actorsync.RoleInversor,
-			CreatedAt:   i.CreatedAt,
-			UpdatedAt:   i.UpdatedAt,
-			CreatedBy:   i.CreatedBy,
-			UpdatedBy:   i.UpdatedBy,
-		})
-		if err != nil {
-			return 0, err
-		}
-		if id > 0 {
-			return id, nil
-		}
-	}
-
-	if i.ID != 0 {
-		var existing invmod.Investor
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, i.ID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return 0, domainerr.Validation(fmt.Sprintf("investor %d not found", i.ID))
-			}
-			return 0, fmt.Errorf("failed to check investor: %w", err)
-		}
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyInvestors,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindUnknown,
-			Role:        actorsync.RoleInversor,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   i.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
-		return existing.ID, nil
-	}
-
-	if i.Name == "" {
-		return 0, domainerr.Validation("investor name is required")
-	}
-	var existing invmod.Investor
-	query := tx.Where("LOWER(name) = LOWER(?)", i.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
-		if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-			SourceTable: actorsync.LegacyInvestors,
-			SourceID:    existing.ID,
-			Name:        existing.Name,
-			ActorKind:   actorsync.KindUnknown,
-			Role:        actorsync.RoleInversor,
-			CreatedAt:   existing.CreatedAt,
-			UpdatedAt:   time.Now(),
-			CreatedBy:   existing.CreatedBy,
-			UpdatedBy:   i.UpdatedBy,
-		}); err != nil {
-			return 0, err
-		}
-		return existing.ID, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, fmt.Errorf("failed to check investor by name: %w", err)
-	}
-
-	if err := tx.Create(i).Error; err != nil {
-		return 0, fmt.Errorf("failed to create investor: %w", err)
-	}
-	if _, err := actorsync.SyncLegacyActor(tx, actorsync.LegacyActorSync{
-		SourceTable: actorsync.LegacyInvestors,
-		SourceID:    i.ID,
-		Name:        i.Name,
-		ActorKind:   actorsync.KindUnknown,
-		Role:        actorsync.RoleInversor,
-		CreatedAt:   i.CreatedAt,
-		UpdatedAt:   i.UpdatedAt,
-		CreatedBy:   i.CreatedBy,
-		UpdatedBy:   i.UpdatedBy,
-	}); err != nil {
-		return 0, err
-	}
 	return i.ID, nil
 }
 
 func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
-	tenantID, hasTenant := tenantIDFromTx(tx)
-	if hasTenant {
-		c.TenantID = tenantID
-	}
 	if c.ID != 0 {
 		var existing cropmod.Crop
-		query := tx
-		if hasTenant {
-			query = query.Where("tenant_id = ?", tenantID)
-		}
-		if err := query.First(&existing, c.ID).Error; err == nil {
+		if err := tx.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check crop: %w", err)
@@ -2036,11 +1007,7 @@ func ensureCrop(tx *gorm.DB, c *cropmod.Crop) (int64, error) {
 	}
 
 	var existing cropmod.Crop
-	query := tx.Where("name = ?", c.Name)
-	if hasTenant {
-		query = query.Where("tenant_id = ?", tenantID)
-	}
-	if err := query.First(&existing).Error; err == nil {
+	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check crop: %w", err)
@@ -2056,44 +1023,47 @@ func actorFromContext(ctx context.Context) (string, error) {
 	return base.ActorFromContext(ctx)
 }
 
-func tenantIDFromTx(tx *gorm.DB) (uuid.UUID, bool) {
-	if tx == nil || tx.Statement == nil {
-		return uuid.Nil, false
+func syncCustomerArchiveState(tx *gorm.DB, customerID int64, deletedBy *string) error {
+	if customerID == 0 {
+		return nil
 	}
-	return authz.TenantFromContext(tx.Statement.Context)
-}
 
-func execWithOptionalTenant(tx *gorm.DB, query string, tenantQuery string, args ...any) error {
-	if tenantID, ok := tenantIDFromTx(tx); ok {
-		tenantArgs := append(append([]any{}, args...), tenantID)
-		return tx.Exec(tenantQuery, tenantArgs...).Error
+	var activeProjects int64
+	if err := tx.Model(&models.Project{}).
+		Where("customer_id = ? AND deleted_at IS NULL", customerID).
+		Count(&activeProjects).Error; err != nil {
+		return domainerr.Internal("failed to check active projects for customer")
 	}
-	return tx.Exec(query, args...).Error
-}
 
-func applyTenantToProjectModel(project *models.Project, tenantID uuid.UUID) {
-	if project == nil || tenantID == uuid.Nil {
-		return
-	}
-	project.TenantID = tenantID
-	for i := range project.Managers {
-		project.Managers[i].TenantID = tenantID
-	}
-	for i := range project.Investors {
-		project.Investors[i].TenantID = tenantID
-	}
-	for i := range project.AdminCostInvestors {
-		project.AdminCostInvestors[i].TenantID = tenantID
-	}
-	for i := range project.Fields {
-		project.Fields[i].TenantID = tenantID
-		for j := range project.Fields[i].FieldInvestors {
-			project.Fields[i].FieldInvestors[j].TenantID = tenantID
+	if activeProjects > 0 {
+		if err := tx.Unscoped().Model(&cusmod.Customer{}).
+			Where("id = ? AND deleted_at IS NOT NULL", customerID).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			return domainerr.Internal("failed to restore customer")
 		}
-		for j := range project.Fields[i].Lots {
-			project.Fields[i].Lots[j].TenantID = tenantID
-		}
+		return nil
 	}
+
+	updates := map[string]any{
+		"deleted_at": time.Now(),
+		"updated_at": time.Now(),
+	}
+	if deletedBy != nil {
+		updates["deleted_by"] = deletedBy
+	} else {
+		updates["deleted_by"] = gorm.Expr("NULL")
+	}
+
+	if err := tx.Unscoped().Model(&cusmod.Customer{}).
+		Where("id = ? AND deleted_at IS NULL", customerID).
+		Updates(updates).Error; err != nil {
+		return domainerr.Internal("failed to archive customer")
+	}
+	return nil
 }
 
 func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) error {
@@ -2104,34 +1074,28 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 
 	newManagerIDs := make(map[int64]struct{})
 	for i, m := range d.Managers {
-		manager := &manmod.Manager{
-			ID:      m.ID,
-			Name:    m.Name,
-			ActorID: m.ActorID,
-			Base: base.Base{
-				CreatedBy: d.UpdatedBy,
-				UpdatedBy: d.UpdatedBy,
-			},
+		if m.ID != 0 {
+			newManagerIDs[m.ID] = struct{}{}
+		} else {
+			manager := &manmod.Manager{
+				Name: m.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			}
+			mgrID, err := ensureManager(tx, manager)
+			if err != nil {
+				return err
+			}
+			newManagerIDs[mgrID] = struct{}{}
+			d.Managers[i].ID = mgrID
 		}
-		mgrID, err := ensureManagerForUpdate(tx, manager)
-		if err != nil {
-			return err
-		}
-		newManagerIDs[mgrID] = struct{}{}
-		d.Managers[i].ID = mgrID
 	}
 
 	for _, m := range d.Managers {
 		if _, exists := existingManagerIDs[m.ID]; !exists {
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				if err := tx.Exec(
-					`INSERT INTO project_managers (tenant_id, project_id, manager_id, created_by, updated_by)
-					 VALUES (?, ?, ?, ?, ?)`,
-					tenantID, d.ID, m.ID, d.UpdatedBy, d.UpdatedBy,
-				).Error; err != nil {
-					return domainerr.Internal("failed to add manager")
-				}
-			} else if err := tx.Exec(
+			if err := tx.Exec(
 				"INSERT INTO project_managers (project_id, manager_id, created_by, updated_by) VALUES (?, ?, ?, ?)",
 				d.ID, m.ID, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
@@ -2142,13 +1106,10 @@ func relinkManagers(tx *gorm.DB, existing models.Project, d *domain.Project) err
 
 	for _, m := range existing.Managers {
 		if _, exists := newManagerIDs[m.ID]; !exists {
-			if err := execWithOptionalTenant(
-				tx,
+			if err := tx.Exec(
 				"DELETE FROM project_managers WHERE project_id = ? AND manager_id = ?",
-				"DELETE FROM project_managers WHERE project_id = ? AND manager_id = ? AND tenant_id = ?",
-				d.ID,
-				m.ID,
-			); err != nil {
+				d.ID, m.ID,
+			).Error; err != nil {
 				return domainerr.Internal("failed to remove manager")
 			}
 		}
@@ -2167,33 +1128,27 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 
 	newInvestorIDs := make(map[int64]struct{})
 	for k, i := range d.Investors {
-		invID, err := ensureInvestorForUpdate(tx, &invmod.Investor{
-			ID:      i.ID,
-			Name:    i.Name,
-			ActorID: i.ActorID,
-			Base: base.Base{
-				CreatedBy: d.UpdatedBy,
-				UpdatedBy: d.UpdatedBy,
-			},
-		})
-		if err != nil {
-			return err
+		if i.ID != 0 {
+			newInvestorIDs[i.ID] = struct{}{}
+		} else {
+			invID, err := ensureInvestor(tx, &invmod.Investor{
+				Name: i.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			newInvestorIDs[invID] = struct{}{}
+			d.Investors[k].ID = invID
 		}
-		newInvestorIDs[invID] = struct{}{}
-		d.Investors[k].ID = invID
 	}
 
 	for _, i := range d.Investors {
 		if _, exists := existingInvestorIDs[i.ID]; !exists {
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				if err := tx.Exec(
-					`INSERT INTO project_investors (tenant_id, project_id, investor_id, percentage, created_by, updated_by)
-					 VALUES (?, ?, ?, ?, ?, ?)`,
-					tenantID, d.ID, i.ID, i.Percentage, d.UpdatedBy, d.UpdatedBy,
-				).Error; err != nil {
-					return domainerr.Internal("failed to add investor")
-				}
-			} else if err := tx.Exec(
+			if err := tx.Exec(
 				"INSERT INTO project_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
 				d.ID, i.ID, i.Percentage, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
@@ -2201,11 +1156,10 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 			}
 		} else if pct, ok := existingInvestorPct[i.ID]; ok && pct != i.Percentage {
 			// Actualizar porcentaje si el inversor ya existe
-			update := tx.Table("project_investors").Where("project_id = ? AND investor_id = ?", d.ID, i.ID)
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				update = update.Where("tenant_id = ?", tenantID)
-			}
-			if err := update.Updates(map[string]any{"percentage": i.Percentage, "updated_by": d.UpdatedBy}).Error; err != nil {
+			if err := tx.Exec(
+				"UPDATE project_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
+				i.Percentage, d.UpdatedBy, d.ID, i.ID,
+			).Error; err != nil {
 				return domainerr.Internal("failed to update investor percentage")
 			}
 		}
@@ -2213,13 +1167,10 @@ func relinkInvestors(tx *gorm.DB, existing models.Project, d *domain.Project) er
 
 	for _, i := range existing.Investors {
 		if _, exists := newInvestorIDs[i.InvestorID]; !exists {
-			if err := execWithOptionalTenant(
-				tx,
+			if err := tx.Exec(
 				"DELETE FROM project_investors WHERE project_id = ? AND investor_id = ?",
-				"DELETE FROM project_investors WHERE project_id = ? AND investor_id = ? AND tenant_id = ?",
-				d.ID,
-				i.InvestorID,
-			); err != nil {
+				d.ID, i.InvestorID,
+			).Error; err != nil {
 				return domainerr.Internal("failed to remove investor")
 			}
 		}
@@ -2240,15 +1191,6 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 			newFieldMap[f.ID] = f
 		} else {
 			f.ProjectID = existing.ID
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				f.TenantID = tenantID
-				for i := range f.FieldInvestors {
-					f.FieldInvestors[i].TenantID = tenantID
-				}
-				for i := range f.Lots {
-					f.Lots[i].TenantID = tenantID
-				}
-			}
 			if err := tx.Create(&f).Error; err != nil {
 				return domainerr.Internal("failed to add field")
 			}
@@ -2278,11 +1220,9 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 			}
 			if len(updates) > 0 {
 				updates["updated_by"] = f.UpdatedBy
-				update := tx.Model(&fieldmod.Field{}).Where("id = ?", f.ID)
-				if tenantID, ok := tenantIDFromTx(tx); ok {
-					update = update.Where("tenant_id = ?", tenantID)
-				}
-				if err := update.Updates(updates).Error; err != nil {
+				if err := tx.Model(&fieldmod.Field{}).
+					Where("id = ?", f.ID).
+					Updates(updates).Error; err != nil {
 					return domainerr.Internal("failed to update field")
 				}
 			}
@@ -2294,18 +1234,10 @@ func relinkFieldsAndLots(tx *gorm.DB, existing models.Project, fields []fieldmod
 
 	for _, ef := range existing.Fields {
 		if _, exists := newFieldMap[ef.ID]; !exists {
-			deleteLots := tx.Where("field_id = ?", ef.ID)
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				deleteLots = deleteLots.Where("tenant_id = ?", tenantID)
-			}
-			if err := deleteLots.Delete(&lotmod.Lot{}).Error; err != nil {
+			if err := tx.Where("field_id = ?", ef.ID).Delete(&lotmod.Lot{}).Error; err != nil {
 				return domainerr.Internal("failed to remove lots")
 			}
-			deleteField := tx.Where("id = ?", ef.ID)
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				deleteField = deleteField.Where("tenant_id = ?", tenantID)
-			}
-			if err := deleteField.Delete(&fieldmod.Field{}).Error; err != nil {
+			if err := tx.Delete(&fieldmod.Field{}, ef.ID).Error; err != nil {
 				return domainerr.Internal("failed to remove field")
 			}
 		}
@@ -2340,14 +1272,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 				return err
 			}
 			l.PreviousCropID = previousCropID
-			lotTenantID := newField.TenantID
-			if lotTenantID == uuid.Nil {
-				if tenantID, ok := tenantIDFromTx(tx); ok {
-					lotTenantID = tenantID
-				}
-			}
 			lot := lotmod.Lot{
-				TenantID:       lotTenantID,
 				FieldID:        newField.ID,
 				Name:           l.Name,
 				Hectares:       l.Hectares,
@@ -2403,11 +1328,9 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 			}
 			if len(updates) > 0 {
 				updates["updated_by"] = newField.UpdatedBy
-				update := tx.Model(&lotmod.Lot{}).Where("id = ?", l.ID)
-				if tenantID, ok := tenantIDFromTx(tx); ok {
-					update = update.Where("tenant_id = ?", tenantID)
-				}
-				if err := update.Updates(updates).Error; err != nil {
+				if err := tx.Model(&lotmod.Lot{}).
+					Where("id = ?", l.ID).
+					Updates(updates).Error; err != nil {
 					return domainerr.Internal("failed to update lot")
 				}
 			}
@@ -2416,12 +1339,7 @@ func relinkLots(tx *gorm.DB, existingField, newField fieldmod.Field) error {
 
 	for _, l := range existingField.Lots {
 		if _, exists := newLotIDs[l.ID]; !exists {
-			if err := execWithOptionalTenant(
-				tx,
-				"DELETE FROM lots WHERE id = ?",
-				"DELETE FROM lots WHERE id = ? AND tenant_id = ?",
-				l.ID,
-			); err != nil {
+			if err := tx.Exec("DELETE FROM lots WHERE id = ?", l.ID).Error; err != nil {
 				return domainerr.Internal("failed to remove lot")
 			}
 		}
@@ -2437,44 +1355,37 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 
 	newAdCostInvIDs := make(map[int64]struct{})
 	for k, aci := range d.AdminCostInvestors {
-		aciID, err := ensureInvestorForUpdate(tx, &invmod.Investor{
-			ID:      aci.ID,
-			Name:    aci.Name,
-			ActorID: aci.ActorID,
-			Base: base.Base{
-				CreatedBy: d.UpdatedBy,
-				UpdatedBy: d.UpdatedBy,
-			},
-		})
-		if err != nil {
-			return err
+		if aci.ID != 0 {
+			newAdCostInvIDs[aci.ID] = struct{}{}
+		} else {
+			aciID, err := ensureInvestor(tx, &invmod.Investor{
+				Name: aci.Name,
+				Base: base.Base{
+					CreatedBy: d.UpdatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			newAdCostInvIDs[aciID] = struct{}{}
+			d.AdminCostInvestors[k].ID = aciID
 		}
-		newAdCostInvIDs[aciID] = struct{}{}
-		d.AdminCostInvestors[k].ID = aciID
 	}
 
 	for _, aci := range d.AdminCostInvestors {
 		if _, exists := existingAdCostInvIDs[aci.ID]; !exists {
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				if err := tx.Exec(
-					`INSERT INTO admin_cost_investors (tenant_id, project_id, investor_id, percentage, created_by, updated_by)
-					 VALUES (?, ?, ?, ?, ?, ?)`,
-					tenantID, d.ID, aci.ID, aci.Percentage, d.UpdatedBy, d.UpdatedBy,
-				).Error; err != nil {
-					return domainerr.Internal("failed to add admin cost investor")
-				}
-			} else if err := tx.Exec(
+			if err := tx.Exec(
 				"INSERT INTO admin_cost_investors (project_id, investor_id, percentage, created_by, updated_by) VALUES (?, ?, ?, ?, ?)",
 				d.ID, aci.ID, aci.Percentage, d.UpdatedBy, d.UpdatedBy,
 			).Error; err != nil {
 				return domainerr.Internal("failed to add admin cost investor")
 			}
 		} else {
-			update := tx.Table("admin_cost_investors").Where("project_id = ? AND investor_id = ?", d.ID, aci.ID)
-			if tenantID, ok := tenantIDFromTx(tx); ok {
-				update = update.Where("tenant_id = ?", tenantID)
-			}
-			if err := update.Updates(map[string]any{"percentage": aci.Percentage, "updated_by": d.UpdatedBy}).Error; err != nil {
+			if err := tx.Exec(
+				"UPDATE admin_cost_investors SET percentage = ?, updated_by = ? WHERE project_id = ? AND investor_id = ?",
+				aci.Percentage, d.UpdatedBy, d.ID, aci.ID,
+			).Error; err != nil {
 				return domainerr.Internal("failed to update admin cost investor")
 			}
 		}
@@ -2482,13 +1393,10 @@ func relinkAdminCostInvestors(tx *gorm.DB, existing models.Project, d *domain.Pr
 
 	for _, aci := range existing.AdminCostInvestors {
 		if _, exists := newAdCostInvIDs[aci.InvestorID]; !exists {
-			if err := execWithOptionalTenant(
-				tx,
+			if err := tx.Exec(
 				"DELETE FROM admin_cost_investors WHERE project_id = ? AND investor_id = ?",
-				"DELETE FROM admin_cost_investors WHERE project_id = ? AND investor_id = ? AND tenant_id = ?",
-				d.ID,
-				aci.InvestorID,
-			); err != nil {
+				d.ID, aci.InvestorID,
+			).Error; err != nil {
 				return domainerr.Internal("failed to remove investor")
 			}
 		}
@@ -2525,28 +1433,20 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 		newIDs := make(map[int64]struct{}, len(df.Investors))
 		for i := range df.Investors {
 			inv := &df.Investors[i]
-			id, err := ensureInvestorForUpdate(tx, &invmod.Investor{
-				ID:      inv.ID,
-				Name:    inv.Name,
-				ActorID: inv.ActorID,
-				Base:    base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
-			})
-			if err != nil {
-				return err
+			if inv.ID == 0 {
+				id, err := ensureInvestor(tx, &invmod.Investor{
+					Name: inv.Name,
+					Base: base.Base{CreatedBy: d.UpdatedBy, UpdatedBy: d.UpdatedBy},
+				})
+				if err != nil {
+					return err
+				}
+				inv.ID = id
 			}
-			inv.ID = id
 			newIDs[inv.ID] = struct{}{}
 
 			if _, existed := existingFieldInvIDs[inv.ID]; !existed {
-				if tenantID, ok := tenantIDFromTx(tx); ok {
-					if err := tx.Exec(
-						`INSERT INTO field_investors (tenant_id, field_id, investor_id, percentage, created_by, updated_by)
-						 VALUES (?, ?, ?, ?, ?, ?)`,
-						tenantID, ef.ID, inv.ID, inv.Percentage, d.UpdatedBy, d.UpdatedBy,
-					).Error; err != nil {
-						return domainerr.Internal("failed to add field investor")
-					}
-				} else if err := tx.Exec(
+				if err := tx.Exec(
 					`INSERT INTO field_investors (field_id, investor_id, percentage, created_by, updated_by)
 					 VALUES (?, ?, ?, ?, ?)`,
 					ef.ID, inv.ID, inv.Percentage, d.UpdatedBy, d.UpdatedBy,
@@ -2554,11 +1454,10 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					return domainerr.Internal("failed to add field investor")
 				}
 			} else {
-				update := tx.Table("field_investors").Where("field_id = ? AND investor_id = ?", ef.ID, inv.ID)
-				if tenantID, ok := tenantIDFromTx(tx); ok {
-					update = update.Where("tenant_id = ?", tenantID)
-				}
-				if err := update.Updates(map[string]any{"percentage": inv.Percentage, "updated_by": d.UpdatedBy}).Error; err != nil {
+				if err := tx.Exec(
+					"UPDATE field_investors SET percentage = ?, updated_by = ? WHERE field_id = ? AND investor_id = ?",
+					inv.Percentage, d.UpdatedBy, ef.ID, inv.ID,
+				).Error; err != nil {
 					return domainerr.Internal("failed to update admin cost investor")
 				}
 			}
@@ -2566,124 +1465,14 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 
 		for invID := range existingFieldInvIDs {
 			if _, exists := newIDs[invID]; !exists {
-				if err := execWithOptionalTenant(
-					tx,
+				if err := tx.Exec(
 					`DELETE FROM field_investors WHERE field_id = ? AND investor_id = ?`,
-					`DELETE FROM field_investors WHERE field_id = ? AND investor_id = ? AND tenant_id = ?`,
-					ef.ID,
-					invID,
-				); err != nil {
+					ef.ID, invID,
+				).Error; err != nil {
 					return domainerr.Internal("failed to remove field investor")
 				}
 			}
 		}
 	}
 	return nil
-}
-
-// assertProjectReferencesActive blocks Create/Update of a project that
-// references archived entities. A project is the hub that connects customer,
-// campaign, managers, investors, admin-cost investors, fields, lots, crops,
-// and field investors — any archived row in that graph breaks the invariant
-// that "archived = no existe" for the operational domain.
-//
-// Each `lifecycle.ActiveRef` is checked with a point query against the
-// `<table>.deleted_at` column. IDs <= 0 are no-ops (new rows that
-// ensure*-helpers will create), so the check is safe to call before the
-// ensure step. Nested actor IDs (manager.actor_id, investor.actor_id, etc.)
-// are validated only when present — they can be nil for legacy rows.
-//
-// Runs inside the caller's transaction so any violation aborts the entire
-// project create/update without partial state.
-func assertProjectReferencesActive(tx *gorm.DB, p *domain.Project) error {
-	if p == nil {
-		return nil
-	}
-	refs := make([]lifecycle.ActiveRef, 0, 16)
-
-	refs = append(refs,
-		lifecycle.ActiveRef{Table: "customers", Label: "customer", ID: p.Customer.ID},
-		lifecycle.ActiveRef{Table: "campaigns", Label: "campaign", ID: p.Campaign.ID},
-	)
-	if p.Customer.ActorID != nil {
-		refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *p.Customer.ActorID})
-	}
-
-	for _, m := range p.Managers {
-		refs = append(refs, lifecycle.ActiveRef{Table: "managers", Label: "manager", ID: m.ID})
-		if m.ActorID != nil {
-			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *m.ActorID})
-		}
-	}
-	for _, inv := range p.Investors {
-		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: inv.ID})
-		if inv.ActorID != nil {
-			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *inv.ActorID})
-		}
-	}
-	for _, inv := range p.AdminCostInvestors {
-		refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: inv.ID})
-		if inv.ActorID != nil {
-			refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *inv.ActorID})
-		}
-	}
-	for _, f := range p.Fields {
-		// f.ID == 0 cuando es nuevo (ensureField lo crea). Solo validamos cuando existe.
-		refs = append(refs, lifecycle.ActiveRef{Table: "fields", Label: "field", ID: f.ID})
-		for _, fi := range f.Investors {
-			refs = append(refs, lifecycle.ActiveRef{Table: "investors", Label: "investor", ID: fi.ID})
-			if fi.ActorID != nil {
-				refs = append(refs, lifecycle.ActiveRef{Table: "actors", Label: "actor", ID: *fi.ActorID})
-			}
-		}
-		for _, lot := range f.Lots {
-			refs = append(refs,
-				lifecycle.ActiveRef{Table: "lots", Label: "lot", ID: lot.ID},
-				lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.CurrentCrop.ID},
-				lifecycle.ActiveRef{Table: "crops", Label: "crop", ID: lot.PreviousCrop.ID},
-			)
-		}
-	}
-	return lifecycle.RequireAllActive(tx, refs)
-}
-
-// GetRawAdminCostTotal calcula `projects.admin_cost × Σ(lots.hectares)` RAW desde tablas base.
-// Sirve como contraparte independiente del valor SSOT `dashboard.StructureExecutedUSD`
-// (que internamente usa `v4_ssot.admin_cost_total_for_project = admin_cost × total_hectares_for_project`).
-func (r *Repository) GetRawAdminCostTotal(ctx context.Context, projectID int64) (decimal.Decimal, error) {
-	tenantID, hasTenant := authz.TenantFromContext(ctx)
-	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return decimal.Zero, domainerr.TenantMissing()
-	}
-
-	projectTenant := ""
-	lotTenant := ""
-	args := []any{projectID}
-	if hasTenant {
-		projectTenant = " AND p.tenant_id = ?"
-		args = append(args, tenantID)
-	}
-	args = append(args, projectID)
-	if hasTenant {
-		lotTenant = " AND f.tenant_id = ? AND l.tenant_id = ?"
-		args = append(args, tenantID, tenantID)
-	}
-
-	q := fmt.Sprintf(`
-		SELECT
-			COALESCE((SELECT p.admin_cost FROM public.projects p WHERE p.id = ? AND p.deleted_at IS NULL %s), 0)
-			*
-			COALESCE((
-				SELECT SUM(l.hectares)
-				FROM public.lots l
-				JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
-				WHERE f.project_id = ? AND l.deleted_at IS NULL %s
-			), 0) AS total
-	`, projectTenant, lotTenant)
-
-	var total decimal.Decimal
-	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
-		return decimal.Zero, domainerr.Internal("failed to get raw admin cost total: " + err.Error())
-	}
-	return total, nil
 }

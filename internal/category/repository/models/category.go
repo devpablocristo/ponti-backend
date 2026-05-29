@@ -4,14 +4,12 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/google/uuid"
 )
 
 type Category struct {
-	ID       int64     `gorm:"primaryKey;autoIncrement;column:id"`
-	TenantID uuid.UUID `gorm:"column:tenant_id;type:uuid;index"`
-	Name     string    `gorm:"type:varchar(50);not null"`
-	TypeID   int64     `gorm:"not null;column:type_id"`
+	ID     int64  `gorm:"primaryKey;autoIncrement;column:id"`
+	Name   string `gorm:"type:varchar(50);unique;not null"`
+	TypeID int64  `gorm:"not null;column:type_id"`
 
 	sharedmodels.Base
 }

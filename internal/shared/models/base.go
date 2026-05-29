@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/platform/security/go/contextkeys"
+	"github.com/devpablocristo/core/security/go/contextkeys"
 	"gorm.io/gorm"
 )
 

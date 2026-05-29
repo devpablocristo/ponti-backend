@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"log"
 	"net/http"
 	"runtime"
 	"strings"
@@ -13,39 +13,18 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 
-	coreginmw "github.com/devpablocristo/platform/http/gin/go"
-	"github.com/devpablocristo/platform/observability/go"
-
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
-	pkgmwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
 )
 
 // runHTTPServer registra rutas en Gin y levanta el servidor HTTP.
-func runHTTPServer(ctx context.Context, logger *slog.Logger, metrics *observability.Metrics, deps *wire.Dependencies) error {
+func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	if deps == nil {
 		return errors.New("dependencies cannot be nil")
 	}
 
-	// Observability primero: request-ID + logger en ctx + access log + RED metrics Prometheus.
-	deps.GinEngine.GetRouter().Use(pkgmwr.ObservabilityWithMetrics(logger, metrics))
-
-	// CORS explícito antes del routing. Origins extra se pasan via CORS_ORIGINS env.
-	deps.GinEngine.GetRouter().Use(coreginmw.NewCORS(coreginmw.CORSConfig{
-		Origins: deps.Config.HTTPServer.CORSOriginList(),
-	}))
-
-	// Rate limit por IP (sliding window 1 min). Si HTTP_RATE_LIMIT_PER_MINUTE=0
-	// (default), no se activa para no romper deploys que no lo hayan calibrado.
-	if rps := deps.Config.HTTPServer.RateLimitPerMinute; rps > 0 {
-		deps.GinEngine.GetRouter().Use(coreginmw.NewRateLimit(rps))
-	}
-
-	// Endpoint Prometheus en path dedicado (no /api/v1/.../metrics que está reservado
-	// para métricas de negocio en lot/work-order/labor handlers).
-	deps.GinEngine.GetRouter().GET("/observability/metrics", gin.WrapH(metrics.Handler()))
 	// Configurar Gin con middlewares globales.
 	// Middlewares globales: ErrorHandling, RequestAndResponseLogger.
 	deps.GinEngine.GetRouter().Use(deps.Middlewares.GetGlobal()...)
@@ -73,9 +52,6 @@ func runHTTPServer(ctx context.Context, logger *slog.Logger, metrics *observabil
 				"base_url": apiBase,
 				"version":  deps.Config.API.APIVersion(),
 			},
-			"reporting": gin.H{
-				"read_mode": deps.Config.Reporting.ReadMode,
-			},
 			"runtime": gin.H{
 				"go": runtime.Version(),
 			},
@@ -96,12 +72,11 @@ func runHTTPServer(ctx context.Context, logger *slog.Logger, metrics *observabil
 	// Cada handler aplica sus middlewares de validación específicos.
 	registerHTTPRoutes(deps, biHandler)
 
-	logger.Info("starting HTTP server",
-		"event", "http_server_starting",
-		"port", deps.Config.HTTPServer.Port,
-		"version", deps.Config.Service.Version,
-		"database", deps.Config.DB.Name,
-	)
+	log.Println("Starting HTTP Server on port: ", deps.Config.HTTPServer.Port)
+	log.Println("Version: ", deps.Config.Service.Version)
+	log.Println("--------------------------------")
+	log.Println("Database: ", deps.Config.DB.Name)
+	log.Println("--------------------------------")
 
 	// Iniciar el servidor HTTP (ej: puerto 8080).
 	return deps.GinEngine.RunServer(ctx)
@@ -145,7 +120,6 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
 func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
-	deps.ActorHandler.Routes()
 	deps.LotHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()

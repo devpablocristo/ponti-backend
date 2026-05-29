@@ -14,17 +14,13 @@ import (
 	gorm "gorm.io/gorm"
 
 	// pkg
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	// project
 	models "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
-	"github.com/devpablocristo/platform/persistence/gorm/go/tenancy"
-
-	"github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
-	"github.com/devpablocristo/ponti-backend/internal/shared/lifecycle"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -45,16 +41,8 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	var lotID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := assertLotReferencesActive(tx, l); err != nil {
-			return err
-		}
 		var existing models.Lot
-		tenantID, hasTenant, err := authz.OptionalTenantOrStrict(ctx)
-		if err != nil {
-			return err
-		}
-		existingDB := tenancy.Scope(ctx, tx, "lots")
-		if err := existingDB.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
+		if err := tx.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
 			First(&existing).Error; err == nil {
 			lotID = existing.ID
 			return nil
@@ -62,9 +50,6 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 			return domainerr.Internal("failed to check lot")
 		}
 		model := models.FromDomain(l)
-		if hasTenant {
-			model.TenantID = tenantID
-		}
 		model.CreatedBy = l.CreatedBy
 		model.UpdatedBy = l.UpdatedBy
 
@@ -83,8 +68,7 @@ func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error
 // ListLotsByField lista los lotes por ID de field.
 func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "lots")
-	if err := db0.
+	if err := r.db.Client().WithContext(ctx).
 		Where("field_id = ? AND deleted_at IS NULL", fieldID).
 		Find(&lots).Error; err != nil {
 		return nil, domainerr.Internal("failed to list lots")
@@ -95,8 +79,7 @@ func (r *Repository) ListLotsByField(ctx context.Context, fieldID int64) ([]doma
 // GetLot obtiene un lote por ID.
 func (r *Repository) GetLot(ctx context.Context, id int64) (*domain.Lot, error) {
 	var m models.Lot
-	db0 := tenancy.Scope(ctx, r.db.Client().WithContext(ctx), "lots")
-	err := db0.
+	err := r.db.Client().WithContext(ctx).
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&m).Error
 	if err != nil {
@@ -119,12 +102,8 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 	model := models.FromDomain(l)
 	model.ID = l.ID
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := assertLotReferencesActive(tx, l); err != nil {
-			return err
-		}
 		// Unicidad de nombre dentro del field (si aplica renombrado)
-		lotDB := tenancy.Scope(ctx, tx, "lots")
-		if err := lotDB.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
+		if err := tx.Where("name = ? AND field_id = ? AND id <> ? AND deleted_at IS NULL",
 			l.Name, l.FieldID, l.ID).First(&models.Lot{}).Error; err == nil {
 			return domainerr.Conflict("lot with same name already exists in this field")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -133,7 +112,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		// Verificación de existencia (distingue 404 de 409)
 		var exists int64
-		if err := tenancy.Scope(ctx, tx.Model(&models.Lot{}), "lots").
+		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Count(&exists).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
@@ -147,7 +126,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 
 		// Obtener la fecha de actualización actual para optimistic locking
 		var currentLot models.Lot
-		if err := tenancy.Scope(ctx, tx, "lots").Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
+		if err := tx.Where("id = ? AND deleted_at IS NULL", l.ID).First(&currentLot).Error; err != nil {
 			return domainerr.Internal("failed to get current lot for optimistic locking")
 		}
 
@@ -178,7 +157,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 			updateFields["variety"] = l.Variety
 		}
 
-		res := tenancy.Scope(ctx, tx.Model(&models.Lot{}), "lots").
+		res := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", l.ID).
 			Updates(updateFields)
 		if res.Error != nil {
@@ -192,7 +171,7 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		// Si cambió el cultivo actual del lote, sincronizar las workorders activas de ese lote
 		// para que el listado de órdenes refleje el mismo cultivo.
 		if l.CurrentCrop.ID > 0 {
-			if err := tenancy.Scope(ctx, tx.Table("workorders"), "workorders").
+			if err := tx.Table("workorders").
 				Where("lot_id = ? AND deleted_at IS NULL", l.ID).
 				Updates(map[string]any{
 					"crop_id":    l.CurrentCrop.ID,
@@ -223,7 +202,7 @@ func upsertLotDateBySequence(
 	nowTS time.Time,
 ) error {
 	var existing []models.LotDates
-	if err := tenancy.Scope(tx.Statement.Context, tx.Unscoped(), "lot_dates").
+	if err := tx.Unscoped().
 		Where("lot_id = ? AND sequence = ?", lotID, date.Sequence).
 		Order("id DESC").
 		Find(&existing).Error; err != nil {
@@ -238,7 +217,7 @@ func upsertLotDateBySequence(
 			duplicateIDs = append(duplicateIDs, existing[i].ID)
 		}
 		if len(duplicateIDs) > 0 {
-			if err := tenancy.Scope(tx.Statement.Context, tx.Model(&models.LotDates{}), "lot_dates").
+			if err := tx.Model(&models.LotDates{}).
 				Where("id IN ? AND deleted_at IS NULL", duplicateIDs).
 				Updates(map[string]any{
 					"deleted_at": nowTS,
@@ -253,7 +232,7 @@ func upsertLotDateBySequence(
 
 	if len(existing) > 0 {
 		keepID := existing[0].ID
-		return tenancy.Scope(tx.Statement.Context, tx.Unscoped(), "lot_dates").
+		return tx.Unscoped().
 			Model(&models.LotDates{}).
 			Where("id = ?", keepID).
 			Updates(map[string]any{
@@ -277,9 +256,6 @@ func upsertLotDateBySequence(
 			UpdatedAt: nowTS,
 		},
 	}
-	if tenantID, ok := authz.TenantFromContext(tx.Statement.Context); ok {
-		lotDate.TenantID = tenantID
-	}
 	return tx.Create(&lotDate).Error
 }
 
@@ -289,13 +265,13 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tenancy.Scope(ctx, tx.Model(&models.Lot{}), "lots").Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
+		if err := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
-		if err := tenancy.Scope(ctx, tx.Model(&models.Lot{}), "lots").
+		if err := tx.Model(&models.Lot{}).
 			Where("id = ? AND deleted_at IS NULL", id).
 			Updates(map[string]any{
 				"tons": tons,
@@ -306,8 +282,8 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 	})
 }
 
-// ArchiveLot ejecuta soft delete con validación.
-func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
+// DeleteLot elimina un lote por ID.
+func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
 	}
@@ -315,232 +291,33 @@ func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	deletedBy := &userID
-
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		archivedAt := time.Now()
-		var l models.Lot
-		if err := tenancy.Scope(ctx, tx.Unscoped(), "lots").Where("id = ?", id).First(&l).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
-			}
-			return domainerr.Internal("failed to get lot")
-		}
-		if l.DeletedAt.Valid {
-			return domainerr.Conflict("lot already archived")
-		}
-
-		cause, err := lifecycle.RootCause(tx, l.TenantID, "lots", id, nil, deletedBy)
-		if err != nil {
-			return err
-		}
-		if err := tenancy.Scope(ctx, tx.Table("lot_dates"), "lot_dates").
-			Where("lot_id = ? AND deleted_at IS NULL", id).
-			Updates(lifecycle.ArchiveUpdates(tx, "lot_dates", archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal("failed to archive lot dates")
-		}
-		if err := tenancy.Scope(ctx, tx.Model(&models.Lot{}), "lots").
-			Where("id = ?", id).
-			Updates(lifecycle.ArchiveUpdates(tx, "lots", archivedAt, deletedBy, cause)).Error; err != nil {
-			return domainerr.Internal("failed to archive lot")
-		}
-		return nil
-	})
-}
-
-// RestoreLot restaura un lote archivado. Si el field padre está archivado (caso típico de cascade-archive),
-// también se restaura la row del field — pero NO los otros lots del field (cada lot conserva su deleted_at).
-// Si el project padre está archivado, retorna 409 pidiendo restaurar el proyecto primero.
-func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
-	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
-		return err
-	}
-
-	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		restoredAt := time.Now()
-		var l models.Lot
-		if err := tenancy.Scope(ctx, tx.Unscoped(), "lots").Where("id = ?", id).First(&l).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
-			}
-			return domainerr.Internal("failed to get lot")
-		}
-		if !l.DeletedAt.Valid {
-			return domainerr.Conflict("lot is not archived")
-		}
-		// Invariante jerárquico: el field padre del lot debe estar activo. Si el
-		// field está archivado, exigir restauración explícita en orden (project
-		// → field → lot) en lugar de reactivar el field sin que el usuario lo
-		// pida — eso puede revivir sus otros lots/cascadas en estado dudoso.
-		var fieldRow struct {
-			ProjectID int64      `gorm:"column:project_id"`
-			DeletedAt *time.Time `gorm:"column:deleted_at"`
-		}
-		if err := tenancy.Scope(ctx, tx.Unscoped().Table("fields"), "fields").
-			Select("project_id, deleted_at").
-			Where("id = ?", l.FieldID).
-			Scan(&fieldRow).Error; err != nil {
-			return domainerr.Internal("failed to check field")
-		}
-		if fieldRow.DeletedAt != nil {
-			if err := lifecycle.RequireActive(tx, "projects", "project", fieldRow.ProjectID); err != nil {
-				return domainerr.Conflict("cannot restore lot while project is archived; restore the project first")
-			}
-			return domainerr.Conflict("cannot restore lot while field is archived; restore the field first")
-		}
-		rowState, err := lifecycle.ReadRowState(tx, "lots", id)
-		if err != nil {
-			return err
-		}
-		cause := lifecycle.CauseFromRow(rowState, "lots", id)
-
-		if err := tenancy.Scope(ctx, tx.Unscoped().Model(&models.Lot{}), "lots").
-			Where("id = ?", id).
-			Updates(lifecycle.RestoreUpdates(tx, "lots", restoredAt)).Error; err != nil {
-			return domainerr.Internal("failed to restore lot")
-		}
-		dateRestore := tenancy.Scope(ctx, tx.Table("lot_dates"), "lot_dates").
-			Where("lot_id = ? AND deleted_at IS NOT NULL", id)
-		dateRestore = lifecycle.ApplyCauseScope(dateRestore, "lot_dates", cause)
-		if err := dateRestore.Updates(lifecycle.RestoreUpdates(tx, "lot_dates", restoredAt)).Error; err != nil {
-			return domainerr.Internal("failed to restore lot dates")
-		}
-		return nil
-	})
-}
-
-// ListArchivedLots lista lotes archivados con nombres de proyecto/campo/cultivo joineados.
-func (r *Repository) ListArchivedLots(ctx context.Context, page, perPage int) ([]domain.LotTable, int64, error) {
-	where := []string{"l.deleted_at IS NOT NULL"}
-	args := []any{}
-	if tenantID, ok := authz.TenantFromContext(ctx); ok {
-		where = append(where, "l.tenant_id = ?")
-		args = append(args, tenantID)
-	}
-	whereSQL := strings.Join(where, " AND ")
-
-	var total int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM lots l WHERE %s", whereSQL)
-	if err := r.db.Client().WithContext(ctx).Raw(countQuery, args...).Scan(&total).Error; err != nil {
-		return nil, 0, domainerr.Internal("failed to count archived lots")
-	}
-
-	type archivedLotRow struct {
-		ID             int64           `gorm:"column:id"`
-		ProjectID      int64           `gorm:"column:project_id"`
-		FieldID        int64           `gorm:"column:field_id"`
-		ProjectName    string          `gorm:"column:project_name"`
-		FieldName      string          `gorm:"column:field_name"`
-		LotName        string          `gorm:"column:lot_name"`
-		PreviousCropID int64           `gorm:"column:previous_crop_id"`
-		PreviousCrop   string          `gorm:"column:previous_crop"`
-		CurrentCropID  int64           `gorm:"column:current_crop_id"`
-		CurrentCrop    string          `gorm:"column:current_crop"`
-		Variety        string          `gorm:"column:variety"`
-		Hectares       decimal.Decimal `gorm:"column:hectares"`
-		Season         string          `gorm:"column:season"`
-		Tons           decimal.Decimal `gorm:"column:tons"`
-		UpdatedAt      *time.Time      `gorm:"column:updated_at"`
-	}
-
-	offset := (page - 1) * perPage
-	listQuery := fmt.Sprintf(`
-		SELECT
-			l.id, f.project_id, l.field_id,
-			p.name AS project_name, f.name AS field_name, l.name AS lot_name,
-			l.previous_crop_id, COALESCE(prev_crop.name, '') AS previous_crop,
-			l.current_crop_id, COALESCE(curr_crop.name, '') AS current_crop,
-			l.variety, l.hectares, l.season, l.tons, l.updated_at
-		FROM lots l
-		LEFT JOIN fields f ON f.id = l.field_id
-		LEFT JOIN projects p ON p.id = f.project_id
-		LEFT JOIN crops prev_crop ON prev_crop.id = l.previous_crop_id
-		LEFT JOIN crops curr_crop ON curr_crop.id = l.current_crop_id
-		WHERE %s
-		ORDER BY l.deleted_at DESC
-		LIMIT ? OFFSET ?
-	`, whereSQL)
-	listArgs := append(append([]any{}, args...), perPage, offset)
-
-	var rows []archivedLotRow
-	if err := r.db.Client().WithContext(ctx).Raw(listQuery, listArgs...).Scan(&rows).Error; err != nil {
-		return nil, 0, domainerr.Internal("failed to list archived lots")
-	}
-
-	result := make([]domain.LotTable, len(rows))
-	for i, row := range rows {
-		result[i] = domain.LotTable{
-			ID:             row.ID,
-			ProjectID:      row.ProjectID,
-			FieldID:        row.FieldID,
-			ProjectName:    row.ProjectName,
-			FieldName:      row.FieldName,
-			LotName:        row.LotName,
-			PreviousCropID: row.PreviousCropID,
-			PreviousCrop:   row.PreviousCrop,
-			CurrentCropID:  row.CurrentCropID,
-			CurrentCrop:    row.CurrentCrop,
-			Variety:        row.Variety,
-			Hectares:       row.Hectares,
-			Season:         row.Season,
-			Tons:           row.Tons,
-			UpdatedAt:      row.UpdatedAt,
-		}
-	}
-	return result, total, nil
-}
-
-// HardDeleteLot elimina definitivamente un lote.
-// Bloquea con 409 si tiene workorders (activas o archivadas) referenciándolo.
-func (r *Repository) HardDeleteLot(ctx context.Context, id int64) error {
-	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
-		return err
-	}
-
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tenancy.Scope(ctx, tx.Unscoped().Table("lots"), "lots").Where("id = ?", id).Count(&count).Error; err != nil {
+		if err := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", id).
+			Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
 		}
-		if err := lifecycle.RequireArchived(tenancy.Scope(ctx, tx.Unscoped().Table("lots"), "lots"), "lots", "lot", id); err != nil {
-			return err
-		}
-
-		var woCount int64
-		if err := tenancy.Scope(ctx, tx.Unscoped().Table("workorders"), "workorders").Where("lot_id = ?", id).Count(&woCount).Error; err != nil {
-			return domainerr.Internal("failed to check workorders")
-		}
-		if woCount > 0 {
-			// Machine-readable prefix `BLOCKED_BY_WORKORDERS:<count>|` lets the FE
-			// detect the case without parsing the text. The English text after
-			// the pipe is the fallback if a caller doesn't match the prefix —
-			// translateBackendError on the FE maps it to a Spanish toast.
-			return domainerr.Conflict(fmt.Sprintf("BLOCKED_BY_WORKORDERS:%d|lot has %d work orders; archive or hard-delete them first", woCount, woCount))
-		}
-
-		// Limpiar lot_dates físicamente (no son entidad de negocio independiente).
-		if err := tenancy.Scope(ctx, tx.Unscoped(), "lot_dates").Where("lot_id = ?", id).Delete(&models.LotDates{}).Error; err != nil {
-			return domainerr.Internal("failed to delete lot_dates")
-		}
-
-		if err := tenancy.Scope(ctx, tx.Unscoped(), "lots").Delete(&models.Lot{}, "id = ?", id).Error; err != nil {
-			return domainerr.Internal("failed to hard delete lot")
+		if err := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", id).
+			Updates(map[string]any{
+				"deleted_at": time.Now(),
+				"deleted_by": &userID,
+			}).Error; err != nil {
+			return domainerr.Internal("failed to soft-delete lot")
 		}
 		return nil
 	})
 }
 
-
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	db := r.db.Client().WithContext(ctx).
+	err := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
-		Where("fields.project_id = ? AND lots.deleted_at IS NULL", projectID)
-	err := tenancy.Scope(ctx, db, "lots").
-		Where("fields.tenant_id = lots.tenant_id").
+		Where("fields.project_id = ? AND lots.deleted_at IS NULL", projectID).
 		Find(&lots).Error
 	if err != nil {
 		return nil, domainerr.Internal("failed to list lots by project")
@@ -550,11 +327,9 @@ func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]
 
 func (r *Repository) ListLotsByProjectAndField(ctx context.Context, projectID, fieldID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
-	db := r.db.Client().WithContext(ctx).
+	err := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
-		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID)
-	err := tenancy.Scope(ctx, db, "lots").
-		Where("fields.tenant_id = lots.tenant_id").
+		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID).
 		Find(&lots).Error
 	if err != nil {
 		return nil, domainerr.Internal("failed to list lots by project and field")
@@ -567,8 +342,6 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	db := r.db.Client().WithContext(ctx).
 		Joins("JOIN fields ON lots.field_id = fields.id").
 		Where("fields.project_id = ? AND fields.id = ? AND lots.deleted_at IS NULL", projectID, fieldID)
-	db = tenancy.Scope(ctx, db, "lots").
-		Where("fields.tenant_id = lots.tenant_id")
 	switch cropType {
 	case "current":
 		db = db.Where("lots.current_crop_id = ?", cropID)
@@ -584,28 +357,11 @@ func (r *Repository) ListLotsByProjectFieldAndCrop(ctx context.Context, projectI
 	return mapLotsToDomain(lots), nil
 }
 
-func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter) (*domain.LotMetrics, error) {
-	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
-		CustomerID: filter.CustomerID,
-		ProjectID:  filter.ProjectID,
-		CampaignID: filter.CampaignID,
-		FieldID:    filter.FieldID,
-	})
-	if err != nil {
-		return nil, err
-	}
-	hasWorkspaceFilter := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
-	if len(projectIDs) == 0 && hasWorkspaceFilter {
-		return &domain.LotMetrics{
-			SeededArea:      decimal.Zero,
-			HarvestedArea:   decimal.Zero,
-			YieldTnPerHa:    decimal.Zero,
-			CostPerHectare:  decimal.Zero,
-			SuperficieTotal: decimal.Zero,
-		}, nil
-	}
-	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
-		return nil, domainerr.TenantMissing()
+func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID int64) (*domain.LotMetrics, error) {
+	if projectID > 0 && fieldID > 0 {
+		if err := sharedfilters.ValidateFieldBelongsToProject(ctx, r.db.Client(), projectID, fieldID); err != nil {
+			return nil, err
+		}
 	}
 
 	type rowAgg struct {
@@ -613,21 +369,21 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 		HarvestedArea   decimal.Decimal `gorm:"column:harvested_area"`
 		YieldTnPerHa    decimal.Decimal `gorm:"column:yield_tn_per_ha"`
 		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
-		SuperficieTotal decimal.Decimal `gorm:"column:superficie_total"`
+		SuperficieTotal decimal.Decimal `gorm:"column:project_total_hectares"`
+		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
 	}
 
 	view := shareddb.ReportView("lot_metrics")
 	where := []string{"1 = 1"}
 	args := []any{}
-	if len(projectIDs) > 0 {
-		where = append(where, "project_id IN ?")
-		args = append(args, projectIDs)
-	}
-	if filter.FieldID != nil && *filter.FieldID > 0 {
+	if fieldID > 0 {
 		where = append(where, "field_id = ?")
-		args = append(args, *filter.FieldID)
+		args = append(args, fieldID)
+	} else if projectID > 0 {
+		where = append(where, "project_id = ?")
+		args = append(args, projectID)
 	}
-	if filter.CropID != nil && *filter.CropID > 0 {
+	if cropID > 0 {
 		where = append(where, `
 			lot_id IN (
 				SELECT id
@@ -636,7 +392,7 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 				  AND deleted_at IS NULL
 			)
 		`)
-		args = append(args, *filter.CropID, *filter.CropID)
+		args = append(args, cropID, cropID)
 	}
 
 	query := fmt.Sprintf(`
@@ -645,7 +401,8 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(seeded_area_ha), 0)) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
-			COALESCE(SUM(hectares), 0) AS superficie_total
+			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
+			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
 		FROM %s
 		WHERE %s
 	`, view, strings.Join(where, " AND "))
@@ -655,12 +412,17 @@ func (r *Repository) GetMetrics(ctx context.Context, filter domain.LotListFilter
 		return nil, domainerr.Internal("failed to scan lot metrics")
 	}
 
+	superficieTotal := row.SuperficieTotal
+	if fieldID > 0 && row.FieldTotal.GreaterThan(decimal.Zero) {
+		superficieTotal = row.FieldTotal
+	}
+
 	return &domain.LotMetrics{
 		SeededArea:      row.SeededArea,
 		HarvestedArea:   row.HarvestedArea,
 		YieldTnPerHa:    row.YieldTnPerHa,
 		CostPerHectare:  row.CostPerHa,
-		SuperficieTotal: row.SuperficieTotal,
+		SuperficieTotal: superficieTotal,
 	}, nil
 }
 
@@ -672,29 +434,34 @@ func (r *Repository) ListLots(
 	view := shareddb.ReportView("lot_list")
 	where := []string{"1 = 1"}
 	args := []any{}
-	projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
-		CustomerID: filter.CustomerID,
-		ProjectID:  filter.ProjectID,
-		CampaignID: filter.CampaignID,
-		FieldID:    filter.FieldID,
-	})
-	if err != nil {
-		return nil, 0, decimal.Zero, decimal.Zero, err
-	}
-	hasWorkspaceFilter := filter.CustomerID != nil || filter.ProjectID != nil || filter.CampaignID != nil || filter.FieldID != nil
-	if len(projectIDs) == 0 && hasWorkspaceFilter {
-		return []domain.LotTable{}, 0, decimal.Zero, decimal.Zero, nil
-	}
-	if len(projectIDs) == 0 && authz.TenantStrictModeEnabled() {
-		return nil, 0, decimal.Zero, decimal.Zero, domainerr.TenantMissing()
-	}
-	if len(projectIDs) > 0 {
-		where = append(where, "project_id IN ?")
-		args = append(args, projectIDs)
+	if filter.ProjectID != nil && (filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil) {
+		_, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+			CustomerID: filter.CustomerID,
+			ProjectID:  filter.ProjectID,
+			CampaignID: filter.CampaignID,
+			FieldID:    filter.FieldID,
+		})
+		if err != nil {
+			return nil, 0, decimal.Zero, decimal.Zero, err
+		}
 	}
 	if filter.FieldID != nil && *filter.FieldID > 0 {
 		where = append(where, "field_id = ?")
 		args = append(args, *filter.FieldID)
+	} else {
+		projectIDs, err := sharedfilters.ResolveProjectIDs(ctx, r.db.Client(), sharedfilters.WorkspaceFilter{
+			CustomerID: filter.CustomerID,
+			ProjectID:  filter.ProjectID,
+			CampaignID: filter.CampaignID,
+			FieldID:    filter.FieldID,
+		})
+		if err != nil {
+			return nil, 0, decimal.Zero, decimal.Zero, err
+		}
+		if len(projectIDs) > 0 {
+			where = append(where, "project_id IN ?")
+			args = append(args, projectIDs)
+		}
 	}
 	if filter.CropID != nil && *filter.CropID > 0 {
 		where = append(where, "(current_crop_id = ? OR previous_crop_id = ?)")
@@ -756,12 +523,7 @@ func (r *Repository) ListLots(
 		}
 		var allDates []models.LotDates
 		datesQuery := "SELECT * FROM lot_dates WHERE lot_id IN ? AND deleted_at IS NULL ORDER BY lot_id, sequence"
-		datesArgs := []any{lotIDs}
-		if tenantID, ok := authz.TenantFromContext(ctx); ok {
-			datesQuery = "SELECT * FROM lot_dates WHERE lot_id IN ? AND tenant_id = ? AND deleted_at IS NULL ORDER BY lot_id, sequence"
-			datesArgs = append(datesArgs, tenantID)
-		}
-		if err := r.db.Client().WithContext(ctx).Raw(datesQuery, datesArgs...).Scan(&allDates).Error; err != nil {
+		if err := r.db.Client().WithContext(ctx).Raw(datesQuery, lotIDs).Scan(&allDates).Error; err != nil {
 			return nil, 0, decimal.Zero, decimal.Zero, domainerr.Internal("failed to get lot dates")
 		}
 		datesByLot := make(map[int64][]models.LotDates)
@@ -803,57 +565,4 @@ func mapLotsToDomain(lots []models.Lot) []domain.Lot {
 
 func actorFromContext(ctx context.Context) (string, error) {
 	return sharedmodels.ActorFromContext(ctx)
-}
-
-// assertLotReferencesActive blocks Create/Update of a lot that references
-// archived parents. FieldID is the required parent; PreviousCrop and
-// CurrentCrop are optional during updates (only present when the caller
-// chose to rotate the crop). IDs <= 0 are no-ops.
-func assertLotReferencesActive(tx *gorm.DB, l *domain.Lot) error {
-	if l == nil {
-		return nil
-	}
-	refs := []lifecycle.ActiveRef{
-		{Table: "fields", Label: "field", ID: l.FieldID},
-		{Table: "crops", Label: "crop", ID: l.PreviousCrop.ID},
-		{Table: "crops", Label: "crop", ID: l.CurrentCrop.ID},
-	}
-	return lifecycle.RequireAllActive(tx, refs)
-}
-
-// GetRawLeaseExecuted calcula el arriendo ejecutado (solo tipos fijos 3 y 4) RAW desde
-// tablas base, sin pasar por v4_ssot/v4_calc/v4_report. Sirve como contraparte
-// independiente del valor SSOT `dashboard.RentExecutedUSD` (que internamente usa
-// `v4_ssot.lease_executed_for_project`, mismo CASE).
-// Fórmula: Σ CASE WHEN fields.lease_type_id IN (3,4) THEN fields.lease_type_value × lots.hectares ELSE 0.
-func (r *Repository) GetRawLeaseExecuted(ctx context.Context, projectID int64) (decimal.Decimal, error) {
-	tenantID, hasTenant := authz.TenantFromContext(ctx)
-	if !hasTenant && authz.TenantStrictModeEnabled() {
-		return decimal.Zero, domainerr.TenantMissing()
-	}
-
-	tenantFilter := ""
-	args := []any{projectID}
-	if hasTenant {
-		tenantFilter = " AND f.tenant_id = ? AND l.tenant_id = ?"
-		args = append(args, tenantID, tenantID)
-	}
-
-	q := fmt.Sprintf(`
-		SELECT COALESCE(SUM(
-			CASE
-				WHEN f.lease_type_id IN (3, 4) THEN COALESCE(f.lease_type_value, 0) * COALESCE(l.hectares, 0)
-				ELSE 0
-			END
-		), 0) AS total
-		FROM public.lots l
-		JOIN public.fields f ON f.id = l.field_id AND f.deleted_at IS NULL
-		WHERE f.project_id = ? AND l.deleted_at IS NULL %s
-	`, tenantFilter)
-
-	var total decimal.Decimal
-	if err := r.db.Client().WithContext(ctx).Raw(q, args...).Scan(&total).Error; err != nil {
-		return decimal.Zero, domainerr.Internal("failed to get raw lease executed: " + err.Error())
-	}
-	return total, nil
 }

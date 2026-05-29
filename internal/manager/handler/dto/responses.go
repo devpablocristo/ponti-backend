@@ -11,7 +11,6 @@ import (
 type ManagerResponse struct {
 	ID         int64      `json:"id"`
 	Name       string     `json:"name"`
-	ActorID    *int64     `json:"actor_id,omitempty"`
 	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
@@ -20,7 +19,6 @@ func ManagerFromDomain(d *domain.Manager) ManagerResponse {
 	return ManagerResponse{
 		ID:         d.ID,
 		Name:       d.Name,
-		ActorID:    d.ActorID,
 		ArchivedAt: d.ArchivedAt,
 	}
 }

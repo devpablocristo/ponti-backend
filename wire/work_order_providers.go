@@ -1,14 +1,19 @@
 package wire
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/google/wire"
 
+	pkgexcel "github.com/devpablocristo/ponti-backend/internal/platform/files/excel/excelize"
 	mwr "github.com/devpablocristo/ponti-backend/internal/platform/http/middlewares/gin"
 	pgin "github.com/devpablocristo/ponti-backend/internal/platform/http/servers/gin"
 	pgorm "github.com/devpablocristo/ponti-backend/internal/platform/persistence/gorm"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
 	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
+	workOrderExcel "github.com/devpablocristo/ponti-backend/internal/work-order/excel"
 )
 
 // ProvideWorkOrderRepository crea la implementación concreta de workorder.Repository.
@@ -21,9 +26,27 @@ func ProvideWorkOrderRepositoryPort(r *workorder.Repository) workorder.Repositor
 	return r
 }
 
-// ProvideWorkOrderExporterPort entrega el exporter CSV.
-func ProvideWorkOrderExporterPort() workorder.ExporterAdapterPort {
-	return workorder.NewCSVExporter()
+// Crea el engine de Excel ya configurado
+func ProvidePkgExcelService() (*pkgexcel.Service, error) {
+	fp := filepath.Join(os.TempDir(), workOrderExcel.DefaultFilename)
+	write := true
+	return pkgexcel.Bootstrap(
+		fp,
+		workOrderExcel.SheetName,
+		workOrderExcel.DateFormat,
+		&write,
+		workOrderExcel.ColumnWidths,
+	)
+}
+
+// bindea el engine como la interfaz XLSXEnginePort
+func ProvideXLSXEnginePort(s *pkgexcel.Service) workorder.XLSXEnginePort {
+	return s
+}
+
+// Crea el adaptador de exportación que usa el engine
+func ProvideExporterPort(eng workorder.XLSXEnginePort) workorder.ExporterAdapterPort {
+	return workorder.NewExcelExporter(eng)
 }
 
 // ProvideWorkOrderUseCases agrupa repositorios en workorder.UseCases.
@@ -77,5 +100,7 @@ var WorkOrderSet = wire.NewSet(
 	ProvideWorkOrderGormEnginePort,
 	ProvideWorkOrderGinEnginePort,
 	ProvideWorkOrderMiddlewaresEnginePort,
-	ProvideWorkOrderExporterPort,
+	ProvidePkgExcelService,
+	ProvideExporterPort,
+	ProvideXLSXEnginePort,
 )

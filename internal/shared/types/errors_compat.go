@@ -1,7 +1,7 @@
 package pkgtypes
 
 import (
-	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 type ErrorType string
