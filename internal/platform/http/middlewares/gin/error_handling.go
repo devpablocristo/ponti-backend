@@ -3,7 +3,7 @@ package pkgmwr
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/http/go/httperr"
+	"github.com/devpablocristo/platform/http/go/httperr"
 )
 
 // ErrorHandling maneja errores del contexto Gin y responde con JSON formateado.

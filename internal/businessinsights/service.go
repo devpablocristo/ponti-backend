@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
-	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
+	reviewclient "github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
+	corecandidates "github.com/devpablocristo/platform/notifications/go/candidates"
 	"github.com/google/uuid"
 )
 

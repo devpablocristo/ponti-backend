@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"

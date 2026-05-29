@@ -13,7 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 

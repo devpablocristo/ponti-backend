@@ -8,12 +8,12 @@ import (
 	"strconv"
 
 	// third-party
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
 	// pkg
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 
 	// excel

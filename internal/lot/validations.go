@@ -10,12 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httperr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/validate/go"
 	dto "github.com/devpablocristo/ponti-backend/internal/lot/handler/dto"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
-	"github.com/devpablocristo/core/validate/go"
 )
 
 // ValidationError representa un error de validación específico

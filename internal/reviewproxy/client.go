@@ -3,7 +3,7 @@
 package reviewproxy
 
 import (
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	reviewclient "github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 )
 
 // Client es un alias del client generico de core.

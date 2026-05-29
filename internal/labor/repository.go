@@ -17,7 +17,7 @@ import (
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/shopspring/decimal"
 )
@@ -428,9 +428,9 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		var investorID int64
-if m.InvestorID != nil {
-	investorID = *m.InvestorID
-}
+		if m.InvestorID != nil {
+			investorID = *m.InvestorID
+		}
 
 		list[i] = domain.LaborListItem{
 			WorkOrderID:     m.WorkOrderID,
