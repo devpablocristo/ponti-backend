@@ -21,7 +21,16 @@ permissions:
 
 env:
   GOPRIVATE: github.com/devpablocristo/*
-  CORE_GOVERNANCE_MODULE: github.com/devpablocristo/core/governance/go@v0.0.0-20260328151810-084828e80b26
+  PLATFORM_MODULES: >-
+    github.com/devpablocristo/platform/authn/go
+    github.com/devpablocristo/platform/databases/postgres/go
+    github.com/devpablocristo/platform/errors/go
+    github.com/devpablocristo/platform/kernels/governance/go
+    github.com/devpablocristo/platform/http/gin/go
+    github.com/devpablocristo/platform/http/go
+    github.com/devpablocristo/platform/notifications/go
+    github.com/devpablocristo/platform/security/go
+    github.com/devpablocristo/platform/validate/go
 
 jobs:
   lint:
@@ -41,7 +50,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          for module in $PLATFORM_MODULES; do go mod download "$module"; done
           go mod download
 
       - name: Lint
@@ -67,7 +76,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          for module in $PLATFORM_MODULES; do go mod download "$module"; done
           go mod download
 
       - name: Build
@@ -90,7 +99,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          for module in $PLATFORM_MODULES; do go mod download "$module"; done
           go mod download
 
       - name: Tests
@@ -115,7 +124,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          for module in $PLATFORM_MODULES; do go mod download "$module"; done
           go mod download
 
       - name: Govulncheck

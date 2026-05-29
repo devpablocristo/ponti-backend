@@ -37,7 +37,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
 	"github.com/devpablocristo/ponti-backend/internal/work-order"
-	workorderdraft "github.com/devpablocristo/ponti-backend/internal/work-order-draft"
+	"github.com/devpablocristo/ponti-backend/internal/work-order-draft"
 )
 
 // Injectors from wire.go:
@@ -108,7 +108,10 @@ func Initialize() (*Dependencies, error) {
 	stockRepository := ProvideStockRepository(stockGormEnginePort)
 	stockRepositoryPort := ProvideStockRepositoryPort(stockRepository)
 	dataintegrityStockRepositoryPort := ProvideDataIntegrityStockRepositoryPort(stockRepositoryPort)
-	dataintegrityUseCases := ProvideDataIntegrityUseCases(workOrderRepositoryPort, dataintegrityDashboardRepositoryPort, dataintegrityLotRepositoryPort, dataintegrityReportRepositoryPort, dataintegrityStockRepositoryPort)
+	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
+	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
+	supplyRepositoryPort := ProvideDataIntegritySupplyRepositoryPort(supplyRepository)
+	dataintegrityUseCases := ProvideDataIntegrityUseCases(workOrderRepositoryPort, dataintegrityDashboardRepositoryPort, dataintegrityLotRepositoryPort, dataintegrityReportRepositoryPort, dataintegrityStockRepositoryPort, supplyRepositoryPort)
 	dataintegrityUseCasesPort := ProvideDataIntegrityUseCasesPort(dataintegrityUseCases)
 	dataintegrityConfigAPIPort := ProvideDataIntegrityConfigAPI(config)
 	dataintegrityMiddlewaresEnginePort := ProvideDataIntegrityMiddlewaresEnginePort(middlewares)
@@ -196,9 +199,7 @@ func Initialize() (*Dependencies, error) {
 	leasetypeMiddlewaresEnginePort := ProvideLeaseTypeMiddlewaresEnginePort(middlewares)
 	leasetypeHandler := ProvideLeaseTypeHandler(leasetypeGinEnginePort, leasetypeUseCasesPort, leasetypeConfigAPIPort, leasetypeMiddlewaresEnginePort)
 	supplyGinEnginePort := ProvideSupplyGinEnginePort(server)
-	supplyGormEnginePort := ProvideSupplyGormEnginePort(repository)
-	supplyRepository := ProvideSupplyRepository(supplyGormEnginePort)
-	supplyRepositoryPort := ProvideSupplyRepositoryPort(supplyRepository)
+	repositoryPort2 := ProvideSupplyRepositoryPort(supplyRepository)
 	supplyExcelService, err := ProvideSupplyPkgExcelService()
 	if err != nil {
 		return nil, err
@@ -213,7 +214,7 @@ func Initialize() (*Dependencies, error) {
 	stockExporterAdapterPort := ProvideStockExporterPort(stockXLSXEnginePort)
 	stockUseCases := ProvideStockUseCases(stockRepositoryPort, stockExporterAdapterPort, projectUseCasesPort)
 	stockUseCasesPort := ProvideSupplyStockUseCasesPort(stockUseCases)
-	supplyUseCases := ProvideSupplyUseCases(supplyRepositoryPort, supplyExporterAdapterPort, stockUseCasesPort)
+	supplyUseCases := ProvideSupplyUseCases(repositoryPort2, supplyExporterAdapterPort, stockUseCasesPort)
 	supplyUseCasesPort := ProvideSupplyUseCasesPort(supplyUseCases)
 	supplyConfigAPIPort := ProvideSupplyConfigAPI(config)
 	supplyMiddlewaresEnginePort := ProvideSupplyMiddlewaresEnginePort(middlewares)
@@ -329,7 +330,7 @@ func Initialize() (*Dependencies, error) {
 	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)
 	workorderdraftRepositoryPort := ProvideWorkOrderDraftRepositoryPort(workorderdraftRepository)
 	publisherPort := ProvideWorkOrderDraftPublisherPort(workorderRepositoryPort)
-	supplyReaderPort := ProvideWorkOrderDraftSupplyReaderPort(supplyRepositoryPort)
+	supplyReaderPort := ProvideWorkOrderDraftSupplyReaderPort(repositoryPort2)
 	workorderdraftUseCases := ProvideWorkOrderDraftUseCases(workorderdraftRepositoryPort, publisherPort, supplyReaderPort)
 	workorderdraftUseCasesPort := ProvideWorkOrderDraftUseCasesPort(workorderdraftUseCases)
 	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)

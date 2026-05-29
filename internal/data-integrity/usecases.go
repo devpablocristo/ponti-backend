@@ -14,6 +14,7 @@ import (
 	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 	stockDomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	workOrderDomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 )
 
@@ -45,6 +46,11 @@ type StockRepositoryPort interface {
 	GetStocks(ctx context.Context, projectID int64, closeDate time.Time) ([]*stockDomain.Stock, error)
 }
 
+// SupplyRepositoryPort define la interfaz para consultar insumos (precios tentativos)
+type SupplyRepositoryPort interface {
+	ListTentativePrices(ctx context.Context, filter supplyDomain.SupplyFilter, limit int) ([]supplyDomain.TentativePriceItem, int64, error)
+}
+
 // UseCases contiene los casos de uso del módulo dataintegrity
 type UseCases struct {
 	workOrderRepo WorkOrderRepositoryPort
@@ -52,6 +58,7 @@ type UseCases struct {
 	lotRepo       LotRepositoryPort
 	reportRepo    ReportRepositoryPort
 	stockRepo     StockRepositoryPort
+	supplyRepo    SupplyRepositoryPort
 }
 
 // NewUseCases crea una nueva instancia de UseCases
@@ -61,6 +68,7 @@ func NewUseCases(
 	lotRepo LotRepositoryPort,
 	reportRepo ReportRepositoryPort,
 	stockRepo StockRepositoryPort,
+	supplyRepo SupplyRepositoryPort,
 ) *UseCases {
 	return &UseCases{
 		workOrderRepo: workOrderRepo,
@@ -68,7 +76,36 @@ func NewUseCases(
 		lotRepo:       lotRepo,
 		reportRepo:    reportRepo,
 		stockRepo:     stockRepo,
+		supplyRepo:    supplyRepo,
 	}
+}
+
+// GetTentativePrices devuelve los insumos con precio tentativo (is_partial_price) del workspace.
+func (u *UseCases) GetTentativePrices(ctx context.Context, filter domain.TentativePricesFilter) (*domain.TentativePricesReport, error) {
+	items, count, err := u.supplyRepo.ListTentativePrices(ctx, supplyDomain.SupplyFilter{
+		CustomerID: filter.CustomerID,
+		ProjectID:  filter.ProjectID,
+		CampaignID: filter.CampaignID,
+		FieldID:    filter.FieldID,
+	}, 10)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]domain.TentativePriceItem, len(items))
+	for i := range items {
+		out[i] = domain.TentativePriceItem{
+			SupplyID:     items[i].SupplyID,
+			Name:         items[i].Name,
+			CategoryName: items[i].CategoryName,
+			Price:        items[i].Price,
+		}
+	}
+
+	return &domain.TentativePricesReport{
+		Count: count,
+		Items: out,
+	}, nil
 }
 
 // sharedData cachea datos compartidos entre controles para reducir round-trips a DB.
