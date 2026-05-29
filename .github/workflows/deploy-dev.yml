@@ -114,7 +114,7 @@ jobs:
 
       - name: Build y push imagen
         env:
-          GO_MODULES_TOKEN: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          GO_MODULES_TOKEN: ${{ secrets.PLATFORM_REPO_READ_TOKEN }}
         run: |
           set -euo pipefail
           IMAGE_TAG="${DEPLOY_SHA}"
