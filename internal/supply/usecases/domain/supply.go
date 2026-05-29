@@ -39,3 +39,10 @@ type Supply struct {
 
 	shareddomain.Base // Audit fields
 }
+
+type TentativePriceItem struct {
+	SupplyID     int64
+	Name         string
+	CategoryName string
+	Price        decimal.Decimal
+}
