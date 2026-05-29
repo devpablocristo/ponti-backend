@@ -14,7 +14,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 // ConfigPort es la interfaz para manejar configuraciones del cliente GORM
@@ -55,7 +55,7 @@ func (r *Repository) Connect(config ConfigPort) error {
 		return fmt.Errorf("failed to create database: %w", err)
 	}
 
-	// Usar core/databases/postgres/go para la conexión GORM.
+	// Usar platform/databases/postgres/go para la conexión GORM.
 	dsn := buildDSN(config)
 	driver := mapDriver(config.GetDBType())
 	gormCfg := gormdb.DefaultGormConfig()

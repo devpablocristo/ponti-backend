@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/platform/http/go/httpclient"
 )
 
 // Client maneja llamadas a Ponti AI (`InsightService` + `CopilotAgent`).

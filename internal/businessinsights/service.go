@@ -1,7 +1,7 @@
 // Package businessinsights genera candidatos de notificacion a partir de
 // eventos de dominio (stock negativo, resultado negativo, etc.). Consulta a
 // Nexus Review para decidir si el evento amerita notificar y, si si,
-// dedupica via core/notifications/go/candidates.
+// dedupica via platform/notifications/go/candidates.
 package businessinsights
 
 import (
@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
-	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
+	reviewclient "github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
+	platformcandidates "github.com/devpablocristo/platform/notifications/go/candidates"
 	"github.com/google/uuid"
 )
 
@@ -47,7 +47,7 @@ type ReadRepository interface {
 
 // Service aplica reglas de dominio a eventos y crea/cierra candidatos de notificacion.
 type Service struct {
-	candidates *corecandidates.Usecases
+	candidates *platformcandidates.Usecases
 	resolver   ResolverRepository
 	reads      ReadRepository
 	review     ReviewClient
@@ -61,7 +61,7 @@ func NewService(repo CandidateRepository, resolver ResolverRepository, reads Rea
 		cfg.NegativeStockDedupWindow = 6 * time.Hour
 	}
 	return &Service{
-		candidates: corecandidates.NewWriteUsecases(repo, repo),
+		candidates: platformcandidates.NewWriteUsecases(repo, repo),
 		resolver:   resolver,
 		reads:      reads,
 		review:     review,

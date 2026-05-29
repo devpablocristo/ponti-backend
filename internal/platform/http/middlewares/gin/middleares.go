@@ -3,7 +3,7 @@ package pkgmwr
 import (
 	"time"
 
-	coreginmw "github.com/devpablocristo/core/http/gin/go"
+	coreginmw "github.com/devpablocristo/platform/http/gin/go"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )

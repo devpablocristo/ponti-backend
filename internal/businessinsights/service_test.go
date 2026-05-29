@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	reviewclient "github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"

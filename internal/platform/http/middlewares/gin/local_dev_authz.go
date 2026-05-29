@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 )
 
 // RequireLocalDevAuthz is a lightweight auth middleware intended for local development.
@@ -74,7 +74,7 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 
 		role := "admin"
 
-		// Inject core/saas/go context keys.
+		// Inject platform/security/go context keys.
 		ctx := c.Request.Context()
 		ctx = context.WithValue(ctx, ctxkeys.Actor, subject)
 		ctx = context.WithValue(ctx, ctxkeys.OrgID, tenantID)

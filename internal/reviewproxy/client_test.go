@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	reviewclient "github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 )
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type Base struct {
 	DeletedBy *string        `gorm:"column:deleted_by"`
 }
 
-// ActorFromContext extrae el actor (email/sub) del contexto de core/saas/go.
+// ActorFromContext extrae el actor (email/sub) del contexto de platform/security/go.
 func ActorFromContext(ctx context.Context) (string, error) {
 	v := ctx.Value(ctxkeys.Actor)
 	if s, ok := v.(string); ok && s != "" {

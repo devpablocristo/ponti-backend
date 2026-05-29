@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	investormodels "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	investordomain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	providermodels "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"

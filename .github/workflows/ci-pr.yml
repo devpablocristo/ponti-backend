@@ -21,7 +21,7 @@ permissions:
 
 env:
   GOPRIVATE: github.com/devpablocristo/*
-  CORE_GOVERNANCE_MODULE: github.com/devpablocristo/core/governance/go@v0.0.0-20260328151810-084828e80b26
+  PLATFORM_GOVERNANCE_MODULE: github.com/devpablocristo/platform/kernels/governance/go@v0.1.0
 
 jobs:
   lint:
@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure private Go modules
-        run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PLATFORM_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -41,7 +41,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download "$PLATFORM_GOVERNANCE_MODULE"
           go mod download
 
       - name: Lint
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure private Go modules
-        run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PLATFORM_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -67,7 +67,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download "$PLATFORM_GOVERNANCE_MODULE"
           go mod download
 
       - name: Build
@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure private Go modules
-        run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PLATFORM_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -90,7 +90,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download "$PLATFORM_GOVERNANCE_MODULE"
           go mod download
 
       - name: Tests
@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure private Go modules
-        run: git config --global url."https://${{ secrets.CORE_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PLATFORM_REPO_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -115,7 +115,7 @@ jobs:
 
       - name: Download Go modules
         run: |
-          go mod download "$CORE_GOVERNANCE_MODULE"
+          go mod download "$PLATFORM_GOVERNANCE_MODULE"
           go mod download
 
       - name: Govulncheck
