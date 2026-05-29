@@ -371,6 +371,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		CostPerHa       decimal.Decimal `gorm:"column:cost_per_ha"`
 		SuperficieTotal decimal.Decimal `gorm:"column:project_total_hectares"`
 		FieldTotal      decimal.Decimal `gorm:"column:field_total_hectares"`
+		TotalTons       decimal.Decimal `gorm:"column:total_tons"`
 	}
 
 	view := shareddb.ReportView("lot_metrics")
@@ -401,6 +402,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
 			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(seeded_area_ha), 0)) AS yield_tn_per_ha,
 			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
+			COALESCE(SUM(tons), 0) AS total_tons,
 			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
 			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
 		FROM %s
@@ -423,6 +425,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		YieldTnPerHa:    row.YieldTnPerHa,
 		CostPerHectare:  row.CostPerHa,
 		SuperficieTotal: superficieTotal,
+		TotalTons:       row.TotalTons,
 	}, nil
 }
 
