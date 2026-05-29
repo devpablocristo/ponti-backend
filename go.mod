@@ -5,15 +5,15 @@ go 1.26.3
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
 	firebase.google.com/go/v4 v4.19.0
-	github.com/devpablocristo/core/authn/go v0.2.1
-	github.com/devpablocristo/core/databases/postgres/go v0.1.0
-	github.com/devpablocristo/core/errors/go v0.1.0
-	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
-	github.com/devpablocristo/core/http/gin/go v0.1.0
-	github.com/devpablocristo/core/http/go v0.1.1
-	github.com/devpablocristo/core/notifications/go v0.3.0
-	github.com/devpablocristo/core/security/go v0.1.0
-	github.com/devpablocristo/core/validate/go v0.1.1
+	github.com/devpablocristo/platform/authn/go v0.2.0
+	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
+	github.com/devpablocristo/platform/errors/go v0.2.0
+	github.com/devpablocristo/platform/http/gin/go v0.2.3
+	github.com/devpablocristo/platform/http/go v0.1.0
+	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
+	github.com/devpablocristo/platform/notifications/go v0.1.1
+	github.com/devpablocristo/platform/security/go v0.2.2
+	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-migrate/migrate/v4 v4.19.1

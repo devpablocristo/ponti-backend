@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 

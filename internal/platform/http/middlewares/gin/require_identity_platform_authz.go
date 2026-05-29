@@ -14,10 +14,10 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/authn/go/jwks"
-	"github.com/devpablocristo/core/security/go/contextkeys"
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/http/go/httperr"
+	"github.com/devpablocristo/platform/authn/go/jwks"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	"github.com/devpablocristo/platform/http/go/httperr"
 )
 
 const (

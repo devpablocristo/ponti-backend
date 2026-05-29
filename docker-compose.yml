@@ -38,6 +38,7 @@ services:
       - DB_HOST=ponti-db
       - DB_PORT=5432
       - GO_MODULES_TOKEN=${GO_MODULES_TOKEN:-}
+      - GOWORK=off
     volumes:
       - .:/app
       # Monta el repo core en la misma ruta absoluta que usan los replace locales de go.mod.

@@ -58,3 +58,5 @@ charts/
 
 # Environment work directories
 env/*/work-*
+go.work
+go.work.sum

@@ -140,3 +140,8 @@ __debug_bin*
 
 *.code-workspace
 *.dump
+
+# Go workspace local (apunta al platform del dev) + binario suelto
+go.work
+go.work.sum
+/api
