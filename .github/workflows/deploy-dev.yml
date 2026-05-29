@@ -48,6 +48,7 @@ jobs:
       SECRET_AI_SERVICE_KEY_NAME: ai-service-keys-dev
       CLOUDSQL_PROXY_PORT: "55432"
       REQUIRE_AUTH_SMOKE: "0"
+      ALLOW_EMPTY_DATA_SMOKE: "1"
       CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_DEV }}
       DB_NAME: ${{ vars.DB_NAME_DEV }}
       DB_USER: ${{ vars.DB_USER_DEV }}

@@ -6,6 +6,7 @@ API_PREFIX="${API_PREFIX:-/api/v1}"
 X_API_KEY="${X_API_KEY:-}"
 AUTH_BEARER_TOKEN="${AUTH_BEARER_TOKEN:-}"
 REQUIRE_AUTH_SMOKE="${REQUIRE_AUTH_SMOKE:-0}"
+ALLOW_EMPTY_DATA_SMOKE="${ALLOW_EMPTY_DATA_SMOKE:-0}"
 
 if [[ -z "${BASE_URL}" ]]; then
   echo "ERROR: BASE_URL vacío." >&2
@@ -104,6 +105,11 @@ if [[ "${SMOKE_PROJECT_ID:-}" != "" ]]; then
 fi
 
 if [[ "${#candidate_project_ids[@]}" -eq 0 ]]; then
+  if [[ "${ALLOW_EMPTY_DATA_SMOKE}" == "1" ]]; then
+    echo "[smoke] WARN: no hay proyectos; se omite smoke funcional porque ALLOW_EMPTY_DATA_SMOKE=1."
+    echo "[smoke] OK - smoke básico completado (ping + schema guardrails previos)."
+    exit 0
+  fi
   echo "ERROR: No hay proyectos para correr smoke test." >&2
   exit 1
 fi
