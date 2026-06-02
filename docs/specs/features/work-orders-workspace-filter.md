@@ -8,7 +8,8 @@
 - **nombre:** Listado de órdenes de trabajo acotado al workspace (cliente · proyecto · campaña · campo)
 - **tipo:** refactor / hardening de contrato de filtros (sin migraciones)
 - **repo:** `ponti-backend` (core)
-- **merge:** BE-first, con confirmación al FE por el nuevo `400`
+- **merge:** BE + FE (BFF/UI), implementados juntos
+- **estado:** ✅ **Implementado y verificado e2e** (core + web, rama `work-orders-workspace-filter`). Detalle en §10.
 
 ---
 
@@ -91,7 +92,7 @@ specs** (plan en §9).
 
 ## 3. Alcance / Archivos
 
-**Archivos de la app a modificar (partial-hunks), en la etapa de implementación posterior — solo `work-order`:**
+**Archivos de la app modificados (partial-hunks) — solo `work-order` (implementado, ver §10):**
 
 - [`internal/work-order/handler.go`](../../../internal/work-order/handler.go)
   - `parseFilters` → pasar a devolver `(domain.WorkOrderFilter, error)` propagando el error de
@@ -137,17 +138,17 @@ de GORM (`internal/shared/models/base.go`) y aplicado en `ResolveProjectIDs`.
 
 - **Intra-repo:** los helpers `internal/shared/filters` e `internal/shared/handlers` ya están presentes y en
   uso. No hay features bloqueantes.
-- **Cross-repo (FE):** este cambio convierte en obligatorio el envío de `customer_id` + `project_id` +
-  `campaign_id` en los 4 endpoints. El FE debe manejar el nuevo
-  `400 "customer_id, project_id and campaign_id are required"`. Es muy probable que el FE ya envíe los tres
-  (flujo de selector de workspace), pero **debe confirmarse** para `metrics`, `export` y especialmente
-  `filter-rows` (ver Riesgos).
+- **Cross-repo (FE) — RESUELTO (ver §10):** este cambio hace obligatorio enviar `customer_id` + `project_id` +
+  `campaign_id` en los 4 endpoints. Se actualizó el **BFF y la UI del repo `web`** (rama
+  `work-orders-workspace-filter`) para enviar siempre los tres + `field_id` cuando aplica. La UI ya tenía los
+  tres en su workspace global; el bug real estaba en el **BFF**, que con un campo seleccionado **dropeaba**
+  `project_id` (contrato viejo "field OR project"). Verificado e2e (§10).
 - **Plataforma:** usa `domainerr` de `platform/errors/go/domainerr` (ya importado por los helpers). Sin
   bumps de `go.mod`.
 
 ---
 
-## 6. Plan de implementación (etapa posterior — no incluida en este spec)
+## 6. Plan de implementación (ejecutado — ver §10)
 
 1. Refactorizar `parseFilters` → `parseWorkOrderFilter(c) (domain.WorkOrderFilter, error)`:
    - propagar el error de `ParseWorkspaceFilter` (no tragarlo);
@@ -188,15 +189,27 @@ de GORM (`internal/shared/models/base.go`) y aplicado en `ResolveProjectIDs`.
 - **`filter-rows`** ya **no** acepta su antigua regla `project_id` OR `field_id`: aplica el mismo `400` que
   el resto de los endpoints.
 
+**Resultado (verificado el 2026-06-02 contra el stack local docker):**
+
+- `go build ./...`, `go vet`, `go test ./internal/work-order/...` → **verde** (incluye 2 tests nuevos:
+  `parseFilters` exige el workspace; `filter-rows` delega sin validación propia).
+- e2e contra **core** (`:8080`) con IDs reales (project 30 / customer 17 / campaign 2 / field SJDD 39):
+  sin filtros → `400`; solo project → `400`; los 3 + field → **`200`** (filtra el campo); los 3 sin field →
+  **`200`** (todos los campos).
+- e2e a través del **BFF** (`:3000`) como la UI, con campo seleccionado: list / metrics / filter-rows /
+  export → **`200`**; solo project (sin cliente/campaña) → `400`.
+
 ---
 
 ## 8. Riesgos y decisiones pendientes
 
-- **Breaking change de contrato:** cualquier consumidor que hoy liste sin filtros recibirá `400`. Confirmar
-  con el FE que envía los tres IDs en los 4 endpoints antes de mergear.
-- **`filter-rows`:** si el FE lo usa para **poblar los selectores antes** de que el usuario haya elegido
-  campaña, exigir los tres IDs podría romper ese flujo. **Punto a validar con FE**; si fuera el caso, habría
-  que excluir `filter-rows` del alcance o cambiar cómo el FE arma esos selectores.
+- **Breaking change de contrato (RESUELTO):** quien liste sin los tres IDs recibe `400`. El FE (BFF + UI de
+  work-orders) se actualizó para enviarlos siempre; verificado e2e (§7, §10).
+- **`filter-rows` (RESUELTO):** la UI de órdenes manda los tres (su workspace global ya los tiene). El acceso
+  desde **Stock** ("ver órdenes que consumen este insumo") **no se rompe**: Stock solo muestra datos con
+  cliente+proyecto+campaña ya elegidos (`web · ui/src/pages/admin/stock/Stock.tsx:666`) y esa selección
+  persiste al navegar. Único caso teórico de `400`: abrir `/admin/work-orders?project_id=N` por URL pelada sin
+  workspace — no es un flujo de la app (ver follow-ups en §10).
 - **Capa de validación:** se elige el **handler** (espejo de `dashboard`). `report` además valida en el use
   case con un validator; acá se considera innecesario duplicarlo. Decisión menor, documentada.
 - **"Activo" transitivo:** `ResolveProjectIDs` chequea `deleted_at IS NULL` en `projects` y `fields`. **No**
@@ -257,3 +270,53 @@ larga.
 `ValidateRequiredWorkspaceFilter` y resuelve con `ResolveProjectIDs`; **cero** parser propio, **cero** copia
 de la regla de requerido, **cero** resolutor propio; `go build` / `go test` en verde. Se prioriza primero
 `dashboard` y `lot` porque cambian el comportamiento observable, no solo el estilo.
+
+---
+
+## 10. Implementación realizada y verificación (estado real)
+
+> Este spec se escribió como **plan previo (BE)**. Esta sección registra lo que **efectivamente se implementó
+> y verificó**, incluida la parte FE que el plan había dejado como "a confirmar".
+
+### Core (`ponti-backend`, rama `work-orders-workspace-filter`)
+
+- `internal/work-order/handler.go`: `parseFilters` ahora devuelve `(filter, error)` y propaga el error de
+  parseo; los 4 read handlers llaman `ValidateRequiredWorkspaceFilter` antes de delegar.
+- `internal/work-order/usecases.go`: eliminada la validación divergente (`project_id` OR `field_id`) de
+  `ListWorkOrderFilterRows`.
+- `internal/work-order/usecases_test.go`: tests nuevos.
+- Commits: `docs(work-orders): spec…` + `fix(work-orders): exigir cliente+proyecto+campaña…`.
+
+### FE (`web`, rama `work-orders-workspace-filter`) — acá estaba el bug que se reportó
+
+- **Causa raíz:** el BFF (`api/src/utils/workOrdersRoute.ts` → `buildWorkOrderScopeParams`) usaba `field_id`
+  **O** `project_id` (excluyente, contrato viejo). Con un campo seleccionado **dropeaba `project_id`** → core
+  respondía `400`. Lo mismo en la copia inline de `/metrics` y en `/export` (solo `project_id`).
+- **Fix:** enviar `project_id` **y** `field_id` juntos; `/metrics` y `/export` convergen a los helpers de
+  scope compartidos; la UI (`ui/.../WorkOrders.tsx` → `handleExport`) exporta con la query completa. Test del
+  BFF actualizado (`api/test/workOrdersRoute.test.js`).
+- Commit: `fix(work-orders): el BFF/UI envían project_id y field_id juntos…`.
+
+### Verificación e2e (2026-06-02, stack local docker)
+
+Elegir un campo **filtra** (200) y el error solo aparece sin cliente/proyecto/campaña — exactamente el
+comportamiento pedido. Detalle de casos en §7.
+
+### Follow-ups detectados en el code review (NO incluidos — fuera de alcance de esta entrega)
+
+- **Guards del FE laxos:** `hasWorkOrderScope` (UI y BFF) sigue con la regla vieja `project OR field`. En el
+  uso normal no molesta (la UI ya tiene los tres en su workspace), pero un acceso con solo `project` (URL
+  pelada, o un futuro caller) muestra el `400` crudo en inglés en vez de un gate claro. Pendiente: alinear a
+  cliente+proyecto+campaña y localizar el mensaje.
+- **Acceso desde Stock** ("ver órdenes que consumen este insumo"): **no se rompe** hoy (Stock exige el
+  workspace completo para mostrar datos), pero su deep-link solo lleva `project_id`+`supply_id`; conviene que
+  incluya cliente+campaña por robustez. **Pertenece al módulo Stock, fuera de este spec.**
+- **`errorMetrics`** oculta el bloque de KPIs sin aviso si metrics falla mientras la lista está cacheada.
+- **`handleExport`** chequea `projectId` crudo vs `effectiveProjectId` (el botón export puede quedar
+  deshabilitado con la lista ya cargada).
+- **`GetMetrics` (core)** ignora `is_digital`/`status` que el BFF ahora reenvía (KPIs vs lista podrían diferir
+  si se usan esos filtros).
+- **Defensa en profundidad (core):** la validación vive solo en el handler; el use case ya no valida scope
+  (no alcanzable hoy, pero un futuro caller no-HTTP podría listar sin scope).
+- **Seguridad (no relacionado):** `verifyToken` del BFF (`api/src/routes/authMiddleware.ts`) no valida la
+  firma del JWT, solo lo decodifica.
