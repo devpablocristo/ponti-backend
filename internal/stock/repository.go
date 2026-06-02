@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplymodels "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"

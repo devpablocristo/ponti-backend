@@ -14,6 +14,7 @@ type LotTableExcelDTO struct {
 	PreviousCrop         string     `excel:"CULTIVO ANTERIOR"`
 	CurrentCrop          string     `excel:"CULTIVO ACTUAL"`
 	Variety              string     `excel:"VARIEDAD"`
+	Hectares             float64    `excel:"SUP. TOTAL"`
 	SowedArea            float64    `excel:"SUP. SIEMBRA"`
 	SowingDate           *time.Time `excel:"FECHA SIEMBRA"`
 	CostUsdPerHa         float64    `excel:"COSTO U$/HA"`
@@ -54,6 +55,7 @@ func BuildLotExcelDTO(items []domain.LotTable) []LotTableExcelDTO {
 			PreviousCrop:         it.PreviousCrop,
 			CurrentCrop:          it.CurrentCrop,
 			Variety:              it.Variety,
+			Hectares:             decToFloat(it.Hectares, 2),
 			SowedArea:            decToFloat(it.SowedArea, 2),
 			SowingDate:           sowingDate,
 			CostUsdPerHa:         decToFloat(it.CostUsdPerHa, 2),

@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
-	corecandidates "github.com/devpablocristo/core/notifications/go/candidates"
+	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
+	corecandidates "github.com/devpablocristo/platform/notifications/go/candidates"
 	"github.com/google/uuid"
 )
 
-// ReviewClient es el subset de reviewclient.Client que usa el service.
+// ReviewClient es el subset de governanceclient.Client que usa el service.
 type ReviewClient interface {
-	SubmitRequest(ctx context.Context, idempotencyKey string, body reviewclient.SubmitRequestBody) (reviewclient.SubmitResponse, error)
+	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 }
 
 // Config centraliza thresholds y ventanas de dedup del service.
@@ -91,7 +91,7 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 	now := time.Now().UTC()
 	fingerprint := bucketedID("ponti.stock.negative", level.ProductID, s.config.NegativeStockDedupWindow, now)
 
-	decision, err := s.review.SubmitRequest(ctx, fingerprint, reviewclient.SubmitRequestBody{
+	decision, err := s.review.SubmitRequest(ctx, fingerprint, governanceclient.SubmitRequestBody{
 		RequesterType: "service",
 		RequesterID:   "ponti-backend",
 		ActionType:    "ponti.stock.negative",
@@ -203,7 +203,7 @@ func (s *Service) Reopen(ctx context.Context, tenantID uuid.UUID, candidateID, a
 // llega vacio pero el decision/status sigue siendo allow/allowed. Nexus
 // rechaza por default si no matchea policy, asi que `decision=allow` ya es
 // señal suficiente para nuestro caso (1 sola policy por action_type).
-func policyMatched(d reviewclient.SubmitResponse) bool {
+func policyMatched(d governanceclient.SubmitResponse) bool {
 	if d.Decision != "allow" {
 		return false
 	}

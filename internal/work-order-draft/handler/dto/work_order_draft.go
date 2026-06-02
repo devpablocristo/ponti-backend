@@ -39,7 +39,7 @@ type WorkOrderDraft struct {
 	InvestorID     int64                `json:"investor_id"`
 	IsDigital      bool                 `json:"is_digital"`
 	InvestorSplits []InvestorSplit      `json:"investor_splits,omitempty"`
-	Items          []WorkOrderDraftItem `json:"items" binding:"required"`
+	Items          []WorkOrderDraftItem `json:"items"`
 }
 
 type WorkOrderDraftBatchLotItem struct {

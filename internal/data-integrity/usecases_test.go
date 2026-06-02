@@ -115,6 +115,7 @@ func TestUseCases_control1LotesVsDashboard(t *testing.T) {
 				NewMockLotRepositoryPort(ctrl),
 				NewMockReportRepositoryPort(ctrl),
 				NewMockStockRepositoryPort(ctrl),
+				NewMockSupplyRepositoryPort(ctrl),
 			)
 
 			sd := &sharedData{
@@ -212,6 +213,7 @@ func TestUseCases_control13LotesResultadoVsDashboard_withRecalcB(t *testing.T) {
 				NewMockLotRepositoryPort(ctrl),
 				NewMockReportRepositoryPort(ctrl),
 				NewMockStockRepositoryPort(ctrl),
+				NewMockSupplyRepositoryPort(ctrl),
 			)
 
 			sd := &sharedData{

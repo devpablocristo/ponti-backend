@@ -14,6 +14,7 @@ type LotMetrics struct {
 	YieldTnPerHa    decimal.Decimal `json:"yield_tn_per_ha"`
 	CostPerHectare  decimal.Decimal `json:"cost_per_hectare"`
 	SuperficieTotal decimal.Decimal `json:"superficie_total"`
+	TotalTons       decimal.Decimal `json:"total_tons"`
 }
 
 // MarshalJSON aplica formato según especificación: Toneladas/ha 2 decimales, resto enteros
@@ -24,12 +25,14 @@ func (m LotMetrics) MarshalJSON() ([]byte, error) {
 		YieldTnPerHa    string `json:"yield_tn_per_ha"`
 		CostPerHectare  string `json:"cost_per_hectare"`
 		SuperficieTotal string `json:"superficie_total"`
+		TotalTons       string `json:"total_tons"`
 	}{
 		SeededArea:      m.SeededArea.Round(0).String(),      // Sin decimales
 		HarvestedArea:   m.HarvestedArea.Round(0).String(),   // Sin decimales
 		YieldTnPerHa:    m.YieldTnPerHa.StringFixed(2),       // Toneladas/ha: 2 decimales
 		CostPerHectare:  m.CostPerHectare.Round(0).String(),  // Sin decimales
 		SuperficieTotal: m.SuperficieTotal.Round(0).String(), // Sin decimales
+		TotalTons:       m.TotalTons.Round(0).String(),       // Sin decimales
 	}
 	return json.Marshal(aux)
 }
@@ -41,5 +44,6 @@ func FromDomainMetrics(d *domain.LotMetrics) LotMetrics {
 		YieldTnPerHa:    d.YieldTnPerHa,
 		CostPerHectare:  d.CostPerHectare,
 		SuperficieTotal: d.SuperficieTotal,
+		TotalTons:       d.TotalTons,
 	}
 }

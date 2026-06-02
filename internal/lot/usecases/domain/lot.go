@@ -33,4 +33,5 @@ type LotMetrics struct {
 	YieldTnPerHa    decimal.Decimal
 	CostPerHectare  decimal.Decimal
 	SuperficieTotal decimal.Decimal
+	TotalTons       decimal.Decimal
 }

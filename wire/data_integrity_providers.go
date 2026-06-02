@@ -12,6 +12,7 @@ import (
 	lot "github.com/devpablocristo/ponti-backend/internal/lot"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
 	stock "github.com/devpablocristo/ponti-backend/internal/stock"
+	supply "github.com/devpablocristo/ponti-backend/internal/supply"
 	workorder "github.com/devpablocristo/ponti-backend/internal/work-order"
 )
 
@@ -22,6 +23,7 @@ func ProvideDataIntegrityUseCases(
 	lotRepo dataintegrity.LotRepositoryPort,
 	reportRepo dataintegrity.ReportRepositoryPort,
 	stockRepo dataintegrity.StockRepositoryPort,
+	supplyRepo dataintegrity.SupplyRepositoryPort,
 ) *dataintegrity.UseCases {
 	return dataintegrity.NewUseCases(
 		workOrderRepo,
@@ -29,6 +31,7 @@ func ProvideDataIntegrityUseCases(
 		lotRepo,
 		reportRepo,
 		stockRepo,
+		supplyRepo,
 	)
 }
 
@@ -87,6 +90,11 @@ func ProvideDataIntegrityStockRepositoryPort(r stock.RepositoryPort) dataintegri
 	return r
 }
 
+// ProvideDataIntegritySupplyRepositoryPort adapta *supply.Repository a dataintegrity.SupplyRepositoryPort
+func ProvideDataIntegritySupplyRepositoryPort(r *supply.Repository) dataintegrity.SupplyRepositoryPort {
+	return r
+}
+
 // DataIntegritySet expone todos los providers necesarios para Data Integrity
 var DataIntegritySet = wire.NewSet(
 	ProvideDataIntegrityUseCases,
@@ -100,4 +108,5 @@ var DataIntegritySet = wire.NewSet(
 	ProvideDataIntegrityLotRepositoryPort,
 	ProvideDataIntegrityReportRepositoryPort,
 	ProvideDataIntegrityStockRepositoryPort,
+	ProvideDataIntegritySupplyRepositoryPort,
 )

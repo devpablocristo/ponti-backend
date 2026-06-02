@@ -13,7 +13,8 @@ import (
 	domain0 "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	domain1 "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 	domain2 "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
-	domain3 "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
+	domain3 "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
+	domain4 "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
 	gomock "github.com/golang/mock/gomock"
 	decimal "github.com/shopspring/decimal"
 )
@@ -42,10 +43,10 @@ func (m *MockWorkOrderRepositoryPort) EXPECT() *MockWorkOrderRepositoryPortMockR
 }
 
 // GetMetrics mocks base method.
-func (m *MockWorkOrderRepositoryPort) GetMetrics(ctx context.Context, filt domain3.WorkOrderFilter) (*domain3.WorkOrderMetrics, error) {
+func (m *MockWorkOrderRepositoryPort) GetMetrics(ctx context.Context, filt domain4.WorkOrderFilter) (*domain4.WorkOrderMetrics, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetrics", ctx, filt)
-	ret0, _ := ret[0].(*domain3.WorkOrderMetrics)
+	ret0, _ := ret[0].(*domain4.WorkOrderMetrics)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -254,4 +255,43 @@ func (m *MockStockRepositoryPort) GetStocks(ctx context.Context, projectID int64
 func (mr *MockStockRepositoryPortMockRecorder) GetStocks(ctx, projectID, closeDate interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStocks", reflect.TypeOf((*MockStockRepositoryPort)(nil).GetStocks), ctx, projectID, closeDate)
+}
+
+// MockSupplyRepositoryPort is a mock of SupplyRepositoryPort interface.
+type MockSupplyRepositoryPort struct {
+	ctrl     *gomock.Controller
+	recorder *MockSupplyRepositoryPortMockRecorder
+}
+
+// MockSupplyRepositoryPortMockRecorder is the mock recorder for MockSupplyRepositoryPort.
+type MockSupplyRepositoryPortMockRecorder struct {
+	mock *MockSupplyRepositoryPort
+}
+
+// NewMockSupplyRepositoryPort creates a new mock instance.
+func NewMockSupplyRepositoryPort(ctrl *gomock.Controller) *MockSupplyRepositoryPort {
+	mock := &MockSupplyRepositoryPort{ctrl: ctrl}
+	mock.recorder = &MockSupplyRepositoryPortMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSupplyRepositoryPort) EXPECT() *MockSupplyRepositoryPortMockRecorder {
+	return m.recorder
+}
+
+// ListTentativePrices mocks base method.
+func (m *MockSupplyRepositoryPort) ListTentativePrices(ctx context.Context, filter domain3.SupplyFilter, limit int) ([]domain3.TentativePriceItem, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTentativePrices", ctx, filter, limit)
+	ret0, _ := ret[0].([]domain3.TentativePriceItem)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListTentativePrices indicates an expected call of ListTentativePrices.
+func (mr *MockSupplyRepositoryPortMockRecorder) ListTentativePrices(ctx, filter, limit interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTentativePrices", reflect.TypeOf((*MockSupplyRepositoryPort)(nil).ListTentativePrices), ctx, filter, limit)
 }

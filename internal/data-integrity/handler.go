@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
@@ -16,6 +16,7 @@ import (
 // UseCasesPort define la interfaz para los casos de uso
 type UseCasesPort interface {
 	CheckCostsCoherence(ctx context.Context, filter domain.CostsCheckFilter) (*domain.IntegrityReport, error)
+	GetTentativePrices(ctx context.Context, filter domain.TentativePricesFilter) (*domain.TentativePricesReport, error)
 }
 
 // GinEnginePort define la interfaz para el servidor Gin
@@ -58,6 +59,7 @@ func (h *Handler) Routes() {
 	public := r.Group(base, h.mws.GetValidation()...)
 	{
 		public.GET("/costs-check", h.CheckCostsCoherence)
+		public.GET("/tentative-prices", h.GetTentativePrices)
 	}
 }
 
@@ -103,4 +105,29 @@ func (h *Handler) CheckCostsCoherence(c *gin.Context) {
 	// Convertir a DTO y retornar
 	response := dto.ToIntegrityReportResponse(report)
 	c.JSON(http.StatusOK, response)
+}
+
+// GetTentativePrices lista los insumos con precio tentativo del workspace seleccionado.
+func (h *Handler) GetTentativePrices(c *gin.Context) {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	report, err := h.ucs.GetTentativePrices(ctx, domain.TentativePricesFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	})
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToTentativePricesResponse(report))
 }

@@ -141,9 +141,6 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 		if lot.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 			return nil, types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
 		}
-		if len(lot.Items) == 0 {
-			return nil, types.NewError(types.ErrValidation, "at least one item is required for each lot", nil)
-		}
 		if _, exists := seenLots[lot.LotID]; exists {
 			return nil, types.NewError(types.ErrValidation, "duplicate lot_id in lots", nil)
 		}
@@ -394,7 +391,6 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			if finalDose.LessThanOrEqual(decimal.Zero) {
 				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
 			}
-
 			draft.Items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
 				TotalUsed: item.TotalUsed,
@@ -468,6 +464,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		LotID:          draft.LotID,
 		CropID:         draft.CropID,
 		LaborID:        draft.LaborID,
+		IsDigital:      draft.IsDigital,
 		Contractor:     draft.Contractor,
 		Observations:   draft.Observations,
 		Date:           draft.Date,
@@ -481,7 +478,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		workOrder.Items[i] = workorderdomain.WorkOrderItem{
 			SupplyID:   item.SupplyID,
 			SupplyName: item.SupplyName,
-			TotalUsed:  item.TotalUsed,
+			TotalUsed:  publishedTotalUsed(draft, item),
 			FinalDose:  item.FinalDose,
 		}
 	}
@@ -503,6 +500,17 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 	}
 
 	return workOrderID, nil
+}
+
+func publishedTotalUsed(draft *domain.WorkOrderDraft, item domain.WorkOrderDraftItem) decimal.Decimal {
+	if draft != nil &&
+		draft.IsDigital &&
+		item.FinalDose.GreaterThan(decimal.Zero) &&
+		draft.EffectiveArea.GreaterThan(decimal.Zero) {
+		return item.FinalDose.Mul(draft.EffectiveArea).Round(2)
+	}
+
+	return item.TotalUsed
 }
 
 func (u *UseCases) validateDraftSuppliesReadyForPublish(ctx context.Context, draft *domain.WorkOrderDraft) error {
@@ -568,9 +576,6 @@ func validateDraft(d *domain.WorkOrderDraft) error {
 	}
 	if d.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
-	}
-	if len(d.Items) == 0 {
-		return types.NewError(types.ErrValidation, "at least one item is required", nil)
 	}
 
 	seenSupplyIDs := make(map[int64]struct{})

@@ -5,7 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"

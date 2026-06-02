@@ -5,15 +5,15 @@ go 1.26.3
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
 	firebase.google.com/go/v4 v4.19.0
-	github.com/devpablocristo/core/authn/go v0.2.1
-	github.com/devpablocristo/core/databases/postgres/go v0.1.0
-	github.com/devpablocristo/core/errors/go v0.1.0
-	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
-	github.com/devpablocristo/core/http/gin/go v0.1.0
-	github.com/devpablocristo/core/http/go v0.1.1
-	github.com/devpablocristo/core/notifications/go v0.3.0
-	github.com/devpablocristo/core/security/go v0.1.0
-	github.com/devpablocristo/core/validate/go v0.1.1
+	github.com/devpablocristo/platform/authn/go v0.2.0
+	github.com/devpablocristo/platform/databases/postgres/go v0.1.0
+	github.com/devpablocristo/platform/errors/go v0.2.0
+	github.com/devpablocristo/platform/http/gin/go v0.2.3
+	github.com/devpablocristo/platform/http/go v0.1.0
+	github.com/devpablocristo/platform/kernels/governance/go v0.1.0
+	github.com/devpablocristo/platform/notifications/go v0.1.1
+	github.com/devpablocristo/platform/security/go v0.2.2
+	github.com/devpablocristo/platform/validate/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -25,7 +25,7 @@ require (
 	github.com/shopspring/decimal v1.2.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go-micro.dev/v4 v4.11.0
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.37.0
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -76,7 +76,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -126,11 +126,11 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.247.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect

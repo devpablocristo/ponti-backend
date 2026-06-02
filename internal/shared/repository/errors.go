@@ -3,8 +3,8 @@ package sharedrepo
 import (
 	"fmt"
 
-	"github.com/devpablocristo/core/errors/go/domainerr"
-	gormdb "github.com/devpablocristo/core/databases/postgres/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
+	gormdb "github.com/devpablocristo/platform/databases/postgres/go"
 )
 
 // HandleGormError centraliza el manejo de ErrRecordNotFound y errores internos.
