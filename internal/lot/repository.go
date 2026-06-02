@@ -396,18 +396,7 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		args = append(args, cropID, cropID)
 	}
 
-	query := fmt.Sprintf(`
-		SELECT
-			COALESCE(SUM(seeded_area_ha), 0) AS seeded_area,
-			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
-			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(seeded_area_ha), 0)) AS yield_tn_per_ha,
-			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
-			COALESCE(SUM(tons), 0) AS total_tons,
-			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
-			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
-		FROM %s
-		WHERE %s
-	`, view, strings.Join(where, " AND "))
+	query := buildLotMetricsQuery(view, strings.Join(where, " AND "))
 
 	var row rowAgg
 	if err := r.db.Client().WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
@@ -427,6 +416,21 @@ func (r *Repository) GetMetrics(ctx context.Context, projectID, fieldID, cropID 
 		SuperficieTotal: superficieTotal,
 		TotalTons:       row.TotalTons,
 	}, nil
+}
+
+func buildLotMetricsQuery(view, whereSQL string) string {
+	return fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(seeded_area_ha), 0) AS seeded_area,
+			COALESCE(SUM(harvested_area_ha), 0) AS harvested_area,
+			v4_core.per_ha(COALESCE(SUM(tons), 0), COALESCE(SUM(hectares), 0)) AS yield_tn_per_ha,
+			COALESCE(SUM(direct_cost_per_ha_usd * hectares) / NULLIF(SUM(hectares), 0), 0) AS cost_per_ha,
+			COALESCE(SUM(tons), 0) AS total_tons,
+			COALESCE(MAX(project_total_hectares), 0) AS project_total_hectares,
+			COALESCE(MAX(field_total_hectares), 0) AS field_total_hectares
+		FROM %s
+		WHERE %s
+	`, view, whereSQL)
 }
 
 func (r *Repository) ListLots(
