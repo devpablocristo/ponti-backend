@@ -243,9 +243,9 @@ func (u *UseCases) ListWorkOrders(
 }
 
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
-	if filt.ProjectID == nil && filt.FieldID == nil {
-		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
-	}
+	// El mínimo cliente+proyecto+campaña se exige en el handler vía
+	// ValidateRequiredWorkspaceFilter (misma regla compartida que el resto de los listados);
+	// no se duplica acá una validación propia más débil.
 	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 

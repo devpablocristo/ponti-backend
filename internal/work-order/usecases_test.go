@@ -2,8 +2,11 @@ package workorder
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -139,13 +142,41 @@ func TestValidateInvestorSplitsRejectsInvalidPaymentStatus(t *testing.T) {
 	}
 }
 
-func TestListWorkOrderFilterRowsRequiresProjectOrFieldScope(t *testing.T) {
+func TestListWorkOrderFilterRowsDelegatesWithoutOwnValidation(t *testing.T) {
 	t.Parallel()
 
+	// El mínimo cliente+proyecto+campaña se exige en el handler (ValidateRequiredWorkspaceFilter);
+	// el use case ya no aplica una validación propia más débil, solo delega al repositorio.
 	uc := NewUseCases(useCasesRepoStub{}, nil)
 
-	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err == nil {
-		t.Fatalf("expected validation error for unscoped filter rows request")
+	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err != nil {
+		t.Fatalf("use case should delegate without its own validation, got: %v", err)
+	}
+}
+
+func TestParseFiltersRequiresWorkspaceMinimum(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	// Sin cliente+proyecto+campaña -> error (regla compartida ValidateRequiredWorkspaceFilter).
+	missing, _ := gin.CreateTestContext(httptest.NewRecorder())
+	missing.Request = httptest.NewRequest(http.MethodGet, "/work-orders", nil)
+	if _, err := parseFilters(missing); err == nil {
+		t.Fatalf("expected error when customer_id/project_id/campaign_id are missing")
+	}
+
+	// Con los tres -> ok; el campo es opcional (nil = todos los campos).
+	full, _ := gin.CreateTestContext(httptest.NewRecorder())
+	full.Request = httptest.NewRequest(http.MethodGet, "/work-orders?customer_id=1&project_id=2&campaign_id=3", nil)
+	f, err := parseFilters(full)
+	if err != nil {
+		t.Fatalf("expected no error with full workspace, got: %v", err)
+	}
+	if f.CustomerID == nil || f.ProjectID == nil || f.CampaignID == nil {
+		t.Fatalf("expected customer/project/campaign to be parsed")
+	}
+	if f.FieldID != nil {
+		t.Fatalf("field_id should be optional (nil = all fields)")
 	}
 }
 

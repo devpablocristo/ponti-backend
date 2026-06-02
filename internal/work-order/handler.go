@@ -195,7 +195,11 @@ func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
 
 // ListWorkOrders lista órdenes de trabajo con filtros.
 func (h *Handler) ListWorkOrders(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	input := types.NewInput(c.Request)
 
 	// Devuelve ([]domain.WorkOrderListElement, types.PageInfo, error)
@@ -209,7 +213,11 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 }
 
 func (h *Handler) ListWorkOrderFilterRows(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 
 	rows, err := h.ucs.ListWorkOrderFilterRows(c.Request.Context(), filt)
 	if err != nil {
@@ -220,13 +228,17 @@ func (h *Handler) ListWorkOrderFilterRows(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.FromDomainFilterRows(rows))
 }
 
-// parseFilters extrae project_id, field_id, customer_id y campaign_id.
-func parseFilters(c *gin.Context) domain.WorkOrderFilter {
+// parseFilters extrae project_id, field_id, customer_id y campaign_id, exigiendo el mínimo
+// cliente+proyecto+campaña (campo opcional = todos) vía el contrato de workspace compartido.
+func parseFilters(c *gin.Context) (domain.WorkOrderFilter, error) {
 	f := domain.WorkOrderFilter{}
 
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
-		return f
+		return f, err
+	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
+		return f, err
 	}
 
 	f.ProjectID = workspaceFilter.ProjectID
@@ -256,13 +268,17 @@ func parseFilters(c *gin.Context) domain.WorkOrderFilter {
 		f.Status = &value
 	}
 
-	return f
+	return f, nil
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
 	var filt domain.WorkOrderFilter
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -285,7 +301,11 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 
 // ExportWorkOrders exporta órdenes de trabajo.
 func (h *Handler) ExportWorkOrders(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	// Para exportación, usar un page_size muy grande para obtener todos los registros
 	input := types.Input{
 		Page:     1,
