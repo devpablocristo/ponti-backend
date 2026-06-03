@@ -9,3 +9,4 @@ Planes/diseños que se planificaron pero se dejaron para implementar más adelan
 |---|------|--------|---------|
 | 0001 | [github-flow-previews-cloudrun.md](0001-github-flow-previews-cloudrun.md) | Deferred | Migración a GitHub Flow + Preview Environments por PR en Cloud Run, con instancia Cloud SQL dedicada para previews |
 | 0002 | [workorder-metrics-digital-and-filters.md](0002-workorder-metrics-digital-and-filters.md) | Draft | KPIs de Órdenes de Trabajo: reflejar borradores digitales y respetar `is_digital`/`status` vía vista dedicada (migración), sin tocar la SSOT de costo de data-integrity |
+| 0003 | [unificar-filtros-workspace.md](0003-unificar-filtros-workspace.md) | Approved | Unificar los filtros de workspace de toda la app en una sola base compartida; convergencia gradual (regla boy-scout) por módulo (dashboard, lot, report, labor, data-integrity) |
