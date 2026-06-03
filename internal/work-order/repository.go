@@ -239,6 +239,30 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order investor splits")
 		}
+		if err := tx.Exec(`
+	DELETE FROM work_order_draft_items
+	WHERE draft_id IN (
+		SELECT id FROM work_order_drafts WHERE published_work_order_id = ?
+	)
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft items")
+		}
+
+		if err := tx.Exec(`
+	DELETE FROM work_order_draft_investor_splits
+	WHERE draft_id IN (
+		SELECT id FROM work_order_drafts WHERE published_work_order_id = ?
+	)
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft investor splits")
+		}
+
+		if err := tx.Exec(`
+	DELETE FROM work_order_drafts
+	WHERE published_work_order_id = ?
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft")
+		}
 		if err := tx.Unscoped().Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete work order")
 		}
