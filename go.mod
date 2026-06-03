@@ -1,6 +1,6 @@
 module github.com/devpablocristo/ponti-backend
 
-go 1.26.3
+go 1.26.4
 
 require (
 	cloud.google.com/go/cloudsqlconn v1.17.2
