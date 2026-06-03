@@ -183,9 +183,12 @@ de GORM (`internal/shared/models/base.go`) y aplicado en `ResolveProjectIDs`.
 - **Con `customer_id` + `project_id` + `campaign_id`** → `200`.
 - **Con `field_id`** → solo las órdenes de ese campo.
 - **Sin `field_id`** → todas las órdenes de todos los campos del proyecto.
-- **Con cliente / proyecto / campo archivado** (`deleted_at IS NOT NULL`) → **lista vacía** (resuelto por
-  `ResolveProjectIDs`).
-- **`field_id` que no pertenece al proyecto** → lista vacía (el `EXISTS` no matchea).
+- **Con proyecto archivado / `field_id` que no pertenece al proyecto / filtros incoherentes** → **`400`**
+  con `"project_id does not match provided filters"`. Como `project_id` ahora es **obligatorio**,
+  `ResolveProjectIDs` entra siempre por la rama "project_id explícito": cuenta los proyectos que matchean
+  (`p.deleted_at IS NULL`, `customer_id`/`campaign_id` coincidentes, `EXISTS` del campo activo) y si da `0`
+  devuelve un error de validación (`workspace.go:68`), **no una lista vacía**. La lista vacía solo ocurriría
+  por la rama sin `project_id` (no alcanzable en este flujo). Ver §8.
 - **`filter-rows`** ya **no** acepta su antigua regla `project_id` OR `field_id`: aplica el mismo `400` que
   el resto de los endpoints.
 
@@ -216,10 +219,13 @@ de GORM (`internal/shared/models/base.go`) y aplicado en `ResolveProjectIDs`.
   hay chequeo explícito de `customers.deleted_at` ni `campaigns.deleted_at`. Esto es aceptado porque:
   - la campaña no tiene lifecycle (es solo una etiqueta del proyecto);
   - un cliente archivado no puede tener proyectos activos (regla de archivado de customer), por lo que un
-    cliente archivado resuelve a 0 proyectos → lista vacía.
+    `project_id` de un cliente archivado no matchea → `400` (ver abajo).
 
-  Si en el futuro se quisiera rechazar explícitamente IDs archivados con un `400` (en vez de devolver lista
-  vacía), sería un cambio adicional fuera de este spec.
+  **Forma del rechazo:** como `project_id` es obligatorio y explícito, cuando los filtros no resuelven a un
+  proyecto activo coherente (proyecto archivado, `field_id` ajeno, customer/campaign que no matchean),
+  `ResolveProjectIDs` devuelve `domainerr.Validation("project_id does not match provided filters")` → **`400`**,
+  no una lista vacía (la rama de lista vacía requiere `project_id` ausente, no alcanzable en este flujo). Si en
+  el futuro se prefiriera devolver lista vacía en estos casos, sería un cambio adicional fuera de este spec.
 
 ---
 

@@ -2,6 +2,7 @@ package workorder
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +15,8 @@ import (
 )
 
 type useCasesRepoStub struct {
-	getHarvestAreaSnapshotFn func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
+	getHarvestAreaSnapshotFn  func(context.Context, int64, int64, int64) (bool, decimal.Decimal, decimal.Decimal, error)
+	listWorkOrderFilterRowsFn func(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 }
 
 func (s useCasesRepoStub) GetHarvestAreaSnapshot(
@@ -56,7 +58,10 @@ func (useCasesRepoStub) RestoreWorkOrder(context.Context, int64) error {
 func (useCasesRepoStub) ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return nil, types.PageInfo{}, nil
 }
-func (useCasesRepoStub) ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+func (s useCasesRepoStub) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+	if s.listWorkOrderFilterRowsFn != nil {
+		return s.listWorkOrderFilterRowsFn(ctx, filt)
+	}
 	return nil, nil
 }
 func (useCasesRepoStub) GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error) {
@@ -146,11 +151,39 @@ func TestListWorkOrderFilterRowsDelegatesWithoutOwnValidation(t *testing.T) {
 	t.Parallel()
 
 	// El mínimo cliente+proyecto+campaña se exige en el handler (ValidateRequiredWorkspaceFilter);
-	// el use case ya no aplica una validación propia más débil, solo delega al repositorio.
-	uc := NewUseCases(useCasesRepoStub{}, nil)
+	// el use case ya no aplica una validación propia más débil: debe delegar tal cual al repositorio,
+	// incluso con un filtro vacío que antes habría rechazado.
 
-	if _, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); err != nil {
+	// 1) Delegación pura: el resultado del repo se devuelve sin modificar y el filtro llega intacto.
+	sentinel := []domain.WorkOrderListElement{{ID: 7}, {ID: 9}}
+	var gotFilter domain.WorkOrderFilter
+	uc := NewUseCases(useCasesRepoStub{
+		listWorkOrderFilterRowsFn: func(_ context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+			gotFilter = filt
+			return sentinel, nil
+		},
+	}, nil)
+
+	rows, err := uc.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{})
+	if err != nil {
 		t.Fatalf("use case should delegate without its own validation, got: %v", err)
+	}
+	if len(rows) != len(sentinel) || rows[0].ID != 7 || rows[1].ID != 9 {
+		t.Fatalf("expected the repo result to be returned unchanged, got: %+v", rows)
+	}
+	if gotFilter != (domain.WorkOrderFilter{}) {
+		t.Fatalf("expected the empty filter to reach the repo unchanged, got: %+v", gotFilter)
+	}
+
+	// 2) Propagación de error: lo que devuelve el repo se propaga sin envolver.
+	repoErr := errors.New("repo boom")
+	ucErr := NewUseCases(useCasesRepoStub{
+		listWorkOrderFilterRowsFn: func(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
+			return nil, repoErr
+		},
+	}, nil)
+	if _, err := ucErr.ListWorkOrderFilterRows(context.Background(), domain.WorkOrderFilter{}); !errors.Is(err, repoErr) {
+		t.Fatalf("expected the repo error to propagate, got: %v", err)
 	}
 }
 
@@ -163,6 +196,27 @@ func TestParseFiltersRequiresWorkspaceMinimum(t *testing.T) {
 	missing.Request = httptest.NewRequest(http.MethodGet, "/work-orders", nil)
 	if _, err := parseFilters(missing); err == nil {
 		t.Fatalf("expected error when customer_id/project_id/campaign_id are missing")
+	}
+
+	// Cada required ausente por separado (los otros dos presentes) -> error.
+	partials := map[string]string{
+		"falta customer_id": "/work-orders?project_id=2&campaign_id=3",
+		"falta project_id":  "/work-orders?customer_id=1&campaign_id=3",
+		"falta campaign_id": "/work-orders?customer_id=1&project_id=2",
+	}
+	for name, target := range partials {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodGet, target, nil)
+		if _, err := parseFilters(c); err == nil {
+			t.Fatalf("%s: expected error when a required workspace id is missing", name)
+		}
+	}
+
+	// ID mal formado -> error de parseo propagado (antes se tragaba y devolvía lista global).
+	malformed, _ := gin.CreateTestContext(httptest.NewRecorder())
+	malformed.Request = httptest.NewRequest(http.MethodGet, "/work-orders?customer_id=abc&project_id=2&campaign_id=3", nil)
+	if _, err := parseFilters(malformed); err == nil {
+		t.Fatalf("expected error for a malformed customer_id (must not fall back to an empty/global filter)")
 	}
 
 	// Con los tres -> ok; el campo es opcional (nil = todos los campos).
