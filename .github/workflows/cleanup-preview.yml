@@ -1,0 +1,111 @@
+name: Cleanup Preview
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Número de PR del preview a destruir"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: preview-pr-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_PREVIEW }}
+      DB_USER: ${{ vars.DB_USER_PREVIEW }}
+      CLOUDSQL_PROXY_PORT: "55432"
+    steps:
+      - name: Resolve PR context
+        run: |
+          set -euo pipefail
+          PR_NUM="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+          if [[ ! "$PR_NUM" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: PR number inválido: '$PR_NUM'"; exit 1
+          fi
+          echo "PR_NUM=$PR_NUM" >> "$GITHUB_ENV"
+          echo "SERVICE_NAME=ponti-backend-pr-${PR_NUM}" >> "$GITHUB_ENV"
+          echo "DB_NAME=ponti_preview_pr_${PR_NUM}" >> "$GITHUB_ENV"
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Delete Cloud Run service
+        run: |
+          gcloud run services delete "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --quiet \
+          && echo "Servicio borrado: $SERVICE_NAME" \
+          || echo "Servicio no existía: $SERVICE_NAME"
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          token="$(gcloud auth print-access-token)"
+          docker rm -f cloudsql-proxy-cleanup >/dev/null 2>&1 || true
+          docker run -d --name cloudsql-proxy-cleanup \
+            -p "127.0.0.1:${CLOUDSQL_PROXY_PORT}:5432" \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0 \
+            --address 0.0.0.0 --port 5432 --token "$token" \
+            "$CLOUDSQL_INSTANCE" >/dev/null
+          for i in {1..30}; do
+            if PGPASSWORD="$DB_PASSWORD" pg_isready -h 127.0.0.1 -p "$CLOUDSQL_PROXY_PORT" -U "$DB_USER" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: cloud sql proxy no quedó listo"; exit 1
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_PREVIEW }}
+
+      - name: Drop preview database (guarded)
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD_PREVIEW }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DB_NAME" =~ ^ponti_preview_pr_[0-9]+$ ]]; then
+            echo "ERROR: DB_NAME fuera de patrón, NO se borra: $DB_NAME"; exit 1
+          fi
+          psql "host=127.0.0.1 port=${CLOUDSQL_PROXY_PORT} user=${DB_USER} dbname=postgres" \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${DB_NAME}' AND pid <> pg_backend_pid()" >/dev/null || true
+          psql "host=127.0.0.1 port=${CLOUDSQL_PROXY_PORT} user=${DB_USER} dbname=postgres" \
+            -c "DROP DATABASE IF EXISTS \"${DB_NAME}\""
+          echo "Base borrada: ${DB_NAME}"
+
+      - name: Comentario en el PR
+        if: ${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$(printf '<!--preview-->\n🧹 Preview de PR #%s destruido (servicio y base eliminados).' "$PR_NUM")"
+          gh pr comment "$PR_NUM" --edit-last --body "$body" 2>/dev/null || gh pr comment "$PR_NUM" --body "$body" || true
+
+      - name: Stop Cloud SQL Proxy
+        if: ${{ always() }}
+        run: docker rm -f cloudsql-proxy-cleanup >/dev/null 2>&1 || true
