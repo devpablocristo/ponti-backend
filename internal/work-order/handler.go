@@ -27,6 +27,7 @@ type UseCasesPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListArchivedWorkOrders(context.Context, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	ExportWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]byte, error)
@@ -69,6 +70,7 @@ func (h *Handler) Routes() {
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
+		grp.GET("/archived", h.ListArchivedWorkOrders)
 		grp.GET("/filter-rows", h.ListWorkOrderFilterRows)
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
@@ -204,6 +206,20 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 
 	// Devuelve ([]domain.WorkOrderListElement, types.PageInfo, error)
 	list, pageInfo, err := h.ucs.ListWorkOrders(c.Request.Context(), filt, input)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
+}
+
+// ListArchivedWorkOrders lista las órdenes archivadas (soft-deleted). Listado global sin scope de
+// workspace (espejo de ListArchivedCustomers); solo paginación.
+func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
+	input := types.NewInput(c.Request)
+
+	list, pageInfo, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), input)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

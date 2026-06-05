@@ -23,6 +23,7 @@ type RepositoryPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListArchivedWorkOrders(context.Context, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
@@ -244,6 +245,15 @@ func (u *UseCases) ListWorkOrders(
 	inp types.Input,
 ) ([]domain.WorkOrderListElement, types.PageInfo, error) {
 	return u.repo.ListWorkOrders(ctx, filt, inp)
+}
+
+// ListArchivedWorkOrders delega al repositorio. Listado global de archivadas (sin scope de
+// workspace), espejo de ListArchivedCustomers.
+func (u *UseCases) ListArchivedWorkOrders(
+	ctx context.Context,
+	inp types.Input,
+) ([]domain.WorkOrderListElement, types.PageInfo, error) {
+	return u.repo.ListArchivedWorkOrders(ctx, inp)
 }
 
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
