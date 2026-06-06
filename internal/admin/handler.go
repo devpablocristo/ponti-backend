@@ -13,6 +13,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/platform/security/go/contextkeys"
 
+	authz "github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 
 	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
@@ -31,6 +32,7 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetIdentity() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
 }
 
@@ -75,6 +77,34 @@ func (h *Handler) Routes() {
 
 		admin.POST("/memberships", h.UpsertMembership)
 	}
+
+	// U3: /me/context — contexto de identidad del usuario autenticado. Ruta
+	// TENANT-AGNÓSTICA (GetIdentity): autentica pero no exige selección de tenant,
+	// porque su propósito es listar los tenants del usuario para que el FE elija.
+	me := r.Group(h.acf.APIBaseURL()+"/me", h.mws.GetIdentity()...)
+	{
+		me.GET("/context", h.MeContext)
+	}
+}
+
+// MeContext (U3) devuelve {user, current_tenant_id, tenants[]} del usuario
+// autenticado. current_tenant_id se resuelve del header X-Tenant-Id si corresponde
+// a una membership activa; si el usuario tiene exactamente una, se usa esa; si no,
+// queda null (el FE debe elegir).
+func (h *Handler) MeContext(c *gin.Context) {
+	p, ok := authz.PrincipalFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(p.Subject) == "" {
+		sharedhandlers.RespondError(c, domainerr.Unauthorized("not authenticated"))
+		return
+	}
+	requestedTenant := strings.TrimSpace(c.GetHeader("X-Tenant-Id"))
+	rp := newRepo(h.db)
+	out, err := rp.getMeContext(c.Request.Context(), p.Subject, requestedTenant)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func requireAdmin(c *gin.Context) bool {
@@ -86,15 +116,23 @@ func requireAdmin(c *gin.Context) bool {
 	return true
 }
 
-// isPlatformAdmin indica si el principal autenticado (idp_sub) está en el
-// allowlist de operadores globales (T1.b, interino sin esquema).
+// isPlatformAdmin indica si el principal autenticado (idp_sub) es operador global.
+// U1: fuente persistente = users.is_platform_admin (DB); el allowlist env
+// (AUTH_PLATFORM_ADMIN_SUBJECTS, T1.b) se conserva como FALLBACK de transición.
 func (h *Handler) isPlatformAdmin(c *gin.Context) bool {
 	sub, err := sharedhandlers.ParseActor(c)
 	if err != nil || strings.TrimSpace(sub) == "" {
 		return false
 	}
-	_, ok := h.platformAdmins[sub]
-	return ok
+	// Fallback de transición: allowlist env.
+	if _, ok := h.platformAdmins[sub]; ok {
+		return true
+	}
+	// Fuente persistente: users.is_platform_admin (U1). Guard por db nil (tests).
+	if h.db == nil {
+		return false
+	}
+	return newRepo(h.db).isPlatformAdminBySub(c.Request.Context(), sub)
 }
 
 // requirePlatformAdmin corta el request si el principal no es platform-admin.
