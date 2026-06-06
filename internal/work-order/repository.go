@@ -35,6 +35,11 @@ func NewRepository(db GormEngine) *Repository {
 }
 
 func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (int64, error) {
+	// 0) Guard de tenant (flag-gated): el project_id viene del cliente.
+	if err := sharedfilters.GuardProjectForTenant(ctx, r.db.Client(), o.ProjectID); err != nil {
+		return 0, err
+	}
+
 	// 1) convertir a modelo GORM (cabecera + items sin WorkOrderID)
 	model := models.FromDomain(o)
 
@@ -148,6 +153,11 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 		// 3.1) Recuperar original para validar existencia y conservar auditoría
 		var orig models.WorkOrder
 		query := tx.Preload("Items").Preload("InvestorSplits").Where("id = ?", model.ID)
+		// Guard de tenant (flag-gated): si el WO no es del tenant, la carga
+		// devuelve RecordNotFound -> NotFound existente.
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			query = query.Where(cond, args...)
+		}
 		if !o.Base.UpdatedAt.IsZero() {
 			query = query.Where("updated_at = ?", o.Base.UpdatedAt)
 		}
@@ -226,7 +236,13 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+		existsQuery := tx.Unscoped().Preload("Items").Where("id = ?", id)
+		// Guard de tenant (flag-gated): si el WO no es del tenant, la carga
+		// devuelve RecordNotFound -> NotFound; se aborta antes de borrar nada.
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			existsQuery = existsQuery.Where(cond, args...)
+		}
+		if err := existsQuery.First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -276,7 +292,12 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+		woQuery := tx.Unscoped().Preload("Items").Where("id = ?", id)
+		// Guard de tenant (flag-gated): si el WO no es del tenant -> NotFound.
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			woQuery = woQuery.Where(cond, args...)
+		}
+		if err := woQuery.First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -303,7 +324,12 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var wo models.WorkOrder
-		if err := tx.Unscoped().Preload("Items").Where("id = ?", id).First(&wo).Error; err != nil {
+		woQuery := tx.Unscoped().Preload("Items").Where("id = ?", id)
+		// Guard de tenant (flag-gated): si el WO no es del tenant -> NotFound.
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			woQuery = woQuery.Where(cond, args...)
+		}
+		if err := woQuery.First(&wo).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -340,7 +366,13 @@ func (r *Repository) UpdateInvestorPaymentStatus(
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var workOrder models.WorkOrder
-		if err := tx.Select("id").Where("id = ?", workOrderID).First(&workOrder).Error; err != nil {
+		woQuery := tx.Select("id").Where("id = ?", workOrderID)
+		// Guard de tenant (flag-gated): si el WO no es del tenant, la carga
+		// devuelve RecordNotFound -> NotFound existente.
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			woQuery = woQuery.Where(cond, args...)
+		}
+		if err := woQuery.First(&workOrder).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("work order not found")
 			}
@@ -443,6 +475,12 @@ func (r *Repository) ListArchivedWorkOrders(
 		Unscoped().
 		Model(&models.WorkOrder{}).
 		Where("workorders.deleted_at IS NOT NULL")
+
+	// T-child: aislar archivadas por tenant (flag-gated) vía projects.tenant_id
+	// (workorders no tiene tenant_id propio). Califica la columna por el JOIN del Find.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		base = base.Where("workorders.project_id IN (SELECT id FROM projects WHERE tenant_id = ?)", orgID)
+	}
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {

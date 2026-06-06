@@ -10,6 +10,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -28,6 +29,9 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, f.ProjectID); err != nil {
+			return err
+		}
 		model := models.FromDomain(f)
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create field")
@@ -102,6 +106,9 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Field{}).
 		Where("id = ?", f.ID)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
 	if !f.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
 	}
@@ -126,9 +133,13 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	delTx := r.db.Client().WithContext(ctx).
 		Unscoped().
-		Delete(&models.Field{}, "id = ?", id)
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		delTx = delTx.Where(cond, args...)
+	}
+	result := delTx.Delete(&models.Field{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete field")
 	}
@@ -143,8 +154,18 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Field{}, "id = ?", id)
+	// T-child: 404 explícito si el field no es del tenant (cross-tenant). Preserva la
+	// idempotencia para el propio tenant (re-archivar ya archivado -> no-op). Con flag off
+	// GuardFieldForTenant es no-op.
+	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
+		return err
+	}
+	archiveTx := r.db.Client().WithContext(ctx).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		archiveTx = archiveTx.Where(cond, args...)
+	}
+	result := archiveTx.Delete(&models.Field{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to archive field")
 	}
@@ -156,11 +177,19 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	// T-child: 404 explícito si el field no es del tenant (cross-tenant). Preserva la
+	// idempotencia para el propio tenant. Con flag off GuardFieldForTenant es no-op.
+	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
+		return err
+	}
+	restoreTx := r.db.Client().WithContext(ctx).
 		Unscoped().
 		Model(&models.Field{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		restoreTx = restoreTx.Where(cond, args...)
+	}
+	result := restoreTx.Update("deleted_at", nil)
 	if result.Error != nil {
 		return domainerr.Internal("failed to restore field")
 	}

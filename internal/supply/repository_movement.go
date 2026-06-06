@@ -10,6 +10,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
@@ -25,6 +26,9 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 	}
 	model := models.SupplyMovementFromDomain(movement)
 	db := r.getDB(ctx)
+	if err := sharedfilters.GuardProjectForTenant(ctx, db, movement.ProjectId); err != nil {
+		return 0, err
+	}
 	if err := db.Create(model).Error; err != nil {
 		return 0, err
 	}
@@ -34,6 +38,10 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error {
 	if projectID <= 0 {
 		return domainerr.Validation("project_id must be greater than 0")
+	}
+
+	if err := sharedfilters.GuardProjectForTenant(ctx, r.getDB(ctx), projectID); err != nil {
+		return err
 	}
 
 	now := time.Now().UTC()
@@ -403,8 +411,11 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		var previous models.SupplyMovement
-		if err := tx.
-			Where("id = ?", movement.ID).
+		findTx := tx.Where("id = ?", movement.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			findTx = findTx.Where(cond, args...)
+		}
+		if err := findTx.
 			First(&previous).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("supply movement not found")
@@ -412,8 +423,18 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 			return domainerr.Internal("failed to get supply movement")
 		}
 
-		if err := tx.Model(&models.SupplyMovement{}).
-			Where("id = ?", movement.ID).
+		// T-child: validar el project DESTINO (evita move-out cross-tenant; el scope
+		// de arriba solo valida la fila vieja).
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, movement.ProjectId); err != nil {
+			return err
+		}
+
+		updateTx := tx.Model(&models.SupplyMovement{}).
+			Where("id = ?", movement.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			updateTx = updateTx.Where(cond, args...)
+		}
+		if err := updateTx.
 			Updates(model).
 			Error; err != nil {
 			return domainerr.Internal("failed to update supply movement")
@@ -441,6 +462,10 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 
 func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, projectId); err != nil {
+			return err
+		}
+
 		var supplyModel models.SupplyMovement
 
 		// Obtener el movimiento a eliminar

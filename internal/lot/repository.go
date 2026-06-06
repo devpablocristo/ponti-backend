@@ -41,6 +41,10 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	var lotID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Guard de tenant (flag-gated): el field debe pertenecer a un project del tenant activo.
+		if err := sharedfilters.GuardFieldForTenant(ctx, tx, l.FieldID); err != nil {
+			return err
+		}
 		var existing models.Lot
 		if err := tx.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
 			First(&existing).Error; err == nil {
@@ -111,10 +115,13 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		}
 
 		// Verificación de existencia (distingue 404 de 409)
+		existsQ := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", l.ID)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
 		var exists int64
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", l.ID).
-			Count(&exists).Error; err != nil {
+		if err := existsQ.Count(&exists).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if exists == 0 {
@@ -264,8 +271,12 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		countQ := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			countQ = countQ.Where(cond, args...)
+		}
 		var count int64
-		if err := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
+		if err := countQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
@@ -292,10 +303,13 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		countQ := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			countQ = countQ.Where(cond, args...)
+		}
 		var count int64
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", id).
-			Count(&count).Error; err != nil {
+		if err := countQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
