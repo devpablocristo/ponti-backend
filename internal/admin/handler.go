@@ -76,14 +76,21 @@ func (h *Handler) Routes() {
 		admin.POST("/users", h.CreateUser)
 
 		admin.POST("/memberships", h.UpsertMembership)
+
+		// U4: invites de tenant (crear/listar/revocar). Gating tenant-scoped
+		// (admin/tenant_owner del tenant) o platform-admin.
+		admin.POST("/tenants/:tenant_id/invites", h.CreateInvite)
+		admin.GET("/tenants/:tenant_id/invites", h.ListInvites)
+		admin.DELETE("/invites/:invite_id", h.RevokeInvite)
 	}
 
-	// U3: /me/context — contexto de identidad del usuario autenticado. Ruta
-	// TENANT-AGNÓSTICA (GetIdentity): autentica pero no exige selección de tenant,
-	// porque su propósito es listar los tenants del usuario para que el FE elija.
+	// U3/U4: rutas TENANT-AGNÓSTICAS (GetIdentity): autentican pero no exigen
+	// selección de tenant. /me/context lista los tenants del usuario; /me/invites/accept
+	// lo usa un invitado que todavía no tiene membership.
 	me := r.Group(h.acf.APIBaseURL()+"/me", h.mws.GetIdentity()...)
 	{
 		me.GET("/context", h.MeContext)
+		me.POST("/invites/accept", h.AcceptInvite)
 	}
 }
 

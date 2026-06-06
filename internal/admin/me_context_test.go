@@ -22,7 +22,8 @@ func newMeContextTestRepo(t *testing.T) (*repo, *gorm.DB) {
 		`CREATE TABLE auth_roles (id TEXT PRIMARY KEY, name TEXT NOT NULL);`,
 		`CREATE TABLE auth_permissions (id TEXT PRIMARY KEY, name TEXT NOT NULL);`,
 		`CREATE TABLE auth_role_permissions (role_id TEXT, permission_id TEXT);`,
-		`CREATE TABLE auth_memberships (user_id TEXT, tenant_id TEXT, role_id TEXT, status TEXT);`,
+		`CREATE TABLE auth_memberships (user_id TEXT, tenant_id TEXT, role_id TEXT, status TEXT, created_at DATETIME, updated_at DATETIME);`,
+		`CREATE TABLE tenant_invites (id TEXT PRIMARY KEY, tenant_id TEXT, email TEXT, role_id TEXT, token_hash TEXT, status TEXT DEFAULT 'pending', expires_at DATETIME, created_by TEXT, accepted_by TEXT, accepted_at DATETIME, created_at DATETIME, updated_at DATETIME);`,
 	} {
 		require.NoError(t, db.Exec(s).Error)
 	}
