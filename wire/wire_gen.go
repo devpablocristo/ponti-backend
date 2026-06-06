@@ -324,7 +324,7 @@ func Initialize() (*Dependencies, error) {
 	wireGinEnginePort := ProvideGinEnginePort(server)
 	api := ProvideConfigAPI(config)
 	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
-	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
+	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort, config)
 	workorderdraftGinEnginePort := ProvideWorkOrderDraftGinEnginePort(server)
 	workorderdraftGormEngine := ProvideWorkOrderDraftGormEnginePort(repository)
 	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)

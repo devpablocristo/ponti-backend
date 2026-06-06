@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 // WorkspaceFilter define filtros comunes de workspace.
@@ -61,6 +63,12 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 			)
 		}
 
+		// T1.e: acotar al tenant activo (flag-gated). Valida que el project pedido
+		// pertenezca al tenant del JWT (cierra la fuga de workspace-ownership).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			query = query.Where("p.tenant_id = ?", orgID)
+		}
+
 		var count int64
 		if err := query.Count(&count).Error; err != nil {
 			return nil, domainerr.Internal("failed to validate project filters")
@@ -92,6 +100,11 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 			"EXISTS (SELECT 1 FROM fields f WHERE f.id = ? AND f.project_id = p.id AND f.deleted_at IS NULL)",
 			*f.FieldID,
 		)
+	}
+
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		query = query.Where("p.tenant_id = ?", orgID)
 	}
 
 	var projectIDs []int64

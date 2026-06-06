@@ -36,8 +36,9 @@ func ProvideAdminHandler(
 	srv GinEnginePort,
 	acf *config.API,
 	mws MiddlewaresEnginePort,
+	cfg *config.Config,
 ) *admin.Handler {
-	return admin.NewHandler(repo.Client(), idpAdmin, srv, acf, mws)
+	return admin.NewHandler(repo.Client(), idpAdmin, srv, acf, mws, cfg.Auth.PlatformAdminSubjects)
 }
 
 var AdminSet = wire.NewSet(

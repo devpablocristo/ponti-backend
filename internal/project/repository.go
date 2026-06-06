@@ -166,6 +166,26 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			return fmt.Errorf("failed to create project: %w", err)
 		}
 		projectID = projectModel.ID
+
+		// T1.e: dual-write de tenant_id (flag-gated). El project nace con el
+		// tenant activo; sus raíces (customer/campaign) solo si aún no tienen
+		// tenant (no se reasigna una raíz que ya pertenece a otro tenant).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			if err := tx.Exec("UPDATE projects SET tenant_id = ? WHERE id = ?", orgID, projectID).Error; err != nil {
+				return fmt.Errorf("failed to set project tenant: %w", err)
+			}
+			if p.Customer.ID > 0 {
+				if err := tx.Exec("UPDATE customers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, p.Customer.ID).Error; err != nil {
+					return fmt.Errorf("failed to set customer tenant: %w", err)
+				}
+			}
+			if p.Campaign.ID > 0 {
+				if err := tx.Exec("UPDATE campaigns SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, p.Campaign.ID).Error; err != nil {
+					return fmt.Errorf("failed to set campaign tenant: %w", err)
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -191,6 +211,11 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Model(&models.Project{}).
 		// Filtrar soft-deletes explícitamente para igualar remoto.
 		Where("deleted_at IS NULL")
+
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		db0 = db0.Where("tenant_id = ?", orgID)
+	}
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count projects")
@@ -226,6 +251,11 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	sumClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		baseClient = baseClient.Where("projects.tenant_id = ?", orgID)
+		sumClient = sumClient.Where("projects.tenant_id = ?", orgID)
+	}
 	if name != "" {
 		baseClient = baseClient.Where("projects.name = ?", name)
 		sumClient = sumClient.Where("projects.name = ?", name)
@@ -296,6 +326,12 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
 
+	// T1.e: acotar archivados al tenant activo (flag-gated) — antes era global.
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		baseClient = baseClient.Where("projects.tenant_id = ?", orgID)
+		sumClient = sumClient.Where("projects.tenant_id = ?", orgID)
+	}
+
 	if err := baseClient.Count(&total).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to count archived projects")
 	}
@@ -340,10 +376,19 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	var projects []domain.ListedProject
 	var total int64
 
+	// T1.e: leer orgID/flag con el paquete `base` ANTES de declarar la var local
+	// `base` (que lo shadowea).
+	tenantOrgID, tenantOK := base.OrgIDFromContext(ctx)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
+
 	base := r.db.Client().
 		WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
+
+	if tenantOn {
+		base = base.Where("projects.tenant_id = ?", tenantOrgID)
+	}
 
 	if customerID > 0 {
 		base = base.Where("customer_id = ?", customerID)
@@ -373,7 +418,12 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	}
 
 	var m models.Project
-	err := r.db.Client().WithContext(ctx).
+	q := r.db.Client().WithContext(ctx)
+	// T1.e: guard de ownership (flag-gated) — 404 si el project no es del tenant.
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		q = q.Where("tenant_id = ?", orgID)
+	}
+	err := q.
 		Preload("Customer").
 		Preload("Campaign").
 		Preload("Managers").
@@ -451,15 +501,19 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar existencia y optimistic locking dentro de la transacción
 		var existing models.Project
-		err := tx.
+		loadQ := tx.
 			Preload("Managers").
 			Preload("Investors.Investor").
 			Preload("AdminCostInvestors.Investor").
 			Preload("Fields").
 			Preload("Fields.FieldInvestors.Investor").
 			Preload("Fields.Lots").
-			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
-			First(&existing).Error
+			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		err := loadQ.First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFound("project not found or outdated")
 		}
@@ -570,7 +624,12 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var project models.Project
-		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
@@ -693,7 +752,12 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que el proyecto esté eliminado
 		var project models.Project
-		if err := tx.Unscoped().Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
@@ -793,7 +857,12 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que el proyecto existe (con Unscoped para incluir eliminados)
 		var project models.Project
-		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}

@@ -35,15 +35,23 @@ type MiddlewaresEnginePort interface {
 }
 
 type Handler struct {
-	db  *gorm.DB
-	idp idp.AdminClient
-	gsv GinEnginePort
-	acf ConfigAPIPort
-	mws MiddlewaresEnginePort
+	db             *gorm.DB
+	idp            idp.AdminClient
+	gsv            GinEnginePort
+	acf            ConfigAPIPort
+	mws            MiddlewaresEnginePort
+	platformAdmins map[string]struct{}
 }
 
-func NewHandler(db *gorm.DB, idpAdmin idp.AdminClient, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
-	return &Handler{db: db, idp: idpAdmin, gsv: s, acf: c, mws: m}
+func NewHandler(db *gorm.DB, idpAdmin idp.AdminClient, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort, platformAdminSubjects []string) *Handler {
+	pa := make(map[string]struct{}, len(platformAdminSubjects))
+	for _, sub := range platformAdminSubjects {
+		sub = strings.TrimSpace(sub)
+		if sub != "" {
+			pa[sub] = struct{}{}
+		}
+	}
+	return &Handler{db: db, idp: idpAdmin, gsv: s, acf: c, mws: m, platformAdmins: pa}
 }
 
 func (h *Handler) Routes() {
@@ -71,12 +79,33 @@ func requireAdmin(c *gin.Context) bool {
 	return true
 }
 
+// isPlatformAdmin indica si el principal autenticado (idp_sub) está en el
+// allowlist de operadores globales (T1.b, interino sin esquema).
+func (h *Handler) isPlatformAdmin(c *gin.Context) bool {
+	sub, err := sharedhandlers.ParseActor(c)
+	if err != nil || strings.TrimSpace(sub) == "" {
+		return false
+	}
+	_, ok := h.platformAdmins[sub]
+	return ok
+}
+
+// requirePlatformAdmin corta el request si el principal no es platform-admin.
+func (h *Handler) requirePlatformAdmin(c *gin.Context) bool {
+	if !h.isPlatformAdmin(c) {
+		sharedhandlers.RespondError(c, domainerr.Forbidden("platform admin required"))
+		return false
+	}
+	return true
+}
+
 type createTenantReq struct {
 	Name string `json:"name"`
 }
 
 func (h *Handler) ListTenants(c *gin.Context) {
-	if !requireAdmin(c) {
+	// T1.b: enumerar todos los tenants es una operación de plataforma.
+	if !h.requirePlatformAdmin(c) {
 		return
 	}
 	rp := newRepo(h.db)
@@ -89,7 +118,9 @@ func (h *Handler) ListTenants(c *gin.Context) {
 }
 
 func (h *Handler) CreateTenant(c *gin.Context) {
-	if !requireAdmin(c) {
+	// T1.b: crear tenants es una operación de plataforma (antes: cualquier admin
+	// de cualquier tenant podía crear tenants arbitrarios).
+	if !h.requirePlatformAdmin(c) {
 		return
 	}
 	var req createTenantReq
@@ -134,7 +165,7 @@ func usernameToEmail(v string) string {
 }
 
 func (h *Handler) CreateUser(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.isPlatformAdmin(c) && !requireAdmin(c) {
 		return
 	}
 	var req createUserReq
@@ -175,7 +206,15 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
+	// T1.b: solo platform-admin puede crear/dirigir a un tenant arbitrario por
+	// nombre; el resto queda acotado a su tenant activo (se ignora req.TenantName
+	// y NO se crea ningún tenant).
+	var tenantID uuid.UUID
+	if h.isPlatformAdmin(c) {
+		tenantID, err = rp.ensureTenantByName(ctx, req.TenantName)
+	} else {
+		tenantID, err = sharedhandlers.ParseOrgID(c)
+	}
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -233,7 +272,7 @@ type upsertMembershipReq struct {
 }
 
 func (h *Handler) UpsertMembership(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.isPlatformAdmin(c) && !requireAdmin(c) {
 		return
 	}
 	var req upsertMembershipReq
@@ -264,7 +303,15 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
+	// T1.b: solo platform-admin puede crear/dirigir a un tenant arbitrario por
+	// nombre; el resto queda acotado a su tenant activo (se ignora req.TenantName
+	// y NO se crea ningún tenant).
+	var tenantID uuid.UUID
+	if h.isPlatformAdmin(c) {
+		tenantID, err = rp.ensureTenantByName(ctx, req.TenantName)
+	} else {
+		tenantID, err = sharedhandlers.ParseOrgID(c)
+	}
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
