@@ -37,18 +37,36 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, domainerr.Internal("failed to create lease type")
 	}
+	// T3 (Modelo 2): dual-write de tenant_id del tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := r.db.Client().WithContext(ctx).Exec("UPDATE lease_types SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
+			return 0, domainerr.Internal("failed to set lease type tenant")
+		}
+	}
 	return model.ID, nil
 }
 
 func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
+	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
+	orgID, tenantScoped := sharedmodels.OrgIDFromContext(ctx)
+	tenantScoped = tenantScoped && sharedmodels.TenantEnforcementEnabled()
+
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.LeaseType{}).Count(&total).Error; err != nil {
+	countTx := r.db.Client().WithContext(ctx).Model(&models.LeaseType{})
+	if tenantScoped {
+		countTx = countTx.Where("tenant_id = ?", orgID)
+	}
+	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count lease types")
 	}
 
 	var list []models.LeaseType
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	listTx := r.db.Client().WithContext(ctx)
+	if tenantScoped {
+		listTx = listTx.Where("tenant_id = ?", orgID)
+	}
+	err := listTx.
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -69,7 +87,12 @@ func (r *Repository) GetLeaseType(ctx context.Context, id int64) (*domain.LeaseT
 		return nil, err
 	}
 	var model models.LeaseType
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		q = q.Where("tenant_id = ?", orgID)
+	}
+	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "lease type", id)
 	}
 	return model.ToDomain(), nil
@@ -88,6 +111,10 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	if !lt.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", lt.UpdatedAt)
 	}
+	// T3 (Modelo 2): guard de ownership (flag-gated) — solo actualiza si es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		updateTx = updateTx.Where("tenant_id = ?", orgID)
+	}
 	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update lease type")
@@ -105,8 +132,12 @@ func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.LeaseType{}, "id = ?", id)
+	deleteTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
+	}
+	result := deleteTx.Delete(&models.LeaseType{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete lease type")
 	}

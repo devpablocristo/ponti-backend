@@ -37,22 +37,37 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
 		return 0, domainerr.Internal("failed to create crop")
 	}
+	// T1.e: dual-write de tenant_id (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := r.db.Client().WithContext(ctx).Exec("UPDATE crops SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
+			return 0, domainerr.Internal("failed to set crop tenant")
+		}
+	}
 	return model.ID, nil
 }
 
 func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Crop{}).Count(&total).Error; err != nil {
+	countTx := r.db.Client().WithContext(ctx).Model(&models.Crop{})
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		countTx = countTx.Where("tenant_id = ?", orgID)
+	}
+	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count crops")
 	}
 
 	var list []models.Crop
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	listTx := r.db.Client().WithContext(ctx).
 		Offset(offset).
 		Limit(perPage).
-		Order("id ASC").
-		Find(&list).Error
+		Order("id ASC")
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		listTx = listTx.Where("tenant_id = ?", orgID)
+	}
+	err := listTx.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list crops")
 	}
@@ -69,7 +84,12 @@ func (r *Repository) GetCrop(ctx context.Context, id int64) (*domain.Crop, error
 		return nil, err
 	}
 	var model models.Crop
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated) — NotFound si el crop no es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		q = q.Where("tenant_id = ?", orgID)
+	}
+	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "crop", id)
 	}
 	return model.ToDomain(), nil
@@ -88,6 +108,10 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	if !c.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
 	}
+	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		updateTx = updateTx.Where("tenant_id = ?", orgID)
+	}
 	result := updateTx.Updates(models.FromDomainCrop(c))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update crop")
@@ -105,8 +129,12 @@ func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Crop{}, "id = ?", id)
+	deleteTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated) — solo borra si es del tenant.
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
+	}
+	result := deleteTx.Delete(&models.Crop{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete crop")
 	}

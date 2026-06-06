@@ -10,6 +10,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
@@ -154,7 +155,12 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 		}
 	}
 	var existing providermodel.Provider
-	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	provQ := tx.Where("name = ?", i.Name)
+	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
+		provQ = provQ.Where("tenant_id = ?", orgID)
+	}
+	if err := provQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check provider: %w", err)
@@ -162,6 +168,12 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create provider: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE providers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set provider tenant: %w", err)
+		}
 	}
 	return i.ID, nil
 }
@@ -522,7 +534,12 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	var providers []providermodel.Provider
-	if err := r.getDB(ctx).Find(&providers).Error; err != nil {
+	db0 := r.getDB(ctx).Model(&providermodel.Provider{})
+	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		db0 = db0.Where("tenant_id = ?", orgID)
+	}
+	if err := db0.Find(&providers).Error; err != nil {
 		return nil, domainerr.Internal("failed to list providers")
 	}
 	res := make([]providerdomain.Provider, len(providers))
