@@ -983,7 +983,13 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 		}
 	}
 	var existing cusmod.Customer
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated) para no
+	// reutilizar un customer de otro tenant (Modelo 2).
+	custQ := tx.Where("name = ?", c.Name)
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		custQ = custQ.Where("tenant_id = ?", orgID)
+	}
+	if err := custQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check customer: %w", err)
@@ -1005,7 +1011,12 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 		}
 	}
 	var existing casmod.Campaign
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	campQ := tx.Where("name = ?", c.Name)
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		campQ = campQ.Where("tenant_id = ?", orgID)
+	}
+	if err := campQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check campaign: %w", err)
@@ -1027,7 +1038,12 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 		}
 	}
 	var existing manmod.Manager
-	if err := tx.Where("name = ?", m.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	mgrQ := tx.Where("name = ?", m.Name)
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		mgrQ = mgrQ.Where("tenant_id = ?", orgID)
+	}
+	if err := mgrQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check manager: %w", err)
@@ -1035,6 +1051,12 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 
 	if err := tx.Create(m).Error; err != nil {
 		return 0, fmt.Errorf("failed to create manager: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE managers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, m.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set manager tenant: %w", err)
+		}
 	}
 	return m.ID, nil
 }
@@ -1049,7 +1071,12 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 		}
 	}
 	var existing invmod.Investor
-	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	invQ := tx.Where("name = ?", i.Name)
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		invQ = invQ.Where("tenant_id = ?", orgID)
+	}
+	if err := invQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check investor: %w", err)
@@ -1057,6 +1084,12 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create investor: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE investors SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set investor tenant: %w", err)
+		}
 	}
 	return i.ID, nil
 }

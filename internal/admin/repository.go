@@ -232,3 +232,119 @@ func (r *repo) listUsersForTenant(ctx context.Context, tenantID uuid.UUID) ([]us
 	}
 	return rows, nil
 }
+
+// --- Tenant lifecycle (CRUDAR platform-admin, PARTE IV) ---
+
+type tenantDetail struct {
+	ID        uuid.UUID  `json:"id"`
+	Name      string     `json:"name"`
+	Status    string     `json:"status"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
+func (r *repo) getTenant(ctx context.Context, id uuid.UUID) (*tenantDetail, error) {
+	var t tenantDetail
+	if err := r.db.WithContext(ctx).
+		Table("auth_tenants").
+		Select("id, name, status, created_at, updated_at, deleted_at").
+		Where("id = ?", id).
+		Limit(1).
+		Take(&t).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domainerr.New(domainerr.KindNotFound, "tenant not found")
+		}
+		return nil, domainerr.Internal("failed to get tenant")
+	}
+	return &t, nil
+}
+
+func (r *repo) listTenantsByArchived(ctx context.Context, archived bool) ([]tenantDetail, error) {
+	q := r.db.WithContext(ctx).
+		Table("auth_tenants").
+		Select("id, name, status, created_at, updated_at, deleted_at")
+	if archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("deleted_at IS NULL")
+	}
+	var rows []tenantDetail
+	if err := q.Order("name ASC").Find(&rows).Error; err != nil {
+		return nil, domainerr.Internal("failed to list tenants")
+	}
+	return rows, nil
+}
+
+func (r *repo) updateTenantName(ctx context.Context, id uuid.UUID, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return domainerr.Validation("tenant name required")
+	}
+	res := r.db.WithContext(ctx).Table("auth_tenants").
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{"name": name, "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return domainerr.Internal("failed to update tenant")
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, "tenant not found")
+	}
+	return nil
+}
+
+func (r *repo) setTenantStatus(ctx context.Context, id uuid.UUID, status string) error {
+	res := r.db.WithContext(ctx).Table("auth_tenants").
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{"status": status, "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return domainerr.Internal("failed to update tenant status")
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, "tenant not found")
+	}
+	return nil
+}
+
+func (r *repo) archiveTenant(ctx context.Context, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Table("auth_tenants").
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(map[string]any{"deleted_at": now, "updated_at": now})
+	if res.Error != nil {
+		return domainerr.Internal("failed to archive tenant")
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, "tenant not found or already archived")
+	}
+	return nil
+}
+
+func (r *repo) restoreTenant(ctx context.Context, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Table("auth_tenants").
+		Where("id = ? AND deleted_at IS NOT NULL", id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return domainerr.Internal("failed to restore tenant")
+	}
+	if res.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, "tenant not found or not archived")
+	}
+	return nil
+}
+
+// hardDeleteTenant borra físicamente un tenant. Requiere que esté archivado
+// primero (offboard tras retención). Si quedan FKs (memberships), la DB rechaza.
+func (r *repo) hardDeleteTenant(ctx context.Context, id uuid.UUID) error {
+	t, err := r.getTenant(ctx, id)
+	if err != nil {
+		return err
+	}
+	if t.DeletedAt == nil {
+		return domainerr.Conflict("tenant must be archived before hard delete")
+	}
+	if err := r.db.WithContext(ctx).Exec("DELETE FROM auth_tenants WHERE id = ?", id).Error; err != nil {
+		return domainerr.Conflict("cannot hard delete tenant (still referenced); remove memberships/data first")
+	}
+	return nil
+}

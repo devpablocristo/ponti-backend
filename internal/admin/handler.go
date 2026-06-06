@@ -60,8 +60,15 @@ func (h *Handler) Routes() {
 
 	admin := r.Group(baseURL, h.mws.GetValidation()...)
 	{
-		admin.GET("/tenants", h.ListTenants)
+		admin.GET("/tenants", h.ListTenants) // ?archived=1 lista archivados
 		admin.POST("/tenants", h.CreateTenant)
+		admin.GET("/tenants/:tenant_id", h.GetTenant)
+		admin.PUT("/tenants/:tenant_id", h.UpdateTenant)
+		admin.POST("/tenants/:tenant_id/suspend", h.SuspendTenant)
+		admin.POST("/tenants/:tenant_id/activate", h.ActivateTenant)
+		admin.POST("/tenants/:tenant_id/archive", h.ArchiveTenant)
+		admin.POST("/tenants/:tenant_id/restore", h.RestoreTenant)
+		admin.DELETE("/tenants/:tenant_id/hard", h.HardDeleteTenant)
 
 		admin.GET("/users", h.ListUsers)
 		admin.POST("/users", h.CreateUser)
@@ -108,8 +115,9 @@ func (h *Handler) ListTenants(c *gin.Context) {
 	if !h.requirePlatformAdmin(c) {
 		return
 	}
+	archived := c.Query("archived") == "1" || strings.EqualFold(c.Query("archived"), "true")
 	rp := newRepo(h.db)
-	items, err := rp.listTenants(c.Request.Context())
+	items, err := rp.listTenantsByArchived(c.Request.Context(), archived)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -135,6 +143,125 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{"id": id}})
+}
+
+// --- Tenant lifecycle CRUDAR (platform-admin, PARTE IV) ---
+
+func parseTenantID(c *gin.Context) (uuid.UUID, error) {
+	id, err := uuid.Parse(strings.TrimSpace(c.Param("tenant_id")))
+	if err != nil {
+		return uuid.Nil, domainerr.Validation("invalid tenant_id")
+	}
+	return id, nil
+}
+
+func (h *Handler) GetTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	t, err := newRepo(h.db).getTenant(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": t})
+}
+
+type updateTenantReq struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) UpdateTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req updateTenantReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	if err := newRepo(h.db).updateTenantName(c.Request.Context(), id, req.Name); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) SuspendTenant(c *gin.Context)  { h.changeTenantStatus(c, "suspended") }
+func (h *Handler) ActivateTenant(c *gin.Context) { h.changeTenantStatus(c, "active") }
+
+func (h *Handler) changeTenantStatus(c *gin.Context, status string) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).setTenantStatus(c.Request.Context(), id, status); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"status": status}})
+}
+
+func (h *Handler) ArchiveTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).archiveTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) RestoreTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).restoreTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) HardDeleteTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).hardDeleteTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 type createUserReq struct {

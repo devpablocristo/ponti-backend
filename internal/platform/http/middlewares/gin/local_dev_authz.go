@@ -12,6 +12,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/security/go/contextkeys"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 // RequireLocalDevAuthz is a lightweight auth middleware intended for local development.
@@ -69,6 +71,14 @@ func RequireLocalDevAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.HandlerFunc {
 			var t tRow
 			if err := db.WithContext(c.Request.Context()).Table("auth_tenants").Select("id").Where("name = 'default'").Limit(1).Take(&t).Error; err == nil {
 				tenantID = t.ID
+			}
+		}
+
+		// PARTE IV: tenant suspendido/archivado => denegar (gated por TENANT_ENFORCEMENT).
+		if db != nil && tenantID != uuid.Nil && sharedmodels.TenantEnforcementEnabled() {
+			if active, aerr := tenantActive(c.Request.Context(), db, tenantID); aerr == nil && !active {
+				denyForbidden(c, "tenant is suspended or archived")
+				return
 			}
 		}
 

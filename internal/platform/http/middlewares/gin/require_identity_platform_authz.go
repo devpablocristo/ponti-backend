@@ -18,6 +18,8 @@ import (
 	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/platform/http/go/httperr"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 const (
@@ -104,6 +106,12 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 				domErr := domainerr.Validation("tenant selection required: provide the X-Tenant-Id header")
 				status, apiErr := httperr.Normalize(domErr)
 				c.AbortWithStatusJSON(status, apiErr)
+				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+				return
+			}
+			// PARTE IV: tenant suspendido o archivado.
+			if errors.Is(err, errTenantInactive) {
+				denyForbidden(c, "tenant is suspended or archived")
 				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
 				return
 			}
@@ -211,6 +219,34 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 // elegir uno arbitrario (T1.c — antes: Order("m.tenant_id ASC").Limit(1)).
 var errTenantSelectionRequired = errors.New("tenant selection required")
 
+// errTenantInactive indica que el tenant resuelto está suspendido o archivado
+// (PARTE IV). Se evalúa gated por TENANT_ENFORCEMENT.
+var errTenantInactive = errors.New("tenant inactive")
+
+// tenantActive devuelve true si el tenant existe, está 'active' y no archivado.
+func tenantActive(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (bool, error) {
+	var row struct {
+		Status    string
+		DeletedAt *time.Time
+	}
+	if err := db.WithContext(ctx).
+		Table("auth_tenants").
+		Select("status, deleted_at").
+		Where("id = ?", tenantID).
+		Limit(1).
+		Take(&row).Error; err != nil {
+		return false, err
+	}
+	return row.Status == "active" && row.DeletedAt == nil, nil
+}
+
+// denyForbidden corta el request con 403 (reutilizable dentro del paquete).
+func denyForbidden(c *gin.Context, msg string) {
+	domErr := domainerr.Forbidden(msg)
+	status, apiErr := httperr.Normalize(domErr)
+	c.AbortWithStatusJSON(status, apiErr)
+}
+
 func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, requestedTenant string) (*membershipResolved, error) {
 	type membershipRow struct {
 		TenantID uuid.UUID
@@ -273,6 +309,19 @@ func loadMembershipPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.U
 	for _, p := range perms {
 		permSet[p.Name] = struct{}{}
 	}
+
+	// PARTE IV: tenant suspendido/archivado => denegar (gated por TENANT_ENFORCEMENT;
+	// requiere migración 000233 aplicada).
+	if sharedmodels.TenantEnforcementEnabled() {
+		active, err := tenantActive(ctx, db, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		if !active {
+			return nil, errTenantInactive
+		}
+	}
+
 	return &membershipResolved{
 		TenantID:    tenantID,
 		RoleName:    roleName,
