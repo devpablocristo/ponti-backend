@@ -17,6 +17,8 @@ type UseCasesPort interface {
 	GetCrop(context.Context, int64) (*domain.Crop, error)
 	UpdateCrop(context.Context, *domain.Crop) error
 	DeleteCrop(context.Context, int64) error
+	ArchiveCrop(context.Context, int64) error
+	RestoreCrop(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -65,6 +67,8 @@ func (h *Handler) Routes() {
 		public.GET("/:crop_id", h.GetCrop)
 		public.PUT("/:crop_id", h.UpdateCrop)
 		public.DELETE("/:crop_id", h.DeleteCrop)
+		public.POST("/:crop_id/archive", h.ArchiveCrop)
+		public.POST("/:crop_id/restore", h.RestoreCrop)
 	}
 }
 
@@ -129,6 +133,33 @@ func (h *Handler) DeleteCrop(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteCrop(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ArchiveCrop ejecuta soft delete (archivado) del crop.
+func (h *Handler) ArchiveCrop(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "crop_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveCrop(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreCrop(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "crop_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreCrop(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

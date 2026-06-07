@@ -2,7 +2,9 @@ package crop
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -126,6 +128,81 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop with id %d does not exist", c.ID))
 	}
 	return nil
+}
+
+func (r *Repository) ArchiveCrop(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var crop models.Crop
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&crop).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
+			}
+			return domainerr.Internal("failed to get crop")
+		}
+		if crop.DeletedAt.Valid {
+			return domainerr.Conflict("crop already archived")
+		}
+
+		updates := map[string]any{
+			"deleted_at": time.Now(),
+		}
+		updates["deleted_by"] = gorm.Expr("NULL")
+
+		if err := tx.Model(&models.Crop{}).
+			Where("id = ?", id).
+			Updates(updates).Error; err != nil {
+			return domainerr.Internal("failed to archive crop")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreCrop(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var crop models.Crop
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&crop).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
+			}
+			return domainerr.Internal("failed to get crop")
+		}
+		if !crop.DeletedAt.Valid {
+			return domainerr.Conflict("crop is not archived")
+		}
+
+		// El trigger normalize_name (dedup) dispara en la reactivación y puede
+		// lanzar un unique-violation → mapear a Conflict.
+		if err := tx.Unscoped().Model(&models.Crop{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("a crop with that name already exists; cannot restore")
+			}
+			return domainerr.Internal("failed to restore crop")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) DeleteCrop(ctx context.Context, id int64) error {

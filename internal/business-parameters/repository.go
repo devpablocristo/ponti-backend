@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -148,6 +149,80 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 				return domainerr.Conflict("business parameter not found or outdated")
 			}
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", item.ID))
+		}
+		return nil
+	})
+}
+
+func (r *Repository) ArchiveParameter(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "business parameter"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var param models.BusinessParameter
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&param).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", id))
+			}
+			return domainerr.Internal("failed to get business parameter")
+		}
+		if param.DeletedAt.Valid {
+			return domainerr.Conflict("business parameter already archived")
+		}
+
+		updates := map[string]any{
+			"deleted_at": time.Now(),
+			"deleted_by": gorm.Expr("NULL"),
+		}
+
+		if err := tx.Model(&models.BusinessParameter{}).
+			Where("id = ?", id).
+			Updates(updates).Error; err != nil {
+			return domainerr.Internal("failed to archive business parameter")
+		}
+		return nil
+	})
+}
+
+func (r *Repository) RestoreParameter(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "business parameter"); err != nil {
+		return err
+	}
+
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var param models.BusinessParameter
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			loadQ = loadQ.Where("tenant_id = ?", orgID)
+		}
+		if err := loadQ.First(&param).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", id))
+			}
+			return domainerr.Internal("failed to get business parameter")
+		}
+		if !param.DeletedAt.Valid {
+			return domainerr.Conflict("business parameter is not archived")
+		}
+
+		// La reactivación puede chocar con el unique por-tenant de key (23505) → Conflict.
+		if err := tx.Unscoped().Model(&models.BusinessParameter{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"deleted_at": nil,
+				"deleted_by": nil,
+				"updated_at": time.Now(),
+			}).Error; err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("a business parameter with that key already exists; cannot restore")
+			}
+			return domainerr.Internal("failed to restore business parameter")
 		}
 		return nil
 	})

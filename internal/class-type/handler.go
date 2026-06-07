@@ -17,6 +17,8 @@ type UseCasesPort interface {
 	GetClassType(context.Context, int64) (*domain.ClassType, error)
 	UpdateClassType(context.Context, *domain.ClassType) error
 	DeleteClassType(context.Context, int64) error
+	ArchiveClassType(context.Context, int64) error
+	RestoreClassType(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -62,6 +64,8 @@ func (h *Handler) Routes() {
 		group.GET("/:class_type_id", h.GetClassType)
 		group.PUT("/:class_type_id", h.UpdateClassType)
 		group.DELETE("/:class_type_id", h.DeleteClassType)
+		group.POST("/:class_type_id/archive", h.ArchiveClassType)
+		group.POST("/:class_type_id/restore", h.RestoreClassType)
 	}
 }
 
@@ -126,6 +130,33 @@ func (h *Handler) DeleteClassType(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteClassType(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ArchiveClassType ejecuta soft delete (archivado) del class type.
+func (h *Handler) ArchiveClassType(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "class_type_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveClassType(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreClassType(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "class_type_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreClassType(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

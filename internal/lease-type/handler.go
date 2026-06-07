@@ -17,6 +17,8 @@ type UseCasesPort interface {
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
 	DeleteLeaseType(context.Context, int64) error
+	ArchiveLeaseType(context.Context, int64) error
+	RestoreLeaseType(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -62,6 +64,8 @@ func (h *Handler) Routes() {
 		public.GET("/:lease_type_id", h.GetLeaseType)
 		public.PUT("/:lease_type_id", h.UpdateLeaseType)
 		public.DELETE("/:lease_type_id", h.DeleteLeaseType)
+		public.POST("/:lease_type_id/archive", h.ArchiveLeaseType)
+		public.POST("/:lease_type_id/restore", h.RestoreLeaseType)
 	}
 }
 
@@ -126,6 +130,33 @@ func (h *Handler) DeleteLeaseType(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteLeaseType(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ArchiveLeaseType ejecuta soft delete (archivado) del lease type.
+func (h *Handler) ArchiveLeaseType(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lease_type_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveLeaseType(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreLeaseType(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lease_type_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreLeaseType(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

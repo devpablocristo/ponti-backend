@@ -12,6 +12,8 @@ type RepositoryPort interface {
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
 	DeleteLeaseType(context.Context, int64) error
+	ArchiveLeaseType(context.Context, int64) error
+	RestoreLeaseType(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -40,4 +42,12 @@ func (u *UseCases) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) er
 
 func (u *UseCases) DeleteLeaseType(ctx context.Context, id int64) error {
 	return u.repo.DeleteLeaseType(ctx, id)
+}
+
+func (u *UseCases) ArchiveLeaseType(ctx context.Context, id int64) error {
+	return u.repo.ArchiveLeaseType(ctx, id)
+}
+
+func (u *UseCases) RestoreLeaseType(ctx context.Context, id int64) error {
+	return u.repo.RestoreLeaseType(ctx, id)
 }

@@ -14,6 +14,8 @@ type RepositoryPort interface {
 	Create(ctx context.Context, item *domain.BusinessParameter) (int64, error)
 	Update(ctx context.Context, item *domain.BusinessParameter) error
 	Delete(ctx context.Context, id int64) error
+	ArchiveParameter(ctx context.Context, id int64) error
+	RestoreParameter(ctx context.Context, id int64) error
 }
 
 type UseCases struct {
@@ -72,4 +74,12 @@ func (u *UseCases) DeleteParameter(ctx context.Context, id int64) error {
 	}
 
 	return u.repository.Delete(ctx, id)
+}
+
+func (u *UseCases) ArchiveParameter(ctx context.Context, id int64) error {
+	return u.repository.ArchiveParameter(ctx, id)
+}
+
+func (u *UseCases) RestoreParameter(ctx context.Context, id int64) error {
+	return u.repository.RestoreParameter(ctx, id)
 }

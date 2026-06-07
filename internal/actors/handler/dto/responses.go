@@ -4,6 +4,7 @@ import (
 	"time"
 
 	domain "github.com/devpablocristo/ponti-backend/internal/actors/usecases/domain"
+	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 )
 
 type KeyResponse struct {
@@ -80,6 +81,23 @@ func SearchFromDomain(r domain.SearchResult) SearchResponse {
 // CandidatesResponse es la salida advisory de GET /actors/similar (exactos con score 1).
 type CandidatesResponse struct {
 	Candidates []ScoredActorResponse `json:"candidates"`
+}
+
+// ListActorsResponse es la respuesta paginada del listado de actores.
+type ListActorsResponse struct {
+	Data     []ActorResponse `json:"data"`
+	PageInfo types.PageInfo  `json:"page_info"`
+}
+
+func NewListActorsResponse(items []domain.Actor, page, perPage int, total int64) ListActorsResponse {
+	data := make([]ActorResponse, 0, len(items))
+	for i := range items {
+		data = append(data, ActorFromDomain(&items[i]))
+	}
+	return ListActorsResponse{
+		Data:     data,
+		PageInfo: types.NewPageInfo(page, perPage, total),
+	}
 }
 
 func CandidatesFromDomain(r domain.SearchResult) CandidatesResponse {

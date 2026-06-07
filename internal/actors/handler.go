@@ -20,6 +20,12 @@ type UseCasesPort interface {
 	Resolve(context.Context, domain.ResolveInput) (domain.ResolveResult, error)
 	GetByTaxID(context.Context, string) (*domain.Actor, error)
 	Search(context.Context, string, int) (domain.SearchResult, error)
+	List(context.Context, string, int, int) ([]domain.Actor, int64, error)
+	Get(context.Context, int64) (*domain.Actor, error)
+	Update(context.Context, *domain.Actor) error
+	Archive(context.Context, int64) error
+	Restore(context.Context, int64) error
+	Delete(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -56,9 +62,15 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("", h.ResolveActor)
+		public.GET("", h.ListActors)
 		public.GET("/search", h.SearchActors)
 		public.GET("/by-tax-id", h.GetByTaxID)
 		public.GET("/similar", h.SimilarActors)
+		public.GET("/:actor_id", h.GetActor)
+		public.PUT("/:actor_id", h.UpdateActor)
+		public.DELETE("/:actor_id", h.DeleteActor)
+		public.POST("/:actor_id/archive", h.ArchiveActor)
+		public.POST("/:actor_id/restore", h.RestoreActor)
 	}
 }
 
