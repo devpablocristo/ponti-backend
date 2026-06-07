@@ -37,6 +37,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a customer with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create customer")
 	}
 	// T1.e: dual-write de tenant_id (flag-gated).

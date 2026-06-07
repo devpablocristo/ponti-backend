@@ -164,7 +164,7 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 	}
 	var existing providermodel.Provider
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
-	provQ := tx.Where("name = ?", i.Name)
+	provQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
 	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
 		provQ = provQ.Where("tenant_id = ?", orgID)
 	}

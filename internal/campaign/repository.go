@@ -42,6 +42,9 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 		WithContext(ctx).
 		Create(model).
 		Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a campaign with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create campaign")
 	}
 

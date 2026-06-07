@@ -985,7 +985,8 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	var existing cusmod.Customer
 	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated) para no
 	// reutilizar un customer de otro tenant (Modelo 2).
-	custQ := tx.Where("name = ?", c.Name)
+	// anti-dup: match por nombre NORMALIZADO (reusa "acme sa" ≡ "Acme SA").
+	custQ := tx.Where("normalize_name(name) = normalize_name(?)", c.Name)
 	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
 		custQ = custQ.Where("tenant_id = ?", orgID)
 	}
@@ -1012,7 +1013,7 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	}
 	var existing casmod.Campaign
 	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated).
-	campQ := tx.Where("name = ?", c.Name)
+	campQ := tx.Where("normalize_name(name) = normalize_name(?)", c.Name)
 	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
 		campQ = campQ.Where("tenant_id = ?", orgID)
 	}
@@ -1039,7 +1040,7 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	}
 	var existing manmod.Manager
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
-	mgrQ := tx.Where("name = ?", m.Name)
+	mgrQ := tx.Where("normalize_name(name) = normalize_name(?)", m.Name)
 	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
 		mgrQ = mgrQ.Where("tenant_id = ?", orgID)
 	}
@@ -1072,7 +1073,7 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	}
 	var existing invmod.Investor
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
-	invQ := tx.Where("name = ?", i.Name)
+	invQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
 	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
 		invQ = invQ.Where("tenant_id = ?", orgID)
 	}

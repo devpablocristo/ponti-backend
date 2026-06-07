@@ -35,6 +35,9 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 		UpdatedBy: inv.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("an investor with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create investor")
 	}
 	// T1.e: dual-write de tenant_id (flag-gated).

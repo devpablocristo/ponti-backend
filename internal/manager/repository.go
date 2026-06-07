@@ -35,6 +35,9 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 		UpdatedBy: m.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a manager with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create manager")
 	}
 	// T1.e: dual-write de tenant_id (flag-gated).
