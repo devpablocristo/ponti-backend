@@ -8,6 +8,7 @@ package wire
 
 import (
 	"github.com/devpablocristo/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/internal/actors"
 	"github.com/devpablocristo/ponti-backend/internal/admin"
 	"github.com/devpablocristo/ponti-backend/internal/ai"
 	"github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -63,15 +64,24 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	ginEnginePort := ProvideCustomerGinEnginePort(server)
-	gormEnginePort := ProvideCustomerGormEnginePort(repository)
-	customerRepository := ProvideCustomerRepository(gormEnginePort)
-	repositoryPort := ProvideCustomerRepositoryPort(customerRepository)
-	useCases := ProvideCustomerUseCases(repositoryPort)
-	useCasesPort := ProvideCustomerUseCasesPort(useCases)
-	configAPIPort := ProvideCustomerConfigAPI(config)
-	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
-	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	ginEnginePort := ProvideActorsGinEnginePort(server)
+	gormEnginePort := ProvideActorsGormEnginePort(repository)
+	actorsRepository := ProvideActorsRepository(gormEnginePort)
+	repositoryPort := ProvideActorsRepositoryPort(actorsRepository)
+	useCases := ProvideActorsUseCases(repositoryPort)
+	useCasesPort := ProvideActorsUseCasesPort(useCases)
+	configAPIPort := ProvideActorsConfigAPI(config)
+	middlewaresEnginePort := ProvideActorsMiddlewaresEnginePort(middlewares)
+	handler := ProvideActorsHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	customerGinEnginePort := ProvideCustomerGinEnginePort(server)
+	customerGormEnginePort := ProvideCustomerGormEnginePort(repository)
+	customerRepository := ProvideCustomerRepository(customerGormEnginePort)
+	customerRepositoryPort := ProvideCustomerRepositoryPort(customerRepository)
+	customerUseCases := ProvideCustomerUseCases(customerRepositoryPort)
+	customerUseCasesPort := ProvideCustomerUseCasesPort(customerUseCases)
+	customerConfigAPIPort := ProvideCustomerConfigAPI(config)
+	customerMiddlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
+	customerHandler := ProvideCustomerHandler(customerGinEnginePort, customerUseCasesPort, customerConfigAPIPort, customerMiddlewaresEnginePort)
 	campaignGinEnginePort := ProvideCampaignGinEnginePort(server)
 	campaignGormEnginePort := ProvideCampaignGormEnginePort(repository)
 	campaignRepository := ProvideCampaignRepository(campaignGormEnginePort)
@@ -342,7 +352,8 @@ func Initialize() (*Dependencies, error) {
 		GormRepo:                  repository,
 		Middlewares:               middlewares,
 		WordsSuggester:            pkgsuggesterWordsSuggester,
-		CustomerHandler:           handler,
+		ActorsHandler:             handler,
+		CustomerHandler:           customerHandler,
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
 		DataIntegrityHandler:      dataintegrityHandler,
@@ -381,6 +392,7 @@ type Dependencies struct {
 	GormRepo                  *pkggorm.Repository
 	Middlewares               *pkgmwr.Middlewares
 	WordsSuggester            *pkgsuggester.WordsSuggester
+	ActorsHandler             *actors.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler

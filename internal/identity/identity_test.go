@@ -4,16 +4,16 @@ import "testing"
 
 func TestCanonicalize(t *testing.T) {
 	cases := map[string]string{
-		"Acme  S.A.":  "acme s a",
-		"La Plata":    "la plata",
-		"Laplata":     "laplata",
-		"Peña SA":     "peña sa",
-		"Pena SA":     "pena sa",
-		"Niño":        "niño",
-		"José Pérez":  "jose perez",
-		"  ÑANDÚ  ":   "ñandu",
-		"":            "",
-		"///":         "",
+		"Acme  S.A.": "acme s a",
+		"La Plata":   "la plata",
+		"Laplata":    "laplata",
+		"Peña SA":    "peña sa",
+		"Pena SA":    "pena sa",
+		"Niño":       "niño",
+		"José Pérez": "jose perez",
+		"  ÑANDÚ  ":  "ñandu",
+		"":           "",
+		"///":        "",
 	}
 	for in, want := range cases {
 		if got := Canonicalize(in); got != want {

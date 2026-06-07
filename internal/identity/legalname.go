@@ -17,7 +17,7 @@ var legalFormMap = map[string]string{
 	"sa": "SA", "sociedadanonima": "SA", "sacif": "SA", "saci": "SA",
 	"srl": "SRL", "sociedadderesponsabilidadlimitada": "SRL",
 	"sas": "SAS",
-	"sh": "SH", "sociedaddehecho": "SH",
+	"sh":  "SH", "sociedaddehecho": "SH",
 	"coop": "COOP", "cooperativa": "COOP",
 	"ute": "UTE",
 }

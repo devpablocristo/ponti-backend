@@ -2,9 +2,9 @@ package identity
 
 import (
 	"context"
-	"errors"
 	"strings"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -62,7 +62,7 @@ func resolveTenant(ctx context.Context, tx *gorm.DB) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 	if id == uuid.Nil {
-		return uuid.Nil, errors.New("identity: no tenant in context and no 'default' tenant")
+		return uuid.Nil, domainerr.Internal("identity: no tenant configured for this request")
 	}
 	return id, nil
 }
@@ -77,19 +77,10 @@ func ResolveOrCreateIdentity(ctx context.Context, tx *gorm.DB, role Role, in Res
 		return ResolveResult{}, err
 	}
 	name := strings.TrimSpace(in.RawName)
-
-	var cands []keyCand
-	if in.TaxID != nil {
-		if n := NormalizeTaxID(*in.TaxID); n != "" {
-			cands = append(cands, keyCand{"TAX_ID", n})
-		}
-	}
 	parsed := ParseLegalName(name)
-	if v := parsed.KeyValue(); v != "" {
-		cands = append(cands, keyCand{parsed.KeyType(), v})
-	}
+	cands := candidateKeys(in)
 	if len(cands) == 0 {
-		return ResolveResult{}, errors.New("identity: empty input (no tax_id, no name)")
+		return ResolveResult{}, domainerr.Validation("name and tax_id cannot both be empty")
 	}
 
 	// 1) Reuse: primer match activo en orden de cascada.
@@ -125,7 +116,8 @@ func ResolveOrCreateIdentity(ctx context.Context, tx *gorm.DB, role Role, in Res
 	if err := attachRole(tx, a.ID, role); err != nil {
 		return ResolveResult{}, err
 	}
-	return ResolveResult{ActorID: a.ID, Reused: false, MatchedKey: cands[len(cands)-1].typ}, nil
+	// MatchedKey = clave primaria de la cascada (CUIT si hay), consistente con el reuse.
+	return ResolveResult{ActorID: a.ID, Reused: false, MatchedKey: cands[0].typ}, nil
 }
 
 // StampActor resuelve la identidad de un portador (rol con tabla propia o texto-libre
@@ -141,6 +133,49 @@ func StampActor(ctx context.Context, tx *gorm.DB, role Role, table, fkColumn, na
 		return err
 	}
 	return tx.Exec("UPDATE "+table+" SET "+fkColumn+" = ? WHERE id = ?", res.ActorID, entityID).Error
+}
+
+// candidateKeys arma la cascada de claves (CUIT → nombre legal) de un input.
+func candidateKeys(in ResolveInput) []keyCand {
+	var cands []keyCand
+	if in.TaxID != nil {
+		if n := NormalizeTaxID(*in.TaxID); n != "" {
+			cands = append(cands, keyCand{"TAX_ID", n})
+		}
+	}
+	p := ParseLegalName(strings.TrimSpace(in.RawName))
+	if v := p.KeyValue(); v != "" {
+		cands = append(cands, keyCand{p.KeyType(), v})
+	}
+	return cands
+}
+
+// TenantFor devuelve el tenant concreto (OrgID del ctx, o 'default'). Exporta la misma
+// resolución que usa el resolver para que los lectores (search/lookup) scopeen igual.
+func TenantFor(ctx context.Context, db *gorm.DB) (uuid.UUID, error) {
+	return resolveTenant(ctx, db)
+}
+
+// LookupIdentity busca (SIN crear) la identidad por la cascada CUIT→nombre dentro del
+// tenant. Devuelve actorID=0 si no hay match.
+func LookupIdentity(ctx context.Context, db *gorm.DB, in ResolveInput) (int64, string, error) {
+	tenantID, err := resolveTenant(ctx, db)
+	if err != nil {
+		return 0, "", err
+	}
+	for _, c := range candidateKeys(in) {
+		var id int64
+		if err := db.Raw(
+			`SELECT actor_id FROM actor_keys WHERE active AND tenant_id = ? AND key_type = ? AND key_value = ? LIMIT 1`,
+			tenantID, c.typ, c.val,
+		).Scan(&id).Error; err != nil {
+			return 0, "", err
+		}
+		if id != 0 {
+			return id, c.typ, nil
+		}
+	}
+	return 0, "", nil
 }
 
 // attachRole asegura (idempotente) que el actor tenga el rol.

@@ -121,6 +121,7 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 // registerHTTPRoutes registra todas las rutas en el router Gin.
 func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
 	deps.LotHandler.Routes()
+	deps.ActorsHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
 	deps.DashboardHandler.Routes()
