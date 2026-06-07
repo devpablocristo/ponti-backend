@@ -35,6 +35,9 @@ func (r *Repository) CreateCategory(ctx context.Context, c *domain.Category) (in
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a category with that name already exists for this type")
+		}
 		return 0, domainerr.Internal("failed to create category")
 	}
 	// T1.e: dual-write de tenant_id (flag-gated).

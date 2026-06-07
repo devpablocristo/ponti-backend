@@ -35,6 +35,9 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		UpdatedBy: lt.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a lease type with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create lease type")
 	}
 	// T3 (Modelo 2): dual-write de tenant_id del tenant activo (flag-gated).

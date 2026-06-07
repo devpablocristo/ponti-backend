@@ -35,6 +35,9 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a crop with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create crop")
 	}
 	// T1.e: dual-write de tenant_id (flag-gated).

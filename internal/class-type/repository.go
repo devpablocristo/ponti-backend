@@ -32,6 +32,9 @@ func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (
 		UpdatedBy: c.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a type with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create class type")
 	}
 	// T1.e/T3: dual-write de tenant_id (flag-gated).
