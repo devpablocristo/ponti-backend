@@ -16,6 +16,7 @@ import (
 	cusmod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	invmod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
@@ -973,6 +974,12 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 
 // --- HELPERS ---
 
+// attachActorIdentity estampa el actor_id de una tabla de rol (delega en
+// identity.StampActor: no-op con el gate off). Corre en la tx del caller.
+func attachActorIdentity(tx *gorm.DB, role identity.Role, table, name string, entityID int64) error {
+	return identity.StampActor(tx.Statement.Context, tx, role, table, "actor_id", name, entityID)
+}
+
 func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	if c.ID != 0 {
 		var existing cusmod.Customer
@@ -998,6 +1005,9 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create customer: %w", err)
+	}
+	if err := attachActorIdentity(tx, identity.RoleCustomer, "customers", c.Name, c.ID); err != nil {
+		return 0, err
 	}
 	return c.ID, nil
 }
@@ -1059,6 +1069,9 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 			return 0, fmt.Errorf("failed to set manager tenant: %w", err)
 		}
 	}
+	if err := attachActorIdentity(tx, identity.RoleManager, "managers", m.Name, m.ID); err != nil {
+		return 0, err
+	}
 	return m.ID, nil
 }
 
@@ -1091,6 +1104,9 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 		if err := tx.Exec("UPDATE investors SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
 			return 0, fmt.Errorf("failed to set investor tenant: %w", err)
 		}
+	}
+	if err := attachActorIdentity(tx, identity.RoleInvestor, "investors", i.Name, i.ID); err != nil {
+		return 0, err
 	}
 	return i.ID, nil
 }

@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -90,6 +91,12 @@ func (r *Repository) CreateWorkOrder(ctx context.Context, o *domain.WorkOrder) (
 			if err := tx.Create(&model.InvestorSplits).Error; err != nil {
 				return domainerr.Internal("failed to create work order investor splits")
 			}
+		}
+
+		// 3.4) Identity Gate: resolver el contratista (ex texto-libre) y estampar
+		// contractor_actor_id. No-op con el gate off o contractor vacío.
+		if err := identity.StampActor(ctx, tx, identity.RoleContractor, "workorders", "contractor_actor_id", o.Contractor, model.ID); err != nil {
+			return err
 		}
 
 		return nil

@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	models "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
@@ -34,17 +35,45 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 		CreatedBy: inv.CreatedBy,
 		UpdatedBy: inv.UpdatedBy,
 	}
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		if sharedrepo.IsUniqueViolation(err) {
-			return 0, domainerr.Conflict("an investor with that name already exists")
+	create := func(db *gorm.DB) error {
+		if err := db.WithContext(ctx).Create(model).Error; err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("an investor with that name already exists")
+			}
+			return domainerr.Internal("failed to create investor")
 		}
-		return 0, domainerr.Internal("failed to create investor")
+		// T1.e: dual-write de tenant_id (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			if err := db.WithContext(ctx).Exec("UPDATE investors SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
+				return domainerr.Internal("failed to set investor tenant")
+			}
+		}
+		return nil
 	}
-	// T1.e: dual-write de tenant_id (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		if err := r.db.Client().WithContext(ctx).Exec("UPDATE investors SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
-			return 0, domainerr.Internal("failed to set investor tenant")
+
+	// Flag off → comportamiento idéntico al actual.
+	if !sharedmodels.IdentityGateEnabled() {
+		if err := create(r.db.Client()); err != nil {
+			return 0, err
 		}
+		return model.ID, nil
+	}
+
+	// Identity Gate on: investor + resolución de identidad + stamp de actor_id en UNA tx.
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := create(tx); err != nil {
+			return err
+		}
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleInvestor, identity.ResolveInput{RawName: inv.Name})
+		if err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("an entity with that identity already exists")
+			}
+			return domainerr.Internal("failed to resolve investor identity")
+		}
+		return tx.Exec("UPDATE investors SET actor_id = ? WHERE id = ?", res.ActorID, model.ID).Error
+	}); err != nil {
+		return 0, err
 	}
 	return model.ID, nil
 }

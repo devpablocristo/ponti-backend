@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
@@ -182,6 +183,10 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 		if err := tx.Exec("UPDATE providers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
 			return 0, fmt.Errorf("failed to set provider tenant: %w", err)
 		}
+	}
+	// Identity Gate: resolver el provider a actor y estampar actor_id (no-op con gate off).
+	if err := identity.StampActor(tx.Statement.Context, tx, identity.RoleProvider, "providers", "actor_id", i.Name, i.ID); err != nil {
+		return 0, err
 	}
 	return i.ID, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
@@ -36,17 +37,48 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
 	}
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		if sharedrepo.IsUniqueViolation(err) {
-			return 0, domainerr.Conflict("a customer with that name already exists")
+
+	// Inserta el customer + dual-write de tenant_id. Reutilizado por ambos caminos.
+	create := func(db *gorm.DB) error {
+		if err := db.WithContext(ctx).Create(model).Error; err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("a customer with that name already exists")
+			}
+			return domainerr.Internal("failed to create customer")
 		}
-		return 0, domainerr.Internal("failed to create customer")
+		// T1.e: dual-write de tenant_id (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			if err := db.WithContext(ctx).Exec("UPDATE customers SET tenant_id = ? WHERE id = ?", orgID, model.ID).Error; err != nil {
+				return domainerr.Internal("failed to set customer tenant")
+			}
+		}
+		return nil
 	}
-	// T1.e: dual-write de tenant_id (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		if err := r.db.Client().WithContext(ctx).Exec("UPDATE customers SET tenant_id = ? WHERE id = ?", orgID, model.ID).Error; err != nil {
-			return 0, domainerr.Internal("failed to set customer tenant")
+
+	// Flag off → comportamiento idéntico al actual.
+	if !sharedmodels.IdentityGateEnabled() {
+		if err := create(r.db.Client()); err != nil {
+			return 0, err
 		}
+		return model.ID, nil
+	}
+
+	// Identity Gate on: customer + resolución de identidad + stamp de actor_id en UNA tx.
+	// Un unique-violation de la clave de identidad revierte el alta (→ 409, reintento reusa).
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := create(tx); err != nil {
+			return err
+		}
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleCustomer, identity.ResolveInput{RawName: c.Name})
+		if err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("an entity with that identity already exists")
+			}
+			return domainerr.Internal("failed to resolve customer identity")
+		}
+		return tx.Exec("UPDATE customers SET actor_id = ? WHERE id = ?", res.ActorID, model.ID).Error
+	}); err != nil {
+		return 0, err
 	}
 	return model.ID, nil
 }

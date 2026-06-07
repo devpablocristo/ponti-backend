@@ -60,3 +60,19 @@ func TenantEnforcementEnabled() bool {
 	})
 	return tenantEnforcement
 }
+
+var (
+	identityGateOnce sync.Once
+	identityGate     bool
+)
+
+// IdentityGateEnabled indica si el Identity Gate (Pilar 3) está activo (env
+// IDENTITY_GATE). Default false: con él apagado los write-paths NO resuelven
+// contra el registro de actores y el comportamiento es el actual.
+func IdentityGateEnabled() bool {
+	identityGateOnce.Do(func() {
+		v := strings.TrimSpace(os.Getenv("IDENTITY_GATE"))
+		identityGate = v == "1" || strings.EqualFold(v, "true")
+	})
+	return identityGate
+}

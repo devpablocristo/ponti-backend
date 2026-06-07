@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	"github.com/devpablocristo/ponti-backend/internal/labor/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/labor/usecases/domain"
 	shareddb "github.com/devpablocristo/ponti-backend/internal/shared/db"
@@ -40,8 +41,15 @@ func (r *Repository) CreateLabor(ctx context.Context, labor *domain.Labor) (int6
 		return 0, err
 	}
 	model := models.FromDomain(labor)
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, domainerr.Internal("failed to create labor")
+	// Identity Gate: el contratista (ex texto-libre `contractor_name`) se resuelve a actor
+	// y se estampa contractor_actor_id en la misma tx. No-op con el gate off.
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(model).Error; err != nil {
+			return domainerr.Internal("failed to create labor")
+		}
+		return identity.StampActor(ctx, tx, identity.RoleContractor, "labors", "contractor_actor_id", labor.ContractorName, model.ID)
+	}); err != nil {
+		return 0, err
 	}
 	return model.ID, nil
 }
@@ -428,9 +436,9 @@ func (r *Repository) ListGroupLabor(
 		}
 
 		var investorID int64
-if m.InvestorID != nil {
-	investorID = *m.InvestorID
-}
+		if m.InvestorID != nil {
+			investorID = *m.InvestorID
+		}
 
 		list[i] = domain.LaborListItem{
 			WorkOrderID:     m.WorkOrderID,
