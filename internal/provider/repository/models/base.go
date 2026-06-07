@@ -13,7 +13,7 @@ type Provider struct {
 }
 
 func (p *Provider) ToDomain() *domain.Provider {
-	return &domain.Provider{
+	d := &domain.Provider{
 		ID:   p.ID,
 		Name: p.Name,
 		Base: shareddomain.Base{
@@ -23,6 +23,11 @@ func (p *Provider) ToDomain() *domain.Provider {
 			UpdatedBy: p.UpdatedBy,
 		},
 	}
+	if p.DeletedAt.Valid {
+		t := p.DeletedAt.Time
+		d.ArchivedAt = &t
+	}
+	return d
 }
 
 func FromDomain(d *domain.Provider) *Provider {

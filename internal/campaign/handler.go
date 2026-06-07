@@ -14,6 +14,11 @@ type UseCasesPort interface {
 	CreateCampaign(context.Context, *domain.Campaign) (int64, error)
 	ListCampaigns(context.Context, int64, string) ([]domain.Campaign, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
+	GetArchivedCampaigns(context.Context) ([]domain.Campaign, error)
+	UpdateCampaign(context.Context, *domain.Campaign) error
+	DeleteCampaign(context.Context, int64) error
+	ArchiveCampaign(context.Context, int64) error
+	RestoreCampaign(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -55,6 +60,13 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListCampaigns)
+		public.POST("", h.CreateCampaign)
+		public.GET("/archived", h.GetArchivedCampaigns)
+		public.GET("/:campaign_id", h.GetCampaign)
+		public.PUT("/:campaign_id", h.UpdateCampaign)
+		public.DELETE("/:campaign_id", h.DeleteCampaign)
+		public.POST("/:campaign_id/archive", h.ArchiveCampaign)
+		public.POST("/:campaign_id/restore", h.RestoreCampaign)
 	}
 }
 
