@@ -8,11 +8,12 @@ import (
 
 // CreateProviderRequest es el body de POST /providers.
 type CreateProviderRequest struct {
-	Name string `json:"name" binding:"required,min=1"`
+	Name  string  `json:"name" binding:"required,min=1"`
+	TaxID *string `json:"tax_id"` // opcional: CUIT/CUIL para el Identity Gate
 }
 
 func (r CreateProviderRequest) ToDomain() *domain.Provider {
-	return &domain.Provider{Name: r.Name}
+	return &domain.Provider{Name: r.Name, TaxID: r.TaxID}
 }
 
 // UpdateProviderRequest es el body de PUT /providers/:id.

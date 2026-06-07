@@ -9,6 +9,7 @@ package authz
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -67,6 +68,35 @@ func RequirePermission(ctx context.Context, permission string) error {
 		return domainerr.Forbidden("insufficient permissions: " + permission)
 	}
 	return nil
+}
+
+// HasPermissionOrRole es el dual-check de transición (U2): evalúa el permiso FINO y, si
+// el principal no lo tiene pero sí cumple alguno de los roles gruesos de fallback,
+// permite y loguea `fallback_to_coarse`. Cuando todos los roles tengan el permiso fino
+// el fallback deja de dispararse (fallback_to_coarse=0) y se puede retirar (U5).
+func HasPermissionOrRole(ctx context.Context, permission string, fallbackRoles ...string) bool {
+	if HasPermission(ctx, permission) {
+		return true
+	}
+	p, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return false
+	}
+	for _, r := range fallbackRoles {
+		if r != "" && p.Role == r {
+			slog.WarnContext(ctx, "authz fallback_to_coarse", "permission", permission, "role", p.Role, "subject", p.Subject)
+			return true
+		}
+	}
+	return false
+}
+
+// RequirePermissionOrRole es HasPermissionOrRole devolviendo Forbidden si falla.
+func RequirePermissionOrRole(ctx context.Context, permission string, fallbackRoles ...string) error {
+	if HasPermissionOrRole(ctx, permission, fallbackRoles...) {
+		return nil
+	}
+	return domainerr.Forbidden("insufficient permissions: " + permission)
 }
 
 // RequireTenant devuelve el tenant activo del contexto, o un error si no hay.

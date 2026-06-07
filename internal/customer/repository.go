@@ -69,7 +69,7 @@ func (r *Repository) CreateCustomer(ctx context.Context, c *domain.Customer) (in
 		if err := create(tx); err != nil {
 			return err
 		}
-		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleCustomer, identity.ResolveInput{RawName: c.Name})
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleCustomer, identity.ResolveInput{RawName: c.Name, TaxID: c.TaxID})
 		if err != nil {
 			if sharedrepo.IsUniqueViolation(err) {
 				return domainerr.Conflict("an entity with that identity already exists")

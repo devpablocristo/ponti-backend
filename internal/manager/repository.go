@@ -64,7 +64,7 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 		if err := create(tx); err != nil {
 			return err
 		}
-		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleManager, identity.ResolveInput{RawName: m.Name})
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleManager, identity.ResolveInput{RawName: m.Name, TaxID: m.TaxID})
 		if err != nil {
 			if sharedrepo.IsUniqueViolation(err) {
 				return domainerr.Conflict("an entity with that identity already exists")

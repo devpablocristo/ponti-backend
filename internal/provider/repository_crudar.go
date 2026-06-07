@@ -51,7 +51,7 @@ func (r *Repository) CreateProvider(ctx context.Context, p *domain.Provider) (in
 		if err := create(tx); err != nil {
 			return err
 		}
-		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleProvider, identity.ResolveInput{RawName: p.Name})
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleProvider, identity.ResolveInput{RawName: p.Name, TaxID: p.TaxID})
 		if err != nil {
 			if sharedrepo.IsUniqueViolation(err) {
 				return domainerr.Conflict("an entity with that identity already exists")

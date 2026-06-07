@@ -64,7 +64,7 @@ func (r *Repository) CreateInvestor(ctx context.Context, inv *domain.Investor) (
 		if err := create(tx); err != nil {
 			return err
 		}
-		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleInvestor, identity.ResolveInput{RawName: inv.Name})
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleInvestor, identity.ResolveInput{RawName: inv.Name, TaxID: inv.TaxID})
 		if err != nil {
 			if sharedrepo.IsUniqueViolation(err) {
 				return domainerr.Conflict("an entity with that identity already exists")

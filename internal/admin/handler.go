@@ -11,7 +11,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	"github.com/devpablocristo/platform/security/go/contextkeys"
 
 	authz "github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
@@ -115,9 +114,9 @@ func (h *Handler) MeContext(c *gin.Context) {
 }
 
 func requireAdmin(c *gin.Context) bool {
-	role, _ := c.Request.Context().Value(ctxkeys.Role).(string)
-	if role != "admin" {
-		sharedhandlers.RespondError(c, domainerr.Forbidden("admin role required"))
+	// U2 dual-check: permiso fino users:manage con fallback (transición) al rol admin.
+	if err := authz.RequirePermissionOrRole(c.Request.Context(), "users:manage", "admin"); err != nil {
+		sharedhandlers.RespondError(c, err)
 		return false
 	}
 	return true

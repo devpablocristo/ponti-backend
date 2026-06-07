@@ -52,7 +52,9 @@ func (h *Handler) canManageTenant(c *gin.Context, tenantID uuid.UUID) bool {
 	if !ok || p.TenantID != tenantID {
 		return false
 	}
-	return p.Role == "admin" || p.Role == "tenant_owner"
+	// U2 dual-check: permiso fino invites:write con fallback (transición) a los roles
+	// admin/tenant_owner del tenant activo.
+	return authz.HasPermissionOrRole(c.Request.Context(), "invites:write", "admin", "tenant_owner")
 }
 
 // CreateInvite (U4): un admin/tenant_owner (o platform-admin) invita un email a su
