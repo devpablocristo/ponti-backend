@@ -80,6 +80,9 @@ func ResolveOrCreateIdentity(ctx context.Context, tx *gorm.DB, role Role, in Res
 		return ResolveResult{}, err
 	}
 	name := strings.TrimSpace(in.RawName)
+	if in.TaxID != nil && strings.TrimSpace(*in.TaxID) != "" && !TaxIDIsNumeric(*in.TaxID) {
+		return ResolveResult{}, domainerr.Validation("el id fiscal solo puede contener números")
+	}
 	parsed := ParseLegalName(name)
 	cands := candidateKeys(in)
 	if len(cands) == 0 {

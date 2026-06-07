@@ -19,13 +19,15 @@ import (
 type UseCasesPort interface {
 	Resolve(context.Context, domain.ResolveInput) (domain.ResolveResult, error)
 	GetByTaxID(context.Context, string) (*domain.Actor, error)
-	Search(context.Context, string, int) (domain.SearchResult, error)
+	Search(context.Context, string, string, int) (domain.SearchResult, error)
 	List(context.Context, string, int, int) ([]domain.Actor, int64, error)
 	Get(context.Context, int64) (*domain.Actor, error)
 	Update(context.Context, *domain.Actor) error
 	Archive(context.Context, int64) error
 	Restore(context.Context, int64) error
 	Delete(context.Context, int64) error
+	SetRoles(context.Context, int64, []string) error
+	SetTaxID(context.Context, int64, string) error
 }
 
 type GinEnginePort interface {
@@ -71,6 +73,8 @@ func (h *Handler) Routes() {
 		public.DELETE("/:actor_id", h.DeleteActor)
 		public.POST("/:actor_id/archive", h.ArchiveActor)
 		public.POST("/:actor_id/restore", h.RestoreActor)
+		public.PUT("/:actor_id/roles", h.SetActorRoles)
+		public.PUT("/:actor_id/tax-id", h.SetActorTaxID)
 	}
 }
 
@@ -93,9 +97,10 @@ func (h *Handler) ResolveActor(c *gin.Context) {
 	ginmw.WriteJSON(c, http.StatusCreated, payload)
 }
 
-// SearchActors (GET /actors/search?q=&limit=): exactos + similares.
+// SearchActors (GET /actors/search?q=&field=&limit=): exactos + similares.
+// field: name (default) | tax_id (busca por CUIT trigram).
 func (h *Handler) SearchActors(c *gin.Context) {
-	res, err := h.ucs.Search(c.Request.Context(), c.Query("q"), parseLimit(c.Query("limit")))
+	res, err := h.ucs.Search(c.Request.Context(), c.Query("q"), c.Query("field"), parseLimit(c.Query("limit")))
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -124,7 +129,7 @@ func (h *Handler) SimilarActors(c *gin.Context) {
 	if q == "" {
 		q = c.Query("q")
 	}
-	res, err := h.ucs.Search(c.Request.Context(), q, parseLimit(c.Query("limit")))
+	res, err := h.ucs.Search(c.Request.Context(), q, "name", parseLimit(c.Query("limit")))
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

@@ -114,6 +114,19 @@ func (r *Repository) Resolve(ctx context.Context, in domain.ResolveInput) (domai
 	}
 
 	err = r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Alta estricta: si ya existe (por nombre o CUIT), 409 — no reusa ni crea.
+		if in.RejectExisting {
+			id, mk, e := identity.LookupIdentity(ctx, tx, ident)
+			if e != nil {
+				return e
+			}
+			if id != 0 {
+				if mk == "TAX_ID" {
+					return domainerr.Conflict("ya existe un actor con ese CUIT/DNI")
+				}
+				return domainerr.Conflict("ya existe un actor con ese nombre")
+			}
+		}
 		rr, e := identity.ResolveOrCreateIdentity(ctx, tx, role, ident)
 		if e != nil {
 			if sharedrepo.IsUniqueViolation(e) {
@@ -158,7 +171,7 @@ func (r *Repository) GetByTaxID(ctx context.Context, taxID string) (*domain.Acto
 // Search devuelve coincidencias exactas + similares (trigram) sobre las claves de
 // nombre activas, scopeado al tenant. Usa normalize_name/similarity (preserva ñ),
 // NO el suggester con unaccent.
-func (r *Repository) Search(ctx context.Context, q string, limit int) (domain.SearchResult, error) {
+func (r *Repository) Search(ctx context.Context, q string, field string, limit int) (domain.SearchResult, error) {
 	out := domain.SearchResult{}
 	q = strings.TrimSpace(q)
 	if q == "" {
@@ -173,8 +186,17 @@ func (r *Repository) Search(ctx context.Context, q string, limit int) (domain.Se
 		return out, err
 	}
 
-	canonKey := identity.ParseLegalName(q).KeyValue() // clave exacta parseada
-	canon := identity.Canonicalize(q)                 // para similitud
+	// field define sobre qué claves se busca. keyTypes son literales controlados (no input).
+	var canonKey, canon, keyTypes string
+	if field == "tax_id" {
+		canonKey = identity.NormalizeTaxID(q) // CUIT exacto normalizado
+		canon = canonKey                      // trigram sobre el CUIT normalizado
+		keyTypes = "'TAX_ID'"
+	} else {
+		canonKey = identity.ParseLegalName(q).KeyValue() // clave de nombre parseada
+		canon = identity.Canonicalize(q)                 // para similitud de nombre
+		keyTypes = "'LEGAL_NAME','PERSON_NAME','ALIAS'"
+	}
 
 	// EXACT: actores activos con una clave de nombre activa == canonKey.
 	var exactIDs []int64
@@ -183,7 +205,7 @@ func (r *Repository) Search(ctx context.Context, q string, limit int) (domain.Se
 			SELECT DISTINCT ak.actor_id
 			FROM actor_keys ak JOIN actors a ON a.id = ak.actor_id
 			WHERE ak.active AND ak.tenant_id = ?
-			  AND ak.key_type IN ('LEGAL_NAME','PERSON_NAME','ALIAS') AND ak.key_value = ?
+			  AND ak.key_type IN (`+keyTypes+`) AND ak.key_value = ?
 			  AND a.deleted_at IS NULL AND a.status = 'active'`,
 			tenantID, canonKey).Scan(&exactIDs).Error; err != nil {
 			return out, err
@@ -203,16 +225,21 @@ func (r *Repository) Search(ctx context.Context, q string, limit int) (domain.Se
 		Score   float64
 	}
 	if canon != "" {
+		// Prefijo (LIKE 'q%') desde el 1er carácter + trigram (para typos/medio). El
+		// prefijo puntúa 1.0 (va primero); el trigram puntúa por similitud. canon no tiene
+		// caracteres especiales de LIKE (% _) — es [a-z0-9ñ espacio] o dígitos.
 		if err := db.Raw(`
-			SELECT ak.actor_id AS actor_id, max(similarity(ak.key_value, ?)) AS score
+			SELECT ak.actor_id AS actor_id,
+			       max(CASE WHEN ak.key_value LIKE ? || '%' THEN 1.0 ELSE similarity(ak.key_value, ?) END) AS score
 			FROM actor_keys ak JOIN actors a ON a.id = ak.actor_id
 			WHERE ak.active AND ak.tenant_id = ?
-			  AND ak.key_type IN ('LEGAL_NAME','PERSON_NAME','ALIAS') AND ak.key_value % ?
+			  AND ak.key_type IN (`+keyTypes+`)
+			  AND (ak.key_value LIKE ? || '%' OR ak.key_value % ?)
 			  AND a.deleted_at IS NULL AND a.status = 'active'
 			GROUP BY ak.actor_id
 			ORDER BY score DESC
 			LIMIT ?`,
-			canon, tenantID, canon, limit).Scan(&sims).Error; err != nil {
+			canon, canon, tenantID, canon, canon, limit).Scan(&sims).Error; err != nil {
 			return out, err
 		}
 	}

@@ -46,6 +46,10 @@ type ResolveInput struct {
 	TaxID       *string
 	Role        string
 	AllowCreate bool
+	// RejectExisting: alta estricta. Si ya existe una identidad con ese nombre o CUIT, NO reusa
+	// ni crea → devuelve 409. (El alta del administrador lo usa; combobox/creates directos no,
+	// para preservar el dedup-por-reuso.)
+	RejectExisting bool
 }
 
 // ResolveResult es el actor resuelto/creado + cómo se resolvió.

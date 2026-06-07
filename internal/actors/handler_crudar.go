@@ -81,6 +81,43 @@ func (h *Handler) ArchiveActor(c *gin.Context) {
 	sharedhandlers.RespondNoContent(c)
 }
 
+// SetActorRoles (PUT /actors/:actor_id/roles) — reemplaza el conjunto de roles.
+func (h *Handler) SetActorRoles(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "actor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req dto.SetRolesRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+	if err := h.ucs.SetRoles(c.Request.Context(), id, req.Roles); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// SetActorTaxID (PUT /actors/:actor_id/tax-id) — corrige la clave fiscal sin re-crear el
+// actor. 409 si otra identidad activa ya tiene ese CUIT/DNI.
+func (h *Handler) SetActorTaxID(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "actor_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req dto.SetTaxIDRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+	if err := h.ucs.SetTaxID(c.Request.Context(), id, req.TaxID); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
 // RestoreActor (POST /actors/:actor_id/restore).
 func (h *Handler) RestoreActor(c *gin.Context) {
 	id, err := ginmw.ParseParamID(c, "actor_id")

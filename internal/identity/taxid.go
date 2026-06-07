@@ -6,11 +6,29 @@ import (
 )
 
 var reNonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+var reTaxIDSep = regexp.MustCompile(`[\s.\-/]+`)
 
 // NormalizeTaxID deja solo alfanumérico en minúscula (CUIT/CUIL/DNI sin guiones,
 // puntos ni espacios). "20-12345678-6" -> "20123456786". Es el key_value de TAX_ID.
 func NormalizeTaxID(s string) string {
 	return reNonAlnum.ReplaceAllString(strings.ToLower(s), "")
+}
+
+// TaxIDIsNumeric reporta si el id fiscal (CUIT/CUIL/DNI) es válido como entrada: sacados los
+// separadores habituales (espacios, '.', '-', '/'), el resto debe ser NO vacío y solo dígitos.
+// Regla de negocio: el id fiscal solo puede ser números. Se valida en los puntos de escritura
+// (alta y re-key), no en lecturas.
+func TaxIDIsNumeric(s string) bool {
+	cleaned := reTaxIDSep.ReplaceAllString(s, "")
+	if cleaned == "" {
+		return false
+	}
+	for _, r := range cleaned {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidCUIT valida un CUIT/CUIL argentino: 11 dígitos + dígito verificador mod-11.
