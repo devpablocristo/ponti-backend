@@ -57,11 +57,14 @@ func resolveTenant(ctx context.Context, tx *gorm.DB) (uuid.UUID, error) {
 	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok {
 		return orgID, nil
 	}
-	var id uuid.UUID
-	if err := tx.Raw(`SELECT id FROM auth_tenants WHERE name = 'default' LIMIT 1`).Scan(&id).Error; err != nil {
+	// Escaneamos id::text y parseamos a uuid (gorm falla al escanear un uuid escalar
+	// directo en uuid.UUID — "string to uint8"). Solo corre contra Postgres.
+	var idStr string
+	if err := tx.Raw(`SELECT id::text FROM auth_tenants WHERE name = 'default' LIMIT 1`).Scan(&idStr).Error; err != nil {
 		return uuid.Nil, err
 	}
-	if id == uuid.Nil {
+	id, perr := uuid.Parse(strings.TrimSpace(idStr))
+	if perr != nil || id == uuid.Nil {
 		return uuid.Nil, domainerr.Internal("identity: no tenant configured for this request")
 	}
 	return id, nil
