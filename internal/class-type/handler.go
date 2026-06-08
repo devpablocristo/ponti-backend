@@ -13,7 +13,7 @@ import (
 
 type UseCasesPort interface {
 	CreateClassType(context.Context, *domain.ClassType) (int64, error)
-	ListClassTypes(context.Context, int, int) ([]domain.ClassType, int64, error)
+	ListClassTypes(context.Context, string, int, int) ([]domain.ClassType, int64, error)
 	GetClassType(context.Context, int64) (*domain.ClassType, error)
 	UpdateClassType(context.Context, *domain.ClassType) error
 	DeleteClassType(context.Context, int64) error
@@ -84,7 +84,7 @@ func (h *Handler) CreateClassType(c *gin.Context) {
 
 func (h *Handler) ListClassTypes(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	items, total, err := h.ucs.ListClassTypes(c.Request.Context(), page, perPage)
+	items, total, err := h.ucs.ListClassTypes(c.Request.Context(), c.Query("status"), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

@@ -51,9 +51,9 @@ func (r *Repository) CreateCrop(ctx context.Context, c *domain.Crop) (int64, err
 	return model.ID, nil
 }
 
-func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain.Crop, int64, error) {
+func (r *Repository) ListCrops(ctx context.Context, status string, page, perPage int) ([]domain.Crop, int64, error) {
 	var total int64
-	countTx := r.db.Client().WithContext(ctx).Model(&models.Crop{})
+	countTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.Crop{}), status)
 	// T1.e: acotar al tenant activo (flag-gated).
 	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
 		countTx = countTx.Where("tenant_id = ?", orgID)
@@ -64,10 +64,10 @@ func (r *Repository) ListCrops(ctx context.Context, page, perPage int) ([]domain
 
 	var list []models.Crop
 	offset := (page - 1) * perPage
-	listTx := r.db.Client().WithContext(ctx).
+	listTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).
 		Offset(offset).
 		Limit(perPage).
-		Order("id ASC")
+		Order("id ASC"), status)
 	// T1.e: acotar al tenant activo (flag-gated).
 	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
 		listTx = listTx.Where("tenant_id = ?", orgID)
@@ -119,6 +119,9 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	}
 	result := updateTx.Updates(models.FromDomainCrop(c))
 	if result.Error != nil {
+		if sharedrepo.IsUniqueViolation(result.Error) {
+			return domainerr.Conflict("a crop with that name already exists")
+		}
 		return domainerr.Internal("failed to update crop")
 	}
 	if result.RowsAffected == 0 {

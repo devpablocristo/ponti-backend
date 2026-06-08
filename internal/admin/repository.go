@@ -307,23 +307,6 @@ func (r *repo) upsertMembership(ctx context.Context, userID, tenantID, roleID uu
 	return nil
 }
 
-type tenantDTO struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
-}
-
-func (r *repo) listTenants(ctx context.Context) ([]tenantDTO, error) {
-	var rows []tenantDTO
-	if err := r.db.WithContext(ctx).
-		Table("auth_tenants").
-		Select("id, name").
-		Order("id ASC").
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
 type userMembershipDTO struct {
 	UserID   uuid.UUID `json:"user_id"`
 	Email    string    `json:"email"`

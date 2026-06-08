@@ -71,6 +71,13 @@ func (h *Handler) Routes() {
 }
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
+	// El admin de catálogos pide los archivados con ?status=archived (mismo contrato que los
+	// otros catálogos); el form de project sigue llamando sin status → lista activa.
+	if c.Query("status") == "archived" {
+		h.GetArchivedCampaigns(c)
+		return
+	}
+
 	var customerID int64
 	customerIDValue, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
 	if err != nil {

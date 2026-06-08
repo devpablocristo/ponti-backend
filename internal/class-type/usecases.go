@@ -8,7 +8,7 @@ import (
 
 type RepositoryPort interface {
 	CreateClassType(context.Context, *domain.ClassType) (int64, error)
-	ListClassTypes(context.Context, int, int) ([]domain.ClassType, int64, error)
+	ListClassTypes(context.Context, string, int, int) ([]domain.ClassType, int64, error)
 	GetClassType(context.Context, int64) (*domain.ClassType, error)
 	UpdateClassType(context.Context, *domain.ClassType) error
 	DeleteClassType(context.Context, int64) error
@@ -28,8 +28,8 @@ func (u *UseCases) CreateClassType(ctx context.Context, c *domain.ClassType) (in
 	return u.repo.CreateClassType(ctx, c)
 }
 
-func (u *UseCases) ListClassTypes(ctx context.Context, page, perPage int) ([]domain.ClassType, int64, error) {
-	return u.repo.ListClassTypes(ctx, page, perPage)
+func (u *UseCases) ListClassTypes(ctx context.Context, status string, page, perPage int) ([]domain.ClassType, int64, error) {
+	return u.repo.ListClassTypes(ctx, status, page, perPage)
 }
 
 func (u *UseCases) GetClassType(ctx context.Context, id int64) (*domain.ClassType, error) {

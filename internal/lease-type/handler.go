@@ -13,7 +13,7 @@ import (
 
 type UseCasesPort interface {
 	CreateLeaseType(context.Context, *domain.LeaseType) (int64, error)
-	ListLeaseTypes(context.Context, int, int) ([]domain.LeaseType, int64, error)
+	ListLeaseTypes(context.Context, string, int, int) ([]domain.LeaseType, int64, error)
 	GetLeaseType(context.Context, int64) (*domain.LeaseType, error)
 	UpdateLeaseType(context.Context, *domain.LeaseType) error
 	DeleteLeaseType(context.Context, int64) error
@@ -84,7 +84,7 @@ func (h *Handler) CreateLeaseType(c *gin.Context) {
 
 func (h *Handler) ListLeaseTypes(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	leaseTypes, total, err := h.ucs.ListLeaseTypes(c.Request.Context(), page, perPage)
+	leaseTypes, total, err := h.ucs.ListLeaseTypes(c.Request.Context(), c.Query("status"), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

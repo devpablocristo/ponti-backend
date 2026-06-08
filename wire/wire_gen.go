@@ -34,6 +34,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 	"github.com/devpablocristo/ponti-backend/internal/project"
 	"github.com/devpablocristo/ponti-backend/internal/provider"
+	"github.com/devpablocristo/ponti-backend/internal/registry"
 	"github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
@@ -346,6 +347,15 @@ func Initialize() (*Dependencies, error) {
 	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)
 	workorderdraftMiddlewaresEnginePort := ProvideWorkOrderDraftMiddlewaresEnginePort(middlewares)
 	workorderdraftHandler := ProvideWorkOrderDraftHandler(workorderdraftGinEnginePort, workorderdraftUseCasesPort, workorderdraftConfigAPIPort, workorderdraftMiddlewaresEnginePort)
+	registryGinEnginePort := ProvideRegistryGinEnginePort(server)
+	registryGormEnginePort := ProvideRegistryGormEnginePort(repository)
+	registryRepository := ProvideRegistryRepository(registryGormEnginePort)
+	registryRepositoryPort := ProvideRegistryRepositoryPort(registryRepository)
+	registryUseCases := ProvideRegistryUseCases(registryRepositoryPort)
+	registryUseCasesPort := ProvideRegistryUseCasesPort(registryUseCases)
+	registryConfigAPIPort := ProvideRegistryConfigAPI(config)
+	registryMiddlewaresEnginePort := ProvideRegistryMiddlewaresEnginePort(middlewares)
+	registryHandler := ProvideRegistryHandler(registryGinEnginePort, registryUseCasesPort, registryConfigAPIPort, registryMiddlewaresEnginePort)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -364,6 +374,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerHandler:            managerHandler,
 		ProjectHandler:            projectHandler,
 		ProviderHandler:           providerHandler,
+		RegistryHandler:           registryHandler,
 		ReportHandler:             reportHandler,
 		LeaseTypeHandler:          leasetypeHandler,
 		SupplyHandler:             supplyHandler,
@@ -404,6 +415,7 @@ type Dependencies struct {
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
 	ProviderHandler           *provider.Handler
+	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler

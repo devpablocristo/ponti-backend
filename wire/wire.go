@@ -32,6 +32,7 @@ import (
 	manager "github.com/devpablocristo/ponti-backend/internal/manager"
 	project "github.com/devpablocristo/ponti-backend/internal/project"
 	provider "github.com/devpablocristo/ponti-backend/internal/provider"
+	registry "github.com/devpablocristo/ponti-backend/internal/registry"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
@@ -58,6 +59,7 @@ type Dependencies struct {
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
 	ProviderHandler           *provider.Handler
+	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
@@ -97,6 +99,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProviderSet,
 		ProjectSet,
+		RegistrySet,
 		ReportSet,
 		LeaseTypeSet,
 		SupplySet,

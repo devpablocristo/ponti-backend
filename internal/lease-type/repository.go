@@ -51,13 +51,13 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	return model.ID, nil
 }
 
-func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
+func (r *Repository) ListLeaseTypes(ctx context.Context, status string, page, perPage int) ([]domain.LeaseType, int64, error) {
 	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
 	orgID, tenantScoped := sharedmodels.OrgIDFromContext(ctx)
 	tenantScoped = tenantScoped && sharedmodels.TenantEnforcementEnabled()
 
 	var total int64
-	countTx := r.db.Client().WithContext(ctx).Model(&models.LeaseType{})
+	countTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), status)
 	if tenantScoped {
 		countTx = countTx.Where("tenant_id = ?", orgID)
 	}
@@ -67,7 +67,7 @@ func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]d
 
 	var list []models.LeaseType
 	offset := (page - 1) * perPage
-	listTx := r.db.Client().WithContext(ctx)
+	listTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx), status)
 	if tenantScoped {
 		listTx = listTx.Where("tenant_id = ?", orgID)
 	}
@@ -122,6 +122,9 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	}
 	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
+		if sharedrepo.IsUniqueViolation(result.Error) {
+			return domainerr.Conflict("a lease type with that name already exists")
+		}
 		return domainerr.Internal("failed to update lease type")
 	}
 	if result.RowsAffected == 0 {

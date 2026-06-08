@@ -48,9 +48,9 @@ func (r *Repository) CreateClassType(ctx context.Context, c *domain.ClassType) (
 	return model.ID, nil
 }
 
-func (r *Repository) ListClassTypes(ctx context.Context, page, perPage int) ([]domain.ClassType, int64, error) {
+func (r *Repository) ListClassTypes(ctx context.Context, status string, page, perPage int) ([]domain.ClassType, int64, error) {
 	var total int64
-	countQ := r.db.Client().WithContext(ctx).Model(&models.ClassType{})
+	countQ := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.ClassType{}), status)
 	// T1.e: acotar al tenant activo (flag-gated).
 	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
 		countQ = countQ.Where("tenant_id = ?", orgID)
@@ -61,10 +61,10 @@ func (r *Repository) ListClassTypes(ctx context.Context, page, perPage int) ([]d
 
 	var list []models.ClassType
 	offset := (page - 1) * perPage
-	listQ := r.db.Client().WithContext(ctx).
+	listQ := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).
 		Offset(offset).
 		Limit(perPage).
-		Order("id ASC")
+		Order("id ASC"), status)
 	// T1.e: acotar al tenant activo (flag-gated).
 	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
 		listQ = listQ.Where("tenant_id = ?", orgID)
@@ -128,6 +128,9 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 			"updated_by": c.UpdatedBy,
 		})
 		if result.Error != nil {
+			if sharedrepo.IsUniqueViolation(result.Error) {
+				return domainerr.Conflict("a type with that name already exists")
+			}
 			return domainerr.Internal("failed to update class type")
 		}
 		if result.RowsAffected == 0 {

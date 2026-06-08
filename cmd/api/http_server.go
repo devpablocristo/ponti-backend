@@ -131,6 +131,7 @@ func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Han
 	deps.FieldHandler.Routes()
 	deps.ProjectHandler.Routes()
 	deps.ProviderHandler.Routes()
+	deps.RegistryHandler.Routes()
 	deps.ReportHandler.Routes()
 	deps.CropHandler.Routes()
 	deps.ManagerHandler.Routes()

@@ -13,7 +13,7 @@ import (
 
 type UseCasesPort interface {
 	CreateCrop(context.Context, *domain.Crop) (int64, error)
-	ListCrops(context.Context, int, int) ([]domain.Crop, int64, error)
+	ListCrops(context.Context, string, int, int) ([]domain.Crop, int64, error)
 	GetCrop(context.Context, int64) (*domain.Crop, error)
 	UpdateCrop(context.Context, *domain.Crop) error
 	DeleteCrop(context.Context, int64) error
@@ -87,7 +87,7 @@ func (h *Handler) CreateCrop(c *gin.Context) {
 
 func (h *Handler) ListCrops(c *gin.Context) {
 	page, perPage := sharedhandlers.ParsePaginationParams(c, 1, 1000)
-	crops, total, err := h.ucs.ListCrops(c.Request.Context(), page, perPage)
+	crops, total, err := h.ucs.ListCrops(c.Request.Context(), c.Query("status"), page, perPage)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
