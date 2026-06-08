@@ -89,7 +89,9 @@ Does not own:
   batch, but published/listed work orders remain one physical row per lot.
 - Work order list, filter-row, and export responses must not invent a `D-n`
   multi-lot work order row. They expose the physical split rows (`D-n.1`,
-  `D-n.2`, ...), with each row carrying its distributed consumption.
+  `D-n.2`, ...), with one row per physical order/draft. Component rows from
+  the report view, such as supply and labor cost rows for the same order ID, are
+  aggregated into that single physical row.
 - Work order duplicate endpoint is currently `Stubbed`.
 - Archived work order listing reads soft-deleted work orders where `deleted_at IS NOT NULL` from the base `workorders` table using GORM `Unscoped()`.
 - Archived work order listing reuses the existing work order list response mapping through `dto.FromDomainList(pageInfo, list)`.
@@ -143,6 +145,6 @@ Does not own:
   distribution, group update distribution, decimal residue, and aggregated group
   detail items.
 - Work order list coverage: `go test ./internal/work-order/...` verifies
-  `D-n.1`/`D-n.2` rows remain physical split rows while their summed
-  consumption is `200`.
+  `D-n.1`/`D-n.2` rows remain physical split rows, each physical order appears
+  once, and their summed consumption is `200`.
 - Labor tests: `go test ./internal/labor/...`.
