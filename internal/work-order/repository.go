@@ -239,6 +239,30 @@ func (r *Repository) DeleteWorkOrderByID(ctx context.Context, id int64) error {
 		if err := tx.Unscoped().Where("workorder_id = ?", id).Delete(&models.WorkOrderInvestorSplit{}).Error; err != nil {
 			return domainerr.Internal("failed to delete work order investor splits")
 		}
+		if err := tx.Exec(`
+	DELETE FROM work_order_draft_items
+	WHERE draft_id IN (
+		SELECT id FROM work_order_drafts WHERE published_work_order_id = ?
+	)
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft items")
+		}
+
+		if err := tx.Exec(`
+	DELETE FROM work_order_draft_investor_splits
+	WHERE draft_id IN (
+		SELECT id FROM work_order_drafts WHERE published_work_order_id = ?
+	)
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft investor splits")
+		}
+
+		if err := tx.Exec(`
+	DELETE FROM work_order_drafts
+	WHERE published_work_order_id = ?
+`, id).Error; err != nil {
+			return domainerr.Internal("failed to delete published work order draft")
+		}
 		if err := tx.Unscoped().Delete(&models.WorkOrder{}, "id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to hard delete work order")
 		}
@@ -405,6 +429,62 @@ func (r *Repository) ListWorkOrders(
 
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
 	return mapWorkOrderListRows(rows), pageInfo, nil
+}
+
+// ListArchivedWorkOrders lista las órdenes archivadas (soft-deleted). No usa la vista
+// v4_report.workorder_list porque esa excluye las archivadas; consulta la tabla base con
+// Unscoped() y deleted_at IS NOT NULL. Listado global (sin filtro de workspace), espejo de
+// ListArchivedCustomers.
+func (r *Repository) ListArchivedWorkOrders(
+	ctx context.Context,
+	inp types.Input,
+) ([]domain.WorkOrderListElement, types.PageInfo, error) {
+	base := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.WorkOrder{}).
+		Where("workorders.deleted_at IS NOT NULL")
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to count archived work orders")
+	}
+
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
+	type archivedRow struct {
+		ID          int64
+		Number      string
+		ProjectName string
+		Date        time.Time
+		IsDigital   bool
+	}
+
+	var rows []archivedRow
+	if err := base.
+		Select("workorders.id, workorders.number, projects.name AS project_name, workorders.date, workorders.is_digital").
+		Joins("LEFT JOIN projects ON projects.id = workorders.project_id").
+		Limit(int(inp.PageSize)).
+		Offset(offset).
+		Order("workorders.deleted_at DESC, workorders.id DESC").
+		Find(&rows).Error; err != nil {
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to list archived work orders")
+	}
+
+	list := make([]domain.WorkOrderListElement, len(rows))
+	for i, row := range rows {
+		list[i] = domain.WorkOrderListElement{
+			ID:          row.ID,
+			Number:      row.Number,
+			ProjectName: row.ProjectName,
+			Date:        row.Date,
+			IsDigital:   row.IsDigital,
+		}
+	}
+
+	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
+	return list, pageInfo, nil
 }
 
 func (r *Repository) ListWorkOrderFilterRows(

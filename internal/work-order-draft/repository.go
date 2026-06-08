@@ -144,6 +144,8 @@ func (r *Repository) GetWorkOrderDraftByID(ctx context.Context, id int64) (*doma
 			return db.Order("id ASC")
 		}).
 		Preload("Items.Supply").
+		Preload("Investor").
+		Preload("InvestorSplits").
 		Preload("InvestorSplits").
 		Where("id = ?", id).
 		First(&model).Error; err != nil {
@@ -201,6 +203,8 @@ func (r *Repository) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.C
 			return db.Order("id ASC")
 		}).
 		Preload("Items.Supply").
+		Preload("Investor").
+		Preload("InvestorSplits").
 		Preload("InvestorSplits").
 		Where("project_id = ?", projectID).
 		Where("is_digital = ?", true).
@@ -429,6 +433,10 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 		ProjectID     int64
 		ProjectName   string
 		FieldID       int64
+		CustomerID    int64
+		CustomerName  string
+		CampaignID    *int64
+		CampaignName  string
 		FieldName     string
 		IsDigital     bool
 		Status        string
@@ -450,8 +458,12 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
  				ELSE wod.number
 			END AS number,
 			MIN(wod.date) AS date,
+			wod.customer_id,
+			MIN(c.name) AS customer_name,
 			wod.project_id,
 			MIN(p.name) AS project_name,
+			wod.campaign_id,
+			MIN(camp.name) AS campaign_name,
 			wod.field_id,
 			MIN(f.name) AS field_name,
 			TRUE AS is_digital,
@@ -465,6 +477,8 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 		`).
 		Joins("join projects p on p.id = wod.project_id").
 		Joins("join fields f on f.id = wod.field_id").
+		Joins("join customers c on c.id = wod.customer_id").
+		Joins("left join campaigns camp on camp.id = wod.campaign_id").
 		Where("wod.is_digital = ?", true).
 		Where("wod.deleted_at IS NULL").
 		Group(`
@@ -473,8 +487,10 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 				THEN split_part(wod.number, '.', 1)
 				ELSE wod.number
 			END,
+			wod.customer_id,
 			wod.project_id,
-			wod.field_id
+			wod.campaign_id,
+			wod.field_id	
 		`)
 
 	if strings.TrimSpace(number) != "" {
@@ -524,6 +540,10 @@ func (r *Repository) ListDigitalWorkOrderDraftGroups(ctx context.Context, number
 			Date:          row.Date,
 			ProjectID:     row.ProjectID,
 			ProjectName:   row.ProjectName,
+			CustomerID:   row.CustomerID,
+			CustomerName: row.CustomerName,
+			CampaignID:   row.CampaignID,
+			CampaignName: row.CampaignName,
 			FieldID:       row.FieldID,
 			FieldName:     row.FieldName,
 			IsDigital:     row.IsDigital,
@@ -776,4 +796,37 @@ func (r *Repository) MarkWorkOrderDraftAsPublished(ctx context.Context, draftID 
 	}
 
 	return nil
+}
+
+func (r *Repository) GetPendingLaborNameByID(ctx context.Context, laborID int64) (string, error) {
+    var row struct {
+        Name string `gorm:"column:name"`
+    }
+
+    err := r.db.Client().
+        WithContext(ctx).
+        Table("labors").
+        Select("name").
+        Where("id = ?", laborID).
+        Where("is_pending = ?", true).
+        First(&row).Error
+
+    if errors.Is(err, gorm.ErrRecordNotFound) {
+        return "", nil
+    }
+    if err != nil {
+        return "", types.NewError(types.ErrInternal, "failed to check pending labor", err)
+    }
+    return row.Name, nil
+}
+
+func (r *Repository) GetLaborContractorByID(ctx context.Context, laborID int64) (string, error) {
+    var contractorName string
+    err := r.db.Client().WithContext(ctx).
+        Raw(`SELECT COALESCE(contractor_name, '') FROM public.labors WHERE id = ? AND deleted_at IS NULL`, laborID).
+        Scan(&contractorName).Error
+    if err != nil {
+        return "", err
+    }
+    return contractorName, nil
 }

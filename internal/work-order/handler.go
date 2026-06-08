@@ -27,6 +27,7 @@ type UseCasesPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListArchivedWorkOrders(context.Context, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	ExportWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]byte, error)
@@ -69,6 +70,7 @@ func (h *Handler) Routes() {
 	{
 		grp.POST("", h.CreateWorkOrder)
 		grp.GET("", h.ListWorkOrders)
+		grp.GET("/archived", h.ListArchivedWorkOrders)
 		grp.GET("/filter-rows", h.ListWorkOrderFilterRows)
 		grp.GET("/metrics", h.GetMetrics)
 		grp.GET("/export", h.ExportWorkOrders)
@@ -195,7 +197,11 @@ func (h *Handler) DeleteWorkOrderByID(c *gin.Context) {
 
 // ListWorkOrders lista órdenes de trabajo con filtros.
 func (h *Handler) ListWorkOrders(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	input := types.NewInput(c.Request)
 
 	// Devuelve ([]domain.WorkOrderListElement, types.PageInfo, error)
@@ -208,8 +214,26 @@ func (h *Handler) ListWorkOrders(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
 }
 
+// ListArchivedWorkOrders lista las órdenes archivadas (soft-deleted). Listado global sin scope de
+// workspace (espejo de ListArchivedCustomers); solo paginación.
+func (h *Handler) ListArchivedWorkOrders(c *gin.Context) {
+	input := types.NewInput(c.Request)
+
+	list, pageInfo, err := h.ucs.ListArchivedWorkOrders(c.Request.Context(), input)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	sharedhandlers.RespondOK(c, dto.FromDomainList(pageInfo, list))
+}
+
 func (h *Handler) ListWorkOrderFilterRows(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 
 	rows, err := h.ucs.ListWorkOrderFilterRows(c.Request.Context(), filt)
 	if err != nil {
@@ -220,13 +244,17 @@ func (h *Handler) ListWorkOrderFilterRows(c *gin.Context) {
 	sharedhandlers.RespondOK(c, dto.FromDomainFilterRows(rows))
 }
 
-// parseFilters extrae project_id, field_id, customer_id y campaign_id.
-func parseFilters(c *gin.Context) domain.WorkOrderFilter {
+// parseFilters extrae project_id, field_id, customer_id y campaign_id, exigiendo el mínimo
+// cliente+proyecto+campaña (campo opcional = todos) vía el contrato de workspace compartido.
+func parseFilters(c *gin.Context) (domain.WorkOrderFilter, error) {
 	f := domain.WorkOrderFilter{}
 
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
-		return f
+		return f, err
+	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
+		return f, err
 	}
 
 	f.ProjectID = workspaceFilter.ProjectID
@@ -256,13 +284,17 @@ func parseFilters(c *gin.Context) domain.WorkOrderFilter {
 		f.Status = &value
 	}
 
-	return f
+	return f, nil
 }
 
 func (h *Handler) GetMetrics(c *gin.Context) {
 	var filt domain.WorkOrderFilter
 	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
 	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := sharedhandlers.ValidateRequiredWorkspaceFilter(workspaceFilter); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
@@ -285,7 +317,11 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 
 // ExportWorkOrders exporta órdenes de trabajo.
 func (h *Handler) ExportWorkOrders(c *gin.Context) {
-	filt := parseFilters(c)
+	filt, err := parseFilters(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
 	// Para exportación, usar un page_size muy grande para obtener todos los registros
 	input := types.Input{
 		Page:     1,

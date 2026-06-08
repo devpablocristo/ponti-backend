@@ -23,6 +23,7 @@ type RepositoryPort interface {
 	ArchiveWorkOrder(context.Context, int64) error
 	RestoreWorkOrder(context.Context, int64) error
 	ListWorkOrders(context.Context, domain.WorkOrderFilter, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
+	ListArchivedWorkOrders(context.Context, types.Input) ([]domain.WorkOrderListElement, types.PageInfo, error)
 	ListWorkOrderFilterRows(context.Context, domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error)
 	GetMetrics(context.Context, domain.WorkOrderFilter) (*domain.WorkOrderMetrics, error)
 	GetRawDirectCost(context.Context, int64) (decimal.Decimal, error)
@@ -234,6 +235,10 @@ func (u *UseCases) RestoreWorkOrder(ctx context.Context, id int64) error {
 }
 
 // ListWorkOrders delega al repositorio.
+//
+// Precondición: el scope de workspace (cliente+proyecto+campaña; campo opcional) se valida en el
+// handler vía ValidateRequiredWorkspaceFilter antes de llegar acá. La regla es única y vive en el
+// handler; este use case no la re-valida. Un caller no-HTTP debe garantizar el scope por su cuenta.
 func (u *UseCases) ListWorkOrders(
 	ctx context.Context,
 	filt domain.WorkOrderFilter,
@@ -242,10 +247,19 @@ func (u *UseCases) ListWorkOrders(
 	return u.repo.ListWorkOrders(ctx, filt, inp)
 }
 
+// ListArchivedWorkOrders delega al repositorio. Listado global de archivadas (sin scope de
+// workspace), espejo de ListArchivedCustomers.
+func (u *UseCases) ListArchivedWorkOrders(
+	ctx context.Context,
+	inp types.Input,
+) ([]domain.WorkOrderListElement, types.PageInfo, error) {
+	return u.repo.ListArchivedWorkOrders(ctx, inp)
+}
+
 func (u *UseCases) ListWorkOrderFilterRows(ctx context.Context, filt domain.WorkOrderFilter) ([]domain.WorkOrderListElement, error) {
-	if filt.ProjectID == nil && filt.FieldID == nil {
-		return nil, domainerr.Validation("project_id or field_id is required for work order filter rows")
-	}
+	// El mínimo cliente+proyecto+campaña se exige en el handler vía
+	// ValidateRequiredWorkspaceFilter (misma regla compartida que el resto de los listados);
+	// no se duplica acá una validación propia más débil.
 	return u.repo.ListWorkOrderFilterRows(ctx, filt)
 }
 
@@ -254,6 +268,8 @@ func (u *UseCases) GetMetrics(ctx context.Context, f domain.WorkOrderFilter) (*d
 	return u.repo.GetMetrics(ctx, f)
 }
 
+// ExportWorkOrders exporta el listado. Igual que ListWorkOrders, asume que el scope de workspace
+// ya fue validado en el handler (parseFilters → ValidateRequiredWorkspaceFilter); no re-valida acá.
 func (u *UseCases) ExportWorkOrders(ctx context.Context, filt domain.WorkOrderFilter, inp types.Input) ([]byte, error) {
 	if u.excel == nil {
 		return nil, domainerr.Internal("exporter not configured")
