@@ -104,6 +104,31 @@ Base path: `/api/v1`
 - `/work-order-drafts/:work_order_draft_id/group-pdf-data`: `GET`
 - `/work-order-drafts/:work_order_draft_id/publish`: `POST`
 
+### Digital Multi-Lot Work Order Contract
+
+- `POST /work-order-drafts/digital/batch` treats each item `total_used` as the
+  total consumption of the logical work order. For a batch with two 50 ha lots
+  and one supply `total_used=200`, Core stores two physical draft rows with
+  `100` and `100`, not `200` and `200`.
+- All lots in a digital batch must include the same supply set. Core calculates
+  `final_dose = total_used / total_effective_area`, distributes each item
+  proportionally by lot effective area, and assigns any decimal residue to the
+  last lot so persisted totals add back to the original input.
+- `GET`/`PUT /work-order-drafts/:work_order_draft_id/group` returns and accepts
+  the logical group payload. `items[].total_used` is the group total and updates
+  are redistributed across the physical lot drafts.
+- `GET /work-orders`, `GET /work-orders/filter-rows`, and
+  `GET /work-orders/export` expose digital split rows as one logical list row:
+  `number=D-n`, `lot_name` joined across lots, `surface_ha` summed across lots,
+  `consumption` and `total_cost` summed from the physical rows, and optional
+  grouped metadata fields `base_number`, `is_grouped_digital`, and
+  `lots_count`.
+- `migrations_v4/000233_fix_multilot_workorder_consumption.up.sql` repairs
+  historical digital split rows by setting per-lot item consumption to
+  `final_dose * effective_area`. The down migration is intentionally a no-op
+  because the duplicated historical totals are not recoverable from the fixed
+  state without an external backup.
+
 ### Labor Catalog Contract
 
 - `GET /projects/:project_id/labors` is the canonical project labor catalog
@@ -122,7 +147,9 @@ Base path: `/api/v1`
 ### Labor Catalog Validation 2026-06-08
 
 - Active local DB: `new_ponti_db_develop_local` from Core `.env`; the proposed
-  `new_ponti_db_dev` command was evaluated but did not change the active DB.
+  `new_ponti_db_dev` command was evaluated and failed with
+  `database "new_ponti_db_dev" does not exist`, so it does not resolve this
+  local stack.
 - Before `000232`, `GET /api/v1/projects/30/labors` reproduced `500` with
   `failed to list labor`; `labors.is_pending` was absent and `category_id` was
   `NOT NULL`.
@@ -130,9 +157,9 @@ Base path: `/api/v1`
   changed `category_id` to nullable, added `is_pending default false`, kept
   `price default 0`, and made `GET /api/v1/projects/30/labors` return `200`
   with 19 catalog rows and `page_info`.
-- Local migration ledger was aligned to version `232`, `dirty=false`, using the
-  official migrate force mechanism because the DB had a stale local ledger at
-  version `247` while this branch's highest migration file is `232`.
+- Local migration ledger is version `233`, `dirty=false`, after applying
+  `000233_fix_multilot_workorder_consumption` with the official migration
+  mechanism.
 
 ## Inventory And Stock
 

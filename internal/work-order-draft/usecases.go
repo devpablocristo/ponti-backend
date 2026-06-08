@@ -133,6 +133,17 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 		totalEffectiveArea = totalEffectiveArea.Add(lot.EffectiveArea)
 	}
 
+	batchItems, err := validateAndNormalizeBatchItems(b.Lots, totalEffectiveArea)
+	if err != nil {
+		return nil, err
+	}
+
+	lotAreas := make([]decimal.Decimal, len(b.Lots))
+	for i, lot := range b.Lots {
+		lotAreas[i] = lot.EffectiveArea
+	}
+	itemsByLot := distributeDraftItemsByArea(batchItems, lotAreas, totalEffectiveArea)
+
 	seenLots := make(map[int64]struct{})
 	drafts := make([]*domain.WorkOrderDraft, len(b.Lots))
 
@@ -153,24 +164,6 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			number = fmt.Sprintf("%s.%d", baseNumber, i+1)
 		}
 
-		items := make([]domain.WorkOrderDraftItem, len(lot.Items))
-		for j, item := range lot.Items {
-			if item.SupplyID <= 0 {
-				return nil, types.NewError(types.ErrValidation, "item supply_id must be greater than 0", nil)
-			}
-			if item.TotalUsed.LessThanOrEqual(decimal.Zero) {
-				return nil, types.NewError(types.ErrValidation, "item total_used must be greater than 0", nil)
-			}
-
-			finalDose := item.TotalUsed.Div(totalEffectiveArea).Round(6)
-
-			items[j] = domain.WorkOrderDraftItem{
-				SupplyID:  item.SupplyID,
-				TotalUsed: item.TotalUsed,
-				FinalDose: finalDose,
-			}
-		}
-
 		draft := &domain.WorkOrderDraft{
 			Number:         number,
 			Date:           b.Date,
@@ -187,7 +180,7 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			InvestorID:     b.InvestorID,
 			IsDigital:      true,
 			Status:         domain.StatusDraft,
-			Items:          items,
+			Items:          itemsByLot[i],
 			InvestorSplits: b.InvestorSplits,
 		}
 
@@ -218,6 +211,100 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 	}
 
 	return result, nil
+}
+
+func validateAndNormalizeBatchItems(lots []domain.WorkOrderDraftBatchLot, totalArea decimal.Decimal) ([]domain.WorkOrderDraftItem, error) {
+	if len(lots) == 0 {
+		return nil, types.NewError(types.ErrValidation, "at least one lot is required", nil)
+	}
+
+	canonical := make([]domain.WorkOrderDraftItem, 0, len(lots[0].Items))
+	seenCanonical := make(map[int64]decimal.Decimal, len(lots[0].Items))
+	for _, item := range lots[0].Items {
+		if item.SupplyID <= 0 {
+			return nil, types.NewError(types.ErrValidation, "item supply_id must be greater than 0", nil)
+		}
+		if item.TotalUsed.LessThanOrEqual(decimal.Zero) {
+			return nil, types.NewError(types.ErrValidation, "item total_used must be greater than 0", nil)
+		}
+		if _, exists := seenCanonical[item.SupplyID]; exists {
+			return nil, types.NewError(types.ErrValidation, "duplicate supply_id in items", nil)
+		}
+		seenCanonical[item.SupplyID] = item.TotalUsed
+		canonical = append(canonical, domain.WorkOrderDraftItem{
+			SupplyID:  item.SupplyID,
+			TotalUsed: item.TotalUsed,
+			FinalDose: item.TotalUsed.Div(totalArea).Round(6),
+		})
+	}
+
+	for _, lot := range lots[1:] {
+		if len(lot.Items) != len(canonical) {
+			return nil, types.NewError(types.ErrValidation, "all lots must include the same supply_id set", nil)
+		}
+
+		seen := make(map[int64]decimal.Decimal, len(lot.Items))
+		for _, item := range lot.Items {
+			if item.SupplyID <= 0 {
+				return nil, types.NewError(types.ErrValidation, "item supply_id must be greater than 0", nil)
+			}
+			if item.TotalUsed.LessThanOrEqual(decimal.Zero) {
+				return nil, types.NewError(types.ErrValidation, "item total_used must be greater than 0", nil)
+			}
+			if _, exists := seen[item.SupplyID]; exists {
+				return nil, types.NewError(types.ErrValidation, "duplicate supply_id in items", nil)
+			}
+			seen[item.SupplyID] = item.TotalUsed
+		}
+
+		for _, item := range canonical {
+			totalUsed, exists := seen[item.SupplyID]
+			if !exists {
+				return nil, types.NewError(types.ErrValidation, "all lots must include the same supply_id set", nil)
+			}
+			if !totalUsed.Equal(item.TotalUsed) {
+				return nil, types.NewError(types.ErrValidation, "item total_used must match across lots in a batch", nil)
+			}
+		}
+	}
+
+	return canonical, nil
+}
+
+func distributeDraftItemsByArea(items []domain.WorkOrderDraftItem, lotAreas []decimal.Decimal, totalArea decimal.Decimal) [][]domain.WorkOrderDraftItem {
+	distributed := make([][]domain.WorkOrderDraftItem, len(lotAreas))
+	for lotIndex := range distributed {
+		distributed[lotIndex] = make([]domain.WorkOrderDraftItem, len(items))
+	}
+	if len(items) == 0 {
+		return distributed
+	}
+
+	for itemIndex, item := range items {
+		finalDose := item.TotalUsed.Div(totalArea).Round(6)
+		accumulated := decimal.Zero
+
+		for lotIndex, area := range lotAreas {
+			totalUsed := item.TotalUsed
+			if len(lotAreas) > 1 {
+				if lotIndex == len(lotAreas)-1 {
+					totalUsed = item.TotalUsed.Sub(accumulated)
+				} else {
+					totalUsed = item.TotalUsed.Mul(area).Div(totalArea).Round(6)
+					accumulated = accumulated.Add(totalUsed)
+				}
+			}
+
+			distributed[lotIndex][itemIndex] = domain.WorkOrderDraftItem{
+				SupplyID:   item.SupplyID,
+				SupplyName: item.SupplyName,
+				TotalUsed:  totalUsed,
+				FinalDose:  finalDose,
+			}
+		}
+	}
+
+	return distributed
 }
 
 func (u *UseCases) PreviewDigitalWorkOrderNumber(ctx context.Context, projectID int64, requested string) (string, error) {
@@ -365,6 +452,12 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
 	}
 
+	lotAreas := make([]decimal.Decimal, len(current.Lots))
+	for i, lot := range current.Lots {
+		lotAreas[i] = lot.EffectiveArea
+	}
+	itemsByLot := distributeDraftItemsByArea(group.Items, lotAreas, current.EffectiveArea)
+
 	drafts := make([]*domain.WorkOrderDraft, len(current.Lots))
 	for i, lot := range current.Lots {
 		draft := &domain.WorkOrderDraft{
@@ -384,20 +477,8 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			InvestorID:     group.InvestorID,
 			IsDigital:      true,
 			Status:         domain.StatusDraft,
-			Items:          make([]domain.WorkOrderDraftItem, len(group.Items)),
+			Items:          itemsByLot[i],
 			InvestorSplits: group.InvestorSplits,
-		}
-
-		for j, item := range group.Items {
-			finalDose := item.FinalDose
-			if finalDose.LessThanOrEqual(decimal.Zero) {
-				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
-			}
-			draft.Items[j] = domain.WorkOrderDraftItem{
-				SupplyID:  item.SupplyID,
-				TotalUsed: item.TotalUsed,
-				FinalDose: finalDose,
-			}
 		}
 
 		if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
@@ -983,12 +1064,41 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 
 	group.EffectiveArea = totalArea
 
-	if len(first.Items) > 0 {
-		group.Items = make([]domain.WorkOrderDraftItem, len(first.Items))
-		copy(group.Items, first.Items)
-	}
+	group.Items = aggregateDraftGroupItems(drafts, totalArea)
 
 	return group
+}
+
+func aggregateDraftGroupItems(drafts []*domain.WorkOrderDraft, totalArea decimal.Decimal) []domain.WorkOrderDraftItem {
+	items := make([]domain.WorkOrderDraftItem, 0)
+	indexBySupplyID := make(map[int64]int)
+
+	for _, draft := range drafts {
+		for _, item := range draft.Items {
+			index, exists := indexBySupplyID[item.SupplyID]
+			if !exists {
+				index = len(items)
+				indexBySupplyID[item.SupplyID] = index
+				items = append(items, domain.WorkOrderDraftItem{
+					SupplyID:   item.SupplyID,
+					SupplyName: item.SupplyName,
+				})
+			}
+
+			items[index].TotalUsed = items[index].TotalUsed.Add(item.TotalUsed)
+			if items[index].SupplyName == "" {
+				items[index].SupplyName = item.SupplyName
+			}
+		}
+	}
+
+	for i := range items {
+		if totalArea.GreaterThan(decimal.Zero) {
+			items[i].FinalDose = items[i].TotalUsed.Div(totalArea).Round(6)
+		}
+	}
+
+	return items
 }
 
 func effectiveDraftContractor(contractor, laborContractorName string) string {

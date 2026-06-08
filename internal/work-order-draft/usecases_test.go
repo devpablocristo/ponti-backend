@@ -54,7 +54,7 @@ func (r *testDraftRepo) ListPendingSupplyNamesByIDs(ctx context.Context, ids []i
 }
 
 func (r *testDraftRepo) GetPendingLaborNameByID(ctx context.Context, laborID int64) (string, error) {
-    return "", nil
+	return "", nil
 }
 
 func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.Context, projectID int64, baseNumber string) ([]*domain.WorkOrderDraft, error) {
@@ -65,7 +65,7 @@ func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx contex
 }
 
 func (r *testDraftRepo) GetLaborContractorByID(ctx context.Context, laborID int64) (string, error) {
-    return "", nil
+	return "", nil
 }
 
 func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
@@ -260,11 +260,156 @@ func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *test
 	require.Equal(t, "D-1.1", created[0].Number)
 	require.Equal(t, "D-1.2", created[1].Number)
 
-	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
-	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
+	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(60)))
+	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(60)))
 
 	require.True(t, created[0].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
 	require.True(t, created[1].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+}
+
+func TestCreateDigitalWorkOrderDraftBatch_DistributesTotalUsedByLotArea(t *testing.T) {
+	var created []*domain.WorkOrderDraft
+
+	repo := &testDraftRepo{
+		listOccupiedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return []string{}, nil
+		},
+		createBatchFn: func(ctx context.Context, drafts []*domain.WorkOrderDraft) ([]int64, error) {
+			created = drafts
+			return []int64{101, 102}, nil
+		},
+	}
+
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
+
+	batch := &domain.WorkOrderDraftBatchCreate{
+		Date:       time.Date(2026, 5, 14, 0, 0, 0, 0, time.UTC),
+		CustomerID: 1,
+		ProjectID:  10,
+		FieldID:    20,
+		CropID:     30,
+		LaborID:    40,
+		Contractor: "Contratista",
+		InvestorID: 50,
+		Lots: []domain.WorkOrderDraftBatchLot{
+			{
+				LotID:         101,
+				EffectiveArea: decimal.NewFromInt(25),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 999, TotalUsed: decimal.NewFromInt(200)},
+				},
+			},
+			{
+				LotID:         102,
+				EffectiveArea: decimal.NewFromInt(75),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 999, TotalUsed: decimal.NewFromInt(200)},
+				},
+			},
+		},
+	}
+
+	_, err := uc.CreateDigitalWorkOrderDraftBatch(context.Background(), batch)
+
+	require.NoError(t, err)
+	require.Len(t, created, 2)
+	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(50)))
+	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(150)))
+	require.True(t, created[0].Items[0].FinalDose.Equal(decimal.NewFromInt(2)))
+	require.True(t, created[1].Items[0].FinalDose.Equal(decimal.NewFromInt(2)))
+}
+
+func TestCreateDigitalWorkOrderDraftBatch_AdjustsLastLotForDecimalResidue(t *testing.T) {
+	var created []*domain.WorkOrderDraft
+
+	repo := &testDraftRepo{
+		listOccupiedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return []string{}, nil
+		},
+		createBatchFn: func(ctx context.Context, drafts []*domain.WorkOrderDraft) ([]int64, error) {
+			created = drafts
+			return []int64{101, 102}, nil
+		},
+	}
+
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
+
+	batch := &domain.WorkOrderDraftBatchCreate{
+		Date:       time.Date(2026, 5, 14, 0, 0, 0, 0, time.UTC),
+		CustomerID: 1,
+		ProjectID:  10,
+		FieldID:    20,
+		CropID:     30,
+		LaborID:    40,
+		Contractor: "Contratista",
+		InvestorID: 50,
+		Lots: []domain.WorkOrderDraftBatchLot{
+			{
+				LotID:         101,
+				EffectiveArea: decimal.NewFromInt(1),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 999, TotalUsed: decimal.NewFromInt(100)},
+				},
+			},
+			{
+				LotID:         102,
+				EffectiveArea: decimal.NewFromInt(2),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 999, TotalUsed: decimal.NewFromInt(100)},
+				},
+			},
+		},
+	}
+
+	_, err := uc.CreateDigitalWorkOrderDraftBatch(context.Background(), batch)
+
+	require.NoError(t, err)
+	require.Len(t, created, 2)
+	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.RequireFromString("33.333333")))
+	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.RequireFromString("66.666667")))
+	sum := created[0].Items[0].TotalUsed.Add(created[1].Items[0].TotalUsed)
+	require.True(t, sum.Equal(decimal.NewFromInt(100)))
+}
+
+func TestCreateDigitalWorkOrderDraftBatch_RejectsDifferentSupplySets(t *testing.T) {
+	repo := &testDraftRepo{
+		listOccupiedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return []string{}, nil
+		},
+	}
+
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
+
+	batch := &domain.WorkOrderDraftBatchCreate{
+		Date:       time.Date(2026, 5, 14, 0, 0, 0, 0, time.UTC),
+		CustomerID: 1,
+		ProjectID:  10,
+		FieldID:    20,
+		CropID:     30,
+		LaborID:    40,
+		Contractor: "Contratista",
+		InvestorID: 50,
+		Lots: []domain.WorkOrderDraftBatchLot{
+			{
+				LotID:         101,
+				EffectiveArea: decimal.NewFromInt(50),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 999, TotalUsed: decimal.NewFromInt(200)},
+				},
+			},
+			{
+				LotID:         102,
+				EffectiveArea: decimal.NewFromInt(50),
+				Items: []domain.WorkOrderDraftBatchLotItem{
+					{SupplyID: 888, TotalUsed: decimal.NewFromInt(200)},
+				},
+			},
+		},
+	}
+
+	_, err := uc.CreateDigitalWorkOrderDraftBatch(context.Background(), batch)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "same supply_id set")
 }
 
 func TestUpdateWorkOrderDraftByID_RevalidatesDigitalNumberExcludingSelf(t *testing.T) {
@@ -487,9 +632,10 @@ func TestUpdateWorkOrderDraftGroupByID_HappyPathSendsAllLotsInSingleCall(t *test
 	require.Len(t, captured, 2)
 	require.Equal(t, int64(101), captured[0].ID)
 	require.Equal(t, int64(102), captured[1].ID)
-	// FinalDose se recalcula sobre el área total del grupo (60+60=120 ha) si
-	// el item llega con FinalDose<=0; con FinalDose=1 lo respeta tal cual.
+	require.True(t, captured[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(60)))
+	require.True(t, captured[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(60)))
 	require.True(t, captured[0].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+	require.True(t, captured[1].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
 }
 
 func TestUpdateWorkOrderDraftGroupByID_AtomicErrorFromRepoIsPropagated(t *testing.T) {
@@ -633,6 +779,38 @@ func TestGetWorkOrderDraftGroupByID_RejectsWhenNoRelatedFound(t *testing.T) {
 	errType, ok := types.GetErrorType(err)
 	require.True(t, ok)
 	require.Equal(t, types.ErrNotFound, errType)
+}
+
+func TestGetWorkOrderDraftGroupByID_AggregatesItemsAcrossLots(t *testing.T) {
+	groupRelated := []*domain.WorkOrderDraft{
+		groupDraft(101, "D-7.1", domain.StatusDraft, decimal.NewFromInt(50)),
+		groupDraft(102, "D-7.2", domain.StatusDraft, decimal.NewFromInt(50)),
+	}
+	groupRelated[0].Items = []domain.WorkOrderDraftItem{
+		{SupplyID: 70, SupplyName: "INSUMO", TotalUsed: decimal.NewFromInt(100), FinalDose: decimal.NewFromInt(2)},
+	}
+	groupRelated[1].Items = []domain.WorkOrderDraftItem{
+		{SupplyID: 70, SupplyName: "INSUMO", TotalUsed: decimal.NewFromInt(100), FinalDose: decimal.NewFromInt(2)},
+	}
+
+	repo := &testDraftRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.WorkOrderDraft, error) {
+			return groupRelated[0], nil
+		},
+		listRelatedFn: func(ctx context.Context, projectID int64, baseNumber string) ([]*domain.WorkOrderDraft, error) {
+			return groupRelated, nil
+		},
+	}
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
+
+	group, err := uc.GetWorkOrderDraftGroupByID(context.Background(), 101)
+
+	require.NoError(t, err)
+	require.Equal(t, "D-7", group.Number)
+	require.True(t, group.EffectiveArea.Equal(decimal.NewFromInt(100)))
+	require.Len(t, group.Items, 1)
+	require.True(t, group.Items[0].TotalUsed.Equal(decimal.NewFromInt(200)))
+	require.True(t, group.Items[0].FinalDose.Equal(decimal.NewFromInt(2)))
 }
 
 func TestListDigitalWorkOrderDraftGroups_DelegatesToRepo(t *testing.T) {

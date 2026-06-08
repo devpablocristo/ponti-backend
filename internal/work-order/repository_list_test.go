@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -38,11 +39,26 @@ func newListWorkOrdersTestDB(t *testing.T) *gorm.DB {
 			number TEXT,
 			project_id INTEGER,
 			field_id INTEGER,
+			project_name TEXT,
+			field_name TEXT,
+			lot_name TEXT,
 			date DATETIME,
 			sequence_day INTEGER,
+			crop_name TEXT,
+			labor_name TEXT,
+			labor_category_name TEXT,
+			type_name TEXT,
+			contractor TEXT,
+			surface_ha NUMERIC,
 			is_digital BOOLEAN,
 			status TEXT,
-			supply_name TEXT
+			supply_name TEXT,
+			consumption NUMERIC,
+			category_name TEXT,
+			dose_per_ha NUMERIC,
+			supply_cost_per_ha NUMERIC,
+			unit_price NUMERIC,
+			supply_total_cost NUMERIC
 		);`,
 		`CREATE TABLE supplies (
 			id INTEGER PRIMARY KEY,
@@ -149,6 +165,65 @@ func TestRepository_ListWorkOrders_FiltersDigitalDrafts(t *testing.T) {
 	}
 	if rows[0].ID != -20 || !rows[0].IsDigital || rows[0].Status != "draft" {
 		t.Fatalf("expected digital draft row, got id=%d is_digital=%v status=%q", rows[0].ID, rows[0].IsDigital, rows[0].Status)
+	}
+}
+
+func TestRepository_ListWorkOrders_GroupsDigitalSplitRows(t *testing.T) {
+	db := newListWorkOrdersTestDB(t)
+	repo := NewRepository(&listTestGormEngine{client: db})
+
+	if err := db.Exec(`
+		INSERT INTO v4_report.workorder_list (
+			id, number, project_id, field_id, lot_name, date, sequence_day,
+			type_name, surface_ha, is_digital, status, supply_name, consumption,
+			category_name, dose_per_ha, supply_cost_per_ha, unit_price, supply_total_cost
+		) VALUES
+			(-21, 'D-3000.1', 30, 40, 'CIR 1', '2026-04-25T00:00:00Z', 0,
+			 'Agroquímicos', 50, true, 'draft', 'INSUMO', 100,
+			 'Herbicida', 2, 2, 1, 100),
+			(-21, 'D-3000.1', 30, 40, 'CIR 1', '2026-04-25T00:00:00Z', 0,
+			 'Labor', 50, true, 'draft', NULL, 0,
+			 'Pulverización', 0, 1, 0, 50),
+			(-22, 'D-3000.2', 30, 40, 'CIR 2', '2026-04-25T00:00:00Z', 0,
+			 'Agroquímicos', 50, true, 'draft', 'INSUMO', 100,
+			 'Herbicida', 2, 2, 1, 100),
+			(-22, 'D-3000.2', 30, 40, 'CIR 2', '2026-04-25T00:00:00Z', 0,
+			 'Labor', 50, true, 'draft', NULL, 0,
+			 'Pulverización', 0, 1, 0, 50);
+	`).Error; err != nil {
+		t.Fatalf("insert grouped rows: %v", err)
+	}
+
+	projectID := int64(30)
+	rows, pageInfo, err := repo.ListWorkOrders(
+		context.Background(),
+		domain.WorkOrderFilter{ProjectID: &projectID},
+		types.Input{Page: 1, PageSize: 10},
+	)
+	if err != nil {
+		t.Fatalf("list work orders: %v", err)
+	}
+
+	if pageInfo.Total != 5 {
+		t.Fatalf("expected logical total 5, got %d", pageInfo.Total)
+	}
+	if rows[0].Number != "D-3000" {
+		t.Fatalf("expected grouped base number first, got %q", rows[0].Number)
+	}
+	if !rows[0].IsGroupedDigital || rows[0].BaseNumber != "D-3000" || rows[0].LotsCount != 2 {
+		t.Fatalf("expected grouped metadata, got grouped=%v base=%q lots=%d", rows[0].IsGroupedDigital, rows[0].BaseNumber, rows[0].LotsCount)
+	}
+	if rows[0].LotName != "CIR 1, CIR 2" {
+		t.Fatalf("expected joined lot names, got %q", rows[0].LotName)
+	}
+	if !rows[0].SurfaceHa.Equal(decimal.NewFromInt(100)) {
+		t.Fatalf("expected surface 100, got %s", rows[0].SurfaceHa)
+	}
+	if !rows[0].Consumption.Equal(decimal.NewFromInt(200)) {
+		t.Fatalf("expected consumption 200, got %s", rows[0].Consumption)
+	}
+	if !rows[0].TotalCost.Equal(decimal.NewFromInt(300)) {
+		t.Fatalf("expected total cost 300, got %s", rows[0].TotalCost)
 	}
 }
 

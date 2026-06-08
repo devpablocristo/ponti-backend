@@ -11,6 +11,8 @@ import (
 type WorkOrderListElement struct {
 	ID                int64           `gorm:"column:id;primaryKey"`
 	Number            string          `gorm:"column:number;primaryKey"`
+	ProjectID         int64           `gorm:"column:project_id"`
+	FieldID           int64           `gorm:"column:field_id"`
 	ProjectName       string          `gorm:"column:project_name"`
 	FieldName         string          `gorm:"column:field_name"`
 	LotName           string          `gorm:"column:lot_name"`
@@ -31,6 +33,9 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal `gorm:"column:supply_total_cost"`
 	IsDigital         bool            `gorm:"column:is_digital"`
 	Status            string          `gorm:"column:status"`
+	BaseNumber        string          `gorm:"-"`
+	IsGroupedDigital  bool            `gorm:"-"`
+	LotsCount         int64           `gorm:"-"`
 }
 
 // TableName apunta a la vista.

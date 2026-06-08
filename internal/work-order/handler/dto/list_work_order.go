@@ -34,6 +34,9 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal `json:"total_cost"`
 	IsDigital         bool            `json:"is_digital"`
 	Status            string          `json:"status"`
+	BaseNumber        string          `json:"base_number,omitempty"`
+	IsGroupedDigital  bool            `json:"is_grouped_digital,omitempty"`
+	LotsCount         int64           `json:"lots_count,omitempty"`
 }
 
 // MarshalJSON asegura 2 decimales en todos los campos decimal de salida.
@@ -61,6 +64,9 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		TotalCost         string    `json:"total_cost"`
 		IsDigital         bool      `json:"is_digital"`
 		Status            string    `json:"status"`
+		BaseNumber        string    `json:"base_number,omitempty"`
+		IsGroupedDigital  bool      `json:"is_grouped_digital,omitempty"`
+		LotsCount         int64     `json:"lots_count,omitempty"`
 	}{
 		ID:                w.ID,
 		Number:            w.Number,
@@ -84,6 +90,9 @@ func (w WorkOrderListElement) MarshalJSON() ([]byte, error) {
 		TotalCost:         w.TotalCost.Round(0).String(),
 		IsDigital:         w.IsDigital,
 		Status:            w.Status,
+		BaseNumber:        w.BaseNumber,
+		IsGroupedDigital:  w.IsGroupedDigital,
+		LotsCount:         w.LotsCount,
 	}
 
 	return json.Marshal(aux)
@@ -122,6 +131,9 @@ func FromDomainListElement(d *domain.WorkOrderListElement) *WorkOrderListElement
 		TotalCost:         d.TotalCost,
 		IsDigital:         d.IsDigital,
 		Status:            d.Status,
+		BaseNumber:        d.BaseNumber,
+		IsGroupedDigital:  d.IsGroupedDigital,
+		LotsCount:         d.LotsCount,
 	}
 }
 

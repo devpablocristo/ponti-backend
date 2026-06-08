@@ -76,6 +76,21 @@ Does not own:
 - Published drafts cannot be updated or deleted.
 - Draft publication fails if any referenced supply is pending.
 - Digital draft numbering uses `D-n` and split suffix forms.
+- Digital batch drafts with more than one lot persist one physical draft per lot
+  (`D-n.1`, `D-n.2`, ...), but the batch input item `total_used` is the total
+  consumption of the logical work order, not per-lot consumption.
+- For digital multi-lot drafts, every lot must carry the same supply set. Core
+  computes `final_dose = total_used / total_effective_area`, stores each lot as
+  `total_used_lot = total_used * lot_effective_area / total_effective_area`,
+  and adjusts the last lot for decimal residue so the persisted sum equals the
+  original total.
+- Digital group edits use the same proportional distribution. Group detail
+  responses aggregate items across all physical lots and expose the logical
+  total.
+- Work order list, filter-row, and export responses group digital split rows as
+  one logical row: `number=D-n`, joined lot names, summed surface, summed
+  consumption/cost, and grouped metadata (`base_number`,
+  `is_grouped_digital`, `lots_count`).
 - Work order duplicate endpoint is currently `Stubbed`.
 - Archived work order listing reads soft-deleted work orders where `deleted_at IS NOT NULL` from the base `workorders` table using GORM `Unscoped()`.
 - Archived work order listing reuses the existing work order list response mapping through `dto.FromDomainList(pageInfo, list)`.
@@ -115,12 +130,20 @@ Does not own:
 - `migrations_v4/000205_work_order_drafts.up.sql`
 - `migrations_v4/000230_workorders_is_digital_origin.up.sql`
 - `migrations_v4/000232_labor_pending_changes.up.sql`
+- `migrations_v4/000233_fix_multilot_workorder_consumption.up.sql`
 
 ## Validation Evidence 2026-06-08
 
 - `GET /api/v1/projects/30/labors` before `000232`: `500 failed to list labor`.
-- Active DB after `000232`: `schema_migrations=232`, `dirty=false`,
-  `labors.category_id` nullable, `labors.is_pending` present.
+- Active DB after `000232` and `000233`: `schema_migrations=233`,
+  `dirty=false`, `labors.category_id` nullable, `labors.is_pending` present.
 - `GET /api/v1/projects/30/labors` after `000232`: `200`, 19 rows,
   `{ data, page_info }`.
-- Tests: `go test ./internal/labor/...` and `go test ./...`.
+- Digital multi-lot unit coverage:
+  `go test ./internal/work-order-draft/...` verifies 50/50 and uneven-area
+  distribution, group update distribution, decimal residue, and aggregated group
+  detail items.
+- Logical work order list coverage: `go test ./internal/work-order/...`
+  verifies `D-n.1`/`D-n.2` list rows collapse to one `D-n` row with total
+  consumption `200`.
+- Labor tests: `go test ./internal/labor/...`.
