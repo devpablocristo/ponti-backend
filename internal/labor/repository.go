@@ -15,6 +15,7 @@ import (
 	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
@@ -118,8 +119,11 @@ func (r *Repository) UpdateLabor(ctx context.Context, labor *domain.Labor) error
 		"price":            labor.Price,
 		"is_partial_price": labor.IsPartialPrice,
 		"project_id":       labor.ProjectId,
-		"category_id":      labor.CategoryId,
+		"is_pending":       false,
 		"updated_by":       labor.UpdatedBy,
+	}
+	if labor.CategoryId > 0 {
+		updates["category_id"] = labor.CategoryId
 	}
 
 	result := r.db.Client().WithContext(ctx).
@@ -151,7 +155,7 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 
 	if err := base.
 		Preload("Category").
-		Select("id, name, contractor_name, price, is_partial_price, category_id, updated_at").
+		Select("id, name, contractor_name, price, is_partial_price, category_id, is_pending, updated_at").
 		Limit(perPage).
 		Offset((page - 1) * perPage).
 		Find(&list).Error; err != nil {
@@ -161,14 +165,19 @@ func (r *Repository) ListLabor(ctx context.Context, page, perPage int, projectID
 	// Mapear a dominio ligero
 	labors := make([]domain.ListedLabor, len(list))
 	for i, labor := range list {
+		var categoryId int64
+		if labor.LaborCategoryID != nil {
+			categoryId = *labor.LaborCategoryID
+		}
 		labors[i] = domain.ListedLabor{
 			ID:             labor.ID,
 			Name:           labor.Name,
 			Price:          labor.Price,
 			IsPartialPrice: labor.IsPartialPrice,
 			ContractorName: labor.ContractorName,
-			CategoryId:     labor.LaborCategoryID,
+			CategoryId:     categoryId,
 			CategoryName:   labor.Category.Name,
+			IsPending:      labor.IsPending,
 			Base:           shareddomain.Base{UpdatedAt: labor.UpdatedAt},
 		}
 	}
@@ -895,4 +904,42 @@ func (r *Repository) ListAllGroupLabor(ctx context.Context) ([]domain.LaborRawIt
 		}
 	}
 	return list, nil
+
+}
+
+
+func (r *Repository) CreatePendingLabor(ctx context.Context, projectID int64, name string) (int64, error) {
+    type pendingLaborInsert struct {
+        ID             int64  `gorm:"column:id;primaryKey"`
+        ProjectId      int64  `gorm:"column:project_id"`
+        Name           string `gorm:"column:name"`
+        ContractorName string `gorm:"column:contractor_name"`
+        IsPending      bool   `gorm:"column:is_pending"`
+        CreatedBy      *string `gorm:"column:created_by"`
+        UpdatedBy      *string `gorm:"column:updated_by"`
+    }
+
+    var id int64
+    err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+        var userID *string
+        if actor, err := sharedmodels.ActorFromContext(ctx); err == nil {
+            userID = &actor
+        }
+
+        row := pendingLaborInsert{
+            ProjectId:      projectID,
+            Name:           name,
+            ContractorName: "",
+            IsPending:      true,
+            CreatedBy:      userID,
+            UpdatedBy:      userID,
+        }
+
+        if err := tx.Table("labors").Create(&row).Error; err != nil {
+            return types.NewError(types.ErrInternal, "failed to create pending labor", err)
+        }
+        id = row.ID
+        return nil
+    })
+    return id, err
 }

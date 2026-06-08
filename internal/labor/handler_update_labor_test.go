@@ -25,6 +25,11 @@ type laborHandlerUseCasesStub struct {
 func (s *laborHandlerUseCasesStub) CreateLabor(context.Context, *domain.Labor) (int64, error) {
 	return 0, nil
 }
+
+func (s *laborHandlerUseCasesStub) CreatePendingLabor(ctx context.Context, projectID int64, name string) (*domain.Labor, error) {
+    return nil, nil
+}
+
 func (s *laborHandlerUseCasesStub) GetLabor(ctx context.Context, id int64) (*domain.Labor, error) {
 	s.getLaborCalls = append(s.getLaborCalls, id)
 	if s.getLaborFn != nil {
