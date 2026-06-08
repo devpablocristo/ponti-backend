@@ -71,6 +71,7 @@ Base path: `/api/v1`
 ## Field Operations
 
 - `/projects/:project_id/labors`: `POST`, `GET`
+- `/projects/:project_id/labors/pending`: `POST`
 - `/projects/:project_id/labors/:labor_id`: `DELETE`, `PUT`
 - `/projects/:project_id/labors/:labor_id/workorders-count`: `GET`
 - `/projects/:project_id/labors/labor-categories/:type_id`: `GET`
@@ -102,6 +103,36 @@ Base path: `/api/v1`
 - `/work-order-drafts/:work_order_draft_id/pdf-data`: `GET`
 - `/work-order-drafts/:work_order_draft_id/group-pdf-data`: `GET`
 - `/work-order-drafts/:work_order_draft_id/publish`: `POST`
+
+### Labor Catalog Contract
+
+- `GET /projects/:project_id/labors` is the canonical project labor catalog
+  endpoint for Web and Mobile selectors and master-data screens. It returns
+  real labor IDs plus `name`, `category_id`, `price`, `is_partial_price`,
+  `contractor_name`, `category_name`, `is_pending`, `updated_at`, and
+  `page_info`.
+- `GET /labors/group/:project_id` is a grouped work-order/history view and must
+  not replace the catalog endpoint because it does not represent the editable
+  labor catalog.
+- The catalog contract requires migration
+  `migrations_v4/000232_labor_pending_changes.up.sql` to be applied because the
+  repository reads `labors.is_pending` and pending labors may have nullable
+  `category_id`.
+
+### Labor Catalog Validation 2026-06-08
+
+- Active local DB: `new_ponti_db_develop_local` from Core `.env`; the proposed
+  `new_ponti_db_dev` command was evaluated but did not change the active DB.
+- Before `000232`, `GET /api/v1/projects/30/labors` reproduced `500` with
+  `failed to list labor`; `labors.is_pending` was absent and `category_id` was
+  `NOT NULL`.
+- Applying `migrations_v4/000232_labor_pending_changes.up.sql` to the active DB
+  changed `category_id` to nullable, added `is_pending default false`, kept
+  `price default 0`, and made `GET /api/v1/projects/30/labors` return `200`
+  with 19 catalog rows and `page_info`.
+- Local migration ledger was aligned to version `232`, `dirty=false`, using the
+  official migrate force mechanism because the DB had a stale local ledger at
+  version `247` while this branch's highest migration file is `232`.
 
 ## Inventory And Stock
 

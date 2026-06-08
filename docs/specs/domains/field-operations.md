@@ -79,6 +79,13 @@ Does not own:
 - Work order duplicate endpoint is currently `Stubbed`.
 - Archived work order listing reads soft-deleted work orders where `deleted_at IS NOT NULL` from the base `workorders` table using GORM `Unscoped()`.
 - Archived work order listing reuses the existing work order list response mapping through `dto.FromDomainList(pageInfo, list)`.
+- Project labor catalog lookup (`GET /api/v1/projects/:project_id/labors`) is
+  the canonical source for labor selectors and master-data labor screens in Web
+  and Mobile. It depends on migration
+  `migrations_v4/000232_labor_pending_changes.up.sql` so `labors.is_pending`
+  exists and pending labors can have nullable `category_id`.
+- Grouped labor lookup (`GET /api/v1/labors/group/:project_id`) is a
+  work-order/reporting view, not a substitute for the project labor catalog.
 
 ## Tenant Isolation Requirements
 
@@ -97,6 +104,7 @@ Does not own:
 
 - `internal/labor/handler.go`
 - `internal/labor/usecases.go`
+- `internal/labor/repository_test.go`
 - `internal/work-order/handler.go`
 - `internal/work-order/usecases.go`
 - `internal/work-order-draft/handler.go`
@@ -106,3 +114,13 @@ Does not own:
 - `migrations_v4/000202_workorder_split_payment_status.up.sql`
 - `migrations_v4/000205_work_order_drafts.up.sql`
 - `migrations_v4/000230_workorders_is_digital_origin.up.sql`
+- `migrations_v4/000232_labor_pending_changes.up.sql`
+
+## Validation Evidence 2026-06-08
+
+- `GET /api/v1/projects/30/labors` before `000232`: `500 failed to list labor`.
+- Active DB after `000232`: `schema_migrations=232`, `dirty=false`,
+  `labors.category_id` nullable, `labors.is_pending` present.
+- `GET /api/v1/projects/30/labors` after `000232`: `200`, 19 rows,
+  `{ data, page_info }`.
+- Tests: `go test ./internal/labor/...` and `go test ./...`.
