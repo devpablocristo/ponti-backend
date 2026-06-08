@@ -10,6 +10,7 @@ Specification type: baseline current-state data architecture specifications.
 - `reporting-views.md`
 - `tenant-isolation.md`
 - `data-flows.md`
+- `data-model-actors.md`
 
 ## Evidence
 

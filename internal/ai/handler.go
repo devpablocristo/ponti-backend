@@ -52,6 +52,11 @@ func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/ai"
 
+	capabilities := r.Group(h.acf.APIBaseURL(), h.mws.GetValidation()...)
+	{
+		capabilities.GET("/capabilities", h.Capabilities)
+	}
+
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.POST("/chat", h.Chat)
@@ -59,6 +64,10 @@ func (h *Handler) Routes() {
 		public.GET("/chat/conversations", h.ListChatConversations)
 		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
 	}
+}
+
+func (h *Handler) Capabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"items": pontiCapabilities()})
 }
 
 func (h *Handler) Chat(c *gin.Context) {

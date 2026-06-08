@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	candidatesdomain "github.com/devpablocristo/platform/notifications/go/candidates/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -300,6 +301,40 @@ func (r *Repository) ListByTenantForUser(ctx context.Context, tenantID, userID s
 		out = append(out, view)
 	}
 	return out, nil
+}
+
+// GetByIDForTenant devuelve un candidato puntual scoped por tenant y enriquecido
+// con read_at para el usuario consultante.
+func (r *Repository) GetByIDForTenant(ctx context.Context, tenantID, candidateID, userID string) (CandidateView, error) {
+	tID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return CandidateView{}, fmt.Errorf("parse tenant_id: %w", err)
+	}
+	id, err := uuid.Parse(candidateID)
+	if err != nil {
+		return CandidateView{}, domainerr.Validation("invalid candidate id")
+	}
+	var row models.CandidateModel
+	err = r.db.WithContext(ctx).First(&row, "id = ? AND tenant_id = ?", id, tID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return CandidateView{}, domainerr.NotFound("insight not found")
+	}
+	if err != nil {
+		return CandidateView{}, err
+	}
+	view := CandidateView{CandidateRecord: toCandidateRecord(row)}
+	if userID != "" {
+		var read models.ReadModel
+		err := r.db.WithContext(ctx).First(&read, "insight_id = ? AND user_id = ?", id, userID).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return CandidateView{}, err
+		}
+		if err == nil {
+			ts := read.ReadAt
+			view.ReadAt = &ts
+		}
+	}
+	return view, nil
 }
 
 func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID string, notifiedAt time.Time) error {

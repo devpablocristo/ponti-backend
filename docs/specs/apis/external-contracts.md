@@ -20,9 +20,49 @@ Evidence:
 - `internal/ai/usecases/usecases.go`
 - `internal/ai/handler.go`
 
+Status:
+- Legacy provider when `AI_PROVIDER=legacy` or `AI_AXIS_ENABLED=false`.
+- Temporary fallback when Axis is configured but unavailable by network/server error.
+
 UNKNOWN:
 - External request/response schema beyond proxy behavior.
 - AI service storage and auth internals.
+
+## Axis Companion
+
+Backend routes preserving Ponti web contract:
+- `POST /api/v1/ai/chat` -> Axis `POST /v1/chat`
+- `GET /api/v1/ai/chat/conversations` -> Axis `GET /v1/chat/conversations?limit=n`
+- `GET /api/v1/ai/chat/conversations/:conversation_id` -> Axis `GET /v1/chat/conversations/:conversation_id`
+
+Ponti product metadata/capabilities exposed to Axis:
+- `GET /api/v1/capabilities`
+- `GET /api/v1/insights`
+- `GET /api/v1/insights/summary`
+- `GET /api/v1/insights/:id/explain`
+
+Auth accepted on these Ponti product endpoints:
+- Normal Ponti API key + user JWT flow.
+- Axis product integration bearer, limited to these endpoints, when `Authorization: Bearer <value>` matches `PONTI_AXIS_API_KEY`.
+
+Headers sent to Axis:
+- `X-API-Key`
+- `X-Org-ID`
+- `X-User-ID`
+- `X-On-Behalf-Of`
+- `X-Product-Surface`
+- `X-Auth-Scopes`
+
+Evidence:
+- `internal/axis/client.go`
+- `internal/ai/usecases/usecases.go`
+- `internal/ai/capabilities.go`
+- `internal/businessinsights/handler.go`
+- `docs/specs/system/ponti-ai-axis-v1.md`
+
+Status:
+- Disabled by default.
+- Enabled with `AI_PROVIDER=axis` and `AI_AXIS_ENABLED=true`.
 
 ## Review / Nexus Governance
 
