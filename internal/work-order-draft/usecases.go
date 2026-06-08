@@ -21,6 +21,8 @@ type RepositoryPort interface {
 	CreateWorkOrderDraftBatch(context.Context, []*domain.WorkOrderDraft) ([]int64, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
+	GetPendingLaborNameByID(context.Context, int64) (string, error)
+	GetLaborContractorByID(context.Context, int64) (string, error)
 	ListRelatedDigitalWorkOrderDraftsByBaseNumber(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	ListWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListOccupiedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
@@ -457,6 +459,34 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		return 0, err
 	}
 
+	if err := u.validateDraftSuppliesReadyForPublish(ctx, draft); err != nil {
+		return 0, err
+	}
+
+	// Validar labor pendiente
+	if draft.LaborID > 0 {
+		laborName, err := u.repo.GetPendingLaborNameByID(ctx, draft.LaborID)
+		if err != nil {
+			return 0, err
+		}
+		if laborName != "" {
+			return 0, types.NewError(
+				types.ErrConflict,
+				fmt.Sprintf("cannot publish work order draft with pending labor: %s", laborName),
+				nil,
+			)
+		}
+	}
+
+	contractor := draft.Contractor
+	if contractor == "" && draft.LaborID > 0 {
+		laborContractor, err := u.repo.GetLaborContractorByID(ctx, draft.LaborID)
+		if err != nil {
+			return 0, err
+		}
+		contractor = laborContractor
+	}
+
 	workOrder := &workorderdomain.WorkOrder{
 		Number:         draft.Number,
 		ProjectID:      draft.ProjectID,
@@ -465,7 +495,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		CropID:         draft.CropID,
 		LaborID:        draft.LaborID,
 		IsDigital:      draft.IsDigital,
-		Contractor:     draft.Contractor,
+		Contractor:     contractor,
 		Observations:   draft.Observations,
 		Date:           draft.Date,
 		InvestorID:     draft.InvestorID,
@@ -570,9 +600,6 @@ func validateDraft(d *domain.WorkOrderDraft) error {
 	}
 	if d.LaborID <= 0 {
 		return types.NewError(types.ErrValidation, "labor_id must be greater than 0", nil)
-	}
-	if strings.TrimSpace(d.Contractor) == "" {
-		return types.NewError(types.ErrValidation, "contractor is required", nil)
 	}
 	if d.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
@@ -926,9 +953,10 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 		CropName:             first.CropName,
 		LaborID:              first.LaborID,
 		LaborName:            first.LaborName,
-		Contractor:           first.Contractor,
+		Contractor:           effectiveDraftContractor(first.Contractor, first.LaborContractorName),
 		Observations:         first.Observations,
 		InvestorID:           first.InvestorID,
+		InvestorName:         first.InvestorName,
 		IsDigital:            first.IsDigital,
 		Status:               groupDraftStatus(drafts),
 		PublishedWorkOrderID: first.PublishedWorkOrderID,
@@ -961,6 +989,13 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 	}
 
 	return group
+}
+
+func effectiveDraftContractor(contractor, laborContractorName string) string {
+	if strings.TrimSpace(contractor) != "" {
+		return contractor
+	}
+	return laborContractorName
 }
 
 func groupDraftStatus(drafts []*domain.WorkOrderDraft) domain.Status {
