@@ -368,6 +368,7 @@ func Initialize() (*Dependencies, error) {
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
 		DataIntegrityHandler:      dataintegrityHandler,
+		DataIntegrityUseCases:     dataintegrityUseCases,
 		InvestorHandler:           investorHandler,
 		CropHandler:               cropHandler,
 		LotHandler:                lotHandler,
@@ -377,6 +378,7 @@ func Initialize() (*Dependencies, error) {
 		ProviderHandler:           providerHandler,
 		RegistryHandler:           registryHandler,
 		ReportHandler:             reportHandler,
+		ReportUseCase:             reportUseCase,
 		LeaseTypeHandler:          leasetypeHandler,
 		SupplyHandler:             supplyHandler,
 		CategoryHandler:           categoryHandler,
@@ -409,6 +411,7 @@ type Dependencies struct {
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -418,6 +421,7 @@ type Dependencies struct {
 	ProviderHandler           *provider.Handler
 	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler

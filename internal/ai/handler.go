@@ -63,6 +63,9 @@ func (h *Handler) Routes() {
 		public.POST("/chat/stream", h.ChatStream)
 		public.GET("/chat/conversations", h.ListChatConversations)
 		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
+		public.POST("/actions/insight-resolve/prepare", h.PrepareInsightResolve)
+		public.POST("/actions/workorder-draft/prepare", h.PrepareWorkOrderDraft)
+		public.POST("/actions/stock-adjustment/prepare", h.PrepareStockAdjustment)
 	}
 }
 

@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
+	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
+	reportmod "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
@@ -37,6 +39,8 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	biService := buildBusinessInsightsService(deps, biRepo)
 	biHandler := businessinsights.NewHandler(biRepo, biService, deps.GinEngine, &deps.Config.API, deps.Middlewares)
 	deps.StockUseCases.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
+	deps.DataIntegrityUseCases.SetBusinessInsightsNotifier(&dataIntegrityAdapter{svc: biService})
+	deps.ReportUseCase.SetBusinessInsightsNotifier(&reportAdapter{svc: biService})
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -105,6 +109,109 @@ func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, te
 		return nil
 	}
 	return a.svc.MaybeResolveStockNegative(ctx, tenantID, productID)
+}
+
+type dataIntegrityAdapter struct {
+	svc *businessinsights.Service
+}
+
+func (a *dataIntegrityAdapter) NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, in dataintegrity.DataIntegrityCriticalInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	controls := make([]businessinsights.DataIntegrityControlIssue, 0, len(in.Controls))
+	for _, control := range in.Controls {
+		controls = append(controls, businessinsights.DataIntegrityControlIssue{
+			ControlNumber: control.ControlNumber,
+			DataToVerify:  control.DataToVerify,
+			Description:   control.Description,
+			DifferenceA:   control.DifferenceA,
+			DifferenceB:   control.DifferenceB,
+			Tolerance:     control.Tolerance,
+			SystemSource:  control.SystemSource,
+			RecalcASource: control.RecalcASource,
+			RecalcBSource: control.RecalcBSource,
+		})
+	}
+	return a.svc.NotifyDataIntegrityCritical(ctx, tenantID, actor, businessinsights.DataIntegrityCritical{
+		ProjectID:    in.ProjectID,
+		FailedChecks: in.FailedChecks,
+		TotalChecks:  in.TotalChecks,
+		Controls:     controls,
+	})
+}
+
+func (a *dataIntegrityAdapter) MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveDataIntegrityCritical(ctx, tenantID, projectID)
+}
+
+func (a *dataIntegrityAdapter) NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, in dataintegrity.TentativePricesInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	items := make([]businessinsights.TentativePriceItem, 0, len(in.SampleItems))
+	for _, item := range in.SampleItems {
+		items = append(items, businessinsights.TentativePriceItem{
+			SupplyID:     item.SupplyID,
+			Name:         item.Name,
+			CategoryName: item.CategoryName,
+			Price:        item.Price,
+		})
+	}
+	return a.svc.NotifyTentativePrices(ctx, tenantID, actor, businessinsights.TentativePricesIssue{
+		ProjectID:   in.ProjectID,
+		CustomerID:  in.CustomerID,
+		CampaignID:  in.CampaignID,
+		FieldID:     in.FieldID,
+		Count:       in.Count,
+		SampleItems: items,
+	})
+}
+
+func (a *dataIntegrityAdapter) MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveTentativePrices(ctx, tenantID, projectID)
+}
+
+type reportAdapter struct {
+	svc *businessinsights.Service
+}
+
+func (a *reportAdapter) NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, in reportmod.OperatingResultNegativeInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	crops := make([]businessinsights.OperatingResultNegativeCrop, 0, len(in.NegativeCrops))
+	for _, crop := range in.NegativeCrops {
+		crops = append(crops, businessinsights.OperatingResultNegativeCrop{
+			CropID:             crop.CropID,
+			CropName:           crop.CropName,
+			OperatingResultUSD: crop.OperatingResultUSD,
+			SurfaceHa:          crop.SurfaceHa,
+			ReturnPct:          crop.ReturnPct,
+		})
+	}
+	return a.svc.NotifyOperatingResultNegative(ctx, tenantID, actor, businessinsights.OperatingResultNegative{
+		ProjectID:               in.ProjectID,
+		CustomerID:              in.CustomerID,
+		CampaignID:              in.CampaignID,
+		TotalOperatingResultUSD: in.TotalOperatingResultUSD,
+		ProjectReturnPct:        in.ProjectReturnPct,
+		TotalInvestedProjectUSD: in.TotalInvestedProjectUSD,
+		NegativeCrops:           crops,
+	})
+}
+
+func (a *reportAdapter) MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveOperatingResultNegative(ctx, tenantID, projectID)
 }
 
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.

@@ -52,6 +52,7 @@ type Dependencies struct {
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -61,6 +62,7 @@ type Dependencies struct {
 	ProviderHandler           *provider.Handler
 	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler

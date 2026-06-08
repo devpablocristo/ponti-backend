@@ -1,10 +1,14 @@
 package usecases
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
@@ -15,10 +19,14 @@ import (
 
 type fakeLegacyClient struct {
 	calls int
+	err   error
 }
 
 func (f *fakeLegacyClient) Do(context.Context, string, string, any, string, string) (int, []byte, error) {
 	f.calls++
+	if f.err != nil {
+		return 0, nil, f.err
+	}
 	return http.StatusOK, []byte(`{"request_id":"legacy","output_kind":"chat_reply","content_language":"es","chat_id":"","reply":"legacy","tokens_used":0,"tool_calls":[],"pending_confirmations":[],"blocks":[],"routed_agent":"general","routing_source":"legacy"}`), nil
 }
 
@@ -131,5 +139,103 @@ func TestUseCases_ChatAxis_ForbiddenDoesNotFallbackToLegacy(t *testing.T) {
 	}
 	if legacy.calls != 0 {
 		t.Fatalf("legacy fallback must not run for Axis 4xx, calls=%d", legacy.calls)
+	}
+}
+
+func TestUseCases_ChatAxis_ServerErrorFallsBackToLegacy(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, orgID)
+	legacy := &fakeLegacyClient{}
+	axisClient := &fakeAxisClient{
+		status: http.StatusInternalServerError,
+		raw:    []byte(`{"code":"INTERNAL","message":"axis failed"}`),
+	}
+	uc := NewUseCases(legacy, axisClient, Config{
+		Provider:       "axis",
+		AxisEnabled:    true,
+		ProductSurface: "ponti",
+	})
+	status, raw, err := uc.Chat(ctx, "user-1", "project-1", map[string]any{"message": "hola"})
+	if err != nil {
+		t.Fatalf("Chat returned error: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("status=%d raw=%s", status, string(raw))
+	}
+	if legacy.calls != 1 {
+		t.Fatalf("legacy fallback calls=%d", legacy.calls)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if out["routing_source"] != "legacy" || out["reply"] != "legacy" {
+		t.Fatalf("unexpected fallback response: %#v", out)
+	}
+}
+
+func TestUseCases_ChatAxis_NetworkErrorFallsBackToLegacy(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, orgID)
+	legacy := &fakeLegacyClient{}
+	axisClient := &fakeAxisClient{err: errors.New("dial tcp refused")}
+	uc := NewUseCases(legacy, axisClient, Config{
+		Provider:       "axis",
+		AxisEnabled:    true,
+		ProductSurface: "ponti",
+	})
+	status, raw, err := uc.Chat(ctx, "user-1", "project-1", map[string]any{"message": "hola"})
+	if err != nil {
+		t.Fatalf("Chat returned error: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("status=%d raw=%s", status, string(raw))
+	}
+	if legacy.calls != 1 {
+		t.Fatalf("legacy fallback calls=%d", legacy.calls)
+	}
+}
+
+func TestUseCases_ChatStreamAxis_EmitsCompatibleSSE(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, orgID)
+	axisClient := &fakeAxisClient{
+		status: http.StatusOK,
+		raw: []byte(`{
+			"chat_id":"11111111-1111-1111-1111-111111111111",
+			"task_id":"task-1",
+			"run_id":"run-1",
+			"reply":"respuesta axis",
+			"tool_calls":[{"name":"ponti.insights.summary"}]
+		}`),
+	}
+	uc := NewUseCases(&fakeLegacyClient{}, axisClient, Config{
+		Provider:       "axis",
+		AxisEnabled:    true,
+		ProductSurface: "ponti",
+	})
+	rec := httptest.NewRecorder()
+	err := uc.ChatStream(ctx, "user-1", "project-1", bytes.NewBufferString(`{"message":"hola"}`), rec)
+	if err != nil {
+		t.Fatalf("ChatStream returned error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{
+		"event: start",
+		"event: tool_call",
+		"event: text",
+		"event: done",
+		`"routing_source":"axis"`,
+		`"reply":"respuesta axis"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("SSE body missing %q:\n%s", expected, body)
+		}
 	}
 }
