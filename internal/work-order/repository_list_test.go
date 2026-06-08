@@ -168,7 +168,7 @@ func TestRepository_ListWorkOrders_FiltersDigitalDrafts(t *testing.T) {
 	}
 }
 
-func TestRepository_ListWorkOrders_GroupsDigitalSplitRows(t *testing.T) {
+func TestRepository_ListWorkOrders_PreservesDigitalSplitRowsWithDistributedConsumption(t *testing.T) {
 	db := newListWorkOrdersTestDB(t)
 	repo := NewRepository(&listTestGormEngine{client: db})
 
@@ -191,7 +191,7 @@ func TestRepository_ListWorkOrders_GroupsDigitalSplitRows(t *testing.T) {
 			 'Labor', 50, true, 'draft', NULL, 0,
 			 'Pulverización', 0, 1, 0, 50);
 	`).Error; err != nil {
-		t.Fatalf("insert grouped rows: %v", err)
+		t.Fatalf("insert digital split rows: %v", err)
 	}
 
 	projectID := int64(30)
@@ -204,26 +204,27 @@ func TestRepository_ListWorkOrders_GroupsDigitalSplitRows(t *testing.T) {
 		t.Fatalf("list work orders: %v", err)
 	}
 
-	if pageInfo.Total != 5 {
-		t.Fatalf("expected logical total 5, got %d", pageInfo.Total)
+	if pageInfo.Total != 8 {
+		t.Fatalf("expected physical total 8, got %d", pageInfo.Total)
 	}
-	if rows[0].Number != "D-3000" {
-		t.Fatalf("expected grouped base number first, got %q", rows[0].Number)
+
+	seenSplitRows := map[string]int{}
+	consumption := decimal.Zero
+	for _, row := range rows {
+		switch row.Number {
+		case "D-3000":
+			t.Fatalf("work order list must not invent a logical multi-lot order row")
+		case "D-3000.1", "D-3000.2":
+			seenSplitRows[row.Number]++
+			consumption = consumption.Add(row.Consumption)
+		}
 	}
-	if !rows[0].IsGroupedDigital || rows[0].BaseNumber != "D-3000" || rows[0].LotsCount != 2 {
-		t.Fatalf("expected grouped metadata, got grouped=%v base=%q lots=%d", rows[0].IsGroupedDigital, rows[0].BaseNumber, rows[0].LotsCount)
+
+	if seenSplitRows["D-3000.1"] != 2 || seenSplitRows["D-3000.2"] != 2 {
+		t.Fatalf("expected supply+labor rows for both split orders, got %#v", seenSplitRows)
 	}
-	if rows[0].LotName != "CIR 1, CIR 2" {
-		t.Fatalf("expected joined lot names, got %q", rows[0].LotName)
-	}
-	if !rows[0].SurfaceHa.Equal(decimal.NewFromInt(100)) {
-		t.Fatalf("expected surface 100, got %s", rows[0].SurfaceHa)
-	}
-	if !rows[0].Consumption.Equal(decimal.NewFromInt(200)) {
-		t.Fatalf("expected consumption 200, got %s", rows[0].Consumption)
-	}
-	if !rows[0].TotalCost.Equal(decimal.NewFromInt(300)) {
-		t.Fatalf("expected total cost 300, got %s", rows[0].TotalCost)
+	if !consumption.Equal(decimal.NewFromInt(200)) {
+		t.Fatalf("expected distributed consumption total 200 across split rows, got %s", consumption)
 	}
 }
 

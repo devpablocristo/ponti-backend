@@ -33,9 +33,6 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal `gorm:"column:supply_total_cost"`
 	IsDigital         bool            `gorm:"column:is_digital"`
 	Status            string          `gorm:"column:status"`
-	BaseNumber        string          `gorm:"-"`
-	IsGroupedDigital  bool            `gorm:"-"`
-	LotsCount         int64           `gorm:"-"`
 }
 
 // TableName apunta a la vista.

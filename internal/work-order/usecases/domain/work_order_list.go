@@ -31,9 +31,6 @@ type WorkOrderListElement struct {
 	TotalCost         decimal.Decimal
 	IsDigital         bool
 	Status            string
-	BaseNumber        string
-	IsGroupedDigital  bool
-	LotsCount         int64
 }
 
 // - CropName: Estos filtros muestran una lista desplegable con todas las opciones de cultivos y un checkbox a la par para activar los cultivos que se quieran ver. Lo mismo es para cada una de las columnas.

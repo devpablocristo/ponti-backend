@@ -78,19 +78,18 @@ Does not own:
 - Digital draft numbering uses `D-n` and split suffix forms.
 - Digital batch drafts with more than one lot persist one physical draft per lot
   (`D-n.1`, `D-n.2`, ...), but the batch input item `total_used` is the total
-  consumption of the logical work order, not per-lot consumption.
+  consumption entered for the batch, not per-lot consumption.
 - For digital multi-lot drafts, every lot must carry the same supply set. Core
   computes `final_dose = total_used / total_effective_area`, stores each lot as
   `total_used_lot = total_used * lot_effective_area / total_effective_area`,
   and adjusts the last lot for decimal residue so the persisted sum equals the
   original total.
 - Digital group edits use the same proportional distribution. Group detail
-  responses aggregate items across all physical lots and expose the logical
-  total.
-- Work order list, filter-row, and export responses group digital split rows as
-  one logical row: `number=D-n`, joined lot names, summed surface, summed
-  consumption/cost, and grouped metadata (`base_number`,
-  `is_grouped_digital`, `lots_count`).
+  responses aggregate items across all physical draft lots for editing the
+  batch, but published/listed work orders remain one physical row per lot.
+- Work order list, filter-row, and export responses must not invent a `D-n`
+  multi-lot work order row. They expose the physical split rows (`D-n.1`,
+  `D-n.2`, ...), with each row carrying its distributed consumption.
 - Work order duplicate endpoint is currently `Stubbed`.
 - Archived work order listing reads soft-deleted work orders where `deleted_at IS NOT NULL` from the base `workorders` table using GORM `Unscoped()`.
 - Archived work order listing reuses the existing work order list response mapping through `dto.FromDomainList(pageInfo, list)`.
@@ -143,7 +142,7 @@ Does not own:
   `go test ./internal/work-order-draft/...` verifies 50/50 and uneven-area
   distribution, group update distribution, decimal residue, and aggregated group
   detail items.
-- Logical work order list coverage: `go test ./internal/work-order/...`
-  verifies `D-n.1`/`D-n.2` list rows collapse to one `D-n` row with total
-  consumption `200`.
+- Work order list coverage: `go test ./internal/work-order/...` verifies
+  `D-n.1`/`D-n.2` rows remain physical split rows while their summed
+  consumption is `200`.
 - Labor tests: `go test ./internal/labor/...`.

@@ -107,22 +107,22 @@ Base path: `/api/v1`
 ### Digital Multi-Lot Work Order Contract
 
 - `POST /work-order-drafts/digital/batch` treats each item `total_used` as the
-  total consumption of the logical work order. For a batch with two 50 ha lots
-  and one supply `total_used=200`, Core stores two physical draft rows with
-  `100` and `100`, not `200` and `200`.
+  total consumption entered for the batch. For a batch with two 50 ha lots and
+  one supply `total_used=200`, Core stores two physical draft rows with `100`
+  and `100`, not `200` and `200`.
 - All lots in a digital batch must include the same supply set. Core calculates
   `final_dose = total_used / total_effective_area`, distributes each item
   proportionally by lot effective area, and assigns any decimal residue to the
   last lot so persisted totals add back to the original input.
 - `GET`/`PUT /work-order-drafts/:work_order_draft_id/group` returns and accepts
-  the logical group payload. `items[].total_used` is the group total and updates
-  are redistributed across the physical lot drafts.
+  the batch editing payload for related digital draft rows. `items[].total_used`
+  is the batch total and updates are redistributed across the physical lot
+  drafts.
 - `GET /work-orders`, `GET /work-orders/filter-rows`, and
-  `GET /work-orders/export` expose digital split rows as one logical list row:
-  `number=D-n`, `lot_name` joined across lots, `surface_ha` summed across lots,
-  `consumption` and `total_cost` summed from the physical rows, and optional
-  grouped metadata fields `base_number`, `is_grouped_digital`, and
-  `lots_count`.
+  `GET /work-orders/export` expose the physical work-order rows. A batch with
+  two lots appears as `D-n.1` and `D-n.2`; each row carries its distributed
+  consumption. These endpoints must not synthesize a `D-n` multi-lot work order
+  row.
 - `migrations_v4/000233_fix_multilot_workorder_consumption.up.sql` repairs
   historical digital split rows by setting per-lot item consumption to
   `final_dose * effective_area`. The down migration is intentionally a no-op
