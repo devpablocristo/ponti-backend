@@ -259,6 +259,49 @@ The chat smoke validates:
 - `reply` is non-empty.
 - `/api/v1/ai/chat/stream` emits compatible SSE events: `start`, `text`, `done`.
 
+## Local Draft Preview Smoke
+
+Ponti API must be running. In normal local development, run the smoke with the
+local API key:
+
+```bash
+export PONTI_BASE_URL=http://localhost:8080
+export PONTI_ORG_ID=<auth_tenants.id>
+export PONTI_AUTH_MODE=local
+export PONTI_API_KEY=<ponti-backend-x-api-key>
+export PONTI_PROJECT_ID=<project id owned by tenant>
+export PONTI_FIELD_ID=<optional field id>
+export PONTI_CAMPAIGN_ID=<optional campaign id>
+export PONTI_SUPPLY_ID=<optional supply id>
+scripts/axis/smoke-ponti-axis-draft-previews.sh
+```
+
+To validate the exact Axis product integration auth path, run the same smoke
+with bearer auth and make sure `PONTI_AXIS_API_KEY` matches the backend env:
+
+```bash
+export PONTI_BASE_URL=http://localhost:8080
+export PONTI_ORG_ID=<auth_tenants.id>
+export PONTI_AUTH_MODE=axis
+export PONTI_AXIS_API_KEY=<ponti-axis-product-key>
+export PONTI_PROJECT_ID=<project id owned by tenant>
+export PONTI_FIELD_ID=<optional field id>
+export PONTI_CAMPAIGN_ID=<optional campaign id>
+export PONTI_SUPPLY_ID=<optional supply id>
+scripts/axis/smoke-ponti-axis-draft-previews.sh
+```
+
+The draft preview smoke validates:
+
+- all three prepare endpoints return `status=preview`;
+- `approval_required=true`;
+- `nexus_action_type=agent.capability.invoke`;
+- `preview_only=true`;
+- `write_performed=false`;
+- `execution_allowed=false`;
+- tenant/workspace evidence is present;
+- invalid zero-delta stock adjustment fails with `400`.
+
 ## Chat Flow
 
 `POST /api/v1/ai/chat` keeps the legacy web contract.
