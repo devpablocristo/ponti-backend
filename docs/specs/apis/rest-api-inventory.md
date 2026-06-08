@@ -123,7 +123,8 @@ Base path: `/api/v1`
   two lots appears as `D-n.1` and `D-n.2`; each row carries its distributed
   consumption. If the report view emits multiple component rows for the same
   physical order ID, Core aggregates them into one response row. These endpoints
-  must not synthesize a `D-n` multi-lot work order row.
+  must not synthesize a `D-n` multi-lot work order row. `page_info.total` counts
+  aggregated physical order rows, not raw report-view component rows.
 - `migrations_v4/000233_fix_multilot_workorder_consumption.up.sql` repairs
   historical digital split rows by setting per-lot item consumption to
   `final_dose * effective_area`. The down migration is intentionally a no-op

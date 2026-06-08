@@ -148,3 +148,6 @@ Does not own:
   `D-n.1`/`D-n.2` rows remain physical split rows, each physical order appears
   once, and their summed consumption is `200`.
 - Labor tests: `go test ./internal/labor/...`.
+- Full Core regression: `go test ./...`.
+- Runtime list check against active DB verified `D-1905555.1`, `D-1905555.2`,
+  and `D-1905555.3` appear once each after component-row aggregation.
