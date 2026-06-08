@@ -163,10 +163,11 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			}
 
 			finalDose := item.TotalUsed.Div(totalEffectiveArea).Round(6)
+			totalUsed := proratedTotalUsed(item.TotalUsed, lot.EffectiveArea, totalEffectiveArea)
 
 			items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
-				TotalUsed: item.TotalUsed,
+				TotalUsed: totalUsed,
 				FinalDose: finalDose,
 			}
 		}
@@ -390,12 +391,16 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 
 		for j, item := range group.Items {
 			finalDose := item.FinalDose
+			totalUsed := decimal.Zero
 			if finalDose.LessThanOrEqual(decimal.Zero) {
 				finalDose = item.TotalUsed.Div(current.EffectiveArea).Round(6)
+				totalUsed = proratedTotalUsed(item.TotalUsed, lot.EffectiveArea, current.EffectiveArea)
+			} else {
+				totalUsed = finalDose.Mul(lot.EffectiveArea).Round(6)
 			}
 			draft.Items[j] = domain.WorkOrderDraftItem{
 				SupplyID:  item.SupplyID,
-				TotalUsed: item.TotalUsed,
+				TotalUsed: totalUsed,
 				FinalDose: finalDose,
 			}
 		}
@@ -541,6 +546,15 @@ func publishedTotalUsed(draft *domain.WorkOrderDraft, item domain.WorkOrderDraft
 	}
 
 	return item.TotalUsed
+}
+
+func proratedTotalUsed(totalUsed, lotArea, totalArea decimal.Decimal) decimal.Decimal {
+	if totalUsed.LessThanOrEqual(decimal.Zero) ||
+		lotArea.LessThanOrEqual(decimal.Zero) ||
+		totalArea.LessThanOrEqual(decimal.Zero) {
+		return decimal.Zero
+	}
+	return totalUsed.Mul(lotArea).Div(totalArea).Round(6)
 }
 
 func (u *UseCases) validateDraftSuppliesReadyForPublish(ctx context.Context, draft *domain.WorkOrderDraft) error {

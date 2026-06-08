@@ -54,7 +54,7 @@ func (r *testDraftRepo) ListPendingSupplyNamesByIDs(ctx context.Context, ids []i
 }
 
 func (r *testDraftRepo) GetPendingLaborNameByID(ctx context.Context, laborID int64) (string, error) {
-    return "", nil
+	return "", nil
 }
 
 func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.Context, projectID int64, baseNumber string) ([]*domain.WorkOrderDraft, error) {
@@ -65,7 +65,7 @@ func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx contex
 }
 
 func (r *testDraftRepo) GetLaborContractorByID(ctx context.Context, laborID int64) (string, error) {
-    return "", nil
+	return "", nil
 }
 
 func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
@@ -203,7 +203,7 @@ func TestCreateDigitalWorkOrderDraft_AssignsSplitNumberWhenBaseExists(t *testing
 	require.Equal(t, "D-41.2", created.Number)
 }
 
-func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *testing.T) {
+func TestCreateDigitalWorkOrderDraftBatch_ProratesTotalUsedByLotArea(t *testing.T) {
 	var created []*domain.WorkOrderDraft
 
 	repo := &testDraftRepo{
@@ -230,7 +230,7 @@ func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *test
 		Lots: []domain.WorkOrderDraftBatchLot{
 			{
 				LotID:         101,
-				EffectiveArea: decimal.NewFromInt(60),
+				EffectiveArea: decimal.NewFromInt(40),
 				Items: []domain.WorkOrderDraftBatchLotItem{
 					{
 						SupplyID:  999,
@@ -240,7 +240,7 @@ func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *test
 			},
 			{
 				LotID:         102,
-				EffectiveArea: decimal.NewFromInt(60),
+				EffectiveArea: decimal.NewFromInt(80),
 				Items: []domain.WorkOrderDraftBatchLotItem{
 					{
 						SupplyID:  999,
@@ -260,8 +260,8 @@ func TestCreateDigitalWorkOrderDraftBatch_UsesTotalBatchAreaForFinalDose(t *test
 	require.Equal(t, "D-1.1", created[0].Number)
 	require.Equal(t, "D-1.2", created[1].Number)
 
-	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
-	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(120)))
+	require.True(t, created[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(40)))
+	require.True(t, created[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(80)))
 
 	require.True(t, created[0].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
 	require.True(t, created[1].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
@@ -448,8 +448,8 @@ func groupUpdateRequest() *domain.WorkOrderDraftGroup {
 
 func TestUpdateWorkOrderDraftGroupByID_HappyPathSendsAllLotsInSingleCall(t *testing.T) {
 	groupRelated := []*domain.WorkOrderDraft{
-		groupDraft(101, "D-7.1", domain.StatusDraft, decimal.NewFromInt(60)),
-		groupDraft(102, "D-7.2", domain.StatusDraft, decimal.NewFromInt(60)),
+		groupDraft(101, "D-7.1", domain.StatusDraft, decimal.NewFromInt(40)),
+		groupDraft(102, "D-7.2", domain.StatusDraft, decimal.NewFromInt(80)),
 	}
 
 	var (
@@ -487,9 +487,12 @@ func TestUpdateWorkOrderDraftGroupByID_HappyPathSendsAllLotsInSingleCall(t *test
 	require.Len(t, captured, 2)
 	require.Equal(t, int64(101), captured[0].ID)
 	require.Equal(t, int64(102), captured[1].ID)
-	// FinalDose se recalcula sobre el área total del grupo (60+60=120 ha) si
+	// FinalDose se recalcula sobre el área total del grupo (40+80=120 ha) si
 	// el item llega con FinalDose<=0; con FinalDose=1 lo respeta tal cual.
 	require.True(t, captured[0].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+	require.True(t, captured[1].Items[0].FinalDose.Equal(decimal.NewFromInt(1)))
+	require.True(t, captured[0].Items[0].TotalUsed.Equal(decimal.NewFromInt(40)))
+	require.True(t, captured[1].Items[0].TotalUsed.Equal(decimal.NewFromInt(80)))
 }
 
 func TestUpdateWorkOrderDraftGroupByID_AtomicErrorFromRepoIsPropagated(t *testing.T) {
