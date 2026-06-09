@@ -65,7 +65,7 @@ Ejemplo local completo:
 ```bash
 export AXIS_COMPANION_BASE_URL=http://localhost:18085
 export AXIS_COMPANION_API_KEY=local-dev-companion-api-key
-export NEXUS_BASE_URL=http://localhost:18086
+export NEXUS_BASE_URL=http://localhost:18084
 export NEXUS_ADMIN_API_KEY=local-dev-nexus-api-key
 export PONTI_BASE_URL=http://localhost:8080
 export PONTI_ORG_ID=<auth_tenants.id>

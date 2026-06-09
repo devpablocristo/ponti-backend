@@ -113,9 +113,23 @@ jobs:
               for name, value in vars_map.items():
                   if not value:
                       continue
-                  if name.endswith("_URL") or name in {"BASE_MANAGER_API", "AI_SERVICE_URL"}:
+                  if name.endswith("_URL") or name in {"BASE_MANAGER_API", "AI_SERVICE_URL", "AXIS_COMPANION_BASE_URL"}:
                       if "---" in value:
                           errors.append(f"[{ENV_NAME}] {svc}: {name} points to tagged URL ({value})")
+
+              if svc == "ponti-backend":
+                  provider = vars_map.get("AI_PROVIDER", "").strip().lower()
+                  axis_enabled = vars_map.get("AI_AXIS_ENABLED", "").strip().lower()
+                  if provider == "axis" and axis_enabled == "true":
+                      axis_url = vars_map.get("AXIS_COMPANION_BASE_URL", "").strip()
+                      product_surface = vars_map.get("AXIS_PRODUCT_SURFACE", "").strip()
+                      if not axis_url:
+                          errors.append(f"[{ENV_NAME}] ponti-backend: AXIS_COMPANION_BASE_URL is empty while Axis is enabled")
+                      if product_surface != "ponti":
+                          errors.append(
+                              f"[{ENV_NAME}] ponti-backend: AXIS_PRODUCT_SURFACE mismatch. "
+                              f"expected=ponti actual={product_surface}"
+                          )
 
               if svc == "ponti-frontend":
                   base_manager_api = vars_map.get("BASE_MANAGER_API", "").rstrip("/")
@@ -147,4 +161,3 @@ jobs:
 
           print("\\nAlignment OK.")
           PY
-

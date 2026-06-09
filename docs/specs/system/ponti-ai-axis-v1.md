@@ -28,6 +28,17 @@ Frontend:
 
 The frontend flag is diagnostic/rollout metadata only. Ponti web and mobile must not call Axis directly in production; Ponti backend is the product boundary.
 
+Cloud Run deploy defaults for v1:
+
+- Ponti backend workflows default to `AI_PROVIDER=axis` and
+  `AI_AXIS_ENABLED=true`, overridable per environment for rollback.
+- Ponti backend mounts `AXIS_COMPANION_API_KEY` and `PONTI_AXIS_API_KEY` from
+  Secret Manager.
+- Axis Companion mounts `PONTI_API_KEY` from Secret Manager and receives
+  `PONTI_BASE_URL`.
+- This v1 remains API-key based. Do not mix it with the older internal
+  JWT/JWKS cutover notes.
+
 ## Identity Mapping
 
 Ponti middleware resolves the effective tenant from the current authenticated request. When `AI_PROVIDER=axis` and `AI_AXIS_ENABLED=true`, backend calls Axis Companion with:
