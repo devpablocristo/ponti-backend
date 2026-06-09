@@ -65,6 +65,74 @@ func pontiCapabilities() []capabilityManifest {
 }
 
 func pontiInsightsManifest() capabilityManifest {
+	tools := []capabilityTool{
+		{
+			Name:        "ponti.insights.list",
+			Description: "Lists insights for the caller's tenant with optional filters.",
+			Mode:        capabilityModeRead,
+			SideEffect:  false,
+			RiskClass:   capabilityRiskLow,
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"limit":            map[string]any{"type": "integer", "minimum": 1, "maximum": 200},
+					"include_resolved": map[string]any{"type": "boolean"},
+				},
+			},
+			OutputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"items": map[string]any{"type": "array"}, "evidence": map[string]any{"type": "object"}},
+				"required":   []string{"items", "evidence"},
+			},
+			EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace"},
+			RequiredRoles:   pontiInsightRoles,
+			RequiredModules: pontiInsightModules,
+			ExecutorRef:     "ponti-backend.insights.list",
+		},
+		{
+			Name:        "ponti.insights.summary",
+			Description: "Returns aggregate counts of insights by status, severity and kind for the tenant.",
+			Mode:        capabilityModeRead,
+			SideEffect:  false,
+			RiskClass:   capabilityRiskLow,
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+			OutputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"summary": map[string]any{"type": "object"}, "evidence": map[string]any{"type": "object"}},
+				"required":   []string{"summary", "evidence"},
+			},
+			EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace"},
+			RequiredRoles:   pontiInsightRoles,
+			RequiredModules: pontiInsightModules,
+			ExecutorRef:     "ponti-backend.insights.summary",
+		},
+		{
+			Name:        "ponti.insights.explain",
+			Description: "Returns one insight together with provenance and evidence.",
+			Mode:        capabilityModeRead,
+			SideEffect:  false,
+			RiskClass:   capabilityRiskLow,
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"insight_id": map[string]any{"type": "string", "format": "uuid"}},
+				"required":   []string{"insight_id"},
+			},
+			OutputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"insight": map[string]any{"type": "object"}, "evidence": map[string]any{"type": "object"}},
+				"required":   []string{"insight", "evidence"},
+			},
+			EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace", "first_seen", "event_type", "entity"},
+			RequiredRoles:   pontiInsightRoles,
+			RequiredModules: pontiInsightModules,
+			ExecutorRef:     "ponti-backend.insights.explain",
+		},
+	}
+	tools = append(tools, pontiPlannedDraftActionTools()...)
+
 	return capabilityManifest{
 		SchemaVersion: pontiCapabilitySchemaVersion,
 		ID:            "ponti.insights",
@@ -79,72 +147,7 @@ func pontiInsightsManifest() capabilityManifest {
 				Description: "Answers questions about active Ponti insights for the caller's tenant.",
 			},
 		},
-		Tools: []capabilityTool{
-			{
-				Name:        "ponti.insights.list",
-				Description: "Lists insights for the caller's tenant with optional filters.",
-				Mode:        capabilityModeRead,
-				SideEffect:  false,
-				RiskClass:   capabilityRiskLow,
-				InputSchema: map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"limit":            map[string]any{"type": "integer", "minimum": 1, "maximum": 200},
-						"include_resolved": map[string]any{"type": "boolean"},
-					},
-				},
-				OutputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{"items": map[string]any{"type": "array"}, "evidence": map[string]any{"type": "object"}},
-					"required":   []string{"items", "evidence"},
-				},
-				EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace"},
-				RequiredRoles:   pontiInsightRoles,
-				RequiredModules: pontiInsightModules,
-				ExecutorRef:     "ponti-backend.insights.list",
-			},
-			{
-				Name:        "ponti.insights.summary",
-				Description: "Returns aggregate counts of insights by status, severity and kind for the tenant.",
-				Mode:        capabilityModeRead,
-				SideEffect:  false,
-				RiskClass:   capabilityRiskLow,
-				InputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-				},
-				OutputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{"summary": map[string]any{"type": "object"}, "evidence": map[string]any{"type": "object"}},
-					"required":   []string{"summary", "evidence"},
-				},
-				EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace"},
-				RequiredRoles:   pontiInsightRoles,
-				RequiredModules: pontiInsightModules,
-				ExecutorRef:     "ponti-backend.insights.summary",
-			},
-			{
-				Name:        "ponti.insights.explain",
-				Description: "Returns one insight together with provenance and evidence.",
-				Mode:        capabilityModeRead,
-				SideEffect:  false,
-				RiskClass:   capabilityRiskLow,
-				InputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{"insight_id": map[string]any{"type": "string", "format": "uuid"}},
-					"required":   []string{"insight_id"},
-				},
-				OutputSchema: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{"insight": map[string]any{"type": "object"}, "evidence": map[string]any{"type": "object"}},
-					"required":   []string{"insight", "evidence"},
-				},
-				EvidenceFields:  []string{"source_ref", "captured_at", "tenant_scope", "workspace", "first_seen", "event_type", "entity"},
-				RequiredRoles:   pontiInsightRoles,
-				RequiredModules: pontiInsightModules,
-				ExecutorRef:     "ponti-backend.insights.explain",
-			},
-		},
+		Tools: tools,
 	}
 }
 

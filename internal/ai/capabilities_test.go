@@ -2,7 +2,7 @@ package ai
 
 import "testing"
 
-func TestPontiCapabilities_ExposeReadOnlyInsightsManifest(t *testing.T) {
+func TestPontiCapabilities_ExposeInsightsAndDraftActionsManifest(t *testing.T) {
 	t.Parallel()
 
 	items := pontiCapabilities()
@@ -17,27 +17,44 @@ func TestPontiCapabilities_ExposeReadOnlyInsightsManifest(t *testing.T) {
 	if manifest.Product != pontiProductSurface {
 		t.Fatalf("unexpected product: %v", manifest.Product)
 	}
-	if len(manifest.Tools) != 3 {
-		t.Fatalf("expected 3 published read-only tools, got %d", len(manifest.Tools))
+	if len(manifest.Tools) != 6 {
+		t.Fatalf("expected 6 published tools, got %d", len(manifest.Tools))
+	}
+	expectedReads := map[string]bool{
+		"ponti.insights.list":    true,
+		"ponti.insights.summary": true,
+		"ponti.insights.explain": true,
+	}
+	expectedDrafts := map[string]bool{
+		"ponti.insight.resolve.prepare":  true,
+		"ponti.workorder.draft.prepare":  true,
+		"ponti.stock_adjustment.prepare": true,
 	}
 	for _, tool := range manifest.Tools {
 		assertToolBasics(t, tool)
-		if tool.Mode != capabilityModeRead {
-			t.Fatalf("tool %v must be read mode", tool.Name)
-		}
-		if tool.SideEffect {
-			t.Fatalf("tool %v must be side_effect=false", tool.Name)
-		}
-		if tool.RiskClass != capabilityRiskLow {
-			t.Fatalf("tool %v must be risk_class=low", tool.Name)
-		}
-		if tool.Governance != nil {
-			t.Fatalf("read-only tool %v must not declare governance", tool.Name)
+		switch {
+		case expectedReads[tool.Name]:
+			if tool.Mode != capabilityModeRead {
+				t.Fatalf("tool %v must be read mode", tool.Name)
+			}
+			if tool.SideEffect {
+				t.Fatalf("tool %v must be side_effect=false", tool.Name)
+			}
+			if tool.RiskClass != capabilityRiskLow {
+				t.Fatalf("tool %v must be risk_class=low", tool.Name)
+			}
+			if tool.Governance != nil {
+				t.Fatalf("read-only tool %v must not declare governance", tool.Name)
+			}
+		case expectedDrafts[tool.Name]:
+			assertGovernedDraftTool(t, tool)
+		default:
+			t.Fatalf("unexpected published tool %q", tool.Name)
 		}
 	}
 }
 
-func TestPontiPlannedDraftActions_AreGovernedButNotPublished(t *testing.T) {
+func TestPontiDraftActions_AreGovernedAndPublished(t *testing.T) {
 	t.Parallel()
 
 	published := map[string]bool{}
@@ -75,25 +92,36 @@ func TestPontiPlannedDraftActions_AreGovernedButNotPublished(t *testing.T) {
 		if !expected[tool.Name] {
 			t.Fatalf("unexpected planned draft action tool %q", tool.Name)
 		}
-		if published[tool.Name] {
-			t.Fatalf("planned draft action %q must not be published until Axis can execute it", tool.Name)
+		if !published[tool.Name] {
+			t.Fatalf("draft action %q must be published now that Axis can execute previews", tool.Name)
 		}
-		assertToolBasics(t, tool)
-		if tool.Mode != capabilityModeWrite {
-			t.Fatalf("draft action %q must be write mode", tool.Name)
-		}
-		if !tool.SideEffect {
-			t.Fatalf("draft action %q must declare side_effect=true", tool.Name)
-		}
-		if tool.Governance == nil {
-			t.Fatalf("draft action %q must declare governance", tool.Name)
-		}
-		if !tool.Governance.RequiresApproval {
-			t.Fatalf("draft action %q must require approval", tool.Name)
-		}
-		if tool.Governance.ActionType != pontiNexusActionType {
-			t.Fatalf("draft action %q must use Nexus action type %q, got %q", tool.Name, pontiNexusActionType, tool.Governance.ActionType)
-		}
+		assertGovernedDraftTool(t, tool)
+	}
+}
+
+func assertGovernedDraftTool(t *testing.T, tool capabilityTool) {
+	t.Helper()
+	assertToolBasics(t, tool)
+	if tool.Mode != capabilityModeWrite {
+		t.Fatalf("draft action %q must be write mode", tool.Name)
+	}
+	if !tool.SideEffect {
+		t.Fatalf("draft action %q must declare side_effect=true", tool.Name)
+	}
+	if tool.RiskClass != capabilityRiskMedium {
+		t.Fatalf("draft action %q must be risk_class=medium", tool.Name)
+	}
+	if tool.Governance == nil {
+		t.Fatalf("draft action %q must declare governance", tool.Name)
+	}
+	if !tool.Governance.RequiresApproval {
+		t.Fatalf("draft action %q must require approval", tool.Name)
+	}
+	if tool.Governance.ActionType != pontiNexusActionType {
+		t.Fatalf("draft action %q must use Nexus action type %q, got %q", tool.Name, pontiNexusActionType, tool.Governance.ActionType)
+	}
+	if tool.Governance.TargetSystem != pontiProductSurface {
+		t.Fatalf("draft action %q must target %q, got %q", tool.Name, pontiProductSurface, tool.Governance.TargetSystem)
 	}
 }
 

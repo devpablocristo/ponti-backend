@@ -8,7 +8,7 @@ Ponti is the first real product surface connected to Axis.
 - Axis `org_id`: Ponti `auth_tenants.id`
 - `external_tenant_id`: initially the same Ponti `auth_tenants.id`
 - Initial auth mode: server-to-server API key plus delegated headers
-- Initial rollout: read-only
+- Initial rollout: read-only plus governed preview actions
 - Legacy fallback: `ponti-ai` remains available through `AI_PROVIDER=legacy`
 
 ## Runtime Config
@@ -63,18 +63,33 @@ First cut publishes one manifest:
 
 - `ponti.insights`
 
-Tools:
+Read tools:
 
 - `ponti.insights.list`
 - `ponti.insights.summary`
 - `ponti.insights.explain`
 
-All tools are:
+Read tools are:
 
 - `mode=read`
 - `side_effect=false`
 - `risk_class=low`
 - tenant-scoped by `auth_tenants.id`
+
+Governed preview tools:
+
+- `ponti.insight.resolve.prepare`
+- `ponti.workorder.draft.prepare`
+- `ponti.stock_adjustment.prepare`
+
+Preview tools are:
+
+- `mode=write`
+- `side_effect=true`
+- `risk_class=medium`
+- `governance.requires_approval=true`
+- `governance.action_type=agent.capability.invoke`
+- preview-only: they prepare proposals but do not mutate Ponti data.
 
 The broader target capabilities remain planned, not published in this cut:
 
@@ -85,20 +100,14 @@ The broader target capabilities remain planned, not published in this cut:
 - `ponti.reports.summary`
 - `ponti.data_integrity.summary`
 
-Reason: the current Axis PontiConnector executes only the three insights operations. Publishing tools that Axis cannot execute would make the planner overpromise.
+Reason: the current Axis PontiConnector executes the three insight reads and
+the three governed preview actions. Publishing broader dashboard/stock/report
+tools before the connector can execute them would make the planner overpromise.
 
-Draft action contracts are prepared in backend code but intentionally not
-published yet:
-
-- `ponti.insight.resolve.prepare`
-- `ponti.workorder.draft.prepare`
-- `ponti.stock_adjustment.prepare`
-
-They are modeled as `mode=write`, `side_effect=true`,
-`governance.requires_approval=true` and
-`governance.action_type=agent.capability.invoke`. They stay unpublished until
-Axis PontiConnector can execute them and Nexus approval can be verified
-end-to-end.
+Draft action contracts are published in the same `ponti.insights` manifest for
+the first connector cut because Axis currently discovers that manifest. If
+Ponti later publishes multiple manifests, Axis PontiConnector must expand
+discovery before Ponti splits these tools into a separate package.
 
 ## Ponti Endpoints For Axis
 
@@ -302,6 +311,11 @@ The draft preview smoke validates:
 - tenant/workspace evidence is present;
 - invalid zero-delta stock adjustment fails with `400`.
 
+Axis connector execution of these preview tools is guarded by Nexus. A direct
+connector execution without `nexus_request_id` is expected to fail before Axis
+calls Ponti. With an approved Nexus request and an `idempotency_key`, Axis may
+call the preview endpoint, which still returns `write_performed=false`.
+
 ## Chat Flow
 
 `POST /api/v1/ai/chat` keeps the legacy web contract.
@@ -349,7 +363,7 @@ Fallback to legacy `ponti-ai` happens only for Axis configuration/network/server
 
 1. Expand Axis/Ponti contract to accept workspace as a first-class field.
 2. Add generic connector execution for dashboard, stock, workorders, lots, reports and integrity.
-3. Add draft-only capabilities governed by Nexus.
+3. Add a Nexus-approved end-to-end smoke for Ponti preview execution.
 4. Add more Ponti insight producers: low stock and overdue operational work once thresholds are defined.
 5. Add mobile after web read-only is stable.
 6. Retire `ponti-ai` only after fallback rate is near zero and smokes/evals are green.
@@ -393,12 +407,8 @@ Insights:
 
 Draft actions:
 
-- Publish `ponti.insight.resolve.prepare` once Axis PontiConnector can execute
-  the preview endpoint and Nexus approval is verified.
-- Publish `ponti.workorder.draft.prepare` once Axis PontiConnector can execute
-  the preview endpoint and Nexus approval is verified.
-- Publish `ponti.stock_adjustment.prepare` once Axis PontiConnector can execute
-  the preview endpoint and Nexus approval is verified.
+- Add an end-to-end smoke that creates/approves the Nexus request and then
+  executes a Ponti preview capability through Axis.
 - Require `approval_required=true`, `side_effect_type=write` and
   `nexus_action_type=agent.capability.invoke` in every draft/write manifest.
 - Convert preview-only endpoints into real draft creation only after Nexus
