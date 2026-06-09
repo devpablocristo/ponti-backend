@@ -88,8 +88,11 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 	totalSurface := decimal.Zero
 
 	type aggregated struct {
-		Name      string
-		TotalUsed decimal.Decimal
+		Name          string
+		TotalUsed     decimal.Decimal
+		FinalDose     decimal.Decimal
+		Seen          int
+		sameFinalDose bool
 	}
 
 	bySupply := make(map[int64]*aggregated)
@@ -108,12 +111,19 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 
 			if _, exists := bySupply[key]; !exists {
 				bySupply[key] = &aggregated{
-					Name:      safeValue(item.SupplyName),
-					TotalUsed: decimal.Zero,
+					Name:          safeValue(item.SupplyName),
+					TotalUsed:     decimal.Zero,
+					FinalDose:     item.FinalDose,
+					sameFinalDose: true,
 				}
 				supplyOrder = append(supplyOrder, key)
 			}
-			bySupply[key].TotalUsed = bySupply[key].TotalUsed.Add(item.TotalUsed)
+			row := bySupply[key]
+			row.TotalUsed = row.TotalUsed.Add(item.TotalUsed)
+			row.Seen++
+			if !row.FinalDose.Equal(item.FinalDose) {
+				row.sameFinalDose = false
+			}
 		}
 	}
 
@@ -124,17 +134,24 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 	items := make([]pdfItemLine, 0, len(supplyOrder))
 	for _, key := range supplyOrder {
 		row := bySupply[key]
+		totalUsed := row.TotalUsed
+		if row.Seen == len(drafts) &&
+			row.sameFinalDose &&
+			row.FinalDose.GreaterThan(decimal.Zero) &&
+			totalSurface.GreaterThan(decimal.Zero) {
+			totalUsed = row.FinalDose.Mul(totalSurface).Round(6)
+		}
 
 		finalDose := decimal.Zero
 		if totalSurface.GreaterThan(decimal.Zero) {
-			finalDose = row.TotalUsed.Div(totalSurface)
+			finalDose = totalUsed.Div(totalSurface)
 		}
 
 		items = append(items, pdfItemLine{
 			Name:             row.Name,
-			TotalUsed:        row.TotalUsed,
+			TotalUsed:        totalUsed,
 			FinalDose:        finalDose,
-			TotalUsedDisplay: formatQuantity(row.TotalUsed),
+			TotalUsedDisplay: formatQuantity(totalUsed),
 			FinalDoseDisplay: formatDose(finalDose),
 		})
 	}

@@ -11,8 +11,7 @@ import (
 )
 
 // pdfGroupDraft construye un draft mínimo apto para alimentar
-// buildGroupDraftPDFData. Replica la semántica del PR: TotalUsed es el total
-// del grupo, no la porción del lote.
+// buildGroupDraftPDFData.
 func pdfGroupDraft(number, lotName string, area decimal.Decimal, items []domain.WorkOrderDraftItem) *domain.WorkOrderDraft {
 	return &domain.WorkOrderDraft{
 		Number:        number,
@@ -29,10 +28,9 @@ func pdfGroupDraft(number, lotName string, area decimal.Decimal, items []domain.
 	}
 }
 
-// TestBuildGroupDraftPDFData_PreservesGroupTotalSemantics fija el invariante
-// post-PR: si el mismo supply aparece en varios lotes (todos con el mismo
-// TotalUsed porque la semántica nueva replica el total del grupo en cada
-// lote), el PDF debe mostrar el valor del grupo una sola vez — NO sumarlo.
+// TestBuildGroupDraftPDFData_PreservesGroupTotalSemantics evita inflar el PDF
+// cuando todavía llegan filas historicas con el total del grupo repetido por
+// lote.
 func TestBuildGroupDraftPDFData_PreservesGroupTotalSemantics(t *testing.T) {
 	supply := domain.WorkOrderDraftItem{
 		SupplyID:   70,

@@ -408,9 +408,8 @@ func (r *Repository) ListWorkOrders(
 		return []domain.WorkOrderListElement{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
 	}
 
-	var total int64
-	if err := base.
-		Count(&total).Error; err != nil {
+	total, err := r.countWorkOrderListRows(ctx, base)
+	if err != nil {
 		return nil, types.PageInfo{}, domainerr.Internal(
 			"failed to count work orders")
 	}
@@ -418,7 +417,7 @@ func (r *Repository) ListWorkOrders(
 	offset := (int(inp.Page) - 1) * int(inp.PageSize)
 
 	var rows []models.WorkOrderListElement
-	if err := base.
+	if err := workOrderListGroupedQuery(base).
 		Limit(int(inp.PageSize)).
 		Offset(offset).
 		Order("date desc, sequence_day desc, id desc").
@@ -500,7 +499,7 @@ func (r *Repository) ListWorkOrderFilterRows(
 	}
 
 	var rows []models.WorkOrderListElement
-	if err := base.
+	if err := workOrderListGroupedQuery(base).
 		Order("date desc, sequence_day desc, id desc").
 		Find(&rows).Error; err != nil {
 		return nil, domainerr.Internal("failed to list work order filter rows")
@@ -575,6 +574,84 @@ func (r *Repository) workOrderListBaseQuery(
 	}
 
 	return base, false, nil
+}
+
+func (r *Repository) countWorkOrderListRows(ctx context.Context, base *gorm.DB) (int64, error) {
+	grouped := base.
+		Session(&gorm.Session{}).
+		Select("id, number").
+		Group("id, number")
+
+	var total int64
+	err := r.db.Client().
+		WithContext(ctx).
+		Table("(?) AS work_order_groups", grouped).
+		Count(&total).Error
+	return total, err
+}
+
+func workOrderListGroupedQuery(base *gorm.DB) *gorm.DB {
+	return base.
+		Select(`
+			id,
+			number,
+			project_id,
+			field_id,
+			project_name,
+			field_name,
+			lot_name,
+			date,
+			sequence_day,
+			crop_name,
+			labor_name,
+			labor_category_name,
+			COALESCE(
+				MAX(CASE WHEN supply_name IS NOT NULL AND supply_name <> '' THEN type_name ELSE NULL END),
+				MAX(type_name),
+				''
+			) AS type_name,
+			contractor,
+			COALESCE(surface_ha, 0) AS surface_ha,
+			COALESCE(MAX(supply_name), '') AS supply_name,
+			COALESCE(SUM(consumption), 0) AS consumption,
+			COALESCE(
+				MAX(CASE WHEN supply_name IS NOT NULL AND supply_name <> '' THEN category_name ELSE NULL END),
+				MAX(category_name),
+				''
+			) AS category_name,
+			COALESCE(
+				MAX(CASE WHEN supply_name IS NOT NULL AND supply_name <> '' THEN dose_per_ha ELSE NULL END),
+				MAX(dose_per_ha),
+				0
+			) AS dose_per_ha,
+			COALESCE(SUM(supply_cost_per_ha), 0) AS supply_cost_per_ha,
+			COALESCE(
+				MAX(CASE WHEN supply_name IS NOT NULL AND supply_name <> '' THEN unit_price ELSE NULL END),
+				MAX(unit_price),
+				0
+			) AS unit_price,
+			COALESCE(SUM(supply_total_cost), 0) AS supply_total_cost,
+			is_digital,
+			status
+		`).
+		Group(`
+			id,
+			number,
+			project_id,
+			field_id,
+			project_name,
+			field_name,
+			lot_name,
+			date,
+			sequence_day,
+			crop_name,
+			labor_name,
+			labor_category_name,
+			contractor,
+			surface_ha,
+			is_digital,
+			status
+		`)
 }
 
 func mapWorkOrderListRows(rows []models.WorkOrderListElement) []domain.WorkOrderListElement {
