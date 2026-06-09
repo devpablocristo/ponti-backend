@@ -459,10 +459,6 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		return 0, err
 	}
 
-	if err := u.validateDraftSuppliesReadyForPublish(ctx, draft); err != nil {
-		return 0, err
-	}
-
 	// Validar labor pendiente
 	if draft.LaborID > 0 {
 		laborName, err := u.repo.GetPendingLaborNameByID(ctx, draft.LaborID)

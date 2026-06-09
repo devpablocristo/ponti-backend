@@ -217,6 +217,35 @@ BEGIN
 END;
 $$;
 
+-- 2.2) Guardrail: workorder_list debe conservar semántica digital y fallback de contratista
+DO $$
+DECLARE
+  v_def text;
+BEGIN
+  SELECT lower(pg_get_viewdef('v4_report.workorder_list'::regclass, true)) INTO v_def;
+
+  IF v_def NOT LIKE '%coalesce(w.is_digital, false)% as is_digital%' THEN
+    RAISE EXCEPTION 'v4_report.workorder_list perdió COALESCE(w.is_digital, false) para órdenes publicadas.';
+  END IF;
+
+  IF v_def NOT LIKE '%round((wi.final_dose * w.effective_area)::numeric, 2)%' THEN
+    RAISE EXCEPTION 'v4_report.workorder_list perdió distribución de consumo para workorders digitales publicadas.';
+  END IF;
+
+  IF v_def NOT LIKE '%round((wodi.final_dose * wod.effective_area)::numeric, 2)%' THEN
+    RAISE EXCEPTION 'v4_report.workorder_list perdió distribución de consumo para drafts digitales abiertos.';
+  END IF;
+
+  IF v_def NOT LIKE '%coalesce(nullif(w.contractor::text, ''''::text), lb.contractor_name)%' THEN
+    RAISE EXCEPTION 'v4_report.workorder_list perdió fallback de contratista para workorders.';
+  END IF;
+
+  IF v_def NOT LIKE '%coalesce(nullif(wod.contractor::text, ''''::text), lb.contractor_name)%' THEN
+    RAISE EXCEPTION 'v4_report.workorder_list perdió fallback de contratista para drafts digitales.';
+  END IF;
+END;
+$$;
+
 -- 3) Integridad lógica: proyectos activos no pueden tener customer archivado
 DO $$
 DECLARE

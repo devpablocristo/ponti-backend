@@ -5,15 +5,16 @@ Backup y restauracion de la base de datos de produccion `new_ponti_db_prod`.
 
 ## Estado actual (aplicado)
 - Frecuencia: diaria.
-- Scheduler: `weekly-prod-db-export-only` (en `new-ponti-dev`, `us-central1`).
+- Scheduler: `daily-prod-db-export-only` (en `new-ponti-dev`, `us-central1`).
 - Cron: `0 4 * * *` (04:00 UTC todos los dias).
-- Job ejecutado: `prod-db-weekly-export` (Cloud Run Job).
+- Job ejecutado: `prod-db-daily-export` (Cloud Run Job).
 - Instancia SQL: `new-ponti-db-dev` (instancia compartida).
 - Base exportada: `new_ponti_db_prod`.
 - Bucket destino: `gs://ponti-prod-only-backups-1087442197188/sql-exports/prod/`.
 - Retencion automatica: 84 dias (12 semanas) sobre prefijo `sql-exports/prod/`.
 - Alerta por fallo: policy `Ponti - Falla backup diario DB PROD`.
 - Canal alerta: `Ponti PROD DB Backup Alerts` (email `devpablocristo@gmail.com`).
+- Legado: `weekly-prod-db-export-only` esta pausado; `prod-db-weekly-export` se conserva sin ejecucion automatica.
 
 ## Como ver los backups
 ```bash
@@ -67,14 +68,19 @@ Incluye:
 ## Validaciones operativas rapidas
 ```bash
 # Scheduler diario habilitado
-gcloud scheduler jobs describe weekly-prod-db-export-only \
+gcloud scheduler jobs describe daily-prod-db-export-only \
   --project=new-ponti-dev --location=us-central1 \
   --format='value(schedule,state,timeZone)'
+
+# Scheduler legacy pausado
+gcloud scheduler jobs describe weekly-prod-db-export-only \
+  --project=new-ponti-dev --location=us-central1 \
+  --format='value(state)'
 
 # Ultimas ejecuciones del job
 gcloud run jobs executions list \
   --project=new-ponti-dev --region=us-central1 \
-  --job=prod-db-weekly-export
+  --job=prod-db-daily-export
 
 # Alerta activa
 gcloud monitoring policies list \
