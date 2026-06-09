@@ -101,6 +101,12 @@ func TestNotifyStockNegative_PolicyMatched_NotifiesOnce(t *testing.T) {
 	if repo.lastUpsert.EventType != "ponti.stock.negative" {
 		t.Fatalf("event_type = %q", repo.lastUpsert.EventType)
 	}
+	if repo.lastUpsert.Evidence["source_ref"] != "ponti.stock.real" {
+		t.Fatalf("source ref mismatch: %#v", repo.lastUpsert.Evidence)
+	}
+	if repo.lastUpsert.Evidence["suggested_action"] != "review_stock_movements" {
+		t.Fatalf("suggested action mismatch: %#v", repo.lastUpsert.Evidence)
+	}
 }
 
 func TestNotifyStockNegative_NoPolicyMatch_SkipsUpsert(t *testing.T) {
@@ -242,6 +248,10 @@ func TestNotifyDataIntegrityCritical_RecordsReadOnlyCandidate(t *testing.T) {
 	if repo.lastUpsert.Evidence["source_ref"] != "ponti.data_integrity.costs_check" {
 		t.Fatalf("source ref mismatch: %#v", repo.lastUpsert.Evidence)
 	}
+	workspace, ok := repo.lastUpsert.Evidence["workspace"].(map[string]any)
+	if !ok || workspace["project_id"] != "4" {
+		t.Fatalf("workspace mismatch: %#v", repo.lastUpsert.Evidence)
+	}
 }
 
 func TestNotifyDataIntegrityCritical_ZeroFailuresResolvesExistingCandidate(t *testing.T) {
@@ -303,6 +313,10 @@ func TestNotifyOperatingResultNegative_RecordsMarginCandidate(t *testing.T) {
 	if repo.lastUpsert.Evidence["source_ref"] != "ponti.reports.summary_results" {
 		t.Fatalf("source ref mismatch: %#v", repo.lastUpsert.Evidence)
 	}
+	workspace, ok := repo.lastUpsert.Evidence["workspace"].(map[string]any)
+	if !ok || workspace["project_id"] != "4" || workspace["customer_id"] != "1" || workspace["campaign_id"] != "2" {
+		t.Fatalf("workspace mismatch: %#v", repo.lastUpsert.Evidence)
+	}
 }
 
 func TestMaybeResolveOperatingResultNegative_ResolvesExistingCandidate(t *testing.T) {
@@ -352,6 +366,10 @@ func TestNotifyTentativePrices_RecordsIntegrityCandidate(t *testing.T) {
 	}
 	if repo.lastUpsert.Evidence["source_ref"] != "ponti.data_integrity.tentative_prices" {
 		t.Fatalf("source ref mismatch: %#v", repo.lastUpsert.Evidence)
+	}
+	workspace, ok := repo.lastUpsert.Evidence["workspace"].(map[string]any)
+	if !ok || workspace["project_id"] != "4" || workspace["customer_id"] != "1" {
+		t.Fatalf("workspace mismatch: %#v", repo.lastUpsert.Evidence)
 	}
 }
 

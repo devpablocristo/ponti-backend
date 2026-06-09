@@ -266,7 +266,32 @@ The chat smoke validates:
 - `POST /api/v1/ai/chat` returns the legacy web shape.
 - `routing_source=axis`.
 - `reply` is non-empty.
+- optional technical ids such as `axis_run_id` and `axis_task_id` remain
+  compatible with web clients.
 - `/api/v1/ai/chat/stream` emits compatible SSE events: `start`, `text`, `done`.
+
+## Local Full Smoke
+
+Run every Ponti/Axis local smoke in the supported order:
+
+```bash
+make smoke-axis-all
+```
+
+This target executes:
+
+1. onboarding;
+2. read-only capability execution;
+3. draft action conformance/governance checks;
+4. direct preview endpoints;
+5. Nexus-approved draft preview execution through Axis;
+6. chat through Axis.
+
+The Nexus-approved smoke is local and idempotent. It creates or updates the
+`agent.capability.invoke` action type and a Ponti policy if needed, approves one
+request, executes `ponti.workorder.draft.prepare` through Axis, validates that
+Ponti still returns preview-only output, and reports the Nexus request as
+`executed`.
 
 ## Local Draft Preview Smoke
 
@@ -363,10 +388,9 @@ Fallback to legacy `ponti-ai` happens only for Axis configuration/network/server
 
 1. Expand Axis/Ponti contract to accept workspace as a first-class field.
 2. Add generic connector execution for dashboard, stock, workorders, lots, reports and integrity.
-3. Add a Nexus-approved end-to-end smoke for Ponti preview execution.
-4. Add more Ponti insight producers: low stock and overdue operational work once thresholds are defined.
-5. Add mobile after web read-only is stable.
-6. Retire `ponti-ai` only after fallback rate is near zero and smokes/evals are green.
+3. Add more Ponti insight producers: low stock and overdue operational work once thresholds are defined.
+4. Add mobile after web read-only is stable.
+5. Retire `ponti-ai` only after fallback rate is near zero and smokes/evals are green.
 
 ## Backlog Despues
 
@@ -376,8 +400,7 @@ Contrato Axis/Ponti:
   it only inside `handoff.workspace`.
 - Replace the initial API-key delegated headers with internal JWT/JWKS when
   Axis production auth is ready.
-- Add a real contract/eval pack `ponti-golden` that covers routing, evidence,
-  tenant leakage and action safety.
+- Keep the `ponti-golden` eval pack expanded as new capabilities are published.
 
 Capabilities:
 

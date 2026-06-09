@@ -13,6 +13,7 @@ MIGRATIONS_NAME    := $(NAME)  # pasar NAME=nombre al crear
 .PHONY: all bin-build run test bin-clean lint \
         build up down logs reset rebuild clean docker-cleanup dev dev-logs \
         run-api up-ponti-local down-ponti-local reset-local-db-from-prod e2e-changes \
+        smoke-axis smoke-axis-chat smoke-axis-governance smoke-axis-all \
         migrate-create openapi \
         db-reset db-migrate-up db-validate db-schema-snapshot db-schema-diff db-verify db-adopt-baseline actors-backfill-sync
 
@@ -96,6 +97,20 @@ actors-backfill-sync:
 # Smoke tests de release (incluye divisor de aportes). Uso: make e2e-changes [BASE_URL=http://...]
 e2e-changes:
 	@bash ./scripts/smoke_release.sh $(BASE_URL)
+
+smoke-axis:
+	@bash ./scripts/axis/smoke-ponti-axis-readonly.sh
+
+smoke-axis-chat:
+	@bash ./scripts/axis/smoke-ponti-axis-chat.sh
+
+smoke-axis-governance:
+	@bash ./scripts/axis/smoke-ponti-axis-draft-actions.sh
+	@bash ./scripts/axis/smoke-ponti-axis-draft-previews.sh
+	@bash ./scripts/axis/smoke-ponti-axis-nexus-approved-draft.sh
+
+smoke-axis-all:
+	@bash ./scripts/axis/smoke-ponti-axis-all.sh
 
 # --------------------------------------------------
 # Base de datos (verificación local v4)

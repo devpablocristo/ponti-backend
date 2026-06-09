@@ -14,6 +14,76 @@ generados no deben quedar commiteados.
 | `run_ponti_local.sh` | Levanta core, web y axis en local. |
 | `smoke_release.sh` | Smoke test de release usado por deploys. |
 
+## Axis / IA
+
+Estos scripts validan Ponti como producto real consumidor de Axis. No levantan
+servicios: Axis, Nexus y Ponti API deben estar corriendo antes de ejecutarlos.
+
+Env vars base:
+
+| Variable | Uso |
+| --- | --- |
+| `AXIS_COMPANION_BASE_URL` | URL de Companion, por ejemplo `http://localhost:18085`. |
+| `AXIS_COMPANION_API_KEY` | API key operativa de Companion. |
+| `NEXUS_BASE_URL` | URL de Nexus para el smoke aprobado. |
+| `NEXUS_ADMIN_API_KEY` | API key de Nexus con scopes admin/result/approval. |
+| `PONTI_BASE_URL` | URL de Ponti API, por ejemplo `http://localhost:8080`. |
+| `PONTI_ORG_ID` | `auth_tenants.id`; se usa como `org_id` Axis. |
+| `PONTI_AXIS_API_KEY` | Bearer server-to-server que Axis usa contra Ponti. |
+| `PONTI_API_KEY` | API key local de Ponti para chat/previews cuando el smoke no usa bearer Axis. |
+| `PONTI_PROJECT_ID` | Proyecto de Ponti owned por el tenant del smoke. |
+| `PONTI_FIELD_ID` | Campo opcional para preview de OT. |
+| `PONTI_CAMPAIGN_ID` | Campania opcional para preview de OT. |
+| `PONTI_SUPPLY_ID` | Insumo opcional para preview de ajuste de stock. |
+
+Orden recomendado para diagnostico incremental:
+
+1. `scripts/axis/onboard-ponti.sh`
+2. `scripts/axis/smoke-ponti-axis-readonly.sh`
+3. `scripts/axis/smoke-ponti-axis-draft-actions.sh`
+4. `scripts/axis/smoke-ponti-axis-draft-previews.sh`
+5. `scripts/axis/smoke-ponti-axis-nexus-approved-draft.sh`
+6. `scripts/axis/smoke-ponti-axis-chat.sh`
+
+Ejecucion completa:
+
+```bash
+make smoke-axis-all
+```
+
+Targets disponibles:
+
+| Target | Uso |
+| --- | --- |
+| `make smoke-axis` | Valida onboarding, discovery y ejecucion read-only por Axis. |
+| `make smoke-axis-chat` | Valida chat Ponti -> Axis manteniendo contrato web legacy. |
+| `make smoke-axis-governance` | Valida draft actions, previews y ejecucion aprobada por Nexus. |
+| `make smoke-axis-all` | Ejecuta todos los smokes Axis/Ponti en orden y falla en el primer error. |
+
+Ejemplo local completo:
+
+```bash
+export AXIS_COMPANION_BASE_URL=http://localhost:18085
+export AXIS_COMPANION_API_KEY=local-dev-companion-api-key
+export NEXUS_BASE_URL=http://localhost:18086
+export NEXUS_ADMIN_API_KEY=local-dev-nexus-api-key
+export PONTI_BASE_URL=http://localhost:8080
+export PONTI_ORG_ID=<auth_tenants.id>
+export PONTI_AXIS_API_KEY=local-dev-ponti-axis-api-key
+export PONTI_API_KEY=<ponti-api-key>
+export PONTI_PROJECT_ID=<project-id>
+export PONTI_FIELD_ID=<field-id>
+export PONTI_CAMPAIGN_ID=<campaign-id>
+export PONTI_SUPPLY_ID=<supply-id>
+
+make smoke-axis-all
+```
+
+El smoke Nexus aprobado es idempotente para uso local: crea o actualiza el
+`action_type` `agent.capability.invoke` y la policy local que requiere
+aprobacion para `target_system=ponti`. No ejecuta writes reales en Ponti; la
+capability aprobada devuelve preview con `write_performed=false`.
+
 ## DB
 
 | Script | Uso |

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -120,6 +121,13 @@ func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any)
 		"routing_source":        "read_fallback",
 	}
 	if !u.axisActive() {
+		slog.InfoContext(ctx, "ponti_ai_chat_provider",
+			"provider", "legacy",
+			"fallback_used", false,
+			"tenant_id", tenantIDFromContext(ctx),
+			"project_id", strings.TrimSpace(projectID),
+			"product_surface", u.productSurface(),
+		)
 		return u.dummyOrReal(ctx, http.MethodPost, "/v1/chat", body, userID, projectID, dummy)
 	}
 	status, raw, err := u.chatAxis(ctx, userID, projectID, body)
@@ -127,9 +135,27 @@ func (u *UseCases) Chat(ctx context.Context, userID, projectID string, body any)
 		return status, raw, nil
 	}
 	if err != nil {
+		slog.WarnContext(ctx, "ponti_ai_axis_fallback",
+			"provider", "axis",
+			"fallback_used", true,
+			"fallback_reason", "axis_request_error",
+			"error", err.Error(),
+			"tenant_id", tenantIDFromContext(ctx),
+			"project_id", strings.TrimSpace(projectID),
+			"product_surface", u.productSurface(),
+		)
 		return u.dummyOrReal(ctx, http.MethodPost, "/v1/chat", body, userID, projectID, dummy)
 	}
 	if status >= http.StatusInternalServerError {
+		slog.WarnContext(ctx, "ponti_ai_axis_fallback",
+			"provider", "axis",
+			"axis_status", status,
+			"fallback_used", true,
+			"fallback_reason", "axis_server_status",
+			"tenant_id", tenantIDFromContext(ctx),
+			"project_id", strings.TrimSpace(projectID),
+			"product_surface", u.productSurface(),
+		)
 		return u.dummyOrReal(ctx, http.MethodPost, "/v1/chat", body, userID, projectID, dummy)
 	}
 	return status, raw, err
@@ -200,6 +226,17 @@ func (u *UseCases) chatAxis(ctx context.Context, userID, projectID string, body 
 	if err != nil {
 		return status, raw, err
 	}
+	runID, taskID := extractAxisIDs(raw)
+	slog.InfoContext(ctx, "ponti_ai_axis_chat_response",
+		"provider", "axis",
+		"axis_status", status,
+		"fallback_used", false,
+		"axis_run_id", runID,
+		"axis_task_id", taskID,
+		"tenant_id", tenantIDFromContext(ctx),
+		"project_id", strings.TrimSpace(projectID),
+		"product_surface", u.productSurface(),
+	)
 	if status >= http.StatusBadRequest {
 		return status, raw, nil
 	}
@@ -379,6 +416,14 @@ func adaptAxisChatResponse(raw []byte, request map[string]any) ([]byte, error) {
 		"axis_task_id":          taskID,
 	}
 	return json.Marshal(out)
+}
+
+func extractAxisIDs(raw []byte) (runID, taskID string) {
+	var in map[string]any
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return "", ""
+	}
+	return stringValue(in["run_id"]), stringValue(in["task_id"])
 }
 
 func jsonError(code, message string) []byte {

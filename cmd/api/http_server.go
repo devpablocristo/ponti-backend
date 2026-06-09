@@ -90,7 +90,12 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 // StockLevel del businessinsights.Service, manteniendo desacoplados los
 // tipos de los paquetes (stock no importa businessinsights y viceversa).
 type stockNegativeAdapter struct {
-	svc *businessinsights.Service
+	svc stockInsightsService
+}
+
+type stockInsightsService interface {
+	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level businessinsights.StockLevel) error
+	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
 }
 
 func (a *stockNegativeAdapter) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockNegativeInput) error {
@@ -112,7 +117,14 @@ func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, te
 }
 
 type dataIntegrityAdapter struct {
-	svc *businessinsights.Service
+	svc dataIntegrityInsightsService
+}
+
+type dataIntegrityInsightsService interface {
+	NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.DataIntegrityCritical) error
+	MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error
+	NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.TentativePricesIssue) error
+	MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error
 }
 
 func (a *dataIntegrityAdapter) NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, in dataintegrity.DataIntegrityCriticalInput) error {
@@ -179,7 +191,12 @@ func (a *dataIntegrityAdapter) MaybeResolveTentativePrices(ctx context.Context, 
 }
 
 type reportAdapter struct {
-	svc *businessinsights.Service
+	svc reportInsightsService
+}
+
+type reportInsightsService interface {
+	NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.OperatingResultNegative) error
+	MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error
 }
 
 func (a *reportAdapter) NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, in reportmod.OperatingResultNegativeInput) error {
