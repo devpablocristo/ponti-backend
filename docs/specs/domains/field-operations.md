@@ -150,4 +150,10 @@ Does not own:
 - Labor tests: `go test ./internal/labor/...`.
 - Full Core regression: `go test ./...`.
 - Runtime list check against active DB verified `D-1905555.1`, `D-1905555.2`,
-  and `D-1905555.3` appear once each after component-row aggregation.
+  and `D-1905555.3` appear once each after component-row aggregation. The
+  stored draft items have `effective_area` `201`, `35`, and `250`, `final_dose`
+  `10`, and corrected `total_used` `2010`, `350`, and `2500`; the summed
+  consumption is `4860`.
+- The active report view still emits two component rows for each `D-1905555.x`
+  physical draft row, so the API aggregation contract is required even after the
+  consumption values are repaired.

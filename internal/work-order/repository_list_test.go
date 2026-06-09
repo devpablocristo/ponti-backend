@@ -228,6 +228,28 @@ func TestRepository_ListWorkOrders_PreservesDigitalSplitRowsWithDistributedConsu
 	}
 }
 
+func TestRepository_ListWorkOrders_CollapsesStoredD1905555ComponentRows(t *testing.T) {
+	db := newListWorkOrdersTestDB(t)
+	repo := NewRepository(&listTestGormEngine{client: db})
+	insertD1905555ComponentRows(t, db)
+
+	projectID := int64(30)
+	rows, pageInfo, err := repo.ListWorkOrders(
+		context.Background(),
+		domain.WorkOrderFilter{ProjectID: &projectID},
+		types.Input{Page: 1, PageSize: 20},
+	)
+	if err != nil {
+		t.Fatalf("list work orders: %v", err)
+	}
+
+	if pageInfo.Total != 7 {
+		t.Fatalf("expected physical total 7, got %d", pageInfo.Total)
+	}
+
+	assertD1905555Rows(t, rows)
+}
+
 func TestRepository_ListWorkOrders_FiltersSupplyForPublishedAndDigitalDrafts(t *testing.T) {
 	db := newListWorkOrdersTestDB(t)
 	repo := NewRepository(&listTestGormEngine{client: db})
@@ -275,5 +297,93 @@ func TestRepository_ListWorkOrderFilterRows_ReturnsAllRowsWithoutPagination(t *t
 	}
 	if rows[0].ID != -20 || rows[3].ID != 11 {
 		t.Fatalf("expected filter rows to preserve work order ordering, got first=%d last=%d", rows[0].ID, rows[3].ID)
+	}
+}
+
+func TestRepository_ListWorkOrderFilterRows_CollapsesStoredD1905555ComponentRows(t *testing.T) {
+	db := newListWorkOrdersTestDB(t)
+	repo := NewRepository(&listTestGormEngine{client: db})
+	insertD1905555ComponentRows(t, db)
+
+	projectID := int64(30)
+	rows, err := repo.ListWorkOrderFilterRows(
+		context.Background(),
+		domain.WorkOrderFilter{ProjectID: &projectID},
+	)
+	if err != nil {
+		t.Fatalf("list work order filter rows: %v", err)
+	}
+	if len(rows) != 7 {
+		t.Fatalf("expected 7 physical filter rows, got %d", len(rows))
+	}
+
+	assertD1905555Rows(t, rows)
+}
+
+func insertD1905555ComponentRows(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	if err := db.Exec(`
+		INSERT INTO v4_report.workorder_list (
+			id, number, project_id, field_id, lot_name, date, sequence_day,
+			type_name, surface_ha, is_digital, status, supply_name, consumption,
+			category_name, dose_per_ha, supply_cost_per_ha, unit_price, supply_total_cost
+		) VALUES
+			(-21, 'D-1905555.1', 30, 40, 'LOTE 2', '2026-06-08T00:00:00Z', 0,
+			 'Agroquímicos', 201, true, 'draft', '2-4 D ESTER', 2010,
+			 'Herbicida', 10, 51, 5.10, 10251),
+			(-21, 'D-1905555.1', 30, 40, 'LOTE 2', '2026-06-08T00:00:00Z', 0,
+			 'Labor', 201, true, 'draft', NULL, 0,
+			 'Pulverización', 0, 1.15, 1.15, 231.15),
+			(-22, 'D-1905555.2', 30, 40, 'LOTE 7', '2026-06-08T00:00:00Z', 0,
+			 'Agroquímicos', 35, true, 'draft', '2-4 D ESTER', 350,
+			 'Herbicida', 10, 51, 5.10, 1785),
+			(-22, 'D-1905555.2', 30, 40, 'LOTE 7', '2026-06-08T00:00:00Z', 0,
+			 'Labor', 35, true, 'draft', NULL, 0,
+			 'Pulverización', 0, 1.15, 1.15, 40.25),
+			(-23, 'D-1905555.3', 30, 40, 'LOTE 10', '2026-06-08T00:00:00Z', 0,
+			 'Agroquímicos', 250, true, 'draft', '2-4 D ESTER', 2500,
+			 'Herbicida', 10, 51, 5.10, 12750),
+			(-23, 'D-1905555.3', 30, 40, 'LOTE 10', '2026-06-08T00:00:00Z', 0,
+			 'Labor', 250, true, 'draft', NULL, 0,
+			 'Pulverización', 0, 1.15, 1.15, 287.50);
+	`).Error; err != nil {
+		t.Fatalf("insert D-1905555 component rows: %v", err)
+	}
+}
+
+func assertD1905555Rows(t *testing.T, rows []domain.WorkOrderListElement) {
+	t.Helper()
+
+	expectedConsumption := map[string]decimal.Decimal{
+		"D-1905555.1": decimal.NewFromInt(2010),
+		"D-1905555.2": decimal.NewFromInt(350),
+		"D-1905555.3": decimal.NewFromInt(2500),
+	}
+	seen := map[string]int{}
+	total := decimal.Zero
+
+	for _, row := range rows {
+		if row.Number == "D-1905555" {
+			t.Fatalf("work order list must not invent a logical multi-lot D-1905555 row")
+		}
+		expected, ok := expectedConsumption[row.Number]
+		if !ok {
+			continue
+		}
+		seen[row.Number]++
+		if !row.Consumption.Equal(expected) {
+			t.Fatalf("expected %s consumption %s, got %s", row.Number, expected, row.Consumption)
+		}
+		total = total.Add(row.Consumption)
+	}
+
+	for number := range expectedConsumption {
+		if seen[number] != 1 {
+			t.Fatalf("expected %s exactly once, got %#v", number, seen)
+		}
+	}
+	if !total.Equal(decimal.NewFromInt(4860)) {
+		t.Fatalf("expected D-1905555 total consumption 4860, got %s", total)
 	}
 }

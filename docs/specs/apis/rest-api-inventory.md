@@ -130,6 +130,11 @@ Base path: `/api/v1`
   `final_dose * effective_area`. The down migration is intentionally a no-op
   because the duplicated historical totals are not recoverable from the fixed
   state without an external backup.
+- Stored-data validation used `D-1905555.1`, `D-1905555.2`, and `D-1905555.3`.
+  They remain three physical draft rows, not a synthetic `D-1905555` row. Their
+  active DB values are `2010`, `350`, and `2500` for a total `4860`, while
+  `v4_report.workorder_list` emits two internal component rows per physical
+  draft row.
 
 ### Labor Catalog Contract
 
