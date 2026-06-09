@@ -109,10 +109,11 @@ func buildGroupDraftPDFData(drafts []*domain.WorkOrderDraft) pdfDocumentData {
 			if _, exists := bySupply[key]; !exists {
 				bySupply[key] = &aggregated{
 					Name:      safeValue(item.SupplyName),
-					TotalUsed: item.TotalUsed,
+					TotalUsed: decimal.Zero,
 				}
 				supplyOrder = append(supplyOrder, key)
 			}
+			bySupply[key].TotalUsed = bySupply[key].TotalUsed.Add(item.TotalUsed)
 		}
 	}
 

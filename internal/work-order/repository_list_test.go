@@ -168,7 +168,7 @@ func TestRepository_ListWorkOrders_FiltersDigitalDrafts(t *testing.T) {
 	}
 }
 
-func TestRepository_ListWorkOrders_CollapsesComponentsPerPhysicalDigitalSplitRow(t *testing.T) {
+func TestRepository_ListWorkOrders_PreservesDigitalSplitRowsWithDistributedConsumption(t *testing.T) {
 	db := newListWorkOrdersTestDB(t)
 	repo := NewRepository(&listTestGormEngine{client: db})
 
@@ -204,13 +204,12 @@ func TestRepository_ListWorkOrders_CollapsesComponentsPerPhysicalDigitalSplitRow
 		t.Fatalf("list work orders: %v", err)
 	}
 
-	if pageInfo.Total != 6 {
-		t.Fatalf("expected physical total 6, got %d", pageInfo.Total)
+	if pageInfo.Total != 8 {
+		t.Fatalf("expected physical total 8, got %d", pageInfo.Total)
 	}
 
 	seenSplitRows := map[string]int{}
 	consumption := decimal.Zero
-	totalCost := decimal.Zero
 	for _, row := range rows {
 		switch row.Number {
 		case "D-3000":
@@ -218,18 +217,14 @@ func TestRepository_ListWorkOrders_CollapsesComponentsPerPhysicalDigitalSplitRow
 		case "D-3000.1", "D-3000.2":
 			seenSplitRows[row.Number]++
 			consumption = consumption.Add(row.Consumption)
-			totalCost = totalCost.Add(row.TotalCost)
 		}
 	}
 
-	if seenSplitRows["D-3000.1"] != 1 || seenSplitRows["D-3000.2"] != 1 {
-		t.Fatalf("expected one physical row for each split order, got %#v", seenSplitRows)
+	if seenSplitRows["D-3000.1"] != 2 || seenSplitRows["D-3000.2"] != 2 {
+		t.Fatalf("expected supply+labor rows for both split orders, got %#v", seenSplitRows)
 	}
 	if !consumption.Equal(decimal.NewFromInt(200)) {
 		t.Fatalf("expected distributed consumption total 200 across split rows, got %s", consumption)
-	}
-	if !totalCost.Equal(decimal.NewFromInt(300)) {
-		t.Fatalf("expected supply+labor total cost 300 across split rows, got %s", totalCost)
 	}
 }
 

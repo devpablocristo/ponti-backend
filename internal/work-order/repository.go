@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -409,20 +408,27 @@ func (r *Repository) ListWorkOrders(
 		return []domain.WorkOrderListElement{}, types.NewPageInfo(int(inp.Page), int(inp.PageSize), 0), nil
 	}
 
+	var total int64
+	if err := base.
+		Count(&total).Error; err != nil {
+		return nil, types.PageInfo{}, domainerr.Internal(
+			"failed to count work orders")
+	}
+
+	offset := (int(inp.Page) - 1) * int(inp.PageSize)
+
 	var rows []models.WorkOrderListElement
 	if err := base.
+		Limit(int(inp.PageSize)).
+		Offset(offset).
 		Order("date desc, sequence_day desc, id desc").
 		Find(&rows).Error; err != nil {
 		return nil, types.PageInfo{}, domainerr.Internal(
 			"failed to list work orders")
 	}
 
-	physicalRows := aggregatePhysicalWorkOrderListRows(rows)
-	total := int64(len(physicalRows))
-	pageRows := paginateWorkOrderListRows(physicalRows, inp)
-
 	pageInfo := types.NewPageInfo(int(inp.Page), int(inp.PageSize), total)
-	return mapWorkOrderListRows(pageRows), pageInfo, nil
+	return mapWorkOrderListRows(rows), pageInfo, nil
 }
 
 // ListArchivedWorkOrders lista las órdenes archivadas (soft-deleted). No usa la vista
@@ -500,7 +506,7 @@ func (r *Repository) ListWorkOrderFilterRows(
 		return nil, domainerr.Internal("failed to list work order filter rows")
 	}
 
-	return mapWorkOrderListRows(aggregatePhysicalWorkOrderListRows(rows)), nil
+	return mapWorkOrderListRows(rows), nil
 }
 
 func (r *Repository) workOrderListBaseQuery(
@@ -569,152 +575,6 @@ func (r *Repository) workOrderListBaseQuery(
 	}
 
 	return base, false, nil
-}
-
-func paginateWorkOrderListRows(rows []models.WorkOrderListElement, inp types.Input) []models.WorkOrderListElement {
-	page := int(inp.Page)
-	if page < 1 {
-		page = 1
-	}
-	pageSize := int(inp.PageSize)
-	if pageSize < 1 {
-		pageSize = 1
-	}
-
-	start := (page - 1) * pageSize
-	if start >= len(rows) {
-		return []models.WorkOrderListElement{}
-	}
-
-	end := start + pageSize
-	if end > len(rows) {
-		end = len(rows)
-	}
-
-	return rows[start:end]
-}
-
-type physicalWorkOrderListAccumulator struct {
-	row              models.WorkOrderListElement
-	supplyNames      []string
-	seenSupplyNames  map[string]struct{}
-	typeNames        []string
-	seenTypeNames    map[string]struct{}
-	categoryNames    []string
-	seenCategoryName map[string]struct{}
-}
-
-func aggregatePhysicalWorkOrderListRows(rows []models.WorkOrderListElement) []models.WorkOrderListElement {
-	aggregated := make([]models.WorkOrderListElement, 0, len(rows))
-	accumulators := make(map[int64]*physicalWorkOrderListAccumulator)
-	indexByID := make(map[int64]int)
-
-	for _, row := range rows {
-		acc, exists := accumulators[row.ID]
-		if !exists {
-			acc = newPhysicalWorkOrderListAccumulator(row)
-			accumulators[row.ID] = acc
-			indexByID[row.ID] = len(aggregated)
-			aggregated = append(aggregated, acc.row)
-		}
-
-		acc.add(row)
-		aggregated[indexByID[row.ID]] = acc.row
-	}
-
-	return aggregated
-}
-
-func newPhysicalWorkOrderListAccumulator(row models.WorkOrderListElement) *physicalWorkOrderListAccumulator {
-	row.SupplyName = ""
-	row.Consumption = decimal.Zero
-	row.Dose = decimal.Zero
-	row.CostPerHa = decimal.Zero
-	row.UnitPrice = decimal.Zero
-	row.TotalCost = decimal.Zero
-
-	return &physicalWorkOrderListAccumulator{
-		row:              row,
-		seenSupplyNames:  make(map[string]struct{}),
-		seenTypeNames:    make(map[string]struct{}),
-		seenCategoryName: make(map[string]struct{}),
-	}
-}
-
-func (a *physicalWorkOrderListAccumulator) add(row models.WorkOrderListElement) {
-	a.row.Consumption = a.row.Consumption.Add(row.Consumption)
-	a.row.TotalCost = a.row.TotalCost.Add(row.TotalCost)
-
-	if isSupplyComponent(row) {
-		a.addSupplyName(row.SupplyName)
-		a.addTypeName(row.TypeName)
-		a.addCategoryName(row.CategoryName)
-		if a.row.UnitPrice.IsZero() {
-			a.row.UnitPrice = row.UnitPrice
-		}
-	}
-
-	if len(a.supplyNames) > 0 {
-		a.row.SupplyName = strings.Join(a.supplyNames, ", ")
-	}
-	a.row.TypeName = collapseDistinctNames(a.typeNames, a.row.TypeName)
-	a.row.CategoryName = collapseDistinctNames(a.categoryNames, a.row.CategoryName)
-
-	if a.row.SurfaceHa.GreaterThan(decimal.Zero) {
-		a.row.Dose = a.row.Consumption.Div(a.row.SurfaceHa)
-		a.row.CostPerHa = a.row.TotalCost.Div(a.row.SurfaceHa)
-	}
-}
-
-func isSupplyComponent(row models.WorkOrderListElement) bool {
-	return strings.TrimSpace(row.SupplyName) != "" && row.Consumption.GreaterThan(decimal.Zero)
-}
-
-func (a *physicalWorkOrderListAccumulator) addSupplyName(name string) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return
-	}
-	if _, exists := a.seenSupplyNames[name]; exists {
-		return
-	}
-	a.seenSupplyNames[name] = struct{}{}
-	a.supplyNames = append(a.supplyNames, name)
-}
-
-func (a *physicalWorkOrderListAccumulator) addTypeName(name string) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return
-	}
-	if _, exists := a.seenTypeNames[name]; exists {
-		return
-	}
-	a.seenTypeNames[name] = struct{}{}
-	a.typeNames = append(a.typeNames, name)
-}
-
-func (a *physicalWorkOrderListAccumulator) addCategoryName(name string) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return
-	}
-	if _, exists := a.seenCategoryName[name]; exists {
-		return
-	}
-	a.seenCategoryName[name] = struct{}{}
-	a.categoryNames = append(a.categoryNames, name)
-}
-
-func collapseDistinctNames(names []string, fallback string) string {
-	switch len(names) {
-	case 0:
-		return fallback
-	case 1:
-		return names[0]
-	default:
-		return "Mixto"
-	}
 }
 
 func mapWorkOrderListRows(rows []models.WorkOrderListElement) []domain.WorkOrderListElement {
