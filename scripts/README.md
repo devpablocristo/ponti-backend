@@ -31,9 +31,14 @@ Env vars base:
 | `PONTI_ORG_ID` | `auth_tenants.id`; se usa como `org_id` Axis. |
 | `PONTI_AXIS_API_KEY` | Bearer server-to-server que Axis usa contra Ponti. |
 | `PONTI_API_KEY` | API key local de Ponti para chat/previews cuando el smoke no usa bearer Axis. |
+| `PONTI_CUSTOMER_ID` | Cliente del proyecto usado para crear el borrador digital aprobado. |
 | `PONTI_PROJECT_ID` | Proyecto de Ponti owned por el tenant del smoke. |
 | `PONTI_FIELD_ID` | Campo opcional para preview de OT. |
 | `PONTI_CAMPAIGN_ID` | Campania opcional para preview de OT. |
+| `PONTI_LOT_ID` | Lote usado por el smoke Nexus aprobado de borrador digital. |
+| `PONTI_CROP_ID` | Cultivo usado por el smoke Nexus aprobado de borrador digital. |
+| `PONTI_LABOR_ID` | Labor usada por el smoke Nexus aprobado de borrador digital. |
+| `PONTI_INVESTOR_ID` | Inversor usado por el smoke Nexus aprobado de borrador digital. |
 | `PONTI_SUPPLY_ID` | Insumo opcional para preview de ajuste de stock. |
 
 Orden recomendado para diagnostico incremental:
@@ -71,9 +76,14 @@ export PONTI_BASE_URL=http://localhost:8080
 export PONTI_ORG_ID=<auth_tenants.id>
 export PONTI_AXIS_API_KEY=local-dev-ponti-axis-api-key
 export PONTI_API_KEY=<ponti-api-key>
+export PONTI_CUSTOMER_ID=<customer-id>
 export PONTI_PROJECT_ID=<project-id>
 export PONTI_FIELD_ID=<field-id>
 export PONTI_CAMPAIGN_ID=<campaign-id>
+export PONTI_LOT_ID=<lot-id>
+export PONTI_CROP_ID=<crop-id>
+export PONTI_LABOR_ID=<labor-id>
+export PONTI_INVESTOR_ID=<investor-id>
 export PONTI_SUPPLY_ID=<supply-id>
 
 make smoke-axis-all

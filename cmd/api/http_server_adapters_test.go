@@ -142,7 +142,7 @@ func TestDataIntegrityAdapter_MapsCriticalAndTentativePrices(t *testing.T) {
 		CampaignID: "campaign-1",
 		FieldID:    "field-1",
 		Count:      3,
-		SampleItems: []dataintegrity.TentativePriceItem{
+		SampleItems: []dataintegrity.TentativePriceInsightItem{
 			{SupplyID: "supply-1", Name: "Semilla", CategoryName: "Insumos", Price: "12.50"},
 		},
 	}); err != nil {

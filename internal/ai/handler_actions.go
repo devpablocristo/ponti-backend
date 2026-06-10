@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -43,6 +44,21 @@ type stockAdjustmentPrepareRequest struct {
 	QuantityDelta float64          `json:"quantity_delta"`
 	Reason        string           `json:"reason"`
 	Workspace     workspaceRequest `json:"workspace,omitempty"`
+}
+
+type insightResolutionDraftRequest struct {
+	InsightID      string           `json:"insight_id"`
+	ResolutionNote string           `json:"resolution_note,omitempty"`
+	Workspace      workspaceRequest `json:"workspace,omitempty"`
+}
+
+type stockCountDraftRequest struct {
+	ProjectID      int64            `json:"project_id"`
+	StockID        *int64           `json:"stock_id,omitempty"`
+	SupplyID       int64            `json:"supply_id"`
+	RealStockUnits float64          `json:"real_stock_units"`
+	Reason         string           `json:"reason"`
+	Workspace      workspaceRequest `json:"workspace,omitempty"`
 }
 
 func (h *Handler) PrepareInsightResolve(c *gin.Context) {
@@ -154,6 +170,86 @@ func (h *Handler) PrepareStockAdjustment(c *gin.Context) {
 	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.stock_adjustment.prepare", orgID, actor, workspace, proposal))
 }
 
+func (h *Handler) DraftInsightResolution(c *gin.Context) {
+	orgID, actor, err := requireActionContext(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req insightResolutionDraftRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	req.InsightID = strings.TrimSpace(req.InsightID)
+	req.ResolutionNote = strings.TrimSpace(req.ResolutionNote)
+	if req.InsightID == "" {
+		sharedhandlers.RespondError(c, domainerr.Validation("insight_id is required"))
+		return
+	}
+	draftID := "insight-resolution-" + uuid.NewString()
+	workspace := req.Workspace.toMap()
+	c.JSON(http.StatusOK, draftActionExecutionResponse(
+		"ponti.insight_resolution.draft",
+		orgID,
+		actor,
+		c.GetHeader("X-Nexus-Request-ID"),
+		draftID,
+		false,
+		"draft_staged",
+		workspace,
+		map[string]any{
+			"insight_id":      req.InsightID,
+			"resolution_note": req.ResolutionNote,
+		},
+	))
+}
+
+func (h *Handler) DraftStockCount(c *gin.Context) {
+	orgID, actor, err := requireActionContext(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req stockCountDraftRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.ProjectID <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("project_id is required"))
+		return
+	}
+	if req.SupplyID <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("supply_id is required"))
+		return
+	}
+	if req.Reason == "" {
+		sharedhandlers.RespondError(c, domainerr.Validation("reason is required"))
+		return
+	}
+	draftID := "stock-count-" + uuid.NewString()
+	workspace := req.Workspace.withFallbackProject(req.ProjectID).toMap()
+	c.JSON(http.StatusOK, draftActionExecutionResponse(
+		"ponti.stock_count.draft",
+		orgID,
+		actor,
+		c.GetHeader("X-Nexus-Request-ID"),
+		draftID,
+		false,
+		"draft_staged",
+		workspace,
+		map[string]any{
+			"project_id":       req.ProjectID,
+			"stock_id":         valueOrNil(req.StockID),
+			"supply_id":        req.SupplyID,
+			"real_stock_units": req.RealStockUnits,
+			"reason":           req.Reason,
+		},
+	))
+}
+
 func requireActionContext(c *gin.Context) (uuid.UUID, string, error) {
 	orgID, err := sharedhandlers.ParseOrgID(c)
 	if err != nil {
@@ -186,6 +282,36 @@ func draftActionPreviewResponse(action string, orgID uuid.UUID, actor string, wo
 			"actor_id":          actor,
 			"workspace":         workspace,
 			"approval_required": true,
+		},
+	}
+}
+
+func draftActionExecutionResponse(action string, orgID uuid.UUID, actor string, nexusRequestID string, draftID any, writePerformed bool, executionStatus string, workspace map[string]any, proposal map[string]any) map[string]any {
+	nexusRequestID = strings.TrimSpace(nexusRequestID)
+	auditRef := fmt.Sprintf("ponti.ai.actions.%s:%v", action, draftID)
+	return map[string]any{
+		"status":               "draft",
+		"action":               action,
+		"approval_required":    true,
+		"nexus_action_type":    pontiNexusActionType,
+		"side_effect_type":     "write",
+		"write_performed":      writePerformed,
+		"draft_id":             draftID,
+		"execution_status":     executionStatus,
+		"nexus_request_id":     nexusRequestID,
+		"audit_ref":            auditRef,
+		"proposal":             proposal,
+		"execution_allowed":    true,
+		"execution_blocked_by": "",
+		"evidence": map[string]any{
+			"source_ref":        "ponti.ai.actions." + action,
+			"captured_at":       time.Now().UTC().Format(time.RFC3339),
+			"tenant_scope":      orgID.String(),
+			"actor_id":          actor,
+			"workspace":         workspace,
+			"approval_required": true,
+			"nexus_request_id":  nexusRequestID,
+			"audit_ref":         auditRef,
 		},
 	}
 }

@@ -9,12 +9,18 @@ PONTI_BASE_URL="${PONTI_BASE_URL:-}"
 PONTI_ORG_ID="${PONTI_ORG_ID:-}"
 PONTI_AXIS_API_KEY="${PONTI_AXIS_API_KEY:-}"
 PONTI_PROJECT_ID="${PONTI_PROJECT_ID:-1}"
+PONTI_CUSTOMER_ID="${PONTI_CUSTOMER_ID:-1}"
+PONTI_FIELD_ID="${PONTI_FIELD_ID:-1}"
+PONTI_LOT_ID="${PONTI_LOT_ID:-1}"
+PONTI_CROP_ID="${PONTI_CROP_ID:-1}"
+PONTI_LABOR_ID="${PONTI_LABOR_ID:-1}"
+PONTI_INVESTOR_ID="${PONTI_INVESTOR_ID:-1}"
 AXIS_ACTOR_ID="${AXIS_ACTOR_ID:-ponti-nexus-approved-smoke}"
 NEXUS_REQUESTER_ID="${NEXUS_REQUESTER_ID:-ponti-nexus-smoke-requester}"
 NEXUS_APPROVER_ID="${NEXUS_APPROVER_ID:-ponti-nexus-smoke-approver}"
-AXIS_SCOPES="${AXIS_SCOPES:-companion:products:admin companion:runtime:admin companion:capabilities:admin companion:connectors:execute ponti:actions:prepare}"
+AXIS_SCOPES="${AXIS_SCOPES:-companion:products:admin companion:runtime:admin companion:capabilities:admin companion:connectors:execute ponti:actions:prepare ponti:actions:draft}"
 NEXUS_SCOPES="${NEXUS_SCOPES:-nexus:requests:read nexus:requests:write nexus:requests:result nexus:approvals:decide nexus:policies:admin nexus:cross_org}"
-OPERATION="ponti.workorder.draft.prepare"
+OPERATION="ponti.workorder_draft.create"
 NEXUS_ACTION_TYPE="agent.capability.invoke"
 NEXUS_POLICY_NAME="ponti-agent-capability-invoke-require-approval"
 IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-ponti-nexus-approved-draft-$(date +%s)}"
@@ -236,16 +242,31 @@ PY
 }
 
 draft_payload() {
-  PONTI_PROJECT_ID="${PONTI_PROJECT_ID}" python3 - <<'PY'
+  PONTI_PROJECT_ID="${PONTI_PROJECT_ID}" \
+  PONTI_CUSTOMER_ID="${PONTI_CUSTOMER_ID}" \
+  PONTI_FIELD_ID="${PONTI_FIELD_ID}" \
+  PONTI_LOT_ID="${PONTI_LOT_ID}" \
+  PONTI_CROP_ID="${PONTI_CROP_ID}" \
+  PONTI_LABOR_ID="${PONTI_LABOR_ID}" \
+  PONTI_INVESTOR_ID="${PONTI_INVESTOR_ID}" \
+  python3 - <<'PY'
 import json
 import os
 
 project_id = int(os.environ["PONTI_PROJECT_ID"])
 print(json.dumps({
     "project_id": project_id,
-    "work_type": "smoke-preview",
+    "customer_id": int(os.environ["PONTI_CUSTOMER_ID"]),
+    "field_id": int(os.environ["PONTI_FIELD_ID"]),
+    "lot_id": int(os.environ["PONTI_LOT_ID"]),
+    "crop_id": int(os.environ["PONTI_CROP_ID"]),
+    "labor_id": int(os.environ["PONTI_LABOR_ID"]),
+    "investor_id": int(os.environ["PONTI_INVESTOR_ID"]),
     "scheduled_date": "2026-07-01",
-    "notes": "Nexus approved draft smoke.",
+    "date": "2026-07-01",
+    "contractor": "Ponti Axis smoke",
+    "effective_area": 1,
+    "observations": "Nexus approved draft smoke.",
     "workspace": {
         "project_id": project_id,
     },
@@ -400,19 +421,25 @@ if data.get("org_id") != os.environ["PONTI_ORG_ID"]:
     print(f"org_id mismatch: {data}", file=sys.stderr)
     sys.exit(1)
 result = data.get("result") or {}
-if result.get("status") != "preview" or result.get("action") != os.environ["OPERATION"]:
-    print(f"Ponti result must be preview for operation: {result}", file=sys.stderr)
+if result.get("status") != "draft" or result.get("action") != os.environ["OPERATION"]:
+    print(f"Ponti result must be draft for operation: {result}", file=sys.stderr)
     sys.exit(1)
 checks = {
-    "approval_required": True,
-    "preview_only": True,
-    "write_performed": False,
-    "execution_allowed": False,
+    "write_performed": True,
 }
 for key, want in checks.items():
     if result.get(key) is not want:
         print(f"result {key} mismatch: {result}", file=sys.stderr)
         sys.exit(1)
+if result.get("execution_status") != "draft_created":
+    print(f"expected execution_status=draft_created: {result}", file=sys.stderr)
+    sys.exit(1)
+if not result.get("draft_id"):
+    print(f"expected draft_id in result: {result}", file=sys.stderr)
+    sys.exit(1)
+if result.get("nexus_request_id") != os.environ["REQUEST_ID"]:
+    print(f"result nexus_request_id mismatch: {result}", file=sys.stderr)
+    sys.exit(1)
 evidence = data.get("evidence") or {}
 if evidence.get("nexus_request_id") != os.environ["REQUEST_ID"]:
     print(f"execution evidence missing nexus_request_id: {evidence}", file=sys.stderr)
@@ -453,8 +480,9 @@ print(json.dumps({
     "result": {
         "connector_execution_id": execution.get("id", ""),
         "operation": execution.get("operation", ""),
-        "preview_only": True,
-        "write_performed": False,
+        "draft_id": (execution.get("result") or {}).get("draft_id"),
+        "execution_status": (execution.get("result") or {}).get("execution_status"),
+        "write_performed": (execution.get("result") or {}).get("write_performed") is True,
     },
 }, separators=(",", ":"), sort_keys=True))
 PY

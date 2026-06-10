@@ -8,7 +8,7 @@ PONTI_ORG_ID="${PONTI_ORG_ID:-}"
 PONTI_AXIS_API_KEY="${PONTI_AXIS_API_KEY:-}"
 PONTI_PROJECT_ID="${PONTI_PROJECT_ID:-1}"
 AXIS_ACTOR_ID="${AXIS_ACTOR_ID:-ponti-draft-smoke}"
-AXIS_SCOPES="${AXIS_SCOPES:-companion:products:admin companion:runtime:admin companion:capabilities:admin companion:connectors:execute ponti:insights:read ponti:actions:prepare}"
+AXIS_SCOPES="${AXIS_SCOPES:-companion:products:admin companion:runtime:admin companion:capabilities:admin companion:connectors:execute ponti:insights:read ponti:actions:prepare ponti:actions:draft}"
 
 require_env() {
   local name="$1"
@@ -76,22 +76,28 @@ import os
 import sys
 
 data = json.loads(os.environ["RAW_JSON"])
-manifest = next((m for m in data.get("items", []) if isinstance(m, dict) and m.get("id") == "ponti.insights"), None)
-if not manifest:
-    print("Ponti capabilities response must include ponti.insights", file=sys.stderr)
-    sys.exit(1)
-tools = {t.get("name"): t for t in manifest.get("tools", []) if isinstance(t, dict)}
-missing = {
+tools = {}
+for manifest in data.get("items", []):
+    if not isinstance(manifest, dict) or manifest.get("product") != "ponti":
+        continue
+    for tool in manifest.get("tools", []):
+        if isinstance(tool, dict):
+            tools[tool.get("name")] = tool
+expected = {
     "ponti.insight.resolve.prepare",
     "ponti.workorder.draft.prepare",
     "ponti.stock_adjustment.prepare",
-} - set(tools)
+    "ponti.workorder_draft.create",
+    "ponti.insight_resolution.draft",
+    "ponti.stock_count.draft",
+}
+missing = expected - set(tools)
 if missing:
     print(f"Ponti capabilities missing draft tools: {sorted(missing)}", file=sys.stderr)
     sys.exit(1)
 for name in sorted(missing):
     print(name)
-for name in ("ponti.insight.resolve.prepare", "ponti.workorder.draft.prepare", "ponti.stock_adjustment.prepare"):
+for name in sorted(expected):
     tool = tools[name]
     governance = tool.get("governance") or {}
     if tool.get("mode") != "write" or tool.get("side_effect") is not True:
@@ -151,15 +157,23 @@ import os
 import sys
 
 data = json.loads(os.environ["RAW_JSON"])
+expected = {
+    "ponti.insight.resolve.prepare",
+    "ponti.workorder.draft.prepare",
+    "ponti.stock_adjustment.prepare",
+    "ponti.workorder_draft.create",
+    "ponti.insight_resolution.draft",
+    "ponti.stock_count.draft",
+}
 found = {}
 for connector in data.get("connectors", []):
     if connector.get("kind") != "ponti":
         continue
     for cap in connector.get("capabilities", []):
         op = cap.get("operation") or cap.get("id")
-        if op in {"ponti.insight.resolve.prepare", "ponti.workorder.draft.prepare", "ponti.stock_adjustment.prepare"}:
+        if op in expected:
             found[op] = cap
-missing = {"ponti.insight.resolve.prepare", "ponti.workorder.draft.prepare", "ponti.stock_adjustment.prepare"} - set(found)
+missing = expected - set(found)
 if missing:
     print(f"Axis Ponti connector missing draft capabilities: {sorted(missing)}", file=sys.stderr)
     sys.exit(1)
@@ -184,11 +198,18 @@ validate_ungated_block() {
   local payload
   payload='{
     "connector_id": "'"${connector_id}"'",
-    "operation": "ponti.workorder.draft.prepare",
+    "operation": "ponti.workorder_draft.create",
     "idempotency_key": "ponti-draft-smoke-ungated",
     "payload": {
       "project_id": '"${PONTI_PROJECT_ID}"',
-      "work_type": "smoke-preview",
+      "date": "2026-07-01",
+      "customer_id": 1,
+      "field_id": 1,
+      "lot_id": 1,
+      "crop_id": 1,
+      "labor_id": 1,
+      "contractor": "smoke",
+      "effective_area": 1,
       "workspace": {
         "project_id": '"${PONTI_PROJECT_ID}"'
       }

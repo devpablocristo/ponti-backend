@@ -21,7 +21,7 @@ func ProvideAxisClient(cfg *config.AI) *axis.Client {
 		BaseURL:        cfg.AxisCompanionURL,
 		APIKey:         cfg.AxisCompanionKey,
 		ProductSurface: cfg.AxisProductSurface,
-		TimeoutMS:      cfg.TimeoutMS,
+		TimeoutMS:      cfg.AxisCompanionTimeoutMS,
 	})
 }
 

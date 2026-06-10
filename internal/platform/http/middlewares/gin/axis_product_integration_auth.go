@@ -87,7 +87,18 @@ func axisProductIntegrationPath(c *gin.Context) bool {
 		path == "/api/v1/insights" ||
 		path == "/api/v1/insights/summary" ||
 		(strings.HasPrefix(path, "/api/v1/insights/") && strings.HasSuffix(path, "/explain")) ||
-		(strings.HasPrefix(path, "/api/v1/ai/actions/") && strings.HasSuffix(path, "/prepare"))
+		path == "/api/v1/dashboard" ||
+		path == "/api/v1/work-orders" ||
+		path == "/api/v1/work-orders/metrics" ||
+		path == "/api/v1/lots" ||
+		path == "/api/v1/supplies" ||
+		strings.HasPrefix(path, "/api/v1/reports/") ||
+		path == "/api/v1/projects/:project_id/stocks/summary" ||
+		(strings.HasPrefix(path, "/api/v1/projects/") && strings.HasSuffix(path, "/stocks/summary")) ||
+		path == "/api/v1/work-order-drafts/digital" ||
+		(strings.HasPrefix(path, "/api/v1/ai/actions/") && strings.HasSuffix(path, "/prepare")) ||
+		path == "/api/v1/ai/actions/insight-resolution/draft" ||
+		path == "/api/v1/ai/actions/stock-count/draft"
 }
 
 func axisProductIntegrationRequiresTenant(c *gin.Context) bool {

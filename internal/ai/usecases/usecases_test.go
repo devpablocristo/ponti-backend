@@ -78,7 +78,8 @@ func TestUseCases_ChatAxis_AdaptsResponseAndThreadsIdentity(t *testing.T) {
 		ProductSurface: "ponti",
 	})
 	status, raw, err := uc.Chat(ctx, "user-1", "project-1", map[string]any{
-		"message": "hola",
+		"message":    "hola",
+		"route_hint": "reports",
 		"workspace": map[string]any{
 			"project_id": 1,
 		},
@@ -113,6 +114,10 @@ func TestUseCases_ChatAxis_AdaptsResponseAndThreadsIdentity(t *testing.T) {
 	}
 	if _, exists := axisClient.body["handoff"]; !exists {
 		t.Fatalf("workspace should be carried inside handoff for future Axis contract: %#v", axisClient.body)
+	}
+	handoff := axisClient.body["handoff"].(map[string]any)
+	if handoff["route_hint"] != "reports" {
+		t.Fatalf("route_hint should be carried inside handoff, got %#v", handoff)
 	}
 }
 

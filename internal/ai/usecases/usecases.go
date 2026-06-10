@@ -280,7 +280,7 @@ func (u *UseCases) chatStreamAxis(ctx context.Context, userID, projectID string,
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	writeSSE(w, "start", map[string]any{"chat_id": response["chat_id"]})
-	for _, tool := range stringSlice(response["tool_calls"]) {
+	for _, tool := range toolCallObjects(response["tool_calls"]) {
 		writeSSE(w, "tool_call", map[string]any{"tool": tool})
 	}
 	if reply, _ := response["reply"].(string); reply != "" {
@@ -292,11 +292,11 @@ func (u *UseCases) chatStreamAxis(ctx context.Context, userID, projectID string,
 
 func (u *UseCases) axisCallContext(ctx context.Context, userID string, readOnly bool) axis.CallContext {
 	scopes := scopesFromContext(ctx)
-	scopes = append(scopes, "ponti:insights:read")
+	scopes = append(scopes, "ponti:insights:read", "ponti:operational:read")
 	if readOnly {
 		scopes = append(scopes, "companion:tasks:read")
 	} else {
-		scopes = append(scopes, "companion:tasks:write", "companion:connectors:execute")
+		scopes = append(scopes, "companion:tasks:write", "companion:connectors:execute", "ponti:actions:draft")
 	}
 	return axis.CallContext{
 		OrgID:          tenantIDFromContext(ctx),
@@ -372,10 +372,21 @@ func buildHandoff(payload map[string]any) any {
 	if v, ok := payload["handoff"]; ok && v != nil {
 		return v
 	}
+	routeHint, _ := payload["route_hint"].(string)
 	if workspace, ok := payload["workspace"]; ok && workspace != nil {
-		return map[string]any{
+		out := map[string]any{
 			"source":    "ponti-web",
 			"workspace": workspace,
+		}
+		if strings.TrimSpace(routeHint) != "" {
+			out["route_hint"] = strings.TrimSpace(routeHint)
+		}
+		return out
+	}
+	if strings.TrimSpace(routeHint) != "" {
+		return map[string]any{
+			"source":     "ponti-web",
+			"route_hint": strings.TrimSpace(routeHint),
 		}
 	}
 	return nil
@@ -407,13 +418,16 @@ func adaptAxisChatResponse(raw []byte, request map[string]any) ([]byte, error) {
 		"chat_id":               chatID,
 		"reply":                 reply,
 		"tokens_used":           intValue(in["tokens_used"]),
-		"tool_calls":            toolCallNames(in["tool_calls"]),
+		"tool_calls":            toolCallObjects(in["tool_calls"]),
 		"pending_confirmations": arrayValue(in["pending_confirmations"]),
 		"blocks":                blocks,
 		"routed_agent":          routedAgent,
 		"routing_source":        routingSource,
 		"axis_run_id":           runID,
 		"axis_task_id":          taskID,
+		"run_id":                runID,
+		"task_id":               taskID,
+		"agent_id":              stringValue(in["agent_id"]),
 	}
 	return json.Marshal(out)
 }
@@ -468,11 +482,16 @@ func arrayValue(v any) []any {
 	return []any{}
 }
 
-func stringSlice(v any) []string {
-	items := []string{}
+func toolCallObjects(v any) []any {
+	items := []any{}
 	for _, item := range arrayValue(v) {
-		if s := stringValue(item); s != "" {
-			items = append(items, s)
+		switch t := item.(type) {
+		case string:
+			if s := strings.TrimSpace(t); s != "" {
+				items = append(items, s)
+			}
+		case map[string]any:
+			items = append(items, t)
 		}
 	}
 	return items

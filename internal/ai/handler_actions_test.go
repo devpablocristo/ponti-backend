@@ -111,6 +111,41 @@ func TestPrepareStockAdjustmentRejectsZeroDelta(t *testing.T) {
 	}
 }
 
+func TestDraftInsightResolutionReturnsDraftContract(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	router := newAIActionTestRouter(orgID, "user-6")
+
+	res := postJSONWithHeaders(router, "/api/v1/ai/actions/insight-resolution/draft", map[string]any{
+		"insight_id":      uuid.NewString(),
+		"resolution_note": "Dejar trazado para revision.",
+		"workspace": map[string]any{
+			"project_id": 10,
+		},
+	}, map[string]string{"X-Nexus-Request-ID": uuid.NewString()})
+
+	assertDraftExecutionResponse(t, res, orgID, "ponti.insight_resolution.draft", false)
+}
+
+func TestDraftStockCountReturnsDraftContract(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.New()
+	router := newAIActionTestRouter(orgID, "user-7")
+	nexusRequestID := uuid.NewString()
+
+	res := postJSONWithHeaders(router, "/api/v1/ai/actions/stock-count/draft", map[string]any{
+		"project_id":       10,
+		"supply_id":        5,
+		"real_stock_units": 12.5,
+		"reason":           "Conteo preparado por diferencia detectada.",
+	}, map[string]string{"X-Nexus-Request-ID": nexusRequestID})
+
+	body := assertDraftExecutionResponse(t, res, orgID, "ponti.stock_count.draft", false)
+	if body["nexus_request_id"] != nexusRequestID {
+		t.Fatalf("expected nexus request id propagated, got %#v", body)
+	}
+}
+
 func TestPrepareWorkOrderDraftRejectsInvalidDate(t *testing.T) {
 	t.Parallel()
 	router := newAIActionTestRouter(uuid.New(), "user-5")
@@ -135,9 +170,16 @@ func newAIActionTestRouter(orgID uuid.UUID, actor string) *gin.Engine {
 }
 
 func postJSON(router *gin.Engine, path string, payload map[string]any) *httptest.ResponseRecorder {
+	return postJSONWithHeaders(router, path, payload, nil)
+}
+
+func postJSONWithHeaders(router *gin.Engine, path string, payload map[string]any, headers map[string]string) *httptest.ResponseRecorder {
 	raw, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	return res
@@ -163,6 +205,34 @@ func assertPreviewResponse(t *testing.T, res *httptest.ResponseRecorder, orgID u
 	}
 	if body["preview_only"] != true || body["write_performed"] != false || body["execution_allowed"] != false {
 		t.Fatalf("preview-only guard missing: %#v", body)
+	}
+	evidence := body["evidence"].(map[string]any)
+	if evidence["tenant_scope"] != orgID.String() {
+		t.Fatalf("tenant evidence mismatch: %#v", evidence)
+	}
+	if evidence["approval_required"] != true {
+		t.Fatalf("approval evidence missing: %#v", evidence)
+	}
+	return body
+}
+
+func assertDraftExecutionResponse(t *testing.T, res *httptest.ResponseRecorder, orgID uuid.UUID, action string, writePerformed bool) map[string]any {
+	t.Helper()
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["action"] != action {
+		t.Fatalf("unexpected action: %#v", body)
+	}
+	if body["write_performed"] != writePerformed {
+		t.Fatalf("unexpected write_performed: %#v", body)
+	}
+	if body["draft_id"] == "" || body["execution_status"] == "" || body["audit_ref"] == "" {
+		t.Fatalf("draft execution contract missing: %#v", body)
 	}
 	evidence := body["evidence"].(map[string]any)
 	if evidence["tenant_scope"] != orgID.String() {

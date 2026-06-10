@@ -13,6 +13,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 
+	aimod "github.com/devpablocristo/ponti-backend/internal/ai"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	reportmod "github.com/devpablocristo/ponti-backend/internal/report"
@@ -41,6 +42,8 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	deps.StockUseCases.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
 	deps.DataIntegrityUseCases.SetBusinessInsightsNotifier(&dataIntegrityAdapter{svc: biService})
 	deps.ReportUseCase.SetBusinessInsightsNotifier(&reportAdapter{svc: biService})
+	decisionRepo := aimod.NewDecisionRepository(deps.GormRepo.Client())
+	deps.AIHandler.SetDecisionService(aimod.NewDecisionService(decisionRepo, deps.StockUseCases, deps.ReportUseCase, biRepo))
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()

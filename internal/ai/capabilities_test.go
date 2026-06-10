@@ -6,34 +6,25 @@ func TestPontiCapabilities_ExposeInsightsAndDraftActionsManifest(t *testing.T) {
 	t.Parallel()
 
 	items := pontiCapabilities()
-	if len(items) != 1 {
-		t.Fatalf("expected one published manifest, got %d", len(items))
+	if len(items) != 3 {
+		t.Fatalf("expected three published manifests, got %d", len(items))
 	}
-	manifest := items[0]
+	manifest := manifestByID(t, items, "ponti.insights")
 	assertManifestBasics(t, manifest)
-	if manifest.ID != "ponti.insights" {
-		t.Fatalf("unexpected manifest id: %v", manifest.ID)
-	}
 	if manifest.Product != pontiProductSurface {
 		t.Fatalf("unexpected product: %v", manifest.Product)
 	}
-	if len(manifest.Tools) != 6 {
-		t.Fatalf("expected 6 published tools, got %d", len(manifest.Tools))
+	if len(manifest.Tools) != 3 {
+		t.Fatalf("expected 3 insight tools, got %d", len(manifest.Tools))
 	}
 	expectedReads := map[string]bool{
 		"ponti.insights.list":    true,
 		"ponti.insights.summary": true,
 		"ponti.insights.explain": true,
 	}
-	expectedDrafts := map[string]bool{
-		"ponti.insight.resolve.prepare":  true,
-		"ponti.workorder.draft.prepare":  true,
-		"ponti.stock_adjustment.prepare": true,
-	}
 	for _, tool := range manifest.Tools {
 		assertToolBasics(t, tool)
-		switch {
-		case expectedReads[tool.Name]:
+		if expectedReads[tool.Name] {
 			if tool.Mode != capabilityModeRead {
 				t.Fatalf("tool %v must be read mode", tool.Name)
 			}
@@ -46,10 +37,43 @@ func TestPontiCapabilities_ExposeInsightsAndDraftActionsManifest(t *testing.T) {
 			if tool.Governance != nil {
 				t.Fatalf("read-only tool %v must not declare governance", tool.Name)
 			}
-		case expectedDrafts[tool.Name]:
-			assertGovernedDraftTool(t, tool)
-		default:
+		} else {
 			t.Fatalf("unexpected published tool %q", tool.Name)
+		}
+	}
+}
+
+func TestPontiOperationalCapabilities_ArePublishedReadOnly(t *testing.T) {
+	t.Parallel()
+
+	manifest := manifestByID(t, pontiCapabilities(), "ponti.operational")
+	assertManifestBasics(t, manifest)
+	expected := map[string]bool{
+		"ponti.dashboard.summary":                     true,
+		"ponti.stock.summary":                         true,
+		"ponti.workorders.list":                       true,
+		"ponti.workorders.metrics":                    true,
+		"ponti.lots.summary":                          true,
+		"ponti.supplies.summary":                      true,
+		"ponti.reports.field_crop.summary":            true,
+		"ponti.reports.investor_contribution.summary": true,
+		"ponti.reports.summary_results.summary":       true,
+	}
+	if len(manifest.Tools) != len(expected) {
+		t.Fatalf("expected %d operational tools, got %d", len(expected), len(manifest.Tools))
+	}
+	for _, tool := range manifest.Tools {
+		if !expected[tool.Name] {
+			t.Fatalf("unexpected operational tool %q", tool.Name)
+		}
+		if tool.Mode != capabilityModeRead || tool.SideEffect {
+			t.Fatalf("operational tool %q must be read-only", tool.Name)
+		}
+		if tool.RiskClass != capabilityRiskLow {
+			t.Fatalf("operational tool %q must be low risk", tool.Name)
+		}
+		if tool.Governance != nil {
+			t.Fatalf("operational tool %q must not declare governance", tool.Name)
 		}
 	}
 }
@@ -64,29 +88,20 @@ func TestPontiDraftActions_AreGovernedAndPublished(t *testing.T) {
 		}
 	}
 
-	tools := pontiPlannedDraftActionTools()
-	if len(tools) != 3 {
-		t.Fatalf("expected 3 planned draft action tools, got %d", len(tools))
+	tools := pontiDraftActionTools()
+	if len(tools) != 6 {
+		t.Fatalf("expected 6 draft action tools, got %d", len(tools))
 	}
-	plannedManifest := capabilityManifest{
-		SchemaVersion: pontiCapabilitySchemaVersion,
-		ID:            "ponti.actions",
-		Product:       pontiProductSurface,
-		Version:       pontiCapabilitiesVersion,
-		TenantScope:   capabilityTenantScopeOrg,
-		Name:          "Ponti Draft Actions",
-		Description:   "Governed draft action contracts prepared for Axis/Nexus execution.",
-		Agents: []capabilityAgentDescriptor{
-			{Name: "ponti_actions", Description: "Prepares governed Ponti action proposals for Nexus approval."},
-		},
-		Tools: tools,
-	}
-	assertManifestBasics(t, plannedManifest)
+	actionsManifest := manifestByID(t, pontiCapabilities(), "ponti.actions")
+	assertManifestBasics(t, actionsManifest)
 
 	expected := map[string]bool{
 		"ponti.insight.resolve.prepare":  true,
 		"ponti.workorder.draft.prepare":  true,
 		"ponti.stock_adjustment.prepare": true,
+		"ponti.workorder_draft.create":   true,
+		"ponti.insight_resolution.draft": true,
+		"ponti.stock_count.draft":        true,
 	}
 	for _, tool := range tools {
 		if !expected[tool.Name] {
@@ -97,6 +112,17 @@ func TestPontiDraftActions_AreGovernedAndPublished(t *testing.T) {
 		}
 		assertGovernedDraftTool(t, tool)
 	}
+}
+
+func manifestByID(t *testing.T, items []capabilityManifest, id string) capabilityManifest {
+	t.Helper()
+	for _, item := range items {
+		if item.ID == id {
+			return item
+		}
+	}
+	t.Fatalf("manifest %q not found", id)
+	return capabilityManifest{}
 }
 
 func assertGovernedDraftTool(t *testing.T, tool capabilityTool) {

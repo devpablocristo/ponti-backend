@@ -38,10 +38,11 @@ type MiddlewaresEnginePort interface {
 }
 
 type Handler struct {
-	ucs UseCasesPort
-	gsv GinEnginePort
-	acf ConfigAPIPort
-	mws MiddlewaresEnginePort
+	ucs       UseCasesPort
+	decisions *DecisionService
+	gsv       GinEnginePort
+	acf       ConfigAPIPort
+	mws       MiddlewaresEnginePort
 }
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
@@ -63,9 +64,17 @@ func (h *Handler) Routes() {
 		public.POST("/chat/stream", h.ChatStream)
 		public.GET("/chat/conversations", h.ListChatConversations)
 		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
+		public.POST("/decision-runs", h.CreateDecisionRun)
+		public.GET("/decision-runs", h.ListDecisionRuns)
+		public.GET("/decision-cards", h.ListDecisionCards)
+		public.POST("/decision-cards/external", h.ImportExternalDecisionCard)
+		public.PATCH("/decision-cards/:id", h.PatchDecisionCard)
+		public.POST("/decision-cards/:id/actions/:action_id", h.ExecuteDecisionCardAction)
 		public.POST("/actions/insight-resolve/prepare", h.PrepareInsightResolve)
 		public.POST("/actions/workorder-draft/prepare", h.PrepareWorkOrderDraft)
 		public.POST("/actions/stock-adjustment/prepare", h.PrepareStockAdjustment)
+		public.POST("/actions/insight-resolution/draft", h.DraftInsightResolution)
+		public.POST("/actions/stock-count/draft", h.DraftStockCount)
 	}
 }
 
