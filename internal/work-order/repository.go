@@ -216,6 +216,25 @@ func (r *Repository) UpdateWorkOrderByID(ctx context.Context, o *domain.WorkOrde
 			}
 		}
 
+		// 3.6) Sincronizar el draft publicado vinculado (si existe) para evitar
+		// inconsistencias de FK que bloqueen operaciones como borrar un lote.
+		if err := tx.Exec(`
+			UPDATE work_order_drafts
+			SET lot_id         = ?,
+			    field_id       = ?,
+			    crop_id        = ?,
+			    labor_id       = ?,
+			    effective_area = ?,
+			    date           = ?,
+			    contractor     = ?
+			WHERE published_work_order_id = ?
+			  AND deleted_at IS NULL
+		`, model.LotID, model.FieldID, model.CropID, model.LaborID,
+			model.EffectiveArea, model.Date, model.Contractor, model.ID,
+		).Error; err != nil {
+			return domainerr.Internal("failed to sync published draft")
+		}
+
 		return nil
 	})
 }

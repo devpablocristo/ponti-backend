@@ -664,12 +664,26 @@ func (u *UseCases) resolveDigitalDraftNumber(ctx context.Context, projectID int6
 }
 
 func (u *UseCases) resolveDigitalDraftNumberForUpdate(ctx context.Context, projectID int64, draftID int64, requested string) (string, error) {
-	occupied, err := u.repo.ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx, projectID, draftID)
-	if err != nil {
-		return "", err
-	}
+    occupied, err := u.repo.ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx, projectID, draftID)
+    if err != nil {
+        return "", err
+    }
 
-	return resolveDigitalDraftNumberWithOccupied(projectID, requested, occupied)
+    // Si el número pedido es un split (D-N.M), excluir hermanos del mismo grupo
+    // (D-N.X con distinto X) para que no generen falso conflicto de base.
+    if reqBase, _, isSplit := extractDigitalSplitSequence(requested); isSplit {
+        filtered := occupied[:0]
+        for _, n := range occupied {
+            b, _, s := extractDigitalSplitSequence(n)
+            if s && b == reqBase {
+                continue
+            }
+            filtered = append(filtered, n)
+        }
+        occupied = filtered
+    }
+
+    return resolveDigitalDraftNumberWithOccupied(projectID, requested, occupied)
 }
 
 func (u *UseCases) resolveDigitalDraftBatchBaseNumber(ctx context.Context, projectID int64, requested string) (string, error) {
