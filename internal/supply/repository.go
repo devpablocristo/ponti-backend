@@ -48,6 +48,9 @@ func (r *Repository) ExecuteInTransaction(ctx context.Context, fn func(ctx conte
 func (r *Repository) CreateSupply(ctx context.Context, s *domain.Supply) (int64, error) {
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, s.ProjectID); err != nil {
+			return err
+		}
 		model := models.FromDomain(s)
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create supply")
@@ -75,6 +78,9 @@ func (r *Repository) CreatePendingSupply(ctx context.Context, projectID int64, n
 
 	var id int64
 	err := r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, projectID); err != nil {
+			return err
+		}
 		var userID *string
 		if actor, err := sharedmodels.ActorFromContext(ctx); err == nil {
 			userID = &actor
@@ -105,6 +111,17 @@ func (r *Repository) CreateSuppliesBulk(ctx context.Context, supplies []domain.S
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		guarded := make(map[int64]struct{}, len(supplies))
+		for i := range supplies {
+			pid := supplies[i].ProjectID
+			if _, ok := guarded[pid]; ok {
+				continue
+			}
+			if err := sharedfilters.GuardProjectForTenant(ctx, tx, pid); err != nil {
+				return err
+			}
+			guarded[pid] = struct{}{}
+		}
 		modelsSlice := make([]*models.Supply, len(supplies))
 		for i := range supplies {
 			modelsSlice[i] = models.FromDomain(&supplies[i])
@@ -270,11 +287,20 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&models.Supply{}).Where("id = ?", s.ID).Count(&count).Error; err != nil {
+		countTx := tx.Model(&models.Supply{}).Where("id = ?", s.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			countTx = countTx.Where(cond, args...)
+		}
+		if err := countTx.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check supply existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", s.ID))
+		}
+		// T-child: validar el project DESTINO (evita move-out cross-tenant; el scope
+		// de arriba solo valida la fila vieja).
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, s.ProjectID); err != nil {
+			return err
 		}
 		updates := map[string]any{
 			"name":             s.Name,
@@ -289,6 +315,9 @@ func (r *Repository) UpdateSupply(ctx context.Context, s *domain.Supply) error {
 		}
 		updateTx := tx.Model(&models.Supply{}).
 			Where("id = ?", s.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			updateTx = updateTx.Where(cond, args...)
+		}
 		if !s.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", s.UpdatedAt)
 		}
@@ -328,13 +357,21 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Unscoped().Model(&models.Supply{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		countTx := tx.Unscoped().Model(&models.Supply{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			countTx = countTx.Where(cond, args...)
+		}
+		if err := countTx.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check supply existence")
 		}
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 		}
-		result := tx.Unscoped().Delete(&models.Supply{}, id)
+		deleteTx := tx.Unscoped().Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			deleteTx = deleteTx.Where(cond, args...)
+		}
+		result := deleteTx.Delete(&models.Supply{})
 		if result.Error != nil {
 			if isForeignKeyViolation(result.Error) {
 				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
@@ -359,7 +396,11 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var supply models.Supply
-		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+		findTx := tx.Unscoped().Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			findTx = findTx.Where(cond, args...)
+		}
+		if err := findTx.First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
@@ -369,8 +410,12 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("supply already archived")
 		}
 
-		if err := tx.Model(&models.Supply{}).
-			Where("id = ?", id).
+		archiveTx := tx.Model(&models.Supply{}).
+			Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			archiveTx = archiveTx.Where(cond, args...)
+		}
+		if err := archiveTx.
 			Updates(map[string]any{
 				"deleted_at": time.Now(),
 			}).Error; err != nil {
@@ -386,7 +431,11 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		var supply models.Supply
-		if err := tx.Unscoped().Where("id = ?", id).First(&supply).Error; err != nil {
+		findTx := tx.Unscoped().Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			findTx = findTx.Where(cond, args...)
+		}
+		if err := findTx.First(&supply).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 			}
@@ -396,8 +445,12 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 			return domainerr.Conflict("supply is not archived")
 		}
 
-		if err := tx.Unscoped().Model(&models.Supply{}).
-			Where("id = ?", id).
+		restoreTx := tx.Unscoped().Model(&models.Supply{}).
+			Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			restoreTx = restoreTx.Where(cond, args...)
+		}
+		if err := restoreTx.
 			Updates(map[string]any{
 				"deleted_at": nil,
 				"updated_at": time.Now(),
@@ -475,6 +528,10 @@ func (r *Repository) ListSuppliesPaginated(
 func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.Supply) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
 		for i := range supplies {
+			// T-child: validar el project DESTINO de cada item (evita move-out cross-tenant).
+			if err := sharedfilters.GuardProjectForTenant(ctx, tx, supplies[i].ProjectID); err != nil {
+				return err
+			}
 			updates := map[string]any{
 				"name":             supplies[i].Name,
 				"unit_id":          int64(supplies[i].UnitID),
@@ -487,6 +544,9 @@ func (r *Repository) UpdateSuppliesBulk(ctx context.Context, supplies []domain.S
 			}
 			updateTx := tx.Model(&models.Supply{}).
 				Where("id = ?", supplies[i].ID)
+			if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+				updateTx = updateTx.Where(cond, args...)
+			}
 			if !supplies[i].UpdatedAt.IsZero() {
 				updateTx = updateTx.Where("updated_at = ?", supplies[i].UpdatedAt)
 			}
@@ -521,6 +581,12 @@ func (r *Repository) ListAllSupplies(ctx context.Context, filter domain.SupplyFi
 		base = base.Where("project_id IN ?", projectIDs)
 	} else if filter.ProjectID != nil || filter.CustomerID != nil || filter.CampaignID != nil || filter.FieldID != nil {
 		return []domain.Supply{}, 0, nil
+	}
+
+	// T-child: aislar por tenant aun SIN workspace-filter (flag-gated). Sin esto, el
+	// caso "listar todo" devolvería supplies de todos los tenants bajo enforcement.
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		base = base.Where(cond, args...)
 	}
 
 	var total int64

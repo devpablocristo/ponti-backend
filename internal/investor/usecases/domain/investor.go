@@ -11,5 +11,6 @@ type Investor struct {
 	Name       string
 	Percentage int
 	ArchivedAt *time.Time
+	TaxID      *string `json:"-"` // transitorio: CUIT para el Identity Gate
 	shareddomain.Base
 }

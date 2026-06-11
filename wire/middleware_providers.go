@@ -15,6 +15,7 @@ import (
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetIdentity() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
 }
 

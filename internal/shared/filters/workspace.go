@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 // WorkspaceFilter define filtros comunes de workspace.
@@ -61,6 +63,12 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 			)
 		}
 
+		// T1.e: acotar al tenant activo (flag-gated). Valida que el project pedido
+		// pertenezca al tenant del JWT (cierra la fuga de workspace-ownership).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			query = query.Where("p.tenant_id = ?", orgID)
+		}
+
 		var count int64
 		if err := query.Count(&count).Error; err != nil {
 			return nil, domainerr.Internal("failed to validate project filters")
@@ -94,12 +102,91 @@ func ResolveProjectIDs(ctx context.Context, db *gorm.DB, f WorkspaceFilter) ([]i
 		)
 	}
 
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		query = query.Where("p.tenant_id = ?", orgID)
+	}
+
 	var projectIDs []int64
 	if err := query.Pluck("p.id", &projectIDs).Error; err != nil {
 		return nil, domainerr.Internal("failed to resolve project IDs")
 	}
 
 	return projectIDs, nil
+}
+
+// === T-child guards (Modelo 2): pertenencia al tenant de entidades HIJAS que NO
+// tienen tenant_id propio (llegan al tenant vía projects.tenant_id). Todo flag-gated:
+// con TENANT_ENFORCEMENT off devuelven nil / predicado vacío (comportamiento idéntico). ===
+
+// GuardProjectForTenant valida que projectID pertenezca al tenant activo. Para
+// Create/operaciones que reciben un project_id del cliente. nil si el flag está off o
+// el project es del tenant; NotFound si no lo es (404, sin revelar existencia).
+func GuardProjectForTenant(ctx context.Context, db *gorm.DB, projectID int64) error {
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok || !sharedmodels.TenantEnforcementEnabled() || projectID <= 0 {
+		return nil
+	}
+	var count int64
+	if err := db.WithContext(ctx).
+		Table("projects").
+		Where("id = ? AND tenant_id = ?", projectID, orgID).
+		Count(&count).Error; err != nil {
+		return domainerr.Internal("failed to validate project tenant")
+	}
+	if count == 0 {
+		return domainerr.NotFound("project not found")
+	}
+	return nil
+}
+
+// GuardFieldForTenant valida que fieldID pertenezca a un project del tenant activo
+// (fields.project_id -> projects.tenant_id). Para Create/operaciones que reciben
+// field_id pero no project_id (ej. lots). nil si el flag está off o el field es del tenant.
+func GuardFieldForTenant(ctx context.Context, db *gorm.DB, fieldID int64) error {
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok || !sharedmodels.TenantEnforcementEnabled() || fieldID <= 0 {
+		return nil
+	}
+	var count int64
+	if err := db.WithContext(ctx).
+		Table("fields f").
+		Joins("JOIN projects p ON p.id = f.project_id").
+		Where("f.id = ? AND p.tenant_id = ?", fieldID, orgID).
+		Count(&count).Error; err != nil {
+		return domainerr.Internal("failed to validate field tenant")
+	}
+	if count == 0 {
+		return domainerr.NotFound("field not found")
+	}
+	return nil
+}
+
+// TenantProjectScope devuelve un predicado SQL (+args) para acotar mutaciones por-id
+// propio de entidades hijas con columna project_id (workorders/supplies/supply_movements/
+// fields) al tenant activo. ("", nil) si el flag está off → no se agrega filtro.
+// Uso:
+//
+//	q := tx.Model(&X{}).Where("id = ?", id)
+//	if cond, args := filters.TenantProjectScope(ctx); cond != "" { q = q.Where(cond, args...) }
+//
+// Con el filtro, RowsAffected==0 si la fila no es del tenant → aplica el NotFound existente.
+func TenantProjectScope(ctx context.Context) (string, []any) {
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok || !sharedmodels.TenantEnforcementEnabled() {
+		return "", nil
+	}
+	return "project_id IN (SELECT id FROM projects WHERE tenant_id = ?)", []any{orgID}
+}
+
+// TenantFieldScope: idem para entidades hija-de-hija con columna field_id (lots),
+// vía fields.project_id -> projects.tenant_id. ("", nil) si el flag está off.
+func TenantFieldScope(ctx context.Context) (string, []any) {
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok || !sharedmodels.TenantEnforcementEnabled() {
+		return "", nil
+	}
+	return "field_id IN (SELECT id FROM fields WHERE project_id IN (SELECT id FROM projects WHERE tenant_id = ?))", []any{orgID}
 }
 
 // ValidateFieldBelongsToProject valida que field_id pertenezca al project_id.
