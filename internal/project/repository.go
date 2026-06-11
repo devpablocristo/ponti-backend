@@ -981,21 +981,29 @@ func attachActorIdentity(tx *gorm.DB, role identity.Role, table, name string, en
 }
 
 func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
+	tenantOrgID, tenantOK := base.OrgIDFromContext(tx.Statement.Context)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
 	if c.ID != 0 {
 		var existing cusmod.Customer
-		if err := tx.First(&existing, c.ID).Error; err == nil {
+		q := tx
+		if tenantOn {
+			q = q.Where("tenant_id = ?", tenantOrgID)
+		}
+		if err := q.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check customer: %w", err)
+		} else if tenantOn {
+			return 0, fmt.Errorf("customer %d not found in tenant", c.ID)
 		}
 	}
 	var existing cusmod.Customer
 	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated) para no
 	// reutilizar un customer de otro tenant (Modelo 2).
 	// anti-dup: match por nombre NORMALIZADO (reusa "acme sa" ≡ "Acme SA").
-	custQ := tx.Where("normalize_name(name) = normalize_name(?)", c.Name)
-	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
-		custQ = custQ.Where("tenant_id = ?", orgID)
+	custQ := tx.Where(projectNameMatchPredicate(tx), c.Name)
+	if tenantOn {
+		custQ = custQ.Where("tenant_id = ?", tenantOrgID)
 	}
 	if err := custQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
@@ -1006,6 +1014,11 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create customer: %w", err)
 	}
+	if tenantOn {
+		if err := tx.Exec("UPDATE customers SET tenant_id = ? WHERE id = ?", tenantOrgID, c.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set customer tenant: %w", err)
+		}
+	}
 	if err := attachActorIdentity(tx, identity.RoleCustomer, "customers", c.Name, c.ID); err != nil {
 		return 0, err
 	}
@@ -1013,19 +1026,27 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 }
 
 func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
+	tenantOrgID, tenantOK := base.OrgIDFromContext(tx.Statement.Context)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
 	if c.ID != 0 {
 		var existing casmod.Campaign
-		if err := tx.First(&existing, c.ID).Error; err == nil {
+		q := tx
+		if tenantOn {
+			q = q.Where("tenant_id = ?", tenantOrgID)
+		}
+		if err := q.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check campaign: %w", err)
+		} else if tenantOn {
+			return 0, fmt.Errorf("campaign %d not found in tenant", c.ID)
 		}
 	}
 	var existing casmod.Campaign
 	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated).
-	campQ := tx.Where("normalize_name(name) = normalize_name(?)", c.Name)
-	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
-		campQ = campQ.Where("tenant_id = ?", orgID)
+	campQ := tx.Where(projectNameMatchPredicate(tx), c.Name)
+	if tenantOn {
+		campQ = campQ.Where("tenant_id = ?", tenantOrgID)
 	}
 	if err := campQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
@@ -1036,7 +1057,19 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create campaign: %w", err)
 	}
+	if tenantOn {
+		if err := tx.Exec("UPDATE campaigns SET tenant_id = ? WHERE id = ?", tenantOrgID, c.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set campaign tenant: %w", err)
+		}
+	}
 	return c.ID, nil
+}
+
+func projectNameMatchPredicate(tx *gorm.DB) string {
+	if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+		return "normalize_name(name) = normalize_name(?)"
+	}
+	return "lower(name) = lower(?)"
 }
 
 func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {

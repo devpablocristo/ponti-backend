@@ -122,13 +122,22 @@ func (r *Repository) Update(ctx context.Context, a *domain.Actor) error {
 		}
 
 		res := tx.Exec(
-			"UPDATE actors SET display_name = ?, party_type = ?, updated_at = now() WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL",
+			"UPDATE actors SET display_name = ?, party_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL",
 			a.DisplayName, a.PartyType, a.ID, tenantID)
 		if res.Error != nil {
 			return domainerr.Internal("failed to update actor")
 		}
 		if res.RowsAffected == 0 {
 			return domainerr.NotFound("actor not found")
+		}
+		hasCustomer, err := r.actorHasCustomerRole(tx, a.ID)
+		if err != nil {
+			return err
+		}
+		if hasCustomer {
+			if err := r.ensureLegacyCustomerForActor(ctx, tx, a.ID); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -143,7 +152,16 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 		return err
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
-		res := tx.Exec("UPDATE actors SET deleted_at = now() WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID)
+		hasCustomer, err := r.actorHasCustomerRole(tx, id)
+		if err != nil {
+			return err
+		}
+		if hasCustomer {
+			if err := r.archiveLegacyCustomerForActor(tx, id); err != nil {
+				return err
+			}
+		}
+		res := tx.Exec("UPDATE actors SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID)
 		if res.Error != nil {
 			return domainerr.Internal("failed to archive actor")
 		}
@@ -176,7 +194,17 @@ func (r *Repository) Restore(ctx context.Context, id int64) error {
 			}
 			return domainerr.Internal("failed to restore actor keys")
 		}
-		return tx.Exec("UPDATE actors SET deleted_at = NULL WHERE id = ?", id).Error
+		if err := tx.Exec("UPDATE actors SET deleted_at = NULL WHERE id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to restore actor")
+		}
+		hasCustomer, err := r.actorHasCustomerRole(tx, id)
+		if err != nil {
+			return err
+		}
+		if hasCustomer {
+			return r.ensureLegacyCustomerForActor(ctx, tx, id)
+		}
+		return nil
 	})
 }
 
@@ -211,11 +239,26 @@ func (r *Repository) SetRoles(ctx context.Context, id int64, roles []string) err
 		if owner == 0 {
 			return domainerr.NotFound("actor not found")
 		}
+		hadCustomer, err := r.actorHasCustomerRole(tx, id)
+		if err != nil {
+			return err
+		}
+		wantsCustomer := hasRoleValue(clean, identity.RoleCustomer)
+		if hadCustomer && !wantsCustomer {
+			if err := r.archiveLegacyCustomerForActor(tx, id); err != nil {
+				return err
+			}
+		}
 		if err := tx.Exec("DELETE FROM actor_roles WHERE actor_id = ? AND role NOT IN ?", id, clean).Error; err != nil {
 			return err
 		}
 		for _, role := range clean {
 			if err := tx.Exec("INSERT INTO actor_roles (actor_id, role) VALUES (?, ?) ON CONFLICT (actor_id, role) DO NOTHING", id, role).Error; err != nil {
+				return err
+			}
+		}
+		if wantsCustomer {
+			if err := r.ensureLegacyCustomerForActor(ctx, tx, id); err != nil {
 				return err
 			}
 		}

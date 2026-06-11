@@ -134,6 +134,11 @@ func (r *Repository) Resolve(ctx context.Context, in domain.ResolveInput) (domai
 			}
 			return e
 		}
+		if role == identity.RoleCustomer {
+			if e := r.ensureLegacyCustomerForActor(ctx, tx, rr.ActorID); e != nil {
+				return e
+			}
+		}
 		a, e := r.loadActor(tx, rr.ActorID)
 		if e != nil {
 			return e
