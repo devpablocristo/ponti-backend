@@ -30,6 +30,11 @@ func ProvideConfigAI(cfg *config.Config) *config.AI {
 	return &cfg.AI
 }
 
+// ProvideConfigNexus ...
+func ProvideConfigNexus(cfg *config.Config) *config.Nexus {
+	return &cfg.Nexus
+}
+
 // ConfigSet ...
 var ConfigSet = wire.NewSet(
 	ProvideAllConfigs,
@@ -37,4 +42,5 @@ var ConfigSet = wire.NewSet(
 	ProvideConfigSuggester,
 	ProvideConfigAPI,
 	ProvideConfigAI,
+	ProvideConfigNexus,
 )

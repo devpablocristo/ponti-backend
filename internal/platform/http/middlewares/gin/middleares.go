@@ -11,6 +11,7 @@ import (
 type Middlewares struct {
 	global     []gin.HandlerFunc
 	validation []gin.HandlerFunc
+	identity   []gin.HandlerFunc
 	protected  []gin.HandlerFunc
 }
 
@@ -29,12 +30,23 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 			ExcludedPaths:  []string{"/health", "/ping", "/swagger/spec", "/swagger/ui/index.html"},
 		}),
 	}
-	validation := []gin.HandlerFunc{coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
+	validation := []gin.HandlerFunc{BridgeAxisProductIntegrationAPIKey(), coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {
 		validation = append(validation, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
 	}
+
+	// identity: auth tenant-AGNÓSTICA (U3). Autentica al usuario pero NO exige
+	// selección de tenant — para endpoints como GET /me/context. En local-dev
+	// reusa el authz local (que ya no exige tenant).
+	identity := []gin.HandlerFunc{coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
+	if cfg.Auth.Enabled {
+		identity = append(identity, RequireIdentityNoTenant(cfg.Auth, cfg.DB))
+	} else {
+		identity = append(identity, RequireLocalDevAuthz(cfg.Auth, cfg.DB))
+	}
+
 	protected := []gin.HandlerFunc{}
 
 	if cfg.Auth.CacheTTL <= 0 {
@@ -44,9 +56,11 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 	return &Middlewares{
 		global:     global,
 		validation: validation,
+		identity:   identity,
 		protected:  protected,
 	}
 }
 func (m *Middlewares) GetGlobal() []gin.HandlerFunc     { return m.global }
 func (m *Middlewares) GetValidation() []gin.HandlerFunc { return m.validation }
+func (m *Middlewares) GetIdentity() []gin.HandlerFunc   { return m.identity }
 func (m *Middlewares) GetProtected() []gin.HandlerFunc  { return m.protected }

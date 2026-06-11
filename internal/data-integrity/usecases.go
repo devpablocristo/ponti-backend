@@ -4,15 +4,18 @@ package dataintegrity
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	stockDomain "github.com/devpablocristo/ponti-backend/internal/stock/usecases/domain"
 	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	workOrderDomain "github.com/devpablocristo/ponti-backend/internal/work-order/usecases/domain"
@@ -51,6 +54,48 @@ type SupplyRepositoryPort interface {
 	ListTentativePrices(ctx context.Context, filter supplyDomain.SupplyFilter, limit int) ([]supplyDomain.TentativePriceItem, int64, error)
 }
 
+type BusinessInsightsNotifier interface {
+	NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, issue DataIntegrityCriticalInput) error
+	MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error
+	NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, issue TentativePricesInput) error
+	MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error
+}
+
+type DataIntegrityCriticalInput struct {
+	ProjectID    string
+	FailedChecks int
+	TotalChecks  int
+	Controls     []DataIntegrityControlIssue
+}
+
+type DataIntegrityControlIssue struct {
+	ControlNumber int
+	DataToVerify  string
+	Description   string
+	DifferenceA   string
+	DifferenceB   string
+	Tolerance     string
+	SystemSource  string
+	RecalcASource string
+	RecalcBSource string
+}
+
+type TentativePricesInput struct {
+	ProjectID   string
+	CustomerID  string
+	CampaignID  string
+	FieldID     string
+	Count       int64
+	SampleItems []TentativePriceInsightItem
+}
+
+type TentativePriceInsightItem struct {
+	SupplyID     string
+	Name         string
+	CategoryName string
+	Price        string
+}
+
 // UseCases contiene los casos de uso del módulo dataintegrity
 type UseCases struct {
 	workOrderRepo WorkOrderRepositoryPort
@@ -59,6 +104,7 @@ type UseCases struct {
 	reportRepo    ReportRepositoryPort
 	stockRepo     StockRepositoryPort
 	supplyRepo    SupplyRepositoryPort
+	notifier      BusinessInsightsNotifier
 }
 
 // NewUseCases crea una nueva instancia de UseCases
@@ -78,6 +124,10 @@ func NewUseCases(
 		stockRepo:     stockRepo,
 		supplyRepo:    supplyRepo,
 	}
+}
+
+func (u *UseCases) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
+	u.notifier = n
 }
 
 // GetTentativePrices devuelve los insumos con precio tentativo (is_partial_price) del workspace.
@@ -102,10 +152,12 @@ func (u *UseCases) GetTentativePrices(ctx context.Context, filter domain.Tentati
 		}
 	}
 
-	return &domain.TentativePricesReport{
+	report := &domain.TentativePricesReport{
 		Count: count,
 		Items: out,
-	}, nil
+	}
+	u.evaluateTentativePricesInsight(ctx, filter, report)
+	return report, nil
 }
 
 // sharedData cachea datos compartidos entre controles para reducir round-trips a DB.
@@ -293,9 +345,119 @@ func (u *UseCases) CheckCostsCoherence(ctx context.Context, filter domain.CostsC
 		return nil, firstErr
 	}
 
-	return &domain.IntegrityReport{
+	report := &domain.IntegrityReport{
 		Checks: checks,
-	}, nil
+	}
+	u.evaluateIntegrityInsight(ctx, filter.ProjectID, report)
+	return report, nil
+}
+
+func (u *UseCases) evaluateIntegrityInsight(ctx context.Context, projectID *int64, report *domain.IntegrityReport) {
+	if u == nil || u.notifier == nil || projectID == nil || report == nil {
+		return
+	}
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok {
+		return
+	}
+	projectIDText := strconv.FormatInt(*projectID, 10)
+	if projectIDText == "" {
+		return
+	}
+	actor, _ := sharedmodels.ActorFromContext(ctx)
+	issue := buildDataIntegrityCriticalInput(projectIDText, report)
+	if issue.FailedChecks == 0 {
+		_ = u.notifier.MaybeResolveDataIntegrityCritical(ctx, orgID, projectIDText)
+		return
+	}
+	_ = u.notifier.NotifyDataIntegrityCritical(ctx, orgID, actor, issue)
+}
+
+func (u *UseCases) evaluateTentativePricesInsight(ctx context.Context, filter domain.TentativePricesFilter, report *domain.TentativePricesReport) {
+	if u == nil || u.notifier == nil || filter.ProjectID == nil || report == nil {
+		return
+	}
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok {
+		return
+	}
+	projectID := strconv.FormatInt(*filter.ProjectID, 10)
+	if report.Count <= 0 {
+		_ = u.notifier.MaybeResolveTentativePrices(ctx, orgID, projectID)
+		return
+	}
+	actor, _ := sharedmodels.ActorFromContext(ctx)
+	_ = u.notifier.NotifyTentativePrices(ctx, orgID, actor, buildTentativePricesInput(filter, report))
+}
+
+func buildTentativePricesInput(filter domain.TentativePricesFilter, report *domain.TentativePricesReport) TentativePricesInput {
+	input := TentativePricesInput{
+		ProjectID:  idPtrString(filter.ProjectID),
+		CustomerID: idPtrString(filter.CustomerID),
+		CampaignID: idPtrString(filter.CampaignID),
+		FieldID:    idPtrString(filter.FieldID),
+	}
+	if report == nil {
+		return input
+	}
+	input.Count = report.Count
+	for _, item := range report.Items {
+		if len(input.SampleItems) >= 5 {
+			continue
+		}
+		input.SampleItems = append(input.SampleItems, TentativePriceInsightItem{
+			SupplyID:     strconv.FormatInt(item.SupplyID, 10),
+			Name:         item.Name,
+			CategoryName: item.CategoryName,
+			Price:        item.Price.String(),
+		})
+	}
+	return input
+}
+
+func idPtrString(v *int64) string {
+	if v == nil {
+		return ""
+	}
+	return strconv.FormatInt(*v, 10)
+}
+
+func buildDataIntegrityCriticalInput(projectID string, report *domain.IntegrityReport) DataIntegrityCriticalInput {
+	if report == nil {
+		return DataIntegrityCriticalInput{ProjectID: projectID}
+	}
+	issue := DataIntegrityCriticalInput{
+		ProjectID:    projectID,
+		TotalChecks:  len(report.Checks),
+		FailedChecks: 0,
+		Controls:     []DataIntegrityControlIssue{},
+	}
+	for _, check := range report.Checks {
+		if check.Status != "ERROR" {
+			continue
+		}
+		issue.FailedChecks++
+		if len(issue.Controls) >= 5 {
+			continue
+		}
+		control := DataIntegrityControlIssue{
+			ControlNumber: check.ControlNumber,
+			DataToVerify:  check.DataToVerify,
+			Description:   check.Description,
+			DifferenceA:   check.DifferenceA.String(),
+			Tolerance:     check.Tolerance.String(),
+			SystemSource:  check.SystemSource,
+			RecalcASource: check.RecalcASource,
+		}
+		if check.DifferenceB != nil {
+			control.DifferenceB = check.DifferenceB.String()
+		}
+		if check.RecalcBSource != nil {
+			control.RecalcBSource = *check.RecalcBSource
+		}
+		issue.Controls = append(issue.Controls, control)
+	}
+	return issue
 }
 
 // =====================================================

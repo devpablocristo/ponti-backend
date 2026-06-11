@@ -11,8 +11,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
-	"github.com/devpablocristo/platform/security/go/contextkeys"
 
+	authz "github.com/devpablocristo/ponti-backend/internal/shared/authz"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 
 	"github.com/devpablocristo/ponti-backend/internal/admin/idp"
@@ -31,19 +31,28 @@ type ConfigAPIPort interface {
 type MiddlewaresEnginePort interface {
 	GetGlobal() []gin.HandlerFunc
 	GetValidation() []gin.HandlerFunc
+	GetIdentity() []gin.HandlerFunc
 	GetProtected() []gin.HandlerFunc
 }
 
 type Handler struct {
-	db  *gorm.DB
-	idp idp.AdminClient
-	gsv GinEnginePort
-	acf ConfigAPIPort
-	mws MiddlewaresEnginePort
+	db             *gorm.DB
+	idp            idp.AdminClient
+	gsv            GinEnginePort
+	acf            ConfigAPIPort
+	mws            MiddlewaresEnginePort
+	platformAdmins map[string]struct{}
 }
 
-func NewHandler(db *gorm.DB, idpAdmin idp.AdminClient, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
-	return &Handler{db: db, idp: idpAdmin, gsv: s, acf: c, mws: m}
+func NewHandler(db *gorm.DB, idpAdmin idp.AdminClient, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort, platformAdminSubjects []string) *Handler {
+	pa := make(map[string]struct{}, len(platformAdminSubjects))
+	for _, sub := range platformAdminSubjects {
+		sub = strings.TrimSpace(sub)
+		if sub != "" {
+			pa[sub] = struct{}{}
+		}
+	}
+	return &Handler{db: db, idp: idpAdmin, gsv: s, acf: c, mws: m, platformAdmins: pa}
 }
 
 func (h *Handler) Routes() {
@@ -52,20 +61,90 @@ func (h *Handler) Routes() {
 
 	admin := r.Group(baseURL, h.mws.GetValidation()...)
 	{
-		admin.GET("/tenants", h.ListTenants)
+		admin.GET("/tenants", h.ListTenants) // ?archived=1 lista archivados
 		admin.POST("/tenants", h.CreateTenant)
+		admin.GET("/tenants/:tenant_id", h.GetTenant)
+		admin.PUT("/tenants/:tenant_id", h.UpdateTenant)
+		admin.POST("/tenants/:tenant_id/suspend", h.SuspendTenant)
+		admin.POST("/tenants/:tenant_id/activate", h.ActivateTenant)
+		admin.POST("/tenants/:tenant_id/archive", h.ArchiveTenant)
+		admin.POST("/tenants/:tenant_id/restore", h.RestoreTenant)
+		admin.DELETE("/tenants/:tenant_id/hard", h.HardDeleteTenant)
 
 		admin.GET("/users", h.ListUsers)
 		admin.POST("/users", h.CreateUser)
 
 		admin.POST("/memberships", h.UpsertMembership)
+
+		// U4: invites de tenant (crear/listar/revocar). Gating tenant-scoped
+		// (admin/tenant_owner del tenant) o platform-admin.
+		admin.POST("/tenants/:tenant_id/invites", h.CreateInvite)
+		admin.GET("/tenants/:tenant_id/invites", h.ListInvites)
+		admin.DELETE("/invites/:invite_id", h.RevokeInvite)
+	}
+
+	// U3/U4: rutas TENANT-AGNÓSTICAS (GetIdentity): autentican pero no exigen
+	// selección de tenant. /me/context lista los tenants del usuario; /me/invites/accept
+	// lo usa un invitado que todavía no tiene membership.
+	me := r.Group(h.acf.APIBaseURL()+"/me", h.mws.GetIdentity()...)
+	{
+		me.GET("/context", h.MeContext)
+		me.POST("/invites/accept", h.AcceptInvite)
 	}
 }
 
+// MeContext (U3) devuelve {user, current_tenant_id, tenants[]} del usuario
+// autenticado. current_tenant_id se resuelve del header X-Tenant-Id si corresponde
+// a una membership activa; si el usuario tiene exactamente una, se usa esa; si no,
+// queda null (el FE debe elegir).
+func (h *Handler) MeContext(c *gin.Context) {
+	p, ok := authz.PrincipalFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(p.Subject) == "" {
+		sharedhandlers.RespondError(c, domainerr.Unauthorized("not authenticated"))
+		return
+	}
+	requestedTenant := strings.TrimSpace(c.GetHeader("X-Tenant-Id"))
+	rp := newRepo(h.db)
+	out, err := rp.getMeContext(c.Request.Context(), p.Subject, requestedTenant)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
 func requireAdmin(c *gin.Context) bool {
-	role, _ := c.Request.Context().Value(ctxkeys.Role).(string)
-	if role != "admin" {
-		sharedhandlers.RespondError(c, domainerr.Forbidden("admin role required"))
+	// U2 dual-check: permiso fino users:manage con fallback (transición) al rol admin.
+	if err := authz.RequirePermissionOrRole(c.Request.Context(), "users:manage", "admin"); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return false
+	}
+	return true
+}
+
+// isPlatformAdmin indica si el principal autenticado (idp_sub) es operador global.
+// U1: fuente persistente = users.is_platform_admin (DB); el allowlist env
+// (AUTH_PLATFORM_ADMIN_SUBJECTS, T1.b) se conserva como FALLBACK de transición.
+func (h *Handler) isPlatformAdmin(c *gin.Context) bool {
+	sub, err := sharedhandlers.ParseActor(c)
+	if err != nil || strings.TrimSpace(sub) == "" {
+		return false
+	}
+	// Fallback de transición: allowlist env.
+	if _, ok := h.platformAdmins[sub]; ok {
+		return true
+	}
+	// Fuente persistente: users.is_platform_admin (U1). Guard por db nil (tests).
+	if h.db == nil {
+		return false
+	}
+	return newRepo(h.db).isPlatformAdminBySub(c.Request.Context(), sub)
+}
+
+// requirePlatformAdmin corta el request si el principal no es platform-admin.
+func (h *Handler) requirePlatformAdmin(c *gin.Context) bool {
+	if !h.isPlatformAdmin(c) {
+		sharedhandlers.RespondError(c, domainerr.Forbidden("platform admin required"))
 		return false
 	}
 	return true
@@ -76,11 +155,13 @@ type createTenantReq struct {
 }
 
 func (h *Handler) ListTenants(c *gin.Context) {
-	if !requireAdmin(c) {
+	// T1.b: enumerar todos los tenants es una operación de plataforma.
+	if !h.requirePlatformAdmin(c) {
 		return
 	}
+	archived := c.Query("archived") == "1" || strings.EqualFold(c.Query("archived"), "true")
 	rp := newRepo(h.db)
-	items, err := rp.listTenants(c.Request.Context())
+	items, err := rp.listTenantsByArchived(c.Request.Context(), archived)
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -89,7 +170,9 @@ func (h *Handler) ListTenants(c *gin.Context) {
 }
 
 func (h *Handler) CreateTenant(c *gin.Context) {
-	if !requireAdmin(c) {
+	// T1.b: crear tenants es una operación de plataforma (antes: cualquier admin
+	// de cualquier tenant podía crear tenants arbitrarios).
+	if !h.requirePlatformAdmin(c) {
 		return
 	}
 	var req createTenantReq
@@ -104,6 +187,125 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{"id": id}})
+}
+
+// --- Tenant lifecycle CRUDAR (platform-admin, PARTE IV) ---
+
+func parseTenantID(c *gin.Context) (uuid.UUID, error) {
+	id, err := uuid.Parse(strings.TrimSpace(c.Param("tenant_id")))
+	if err != nil {
+		return uuid.Nil, domainerr.Validation("invalid tenant_id")
+	}
+	return id, nil
+}
+
+func (h *Handler) GetTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	t, err := newRepo(h.db).getTenant(c.Request.Context(), id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": t})
+}
+
+type updateTenantReq struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) UpdateTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req updateTenantReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		sharedhandlers.RespondError(c, domainerr.Validation("invalid request payload"))
+		return
+	}
+	if err := newRepo(h.db).updateTenantName(c.Request.Context(), id, req.Name); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) SuspendTenant(c *gin.Context)  { h.changeTenantStatus(c, "suspended") }
+func (h *Handler) ActivateTenant(c *gin.Context) { h.changeTenantStatus(c, "active") }
+
+func (h *Handler) changeTenantStatus(c *gin.Context, status string) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).setTenantStatus(c.Request.Context(), id, status); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"status": status}})
+}
+
+func (h *Handler) ArchiveTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).archiveTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) RestoreTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).restoreTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) HardDeleteTenant(c *gin.Context) {
+	if !h.requirePlatformAdmin(c) {
+		return
+	}
+	id, err := parseTenantID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := newRepo(h.db).hardDeleteTenant(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 type createUserReq struct {
@@ -134,7 +336,7 @@ func usernameToEmail(v string) string {
 }
 
 func (h *Handler) CreateUser(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.isPlatformAdmin(c) && !requireAdmin(c) {
 		return
 	}
 	var req createUserReq
@@ -175,7 +377,15 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
+	// T1.b: solo platform-admin puede crear/dirigir a un tenant arbitrario por
+	// nombre; el resto queda acotado a su tenant activo (se ignora req.TenantName
+	// y NO se crea ningún tenant).
+	var tenantID uuid.UUID
+	if h.isPlatformAdmin(c) {
+		tenantID, err = rp.ensureTenantByName(ctx, req.TenantName)
+	} else {
+		tenantID, err = sharedhandlers.ParseOrgID(c)
+	}
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
@@ -233,7 +443,7 @@ type upsertMembershipReq struct {
 }
 
 func (h *Handler) UpsertMembership(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.isPlatformAdmin(c) && !requireAdmin(c) {
 		return
 	}
 	var req upsertMembershipReq
@@ -264,7 +474,15 @@ func (h *Handler) UpsertMembership(c *gin.Context) {
 		sharedhandlers.RespondError(c, err)
 		return
 	}
-	tenantID, err := rp.ensureTenantByName(ctx, req.TenantName)
+	// T1.b: solo platform-admin puede crear/dirigir a un tenant arbitrario por
+	// nombre; el resto queda acotado a su tenant activo (se ignora req.TenantName
+	// y NO se crea ningún tenant).
+	var tenantID uuid.UUID
+	if h.isPlatformAdmin(c) {
+		tenantID, err = rp.ensureTenantByName(ctx, req.TenantName)
+	} else {
+		tenantID, err = sharedhandlers.ParseOrgID(c)
+	}
 	if err != nil {
 		sharedhandlers.RespondError(c, err)
 		return

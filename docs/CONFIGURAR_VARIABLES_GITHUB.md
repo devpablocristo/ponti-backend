@@ -52,10 +52,15 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `CLOUD_RUN_SERVICE_FRONTEND_DEV` | Nombre del servicio Cloud Run del frontend (DEV) |
 | `BASE_MANAGER_API_DEV` | URL del backend (DEV) usada por el BFF |
 
-#### AI (DEV)
+#### AI / Axis (DEV)
 | Variable | Descripción |
 |----------|-------------|
-| `CLOUD_RUN_SERVICE_AI_DEV` | Nombre del servicio Cloud Run de AI (DEV) |
+| `AI_PROVIDER_DEV` | `axis` por defecto; usar `legacy` solo para rollback |
+| `AI_AXIS_ENABLED_DEV` | `true` por defecto; usar `false` para rollback |
+| `AXIS_COMPANION_BASE_URL_DEV` | URL canónica detagged de Axis Companion DEV |
+| `AXIS_PRODUCT_SURFACE_DEV` | `ponti` |
+| `AXIS_COMPANION_API_KEY_SECRET_NAME_DEV` | Secret Manager name para `AXIS_COMPANION_API_KEY` |
+| `PONTI_AXIS_API_KEY_SECRET_NAME_DEV` | Secret Manager name para `PONTI_AXIS_API_KEY` |
 
 ### STG (unificado en instancia new-ponti-db-dev, instancia vieja eliminada)
 | Variable | Valor |
@@ -78,10 +83,15 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `CLOUD_RUN_SERVICE_FRONTEND_STG` | Nombre del servicio Cloud Run del frontend (STG) |
 | `BASE_MANAGER_API_STG` | URL del backend (STG) usada por el BFF |
 
-#### AI (STG)
+#### AI / Axis (STG)
 | Variable | Descripción |
 |----------|-------------|
-| `CLOUD_RUN_SERVICE_AI_STG` | Nombre del servicio Cloud Run de AI (STG) |
+| `AI_PROVIDER_STG` | `axis` por defecto; usar `legacy` solo para rollback |
+| `AI_AXIS_ENABLED_STG` | `true` por defecto; usar `false` para rollback |
+| `AXIS_COMPANION_BASE_URL_STG` | URL canónica detagged de Axis Companion STG |
+| `AXIS_PRODUCT_SURFACE_STG` | `ponti` |
+| `AXIS_COMPANION_API_KEY_SECRET_NAME_STG` | Secret Manager name para `AXIS_COMPANION_API_KEY` |
+| `PONTI_AXIS_API_KEY_SECRET_NAME_STG` | Secret Manager name para `PONTI_AXIS_API_KEY` |
 
 ### PROD
 | Variable | Valor |
@@ -96,6 +106,16 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `DB_USER_PROD` | `soalen-db-v3` |
 | `DB_INSTANCE_NAME_PROD` | `new-ponti-prod-db` |
 
+#### AI / Axis (PROD)
+| Variable | Descripción |
+|----------|-------------|
+| `AI_PROVIDER_PROD` | `axis` por defecto; usar `legacy` solo para rollback |
+| `AI_AXIS_ENABLED_PROD` | `true` por defecto; usar `false` para rollback |
+| `AXIS_COMPANION_BASE_URL_PROD` | URL canónica detagged de Axis Companion PROD |
+| `AXIS_PRODUCT_SURFACE_PROD` | `ponti` |
+| `AXIS_COMPANION_API_KEY_SECRET_NAME_PROD` | Secret Manager name para `AXIS_COMPANION_API_KEY` |
+| `PONTI_AXIS_API_KEY_SECRET_NAME_PROD` | Secret Manager name para `PONTI_AXIS_API_KEY` |
+
 ## Secrets de repositorio (sensibles)
 
 | Secret | Descripción |
@@ -106,6 +126,20 @@ Esta guía refleja el **flujo actual** de deploys (DEV → STG → PROMOTE a PRO
 | `X_API_KEY_STG` | API key stg |
 | `DB_PASSWORD_PROD` | Password del usuario DB prod |
 | `X_API_KEY_PROD` | API key prod |
+
+## Secrets de Google Secret Manager para Axis
+
+Los workflows montan estos valores como variables de entorno secretas de Cloud
+Run. Los nombres pueden sobreescribirse con las variables `*_SECRET_NAME_*`
+anteriores.
+
+| Secret Manager secret | Env montada en Cloud Run | Uso |
+|-----------------------|--------------------------|-----|
+| `axis-companion-api-key-dev/stg/prod` | `AXIS_COMPANION_API_KEY` | Ponti backend llama a Axis Companion |
+| `ponti-axis-api-key-dev/stg/prod` | `PONTI_AXIS_API_KEY` | Axis llama endpoints product integration de Ponti |
+
+El valor de `PONTI_AXIS_API_KEY` debe coincidir con la secret `PONTI_API_KEY`
+configurada del lado de Axis Companion para el mismo ambiente.
 
 ## Environments en GitHub
 

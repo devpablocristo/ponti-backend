@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	providermodel "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	providerdomain "github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
@@ -24,6 +27,9 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 	}
 	model := models.SupplyMovementFromDomain(movement)
 	db := r.getDB(ctx)
+	if err := sharedfilters.GuardProjectForTenant(ctx, db, movement.ProjectId); err != nil {
+		return 0, err
+	}
 	if err := db.Create(model).Error; err != nil {
 		return 0, err
 	}
@@ -33,6 +39,10 @@ func (r *Repository) CreateSupplyMovement(ctx context.Context, movement *domain.
 func (r *Repository) ResetFieldStockCounts(ctx context.Context, projectID int64, updatedBy *string) error {
 	if projectID <= 0 {
 		return domainerr.Validation("project_id must be greater than 0")
+	}
+
+	if err := sharedfilters.GuardProjectForTenant(ctx, r.getDB(ctx), projectID); err != nil {
+		return err
 	}
 
 	now := time.Now().UTC()
@@ -154,7 +164,12 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 		}
 	}
 	var existing providermodel.Provider
-	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	provQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
+	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
+		provQ = provQ.Where("tenant_id = ?", orgID)
+	}
+	if err := provQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check provider: %w", err)
@@ -162,6 +177,16 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create provider: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE providers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set provider tenant: %w", err)
+		}
+	}
+	// Identity Gate: resolver el provider a actor y estampar actor_id (no-op con gate off).
+	if err := identity.StampActor(tx.Statement.Context, tx, identity.RoleProvider, "providers", "actor_id", i.Name, i.ID); err != nil {
+		return 0, err
 	}
 	return i.ID, nil
 }
@@ -391,8 +416,11 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		var previous models.SupplyMovement
-		if err := tx.
-			Where("id = ?", movement.ID).
+		findTx := tx.Where("id = ?", movement.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			findTx = findTx.Where(cond, args...)
+		}
+		if err := findTx.
 			First(&previous).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("supply movement not found")
@@ -400,8 +428,18 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 			return domainerr.Internal("failed to get supply movement")
 		}
 
-		if err := tx.Model(&models.SupplyMovement{}).
-			Where("id = ?", movement.ID).
+		// T-child: validar el project DESTINO (evita move-out cross-tenant; el scope
+		// de arriba solo valida la fila vieja).
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, movement.ProjectId); err != nil {
+			return err
+		}
+
+		updateTx := tx.Model(&models.SupplyMovement{}).
+			Where("id = ?", movement.ID)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			updateTx = updateTx.Where(cond, args...)
+		}
+		if err := updateTx.
 			Updates(model).
 			Error; err != nil {
 			return domainerr.Internal("failed to update supply movement")
@@ -429,6 +467,10 @@ func (r *Repository) UpdateSupplyMovement(ctx context.Context, movement *domain.
 
 func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supplyId int64) error {
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, projectId); err != nil {
+			return err
+		}
+
 		var supplyModel models.SupplyMovement
 
 		// Obtener el movimiento a eliminar
@@ -522,7 +564,12 @@ func (r *Repository) DeleteSupplyMovement(ctx context.Context, projectId, supply
 
 func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provider, error) {
 	var providers []providermodel.Provider
-	if err := r.getDB(ctx).Find(&providers).Error; err != nil {
+	db0 := r.getDB(ctx).Model(&providermodel.Provider{})
+	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		db0 = db0.Where("tenant_id = ?", orgID)
+	}
+	if err := db0.Find(&providers).Error; err != nil {
 		return nil, domainerr.Internal("failed to list providers")
 	}
 	res := make([]providerdomain.Provider, len(providers))

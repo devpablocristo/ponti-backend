@@ -15,9 +15,11 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/authn/go/jwks"
-	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
+
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 const (
@@ -66,6 +68,10 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 		start := time.Now()
 		permission := permissionForMethod(c.Request.Method)
 
+		if authorizeAxisProductIntegration(c, cfg, permission, start) {
+			return
+		}
+
 		tokenStr := extractBearer(c.GetHeader("Authorization"))
 		if tokenStr == "" {
 			denyAuthRequest(c, "missing bearer token")
@@ -98,6 +104,21 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 
 		membership, err := resolveMembership(c.Request.Context(), db, userID, c.GetHeader(cfg.TenantHeader))
 		if err != nil {
+			// T1.c: usuario con >1 membership y sin X-Tenant-Id => exigir
+			// selección explícita de tenant; NO elegir uno arbitrario.
+			if errors.Is(err, errTenantSelectionRequired) {
+				domErr := domainerr.Validation("tenant selection required: provide the X-Tenant-Id header")
+				status, apiErr := httperr.Normalize(domErr)
+				c.AbortWithStatusJSON(status, apiErr)
+				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+				return
+			}
+			// PARTE IV: tenant suspendido o archivado.
+			if errors.Is(err, errTenantInactive) {
+				denyForbidden(c, "tenant is suspended or archived")
+				logAuthDecision(claims.Subject, "", c.FullPath(), permission, "DENY", start)
+				return
+			}
 			if cfg.AutoProvision {
 				membership, err = ensureDefaultMembership(
 					c.Request.Context(),
@@ -197,6 +218,39 @@ func ensureDefaultMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID,
 	return resolveMembership(ctx, db, userID, tenant.ID.String())
 }
 
+// errTenantSelectionRequired indica que el usuario tiene >1 membership activa y
+// no envió X-Tenant-Id: hay que pedir selección explícita de tenant en vez de
+// elegir uno arbitrario (T1.c — antes: Order("m.tenant_id ASC").Limit(1)).
+var errTenantSelectionRequired = errors.New("tenant selection required")
+
+// errTenantInactive indica que el tenant resuelto está suspendido o archivado
+// (PARTE IV). Se evalúa gated por TENANT_ENFORCEMENT.
+var errTenantInactive = errors.New("tenant inactive")
+
+// tenantActive devuelve true si el tenant existe, está 'active' y no archivado.
+func tenantActive(ctx context.Context, db *gorm.DB, tenantID uuid.UUID) (bool, error) {
+	var row struct {
+		Status    string
+		DeletedAt *time.Time
+	}
+	if err := db.WithContext(ctx).
+		Table("auth_tenants").
+		Select("status, deleted_at").
+		Where("id = ?", tenantID).
+		Limit(1).
+		Take(&row).Error; err != nil {
+		return false, err
+	}
+	return row.Status == "active" && row.DeletedAt == nil, nil
+}
+
+// denyForbidden corta el request con 403 (reutilizable dentro del paquete).
+func denyForbidden(c *gin.Context, msg string) {
+	domErr := domainerr.Forbidden(msg)
+	status, apiErr := httperr.Normalize(domErr)
+	c.AbortWithStatusJSON(status, apiErr)
+}
+
 func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, requestedTenant string) (*membershipResolved, error) {
 	type membershipRow struct {
 		TenantID uuid.UUID
@@ -204,25 +258,44 @@ func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, reque
 		RoleName string
 	}
 
-	query := db.WithContext(ctx).
+	base := db.WithContext(ctx).
 		Table("auth_memberships AS m").
 		Select("m.tenant_id AS tenant_id, m.role_id AS role_id, r.name AS role_name").
 		Joins("JOIN auth_roles r ON r.id = m.role_id").
 		Where("m.user_id = ? AND m.status = 'active'", userID)
 
-	if strings.TrimSpace(requestedTenant) != "" {
-		tenantID, err := uuid.Parse(strings.TrimSpace(requestedTenant))
+	requestedTenant = strings.TrimSpace(requestedTenant)
+	if requestedTenant != "" {
+		// Tenant explícito: validar membership en ESE tenant. Sin fallback:
+		// si el usuario no la tiene, devolver el error (el caller deniega).
+		tenantID, err := uuid.Parse(requestedTenant)
 		if err != nil {
 			return nil, err
 		}
-		query = query.Where("m.tenant_id = ?", tenantID)
+		var row membershipRow
+		if err := base.Where("m.tenant_id = ?", tenantID).Take(&row).Error; err != nil {
+			return nil, err
+		}
+		return loadMembershipPermissions(ctx, db, row.TenantID, row.RoleName, row.RoleID)
 	}
 
-	var row membershipRow
-	if err := query.Order("m.tenant_id ASC").Limit(1).Take(&row).Error; err != nil {
+	// Sin header de tenant: usar la única membership si hay exactamente una;
+	// con más de una, exigir selección explícita (no elegir un tenant arbitrario).
+	var rows []membershipRow
+	if err := base.Limit(2).Find(&rows).Error; err != nil {
 		return nil, err
 	}
+	switch len(rows) {
+	case 0:
+		return nil, gorm.ErrRecordNotFound
+	case 1:
+		return loadMembershipPermissions(ctx, db, rows[0].TenantID, rows[0].RoleName, rows[0].RoleID)
+	default:
+		return nil, errTenantSelectionRequired
+	}
+}
 
+func loadMembershipPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.UUID, roleName string, roleID uuid.UUID) (*membershipResolved, error) {
 	type permRow struct {
 		Name string
 	}
@@ -231,7 +304,7 @@ func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, reque
 		Table("auth_role_permissions rp").
 		Select("p.name").
 		Joins("JOIN auth_permissions p ON p.id = rp.permission_id").
-		Where("rp.role_id = ?", row.RoleID).
+		Where("rp.role_id = ?", roleID).
 		Find(&perms).Error; err != nil {
 		return nil, err
 	}
@@ -240,9 +313,22 @@ func resolveMembership(ctx context.Context, db *gorm.DB, userID uuid.UUID, reque
 	for _, p := range perms {
 		permSet[p.Name] = struct{}{}
 	}
+
+	// PARTE IV: tenant suspendido/archivado => denegar (gated por TENANT_ENFORCEMENT;
+	// requiere migración 000233 aplicada).
+	if sharedmodels.TenantEnforcementEnabled() {
+		active, err := tenantActive(ctx, db, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		if !active {
+			return nil, errTenantInactive
+		}
+	}
+
 	return &membershipResolved{
-		TenantID:    row.TenantID,
-		RoleName:    row.RoleName,
+		TenantID:    tenantID,
+		RoleName:    roleName,
 		Permissions: permSet,
 	}, nil
 }

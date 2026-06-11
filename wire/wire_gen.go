@@ -8,6 +8,7 @@ package wire
 
 import (
 	"github.com/devpablocristo/ponti-backend/cmd/config"
+	"github.com/devpablocristo/ponti-backend/internal/actors"
 	"github.com/devpablocristo/ponti-backend/internal/admin"
 	"github.com/devpablocristo/ponti-backend/internal/ai"
 	"github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -21,6 +22,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	"github.com/devpablocristo/ponti-backend/internal/dollar"
 	"github.com/devpablocristo/ponti-backend/internal/field"
+	"github.com/devpablocristo/ponti-backend/internal/governance"
 	"github.com/devpablocristo/ponti-backend/internal/investor"
 	"github.com/devpablocristo/ponti-backend/internal/invoice"
 	"github.com/devpablocristo/ponti-backend/internal/labor"
@@ -33,6 +35,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 	"github.com/devpablocristo/ponti-backend/internal/project"
 	"github.com/devpablocristo/ponti-backend/internal/provider"
+	"github.com/devpablocristo/ponti-backend/internal/registry"
 	"github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	"github.com/devpablocristo/ponti-backend/internal/supply"
@@ -63,15 +66,24 @@ func Initialize() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	ginEnginePort := ProvideCustomerGinEnginePort(server)
-	gormEnginePort := ProvideCustomerGormEnginePort(repository)
-	customerRepository := ProvideCustomerRepository(gormEnginePort)
-	repositoryPort := ProvideCustomerRepositoryPort(customerRepository)
-	useCases := ProvideCustomerUseCases(repositoryPort)
-	useCasesPort := ProvideCustomerUseCasesPort(useCases)
-	configAPIPort := ProvideCustomerConfigAPI(config)
-	middlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
-	handler := ProvideCustomerHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	ginEnginePort := ProvideActorsGinEnginePort(server)
+	gormEnginePort := ProvideActorsGormEnginePort(repository)
+	actorsRepository := ProvideActorsRepository(gormEnginePort)
+	repositoryPort := ProvideActorsRepositoryPort(actorsRepository)
+	useCases := ProvideActorsUseCases(repositoryPort)
+	useCasesPort := ProvideActorsUseCasesPort(useCases)
+	configAPIPort := ProvideActorsConfigAPI(config)
+	middlewaresEnginePort := ProvideActorsMiddlewaresEnginePort(middlewares)
+	handler := ProvideActorsHandler(ginEnginePort, useCasesPort, configAPIPort, middlewaresEnginePort)
+	customerGinEnginePort := ProvideCustomerGinEnginePort(server)
+	customerGormEnginePort := ProvideCustomerGormEnginePort(repository)
+	customerRepository := ProvideCustomerRepository(customerGormEnginePort)
+	customerRepositoryPort := ProvideCustomerRepositoryPort(customerRepository)
+	customerUseCases := ProvideCustomerUseCases(customerRepositoryPort)
+	customerUseCasesPort := ProvideCustomerUseCasesPort(customerUseCases)
+	customerConfigAPIPort := ProvideCustomerConfigAPI(config)
+	customerMiddlewaresEnginePort := ProvideCustomerMiddlewaresEnginePort(middlewares)
+	customerHandler := ProvideCustomerHandler(customerGinEnginePort, customerUseCasesPort, customerConfigAPIPort, customerMiddlewaresEnginePort)
 	campaignGinEnginePort := ProvideCampaignGinEnginePort(server)
 	campaignGormEnginePort := ProvideCampaignGormEnginePort(repository)
 	campaignRepository := ProvideCampaignRepository(campaignGormEnginePort)
@@ -183,6 +195,15 @@ func Initialize() (*Dependencies, error) {
 	providerConfigAPIPort := ProvideProviderConfigAPI(config)
 	providerMiddlewaresEnginePort := ProvideProviderMiddlewaresEnginePort(middlewares)
 	providerHandler := ProvideProviderHandler(providerGinEnginePort, providerUseCasesPort, providerConfigAPIPort, providerMiddlewaresEnginePort)
+	registryGinEnginePort := ProvideRegistryGinEnginePort(server)
+	registryGormEnginePort := ProvideRegistryGormEnginePort(repository)
+	registryRepository := ProvideRegistryRepository(registryGormEnginePort)
+	registryRepositoryPort := ProvideRegistryRepositoryPort(registryRepository)
+	registryUseCases := ProvideRegistryUseCases(registryRepositoryPort)
+	registryUseCasesPort := ProvideRegistryUseCasesPort(registryUseCases)
+	registryConfigAPIPort := ProvideRegistryConfigAPI(config)
+	registryMiddlewaresEnginePort := ProvideRegistryMiddlewaresEnginePort(middlewares)
+	registryHandler := ProvideRegistryHandler(registryGinEnginePort, registryUseCasesPort, registryConfigAPIPort, registryMiddlewaresEnginePort)
 	reportGinEnginePort := ProvideReportGinEnginePort(server)
 	reportUseCase := ProvideReportUseCases(reportRepositoryPort)
 	reportUseCasePort := ProvideReportUseCasesPort(reportUseCase)
@@ -308,7 +329,8 @@ func Initialize() (*Dependencies, error) {
 	aiGinEnginePort := ProvideAIGinEnginePort(server)
 	ai := ProvideConfigAI(config)
 	client := ProvideAIClient(ai)
-	usecasesUseCases := ProvideAIUseCases(client)
+	axisClient := ProvideAxisClient(ai)
+	usecasesUseCases := ProvideAIUseCases(client, axisClient, ai)
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
@@ -324,7 +346,7 @@ func Initialize() (*Dependencies, error) {
 	wireGinEnginePort := ProvideGinEnginePort(server)
 	api := ProvideConfigAPI(config)
 	wireMiddlewaresEnginePort := ProvideMiddlewaresEnginePort(middlewares)
-	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort)
+	adminHandler := ProvideAdminHandler(repository, adminClient, wireGinEnginePort, api, wireMiddlewaresEnginePort, config)
 	workorderdraftGinEnginePort := ProvideWorkOrderDraftGinEnginePort(server)
 	workorderdraftGormEngine := ProvideWorkOrderDraftGormEnginePort(repository)
 	workorderdraftRepository := ProvideWorkOrderDraftRepository(workorderdraftGormEngine)
@@ -336,16 +358,31 @@ func Initialize() (*Dependencies, error) {
 	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)
 	workorderdraftMiddlewaresEnginePort := ProvideWorkOrderDraftMiddlewaresEnginePort(middlewares)
 	workorderdraftHandler := ProvideWorkOrderDraftHandler(workorderdraftGinEnginePort, workorderdraftUseCasesPort, workorderdraftConfigAPIPort, workorderdraftMiddlewaresEnginePort)
+	governanceRepository := ProvideGovernanceRepository(repository)
+	governanceRepositoryPort := ProvideGovernanceRepositoryPort(governanceRepository)
+	nexus := ProvideConfigNexus(config)
+	nexusClient := ProvideNexusClient(nexus)
+	nexusPort := ProvideGovernanceNexusPort(nexusClient)
+	approvedExecutor := ProvideGovernanceApprovedExecutor(governanceRepositoryPort, nexusClient, nexus)
+	executor := ProvideGovernanceExecutor(approvedExecutor)
+	governanceService := ProvideGovernanceService(governanceRepositoryPort, nexusPort, nexus, executor)
+	governanceGinEnginePort := ProvideGovernanceGinEnginePort(server)
+	governanceConfigAPIPort := ProvideGovernanceConfigAPI(config)
+	governanceMiddlewaresEnginePort := ProvideGovernanceMiddlewaresEnginePort(middlewares)
+	governanceHandler := ProvideGovernanceHandler(governanceService, governanceGinEnginePort, governanceConfigAPIPort, governanceMiddlewaresEnginePort)
+	verifier := ProvideGovernanceVerifier(nexusClient)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
 		GormRepo:                  repository,
 		Middlewares:               middlewares,
 		WordsSuggester:            pkgsuggesterWordsSuggester,
-		CustomerHandler:           handler,
+		ActorsHandler:             handler,
+		CustomerHandler:           customerHandler,
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
 		DataIntegrityHandler:      dataintegrityHandler,
+		DataIntegrityUseCases:     dataintegrityUseCases,
 		InvestorHandler:           investorHandler,
 		CropHandler:               cropHandler,
 		LotHandler:                lotHandler,
@@ -353,7 +390,9 @@ func Initialize() (*Dependencies, error) {
 		ManagerHandler:            managerHandler,
 		ProjectHandler:            projectHandler,
 		ProviderHandler:           providerHandler,
+		RegistryHandler:           registryHandler,
 		ReportHandler:             reportHandler,
+		ReportUseCase:             reportUseCase,
 		LeaseTypeHandler:          leasetypeHandler,
 		SupplyHandler:             supplyHandler,
 		CategoryHandler:           categoryHandler,
@@ -369,6 +408,9 @@ func Initialize() (*Dependencies, error) {
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
 		WorkOrderDraftHandler:     workorderdraftHandler,
+		GovernanceHandler:         governanceHandler,
+		GovernanceVerifier:        verifier,
+		GovernanceExecutor:        approvedExecutor,
 	}
 	return dependencies, nil
 }
@@ -381,10 +423,12 @@ type Dependencies struct {
 	GormRepo                  *pkggorm.Repository
 	Middlewares               *pkgmwr.Middlewares
 	WordsSuggester            *pkgsuggester.WordsSuggester
+	ActorsHandler             *actors.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -392,7 +436,9 @@ type Dependencies struct {
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
 	ProviderHandler           *provider.Handler
+	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler
@@ -408,4 +454,7 @@ type Dependencies struct {
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 	WorkOrderDraftHandler     *workorderdraft.Handler
+	GovernanceHandler         *governance.Handler
+	GovernanceVerifier        *governance.Verifier
+	GovernanceExecutor        *governance.ApprovedExecutor
 }

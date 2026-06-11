@@ -16,6 +16,18 @@ Base path: `/api/v1`
 - `POST /admin/users`
 - `POST /admin/memberships`
 
+- `/actors`: `POST` (resolve-or-create; body `{name, tax_id?, role, allow_create, reject_existing}`), `GET` (`?status=active|archived|all&page&per_page`)
+- `/actors/search`: `GET` (`?q&field=name|tax_id&limit`)
+- `/actors/by-tax-id`: `GET` (`?tax_id`)
+- `/actors/similar`: `GET` (`?name&limit`)
+- `/actors/:actor_id`: `GET`, `PUT`, `DELETE`
+- `/actors/:actor_id/archive`: `POST`
+- `/actors/:actor_id/restore`: `POST`
+- `/actors/:actor_id/roles`: `PUT`
+- `/actors/:actor_id/tax-id`: `PUT`
+- `/registry`: `GET` (`?q&type&status&page&per_page`)
+- `/registry/actors/:actor_id/aliases`: `PUT`
+
 ## Portfolio And Master Data
 
 - `/customers`: `POST`, `GET`
@@ -23,7 +35,11 @@ Base path: `/api/v1`
 - `/customers/:customer_id`: `GET`, `PUT`, `DELETE`
 - `/customers/:customer_id/archive`: `POST`
 - `/customers/:customer_id/restore`: `POST`
-- `/campaigns`: `GET`
+- `/campaigns`: `POST`, `GET` (`?status=active|archived|all`; `status=archived` routes to `/campaigns/archived`)
+- `/campaigns/archived`: `GET`
+- `/campaigns/:campaign_id`: `GET`, `PUT`, `DELETE`
+- `/campaigns/:campaign_id/archive`: `POST`
+- `/campaigns/:campaign_id/restore`: `POST`
 - `/projects`: `POST`, `GET`
 - `/projects/archived`: `GET`
 - `/projects/:project_id/fields`: `GET`
@@ -49,7 +65,7 @@ Base path: `/api/v1`
 - `/business-parameters/:parameter_id`: `PUT`, `DELETE`
 - `/categories`: `POST`, `GET`
 - `/categories/:category_id`: `GET`, `PUT`, `DELETE`
-- `/types`: `POST`, `GET`
+- `/types`: `POST`, `GET` (`?status=active|archived|all`)
 - `/types/:class_type_id`: `GET`, `PUT`, `DELETE`
 
 ## Land And Crops
@@ -58,14 +74,14 @@ Base path: `/api/v1`
 - `/fields/:field_id`: `GET`, `PUT`, `DELETE`
 - `/fields/:field_id/archive`: `POST`
 - `/fields/:field_id/restore`: `POST`
-- `/lease-types`: `POST`, `GET`
+- `/lease-types`: `POST`, `GET` (`?status=active|archived|all`)
 - `/lease-types/:lease_type_id`: `GET`, `PUT`, `DELETE`
 - `/lots`: `POST`, `GET`
 - `/lots/metrics`: `GET`
 - `/lots/:lot_id/tons`: `PUT`
 - `/lots/:lot_id`: `GET`, `PUT`, `DELETE`
 - `/lots/export`: `GET`
-- `/crops`: `POST`, `GET`
+- `/crops`: `POST`, `GET` (`?status=active|archived|all`)
 - `/crops/:crop_id`: `GET`, `PUT`, `DELETE`
 
 ## Field Operations

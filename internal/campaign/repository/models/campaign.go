@@ -14,7 +14,7 @@ type Campaign struct {
 }
 
 func (m Campaign) ToDomain() *domain.Campaign {
-	return &domain.Campaign{
+	d := &domain.Campaign{
 		ID:   m.ID,
 		Name: m.Name,
 		Base: shareddomain.Base{
@@ -24,6 +24,11 @@ func (m Campaign) ToDomain() *domain.Campaign {
 			UpdatedBy: m.UpdatedBy,
 		},
 	}
+	if m.DeletedAt.Valid {
+		t := m.DeletedAt.Time
+		d.ArchivedAt = &t
+	}
+	return d
 }
 
 func FromDomain(d *domain.Campaign) *Campaign {

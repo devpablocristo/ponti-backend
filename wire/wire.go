@@ -10,6 +10,7 @@ import (
 	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	actors "github.com/devpablocristo/ponti-backend/internal/actors"
 	admin "github.com/devpablocristo/ponti-backend/internal/admin"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -23,6 +24,7 @@ import (
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	dollar "github.com/devpablocristo/ponti-backend/internal/dollar"
 	field "github.com/devpablocristo/ponti-backend/internal/field"
+	governance "github.com/devpablocristo/ponti-backend/internal/governance"
 	investor "github.com/devpablocristo/ponti-backend/internal/investor"
 	invoice "github.com/devpablocristo/ponti-backend/internal/invoice"
 	labor "github.com/devpablocristo/ponti-backend/internal/labor"
@@ -31,6 +33,7 @@ import (
 	manager "github.com/devpablocristo/ponti-backend/internal/manager"
 	project "github.com/devpablocristo/ponti-backend/internal/project"
 	provider "github.com/devpablocristo/ponti-backend/internal/provider"
+	registry "github.com/devpablocristo/ponti-backend/internal/registry"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
@@ -45,10 +48,12 @@ type Dependencies struct {
 	GormRepo                  *gorm.Repository
 	Middlewares               *mwr.Middlewares
 	WordsSuggester            *sug.WordsSuggester
+	ActorsHandler             *actors.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -56,7 +61,9 @@ type Dependencies struct {
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
 	ProviderHandler           *provider.Handler
+	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler
@@ -72,6 +79,9 @@ type Dependencies struct {
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 	WorkOrderDraftHandler     *workorderdraft.Handler
+	GovernanceHandler         *governance.Handler
+	GovernanceVerifier        *governance.Verifier
+	GovernanceExecutor        *governance.ApprovedExecutor
 }
 
 func Initialize() (*Dependencies, error) {
@@ -81,6 +91,7 @@ func Initialize() (*Dependencies, error) {
 		GinSet,
 		MiddlewareSet,
 		SuggesterSet,
+		ActorsSet,
 		CustomerSet,
 		CampaignSet,
 		DashboardSet,
@@ -94,6 +105,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProviderSet,
 		ProjectSet,
+		RegistrySet,
 		ReportSet,
 		LeaseTypeSet,
 		SupplySet,
@@ -107,6 +119,7 @@ func Initialize() (*Dependencies, error) {
 		StockSet,
 		InvoiceSet,
 		AdminSet,
+		GovernanceSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

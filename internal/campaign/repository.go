@@ -42,7 +42,17 @@ func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) (in
 		WithContext(ctx).
 		Create(model).
 		Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a campaign with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create campaign")
+	}
+
+	// T1.e: dual-write de tenant_id (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := r.db.Client().WithContext(ctx).Exec("UPDATE campaigns SET tenant_id = ? WHERE id = ?", orgID, model.ID).Error; err != nil {
+			return 0, domainerr.Internal("failed to set campaign tenant")
+		}
 	}
 
 	return model.ID, nil
@@ -78,7 +88,11 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			ids[i] = f.CampaignID
 			mapProject[f.CampaignID] = f.ProjectID
 		}
-		if err := db.Where("id IN ?", ids).Find(&raw).Error; err != nil {
+		fq := db.Where("id IN ?", ids)
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			fq = fq.Where("tenant_id = ?", orgID)
+		}
+		if err := fq.Find(&raw).Error; err != nil {
 			return nil, domainerr.Internal("failed to fetch filtered campaigns")
 		}
 
@@ -92,7 +106,11 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 	}
 
 	// Sin filtro
-	if err := db.Find(&raw).Error; err != nil {
+	nq := db
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		nq = nq.Where("tenant_id = ?", orgID)
+	}
+	if err := nq.Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list campaigns")
 	}
 	out := make([]domain.Campaign, len(raw))
@@ -104,10 +122,12 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 
 func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaign, error) {
 	var m models.Campaign
-	err := r.db.Client().
-		WithContext(ctx).
-		First(&m, id).
-		Error
+	q := r.db.Client().WithContext(ctx)
+	// T1.e: guard de ownership (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		q = q.Where("tenant_id = ?", orgID)
+	}
+	err := q.First(&m, id).Error
 	if err != nil {
 		return nil, sharedrepo.HandleGormError(err, "campaign", id)
 	}

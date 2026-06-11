@@ -12,5 +12,6 @@ type Manager struct {
 	Name       string
 	Type       string
 	ArchivedAt *time.Time
+	TaxID      *string `json:"-"` // transitorio: CUIT para el Identity Gate
 	shareddomain.Base
 }

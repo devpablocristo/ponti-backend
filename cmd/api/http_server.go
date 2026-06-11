@@ -13,7 +13,11 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 
+	aimod "github.com/devpablocristo/ponti-backend/internal/ai"
+	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
+	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
+	reportmod "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/reviewproxy"
 	stockmod "github.com/devpablocristo/ponti-backend/internal/stock"
 	wire "github.com/devpablocristo/ponti-backend/wire"
@@ -37,6 +41,28 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	biService := buildBusinessInsightsService(deps, biRepo)
 	biHandler := businessinsights.NewHandler(biRepo, biService, deps.GinEngine, &deps.Config.API, deps.Middlewares)
 	deps.StockUseCases.SetBusinessInsightsNotifier(&stockNegativeAdapter{svc: biService})
+	deps.DataIntegrityUseCases.SetBusinessInsightsNotifier(&dataIntegrityAdapter{svc: biService})
+	deps.ReportUseCase.SetBusinessInsightsNotifier(&reportAdapter{svc: biService})
+	decisionRepo := aimod.NewDecisionRepository(deps.GormRepo.Client())
+	deps.AIHandler.SetDecisionService(aimod.NewDecisionService(decisionRepo, deps.StockUseCases, deps.ReportUseCase, biRepo))
+
+	// Ola B.1: writes reales gobernados. El ActionExecutor stagea drafts en
+	// ai_action_drafts y solo aplica el write (resolución de insight / conteo
+	// de stock) con AI_GOVERNED_WRITES_ENABLED y un nexus request verificado.
+	// El executor de governance lo invoca desde el callback approval_resolved
+	// y los handlers HTTP lo usan para los drafts del agente.
+	actionExecutor := aimod.NewActionExecutor(
+		aimod.NewActionDraftRepository(deps.GormRepo.Client()),
+		biService,
+		deps.StockUseCases,
+		deps.GovernanceVerifier,
+		aimod.ActionExecutorConfig{GovernedWritesEnabled: deps.Config.Nexus.GovernedWritesEnabled},
+	)
+	deps.GovernanceExecutor.SetDispatcher(actionExecutor)
+	deps.AIHandler.SetGovernedActions(actionExecutor, deps.GovernanceVerifier, aimod.GovernedActionsConfig{
+		VerifyNexus: deps.Config.Nexus.VerifyNexus,
+	})
+	deps.WorkOrderDraftHandler.SetNexusVerifier(deps.GovernanceVerifier, deps.Config.Nexus.VerifyNexus)
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -86,7 +112,13 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 // StockLevel del businessinsights.Service, manteniendo desacoplados los
 // tipos de los paquetes (stock no importa businessinsights y viceversa).
 type stockNegativeAdapter struct {
-	svc *businessinsights.Service
+	svc stockInsightsService
+}
+
+type stockInsightsService interface {
+	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level businessinsights.StockLevel) error
+	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
+	NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level businessinsights.StockLowLevel) error
 }
 
 func (a *stockNegativeAdapter) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockNegativeInput) error {
@@ -107,6 +139,133 @@ func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, te
 	return a.svc.MaybeResolveStockNegative(ctx, tenantID, productID)
 }
 
+func (a *stockNegativeAdapter) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockLowInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.NotifyStockLow(ctx, tenantID, actor, businessinsights.StockLowLevel{
+		SupplyID:   in.SupplyID,
+		StockID:    in.StockID,
+		SupplyName: in.SupplyName,
+		Level:      in.Level,
+	})
+}
+
+type dataIntegrityAdapter struct {
+	svc dataIntegrityInsightsService
+}
+
+type dataIntegrityInsightsService interface {
+	NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.DataIntegrityCritical) error
+	MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error
+	NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.TentativePricesIssue) error
+	MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error
+}
+
+func (a *dataIntegrityAdapter) NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, in dataintegrity.DataIntegrityCriticalInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	controls := make([]businessinsights.DataIntegrityControlIssue, 0, len(in.Controls))
+	for _, control := range in.Controls {
+		controls = append(controls, businessinsights.DataIntegrityControlIssue{
+			ControlNumber: control.ControlNumber,
+			DataToVerify:  control.DataToVerify,
+			Description:   control.Description,
+			DifferenceA:   control.DifferenceA,
+			DifferenceB:   control.DifferenceB,
+			Tolerance:     control.Tolerance,
+			SystemSource:  control.SystemSource,
+			RecalcASource: control.RecalcASource,
+			RecalcBSource: control.RecalcBSource,
+		})
+	}
+	return a.svc.NotifyDataIntegrityCritical(ctx, tenantID, actor, businessinsights.DataIntegrityCritical{
+		ProjectID:    in.ProjectID,
+		FailedChecks: in.FailedChecks,
+		TotalChecks:  in.TotalChecks,
+		Controls:     controls,
+	})
+}
+
+func (a *dataIntegrityAdapter) MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveDataIntegrityCritical(ctx, tenantID, projectID)
+}
+
+func (a *dataIntegrityAdapter) NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, in dataintegrity.TentativePricesInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	items := make([]businessinsights.TentativePriceItem, 0, len(in.SampleItems))
+	for _, item := range in.SampleItems {
+		items = append(items, businessinsights.TentativePriceItem{
+			SupplyID:     item.SupplyID,
+			Name:         item.Name,
+			CategoryName: item.CategoryName,
+			Price:        item.Price,
+		})
+	}
+	return a.svc.NotifyTentativePrices(ctx, tenantID, actor, businessinsights.TentativePricesIssue{
+		ProjectID:   in.ProjectID,
+		CustomerID:  in.CustomerID,
+		CampaignID:  in.CampaignID,
+		FieldID:     in.FieldID,
+		Count:       in.Count,
+		SampleItems: items,
+	})
+}
+
+func (a *dataIntegrityAdapter) MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveTentativePrices(ctx, tenantID, projectID)
+}
+
+type reportAdapter struct {
+	svc reportInsightsService
+}
+
+type reportInsightsService interface {
+	NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, issue businessinsights.OperatingResultNegative) error
+	MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error
+}
+
+func (a *reportAdapter) NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, in reportmod.OperatingResultNegativeInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	crops := make([]businessinsights.OperatingResultNegativeCrop, 0, len(in.NegativeCrops))
+	for _, crop := range in.NegativeCrops {
+		crops = append(crops, businessinsights.OperatingResultNegativeCrop{
+			CropID:             crop.CropID,
+			CropName:           crop.CropName,
+			OperatingResultUSD: crop.OperatingResultUSD,
+			SurfaceHa:          crop.SurfaceHa,
+			ReturnPct:          crop.ReturnPct,
+		})
+	}
+	return a.svc.NotifyOperatingResultNegative(ctx, tenantID, actor, businessinsights.OperatingResultNegative{
+		ProjectID:               in.ProjectID,
+		CustomerID:              in.CustomerID,
+		CampaignID:              in.CampaignID,
+		TotalOperatingResultUSD: in.TotalOperatingResultUSD,
+		ProjectReturnPct:        in.ProjectReturnPct,
+		TotalInvestedProjectUSD: in.TotalInvestedProjectUSD,
+		NegativeCrops:           crops,
+	})
+}
+
+func (a *reportAdapter) MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.MaybeResolveOperatingResultNegative(ctx, tenantID, projectID)
+}
+
 // buildBusinessInsightsService arma el Service para notificaciones reactivas.
 // Si REVIEW_URL esta vacio devuelve un Service con review=nil (no-op gracioso).
 func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsights.Repository) *businessinsights.Service {
@@ -115,12 +274,20 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 	if reviewURL != "" {
 		client = reviewproxy.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
 	}
-	return businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{
+		LowStockEnabled:   deps.Config.AI.InsightLowStockEnabled,
+		LowStockThreshold: deps.Config.AI.InsightLowStockThreshold,
+	})
+	// Umbral de stock bajo per-tenant via business parameters
+	// (ai.insights.low_stock_threshold_units); el env queda como fallback.
+	svc.SetBusinessParameters(bparams.NewUseCases(bparams.NewRepository(deps.GormRepo)))
+	return svc
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
 func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Handler) {
 	deps.LotHandler.Routes()
+	deps.ActorsHandler.Routes()
 	deps.CustomerHandler.Routes()
 	deps.CampaignHandler.Routes()
 	deps.DashboardHandler.Routes()
@@ -130,6 +297,7 @@ func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Han
 	deps.FieldHandler.Routes()
 	deps.ProjectHandler.Routes()
 	deps.ProviderHandler.Routes()
+	deps.RegistryHandler.Routes()
 	deps.ReportHandler.Routes()
 	deps.CropHandler.Routes()
 	deps.ManagerHandler.Routes()
@@ -146,5 +314,6 @@ func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Han
 	deps.CommercializationHandler.Routes()
 	deps.AIHandler.Routes()
 	deps.AdminHandler.Routes()
+	deps.GovernanceHandler.Routes()
 	biHandler.Routes()
 }

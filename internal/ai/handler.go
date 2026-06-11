@@ -37,20 +37,46 @@ type MiddlewaresEnginePort interface {
 	GetValidation() []gin.HandlerFunc
 }
 
+// GovernedActionsConfig agrupa los flags de enforcement de las acciones
+// gobernadas (subset de config.Nexus).
+type GovernedActionsConfig struct {
+	// VerifyNexus refleja GOVERNANCE_VERIFY_NEXUS: con true las acciones
+	// gobernadas llamadas por Axis exigen un X-Nexus-Request-ID verificado.
+	VerifyNexus bool
+}
+
 type Handler struct {
-	ucs UseCasesPort
-	gsv GinEnginePort
-	acf ConfigAPIPort
-	mws MiddlewaresEnginePort
+	ucs         UseCasesPort
+	decisions   *DecisionService
+	actions     *ActionExecutor
+	verifier    ActionVerifierPort
+	governedCfg GovernedActionsConfig
+	gsv         GinEnginePort
+	acf         ConfigAPIPort
+	mws         MiddlewaresEnginePort
 }
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
 }
 
+// SetGovernedActions conecta el executor de writes gobernados y el verifier de
+// Nexus después de wire (mismo patrón que SetDecisionService: las dependencias
+// se arman en bootstrap).
+func (h *Handler) SetGovernedActions(actions *ActionExecutor, verifier ActionVerifierPort, cfg GovernedActionsConfig) {
+	h.actions = actions
+	h.verifier = verifier
+	h.governedCfg = cfg
+}
+
 func (h *Handler) Routes() {
 	r := h.gsv.GetRouter()
 	baseURL := h.acf.APIBaseURL() + "/ai"
+
+	capabilities := r.Group(h.acf.APIBaseURL(), h.mws.GetValidation()...)
+	{
+		capabilities.GET("/capabilities", h.Capabilities)
+	}
 
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
@@ -58,7 +84,22 @@ func (h *Handler) Routes() {
 		public.POST("/chat/stream", h.ChatStream)
 		public.GET("/chat/conversations", h.ListChatConversations)
 		public.GET("/chat/conversations/:conversation_id", h.GetChatConversation)
+		public.POST("/decision-runs", h.CreateDecisionRun)
+		public.GET("/decision-runs", h.ListDecisionRuns)
+		public.GET("/decision-cards", h.ListDecisionCards)
+		public.POST("/decision-cards/external", h.ImportExternalDecisionCard)
+		public.PATCH("/decision-cards/:id", h.PatchDecisionCard)
+		public.POST("/decision-cards/:id/actions/:action_id", h.ExecuteDecisionCardAction)
+		public.POST("/actions/insight-resolve/prepare", h.PrepareInsightResolve)
+		public.POST("/actions/workorder-draft/prepare", h.PrepareWorkOrderDraft)
+		public.POST("/actions/stock-adjustment/prepare", h.PrepareStockAdjustment)
+		public.POST("/actions/insight-resolution/draft", h.DraftInsightResolution)
+		public.POST("/actions/stock-count/draft", h.DraftStockCount)
 	}
+}
+
+func (h *Handler) Capabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"items": pontiCapabilities()})
 }
 
 func (h *Handler) Chat(c *gin.Context) {

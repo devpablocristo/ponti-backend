@@ -25,12 +25,23 @@ type StockNegativeInput struct {
 	Quantity    float64
 }
 
+// StockLowInput es el payload para evaluar el insight de stock bajo. El umbral
+// per-tenant vive en businessinsights, por eso el dominio solo reporta el
+// nivel actual y el insight decide crear/resolver.
+type StockLowInput struct {
+	SupplyID   string
+	StockID    string
+	SupplyName string
+	Level      float64
+}
+
 // BusinessInsightsNotifier es el contrato que evalua y dispara notificaciones
 // reactivas cuando el stock real cambia. Opcional: si es nil, las mutaciones
 // siguen funcionando pero no emiten/resuelven notificaciones.
 type BusinessInsightsNotifier interface {
 	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level StockNegativeInput) error
 	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
+	NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level StockLowInput) error
 }
 
 type RepositoryPort interface {
@@ -172,16 +183,22 @@ func (u *UseCases) evaluateStockNotification(ctx context.Context, s *domain.Stoc
 	}
 	productID := strconv.FormatInt(s.Supply.ID, 10)
 	qty, _ := s.RealStockUnits.Float64()
+	actor, _ := sharedmodels.ActorFromContext(ctx)
 	if qty < 0 {
-		actor, _ := sharedmodels.ActorFromContext(ctx)
 		_ = u.notifier.NotifyStockNegative(ctx, orgID, actor, StockNegativeInput{
 			ProductID:   productID,
 			ProductName: s.Supply.Name,
 			Quantity:    qty,
 		})
-		return
+	} else {
+		_ = u.notifier.MaybeResolveStockNegative(ctx, orgID, productID)
 	}
-	_ = u.notifier.MaybeResolveStockNegative(ctx, orgID, productID)
+	_ = u.notifier.NotifyStockLow(ctx, orgID, actor, StockLowInput{
+		SupplyID:   productID,
+		StockID:    strconv.FormatInt(s.ID, 10),
+		SupplyName: s.Supply.Name,
+		Level:      qty,
+	})
 }
 
 func (u *UseCases) GetStockByID(ctx context.Context, stockID int64) (*domain.Stock, error) {
