@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -10,10 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/ponti-backend/internal/governance"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 )
 
-const draftActionStatusPreview = "preview"
+const (
+	draftActionStatusPreview = "preview"
+
+	// nexusRequestIDHeader trae el request id de Nexus que respalda la acción.
+	nexusRequestIDHeader = "X-Nexus-Request-ID"
+	// axisCompanionActor es el actor con el que el middleware de integración
+	// identifica a Axis (axis_product_integration_auth).
+	axisCompanionActor = "axis-companion"
+	// executionBlockedByNexus es la causa de bloqueo expuesta en las 412.
+	executionBlockedByNexus = "nexus_required"
+)
 
 type workspaceRequest struct {
 	CustomerID *int64 `json:"customer_id,omitempty"`
@@ -78,6 +90,9 @@ func (h *Handler) PrepareInsightResolve(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("insight_id is required"))
 		return
 	}
+	if _, ok := h.requireNexusApproval(c, orgID, actor, pontiActionTypeInsightResolve); !ok {
+		return
+	}
 	workspace := req.Workspace.toMap()
 	proposal := map[string]any{
 		"insight_id":      req.InsightID,
@@ -85,7 +100,7 @@ func (h *Handler) PrepareInsightResolve(c *gin.Context) {
 		"preview_only":    true,
 		"write_performed": false,
 	}
-	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.insight.resolve.prepare", orgID, actor, workspace, proposal))
+	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.insight.resolve.prepare", pontiActionTypeInsightResolve, orgID, actor, workspace, proposal))
 }
 
 func (h *Handler) PrepareWorkOrderDraft(c *gin.Context) {
@@ -116,6 +131,9 @@ func (h *Handler) PrepareWorkOrderDraft(c *gin.Context) {
 			return
 		}
 	}
+	if _, ok := h.requireNexusApproval(c, orgID, actor, pontiActionTypeWorkOrderDraftCreate); !ok {
+		return
+	}
 	workspace := req.Workspace.withFallbackProject(req.ProjectID).withFallbackField(req.FieldID).withFallbackCampaign(req.CampaignID).toMap()
 	proposal := map[string]any{
 		"project_id":      req.ProjectID,
@@ -127,7 +145,7 @@ func (h *Handler) PrepareWorkOrderDraft(c *gin.Context) {
 		"preview_only":    true,
 		"write_performed": false,
 	}
-	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.workorder.draft.prepare", orgID, actor, workspace, proposal))
+	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.workorder.draft.prepare", pontiActionTypeWorkOrderDraftCreate, orgID, actor, workspace, proposal))
 }
 
 func (h *Handler) PrepareStockAdjustment(c *gin.Context) {
@@ -158,6 +176,9 @@ func (h *Handler) PrepareStockAdjustment(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("reason is required"))
 		return
 	}
+	if _, ok := h.requireNexusApproval(c, orgID, actor, pontiActionTypeStockAdjust); !ok {
+		return
+	}
 	workspace := req.Workspace.withFallbackProject(req.ProjectID).toMap()
 	proposal := map[string]any{
 		"project_id":      req.ProjectID,
@@ -167,7 +188,7 @@ func (h *Handler) PrepareStockAdjustment(c *gin.Context) {
 		"preview_only":    true,
 		"write_performed": false,
 	}
-	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.stock_adjustment.prepare", orgID, actor, workspace, proposal))
+	c.JSON(http.StatusOK, draftActionPreviewResponse("ponti.stock_adjustment.prepare", pontiActionTypeStockAdjust, orgID, actor, workspace, proposal))
 }
 
 func (h *Handler) DraftInsightResolution(c *gin.Context) {
@@ -187,16 +208,35 @@ func (h *Handler) DraftInsightResolution(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("insight_id is required"))
 		return
 	}
-	draftID := "insight-resolution-" + uuid.NewString()
+	nexusRequestID, ok := h.requireNexusApproval(c, orgID, actor, pontiActionTypeInsightResolve)
+	if !ok {
+		return
+	}
 	workspace := req.Workspace.toMap()
+	draftID := any("insight-resolution-" + uuid.NewString())
+	writePerformed := false
+	if h.actions != nil {
+		result, aerr := h.actions.ApplyInsightResolution(c.Request.Context(), orgID, actor, nexusRequestID, InsightResolutionInput{
+			InsightID:      req.InsightID,
+			ResolutionNote: req.ResolutionNote,
+			Workspace:      workspace,
+		})
+		if aerr != nil {
+			sharedhandlers.RespondError(c, aerr)
+			return
+		}
+		draftID = "insight-resolution-" + result.DraftID.String()
+		writePerformed = result.Applied
+	}
 	c.JSON(http.StatusOK, draftActionExecutionResponse(
 		"ponti.insight_resolution.draft",
+		pontiActionTypeInsightResolve,
 		orgID,
 		actor,
-		c.GetHeader("X-Nexus-Request-ID"),
+		nexusRequestID,
 		draftID,
-		false,
-		"draft_staged",
+		writePerformed,
+		draftExecutionStatus(writePerformed),
 		workspace,
 		map[string]any{
 			"insight_id":      req.InsightID,
@@ -229,16 +269,38 @@ func (h *Handler) DraftStockCount(c *gin.Context) {
 		sharedhandlers.RespondError(c, domainerr.Validation("reason is required"))
 		return
 	}
-	draftID := "stock-count-" + uuid.NewString()
+	nexusRequestID, ok := h.requireNexusApproval(c, orgID, actor, pontiActionTypeStockCountApply)
+	if !ok {
+		return
+	}
 	workspace := req.Workspace.withFallbackProject(req.ProjectID).toMap()
+	draftID := any("stock-count-" + uuid.NewString())
+	writePerformed := false
+	if h.actions != nil {
+		result, aerr := h.actions.ApplyStockCount(c.Request.Context(), orgID, actor, nexusRequestID, StockCountInput{
+			ProjectID:      req.ProjectID,
+			StockID:        req.StockID,
+			SupplyID:       req.SupplyID,
+			RealStockUnits: req.RealStockUnits,
+			Reason:         req.Reason,
+			Workspace:      workspace,
+		})
+		if aerr != nil {
+			sharedhandlers.RespondError(c, aerr)
+			return
+		}
+		draftID = "stock-count-" + result.DraftID.String()
+		writePerformed = result.Applied
+	}
 	c.JSON(http.StatusOK, draftActionExecutionResponse(
 		"ponti.stock_count.draft",
+		pontiActionTypeStockCountApply,
 		orgID,
 		actor,
-		c.GetHeader("X-Nexus-Request-ID"),
+		nexusRequestID,
 		draftID,
-		false,
-		"draft_staged",
+		writePerformed,
+		draftExecutionStatus(writePerformed),
 		workspace,
 		map[string]any{
 			"project_id":       req.ProjectID,
@@ -262,19 +324,67 @@ func requireActionContext(c *gin.Context) (uuid.UUID, string, error) {
 	return orgID, actor, nil
 }
 
-func draftActionPreviewResponse(action string, orgID uuid.UUID, actor string, workspace map[string]any, proposal map[string]any) map[string]any {
+// requireNexusApproval aplica el gate de governance sobre una acción gobernada.
+// Con GOVERNANCE_VERIFY_NEXUS=true y caller Axis (actor axis-companion) exige
+// X-Nexus-Request-ID verificado como aprobado en Nexus: faltante o inválido →
+// 412 {execution_blocked_by: nexus_required}; Nexus inalcanzable → 502 (fail
+// closed). Con el flag apagado mantiene el comportamiento previo y solo
+// loggea la ausencia del header. Devuelve el request id y si puede continuar.
+func (h *Handler) requireNexusApproval(c *gin.Context, orgID uuid.UUID, actor, expectedActionType string) (string, bool) {
+	nexusRequestID := strings.TrimSpace(c.GetHeader(nexusRequestIDHeader))
+	if !h.governedCfg.VerifyNexus || actor != axisCompanionActor {
+		if nexusRequestID == "" {
+			log.Printf("[ai-actions] WARN: %s sin %s (actor=%s, GOVERNANCE_VERIFY_NEXUS=%t)", expectedActionType, nexusRequestIDHeader, actor, h.governedCfg.VerifyNexus)
+		}
+		return nexusRequestID, true
+	}
+	if nexusRequestID == "" {
+		respondNexusBlocked(c, nexusRequestIDHeader+" header is required")
+		return "", false
+	}
+	if h.verifier == nil {
+		// Fail closed: enforcement activo sin verifier configurado.
+		sharedhandlers.RespondError(c, domainerr.Unavailable("nexus verifier not configured"))
+		return "", false
+	}
+	if err := h.verifier.VerifyApproved(c.Request.Context(), orgID, nexusRequestID, expectedActionType); err != nil {
+		if governance.IsNotApproved(err) {
+			respondNexusBlocked(c, err.Error())
+			return "", false
+		}
+		sharedhandlers.RespondError(c, err)
+		return "", false
+	}
+	return nexusRequestID, true
+}
+
+func respondNexusBlocked(c *gin.Context, detail string) {
+	c.JSON(http.StatusPreconditionFailed, gin.H{
+		"execution_blocked_by": executionBlockedByNexus,
+		"detail":               detail,
+	})
+}
+
+func draftExecutionStatus(writePerformed bool) string {
+	if writePerformed {
+		return "applied"
+	}
+	return "draft_staged"
+}
+
+func draftActionPreviewResponse(action, actionType string, orgID uuid.UUID, actor string, workspace map[string]any, proposal map[string]any) map[string]any {
 	return map[string]any{
 		"status":               draftActionStatusPreview,
 		"action":               action,
 		"approval_required":    true,
-		"nexus_action_type":    pontiNexusActionType,
+		"nexus_action_type":    actionType,
 		"side_effect_type":     "write",
 		"preview_only":         true,
 		"write_performed":      false,
 		"proposal":             proposal,
 		"pending_execution":    true,
 		"execution_allowed":    false,
-		"execution_blocked_by": "nexus_required",
+		"execution_blocked_by": executionBlockedByNexus,
 		"evidence": map[string]any{
 			"source_ref":        "ponti.ai.actions." + action,
 			"captured_at":       time.Now().UTC().Format(time.RFC3339),
@@ -286,15 +396,16 @@ func draftActionPreviewResponse(action string, orgID uuid.UUID, actor string, wo
 	}
 }
 
-func draftActionExecutionResponse(action string, orgID uuid.UUID, actor string, nexusRequestID string, draftID any, writePerformed bool, executionStatus string, workspace map[string]any, proposal map[string]any) map[string]any {
+func draftActionExecutionResponse(action, actionType string, orgID uuid.UUID, actor string, nexusRequestID string, draftID any, writePerformed bool, executionStatus string, workspace map[string]any, proposal map[string]any) map[string]any {
 	nexusRequestID = strings.TrimSpace(nexusRequestID)
 	auditRef := fmt.Sprintf("ponti.ai.actions.%s:%v", action, draftID)
 	return map[string]any{
 		"status":               "draft",
 		"action":               action,
 		"approval_required":    true,
-		"nexus_action_type":    pontiNexusActionType,
+		"nexus_action_type":    actionType,
 		"side_effect_type":     "write",
+		"preview_only":         !writePerformed,
 		"write_performed":      writePerformed,
 		"draft_id":             draftID,
 		"execution_status":     executionStatus,

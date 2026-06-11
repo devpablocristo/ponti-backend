@@ -93,6 +93,7 @@ func axisProductIntegrationPath(c *gin.Context) bool {
 		path == "/api/v1/lots" ||
 		path == "/api/v1/supplies" ||
 		strings.HasPrefix(path, "/api/v1/reports/") ||
+		path == "/api/v1/data-integrity/summary" ||
 		path == "/api/v1/projects/:project_id/stocks/summary" ||
 		(strings.HasPrefix(path, "/api/v1/projects/") && strings.HasSuffix(path, "/stocks/summary")) ||
 		path == "/api/v1/work-order-drafts/digital" ||

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	aimod "github.com/devpablocristo/ponti-backend/internal/ai"
+	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	reportmod "github.com/devpablocristo/ponti-backend/internal/report"
@@ -44,6 +45,24 @@ func runHTTPServer(ctx context.Context, deps *wire.Dependencies) error {
 	deps.ReportUseCase.SetBusinessInsightsNotifier(&reportAdapter{svc: biService})
 	decisionRepo := aimod.NewDecisionRepository(deps.GormRepo.Client())
 	deps.AIHandler.SetDecisionService(aimod.NewDecisionService(decisionRepo, deps.StockUseCases, deps.ReportUseCase, biRepo))
+
+	// Ola B.1: writes reales gobernados. El ActionExecutor stagea drafts en
+	// ai_action_drafts y solo aplica el write (resolución de insight / conteo
+	// de stock) con AI_GOVERNED_WRITES_ENABLED y un nexus request verificado.
+	// El executor de governance lo invoca desde el callback approval_resolved
+	// y los handlers HTTP lo usan para los drafts del agente.
+	actionExecutor := aimod.NewActionExecutor(
+		aimod.NewActionDraftRepository(deps.GormRepo.Client()),
+		biService,
+		deps.StockUseCases,
+		deps.GovernanceVerifier,
+		aimod.ActionExecutorConfig{GovernedWritesEnabled: deps.Config.Nexus.GovernedWritesEnabled},
+	)
+	deps.GovernanceExecutor.SetDispatcher(actionExecutor)
+	deps.AIHandler.SetGovernedActions(actionExecutor, deps.GovernanceVerifier, aimod.GovernedActionsConfig{
+		VerifyNexus: deps.Config.Nexus.VerifyNexus,
+	})
+	deps.WorkOrderDraftHandler.SetNexusVerifier(deps.GovernanceVerifier, deps.Config.Nexus.VerifyNexus)
 
 	// Meta endpoints (version + health) bajo /api/v1 (o el APIBaseURL configurado).
 	apiBase := deps.Config.API.APIBaseURL()
@@ -99,6 +118,7 @@ type stockNegativeAdapter struct {
 type stockInsightsService interface {
 	NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, level businessinsights.StockLevel) error
 	MaybeResolveStockNegative(ctx context.Context, tenantID uuid.UUID, productID string) error
+	NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level businessinsights.StockLowLevel) error
 }
 
 func (a *stockNegativeAdapter) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockNegativeInput) error {
@@ -117,6 +137,18 @@ func (a *stockNegativeAdapter) MaybeResolveStockNegative(ctx context.Context, te
 		return nil
 	}
 	return a.svc.MaybeResolveStockNegative(ctx, tenantID, productID)
+}
+
+func (a *stockNegativeAdapter) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, in stockmod.StockLowInput) error {
+	if a == nil || a.svc == nil {
+		return nil
+	}
+	return a.svc.NotifyStockLow(ctx, tenantID, actor, businessinsights.StockLowLevel{
+		SupplyID:   in.SupplyID,
+		StockID:    in.StockID,
+		SupplyName: in.SupplyName,
+		Level:      in.Level,
+	})
 }
 
 type dataIntegrityAdapter struct {
@@ -242,7 +274,14 @@ func buildBusinessInsightsService(deps *wire.Dependencies, repo *businessinsight
 	if reviewURL != "" {
 		client = reviewproxy.NewClient(reviewURL, strings.TrimSpace(deps.Config.Review.APIKey))
 	}
-	return businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{})
+	svc := businessinsights.NewService(repo, repo, repo, client, businessinsights.Config{
+		LowStockEnabled:   deps.Config.AI.InsightLowStockEnabled,
+		LowStockThreshold: deps.Config.AI.InsightLowStockThreshold,
+	})
+	// Umbral de stock bajo per-tenant via business parameters
+	// (ai.insights.low_stock_threshold_units); el env queda como fallback.
+	svc.SetBusinessParameters(bparams.NewUseCases(bparams.NewRepository(deps.GormRepo)))
+	return svc
 }
 
 // registerHTTPRoutes registra todas las rutas en el router Gin.
@@ -275,5 +314,6 @@ func registerHTTPRoutes(deps *wire.Dependencies, biHandler *businessinsights.Han
 	deps.CommercializationHandler.Routes()
 	deps.AIHandler.Routes()
 	deps.AdminHandler.Routes()
+	deps.GovernanceHandler.Routes()
 	biHandler.Routes()
 }

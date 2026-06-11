@@ -22,6 +22,7 @@ type Config struct {
 	Migrations     Migrations     // Configuración de migraciones
 	AI             AI             // Configuración de Ponti AI (`InsightService` + `CopilotAgent`)
 	Review         Review         // Configuración de Nexus Review / approvals
+	Nexus          Nexus          // Configuración del cliente directo a Nexus Governance + callbacks
 }
 
 // LoadConfig carga la configuración desde variables de entorno y archivos .env.

@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	"github.com/google/uuid"
 
+	bparamsdomain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/businessinsights"
 )
 
@@ -208,6 +209,160 @@ func TestNotifyStockNegative_NilReview_NoOp(t *testing.T) {
 	}
 	if repo.upsertCalls != 0 {
 		t.Fatalf("upsert should not be called when review is nil")
+	}
+}
+
+type stubParams struct {
+	calls int
+	value string
+	err   error
+}
+
+func (s *stubParams) GetParameter(_ context.Context, key string) (*bparamsdomain.BusinessParameter, error) {
+	s.calls++
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &bparamsdomain.BusinessParameter{Key: key, Value: s.value, Type: "decimal"}, nil
+}
+
+func TestNotifyStockLow_BelowThreshold_RecordsCandidate(t *testing.T) {
+	repo := &stubRepo{shouldNotify: true}
+	svc := businessinsights.NewService(repo, nil, nil, nil, businessinsights.Config{
+		LowStockEnabled:   true,
+		LowStockThreshold: 10,
+	})
+	tenantID := uuid.New()
+
+	err := svc.NotifyStockLow(context.Background(), tenantID, "user-1", businessinsights.StockLowLevel{
+		SupplyID:   "p-1",
+		StockID:    "s-1",
+		SupplyName: "Fertilizante",
+		Level:      3,
+	})
+	if err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if repo.upsertCalls != 1 {
+		t.Fatalf("upsert calls = %d, want 1", repo.upsertCalls)
+	}
+	if repo.markCalls != 1 {
+		t.Fatalf("mark notified calls = %d, want 1", repo.markCalls)
+	}
+	if repo.lastUpsert.EventType != "ponti.stock.low" {
+		t.Fatalf("event_type = %q", repo.lastUpsert.EventType)
+	}
+	if repo.lastUpsert.Kind != "insight" || repo.lastUpsert.EntityType != "supply" || repo.lastUpsert.EntityID != "p-1" {
+		t.Fatalf("unexpected candidate shape: %#v", repo.lastUpsert)
+	}
+	if repo.lastUpsert.Severity != "info" {
+		t.Fatalf("severity = %q, want info (menor que warning)", repo.lastUpsert.Severity)
+	}
+	if repo.lastUpsert.Evidence["source_ref"] != "ponti.stock.low" {
+		t.Fatalf("source ref mismatch: %#v", repo.lastUpsert.Evidence)
+	}
+	if repo.lastUpsert.Evidence["level"] != 3.0 || repo.lastUpsert.Evidence["threshold"] != 10.0 {
+		t.Fatalf("level/threshold mismatch: %#v", repo.lastUpsert.Evidence)
+	}
+	if repo.lastUpsert.Evidence["supply_id"] != "p-1" || repo.lastUpsert.Evidence["stock_id"] != "s-1" {
+		t.Fatalf("supply/stock id mismatch: %#v", repo.lastUpsert.Evidence)
+	}
+}
+
+func TestNotifyStockLow_LevelAtThreshold_ResolvesCandidate(t *testing.T) {
+	repo := &stubRepo{}
+	resolver := &stubResolver{}
+	svc := businessinsights.NewService(repo, resolver, nil, nil, businessinsights.Config{
+		LowStockEnabled:   true,
+		LowStockThreshold: 10,
+	})
+	tenantID := uuid.New()
+
+	err := svc.NotifyStockLow(context.Background(), tenantID, "user-1", businessinsights.StockLowLevel{
+		SupplyID: "p-1",
+		Level:    12,
+	})
+	if err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if repo.upsertCalls != 0 {
+		t.Fatalf("upsert calls = %d, want 0", repo.upsertCalls)
+	}
+	if resolver.resolveByEntityCalls != 1 {
+		t.Fatalf("resolve calls = %d, want 1", resolver.resolveByEntityCalls)
+	}
+	if resolver.lastResolveByEntity[1] != "ponti.stock.low" || resolver.lastResolveByEntity[3] != "p-1" {
+		t.Fatalf("unexpected resolve target: %#v", resolver.lastResolveByEntity)
+	}
+}
+
+func TestNotifyStockLow_FlagOff_NoOp(t *testing.T) {
+	repo := &stubRepo{}
+	resolver := &stubResolver{}
+	params := &stubParams{value: "10"}
+	svc := businessinsights.NewService(repo, resolver, nil, nil, businessinsights.Config{
+		LowStockThreshold: 10,
+	})
+	svc.SetBusinessParameters(params)
+	tenantID := uuid.New()
+
+	err := svc.NotifyStockLow(context.Background(), tenantID, "user-1", businessinsights.StockLowLevel{
+		SupplyID: "p-1",
+		Level:    1,
+	})
+	if err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if repo.upsertCalls != 0 || resolver.resolveByEntityCalls != 0 || params.calls != 0 {
+		t.Fatalf("expected full no-op with flag off: %#v %#v %#v", repo, resolver, params)
+	}
+}
+
+func TestNotifyStockLow_ThresholdZero_NoOp(t *testing.T) {
+	repo := &stubRepo{}
+	resolver := &stubResolver{}
+	svc := businessinsights.NewService(repo, resolver, nil, nil, businessinsights.Config{
+		LowStockEnabled: true,
+	})
+	tenantID := uuid.New()
+
+	err := svc.NotifyStockLow(context.Background(), tenantID, "user-1", businessinsights.StockLowLevel{
+		SupplyID: "p-1",
+		Level:    1,
+	})
+	if err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if repo.upsertCalls != 0 || resolver.resolveByEntityCalls != 0 {
+		t.Fatalf("expected no-op without threshold: %#v %#v", repo, resolver)
+	}
+}
+
+func TestNotifyStockLow_TenantParameterOverridesFallback(t *testing.T) {
+	repo := &stubRepo{shouldNotify: true}
+	params := &stubParams{value: "20"}
+	svc := businessinsights.NewService(repo, nil, nil, nil, businessinsights.Config{
+		LowStockEnabled:   true,
+		LowStockThreshold: 5, // con el fallback no dispararía (10 >= 5)
+	})
+	svc.SetBusinessParameters(params)
+	tenantID := uuid.New()
+
+	err := svc.NotifyStockLow(context.Background(), tenantID, "user-1", businessinsights.StockLowLevel{
+		SupplyID: "p-1",
+		Level:    10,
+	})
+	if err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if params.calls != 1 {
+		t.Fatalf("params calls = %d, want 1", params.calls)
+	}
+	if repo.upsertCalls != 1 {
+		t.Fatalf("upsert calls = %d, want 1 (umbral per-tenant 20 > nivel 10)", repo.upsertCalls)
+	}
+	if repo.lastUpsert.Evidence["threshold"] != 20.0 {
+		t.Fatalf("threshold mismatch: %#v", repo.lastUpsert.Evidence)
 	}
 }
 

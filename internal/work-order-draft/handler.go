@@ -2,14 +2,28 @@ package workorderdraft
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"strings"
 
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
+	"github.com/devpablocristo/ponti-backend/internal/governance"
+	nexusclient "github.com/devpablocristo/ponti-backend/internal/nexus"
 	sharedhandlers "github.com/devpablocristo/ponti-backend/internal/shared/handlers"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
 	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/handler/dto"
 	"github.com/devpablocristo/ponti-backend/internal/work-order-draft/usecases/domain"
+)
+
+const (
+	// nexusRequestIDHeader trae el request id de Nexus que respalda el draft.
+	nexusRequestIDHeader = "X-Nexus-Request-ID"
+	// axisCompanionActor es el actor con el que el middleware de integración
+	// identifica a Axis (axis_product_integration_auth).
+	axisCompanionActor = "axis-companion"
 )
 
 type UseCasesPort interface {
@@ -47,11 +61,19 @@ type MiddlewaresEnginePort interface {
 	GetProtected() []gin.HandlerFunc
 }
 
+// NexusVerifierPort abstrae el governance.Verifier: confirma contra Nexus que
+// un request id está aprobado para el action type esperado.
+type NexusVerifierPort interface {
+	VerifyApproved(ctx context.Context, tenantID uuid.UUID, nexusRequestID, expectedActionType string) error
+}
+
 type Handler struct {
-	ucs UseCasesPort
-	gsv GinEnginePort
-	acf ConfigAPIPort
-	mws MiddlewaresEnginePort
+	ucs           UseCasesPort
+	gsv           GinEnginePort
+	acf           ConfigAPIPort
+	mws           MiddlewaresEnginePort
+	nexusVerifier NexusVerifierPort
+	verifyNexus   bool
 }
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
@@ -61,6 +83,15 @@ func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresE
 		acf: c,
 		mws: m,
 	}
+}
+
+// SetNexusVerifier conecta el verifier de Nexus después de wire para gatear
+// los drafts digitales creados por Axis cuando GOVERNANCE_VERIFY_NEXUS está
+// activo. Solo aplica al caller axis-companion: los usuarios humanos del FE
+// nunca pasan por este gate.
+func (h *Handler) SetNexusVerifier(v NexusVerifierPort, verifyNexus bool) {
+	h.nexusVerifier = v
+	h.verifyNexus = verifyNexus
 }
 
 func (h *Handler) Routes() {
@@ -113,6 +144,10 @@ func (h *Handler) CreateWorkOrderDraft(c *gin.Context) {
 }
 
 func (h *Handler) CreateDigitalWorkOrderDraft(c *gin.Context) {
+	if h.blockUnverifiedAxisDraft(c) {
+		return
+	}
+
 	var req dto.WorkOrderDraft
 	if err := sharedhandlers.BindJSON(c, &req); err != nil {
 		return
@@ -131,6 +166,55 @@ func (h *Handler) CreateDigitalWorkOrderDraft(c *gin.Context) {
 	}
 
 	sharedhandlers.RespondCreated(c, id)
+}
+
+// blockUnverifiedAxisDraft aplica el gate de governance a los drafts digitales
+// creados por Axis: con GOVERNANCE_VERIFY_NEXUS=true exige X-Nexus-Request-ID
+// verificado como aprobado para ponti.workorder.draft.create (412 si falta o
+// no aprueba; 502 si Nexus no responde — fail closed). Con el flag apagado
+// solo loggea la ausencia del header. Devuelve true si ya respondió.
+func (h *Handler) blockUnverifiedAxisDraft(c *gin.Context) bool {
+	actor, err := sharedhandlers.ParseActor(c)
+	if err != nil || actor != axisCompanionActor {
+		return false
+	}
+	nexusRequestID := strings.TrimSpace(c.GetHeader(nexusRequestIDHeader))
+	if !h.verifyNexus {
+		if nexusRequestID == "" {
+			log.Printf("[work-order-draft] WARN: draft digital de Axis sin %s (GOVERNANCE_VERIFY_NEXUS=false)", nexusRequestIDHeader)
+		}
+		return false
+	}
+	orgID, err := sharedhandlers.ParseOrgID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return true
+	}
+	if nexusRequestID == "" {
+		respondNexusBlocked(c, nexusRequestIDHeader+" header is required")
+		return true
+	}
+	if h.nexusVerifier == nil {
+		// Fail closed: enforcement activo sin verifier configurado.
+		sharedhandlers.RespondError(c, domainerr.Unavailable("nexus verifier not configured"))
+		return true
+	}
+	if err := h.nexusVerifier.VerifyApproved(c.Request.Context(), orgID, nexusRequestID, nexusclient.ActionTypeWorkOrderDraftCreate); err != nil {
+		if governance.IsNotApproved(err) {
+			respondNexusBlocked(c, err.Error())
+			return true
+		}
+		sharedhandlers.RespondError(c, err)
+		return true
+	}
+	return false
+}
+
+func respondNexusBlocked(c *gin.Context, detail string) {
+	c.JSON(http.StatusPreconditionFailed, gin.H{
+		"execution_blocked_by": "nexus_required",
+		"detail":               detail,
+	})
 }
 
 func (h *Handler) PreviewDigitalWorkOrderNumber(c *gin.Context) {

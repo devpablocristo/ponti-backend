@@ -1,10 +1,23 @@
 package ai
 
+import (
+	nexusclient "github.com/devpablocristo/ponti-backend/internal/nexus"
+)
+
 const (
 	pontiCapabilitySchemaVersion = "capability_manifest.v1"
 	pontiProductSurface          = "ponti"
-	pontiCapabilitiesVersion     = "1.0.0"
-	pontiNexusActionType         = "agent.capability.invoke"
+	pontiCapabilitiesVersion     = "1.2.0"
+
+	// pontiNexusActionType es el action type legacy global; el verifier lo
+	// acepta como fallback de cualquier action type per-tool en la transición.
+	pontiNexusActionType = nexusclient.ActionTypeCapabilityInvoke
+
+	// Action types per-tool registrados en Nexus (Ola B).
+	pontiActionTypeWorkOrderDraftCreate = nexusclient.ActionTypeWorkOrderDraftCreate
+	pontiActionTypeInsightResolve       = nexusclient.ActionTypeInsightResolve
+	pontiActionTypeStockAdjust          = nexusclient.ActionTypeStockAdjust
+	pontiActionTypeStockCountApply      = nexusclient.ActionTypeStockCountApply
 
 	capabilityTenantScopeOrg = "org"
 	capabilityModeRead       = "read"
@@ -227,6 +240,12 @@ func pontiOperationalManifest() capabilityManifest {
 			"ponti-backend.reports.summary_results.summary",
 			map[string]any{},
 		),
+		pontiOperationalReadTool(
+			"ponti.data_integrity.summary",
+			"Summarizes data-integrity cost checks and tentative-price supplies for a Ponti project.",
+			"ponti-backend.data_integrity.summary",
+			map[string]any{},
+		),
 	}
 
 	return capabilityManifest{
@@ -305,12 +324,14 @@ func pontiDraftActionTools() []capabilityTool {
 			"ponti.workorder_draft.create",
 			"Creates an approved digital work-order draft in Ponti without publishing a final work order.",
 			"ponti-backend.actions.workorder_draft.create",
+			pontiActionTypeWorkOrderDraftCreate,
 			workOrderDraftCreateInputSchema(),
 		),
 		pontiGovernedDraftTool(
 			"ponti.insight_resolution.draft",
 			"Creates an approved reversible insight-resolution draft without deleting evidence.",
 			"ponti-backend.actions.insight_resolution.draft",
+			pontiActionTypeInsightResolve,
 			map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -325,6 +346,7 @@ func pontiDraftActionTools() []capabilityTool {
 			"ponti.stock_count.draft",
 			"Creates an approved stock-count draft without closing stock or applying a final stock movement.",
 			"ponti-backend.actions.stock_count.draft",
+			pontiActionTypeStockCountApply,
 			map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -348,6 +370,7 @@ func pontiPlannedDraftActionTools() []capabilityTool {
 			"ponti.insight.resolve.prepare",
 			"Prepares a proposed insight resolution for Nexus approval without resolving it directly.",
 			"ponti-backend.actions.insight.resolve.prepare",
+			pontiActionTypeInsightResolve,
 			map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -362,6 +385,7 @@ func pontiPlannedDraftActionTools() []capabilityTool {
 			"ponti.workorder.draft.prepare",
 			"Prepares a work-order draft proposal for Nexus approval without publishing an order.",
 			"ponti-backend.actions.workorder.draft.prepare",
+			pontiActionTypeWorkOrderDraftCreate,
 			map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -380,6 +404,7 @@ func pontiPlannedDraftActionTools() []capabilityTool {
 			"ponti.stock_adjustment.prepare",
 			"Prepares a stock adjustment proposal for Nexus approval without applying inventory changes.",
 			"ponti-backend.actions.stock_adjustment.prepare",
+			pontiActionTypeStockAdjust,
 			map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -395,7 +420,7 @@ func pontiPlannedDraftActionTools() []capabilityTool {
 	}
 }
 
-func pontiGovernedDraftTool(name, description, executorRef string, inputSchema map[string]any) capabilityTool {
+func pontiGovernedDraftTool(name, description, executorRef, actionType string, inputSchema map[string]any) capabilityTool {
 	return capabilityTool{
 		Name:            name,
 		Description:     description,
@@ -410,7 +435,7 @@ func pontiGovernedDraftTool(name, description, executorRef string, inputSchema m
 		ExecutorRef:     executorRef,
 		Governance: &capabilityGovernance{
 			RequiresApproval: true,
-			ActionType:       pontiNexusActionType,
+			ActionType:       actionType,
 			TargetSystem:     pontiProductSurface,
 		},
 	}

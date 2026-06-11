@@ -55,7 +55,7 @@ func TestPrepareInsightResolveReturnsPreviewOnlyGovernedPayload(t *testing.T) {
 		},
 	})
 
-	assertPreviewResponse(t, res, orgID, "ponti.insight.resolve.prepare")
+	assertPreviewResponse(t, res, orgID, "ponti.insight.resolve.prepare", pontiActionTypeInsightResolve)
 }
 
 func TestPrepareWorkOrderDraftReturnsPreviewOnlyGovernedPayload(t *testing.T) {
@@ -72,7 +72,7 @@ func TestPrepareWorkOrderDraftReturnsPreviewOnlyGovernedPayload(t *testing.T) {
 		"notes":          "Preparar borrador, no publicar.",
 	})
 
-	body := assertPreviewResponse(t, res, orgID, "ponti.workorder.draft.prepare")
+	body := assertPreviewResponse(t, res, orgID, "ponti.workorder.draft.prepare", pontiActionTypeWorkOrderDraftCreate)
 	evidence := body["evidence"].(map[string]any)
 	workspace := evidence["workspace"].(map[string]any)
 	if workspace["project_id"].(float64) != 10 {
@@ -92,7 +92,7 @@ func TestPrepareStockAdjustmentReturnsPreviewOnlyGovernedPayload(t *testing.T) {
 		"reason":         "Correccion propuesta por diferencia detectada.",
 	})
 
-	assertPreviewResponse(t, res, orgID, "ponti.stock_adjustment.prepare")
+	assertPreviewResponse(t, res, orgID, "ponti.stock_adjustment.prepare", pontiActionTypeStockAdjust)
 }
 
 func TestPrepareStockAdjustmentRejectsZeroDelta(t *testing.T) {
@@ -185,7 +185,7 @@ func postJSONWithHeaders(router *gin.Engine, path string, payload map[string]any
 	return res
 }
 
-func assertPreviewResponse(t *testing.T, res *httptest.ResponseRecorder, orgID uuid.UUID, action string) map[string]any {
+func assertPreviewResponse(t *testing.T, res *httptest.ResponseRecorder, orgID uuid.UUID, action, actionType string) map[string]any {
 	t.Helper()
 	if res.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
@@ -200,7 +200,7 @@ func assertPreviewResponse(t *testing.T, res *httptest.ResponseRecorder, orgID u
 	if body["action"] != action {
 		t.Fatalf("unexpected action: %#v", body)
 	}
-	if body["approval_required"] != true || body["nexus_action_type"] != pontiNexusActionType {
+	if body["approval_required"] != true || body["nexus_action_type"] != actionType {
 		t.Fatalf("governance missing: %#v", body)
 	}
 	if body["preview_only"] != true || body["write_performed"] != false || body["execution_allowed"] != false {

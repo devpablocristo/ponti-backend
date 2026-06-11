@@ -58,6 +58,7 @@ func TestPontiOperationalCapabilities_ArePublishedReadOnly(t *testing.T) {
 		"ponti.reports.field_crop.summary":            true,
 		"ponti.reports.investor_contribution.summary": true,
 		"ponti.reports.summary_results.summary":       true,
+		"ponti.data_integrity.summary":                true,
 	}
 	if len(manifest.Tools) != len(expected) {
 		t.Fatalf("expected %d operational tools, got %d", len(expected), len(manifest.Tools))
@@ -95,22 +96,26 @@ func TestPontiDraftActions_AreGovernedAndPublished(t *testing.T) {
 	actionsManifest := manifestByID(t, pontiCapabilities(), "ponti.actions")
 	assertManifestBasics(t, actionsManifest)
 
-	expected := map[string]bool{
-		"ponti.insight.resolve.prepare":  true,
-		"ponti.workorder.draft.prepare":  true,
-		"ponti.stock_adjustment.prepare": true,
-		"ponti.workorder_draft.create":   true,
-		"ponti.insight_resolution.draft": true,
-		"ponti.stock_count.draft":        true,
+	expected := map[string]string{
+		"ponti.insight.resolve.prepare":  pontiActionTypeInsightResolve,
+		"ponti.workorder.draft.prepare":  pontiActionTypeWorkOrderDraftCreate,
+		"ponti.stock_adjustment.prepare": pontiActionTypeStockAdjust,
+		"ponti.workorder_draft.create":   pontiActionTypeWorkOrderDraftCreate,
+		"ponti.insight_resolution.draft": pontiActionTypeInsightResolve,
+		"ponti.stock_count.draft":        pontiActionTypeStockCountApply,
 	}
 	for _, tool := range tools {
-		if !expected[tool.Name] {
+		actionType, ok := expected[tool.Name]
+		if !ok {
 			t.Fatalf("unexpected planned draft action tool %q", tool.Name)
 		}
 		if !published[tool.Name] {
 			t.Fatalf("draft action %q must be published now that Axis can execute previews", tool.Name)
 		}
-		assertGovernedDraftTool(t, tool)
+		assertGovernedDraftTool(t, tool, actionType)
+	}
+	if actionsManifest.Version != "1.2.0" {
+		t.Fatalf("expected actions manifest version 1.2.0, got %q", actionsManifest.Version)
 	}
 }
 
@@ -125,7 +130,7 @@ func manifestByID(t *testing.T, items []capabilityManifest, id string) capabilit
 	return capabilityManifest{}
 }
 
-func assertGovernedDraftTool(t *testing.T, tool capabilityTool) {
+func assertGovernedDraftTool(t *testing.T, tool capabilityTool, actionType string) {
 	t.Helper()
 	assertToolBasics(t, tool)
 	if tool.Mode != capabilityModeWrite {
@@ -143,8 +148,11 @@ func assertGovernedDraftTool(t *testing.T, tool capabilityTool) {
 	if !tool.Governance.RequiresApproval {
 		t.Fatalf("draft action %q must require approval", tool.Name)
 	}
-	if tool.Governance.ActionType != pontiNexusActionType {
-		t.Fatalf("draft action %q must use Nexus action type %q, got %q", tool.Name, pontiNexusActionType, tool.Governance.ActionType)
+	if tool.Governance.ActionType != actionType {
+		t.Fatalf("draft action %q must use Nexus action type %q, got %q", tool.Name, actionType, tool.Governance.ActionType)
+	}
+	if tool.Governance.ActionType == pontiNexusActionType {
+		t.Fatalf("draft action %q must use a per-tool action type, got legacy %q", tool.Name, tool.Governance.ActionType)
 	}
 	if tool.Governance.TargetSystem != pontiProductSurface {
 		t.Fatalf("draft action %q must target %q, got %q", tool.Name, pontiProductSurface, tool.Governance.TargetSystem)

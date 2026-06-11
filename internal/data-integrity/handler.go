@@ -60,6 +60,7 @@ func (h *Handler) Routes() {
 	{
 		public.GET("/costs-check", h.CheckCostsCoherence)
 		public.GET("/tentative-prices", h.GetTentativePrices)
+		public.GET("/summary", h.GetSummary)
 	}
 }
 
@@ -130,4 +131,45 @@ func (h *Handler) GetTentativePrices(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.ToTentativePricesResponse(report))
+}
+
+// GetSummary agrega costs-check + tentative-prices en el envelope de evidencia
+// de los reads operacionales (source, workspace, filters, captured_at, summary).
+func (h *Handler) GetSummary(c *gin.Context) {
+	workspaceFilter, err := sharedhandlers.ParseWorkspaceFilter(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if workspaceFilter.ProjectID == nil {
+		sharedhandlers.RespondError(c, domainerr.Validation(
+			"missing required query param: project_id",
+		))
+		return
+	}
+
+	// Timeout 8 min: el resumen ejecuta los mismos controles que costs-check.
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Minute)
+	defer cancel()
+
+	costsReport, err := h.ucs.CheckCostsCoherence(ctx, domain.CostsCheckFilter{
+		ProjectID: workspaceFilter.ProjectID,
+	})
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	pricesReport, err := h.ucs.GetTentativePrices(ctx, domain.TentativePricesFilter{
+		CustomerID: workspaceFilter.CustomerID,
+		ProjectID:  workspaceFilter.ProjectID,
+		CampaignID: workspaceFilter.CampaignID,
+		FieldID:    workspaceFilter.FieldID,
+	})
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToDataIntegritySummaryResponse(workspaceFilter, costsReport, pricesReport))
 }

@@ -128,7 +128,7 @@ func TestDecisionServicePrepareActionDoesNotWriteFinalDraft(t *testing.T) {
 	if card.Status != decisionStatusAccepted {
 		t.Fatalf("expected accepted card after action preparation, got %s", card.Status)
 	}
-	if action["requires_approval"] != true || action["nexus_action_type"] != pontiNexusActionType {
+	if action["requires_approval"] != true || action["nexus_action_type"] != pontiActionTypeStockCountApply {
 		t.Fatalf("expected nexus-governed pending action, got %#v", action)
 	}
 	if _, ok := action["draft_id"]; ok {

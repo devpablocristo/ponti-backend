@@ -8,23 +8,40 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	corecandidates "github.com/devpablocristo/platform/notifications/go/candidates"
 	"github.com/google/uuid"
+
+	bparamsdomain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
+
+// lowStockThresholdParamKey es la clave per-tenant del umbral de stock bajo.
+const lowStockThresholdParamKey = "ai.insights.low_stock_threshold_units"
 
 // ReviewClient es el subset de governanceclient.Client que usa el service.
 type ReviewClient interface {
 	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 }
 
+// BusinessParametersPort lee parametros de negocio del tenant activo (el
+// tenant se resuelve por contexto en el repositorio de business parameters).
+type BusinessParametersPort interface {
+	GetParameter(ctx context.Context, key string) (*bparamsdomain.BusinessParameter, error)
+}
+
 // Config centraliza thresholds y ventanas de dedup del service.
 type Config struct {
 	NegativeStockDedupWindow time.Duration
 	DataIntegrityDedupWindow time.Duration
+	// LowStockEnabled habilita el insight ponti.stock.low (default off).
+	LowStockEnabled bool
+	// LowStockThreshold es el umbral fallback (env) cuando el tenant no tiene
+	// configurado ai.insights.low_stock_threshold_units.
+	LowStockThreshold float64
 }
 
 // CandidateRepository es la persistencia de candidatos (implementada en repository.go).
@@ -52,6 +69,7 @@ type Service struct {
 	resolver   ResolverRepository
 	reads      ReadRepository
 	review     ReviewClient
+	params     BusinessParametersPort
 	config     Config
 }
 
@@ -73,11 +91,27 @@ func NewService(repo CandidateRepository, resolver ResolverRepository, reads Rea
 	}
 }
 
+// SetBusinessParameters conecta la lectura de business parameters despues de
+// wire (mismo patron que los notifiers conectados en bootstrap). Opcional: si
+// no se setea, el umbral de stock bajo cae al fallback de Config.
+func (s *Service) SetBusinessParameters(p BusinessParametersPort) {
+	s.params = p
+}
+
 // StockLevel describe el estado de stock que motiva la notificacion.
 type StockLevel struct {
 	ProductID   string
 	ProductName string
 	Quantity    float64
+}
+
+// StockLowLevel describe el nivel de stock que se compara contra el umbral
+// per-tenant de stock bajo.
+type StockLowLevel struct {
+	SupplyID   string
+	StockID    string
+	SupplyName string
+	Level      float64
 }
 
 // DataIntegrityControlIssue resume un control de integridad fallido con la
@@ -236,6 +270,106 @@ func (s *Service) MaybeResolveStockNegative(ctx context.Context, tenantID uuid.U
 		time.Now().UTC(),
 	)
 	return err
+}
+
+// NotifyStockLow registra un insight cuando el stock real queda por debajo
+// del umbral per-tenant de stock bajo, y lo cierra automaticamente cuando el
+// nivel vuelve a alcanzar el umbral. No-op si el flag esta apagado o si no hay
+// umbral configurado (parametro per-tenant ni fallback de env).
+func (s *Service) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level StockLowLevel) error {
+	if s == nil || s.candidates == nil {
+		return nil
+	}
+	if !s.config.LowStockEnabled {
+		return nil
+	}
+	supplyID := strings.TrimSpace(level.SupplyID)
+	if supplyID == "" {
+		return nil
+	}
+	threshold := s.lowStockThreshold(ctx)
+	if threshold <= 0 {
+		return nil
+	}
+	if level.Level >= threshold {
+		return s.MaybeResolveStockLow(ctx, tenantID, supplyID)
+	}
+
+	now := time.Now().UTC()
+	fingerprint := bucketedID("ponti.stock.low", supplyID, s.config.NegativeStockDedupWindow, now)
+	body := fmt.Sprintf(
+		"%s tiene stock bajo: %s unidades, por debajo del umbral de %s. Conviene planificar la reposicion antes de que se agote.",
+		nonEmpty(level.SupplyName, "El insumo"),
+		formatNumber(level.Level),
+		formatNumber(threshold),
+	)
+	evidence := map[string]any{
+		"supply_id":        supplyID,
+		"level":            level.Level,
+		"threshold":        threshold,
+		"suggested_action": "review_stock_replenishment",
+		"source_ref":       "ponti.stock.low",
+		"workspace":        map[string]any{},
+	}
+	if stockID := strings.TrimSpace(level.StockID); stockID != "" {
+		evidence["stock_id"] = stockID
+	}
+
+	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
+		TenantID:    tenantID.String(),
+		Kind:        "insight",
+		EventType:   "ponti.stock.low",
+		EntityType:  "supply",
+		EntityID:    supplyID,
+		Fingerprint: fingerprint,
+		Severity:    "info",
+		Title:       "Stock bajo",
+		Body:        body,
+		Evidence:    evidence,
+		Actor:       actor,
+		Now:         now,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert stock low candidate: %w", err)
+	}
+	if !shouldNotify {
+		return nil
+	}
+	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
+}
+
+// MaybeResolveStockLow cierra automaticamente el insight de stock bajo cuando
+// el nivel del producto vuelve a estar en o por encima del umbral.
+func (s *Service) MaybeResolveStockLow(ctx context.Context, tenantID uuid.UUID, supplyID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(supplyID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.stock.low",
+		"supply",
+		strings.TrimSpace(supplyID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// lowStockThreshold resuelve el umbral per-tenant desde business parameters,
+// con fallback al valor de config (env) si la clave no existe o no es numerica.
+func (s *Service) lowStockThreshold(ctx context.Context) float64 {
+	if s.params != nil {
+		if param, err := s.params.GetParameter(ctx, lowStockThresholdParamKey); err == nil && param != nil {
+			if v, err := strconv.ParseFloat(strings.TrimSpace(param.Value), 64); err == nil {
+				return v
+			}
+		}
+	}
+	return s.config.LowStockThreshold
 }
 
 // NotifyDataIntegrityCritical registra un candidato cuando los controles de

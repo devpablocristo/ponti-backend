@@ -37,16 +37,36 @@ type MiddlewaresEnginePort interface {
 	GetValidation() []gin.HandlerFunc
 }
 
+// GovernedActionsConfig agrupa los flags de enforcement de las acciones
+// gobernadas (subset de config.Nexus).
+type GovernedActionsConfig struct {
+	// VerifyNexus refleja GOVERNANCE_VERIFY_NEXUS: con true las acciones
+	// gobernadas llamadas por Axis exigen un X-Nexus-Request-ID verificado.
+	VerifyNexus bool
+}
+
 type Handler struct {
-	ucs       UseCasesPort
-	decisions *DecisionService
-	gsv       GinEnginePort
-	acf       ConfigAPIPort
-	mws       MiddlewaresEnginePort
+	ucs         UseCasesPort
+	decisions   *DecisionService
+	actions     *ActionExecutor
+	verifier    ActionVerifierPort
+	governedCfg GovernedActionsConfig
+	gsv         GinEnginePort
+	acf         ConfigAPIPort
+	mws         MiddlewaresEnginePort
 }
 
 func NewHandler(u UseCasesPort, s GinEnginePort, c ConfigAPIPort, m MiddlewaresEnginePort) *Handler {
 	return &Handler{ucs: u, gsv: s, acf: c, mws: m}
+}
+
+// SetGovernedActions conecta el executor de writes gobernados y el verifier de
+// Nexus después de wire (mismo patrón que SetDecisionService: las dependencias
+// se arman en bootstrap).
+func (h *Handler) SetGovernedActions(actions *ActionExecutor, verifier ActionVerifierPort, cfg GovernedActionsConfig) {
+	h.actions = actions
+	h.verifier = verifier
+	h.governedCfg = cfg
 }
 
 func (h *Handler) Routes() {

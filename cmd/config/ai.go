@@ -11,4 +11,7 @@ type AI struct {
 	AxisCompanionKey       string `envconfig:"AXIS_COMPANION_API_KEY"`
 	AxisCompanionTimeoutMS int    `envconfig:"AXIS_COMPANION_TIMEOUT_MS" default:"45000"`
 	AxisProductSurface     string `envconfig:"AXIS_PRODUCT_SURFACE" default:"ponti"`
+
+	InsightLowStockEnabled   bool    `envconfig:"AI_INSIGHT_LOW_STOCK_ENABLED" default:"false"`
+	InsightLowStockThreshold float64 `envconfig:"AI_INSIGHT_LOW_STOCK_THRESHOLD"` // fallback si el tenant no define ai.insights.low_stock_threshold_units
 }

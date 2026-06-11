@@ -702,7 +702,7 @@ func stockCountAction(workspace workspaceRequest, st *stockdomain.Stock, reason 
 		"label":             "Pedir aprobación para conteo",
 		"capability_id":     "ponti.stock_count.draft",
 		"requires_approval": true,
-		"nexus_action_type": pontiNexusActionType,
+		"nexus_action_type": pontiActionTypeStockCountApply,
 		"payload":           payload,
 		"missing_inputs":    missingInputs,
 	}
@@ -714,7 +714,7 @@ func insightResolutionAction(workspace workspaceRequest, view businessinsights.C
 		"label":             "Preparar resolución",
 		"capability_id":     "ponti.insight_resolution.draft",
 		"requires_approval": true,
-		"nexus_action_type": pontiNexusActionType,
+		"nexus_action_type": pontiActionTypeInsightResolve,
 		"payload": map[string]any{
 			"insight_id":      view.ID,
 			"resolution_note": "Preparar resolución reversible con evidencia del insight.",

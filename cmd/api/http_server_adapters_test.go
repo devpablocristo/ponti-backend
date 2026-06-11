@@ -13,10 +13,12 @@ import (
 )
 
 type stockInsightsStub struct {
-	notifyCalled  bool
-	resolveCalled bool
-	level         businessinsights.StockLevel
-	productID     string
+	notifyCalled    bool
+	resolveCalled   bool
+	notifyLowCalled bool
+	level           businessinsights.StockLevel
+	lowLevel        businessinsights.StockLowLevel
+	productID       string
 }
 
 func (s *stockInsightsStub) NotifyStockNegative(_ context.Context, _ uuid.UUID, _ string, level businessinsights.StockLevel) error {
@@ -28,6 +30,12 @@ func (s *stockInsightsStub) NotifyStockNegative(_ context.Context, _ uuid.UUID, 
 func (s *stockInsightsStub) MaybeResolveStockNegative(_ context.Context, _ uuid.UUID, productID string) error {
 	s.resolveCalled = true
 	s.productID = productID
+	return nil
+}
+
+func (s *stockInsightsStub) NotifyStockLow(_ context.Context, _ uuid.UUID, _ string, level businessinsights.StockLowLevel) error {
+	s.notifyLowCalled = true
+	s.lowLevel = level
 	return nil
 }
 
@@ -108,6 +116,21 @@ func TestStockNegativeAdapter_MapsNotifyAndResolve(t *testing.T) {
 	}
 	if !stub.resolveCalled || stub.productID != "supply-1" {
 		t.Fatalf("resolve not mapped correctly: %#v", stub)
+	}
+
+	if err := adapter.NotifyStockLow(context.Background(), tenantID, "actor-1", stockmod.StockLowInput{
+		SupplyID:   "supply-1",
+		StockID:    "stock-9",
+		SupplyName: "Urea",
+		Level:      3,
+	}); err != nil {
+		t.Fatalf("NotifyStockLow: %v", err)
+	}
+	if !stub.notifyLowCalled {
+		t.Fatal("expected notify low to be called")
+	}
+	if stub.lowLevel.SupplyID != "supply-1" || stub.lowLevel.StockID != "stock-9" || stub.lowLevel.SupplyName != "Urea" || stub.lowLevel.Level != 3 {
+		t.Fatalf("unexpected stock low level: %#v", stub.lowLevel)
 	}
 }
 
