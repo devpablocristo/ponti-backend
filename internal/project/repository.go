@@ -1066,7 +1066,7 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 }
 
 func projectNameMatchPredicate(tx *gorm.DB) string {
-	if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+	if tx.Name() == "postgres" {
 		return "normalize_name(name) = normalize_name(?)"
 	}
 	return "lower(name) = lower(?)"

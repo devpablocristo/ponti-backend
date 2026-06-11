@@ -34,7 +34,7 @@ func (r *Repository) actorHasCustomerRole(tx *gorm.DB, actorID int64) (bool, err
 }
 
 func nameMatchPredicate(tx *gorm.DB) string {
-	if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+	if tx.Name() == "postgres" {
 		return "normalize_name(name) = normalize_name(?)"
 	}
 	return "lower(name) = lower(?)"
