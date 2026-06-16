@@ -10,6 +10,8 @@ Ponti is the first real product surface connected to Axis.
 - Initial auth mode: server-to-server API key plus delegated headers
 - Initial rollout: read-only plus governed preview actions
 - Legacy fallback: `ponti-ai` remains available through `AI_PROVIDER=legacy`
+- Axis product execution contract: `capability_execution.v1` via
+  `POST /api/v1/capability-executions`
 
 ## Runtime Config
 
@@ -34,8 +36,9 @@ Cloud Run deploy defaults for v1:
   `AI_AXIS_ENABLED=true`, overridable per environment for rollback.
 - Ponti backend mounts `AXIS_COMPANION_API_KEY` and `PONTI_AXIS_API_KEY` from
   Secret Manager.
-- Axis Companion mounts `PONTI_API_KEY` from Secret Manager and receives
-  `PONTI_BASE_URL`.
+- Axis Companion mounts `PONTI_API_KEY` from Secret Manager. `PONTI_BASE_URL`
+  is used by onboarding scripts to create the Product Registry installation,
+  not to auto-register the legacy connector.
 - This v1 remains API-key based. Do not mix it with the older internal
   JWT/JWKS cutover notes.
 
@@ -51,7 +54,10 @@ Ponti middleware resolves the effective tenant from the current authenticated re
 
 Axis must already have an active installation for `org_id + ponti`.
 
-Axis calls Ponti product endpoints with `Authorization: Bearer <PONTI_API_KEY>`. Ponti accepts that bearer only on product integration endpoints when it matches `PONTI_AXIS_API_KEY`. In Axis, store the same value as the installation secret referenced by `secret_ref` (default local ref: `env:PONTI_API_KEY`).
+Axis calls Ponti product endpoints with `Authorization: Bearer <PONTI_API_KEY>`.
+Ponti accepts that bearer only on product integration endpoints when it matches
+`PONTI_AXIS_API_KEY`. In Axis, store the same value as the installation secret
+referenced by `secret_ref` (default local ref: `env:PONTI_API_KEY`).
 
 ## Workspace Schema
 
@@ -70,15 +76,27 @@ Current Axis `POST /v1/chat` rejects unknown top-level fields, so Ponti does not
 
 ## Published Capabilities
 
-First cut publishes one manifest:
+Ponti publishes three manifests through `GET /api/v1/capabilities`:
 
 - `ponti.insights`
+- `ponti.operational`
+- `ponti.actions`
 
 Read tools:
 
 - `ponti.insights.list`
 - `ponti.insights.summary`
 - `ponti.insights.explain`
+- `ponti.dashboard.summary`
+- `ponti.stock.summary`
+- `ponti.workorders.list`
+- `ponti.workorders.metrics`
+- `ponti.lots.summary`
+- `ponti.supplies.summary`
+- `ponti.reports.field_crop.summary`
+- `ponti.reports.investor_contribution.summary`
+- `ponti.reports.summary_results.summary`
+- `ponti.data_integrity.summary`
 
 Read tools are:
 
@@ -92,6 +110,9 @@ Governed preview tools:
 - `ponti.insight.resolve.prepare`
 - `ponti.workorder.draft.prepare`
 - `ponti.stock_adjustment.prepare`
+- `ponti.workorder_draft.create`
+- `ponti.insight_resolution.draft`
+- `ponti.stock_count.draft`
 
 Preview tools are:
 
@@ -99,30 +120,27 @@ Preview tools are:
 - `side_effect=true`
 - `risk_class=medium`
 - `governance.requires_approval=true`
-- `governance.action_type=agent.capability.invoke`
+- `governance.action_type` uses per-tool Nexus action types where available,
+  with `agent.capability.invoke` accepted only as transitional fallback by
+  verification code.
 - preview-only: they prepare proposals but do not mutate Ponti data.
 
-The broader target capabilities remain planned, not published in this cut:
-
-- `ponti.dashboard.summary`
-- `ponti.stock.summary`
-- `ponti.workorders.list`
-- `ponti.lots.summary`
-- `ponti.reports.summary`
-- `ponti.data_integrity.summary`
-
-Reason: the current Axis PontiConnector executes the three insight reads and
-the three governed preview actions. Publishing broader dashboard/stock/report
-tools before the connector can execute them would make the planner overpromise.
-
-Draft action contracts are published in the same `ponti.insights` manifest for
-the first connector cut because Axis currently discovers that manifest. If
-Ponti later publishes multiple manifests, Axis PontiConnector must expand
-discovery before Ponti splits these tools into a separate package.
+The published tools are covered by `POST /api/v1/capability-executions`; tests
+fail if a manifest tool is added without dispatcher support.
 
 ## Ponti Endpoints For Axis
 
 - `GET /api/v1/capabilities`
+- `POST /api/v1/capability-executions`
+
+`POST /api/v1/capability-executions` is the canonical Product Integration
+execution endpoint. It receives `capability_execution.v1`, validates tenant
+context and dispatches internally to existing Ponti handlers so business logic,
+workspace validation and governance stay in Ponti.
+
+Legacy direct product endpoints remain available temporarily for old smokes and
+rollback paths:
+
 - `GET /api/v1/insights`
 - `GET /api/v1/insights/summary`
 - `GET /api/v1/insights/:id/explain`
@@ -224,8 +242,9 @@ export PONTI_AXIS_API_KEY=local-dev-ponti-axis-api-key
 Axis Companion must be running with:
 
 ```bash
-PONTI_BASE_URL=$PONTI_BASE_URL
 PONTI_API_KEY=$PONTI_AXIS_API_KEY
+COMPANION_PRODUCT_CONNECTOR_GENERIC=true
+COMPANION_LEGACY_PONTI_CONNECTOR_ENABLED=false
 ```
 
 Register product + installation + refresh connector:
@@ -242,10 +261,10 @@ scripts/axis/smoke-ponti-axis-readonly.sh
 
 The smoke validates:
 
-- Ponti publishes `ponti.insights`.
-- Axis registers `ponti`.
+- Ponti publishes capability manifests.
+- Axis registers `ponti` through Product Registry.
 - Axis has an active installation for `PONTI_ORG_ID + ponti`.
-- Axis discovers the Ponti connector.
+- Axis discovers the generic ProductConnector for `ponti`.
 - Axis executes `ponti.insights.summary`.
 - Axis executes `ponti.insights.list`.
 - Execution evidence includes `product_surface=ponti`.

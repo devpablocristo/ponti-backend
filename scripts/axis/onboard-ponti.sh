@@ -97,7 +97,9 @@ axis_request PUT "/v1/product-installations/ponti?org_id=${PONTI_ORG_ID}" '{
   "secret_ref": "'"${PONTI_API_KEY_SECRET_REF}"'",
   "enabled": true,
   "config": {
-    "capabilities_path": "/api/v1/capabilities"
+    "connector_mode": "envelope.v1",
+    "discovery_path": "/api/v1/capabilities",
+    "execute_path": "/api/v1/capability-executions"
   }
 }' >/dev/null
 

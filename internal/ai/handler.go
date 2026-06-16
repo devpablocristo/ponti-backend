@@ -76,6 +76,7 @@ func (h *Handler) Routes() {
 	capabilities := r.Group(h.acf.APIBaseURL(), h.mws.GetValidation()...)
 	{
 		capabilities.GET("/capabilities", h.Capabilities)
+		capabilities.POST("/capability-executions", h.CapabilityExecution)
 	}
 
 	public := r.Group(baseURL, h.mws.GetValidation()...)

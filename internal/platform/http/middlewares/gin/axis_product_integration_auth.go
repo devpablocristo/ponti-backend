@@ -84,6 +84,7 @@ func axisProductIntegrationPath(c *gin.Context) bool {
 		path = c.Request.URL.Path
 	}
 	return path == "/api/v1/capabilities" ||
+		path == "/api/v1/capability-executions" ||
 		path == "/api/v1/insights" ||
 		path == "/api/v1/insights/summary" ||
 		(strings.HasPrefix(path, "/api/v1/insights/") && strings.HasSuffix(path, "/explain")) ||
