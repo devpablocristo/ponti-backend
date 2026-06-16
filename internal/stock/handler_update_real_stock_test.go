@@ -57,7 +57,10 @@ func TestHandler_UpdateRealStockRejectsStockFromOtherProject(t *testing.T) {
 	assert.False(t, fakeUC.updateCalled)
 }
 
-func TestHandler_UpdateRealStockUsesClientUpdatedAtForOptimisticLock(t *testing.T) {
+func TestHandler_UpdateRealStockIgnoresClientUpdatedAt(t *testing.T) {
+	// El stock de campo es un conteo manual (last-write-wins): el handler debe
+	// IGNORAR el updated_at del cliente y dejar UpdatedAt en zero para no activar
+	// el lock optimista del repositorio (que provocaba el guardado intermitente).
 	gin.SetMode(gin.TestMode)
 	serverVersion := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 	clientVersion := serverVersion.Add(-time.Minute)
@@ -83,7 +86,7 @@ func TestHandler_UpdateRealStockUsesClientUpdatedAtForOptimisticLock(t *testing.
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.True(t, fakeUC.updateCalled)
 	require.NotNil(t, fakeUC.updatedStock)
-	assert.True(t, fakeUC.updatedStock.UpdatedAt.Equal(clientVersion))
+	assert.True(t, fakeUC.updatedStock.UpdatedAt.IsZero())
 	assert.True(t, fakeUC.updatedStock.RealStockUnits.Equal(decimal.NewFromInt(7)))
 	assert.True(t, fakeUC.updatedStock.HasRealStockCount)
 	require.NotNil(t, fakeUC.updatedStock.UpdatedBy)

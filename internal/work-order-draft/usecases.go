@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	CreateWorkOrderDraft(context.Context, *domain.WorkOrderDraft) (int64, error)
 	CreateWorkOrderDraftBatch(context.Context, []*domain.WorkOrderDraft) ([]int64, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
+	GetProjectCampaignID(context.Context, int64) (*int64, error)
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
 	GetPendingLaborNameByID(context.Context, int64) (string, error)
 	GetLaborContractorByID(context.Context, int64) (string, error)
@@ -95,6 +96,14 @@ func (u *UseCases) CreateDigitalWorkOrderDraft(ctx context.Context, d *domain.Wo
 		d.Status = domain.StatusDraft
 	}
 
+	// La campaña la determina el proyecto (1:1), no el payload de mobile, que puede
+	// mandar una campaña errónea/inexistente y dejar el draft fuera de los listados.
+	campaignID, err := u.repo.GetProjectCampaignID(ctx, d.ProjectID)
+	if err != nil {
+		return 0, err
+	}
+	d.CampaignID = campaignID
+
 	number, err := u.resolveDigitalDraftNumber(ctx, d.ProjectID, strings.TrimSpace(d.Number))
 	if err != nil {
 		return 0, err
@@ -121,6 +130,12 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 	}
 
 	baseNumber, err := u.resolveDigitalDraftBatchBaseNumber(ctx, b.ProjectID, strings.TrimSpace(b.Number))
+	if err != nil {
+		return nil, err
+	}
+
+	// La campaña la determina el proyecto (1:1), no el payload de mobile.
+	campaignID, err := u.repo.GetProjectCampaignID(ctx, b.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +191,7 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			Date:           b.Date,
 			CustomerID:     b.CustomerID,
 			ProjectID:      b.ProjectID,
-			CampaignID:     b.CampaignID,
+			CampaignID:     campaignID,
 			FieldID:        b.FieldID,
 			LotID:          lot.LotID,
 			CropID:         b.CropID,
