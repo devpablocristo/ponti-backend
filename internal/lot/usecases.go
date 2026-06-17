@@ -23,6 +23,8 @@ type RepositoryPort interface {
 	GetLot(context.Context, int64) (*domain.Lot, error)
 	UpdateLot(context.Context, *domain.Lot) error
 	DeleteLot(context.Context, int64) error
+	ArchiveLot(context.Context, int64) error
+	RestoreLot(context.Context, int64) error
 	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	UpdateLotTons(context.Context, int64, decimal.Decimal) error
@@ -108,4 +110,12 @@ func (u *UseCases) ExportLots(ctx context.Context, filter domain.LotListFilter, 
 	}
 
 	return u.excel.Export(ctx, items)
+}
+
+func (u *UseCases) ArchiveLot(ctx context.Context, id int64) error {
+	return u.repo.ArchiveLot(ctx, id)
+}
+
+func (u *UseCases) RestoreLot(ctx context.Context, id int64) error {
+	return u.repo.RestoreLot(ctx, id)
 }

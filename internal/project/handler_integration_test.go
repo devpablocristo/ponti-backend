@@ -50,7 +50,8 @@ func (f *fakeUseCases) UpdateProject(_ context.Context, p *domain.Project) error
 	f.updatedProj = p
 	return f.updateErr
 }
-func (f *fakeUseCases) ArchiveProject(context.Context, int64) error { return nil }
+func (f *fakeUseCases) UpdateProjectName(context.Context, int64, string) error { return nil }
+func (f *fakeUseCases) ArchiveProject(context.Context, int64) error            { return nil }
 func (f *fakeUseCases) RestoreProject(context.Context, int64) error { return nil }
 func (f *fakeUseCases) DeleteProject(context.Context, int64) error  { return nil }
 
@@ -207,7 +208,9 @@ func TestUpdateProject_RejectsInvalidLeaseTypeDecimal(t *testing.T) {
 	}
 }
 
-func TestUpdateProject_RejectsMissingFieldInvestorsWithExplicitMessage(t *testing.T) {
+// Tras separar arrendatarios (field_lessees) de inversores, los inversores a nivel campo
+// dejaron de ser obligatorios: un campo sin investors ni lessees es un payload válido.
+func TestUpdateProject_AllowsFieldWithoutInvestorsOrLessees(t *testing.T) {
 	ucs := &fakeUseCases{}
 	router := setupProjectRouter(ucs)
 
@@ -249,13 +252,10 @@ func TestUpdateProject_RejectsMissingFieldInvestorsWithExplicitMessage(t *testin
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d. body=%s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d. body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), "investors is required") {
-		t.Fatalf("expected explicit missing field investors message, got body=%s", rr.Body.String())
-	}
-	if ucs.updateCalled {
-		t.Fatal("did not expect UpdateProject to be called on invalid payload")
+	if !ucs.updateCalled {
+		t.Fatal("expected UpdateProject to be called on valid payload")
 	}
 }

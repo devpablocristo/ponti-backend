@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	"github.com/devpablocristo/ponti-backend/internal/invoice/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/invoice/usecases/domain"
 	"gorm.io/gorm"
@@ -55,8 +56,15 @@ func (r *Repository) Create(ctx context.Context, item *domain.Invoice) (int64, e
 	}
 
 	m := models.FromDomain(item)
-	if err := r.db.Client().WithContext(ctx).Create(&m).Error; err != nil {
-		return 0, domainerr.Internal("fail to create invoice")
+	// Identity Gate: el biller (ex texto-libre `company`) se resuelve a actor y se estampa
+	// biller_actor_id en la misma tx. StampActor es no-op con el gate off (→ create simple).
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&m).Error; err != nil {
+			return domainerr.Internal("fail to create invoice")
+		}
+		return identity.StampActor(ctx, tx, identity.RoleBiller, "invoices", "biller_actor_id", item.Company, m.ID)
+	}); err != nil {
+		return 0, err
 	}
 	return m.ID, nil
 }
