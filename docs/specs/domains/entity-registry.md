@@ -87,9 +87,9 @@ Does not own:
 
 ## Migrations
 
-- `migrations_v4/000232_add_tenant_id_to_workspace_roots.up.sql` — adds `tenant_id` to `customers`, `campaigns`, `projects`; backfills from tenant `default`.
-- `migrations_v4/000233_add_tenant_lifecycle.up.sql` — tenant lifecycle support.
-- `migrations_v4/000234_unique_name_per_tenant_roots.up.sql` — unique index `(tenant_id, name)` on `customers` and `campaigns`, scoped per tenant.
+- `migrations_v4/000234_add_tenant_id_to_workspace_roots.up.sql` — adds `tenant_id` to `customers`, `campaigns`, `projects`; backfills from tenant `default`.
+- `migrations_v4/000235_add_tenant_lifecycle.up.sql` — tenant lifecycle support.
+- `migrations_v4/000236_unique_name_per_tenant_roots.up.sql` — unique index `(tenant_id, name)` on `customers` and `campaigns`, scoped per tenant.
 
 ## Evidence
 

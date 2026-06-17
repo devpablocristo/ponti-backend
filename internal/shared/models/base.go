@@ -51,7 +51,7 @@ var (
 // TenantEnforcementEnabled indica si el filtrado físico por tenant_id está
 // activo (flag de transición T1.e, env TENANT_ENFORCEMENT). Default false:
 // con él apagado el comportamiento es el actual (sin filtro de tenant) y NO se
-// referencia la columna tenant_id. Activar SOLO tras aplicar la migración 000232
+// referencia la columna tenant_id. Activar SOLO tras aplicar la migración 000234
 // y tener el dual-write de tenant_id en los creates.
 func TenantEnforcementEnabled() bool {
 	tenantEnforcementOnce.Do(func() {

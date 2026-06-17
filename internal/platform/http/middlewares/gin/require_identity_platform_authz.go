@@ -311,7 +311,7 @@ func loadMembershipPermissions(ctx context.Context, db *gorm.DB, tenantID uuid.U
 	}
 
 	// PARTE IV: tenant suspendido/archivado => denegar (gated por TENANT_ENFORCEMENT;
-	// requiere migración 000233 aplicada).
+	// requiere migración 000235 aplicada).
 	if sharedmodels.TenantEnforcementEnabled() {
 		active, err := tenantActive(ctx, db, tenantID)
 		if err != nil {

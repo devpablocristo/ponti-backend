@@ -87,9 +87,9 @@ Fuera de su responsabilidad:
 
 ## Migraciones relacionadas
 
-- `migrations_v4/000232_add_tenant_id_to_workspace_roots.up.sql` — agrega `tenant_id` a `customers`, `campaigns`, `projects`; backfill desde el tenant `default`.
-- `migrations_v4/000233_add_tenant_lifecycle.up.sql` — soporte de ciclo de vida por tenant.
-- `migrations_v4/000234_unique_name_per_tenant_roots.up.sql` — índice único `(tenant_id, name)` en `customers` y `campaigns`, acotado por tenant.
+- `migrations_v4/000234_add_tenant_id_to_workspace_roots.up.sql` — agrega `tenant_id` a `customers`, `campaigns`, `projects`; backfill desde el tenant `default`.
+- `migrations_v4/000235_add_tenant_lifecycle.up.sql` — soporte de ciclo de vida por tenant.
+- `migrations_v4/000236_unique_name_per_tenant_roots.up.sql` — índice único `(tenant_id, name)` en `customers` y `campaigns`, acotado por tenant.
 
 ## Evidencia de código
 
