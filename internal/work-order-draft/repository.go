@@ -9,6 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
@@ -27,6 +28,36 @@ type Repository struct {
 
 func NewRepository(db GormEngine) *Repository {
 	return &Repository{db: db}
+}
+
+// GetProjectCampaignID devuelve la campaña a la que pertenece el proyecto.
+// projects.campaign_id es la fuente de verdad (1 proyecto : 1 campaña); los
+// borradores digitales que llegan de mobile pueden traer una campaña errónea
+// o inexistente, así que el campaign_id del draft se deriva de acá y no del payload.
+func (r *Repository) GetProjectCampaignID(ctx context.Context, projectID int64) (*int64, error) {
+	var row struct {
+		CampaignID *int64
+	}
+	// Ownership-by-id: SIEMPRE acotado al tenant del caller (NO flag-gated), igual que
+	// registry/identity. identity.TenantFor devuelve el OrgID del ctx o el tenant 'default';
+	// projects está backfilleado a 'default' (migr 000234), así que con el flag off ambos lados
+	// coinciden y la lectura funciona, pero nunca devuelve la campaña de un project de otro tenant.
+	tenantID, err := identity.TenantFor(ctx, r.db.Client())
+	if err != nil {
+		return nil, types.NewError(types.ErrInternal, "failed to resolve tenant", err)
+	}
+	res := r.db.Client().WithContext(ctx).
+		Table("projects").
+		Select("campaign_id").
+		Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", projectID, tenantID).
+		Take(&row)
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return nil, types.NewError(types.ErrValidation, "project not found", res.Error)
+		}
+		return nil, types.NewError(types.ErrInternal, "failed to read project campaign", res.Error)
+	}
+	return row.CampaignID, nil
 }
 
 func (r *Repository) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {

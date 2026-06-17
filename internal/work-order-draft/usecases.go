@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	CreateWorkOrderDraft(context.Context, *domain.WorkOrderDraft) (int64, error)
 	CreateWorkOrderDraftBatch(context.Context, []*domain.WorkOrderDraft) ([]int64, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
+	GetProjectCampaignID(context.Context, int64) (*int64, error)
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
 	GetPendingLaborNameByID(context.Context, int64) (string, error)
 	GetLaborContractorByID(context.Context, int64) (string, error)
@@ -84,12 +85,29 @@ func (u *UseCases) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrder
 	return u.repo.CreateWorkOrderDraft(ctx, d)
 }
 
+// applyDigitalDraftInvariants es el ÚNICO punto que garantiza los invariantes de un draft
+// DIGITAL: marca IsDigital y deriva campaign_id del proyecto (1:1), en vez de confiar en el
+// payload de mobile (que puede traer una campaña errónea y dejar el draft fuera de los listados
+// filtrados por campaña → 400 en ResolveProjectIDs). TODO path de escritura digital (create,
+// batch, update single, update group) pasa por acá para que el invariante no pueda divergir.
+func (u *UseCases) applyDigitalDraftInvariants(ctx context.Context, d *domain.WorkOrderDraft) error {
+	d.IsDigital = true
+	campaignID, err := u.repo.GetProjectCampaignID(ctx, d.ProjectID)
+	if err != nil {
+		return err
+	}
+	d.CampaignID = campaignID
+	return nil
+}
+
 func (u *UseCases) CreateDigitalWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
 	if d == nil {
 		return 0, types.NewError(types.ErrValidation, "work order draft is nil", nil)
 	}
 
-	d.IsDigital = true
+	if err := u.applyDigitalDraftInvariants(ctx, d); err != nil {
+		return 0, err
+	}
 
 	if d.Status == "" {
 		d.Status = domain.StatusDraft
@@ -176,7 +194,6 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			Date:           b.Date,
 			CustomerID:     b.CustomerID,
 			ProjectID:      b.ProjectID,
-			CampaignID:     b.CampaignID,
 			FieldID:        b.FieldID,
 			LotID:          lot.LotID,
 			CropID:         b.CropID,
@@ -185,10 +202,13 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			EffectiveArea:  lot.EffectiveArea,
 			Observations:   b.Observations,
 			InvestorID:     b.InvestorID,
-			IsDigital:      true,
 			Status:         domain.StatusDraft,
 			Items:          items,
 			InvestorSplits: b.InvestorSplits,
+		}
+		// Invariante digital (IsDigital + campaña del proyecto) vía el chokepoint único.
+		if err := u.applyDigitalDraftInvariants(ctx, draft); err != nil {
+			return nil, err
 		}
 
 		if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
@@ -319,7 +339,11 @@ func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkO
 	}
 
 	if current.IsDigital || d.IsDigital {
-		d.IsDigital = true
+		// Cierra el path que faltaba: editar un draft digital por el endpoint singular también
+		// debe derivar la campaña del proyecto (antes tomaba campaign_id del payload → drift).
+		if err := u.applyDigitalDraftInvariants(ctx, d); err != nil {
+			return err
+		}
 
 		number, err := u.resolveDigitalDraftNumberForUpdate(ctx, d.ProjectID, d.ID, strings.TrimSpace(d.Number))
 		if err != nil {
@@ -373,7 +397,6 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			Date:           group.Date,
 			CustomerID:     group.CustomerID,
 			ProjectID:      group.ProjectID,
-			CampaignID:     group.CampaignID,
 			FieldID:        group.FieldID,
 			LotID:          lot.LotID,
 			CropID:         group.CropID,
@@ -382,10 +405,13 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			EffectiveArea:  lot.EffectiveArea,
 			Observations:   group.Observations,
 			InvestorID:     group.InvestorID,
-			IsDigital:      true,
 			Status:         domain.StatusDraft,
 			Items:          make([]domain.WorkOrderDraftItem, len(group.Items)),
 			InvestorSplits: group.InvestorSplits,
+		}
+		// Invariante digital (IsDigital + campaña del proyecto) vía el chokepoint único.
+		if err := u.applyDigitalDraftInvariants(ctx, draft); err != nil {
+			return err
 		}
 
 		for j, item := range group.Items {
