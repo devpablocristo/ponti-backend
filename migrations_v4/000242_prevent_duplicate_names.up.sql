@@ -70,10 +70,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.customers;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.campaigns;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.campaigns FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.managers;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.managers  FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.investors;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.investors FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.providers;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.providers FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
 
 COMMIT;

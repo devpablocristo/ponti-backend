@@ -2,7 +2,7 @@
 
 BEGIN;
 
-CREATE TABLE public.ai_decision_runs (
+CREATE TABLE IF NOT EXISTS public.ai_decision_runs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES public.auth_tenants(id) ON DELETE CASCADE,
     workspace_json jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -21,10 +21,10 @@ CREATE TABLE public.ai_decision_runs (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_ai_decision_runs_tenant_created
+CREATE INDEX IF NOT EXISTS idx_ai_decision_runs_tenant_created
     ON public.ai_decision_runs (tenant_id, created_at DESC);
 
-CREATE TABLE public.ai_decision_cards (
+CREATE TABLE IF NOT EXISTS public.ai_decision_cards (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES public.auth_tenants(id) ON DELETE CASCADE,
     decision_run_id uuid REFERENCES public.ai_decision_runs(id) ON DELETE SET NULL,
@@ -58,10 +58,10 @@ CREATE TABLE public.ai_decision_cards (
     CONSTRAINT ai_decision_cards_status_check CHECK (status IN ('open','accepted','drafted','dismissed','snoozed','resolved'))
 );
 
-CREATE INDEX idx_ai_decision_cards_tenant_status_seen
+CREATE INDEX IF NOT EXISTS idx_ai_decision_cards_tenant_status_seen
     ON public.ai_decision_cards (tenant_id, status, last_seen_at DESC);
 
-CREATE INDEX idx_ai_decision_cards_tenant_route
+CREATE INDEX IF NOT EXISTS idx_ai_decision_cards_tenant_route
     ON public.ai_decision_cards (tenant_id, route_hint, bucket);
 
 COMMIT;
