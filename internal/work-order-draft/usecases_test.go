@@ -53,11 +53,19 @@ func (r *testDraftRepo) ListPendingSupplyNamesByIDs(ctx context.Context, ids []i
 	return r.listPendingSupplyNamesFn(ctx, ids)
 }
 
+func (r *testDraftRepo) GetPendingLaborNameByID(ctx context.Context, laborID int64) (string, error) {
+    return "", nil
+}
+
 func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.Context, projectID int64, baseNumber string) ([]*domain.WorkOrderDraft, error) {
 	if r.listRelatedFn == nil {
 		return nil, nil
 	}
 	return r.listRelatedFn(ctx, projectID, baseNumber)
+}
+
+func (r *testDraftRepo) GetLaborContractorByID(ctx context.Context, laborID int64) (string, error) {
+    return "", nil
 }
 
 func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {

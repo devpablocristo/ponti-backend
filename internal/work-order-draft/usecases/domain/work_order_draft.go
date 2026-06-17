@@ -35,10 +35,12 @@ type WorkOrderDraft struct {
 	CropName             string
 	LaborID              int64
 	LaborName            string
+	LaborContractorName  string
 	Contractor           string
 	EffectiveArea        decimal.Decimal
 	Observations         string
 	InvestorID           int64
+	InvestorName 		 string
 	IsDigital            bool
 	Status               Status
 	ReviewedBy           *int64
@@ -75,18 +77,22 @@ type WorkOrderDraftListItem struct {
 }
 
 type WorkOrderDraftGroupListItem struct {
-	ID            int64
-	Number        string
-	Date          time.Time
-	ProjectID     int64
-	ProjectName   string
-	FieldID       int64
-	FieldName     string
-	IsDigital     bool
-	Status        Status
-	LotsCount     int64
-	EffectiveArea decimal.Decimal
-	Base          shareddomain.Base
+    ID            int64
+    Number        string
+    Date          time.Time
+    CustomerID    int64           // ← agregar
+    CustomerName  string          // ← agregar
+    ProjectID     int64
+    ProjectName   string
+    CampaignID    *int64          // ← agregar (puntero porque puede ser null)
+    CampaignName  string          // ← agregar
+    FieldID       int64
+    FieldName     string
+    IsDigital     bool
+    Status        Status
+    LotsCount     int64
+    EffectiveArea decimal.Decimal
+    Base          shareddomain.Base
 }
 
 type WorkOrderDraftBatchLotItem struct {
@@ -152,6 +158,7 @@ type WorkOrderDraftGroup struct {
 	EffectiveArea        decimal.Decimal
 	Observations         string
 	InvestorID           int64
+	InvestorName         string
 	IsDigital            bool
 	Status               Status
 	PublishedWorkOrderID *int64

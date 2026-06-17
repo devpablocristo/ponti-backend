@@ -26,6 +26,7 @@ type UseCasesPort interface {
 	CountWorkOrdersByLaborID(context.Context, int64) (int64, error)
 	ListLaborCategoriesByTypeID(context.Context, int64) ([]domain.LaborCategory, error)
 	ListLaborByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
+	CreatePendingLabor(context.Context, int64, string) (*domain.Labor, error)
 	ListGroupLaborByWorkOrder(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
 	ExportGroupLaborXLSX(context.Context, types.Input, int64, int64) ([]byte, error)
 	ExportAllGroupLabors(context.Context, int64) ([]byte, error)
@@ -80,6 +81,7 @@ func (h *Handler) Routes() {
 		projectLaborsGroup.GET("/:labor_id/workorders-count", h.CountWorkOrdersByLaborID)
 		projectLaborsGroup.GET("/labor-categories/:type_id", h.ListLaborCategories)
 		projectLaborsGroup.GET("/export", h.ExportProjectLabors)
+		projectLaborsGroup.POST("/pending", h.CreatePendingLabor)
 	}
 
 	// Endpoints de labores asociados a órdenes de trabajo y operaciones globales
@@ -92,6 +94,32 @@ func (h *Handler) Routes() {
 		workOrderLaborsGroup.GET("/export/all", h.ExportAllGroupLabors)
 		workOrderLaborsGroup.GET("/metrics", h.GetMetrics)
 	}
+}
+
+func (h *Handler) CreatePendingLabor(c *gin.Context) {
+    projectID, err := sharedhandlers.ParseParamID(c.Param("project_id"), "project_id")
+    if err != nil {
+        sharedhandlers.RespondError(c, err)
+        return
+    }
+
+    var req dto.PendingLaborRequest
+    if err := sharedhandlers.BindJSON(c, &req); err != nil {
+        return
+    }
+
+    labor, err := h.ucs.CreatePendingLabor(c.Request.Context(), projectID, req.Name)
+    if err != nil {
+        sharedhandlers.RespondError(c, err)
+        return
+    }
+
+    c.JSON(http.StatusCreated, dto.PendingLaborResponse{
+        ID:        labor.ID,
+        Name:      labor.Name,
+        IsPending: labor.IsPending,
+        Created:   true,
+    })
 }
 
 func (h *Handler) CreateLabor(c *gin.Context) {
