@@ -59,6 +59,27 @@ jobs:
           version: v2.11.4
           args: --timeout=5m
 
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check new migrations are idempotent
+        run: |
+          set -euo pipefail
+          base="refs/remotes/origin/${{ github.base_ref }}"
+          if ! git fetch --no-tags origin "${{ github.base_ref }}":"$base" 2>/dev/null; then
+            echo "Base ref ${{ github.base_ref }} no disponible; skip."; exit 0
+          fi
+          mapfile -t CHANGED < <(git diff --name-only --diff-filter=AM "$base...HEAD" -- 'migrations_v4/*.up.sql' || true)
+          if [ "${#CHANGED[@]}" -eq 0 ]; then
+            echo "Sin migraciones nuevas/modificadas."; exit 0
+          fi
+          bash scripts/check-migrations-idempotent.sh "${CHANGED[@]}"
+
   build:
     runs-on: ubuntu-latest
     steps:

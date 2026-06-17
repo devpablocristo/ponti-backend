@@ -39,6 +39,8 @@ type UseCasesPort interface {
 	GetMetrics(context.Context, int64, int64, int64) (*domain.LotMetrics, error)
 	ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error)
 	ExportLots(context.Context, domain.LotListFilter, int, int) ([]byte, error)
+	ArchiveLot(context.Context, int64) error
+	RestoreLot(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -88,6 +90,8 @@ func (h *Handler) Routes() {
 		public.GET("/:lot_id", h.GetLot)
 		public.PUT("/:lot_id", ValidateLotUpdate(), h.UpdateLot)
 		public.DELETE("/:lot_id", h.DeleteLot)
+		public.POST("/:lot_id/archive", h.ArchiveLot)
+		public.POST("/:lot_id/restore", h.RestoreLot)
 		public.GET("/export", h.ExportLots)
 	}
 }
@@ -305,4 +309,30 @@ func (h *Handler) ExportLots(c *gin.Context) {
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+func (h *Handler) ArchiveLot(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveLot(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreLot(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "lot_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreLot(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
 }

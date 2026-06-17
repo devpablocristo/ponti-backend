@@ -12,6 +12,8 @@ type RepositoryPort interface {
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
 	DeleteCategory(context.Context, int64) error
+	ArchiveCategory(context.Context, int64) error
+	RestoreCategory(context.Context, int64) error
 }
 
 type UseCases struct {
@@ -40,4 +42,12 @@ func (u *UseCases) UpdateCategory(ctx context.Context, c *domain.Category) error
 
 func (u *UseCases) DeleteCategory(ctx context.Context, id int64) error {
 	return u.repo.DeleteCategory(ctx, id)
+}
+
+func (u *UseCases) ArchiveCategory(ctx context.Context, id int64) error {
+	return u.repo.ArchiveCategory(ctx, id)
+}
+
+func (u *UseCases) RestoreCategory(ctx context.Context, id int64) error {
+	return u.repo.RestoreCategory(ctx, id)
 }

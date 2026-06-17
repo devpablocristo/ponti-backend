@@ -10,6 +10,7 @@ import (
 	sug "github.com/devpablocristo/ponti-backend/internal/platform/words-suggesters/trigram-search"
 
 	config "github.com/devpablocristo/ponti-backend/cmd/config"
+	actors "github.com/devpablocristo/ponti-backend/internal/actors"
 	admin "github.com/devpablocristo/ponti-backend/internal/admin"
 	ai "github.com/devpablocristo/ponti-backend/internal/ai"
 	bparams "github.com/devpablocristo/ponti-backend/internal/business-parameters"
@@ -31,6 +32,7 @@ import (
 	manager "github.com/devpablocristo/ponti-backend/internal/manager"
 	project "github.com/devpablocristo/ponti-backend/internal/project"
 	provider "github.com/devpablocristo/ponti-backend/internal/provider"
+	registry "github.com/devpablocristo/ponti-backend/internal/registry"
 	report "github.com/devpablocristo/ponti-backend/internal/report"
 	"github.com/devpablocristo/ponti-backend/internal/stock"
 	supply "github.com/devpablocristo/ponti-backend/internal/supply"
@@ -45,6 +47,7 @@ type Dependencies struct {
 	GormRepo                  *gorm.Repository
 	Middlewares               *mwr.Middlewares
 	WordsSuggester            *sug.WordsSuggester
+	ActorsHandler             *actors.Handler
 	CustomerHandler           *customer.Handler
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
@@ -56,6 +59,7 @@ type Dependencies struct {
 	ManagerHandler            *manager.Handler
 	ProjectHandler            *project.Handler
 	ProviderHandler           *provider.Handler
+	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
@@ -81,6 +85,7 @@ func Initialize() (*Dependencies, error) {
 		GinSet,
 		MiddlewareSet,
 		SuggesterSet,
+		ActorsSet,
 		CustomerSet,
 		CampaignSet,
 		DashboardSet,
@@ -94,6 +99,7 @@ func Initialize() (*Dependencies, error) {
 		ManagerSet,
 		ProviderSet,
 		ProjectSet,
+		RegistrySet,
 		ReportSet,
 		LeaseTypeSet,
 		SupplySet,

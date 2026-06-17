@@ -14,6 +14,13 @@ import (
 
 type UseCasesPort interface {
 	GetProviders(context.Context) ([]domain.Provider, error)
+	GetArchivedProviders(context.Context) ([]domain.Provider, error)
+	CreateProvider(context.Context, *domain.Provider) (int64, error)
+	GetProvider(context.Context, int64) (*domain.Provider, error)
+	UpdateProvider(context.Context, *domain.Provider) error
+	DeleteProvider(context.Context, int64) error
+	ArchiveProvider(context.Context, int64) error
+	RestoreProvider(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -40,6 +47,13 @@ func (h *Handler) Routes() {
 	publicGroup := r.Group(baseURL+"/providers", h.mws.GetValidation()...)
 	{
 		publicGroup.GET("", h.GetProviders)
+		publicGroup.POST("", h.CreateProvider)
+		publicGroup.GET("/archived", h.GetArchivedProviders)
+		publicGroup.GET("/:provider_id", h.GetProvider)
+		publicGroup.PUT("/:provider_id", h.UpdateProvider)
+		publicGroup.DELETE("/:provider_id", h.DeleteProvider)
+		publicGroup.POST("/:provider_id/archive", h.ArchiveProvider)
+		publicGroup.POST("/:provider_id/restore", h.RestoreProvider)
 	}
 }
 

@@ -21,6 +21,8 @@ type UseCasesPort interface {
 	CreateParameter(context.Context, *domain.BusinessParameter) (int64, error)
 	UpdateParameter(context.Context, *domain.BusinessParameter) error
 	DeleteParameter(context.Context, int64) error
+	ArchiveParameter(context.Context, int64) error
+	RestoreParameter(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -67,6 +69,8 @@ func (h *Handler) Routes() {
 		group.POST("", h.CreateParameter)
 		group.PUT("/:parameter_id", h.UpdateParameter)
 		group.DELETE("/:parameter_id", h.DeleteParameter)
+		group.POST("/:parameter_id/archive", h.ArchiveParameter)
+		group.POST("/:parameter_id/restore", h.RestoreParameter)
 	}
 }
 
@@ -163,6 +167,33 @@ func (h *Handler) DeleteParameter(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteParameter(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ArchiveParameter ejecuta soft delete (archivado) del business parameter.
+func (h *Handler) ArchiveParameter(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "parameter_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveParameter(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreParameter(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "parameter_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreParameter(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

@@ -10,6 +10,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -28,6 +29,9 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, f.ProjectID); err != nil {
+			return err
+		}
 		model := models.FromDomain(f)
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create field")
@@ -102,6 +106,9 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Field{}).
 		Where("id = ?", f.ID)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
 	if !f.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
 	}
@@ -121,14 +128,40 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	return nil
 }
 
+// UpdateFieldName actualiza únicamente el nombre del campo (edición desde el
+// catálogo/registry unificado), sin requerir el resto del payload (lease_type, lotes).
+func (r *Repository) UpdateFieldName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
+	result := updateTx.Updates(map[string]any{"name": name})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update field name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+	}
+	return nil
+}
+
 // DeleteField ejecuta un hard delete (permanente).
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	delTx := r.db.Client().WithContext(ctx).
 		Unscoped().
-		Delete(&models.Field{}, "id = ?", id)
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		delTx = delTx.Where(cond, args...)
+	}
+	result := delTx.Delete(&models.Field{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete field")
 	}
@@ -143,12 +176,31 @@ func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Field{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive field")
-	}
-	return nil
+	// 404 explícito si el field no existe o no es del tenant (cross-tenant). La existencia
+	// se chequea con Unscoped (incluye ya-archivados) para preservar la idempotencia
+	// (re-archivar ya archivado -> no-op 2xx). Con flag off TenantProjectScope es no-op,
+	// pero el chequeo de existencia sigue dando 404 para un field inexistente.
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existsQ := tx.Unscoped().Model(&models.Field{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
+		var count int64
+		if err := existsQ.Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check field existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+		}
+		archiveTx := tx.Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			archiveTx = archiveTx.Where(cond, args...)
+		}
+		if err := archiveTx.Delete(&models.Field{}).Error; err != nil {
+			return domainerr.Internal("failed to archive field")
+		}
+		return nil
+	})
 }
 
 // RestoreField restaura un registro previamente archivado.
@@ -156,13 +208,27 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Field{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore field")
-	}
-	return nil
+	// 404 explícito si el field no existe o no es del tenant (cross-tenant). Existencia con
+	// Unscoped → 404 sólo si realmente no existe; no-op idempotente si no estaba archivado.
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existsQ := tx.Unscoped().Model(&models.Field{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
+		var count int64
+		if err := existsQ.Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check field existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+		}
+		restoreTx := tx.Unscoped().Model(&models.Field{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			restoreTx = restoreTx.Where(cond, args...)
+		}
+		if err := restoreTx.Update("deleted_at", nil).Error; err != nil {
+			return domainerr.Internal("failed to restore field")
+		}
+		return nil
+	})
 }

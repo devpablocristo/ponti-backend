@@ -11,6 +11,10 @@ type Customer struct {
 	Name       string
 	ArchivedAt *time.Time
 
+	// TaxID es transitorio (no se persiste en customers): se pasa al Identity Gate
+	// para resolver/crear el actor por CUIT. La CUIT vive en actor_keys.
+	TaxID *string `json:"-"`
+
 	shareddomain.Base
 }
 

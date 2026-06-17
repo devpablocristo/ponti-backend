@@ -6,14 +6,16 @@ import (
 
 // CreateInvestorRequest es el DTO de entrada para crear un inversor.
 type CreateInvestorRequest struct {
-	Name       string `json:"name" binding:"required"`
-	Percentage int    `json:"percentage"`
+	Name       string  `json:"name" binding:"required"`
+	Percentage int     `json:"percentage"`
+	TaxID      *string `json:"tax_id"` // opcional: CUIT/CUIL para el Identity Gate
 }
 
 func (r *CreateInvestorRequest) ToDomain() *domain.Investor {
 	return &domain.Investor{
 		Name:       r.Name,
 		Percentage: r.Percentage,
+		TaxID:      r.TaxID,
 	}
 }
 
