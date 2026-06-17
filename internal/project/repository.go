@@ -22,6 +22,7 @@ import (
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -214,9 +215,7 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Where("deleted_at IS NULL")
 
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count projects")
@@ -421,9 +420,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	var m models.Project
 	q := r.db.Client().WithContext(ctx)
 	// T1.e: guard de ownership (flag-gated) — 404 si el project no es del tenant.
-	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	err := q.
 		Preload("Customer").
 		Preload("Campaign").
@@ -513,9 +510,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			Preload("Fields.Lots").
 			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		err := loadQ.First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFound("project not found or outdated")
@@ -631,9 +626,7 @@ func (r *Repository) UpdateProjectName(ctx context.Context, id int64, name strin
 		Model(&models.Project{}).
 		Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated).
-	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(map[string]any{
 		"name":       name,
 		"updated_by": userID,
@@ -665,9 +658,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 		var project models.Project
 		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
@@ -793,9 +784,7 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 		var project models.Project
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
@@ -898,9 +887,7 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 		var project models.Project
 		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
@@ -1122,9 +1109,7 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 	var existing manmod.Manager
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
 	mgrQ := tx.Where("normalize_name(name) = normalize_name(?)", m.Name)
-	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
-		mgrQ = mgrQ.Where("tenant_id = ?", orgID)
-	}
+	mgrQ = sharedfilters.ScopeTenant(tx.Statement.Context, mgrQ)
 	if err := mgrQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1158,9 +1143,7 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 	var existing invmod.Investor
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
 	invQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
-	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
-		invQ = invQ.Where("tenant_id = ?", orgID)
-	}
+	invQ = sharedfilters.ScopeTenant(tx.Statement.Context, invQ)
 	if err := invQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {

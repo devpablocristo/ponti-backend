@@ -87,3 +87,23 @@ func TestRestoreLot_ReactivatesArchived(t *testing.T) {
 		t.Fatalf("expected deleted_at NULL after restore, got %v", *deletedAt)
 	}
 }
+
+// Restaurar un lote que NO está archivado es un no-op (nil), NO 404: la existencia se
+// chequea con Unscoped, así que el lote existe; el Update no cambia nada.
+func TestRestoreLot_NotArchivedIsNoop(t *testing.T) {
+	db := newArchiveDB(t)
+	if err := db.Exec(`INSERT INTO lots (id, name, field_id) VALUES (1, 'L1', 1)`).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	repo := NewRepository(stubEngine{db: db})
+	if err := repo.RestoreLot(context.Background(), 1); err != nil {
+		t.Fatalf("restore de lote no-archivado debe ser no-op (nil), got %v", err)
+	}
+	var deletedAt *string
+	if err := db.Raw(`SELECT deleted_at FROM lots WHERE id = 1`).Scan(&deletedAt).Error; err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if deletedAt != nil {
+		t.Fatalf("expected deleted_at NULL (sin cambios), got %v", *deletedAt)
+	}
+}

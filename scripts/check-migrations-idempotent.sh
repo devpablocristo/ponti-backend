@@ -54,11 +54,14 @@ for f in "${files[@]}"; do
     done < <(grep -nEi '^[[:space:]]*CREATE[[:space:]]+(UNIQUE[[:space:]]+)?INDEX[[:space:]]+' "$f" | grep -viE 'IF[[:space:]]+NOT[[:space:]]+EXISTS')
   fi
 
-  # CREATE TRIGGER sin un DROP TRIGGER IF EXISTS en el archivo
-  if grep -qEi '^[[:space:]]*CREATE[[:space:]]+TRIGGER' "$f" \
-     && ! grep -qEi 'DROP[[:space:]]+TRIGGER[[:space:]]+IF[[:space:]]+EXISTS' "$f"; then
-    report "$f: CREATE TRIGGER sin 'DROP TRIGGER IF EXISTS' previo"
-  fi
+  # CREATE TRIGGER <name>: CADA trigger requiere su PROPIO 'DROP TRIGGER IF EXISTS <name>'
+  # (chequeo por nombre, no a nivel de archivo: un DROP de otro trigger no alcanza).
+  while IFS= read -r tname; do
+    [ -z "$tname" ] && continue
+    if ! grep -qEi "DROP[[:space:]]+TRIGGER[[:space:]]+IF[[:space:]]+EXISTS[[:space:]]+${tname}([[:space:]]|;|\$)" "$f"; then
+      report "$f: CREATE TRIGGER ${tname} sin 'DROP TRIGGER IF EXISTS ${tname}' previo"
+    fi
+  done < <(grep -oiE 'CREATE[[:space:]]+TRIGGER[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*' "$f" | sed -E 's/.*[[:space:]]//' | sort -u)
 done
 
 if [ "$violations" -gt 0 ]; then

@@ -53,25 +53,16 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 }
 
 func (r *Repository) ListLeaseTypes(ctx context.Context, status string, page, perPage int) ([]domain.LeaseType, int64, error) {
-	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
-	orgID, tenantScoped := sharedmodels.OrgIDFromContext(ctx)
-	tenantScoped = tenantScoped && sharedmodels.TenantEnforcementEnabled()
-
+	// T3 (Modelo 2): acotar al tenant activo (flag-gated) vía helper compartido.
 	var total int64
-	countTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), status)
-	if tenantScoped {
-		countTx = countTx.Where("tenant_id = ?", orgID)
-	}
+	countTx := sharedfilters.ScopeTenant(ctx, sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), status))
 	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count lease types")
 	}
 
 	var list []models.LeaseType
 	offset := (page - 1) * perPage
-	listTx := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx), status)
-	if tenantScoped {
-		listTx = listTx.Where("tenant_id = ?", orgID)
-	}
+	listTx := sharedfilters.ScopeTenant(ctx, sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx), status))
 	err := listTx.
 		Offset(offset).
 		Limit(perPage).
