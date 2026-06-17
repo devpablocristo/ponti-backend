@@ -128,6 +128,28 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	return nil
 }
 
+// UpdateFieldName actualiza únicamente el nombre del campo (edición desde el
+// catálogo/registry unificado), sin requerir el resto del payload (lease_type, lotes).
+func (r *Repository) UpdateFieldName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
+	result := updateTx.Updates(map[string]any{"name": name})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update field name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+	}
+	return nil
+}
+
 // DeleteField ejecuta un hard delete (permanente).
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {

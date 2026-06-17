@@ -152,6 +152,17 @@ func FromDomain(d *domain.Project) *Project {
 			})
 		}
 
+		for _, le := range f.Lessees {
+			m.Fields[key].FieldLessees = append(m.Fields[key].FieldLessees, fieldmod.FieldLessee{
+				ActorID:    le.ActorID,
+				Percentage: le.Percentage,
+				Base: sharedmodels.Base{
+					CreatedBy: d.CreatedBy,
+					UpdatedBy: d.UpdatedBy,
+				},
+			})
+		}
+
 		for _, l := range f.Lots {
 			m.Fields[key].Lots = append(m.Fields[key].Lots, lotmod.Lot{
 				ID:             l.ID,
@@ -247,6 +258,14 @@ func (m *Project) ToDomain() *domain.Project {
 					CreatedBy: fi.CreatedBy,
 					UpdatedBy: fi.UpdatedBy,
 				},
+			})
+		}
+
+		for _, le := range f.FieldLessees {
+			field.Lessees = append(field.Lessees, fielddom.Lessee{
+				ActorID:    le.ActorID,
+				Name:       le.Actor.DisplayName,
+				Percentage: le.Percentage,
 			})
 		}
 

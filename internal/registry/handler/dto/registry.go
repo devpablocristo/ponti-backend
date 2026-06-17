@@ -17,6 +17,7 @@ type rowResponse struct {
 	Tax        string   `json:"tax,omitempty"`
 	Roles      []string `json:"roles"`
 	Archived   bool     `json:"archived"`
+	Subtitle   string   `json:"subtitle,omitempty"`
 }
 
 type pageInfo struct {
@@ -32,6 +33,31 @@ type SearchResponse struct {
 	PageInfo pageInfo      `json:"page_info"`
 }
 
+// UsageItemResponse es un proyecto que usa una entidad del catálogo.
+type UsageItemResponse struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Customer string `json:"customer"`
+	Campaign string `json:"campaign"`
+}
+
+// UsageResponse es la lista de proyectos devuelta por GET /registry/usages.
+type UsageResponse struct {
+	Items []UsageItemResponse `json:"items"`
+	Total int                 `json:"total"`
+}
+
+// NewUsageResponse convierte el resultado de dominio al DTO HTTP.
+func NewUsageResponse(res domain.UsageResult) UsageResponse {
+	items := make([]UsageItemResponse, 0, len(res.Items))
+	for _, it := range res.Items {
+		items = append(items, UsageItemResponse{
+			ID: it.ID, Name: it.Name, Customer: it.Customer, Campaign: it.Campaign,
+		})
+	}
+	return UsageResponse{Items: items, Total: res.Total}
+}
+
 // NewSearchResponse arma la respuesta paginada desde el resultado de dominio.
 func NewSearchResponse(res domain.RegistryResult, page, perPage int) SearchResponse {
 	rows := make([]rowResponse, 0, len(res.Rows))
@@ -42,7 +68,7 @@ func NewSearchResponse(res domain.RegistryResult, page, perPage int) SearchRespo
 		}
 		rows = append(rows, rowResponse{
 			EntityType: r.EntityType, ID: r.ID, Name: r.Name,
-			Tax: r.Tax, Roles: roles, Archived: r.Archived,
+			Tax: r.Tax, Roles: roles, Archived: r.Archived, Subtitle: r.Subtitle,
 		})
 	}
 	maxPage := 1

@@ -438,6 +438,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 			return db.Order("id ASC")
 		}).
 		Preload("Fields.FieldInvestors.Investor").
+		Preload("Fields.FieldLessees.Actor").
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
@@ -508,6 +509,7 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			Preload("AdminCostInvestors.Investor").
 			Preload("Fields").
 			Preload("Fields.FieldInvestors.Investor").
+			Preload("Fields.FieldLessees").
 			Preload("Fields.Lots").
 			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
 		// T1.e: guard de ownership (flag-gated).
@@ -602,12 +604,48 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			return err
 		}
 
+		if err := relinkFieldLessees(tx, existing, d); err != nil {
+			return err
+		}
+
 		if err := relinkFieldsAndLots(tx, existing, m.Fields); err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+// UpdateProjectName actualiza únicamente el nombre del proyecto. Aislado del flujo
+// UpdateProject (que reconcilia toda la jerarquía) para soportar la edición desde el
+// catálogo/registry sin requerir el payload completo.
+func (r *Repository) UpdateProjectName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return err
+	}
+	userID, err := actorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Project{}).
+		Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		updateTx = updateTx.Where("tenant_id = ?", orgID)
+	}
+	result := updateTx.Updates(map[string]any{
+		"name":       name,
+		"updated_by": userID,
+		"updated_at": time.Now(),
+	})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update project name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project with id %d does not exist", id))
+	}
+	return nil
 }
 
 // ArchiveProject archiva (soft delete) un proyecto por ID.
@@ -1589,6 +1627,73 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					ef.ID, invID,
 				).Error; err != nil {
 					return domainerr.Internal("failed to remove field investor")
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// relinkFieldLessees sincroniza los arrendatarios de cada campo (tabla field_lessees).
+// Espejo de relinkFieldInvestors pero keyeado por actor_id y SIN ensure: el actor ya
+// existe en el registry (lo seleccionó el usuario), nunca se crea acá.
+func relinkFieldLessees(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	findDomainField := func(fid int64, fname string) *domainField.Field {
+		for i := range d.Fields {
+			if d.Fields[i].ID > 0 && d.Fields[i].ID == fid {
+				return &d.Fields[i]
+			}
+			if d.Fields[i].ID == 0 && d.Fields[i].Name == fname {
+				return &d.Fields[i]
+			}
+		}
+		return nil
+	}
+
+	for _, ef := range existing.Fields {
+		df := findDomainField(ef.ID, ef.Name)
+		if df == nil {
+			continue
+		}
+
+		existingActorIDs := make(map[int64]struct{}, len(ef.FieldLessees))
+		for _, fl := range ef.FieldLessees {
+			existingActorIDs[fl.ActorID] = struct{}{}
+		}
+
+		newIDs := make(map[int64]struct{}, len(df.Lessees))
+		for i := range df.Lessees {
+			le := &df.Lessees[i]
+			if le.ActorID == 0 {
+				continue // sin actor resuelto no se persiste (el front manda actores existentes)
+			}
+			newIDs[le.ActorID] = struct{}{}
+
+			if _, existed := existingActorIDs[le.ActorID]; !existed {
+				if err := tx.Exec(
+					`INSERT INTO field_lessees (field_id, actor_id, percentage, created_by, updated_by)
+					 VALUES (?, ?, ?, ?, ?)`,
+					ef.ID, le.ActorID, le.Percentage, d.UpdatedBy, d.UpdatedBy,
+				).Error; err != nil {
+					return domainerr.Internal("failed to add field lessee")
+				}
+			} else {
+				if err := tx.Exec(
+					"UPDATE field_lessees SET percentage = ?, updated_by = ? WHERE field_id = ? AND actor_id = ?",
+					le.Percentage, d.UpdatedBy, ef.ID, le.ActorID,
+				).Error; err != nil {
+					return domainerr.Internal("failed to update field lessee")
+				}
+			}
+		}
+
+		for actorID := range existingActorIDs {
+			if _, exists := newIDs[actorID]; !exists {
+				if err := tx.Exec(
+					`DELETE FROM field_lessees WHERE field_id = ? AND actor_id = ?`,
+					ef.ID, actorID,
+				).Error; err != nil {
+					return domainerr.Internal("failed to remove field lessee")
 				}
 			}
 		}

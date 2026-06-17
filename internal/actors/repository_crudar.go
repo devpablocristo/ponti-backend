@@ -150,12 +150,21 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 		if res.RowsAffected == 0 {
 			return domainerr.NotFound("actor not found")
 		}
-		return tx.Exec("UPDATE actor_keys SET active = false WHERE actor_id = ?", id).Error
+		if err := tx.Exec("UPDATE actor_keys SET active = false WHERE actor_id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to deactivate actor keys")
+		}
+		for _, tbl := range []string{"customers", "investors", "managers", "providers"} {
+			if err := tx.Exec("UPDATE "+tbl+" SET deleted_at = now() WHERE actor_id = ? AND deleted_at IS NULL", id).Error; err != nil {
+				return domainerr.Internal("failed to cascade archive to " + tbl)
+			}
+		}
+		return nil
 	})
 }
 
-// Restore reactiva el actor y sus claves. Si otra identidad activa ya tomó una de esas
-// claves, el índice único lo rechaza → 409.
+// Restore reactiva el actor y sus claves. Pre-chequea duplicados de CUIT/DNI y nombre
+// antes de intentar la reactivación, para devolver 409 con mensaje específico en vez de
+// confiar solo en que la violación de índice único se surfacee correctamente.
 func (r *Repository) Restore(ctx context.Context, id int64) error {
 	db := r.db.Client().WithContext(ctx)
 	tenantID, err := identity.TenantFor(ctx, db)
@@ -164,19 +173,76 @@ func (r *Repository) Restore(ctx context.Context, id int64) error {
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		var owner int64
-		if err := tx.Raw("SELECT id FROM actors WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL", id, tenantID).Scan(&owner).Error; err != nil {
+		if err := tx.Raw(
+			"SELECT id FROM actors WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL",
+			id, tenantID,
+		).Scan(&owner).Error; err != nil {
 			return domainerr.Internal("failed to restore actor")
 		}
 		if owner == 0 {
 			return domainerr.NotFound("archived actor not found")
 		}
+
+		// ── Pre-check CUIT/DNI ────────────────────────────────────────────────
+		// ¿Alguna clave TAX_ID de este actor archivado es hoy activa en otra identidad?
+		var taxConflict int64
+		if err := tx.Raw(`
+			SELECT count(*)
+			FROM actor_keys mine
+			JOIN actor_keys other
+			  ON other.tenant_id = mine.tenant_id
+			 AND other.key_type  = mine.key_type
+			 AND other.key_value = mine.key_value
+			 AND other.actor_id != mine.actor_id
+			 AND other.active = true
+			WHERE mine.actor_id = ? AND mine.key_type = 'TAX_ID'
+		`, id).Scan(&taxConflict).Error; err != nil {
+			return domainerr.Internal("failed to check tax_id conflict")
+		}
+		if taxConflict > 0 {
+			return domainerr.Conflict("ya existe un actor activo con ese CUIT/DNI")
+		}
+
+		// ── Pre-check nombre ──────────────────────────────────────────────────
+		// ¿Alguna clave de nombre (LEGAL_NAME / PERSON_NAME) ya la tiene otra identidad activa?
+		var nameConflict int64
+		if err := tx.Raw(`
+			SELECT count(*)
+			FROM actor_keys mine
+			JOIN actor_keys other
+			  ON other.tenant_id = mine.tenant_id
+			 AND other.key_type  = mine.key_type
+			 AND other.key_value = mine.key_value
+			 AND other.actor_id != mine.actor_id
+			 AND other.active = true
+			WHERE mine.actor_id = ? AND mine.key_type IN ('LEGAL_NAME', 'PERSON_NAME')
+		`, id).Scan(&nameConflict).Error; err != nil {
+			return domainerr.Internal("failed to check name conflict")
+		}
+		if nameConflict > 0 {
+			return domainerr.Conflict("ya existe un actor activo con ese nombre")
+		}
+
+		// ── Reactivar claves y actor ──────────────────────────────────────────
 		if err := tx.Exec("UPDATE actor_keys SET active = true WHERE actor_id = ?", id).Error; err != nil {
+			// Fallback por si hay race condition entre el pre-check y el UPDATE.
 			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("cannot restore: an active identity now uses one of its keys")
+				return domainerr.Conflict("ya existe un actor activo con ese CUIT/DNI o nombre")
 			}
 			return domainerr.Internal("failed to restore actor keys")
 		}
-		return tx.Exec("UPDATE actors SET deleted_at = NULL WHERE id = ?", id).Error
+		if err := tx.Exec("UPDATE actors SET deleted_at = NULL WHERE id = ?", id).Error; err != nil {
+			return domainerr.Internal("failed to restore actor")
+		}
+		for _, tbl := range []string{"customers", "investors", "managers", "providers"} {
+			if err := tx.Exec(
+				"UPDATE "+tbl+" SET deleted_at = NULL WHERE actor_id = ? AND deleted_at IS NOT NULL",
+				id,
+			).Error; err != nil {
+				return domainerr.Internal("failed to cascade restore to " + tbl)
+			}
+		}
+		return nil
 	})
 }
 

@@ -327,6 +327,48 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	})
 }
 
+// ArchiveLot ejecuta un soft delete (idempotente).
+func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
+		return err
+	}
+	archiveTx := r.db.Client().WithContext(ctx).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+		archiveTx = archiveTx.Where(cond, args...)
+	}
+	result := archiveTx.Delete(&models.Lot{})
+	if result.Error != nil {
+		return domainerr.Internal("failed to archive lot")
+	}
+	return nil
+}
+
+// RestoreLot restaura un registro previamente archivado.
+func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
+		return err
+	}
+	restoreTx := r.db.Client().WithContext(ctx).
+		Unscoped().
+		Model(&models.Lot{}).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+		restoreTx = restoreTx.Where(cond, args...)
+	}
+	result := restoreTx.Update("deleted_at", nil)
+	if result.Error != nil {
+		return domainerr.Internal("failed to restore lot")
+	}
+	return nil
+}
+
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
 	err := r.db.Client().WithContext(ctx).

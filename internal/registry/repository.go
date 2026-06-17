@@ -57,6 +57,7 @@ type regRow struct {
 	Tax        *string `gorm:"column:tax"`
 	Roles      string  `gorm:"column:roles"`
 	Archived   bool    `gorm:"column:archived"`
+	Subtitle   *string  `gorm:"column:subtitle"`
 }
 
 // SearchRegistry busca entidades (actores + catálogos) por nombre/alias/CUIT, filtrando por tipo y
@@ -101,24 +102,55 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 			roleClause = " AND EXISTS (SELECT 1 FROM actor_roles arr WHERE arr.actor_id = a.id AND arr.role = @role)"
 		}
 		sources = append(sources, `SELECT 'actor'::text AS entity_type, a.id AS id, a.display_name AS name,
-			(SELECT k.key_value FROM actor_keys k WHERE k.actor_id = a.id AND k.key_type = 'TAX_ID' AND k.active LIMIT 1) AS tax,
-			COALESCE((SELECT string_agg(ar.role, ',') FROM actor_roles ar WHERE ar.actor_id = a.id), '') AS roles,
-			(a.deleted_at IS NOT NULL) AS archived
-		FROM actors a
-		WHERE `+statusSQL("a")+tenantSQL("a")+` AND (
-			a.display_name ILIKE @like
-			OR EXISTS (SELECT 1 FROM actor_keys k2 WHERE k2.actor_id = a.id AND k2.active AND (
-				(k2.key_type IN ('LEGAL_NAME','PERSON_NAME','ALIAS') AND k2.key_value ILIKE @like)
-				OR (@hasdig AND k2.key_type = 'TAX_ID' AND k2.key_value LIKE @dig)
-			))
-		)`+roleClause)
+    (SELECT k.key_value FROM actor_keys k WHERE k.actor_id = a.id AND k.key_type = 'TAX_ID' AND k.active LIMIT 1) AS tax,
+    COALESCE((SELECT string_agg(ar.role, ',') FROM actor_roles ar WHERE ar.actor_id = a.id), '') AS roles,
+    (a.deleted_at IS NOT NULL) AS archived,
+    NULL::text AS subtitle
+FROM actors a
+WHERE `+statusSQL("a")+tenantSQL("a")+` AND (
+    a.display_name ILIKE @like
+    OR EXISTS (SELECT 1 FROM actor_keys k2 WHERE k2.actor_id = a.id AND k2.active AND (
+        (k2.key_type IN ('LEGAL_NAME','PERSON_NAME','ALIAS') AND k2.key_value ILIKE @like)
+        OR (@hasdig AND k2.key_type = 'TAX_ID' AND k2.key_value LIKE @dig)
+    ))
+)`+roleClause)
 	}
 
 	addCatalog := func(label, table string) {
 		sources = append(sources, `SELECT '`+label+`'::text AS entity_type, t.id AS id, t.name AS name,
-			NULL::text AS tax, ''::text AS roles, (t.deleted_at IS NOT NULL) AS archived
-		FROM `+table+` t
-		WHERE `+statusSQL("t")+tenantSQL("t")+` AND t.name ILIKE @like`)
+        NULL::text AS tax, ''::text AS roles, (t.deleted_at IS NOT NULL) AS archived,
+        NULL::text AS subtitle
+    FROM `+table+` t
+    WHERE `+statusSQL("t")+tenantSQL("t")+` AND t.name ILIKE @like`)
+	}
+
+	addProjectSource := func() {
+		sources = append(sources, `SELECT 'project'::text AS entity_type, p.id AS id, p.name AS name,
+        NULL::text AS tax, ''::text AS roles, (p.deleted_at IS NOT NULL) AS archived,
+        (c.name || ' · ' || cam.name)::text AS subtitle
+    FROM projects p
+    JOIN customers c ON c.id = p.customer_id
+    JOIN campaigns cam ON cam.id = p.campaign_id
+    WHERE `+statusSQL("p")+tenantSQL("p")+` AND p.name ILIKE @like`)
+	}
+
+	addFieldSource := func() {
+		sources = append(sources, `SELECT 'field'::text AS entity_type, f.id AS id, f.name AS name,
+        NULL::text AS tax, ''::text AS roles, (f.deleted_at IS NOT NULL) AS archived,
+        p.name::text AS subtitle
+    FROM fields f
+    JOIN projects p ON p.id = f.project_id
+    WHERE `+statusSQL("f")+tenantSQL("p")+` AND f.name ILIKE @like`)
+	}
+
+	addLotSource := func() {
+		sources = append(sources, `SELECT 'lot'::text AS entity_type, l.id AS id, l.name AS name,
+        NULL::text AS tax, ''::text AS roles, (l.deleted_at IS NOT NULL) AS archived,
+        (p.name || ' · ' || f.name)::text AS subtitle
+    FROM lots l
+    JOIN fields f ON f.id = l.field_id
+    JOIN projects p ON p.id = f.project_id
+    WHERE `+statusSQL("l")+tenantSQL("p")+` AND l.name ILIKE @like`)
 	}
 
 	if typ == "all" {
@@ -126,8 +158,20 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 		addCatalog("types", "types")
 		addCatalog("lease-types", "lease_types")
 		addCatalog("campaigns", "campaigns")
+		addProjectSource()
+		addFieldSource()
+		addLotSource()
 	} else if tbl, ok := catalogTables[typ]; ok {
 		addCatalog(typ, tbl)
+	} else {
+		switch typ {
+		case "project":
+			addProjectSource()
+		case "field":
+			addFieldSource()
+		case "lot":
+			addLotSource()
+		}
 	}
 
 	if len(sources) == 0 {
@@ -158,7 +202,7 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 		sql.Named("offset", (page-1)*perPage),
 	)
 	var raw []regRow
-	if err := db.Raw("SELECT entity_type, id, name, tax, roles, archived FROM ("+union+") u ORDER BY name ASC LIMIT @limit OFFSET @offset", listArgs...).Scan(&raw).Error; err != nil {
+	if err := db.Raw("SELECT entity_type, id, name, tax, roles, archived, subtitle FROM ("+union+") u ORDER BY name ASC LIMIT @limit OFFSET @offset", listArgs...).Scan(&raw).Error; err != nil {
 		return domain.RegistryResult{}, domainerr.Internal("failed to list registry")
 	}
 
@@ -172,12 +216,127 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 		if rr.Tax != nil {
 			tax = *rr.Tax
 		}
+		subtitle := ""
+		if rr.Subtitle != nil {
+			subtitle = *rr.Subtitle
+		}
 		rows = append(rows, domain.RegistryRow{
 			EntityType: rr.EntityType, ID: rr.ID, Name: rr.Name,
-			Tax: tax, Roles: roles, Archived: rr.Archived,
+			Tax: tax, Roles: roles, Archived: rr.Archived, Subtitle: subtitle,
 		})
 	}
+
 	return domain.RegistryResult{Rows: rows, Total: total}, nil
+}
+
+type usageRow struct {
+	ID       int64  `gorm:"column:id"`
+	Name     string `gorm:"column:name"`
+	Customer string `gorm:"column:customer"`
+	Campaign string `gorm:"column:campaign"`
+}
+
+// GetUsages devuelve los proyectos activos que referencian la entidad dada.
+// entity_type: "crops" | "lease-types" | "types" | "lot" | "field" | "project".
+// Máximo 100 resultados.
+func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64) (domain.UsageResult, error) {
+	db := r.db.Client().WithContext(ctx)
+	empty := domain.UsageResult{Items: []domain.UsageItem{}}
+
+	var q string
+	var args []any
+	switch entityType {
+	case "crops":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+			JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
+			WHERE (l.current_crop_id = ? OR l.previous_crop_id = ?)
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id, id}
+	case "lease-types":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+			WHERE f.lease_type_id = ?
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	case "types":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN workorders w ON w.project_id = p.id AND w.deleted_at IS NULL
+			JOIN workorder_items wi ON wi.workorder_id = w.id
+			JOIN supplies s ON s.id = wi.supply_id AND s.type_id = ?
+			WHERE p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	case "lot":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+			JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
+			WHERE l.id = ?
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	case "field":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+			WHERE f.id = ?
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	case "project":
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			WHERE p.id = ?
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	case "actor":
+		// Por ahora solo cubre el rol arrendatario (field_lessees); customer/investor/manager
+		// se resuelven en el BFF y contractor/provider/biller no tienen soporte aún.
+		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
+			FROM projects p
+			JOIN customers c ON c.id = p.customer_id
+			JOIN campaigns cam ON cam.id = p.campaign_id
+			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
+			JOIN field_lessees fl ON fl.field_id = f.id
+			WHERE fl.actor_id = ?
+			  AND p.deleted_at IS NULL
+			ORDER BY p.name LIMIT 100`
+		args = []any{id}
+	default:
+		return empty, nil
+	}
+
+	var raw []usageRow
+	if err := db.Raw(q, args...).Scan(&raw).Error; err != nil {
+		return empty, domainerr.Internal("failed to query usages")
+	}
+
+	items := make([]domain.UsageItem, 0, len(raw))
+	for _, rr := range raw {
+		items = append(items, domain.UsageItem{
+			ID: rr.ID, Name: rr.Name, Customer: rr.Customer, Campaign: rr.Campaign,
+		})
+	}
+	return domain.UsageResult{Items: items, Total: len(items)}, nil
 }
 
 // SetAliases reemplaza el conjunto de alias (actor_keys ALIAS) de un actor. Desactiva los que no

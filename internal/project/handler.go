@@ -28,6 +28,7 @@ type UseCasesPort interface {
 	GetFieldsByProjectID(ctx context.Context, projectID int64) ([]domainField.Field, error)
 	GetProject(context.Context, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
+	UpdateProjectName(context.Context, int64, string) error
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
 	DeleteProject(context.Context, int64) error
@@ -84,6 +85,7 @@ func (h *Handler) Routes() {
 		public.GET("/customers/:customer_id", h.ListProjectsByCustomerID)
 		public.GET("/:project_id", h.GetProject)
 		public.PUT("/:project_id", h.UpdateProject)
+		public.PATCH("/:project_id/name", h.UpdateProjectName)
 		public.POST("/:project_id/archive", h.ArchiveProject)
 		public.POST("/:project_id/restore", h.RestoreProject)
 		public.DELETE("/:project_id", h.DeleteProject)
@@ -240,6 +242,24 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 		UpdatedAt: *req.UpdatedAt,
 	}
 	if err := h.ucs.UpdateProject(c.Request.Context(), dom); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// UpdateProjectName actualiza solo el nombre del proyecto (edición desde el catálogo/registry).
+func (h *Handler) UpdateProjectName(c *gin.Context) {
+	id, err := sharedhandlers.ParseProjectIDParam(c, "project_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req dto.UpdateProjectNameRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+	if err := h.ucs.UpdateProjectName(c.Request.Context(), id, req.Name); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

@@ -75,7 +75,11 @@ func (r *Repository) loadActor(db *gorm.DB, id int64) (*domain.Actor, error) {
 		KeyType  string
 		KeyValue string
 	}
-	if err := db.Raw(`SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? AND active ORDER BY key_type`, id).Scan(&keys).Error; err != nil {
+	keysQuery := `SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? AND active ORDER BY key_type`
+	if a.DeletedAt.Valid {
+		keysQuery = `SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? ORDER BY key_type`
+	}
+	if err := db.Raw(keysQuery, id).Scan(&keys).Error; err != nil {
 		return nil, err
 	}
 	for _, k := range keys {
