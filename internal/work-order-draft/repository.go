@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	shareddomain "github.com/devpablocristo/ponti-backend/internal/shared/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
@@ -37,11 +38,14 @@ func (r *Repository) GetProjectCampaignID(ctx context.Context, projectID int64) 
 	var row struct {
 		CampaignID *int64
 	}
-	res := r.db.Client().WithContext(ctx).
+	// Ownership por tenant (flag-gated), igual que ResolveProjectIDs: con TENANT_ENFORCEMENT
+	// on, un caller no puede leer la campaña de un project de otro tenant.
+	q := r.db.Client().WithContext(ctx).
 		Table("projects").
 		Select("campaign_id").
-		Where("id = ? AND deleted_at IS NULL", projectID).
-		Take(&row)
+		Where("id = ? AND deleted_at IS NULL", projectID)
+	q = sharedfilters.ScopeTenant(ctx, q)
+	res := q.Take(&row)
 	if res.Error != nil {
 		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 			return nil, types.NewError(types.ErrValidation, "project not found", res.Error)

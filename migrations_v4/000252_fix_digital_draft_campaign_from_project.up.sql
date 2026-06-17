@@ -8,6 +8,7 @@ UPDATE public.work_order_drafts wod
 SET campaign_id = p.campaign_id
 FROM public.projects p
 WHERE p.id = wod.project_id
+  AND p.deleted_at IS NULL                       -- mismo criterio que GetProjectCampaignID (no toca drafts de projects borrados)
   AND wod.is_digital = true
   AND wod.deleted_at IS NULL
   AND wod.campaign_id IS DISTINCT FROM p.campaign_id;

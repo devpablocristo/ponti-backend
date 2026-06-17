@@ -380,6 +380,14 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
 	}
 
+	// La campaña la determina el proyecto (1:1), igual que en el create digital: NO confiar
+	// en group.CampaignID del payload. Si no, editar un draft digital reintroduce el drift
+	// que arregla el backfill 000252 y lo deja fuera de los listados filtrados por campaña.
+	campaignID, err := u.repo.GetProjectCampaignID(ctx, group.ProjectID)
+	if err != nil {
+		return err
+	}
+
 	drafts := make([]*domain.WorkOrderDraft, len(current.Lots))
 	for i, lot := range current.Lots {
 		draft := &domain.WorkOrderDraft{
@@ -388,7 +396,7 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			Date:           group.Date,
 			CustomerID:     group.CustomerID,
 			ProjectID:      group.ProjectID,
-			CampaignID:     group.CampaignID,
+			CampaignID:     campaignID,
 			FieldID:        group.FieldID,
 			LotID:          lot.LotID,
 			CropID:         group.CropID,
