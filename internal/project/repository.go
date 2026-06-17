@@ -656,7 +656,7 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var project models.Project
-		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
+		loadQ := tx.Unscoped().Select("id", "customer_id", "deleted_at").Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
 		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&project).Error; err != nil {
@@ -666,12 +666,9 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to load project")
 		}
 
-		var count int64
-		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return domainerr.Internal("failed to check project existence")
-		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
+		// Idempotente: si el proyecto ya está archivado, no-op.
+		if project.DeletedAt.Valid {
+			return nil
 		}
 
 		if deletedBy != nil {
@@ -792,8 +789,9 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to check project")
 		}
 
+		// Idempotente: si el proyecto ya está activo, no-op.
 		if !project.DeletedAt.Valid {
-			return domainerr.Validation("project is not deleted, cannot restore")
+			return nil
 		}
 
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)

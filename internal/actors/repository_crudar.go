@@ -2,6 +2,7 @@ package actors
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"gorm.io/gorm"
@@ -152,6 +153,19 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 		return err
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
+		// Contrato unificado (idempotente): 404 si no existe en el tenant; no-op si YA está
+		// archivado. Recién entonces corre la cascada de archivado.
+		var states []sql.NullTime
+		if err := tx.Raw("SELECT deleted_at FROM actors WHERE id = ? AND tenant_id = ?", id, tenantID).Scan(&states).Error; err != nil {
+			return domainerr.Internal("failed to load actor")
+		}
+		if len(states) == 0 {
+			return domainerr.NotFound("actor not found")
+		}
+		if states[0].Valid {
+			return nil // ya archivado → no-op
+		}
+
 		hasCustomer, err := r.actorHasCustomerRole(tx, id)
 		if err != nil {
 			return err
@@ -164,9 +178,6 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 		res := tx.Exec("UPDATE actors SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL", id, tenantID)
 		if res.Error != nil {
 			return domainerr.Internal("failed to archive actor")
-		}
-		if res.RowsAffected == 0 {
-			return domainerr.NotFound("actor not found")
 		}
 		if err := tx.Exec("UPDATE actor_keys SET active = false WHERE actor_id = ?", id).Error; err != nil {
 			return domainerr.Internal("failed to deactivate actor keys")
@@ -190,15 +201,17 @@ func (r *Repository) Restore(ctx context.Context, id int64) error {
 		return err
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
-		var owner int64
-		if err := tx.Raw(
-			"SELECT id FROM actors WHERE id = ? AND tenant_id = ? AND deleted_at IS NOT NULL",
-			id, tenantID,
-		).Scan(&owner).Error; err != nil {
-			return domainerr.Internal("failed to restore actor")
+		// Contrato unificado (idempotente): 404 si no existe en el tenant; no-op si YA está
+		// activo. Recién entonces corren los pre-checks y la reactivación.
+		var states []sql.NullTime
+		if err := tx.Raw("SELECT deleted_at FROM actors WHERE id = ? AND tenant_id = ?", id, tenantID).Scan(&states).Error; err != nil {
+			return domainerr.Internal("failed to load actor")
 		}
-		if owner == 0 {
-			return domainerr.NotFound("archived actor not found")
+		if len(states) == 0 {
+			return domainerr.NotFound("actor not found")
+		}
+		if !states[0].Valid {
+			return nil // ya activo → no-op
 		}
 
 		// ── Pre-check CUIT/DNI ────────────────────────────────────────────────

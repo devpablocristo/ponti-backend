@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
@@ -205,41 +204,22 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var customer models.Customer
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&customer).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
-			}
-			return domainerr.Internal("failed to get customer")
-		}
-		if customer.DeletedAt.Valid {
-			return domainerr.Conflict("customer already archived")
-		}
-
-		var activeProjects int64
-		if err := tx.Table("projects").
-			Where("customer_id = ? AND deleted_at IS NULL", id).
-			Count(&activeProjects).Error; err != nil {
-			return domainerr.Internal("failed to check active projects")
-		}
-		if activeProjects > 0 {
-			return domainerr.Conflict("customer has active projects")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.Customer{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive customer")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.Customer{}, id, "customer", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			// Guard preservado EXACTO: no archivar un customer con proyectos activos.
+			BeforeArchive: func(tx *gorm.DB) error {
+				var activeProjects int64
+				if err := tx.Table("projects").
+					Where("customer_id = ? AND deleted_at IS NULL", id).
+					Count(&activeProjects).Error; err != nil {
+					return domainerr.Internal("failed to check active projects")
+				}
+				if activeProjects > 0 {
+					return domainerr.Conflict("customer has active projects")
+				}
+				return nil
+			},
+		})
 	})
 }
 
@@ -247,32 +227,11 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "customer"); err != nil {
 		return err
 	}
-
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var customer models.Customer
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&customer).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
-			}
-			return domainerr.Internal("failed to get customer")
-		}
-		if !customer.DeletedAt.Valid {
-			return domainerr.Conflict("customer is not archived")
-		}
-
-		if err := tx.Unscoped().Model(&models.Customer{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			return domainerr.Internal("failed to restore customer")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Customer{}, id, "customer", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a customer with that name already exists; cannot restore",
+		})
 	})
 }
 

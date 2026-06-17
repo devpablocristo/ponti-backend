@@ -395,33 +395,14 @@ func (r *Repository) ArchiveSupply(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
-		var supply models.Supply
-		findTx := tx.Unscoped().Where("id = ?", id)
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			findTx = findTx.Where(cond, args...)
-		}
-		if err := findTx.First(&supply).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-			}
-			return domainerr.Internal("failed to get supply")
-		}
-		if supply.DeletedAt.Valid {
-			return domainerr.Conflict("supply already archived")
-		}
-
-		archiveTx := tx.Model(&models.Supply{}).
-			Where("id = ?", id)
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			archiveTx = archiveTx.Where(cond, args...)
-		}
-		if err := archiveTx.
-			Updates(map[string]any{
-				"deleted_at": time.Now(),
-			}).Error; err != nil {
-			return domainerr.Internal("failed to archive supply")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.Supply{}, id, "supply", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB {
+				if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+					return q.Where(cond, args...)
+				}
+				return q
+			},
+		})
 	})
 }
 
@@ -430,34 +411,14 @@ func (r *Repository) RestoreSupply(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.getDB(ctx).Transaction(func(tx *gorm.DB) error {
-		var supply models.Supply
-		findTx := tx.Unscoped().Where("id = ?", id)
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			findTx = findTx.Where(cond, args...)
-		}
-		if err := findTx.First(&supply).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
-			}
-			return domainerr.Internal("failed to get supply")
-		}
-		if !supply.DeletedAt.Valid {
-			return domainerr.Conflict("supply is not archived")
-		}
-
-		restoreTx := tx.Unscoped().Model(&models.Supply{}).
-			Where("id = ?", id)
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			restoreTx = restoreTx.Where(cond, args...)
-		}
-		if err := restoreTx.
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			return domainerr.Internal("failed to restore supply")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Supply{}, id, "supply", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB {
+				if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+					return q.Where(cond, args...)
+				}
+				return q
+			},
+		})
 	})
 }
 

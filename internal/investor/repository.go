@@ -169,29 +169,21 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	archiveTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
-	// T1.e: guard de ownership (flag-gated) — solo archiva si es del tenant.
-	archiveTx = sharedfilters.ScopeTenant(ctx, archiveTx)
-	result := archiveTx.Delete(&models.Investor{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive investor")
-	}
-	// Idempotente: si ya estaba archivado, RowsAffected == 0 es OK
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Investor{}, id, "investor", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
+	})
 }
 
 func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	restoreTx := r.db.Client().WithContext(ctx).Unscoped().
-		Model(&models.Investor{}).
-		Where("id = ?", id)
-	// T1.e: guard de ownership (flag-gated) — solo restaura si es del tenant.
-	restoreTx = sharedfilters.ScopeTenant(ctx, restoreTx)
-	result := restoreTx.Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore investor")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Investor{}, id, "investor", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "an investor with that name already exists; cannot restore",
+		})
+	})
 }

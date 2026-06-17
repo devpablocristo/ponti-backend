@@ -2,9 +2,7 @@ package crop
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -126,36 +124,19 @@ func (r *Repository) UpdateCrop(ctx context.Context, c *domain.Crop) error {
 	return nil
 }
 
+// scopeTenant acota un query al tenant activo (flag-gated), para pasar al helper de archive.
+func (r *Repository) scopeTenant(ctx context.Context) func(*gorm.DB) *gorm.DB {
+	return func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) }
+}
+
 func (r *Repository) ArchiveCrop(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var crop models.Crop
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&crop).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
-			}
-			return domainerr.Internal("failed to get crop")
-		}
-		if crop.DeletedAt.Valid {
-			return domainerr.Conflict("crop already archived")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.Crop{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive crop")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.Crop{}, id, "crop", sharedrepo.ArchiveOptions{
+			Scope: r.scopeTenant(ctx),
+		})
 	})
 }
 
@@ -163,37 +144,11 @@ func (r *Repository) RestoreCrop(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "crop"); err != nil {
 		return err
 	}
-
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var crop models.Crop
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&crop).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("crop %d not found", id))
-			}
-			return domainerr.Internal("failed to get crop")
-		}
-		if !crop.DeletedAt.Valid {
-			return domainerr.Conflict("crop is not archived")
-		}
-
-		// El trigger normalize_name (dedup) dispara en la reactivación y puede
-		// lanzar un unique-violation → mapear a Conflict.
-		if err := tx.Unscoped().Model(&models.Crop{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a crop with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore crop")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Crop{}, id, "crop", sharedrepo.ArchiveOptions{
+			Scope:              r.scopeTenant(ctx),
+			RestoreConflictMsg: "a crop with that name already exists; cannot restore",
+		})
 	})
 }
 
