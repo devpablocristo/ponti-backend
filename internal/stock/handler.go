@@ -218,10 +218,12 @@ func (h *Handler) UpdateRealStock(c *gin.Context) {
 	stockDomain.RealStockUnits = req.RealStockUnits
 	stockDomain.HasRealStockCount = true
 	stockDomain.UpdatedBy = &userID
+	// El "stock de campo" es un conteo manual de un solo campo: aplicamos
+	// last-write-wins. Dejamos UpdatedAt en zero para NO activar el lock
+	// optimista por updated_at en el repositorio (req.UpdatedAt podía no
+	// coincidir por precisión del timestamp o refrescos, y entonces el guardado
+	// fallaba con 409 de forma intermitente: "a veces lo toma y a veces no").
 	stockDomain.UpdatedAt = time.Time{}
-	if req.UpdatedAt != nil {
-		stockDomain.UpdatedAt = *req.UpdatedAt
-	}
 
 	err = h.ucs.UpdateRealStockUnits(ctx, stockID, stockDomain)
 	if err != nil {
