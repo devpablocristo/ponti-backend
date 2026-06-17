@@ -172,7 +172,7 @@ func (r *Repository) Archive(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to deactivate actor keys")
 		}
 		for _, tbl := range []string{"customers", "investors", "managers", "providers"} {
-			if err := tx.Exec("UPDATE "+tbl+" SET deleted_at = now() WHERE actor_id = ? AND deleted_at IS NULL", id).Error; err != nil {
+			if err := tx.Exec("UPDATE "+tbl+" SET deleted_at = CURRENT_TIMESTAMP WHERE actor_id = ? AND deleted_at IS NULL", id).Error; err != nil {
 				return domainerr.Internal("failed to cascade archive to " + tbl)
 			}
 		}

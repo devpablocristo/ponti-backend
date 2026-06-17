@@ -56,6 +56,18 @@ func newActorsRepositoryTestDB(t *testing.T) *gorm.DB {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			customer_id INTEGER NOT NULL,
 			deleted_at DATETIME);`,
+		`CREATE TABLE investors (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			actor_id INTEGER,
+			deleted_at DATETIME);`,
+		`CREATE TABLE managers (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			actor_id INTEGER,
+			deleted_at DATETIME);`,
+		`CREATE TABLE providers (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			actor_id INTEGER,
+			deleted_at DATETIME);`,
 	}
 	for _, s := range stmts {
 		if err := db.Exec(s).Error; err != nil {
