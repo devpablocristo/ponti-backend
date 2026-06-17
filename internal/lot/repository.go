@@ -327,46 +327,65 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	})
 }
 
-// ArchiveLot ejecuta un soft delete (idempotente).
+// ArchiveLot ejecuta un soft delete (idempotente). Verifica existencia (incluyendo
+// ya-archivados) acotada al tenant: 404 si el lote no existe o no es del tenant; no-op
+// idempotente si ya estaba archivado. (El guard anterior pasaba el lot id a un guard de
+// field —entidad equivocada— y no detectaba el lote inexistente → 204 silencioso.)
 func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
 	}
-	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
-		return err
-	}
-	archiveTx := r.db.Client().WithContext(ctx).
-		Where("id = ?", id)
-	if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
-		archiveTx = archiveTx.Where(cond, args...)
-	}
-	result := archiveTx.Delete(&models.Lot{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive lot")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existsQ := tx.Unscoped().Model(&models.Lot{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
+		var count int64
+		if err := existsQ.Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check lot existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
+		}
+		archiveTx := tx.Where("id = ?", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			archiveTx = archiveTx.Where(cond, args...)
+		}
+		if err := archiveTx.Delete(&models.Lot{}).Error; err != nil {
+			return domainerr.Internal("failed to archive lot")
+		}
+		return nil
+	})
 }
 
-// RestoreLot restaura un registro previamente archivado.
+// RestoreLot restaura un registro previamente archivado. Verifica existencia (incluyendo
+// ya-archivados) acotada al tenant: 404 si el lote no existe o no es del tenant; no-op
+// idempotente si no estaba archivado.
 func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
 		return err
 	}
-	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
-		return err
-	}
-	restoreTx := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Lot{}).
-		Where("id = ?", id)
-	if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
-		restoreTx = restoreTx.Where(cond, args...)
-	}
-	result := restoreTx.Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore lot")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existsQ := tx.Unscoped().Model(&models.Lot{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
+		var count int64
+		if err := existsQ.Count(&count).Error; err != nil {
+			return domainerr.Internal("failed to check lot existence")
+		}
+		if count == 0 {
+			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lot %d not found", id))
+		}
+		restoreTx := tx.Unscoped().Model(&models.Lot{}).Where("id = ?", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			restoreTx = restoreTx.Where(cond, args...)
+		}
+		if err := restoreTx.Update("deleted_at", nil).Error; err != nil {
+			return domainerr.Internal("failed to restore lot")
+		}
+		return nil
+	})
 }
 
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {

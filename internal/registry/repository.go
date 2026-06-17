@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	domain "github.com/devpablocristo/ponti-backend/internal/registry/usecases/domain"
-	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -61,7 +61,7 @@ type regRow struct {
 }
 
 // SearchRegistry busca entidades (actores + catálogos) por nombre/alias/CUIT, filtrando por tipo y
-// estado, paginado. Devuelve filas tipadas + total. Read-only, tenant-scoped (flag-gated).
+// estado, paginado. Devuelve filas tipadas + total. Read-only, tenant-scoped (siempre).
 func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, page, perPage int) (domain.RegistryResult, error) {
 	db := r.db.Client().WithContext(ctx)
 
@@ -70,10 +70,11 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 	hasDig := digits != ""
 	digPrefix := digits + "%"
 
-	scoped := false
-	var orgID uuid.UUID
-	if oid, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		scoped, orgID = true, oid
+	// Tenant de registro (OrgID del ctx o 'default'), igual que el paquete actors.
+	// El scoping por tenant es de OWNERSHIP: SIEMPRE se aplica, nunca gateado por el flag.
+	tenantID, err := identity.TenantFor(ctx, db)
+	if err != nil {
+		return domain.RegistryResult{}, err
 	}
 
 	statusSQL := func(alias string) string {
@@ -87,10 +88,7 @@ func (r *Repository) SearchRegistry(ctx context.Context, q, typ, status string, 
 		}
 	}
 	tenantSQL := func(alias string) string {
-		if scoped {
-			return " AND " + alias + ".tenant_id = @tenant"
-		}
-		return ""
+		return " AND " + alias + ".tenant_id = @tenant"
 	}
 
 	isRole := actorRoles[typ]
@@ -184,9 +182,7 @@ WHERE `+statusSQL("a")+tenantSQL("a")+` AND (
 		sql.Named("like", like),
 		sql.Named("hasdig", hasDig),
 		sql.Named("dig", digPrefix),
-	}
-	if scoped {
-		args = append(args, sql.Named("tenant", orgID))
+		sql.Named("tenant", tenantID),
 	}
 	if isRole {
 		args = append(args, sql.Named("role", typ))
@@ -325,6 +321,15 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 		return empty, nil
 	}
 
+	// Ownership: scopear por el tenant del project (SIEMPRE, no flag-gated). Todas las
+	// ramas usan el alias `p` (projects) y terminan en "ORDER BY p.name LIMIT 100".
+	tenantID, terr := identity.TenantFor(ctx, db)
+	if terr != nil {
+		return empty, terr
+	}
+	q = strings.Replace(q, "ORDER BY p.name LIMIT 100", "AND p.tenant_id = ? ORDER BY p.name LIMIT 100", 1)
+	args = append(args, tenantID)
+
 	var raw []usageRow
 	if err := db.Raw(q, args...).Scan(&raw).Error; err != nil {
 		return empty, domainerr.Internal("failed to query usages")
@@ -360,10 +365,11 @@ func (r *Repository) SetAliases(ctx context.Context, actorID int64, aliases []st
 		clean = append(clean, t)
 	}
 
-	scoped := false
-	var orgID uuid.UUID
-	if oid, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		scoped, orgID = true, oid
+	// Ownership: el actor debe pertenecer al tenant del caller. SIEMPRE se valida
+	// (no flag-gated): de lo contrario sería un IDOR de escritura cross-tenant.
+	tenantID, err := identity.TenantFor(ctx, db)
+	if err != nil {
+		return err
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -372,13 +378,8 @@ func (r *Repository) SetAliases(ctx context.Context, actorID int64, aliases []st
 			TenantID *uuid.UUID `gorm:"column:tenant_id"`
 		}
 		guard := tx.Raw(
-			"SELECT id, tenant_id FROM actors WHERE id = ? AND deleted_at IS NULL", actorID,
+			"SELECT id, tenant_id FROM actors WHERE id = ? AND deleted_at IS NULL AND tenant_id = ?", actorID, tenantID,
 		)
-		if scoped {
-			guard = tx.Raw(
-				"SELECT id, tenant_id FROM actors WHERE id = ? AND deleted_at IS NULL AND tenant_id = ?", actorID, orgID,
-			)
-		}
 		if err := guard.Scan(&row).Error; err != nil {
 			return domainerr.Internal("failed to load actor")
 		}
