@@ -251,7 +251,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
 			WHERE (l.current_crop_id = ? OR l.previous_crop_id = ?)
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id, id}
 	case "lease-types":
 		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
@@ -261,7 +261,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
 			WHERE f.lease_type_id = ?
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	case "types":
 		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
@@ -272,7 +272,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN workorder_items wi ON wi.workorder_id = w.id
 			JOIN supplies s ON s.id = wi.supply_id AND s.type_id = ?
 			WHERE p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	case "lot":
 		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
@@ -283,7 +283,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN lots l ON l.field_id = f.id AND l.deleted_at IS NULL
 			WHERE l.id = ?
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	case "field":
 		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
@@ -293,7 +293,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN fields f ON f.project_id = p.id AND f.deleted_at IS NULL
 			WHERE f.id = ?
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	case "project":
 		q = `SELECT DISTINCT p.id, p.name, c.name AS customer, cam.name AS campaign
@@ -302,7 +302,7 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN campaigns cam ON cam.id = p.campaign_id
 			WHERE p.id = ?
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	case "actor":
 		// Por ahora solo cubre el rol arrendatario (field_lessees); customer/investor/manager
@@ -315,19 +315,22 @@ func (r *Repository) GetUsages(ctx context.Context, entityType string, id int64)
 			JOIN field_lessees fl ON fl.field_id = f.id
 			WHERE fl.actor_id = ?
 			  AND p.deleted_at IS NULL
-			ORDER BY p.name LIMIT 100`
+			`
 		args = []any{id}
 	default:
 		return empty, nil
 	}
 
-	// Ownership: scopear por el tenant del project (SIEMPRE, no flag-gated). Todas las
-	// ramas usan el alias `p` (projects) y terminan en "ORDER BY p.name LIMIT 100".
+	// Ownership: scopear por el tenant del project (SIEMPRE, no flag-gated). Cada rama arma su
+	// WHERE entity-specific (terminando en `p.deleted_at IS NULL`); el predicado de tenant y el
+	// orden/límite comunes se agregan acá por construcción explícita — NO por reemplazo de un
+	// literal mágico, que un refactor de una rama podría romper en silencio dejando la query sin
+	// scope (fuga cross-tenant). El `?` de tenant queda al final, alineado con el append a args.
 	tenantID, terr := identity.TenantFor(ctx, db)
 	if terr != nil {
 		return empty, terr
 	}
-	q = strings.Replace(q, "ORDER BY p.name LIMIT 100", "AND p.tenant_id = ? ORDER BY p.name LIMIT 100", 1)
+	q += " AND p.tenant_id = ? ORDER BY p.name LIMIT 100"
 	args = append(args, tenantID)
 
 	var raw []usageRow
