@@ -11,6 +11,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
 	projectmod "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
@@ -89,9 +90,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 			mapProject[f.CampaignID] = f.ProjectID
 		}
 		fq := db.Where("id IN ?", ids)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			fq = fq.Where("tenant_id = ?", orgID)
-		}
+		fq = sharedfilters.ScopeTenant(ctx, fq)
 		if err := fq.Find(&raw).Error; err != nil {
 			return nil, domainerr.Internal("failed to fetch filtered campaigns")
 		}
@@ -107,9 +106,7 @@ func (r *Repository) ListCampaigns(ctx context.Context, customerID int64, projec
 
 	// Sin filtro
 	nq := db
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		nq = nq.Where("tenant_id = ?", orgID)
-	}
+	nq = sharedfilters.ScopeTenant(ctx, nq)
 	if err := nq.Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list campaigns")
 	}
@@ -124,9 +121,7 @@ func (r *Repository) GetCampaign(ctx context.Context, id int64) (*domain.Campaig
 	var m models.Campaign
 	q := r.db.Client().WithContext(ctx)
 	// T1.e: guard de ownership (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	err := q.First(&m, id).Error
 	if err != nil {
 		return nil, sharedrepo.HandleGormError(err, "campaign", id)

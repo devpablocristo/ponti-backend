@@ -11,6 +11,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/customer/usecases/domain"
 	identity "github.com/devpablocristo/ponti-backend/internal/identity"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
@@ -92,9 +93,7 @@ func (r *Repository) ListCustomers(ctx context.Context, page, perPage int) ([]do
 		Where("deleted_at IS NULL")
 
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 
 	// Conteo total
 	if err := db0.Count(&total).Error; err != nil {
@@ -132,9 +131,7 @@ func (r *Repository) ListArchivedCustomers(ctx context.Context, page, perPage in
 		Where("deleted_at IS NOT NULL")
 
 	// T1.e: acotar archivados al tenant activo (flag-gated) — antes era global.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count archived customers")
@@ -164,9 +161,7 @@ func (r *Repository) GetCustomer(ctx context.Context, id int64) (*domain.Custome
 	q := r.db.Client().WithContext(ctx).
 		Where("id = ? AND deleted_at IS NULL", id)
 	// T1.e: guard de ownership (flag-gated) — 404 si el customer no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	err := q.First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -191,9 +186,7 @@ func (r *Repository) UpdateCustomer(ctx context.Context, c *domain.Customer) err
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
 	}
 	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update customer")
@@ -215,9 +208,7 @@ func (r *Repository) ArchiveCustomer(ctx context.Context, id int64) error {
 		var customer models.Customer
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&customer).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
@@ -261,9 +252,7 @@ func (r *Repository) RestoreCustomer(ctx context.Context, id int64) error {
 		var customer models.Customer
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&customer).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("customer %d not found", id))
@@ -297,9 +286,7 @@ func (r *Repository) DeleteCustomer(ctx context.Context, id int64) error {
 		var count int64
 		existsQ := tx.Unscoped().Model(&models.Customer{}).Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			existsQ = existsQ.Where("tenant_id = ?", orgID)
-		}
+		existsQ = sharedfilters.ScopeTenant(ctx, existsQ)
 		if err := existsQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check customer existence")
 		}

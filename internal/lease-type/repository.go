@@ -11,6 +11,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -94,9 +95,7 @@ func (r *Repository) GetLeaseType(ctx context.Context, id int64) (*domain.LeaseT
 	var model models.LeaseType
 	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
 	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "lease type", id)
 	}
@@ -117,9 +116,7 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		updateTx = updateTx.Where("updated_at = ?", lt.UpdatedAt)
 	}
 	// T3 (Modelo 2): guard de ownership (flag-gated) — solo actualiza si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
 		if sharedrepo.IsUniqueViolation(result.Error) {
@@ -144,9 +141,7 @@ func (r *Repository) ArchiveLeaseType(ctx context.Context, id int64) error {
 		var leaseType models.LeaseType
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T3 (Modelo 2): guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&leaseType).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
@@ -180,9 +175,7 @@ func (r *Repository) RestoreLeaseType(ctx context.Context, id int64) error {
 		var leaseType models.LeaseType
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T3 (Modelo 2): guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&leaseType).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
@@ -217,9 +210,7 @@ func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
 	}
 	deleteTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
 	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.LeaseType{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete lease type")

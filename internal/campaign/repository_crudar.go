@@ -11,7 +11,7 @@ import (
 
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
-	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -21,9 +21,7 @@ func (r *Repository) GetArchivedCampaigns(ctx context.Context) ([]domain.Campaig
 	db0 := r.db.Client().WithContext(ctx).Unscoped().
 		Model(&models.Campaign{}).
 		Where("deleted_at IS NOT NULL")
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 	if err := db0.Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list archived campaigns")
 	}
@@ -45,9 +43,7 @@ func (r *Repository) UpdateCampaign(ctx context.Context, c *domain.Campaign) err
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Campaign{}).
 		Where("id = ?", c.ID)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(map[string]any{"name": c.Name, "updated_by": c.UpdatedBy})
 	if result.Error != nil {
 		if sharedrepo.IsUniqueViolation(result.Error) {
@@ -67,9 +63,7 @@ func (r *Repository) DeleteCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	deleteTx := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.Campaign{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete campaign")
@@ -88,9 +82,7 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var m models.Campaign
 		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&m).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
@@ -113,9 +105,7 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var m models.Campaign
 		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&m).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))

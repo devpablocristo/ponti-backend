@@ -12,6 +12,7 @@ import (
 	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -71,9 +72,7 @@ func (r *Repository) GetArchivedProviders(ctx context.Context) ([]domain.Provide
 	db0 := r.db.Client().WithContext(ctx).Unscoped().
 		Model(&models.Provider{}).
 		Where("deleted_at IS NOT NULL")
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 	if err := db0.Find(&providers).Error; err != nil {
 		return nil, domainerr.Internal("failed to list archived providers")
 	}
@@ -88,9 +87,7 @@ func (r *Repository) GetArchivedProviders(ctx context.Context) ([]domain.Provide
 func (r *Repository) GetProvider(ctx context.Context, id int64) (*domain.Provider, error) {
 	var model models.Provider
 	q := r.db.Client().WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider with id %d not found", id))
@@ -111,9 +108,7 @@ func (r *Repository) UpdateProvider(ctx context.Context, p *domain.Provider) err
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Provider{}).
 		Where("id = ?", p.ID)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(map[string]any{"name": p.Name, "updated_by": p.UpdatedBy})
 	if result.Error != nil {
 		if sharedrepo.IsUniqueViolation(result.Error) {
@@ -133,9 +128,7 @@ func (r *Repository) DeleteProvider(ctx context.Context, id int64) error {
 		return err
 	}
 	deleteTx := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.Provider{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete provider")
@@ -154,9 +147,7 @@ func (r *Repository) ArchiveProvider(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p models.Provider
 		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&p).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider %d not found", id))
@@ -179,9 +170,7 @@ func (r *Repository) RestoreProvider(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p models.Provider
 		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&p).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider %d not found", id))

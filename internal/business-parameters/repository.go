@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	"gorm.io/gorm"
@@ -32,9 +33,7 @@ func (r *Repository) GetByKey(ctx context.Context, key string) (*domain.Business
 	q := r.db.Client().WithContext(ctx).
 		Where("key = ?", key)
 	// T1.e: guard de ownership por identidad (flag-gated) — NotFound si la key no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	err := q.First(&m).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -53,9 +52,7 @@ func (r *Repository) ListByCategory(ctx context.Context, category string) ([]dom
 		Where("category = ?", category)
 
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		tx = tx.Where("tenant_id = ?", orgID)
-	}
+	tx = sharedfilters.ScopeTenant(ctx, tx)
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -75,9 +72,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]domain.BusinessParameter, e
 		Model(&models.BusinessParameter{})
 
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		tx = tx.Where("tenant_id = ?", orgID)
-	}
+	tx = sharedfilters.ScopeTenant(ctx, tx)
 
 	var rows []models.BusinessParameter
 	if err := tx.Find(&rows).Error; err != nil {
@@ -114,9 +109,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 		var count int64
 		existsQ := tx.Model(&models.BusinessParameter{}).Where("id = ?", item.ID)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			existsQ = existsQ.Where("tenant_id = ?", orgID)
-		}
+		existsQ = sharedfilters.ScopeTenant(ctx, existsQ)
 		if err := existsQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
@@ -131,9 +124,7 @@ func (r *Repository) Update(ctx context.Context, item *domain.BusinessParameter)
 			updateTx = updateTx.Where("updated_at = ?", item.UpdatedAt)
 		}
 		// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			updateTx = updateTx.Where("tenant_id = ?", orgID)
-		}
+		updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 		result := updateTx.Updates(map[string]any{
 			"key":         item.Key,
 			"value":       item.Value,
@@ -162,9 +153,7 @@ func (r *Repository) ArchiveParameter(ctx context.Context, id int64) error {
 		var param models.BusinessParameter
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&param).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", id))
@@ -198,9 +187,7 @@ func (r *Repository) RestoreParameter(ctx context.Context, id int64) error {
 		var param models.BusinessParameter
 		loadQ := tx.Unscoped().Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
 		if err := loadQ.First(&param).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("business parameter %d not found", id))
@@ -237,9 +224,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 		var count int64
 		existsQ := tx.Model(&models.BusinessParameter{}).Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			existsQ = existsQ.Where("tenant_id = ?", orgID)
-		}
+		existsQ = sharedfilters.ScopeTenant(ctx, existsQ)
 		if err := existsQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check existence")
 		}
@@ -249,9 +234,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 
 		delTx := tx.Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated) — solo borra si es del tenant.
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			delTx = delTx.Where("tenant_id = ?", orgID)
-		}
+		delTx = sharedfilters.ScopeTenant(ctx, delTx)
 		result := delTx.Delete(&models.BusinessParameter{})
 		if result.Error != nil {
 			return domainerr.Internal("failed to delete business parameter")

@@ -10,6 +10,7 @@ import (
 	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	models "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -82,9 +83,7 @@ func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]dom
 	var total int64
 	countTx := r.db.Client().WithContext(ctx).Model(&models.Manager{})
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		countTx = countTx.Where("tenant_id = ?", orgID)
-	}
+	countTx = sharedfilters.ScopeTenant(ctx, countTx)
 	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count managers")
 	}
@@ -96,9 +95,7 @@ func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]dom
 		Limit(perPage).
 		Order("id ASC")
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		listTx = listTx.Where("tenant_id = ?", orgID)
-	}
+	listTx = sharedfilters.ScopeTenant(ctx, listTx)
 	err := listTx.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list managers")
@@ -118,9 +115,7 @@ func (r *Repository) GetManager(ctx context.Context, id int64) (*domain.Manager,
 	var model models.Manager
 	q := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — 404 si el manager no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "manager", id)
 	}
@@ -141,9 +136,7 @@ func (r *Repository) UpdateManager(ctx context.Context, m *domain.Manager) error
 		updateTx = updateTx.Where("updated_at = ?", m.UpdatedAt)
 	}
 	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomain(m))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update manager")
@@ -166,9 +159,7 @@ func (r *Repository) DeleteManager(ctx context.Context, id int64) error {
 		Unscoped().
 		Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.Manager{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete manager")
@@ -187,9 +178,7 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 	archiveTx := r.db.Client().WithContext(ctx).
 		Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		archiveTx = archiveTx.Where("tenant_id = ?", orgID)
-	}
+	archiveTx = sharedfilters.ScopeTenant(ctx, archiveTx)
 	result := archiveTx.Delete(&models.Manager{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to archive manager")
@@ -207,9 +196,7 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 		Model(&models.Manager{}).
 		Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		restoreTx = restoreTx.Where("tenant_id = ?", orgID)
-	}
+	restoreTx = sharedfilters.ScopeTenant(ctx, restoreTx)
 	result := restoreTx.Update("deleted_at", nil)
 	if result.Error != nil {
 		return domainerr.Internal("failed to restore manager")
