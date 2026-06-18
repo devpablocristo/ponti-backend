@@ -2,7 +2,7 @@
 
 BEGIN;
 
-CREATE TABLE public.ai_governance_requests (
+CREATE TABLE IF NOT EXISTS public.ai_governance_requests (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES public.auth_tenants(id) ON DELETE CASCADE,
     nexus_request_id text NOT NULL,
@@ -32,10 +32,10 @@ CREATE TABLE public.ai_governance_requests (
     CONSTRAINT ai_governance_requests_origin_check CHECK (origin IN ('agent','watcher'))
 );
 
-CREATE INDEX idx_ai_governance_requests_tenant_status
+CREATE INDEX IF NOT EXISTS idx_ai_governance_requests_tenant_status
     ON public.ai_governance_requests (tenant_id, status);
 
-CREATE INDEX idx_ai_governance_requests_nexus_request
+CREATE INDEX IF NOT EXISTS idx_ai_governance_requests_nexus_request
     ON public.ai_governance_requests (nexus_request_id);
 
 COMMIT;

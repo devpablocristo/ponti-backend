@@ -2,7 +2,7 @@
 
 BEGIN;
 
-CREATE TABLE public.ai_action_drafts (
+CREATE TABLE IF NOT EXISTS public.ai_action_drafts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES public.auth_tenants(id) ON DELETE CASCADE,
     draft_type text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE public.ai_action_drafts (
     CONSTRAINT ai_action_drafts_status_check CHECK (status IN ('staged','applied','discarded'))
 );
 
-CREATE INDEX idx_ai_action_drafts_tenant_status
+CREATE INDEX IF NOT EXISTS idx_ai_action_drafts_tenant_status
     ON public.ai_action_drafts (tenant_id, status);
 
 COMMIT;

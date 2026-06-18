@@ -2,7 +2,7 @@
 
 BEGIN;
 
-CREATE TABLE public.ai_evidence_packs (
+CREATE TABLE IF NOT EXISTS public.ai_evidence_packs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid NOT NULL REFERENCES public.auth_tenants(id) ON DELETE CASCADE,
     nexus_request_id text NOT NULL,
