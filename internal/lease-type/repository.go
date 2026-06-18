@@ -2,9 +2,7 @@ package leasetype
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -129,31 +127,9 @@ func (r *Repository) ArchiveLeaseType(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var leaseType models.LeaseType
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T3 (Modelo 2): guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&leaseType).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
-			}
-			return domainerr.Internal("failed to get lease type")
-		}
-		if leaseType.DeletedAt.Valid {
-			return domainerr.Conflict("lease type already archived")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.LeaseType{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive lease type")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.LeaseType{}, id, "lease type", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -161,37 +137,11 @@ func (r *Repository) RestoreLeaseType(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
 		return err
 	}
-
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var leaseType models.LeaseType
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T3 (Modelo 2): guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&leaseType).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("lease type %d not found", id))
-			}
-			return domainerr.Internal("failed to get lease type")
-		}
-		if !leaseType.DeletedAt.Valid {
-			return domainerr.Conflict("lease type is not archived")
-		}
-
-		// La reactivación dispara el trigger de dedup normalize_name; un unique
-		// violation se mapea a 409 (no se puede restaurar por nombre duplicado).
-		if err := tx.Unscoped().Model(&models.LeaseType{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a lease type with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore lease type")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.LeaseType{}, id, "lease type", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a lease type with that name already exists; cannot restore",
+		})
 	})
 }
 

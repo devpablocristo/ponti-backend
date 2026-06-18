@@ -2,9 +2,7 @@ package category
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -146,31 +144,9 @@ func (r *Repository) ArchiveCategory(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var category models.Category
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&category).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
-			}
-			return domainerr.Internal("failed to get category")
-		}
-		if category.DeletedAt.Valid {
-			return domainerr.Conflict("category already archived")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.Category{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive category")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.Category{}, id, "category", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -180,34 +156,9 @@ func (r *Repository) RestoreCategory(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var category models.Category
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&category).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
-			}
-			return domainerr.Internal("failed to get category")
-		}
-		if !category.DeletedAt.Valid {
-			return domainerr.Conflict("category is not archived")
-		}
-
-		// El trigger de dedup (normalize_name) se dispara al reactivar y puede
-		// devolver un unique-violation → 409.
-		if err := tx.Unscoped().Model(&models.Category{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a category with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore category")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Category{}, id, "category", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a category with that name already exists; cannot restore",
+		})
 	})
 }

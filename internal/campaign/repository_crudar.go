@@ -2,9 +2,7 @@ package campaign
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"gorm.io/gorm"
@@ -80,20 +78,9 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var m models.Campaign
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&m).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
-			}
-			return domainerr.Internal("failed to get campaign")
-		}
-		if m.DeletedAt.Valid {
-			return domainerr.Conflict("campaign already archived")
-		}
-		return tx.Model(&models.Campaign{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": time.Now(), "deleted_by": gorm.Expr("NULL")}).Error
+		return sharedrepo.SoftArchive(ctx, tx, &models.Campaign{}, id, "campaign", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -103,25 +90,9 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var m models.Campaign
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&m).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
-			}
-			return domainerr.Internal("failed to get campaign")
-		}
-		if !m.DeletedAt.Valid {
-			return domainerr.Conflict("campaign is not archived")
-		}
-		if err := tx.Unscoped().Model(&models.Campaign{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": nil, "deleted_by": nil, "updated_at": time.Now()}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a campaign with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore campaign")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Campaign{}, id, "campaign", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a campaign with that name already exists; cannot restore",
+		})
 	})
 }

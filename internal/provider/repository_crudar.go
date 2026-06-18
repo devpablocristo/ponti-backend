@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"gorm.io/gorm"
@@ -145,20 +144,9 @@ func (r *Repository) ArchiveProvider(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var p models.Provider
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&p).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider %d not found", id))
-			}
-			return domainerr.Internal("failed to get provider")
-		}
-		if p.DeletedAt.Valid {
-			return domainerr.Conflict("provider already archived")
-		}
-		return tx.Model(&models.Provider{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": time.Now(), "deleted_by": gorm.Expr("NULL")}).Error
+		return sharedrepo.SoftArchive(ctx, tx, &models.Provider{}, id, "provider", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -168,25 +156,9 @@ func (r *Repository) RestoreProvider(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var p models.Provider
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
-		if err := loadQ.First(&p).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("provider %d not found", id))
-			}
-			return domainerr.Internal("failed to get provider")
-		}
-		if !p.DeletedAt.Valid {
-			return domainerr.Conflict("provider is not archived")
-		}
-		if err := tx.Unscoped().Model(&models.Provider{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": nil, "deleted_by": nil, "updated_at": time.Now()}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a provider with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore provider")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Provider{}, id, "provider", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a provider with that name already exists; cannot restore",
+		})
 	})
 }

@@ -317,30 +317,14 @@ func (r *Repository) ArchiveWorkOrder(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var wo models.WorkOrder
-		woQuery := tx.Unscoped().Preload("Items").Where("id = ?", id)
-		// Guard de tenant (flag-gated): si el WO no es del tenant -> NotFound.
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			woQuery = woQuery.Where(cond, args...)
-		}
-		if err := woQuery.First(&wo).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.NotFound("work order not found")
-			}
-			return domainerr.Internal("failed to get work order")
-		}
-		if wo.DeletedAt.Valid {
-			return domainerr.Conflict("work order already archived")
-		}
-
-		if err := tx.Model(&models.WorkOrder{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": time.Now(),
-			}).Error; err != nil {
-			return domainerr.Internal("failed to archive work order")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.WorkOrder{}, id, "work order", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB {
+				if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+					return q.Where(cond, args...)
+				}
+				return q
+			},
+		})
 	})
 }
 
@@ -349,31 +333,14 @@ func (r *Repository) RestoreWorkOrder(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var wo models.WorkOrder
-		woQuery := tx.Unscoped().Preload("Items").Where("id = ?", id)
-		// Guard de tenant (flag-gated): si el WO no es del tenant -> NotFound.
-		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-			woQuery = woQuery.Where(cond, args...)
-		}
-		if err := woQuery.First(&wo).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.NotFound("work order not found")
-			}
-			return domainerr.Internal("failed to get work order")
-		}
-		if !wo.DeletedAt.Valid {
-			return domainerr.Conflict("work order is not archived")
-		}
-
-		if err := tx.Unscoped().Model(&models.WorkOrder{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			return domainerr.Internal("failed to restore work order")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.WorkOrder{}, id, "work order", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB {
+				if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+					return q.Where(cond, args...)
+				}
+				return q
+			},
+		})
 	})
 }
 
