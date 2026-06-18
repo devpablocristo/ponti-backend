@@ -16,6 +16,7 @@ type UseCasesPort interface {
 	ListFields(ctx context.Context, page, perPage int) ([]domain.Field, int64, error)
 	GetField(ctx context.Context, id int64) (*domain.Field, error)
 	UpdateField(ctx context.Context, f *domain.Field) error
+	UpdateFieldName(ctx context.Context, id int64, name string) error
 	DeleteField(ctx context.Context, id int64) error
 	ArchiveField(ctx context.Context, id int64) error
 	RestoreField(ctx context.Context, id int64) error
@@ -63,6 +64,7 @@ func (h *Handler) Routes() {
 		public.GET("", h.ListFields)
 		public.GET("/:field_id", h.GetField)
 		public.PUT("/:field_id", h.UpdateField)
+		public.PATCH("/:field_id/name", h.UpdateFieldName)
 		public.DELETE("/:field_id", h.DeleteField)
 		public.POST("/:field_id/archive", h.ArchiveField)
 		public.POST("/:field_id/restore", h.RestoreField)
@@ -117,6 +119,24 @@ func (h *Handler) UpdateField(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.UpdateField(c.Request.Context(), req.ToDomain(id)); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// UpdateFieldName actualiza solo el nombre del campo (edición desde el catálogo/registry).
+func (h *Handler) UpdateFieldName(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "field_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	var req dto.UpdateFieldNameRequest
+	if err := sharedhandlers.BindJSON(c, &req); err != nil {
+		return
+	}
+	if err := h.ucs.UpdateFieldName(c.Request.Context(), id, req.Name); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

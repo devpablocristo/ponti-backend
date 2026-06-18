@@ -5,7 +5,7 @@ BEGIN;
 -- la unicidad la garantiza el ÍNDICE (no un trigger). Aditivo: NO toca tablas existentes.
 -- Track A (actores). Las claves duras (CUIT) + nombre legal viven en actor_keys.
 
-CREATE TABLE public.actors (
+CREATE TABLE IF NOT EXISTS public.actors (
 	id           bigserial PRIMARY KEY,
 	tenant_id    uuid NULL,                                   -- el resolver llena un tenant concreto (OrgID o 'default')
 	party_type   text NOT NULL DEFAULT 'unknown' CHECK (party_type IN ('org', 'person', 'unknown')),
@@ -18,10 +18,10 @@ CREATE TABLE public.actors (
 	created_by   text NULL,
 	updated_by   text NULL
 );
-CREATE INDEX idx_actors_tenant ON public.actors (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_actors_tenant ON public.actors (tenant_id);
 
 -- roles que juega cada actor (ATRIBUTO, no partición) → cross-rol unificado
-CREATE TABLE public.actor_roles (
+CREATE TABLE IF NOT EXISTS public.actor_roles (
 	actor_id   bigint NOT NULL REFERENCES public.actors(id) ON DELETE CASCADE,
 	role       text NOT NULL CHECK (role IN ('customer', 'provider', 'investor', 'manager', 'contractor', 'biller', 'lessee')),
 	created_at timestamptz NOT NULL DEFAULT now(),
@@ -29,7 +29,7 @@ CREATE TABLE public.actor_roles (
 );
 
 -- claves deduplicantes (la unicidad real vive acá, no en un trigger)
-CREATE TABLE public.actor_keys (
+CREATE TABLE IF NOT EXISTS public.actor_keys (
 	id         bigserial PRIMARY KEY,
 	actor_id   bigint NOT NULL REFERENCES public.actors(id) ON DELETE CASCADE,
 	tenant_id  uuid NULL,
@@ -44,9 +44,9 @@ CREATE TABLE public.actor_keys (
 -- (cross-rol unificado). Solo claves ACTIVAS → no obliga a limpiar históricos. El resolver
 -- llena tenant_id con un tenant CONCRETO (OrgID o el 'default'), así no hace falta COALESCE
 -- ni hardcodear el uuid del default (portable entre entornos).
-CREATE UNIQUE INDEX uq_actor_keys_active ON public.actor_keys (tenant_id, key_type, key_value) WHERE active;
-CREATE INDEX idx_actor_keys_actor ON public.actor_keys (actor_id);
-CREATE INDEX idx_actor_keys_trgm ON public.actor_keys USING gin (key_value gin_trgm_ops)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_actor_keys_active ON public.actor_keys (tenant_id, key_type, key_value) WHERE active;
+CREATE INDEX IF NOT EXISTS idx_actor_keys_actor ON public.actor_keys (actor_id);
+CREATE INDEX IF NOT EXISTS idx_actor_keys_trgm ON public.actor_keys USING gin (key_value gin_trgm_ops)
 	WHERE key_type IN ('LEGAL_NAME', 'PERSON_NAME', 'ALIAS');
 
 COMMIT;

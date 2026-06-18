@@ -2,16 +2,14 @@ package campaign
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"gorm.io/gorm"
 
 	models "github.com/devpablocristo/ponti-backend/internal/campaign/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/campaign/usecases/domain"
-	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -21,9 +19,7 @@ func (r *Repository) GetArchivedCampaigns(ctx context.Context) ([]domain.Campaig
 	db0 := r.db.Client().WithContext(ctx).Unscoped().
 		Model(&models.Campaign{}).
 		Where("deleted_at IS NOT NULL")
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 	if err := db0.Find(&raw).Error; err != nil {
 		return nil, domainerr.Internal("failed to list archived campaigns")
 	}
@@ -45,9 +41,7 @@ func (r *Repository) UpdateCampaign(ctx context.Context, c *domain.Campaign) err
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Campaign{}).
 		Where("id = ?", c.ID)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(map[string]any{"name": c.Name, "updated_by": c.UpdatedBy})
 	if result.Error != nil {
 		if sharedrepo.IsUniqueViolation(result.Error) {
@@ -67,9 +61,7 @@ func (r *Repository) DeleteCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	deleteTx := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.Campaign{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete campaign")
@@ -86,22 +78,9 @@ func (r *Repository) ArchiveCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var m models.Campaign
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&m).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
-			}
-			return domainerr.Internal("failed to get campaign")
-		}
-		if m.DeletedAt.Valid {
-			return domainerr.Conflict("campaign already archived")
-		}
-		return tx.Model(&models.Campaign{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": time.Now(), "deleted_by": gorm.Expr("NULL")}).Error
+		return sharedrepo.SoftArchive(ctx, tx, &models.Campaign{}, id, "campaign", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -111,27 +90,9 @@ func (r *Repository) RestoreCampaign(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var m models.Campaign
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&m).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("campaign %d not found", id))
-			}
-			return domainerr.Internal("failed to get campaign")
-		}
-		if !m.DeletedAt.Valid {
-			return domainerr.Conflict("campaign is not archived")
-		}
-		if err := tx.Unscoped().Model(&models.Campaign{}).Where("id = ?", id).
-			Updates(map[string]any{"deleted_at": nil, "deleted_by": nil, "updated_at": time.Now()}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a campaign with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore campaign")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Campaign{}, id, "campaign", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a campaign with that name already exists; cannot restore",
+		})
 	})
 }

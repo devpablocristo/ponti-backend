@@ -162,6 +162,17 @@ func GuardFieldForTenant(ctx context.Context, db *gorm.DB, fieldID int64) error 
 	return nil
 }
 
+// ScopeTenant acota q al tenant activo (tenant_id = OrgID) cuando TENANT_ENFORCEMENT está on
+// y hay OrgID en el ctx; si no, devuelve q sin cambios. Centraliza el idiom flag-gated que
+// estaba copiado en ~todos los repos de catálogo/master, para que el scoping no diverja por
+// copy-paste. Para chequeos de OWNERSHIP-by-id siempre-on, usar identity.TenantFor (no esto).
+func ScopeTenant(ctx context.Context, q *gorm.DB) *gorm.DB {
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		return q.Where("tenant_id = ?", orgID)
+	}
+	return q
+}
+
 // TenantProjectScope devuelve un predicado SQL (+args) para acotar mutaciones por-id
 // propio de entidades hijas con columna project_id (workorders/supplies/supply_movements/
 // fields) al tenant activo. ("", nil) si el flag está off → no se agrega filtro.

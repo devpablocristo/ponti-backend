@@ -18,6 +18,7 @@ type testDraftRepo struct {
 	createFn                     func(context.Context, *domain.WorkOrderDraft) (int64, error)
 	createBatchFn                func(context.Context, []*domain.WorkOrderDraft) ([]int64, error)
 	getByIDFn                    func(context.Context, int64) (*domain.WorkOrderDraft, error)
+	getProjectCampaignFn         func(context.Context, int64) (*int64, error)
 	listPendingSupplyNamesFn     func(context.Context, []int64) ([]string, error)
 	listRelatedFn                func(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	listFn                       func(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
@@ -46,6 +47,13 @@ func (r *testDraftRepo) GetWorkOrderDraftByID(ctx context.Context, id int64) (*d
 	return r.getByIDFn(ctx, id)
 }
 
+func (r *testDraftRepo) GetProjectCampaignID(ctx context.Context, projectID int64) (*int64, error) {
+	if r.getProjectCampaignFn == nil {
+		return nil, nil
+	}
+	return r.getProjectCampaignFn(ctx, projectID)
+}
+
 func (r *testDraftRepo) ListPendingSupplyNamesByIDs(ctx context.Context, ids []int64) ([]string, error) {
 	if r.listPendingSupplyNamesFn == nil {
 		return nil, nil
@@ -53,11 +61,19 @@ func (r *testDraftRepo) ListPendingSupplyNamesByIDs(ctx context.Context, ids []i
 	return r.listPendingSupplyNamesFn(ctx, ids)
 }
 
+func (r *testDraftRepo) GetPendingLaborNameByID(ctx context.Context, laborID int64) (string, error) {
+    return "", nil
+}
+
 func (r *testDraftRepo) ListRelatedDigitalWorkOrderDraftsByBaseNumber(ctx context.Context, projectID int64, baseNumber string) ([]*domain.WorkOrderDraft, error) {
 	if r.listRelatedFn == nil {
 		return nil, nil
 	}
 	return r.listRelatedFn(ctx, projectID, baseNumber)
+}
+
+func (r *testDraftRepo) GetLaborContractorByID(ctx context.Context, laborID int64) (string, error) {
+    return "", nil
 }
 
 func (r *testDraftRepo) ListWorkOrderDrafts(ctx context.Context, number string, status string, isDigital *bool, inp types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error) {
@@ -169,6 +185,36 @@ func TestCreateDigitalWorkOrderDraft_AssignsNextBaseNumber(t *testing.T) {
 	require.True(t, created.IsDigital)
 	require.Equal(t, domain.StatusDraft, created.Status)
 	require.Equal(t, "D-42", created.Number)
+}
+
+func TestCreateDigitalWorkOrderDraft_DerivesCampaignFromProject(t *testing.T) {
+	var created *domain.WorkOrderDraft
+	projectCampaign := int64(3)
+
+	repo := &testDraftRepo{
+		listOccupiedFn: func(ctx context.Context, projectID int64) ([]string, error) {
+			return nil, nil
+		},
+		getProjectCampaignFn: func(ctx context.Context, projectID int64) (*int64, error) {
+			return &projectCampaign, nil
+		},
+		createFn: func(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
+			created = d
+			return 1, nil
+		},
+	}
+
+	uc := NewUseCases(repo, &testPublisher{}, &testSupplyReader{})
+
+	draft := validDraft()
+	wrongCampaign := int64(12) // mobile manda una campaña equivocada/inexistente
+	draft.CampaignID = &wrongCampaign
+
+	_, err := uc.CreateDigitalWorkOrderDraft(context.Background(), draft)
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.NotNil(t, created.CampaignID)
+	require.Equal(t, projectCampaign, *created.CampaignID)
 }
 
 func TestCreateDigitalWorkOrderDraft_AssignsSplitNumberWhenBaseExists(t *testing.T) {

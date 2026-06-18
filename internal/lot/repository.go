@@ -327,6 +327,43 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 	})
 }
 
+// lotTenantScope acota el query a la entidad hija lot por su predicado de tenant (field_id).
+// lot no tiene tenant_id propio, así que NO usa ScopeTenant.
+func lotTenantScope(ctx context.Context) func(*gorm.DB) *gorm.DB {
+	return func(q *gorm.DB) *gorm.DB {
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			return q.Where(cond, args...)
+		}
+		return q
+	}
+}
+
+// ArchiveLot ejecuta un soft delete con la semántica unificada del helper compartido:
+// 404 si el lote no existe o no es del tenant; no-op idempotente si ya estaba archivado.
+func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Lot{}, id, "lot", sharedrepo.ArchiveOptions{
+			Scope: lotTenantScope(ctx),
+		})
+	})
+}
+
+// RestoreLot restaura un registro previamente archivado con la semántica unificada del helper
+// compartido: 404 si el lote no existe o no es del tenant; no-op idempotente si no estaba archivado.
+func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Lot{}, id, "lot", sharedrepo.ArchiveOptions{
+			Scope: lotTenantScope(ctx),
+		})
+	})
+}
+
 func (r *Repository) ListLotsByProject(ctx context.Context, projectID int64) ([]domain.Lot, error) {
 	var lots []models.Lot
 	err := r.db.Client().WithContext(ctx).

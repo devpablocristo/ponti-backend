@@ -2,8 +2,10 @@ package registry
 
 import (
 	"context"
+	"strconv"
 
 	ginmw "github.com/devpablocristo/platform/http/gin/go"
+	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/gin-gonic/gin"
 
 	dto "github.com/devpablocristo/ponti-backend/internal/registry/handler/dto"
@@ -14,6 +16,7 @@ import (
 type UseCasesPort interface {
 	SearchRegistry(ctx context.Context, q, typ, status string, page, perPage int) (domain.RegistryResult, error)
 	SetAliases(ctx context.Context, actorID int64, aliases []string) error
+	GetUsages(ctx context.Context, entityType string, id int64) (domain.UsageResult, error)
 }
 
 type GinEnginePort interface {
@@ -52,6 +55,7 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.Search)
+		public.GET("/usages", h.GetUsages)
 		public.PUT("/actors/:actor_id/aliases", h.SetActorAliases)
 	}
 }
@@ -69,6 +73,25 @@ func (h *Handler) Search(c *gin.Context) {
 		return
 	}
 	sharedhandlers.RespondOK(c, dto.NewSearchResponse(res, page, perPage))
+}
+
+// GetUsages (GET /registry/usages?entity_type=&id=) — proyectos que usan una entidad del catálogo.
+// Soporta entity_type: crops | lease-types | types | lot | field | project | actor (arrendatario,
+// vía field_lessees; el BFF resuelve customer/investor/manager por su cuenta).
+func (h *Handler) GetUsages(c *gin.Context) {
+	entityType := c.Query("entity_type")
+	idStr := c.Query("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		sharedhandlers.RespondError(c, domainerr.Validation("id must be a positive integer"))
+		return
+	}
+	res, err := h.ucs.GetUsages(c.Request.Context(), entityType, id)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondOK(c, dto.NewUsageResponse(res))
 }
 
 // SetActorAliases (PUT /registry/actors/:actor_id/aliases) — reemplaza el set de alias del actor.

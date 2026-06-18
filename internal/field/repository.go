@@ -128,6 +128,28 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	return nil
 }
 
+// UpdateFieldName actualiza únicamente el nombre del campo (edición desde el
+// catálogo/registry unificado), sin requerir el resto del payload (lease_type, lotes).
+func (r *Repository) UpdateFieldName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
+	result := updateTx.Updates(map[string]any{"name": name})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update field name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+	}
+	return nil
+}
+
 // DeleteField ejecuta un hard delete (permanente).
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
@@ -149,27 +171,27 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	return nil
 }
 
+// fieldScope acota el query al tenant/proyecto del caller (field es entidad hija,
+// sin tenant_id propio: usa el predicado project_id de TenantProjectScope).
+func fieldScope(ctx context.Context) func(*gorm.DB) *gorm.DB {
+	return func(q *gorm.DB) *gorm.DB {
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			return q.Where(cond, args...)
+		}
+		return q
+	}
+}
+
 // ArchiveField ejecuta un soft delete (idempotente).
 func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	// T-child: 404 explícito si el field no es del tenant (cross-tenant). Preserva la
-	// idempotencia para el propio tenant (re-archivar ya archivado -> no-op). Con flag off
-	// GuardFieldForTenant es no-op.
-	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
-		return err
-	}
-	archiveTx := r.db.Client().WithContext(ctx).
-		Where("id = ?", id)
-	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-		archiveTx = archiveTx.Where(cond, args...)
-	}
-	result := archiveTx.Delete(&models.Field{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive field")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Field{}, id, "field", sharedrepo.ArchiveOptions{
+			Scope: fieldScope(ctx),
+		})
+	})
 }
 
 // RestoreField restaura un registro previamente archivado.
@@ -177,21 +199,9 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	// T-child: 404 explícito si el field no es del tenant (cross-tenant). Preserva la
-	// idempotencia para el propio tenant. Con flag off GuardFieldForTenant es no-op.
-	if err := sharedfilters.GuardFieldForTenant(ctx, r.db.Client(), id); err != nil {
-		return err
-	}
-	restoreTx := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Field{}).
-		Where("id = ?", id)
-	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
-		restoreTx = restoreTx.Where(cond, args...)
-	}
-	result := restoreTx.Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore field")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Field{}, id, "field", sharedrepo.ArchiveOptions{
+			Scope: fieldScope(ctx),
+		})
+	})
 }

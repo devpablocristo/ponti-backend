@@ -73,8 +73,18 @@ type Field struct {
 	LeaseTypeID      int64            `json:"lease_type_id" binding:"required"`
 	LeaseTypePercent *decimal.Decimal `json:"lease_type_percent"`
 	LeaseTypeValue   *decimal.Decimal `json:"lease_type_value"`
-	Investors        []Investor       `json:"investors" binding:"required,dive,required"`
-	Lots             []Lot            `json:"lots" binding:"required,dive,required"`
+	// Investors a nivel campo quedó deprecado (el form ya no lo manda); opcional por
+	// compatibilidad. Los arrendatarios viven ahora en Lessees.
+	Investors []Investor `json:"investors" binding:"omitempty,dive"`
+	Lessees   []Lessee   `json:"lessees" binding:"omitempty,dive"`
+	Lots      []Lot      `json:"lots" binding:"required,dive,required"`
+}
+
+// Lessee = arrendatario del campo. ID = actor_id (encaja con el {id} del front).
+type Lessee struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Percentage int    `json:"percentage"`
 }
 
 // UnmarshalJSON tolera lease_type_percent/value como null, "", número o string numérico.
@@ -88,6 +98,7 @@ func (f *Field) UnmarshalJSON(data []byte) error {
 		LeaseTypePercent json.RawMessage `json:"lease_type_percent"`
 		LeaseTypeValue   json.RawMessage `json:"lease_type_value"`
 		Investors        []Investor      `json:"investors"`
+		Lessees          []Lessee        `json:"lessees"`
 		Lots             []Lot           `json:"lots"`
 	}
 
@@ -113,6 +124,7 @@ func (f *Field) UnmarshalJSON(data []byte) error {
 	f.LeaseTypePercent = leaseTypePercent
 	f.LeaseTypeValue = leaseTypeValue
 	f.Investors = aux.Investors
+	f.Lessees = aux.Lessees
 	f.Lots = aux.Lots
 
 	return nil
@@ -168,6 +180,7 @@ func (f Field) MarshalJSON() ([]byte, error) {
 		LeaseTypePercent *string    `json:"lease_type_percent"`
 		LeaseTypeValue   *string    `json:"lease_type_value"`
 		Investors        []Investor `json:"investors"`
+		Lessees          []Lessee   `json:"lessees"`
 		Lots             []Lot      `json:"lots"`
 	}{
 		ID:            f.ID,
@@ -176,6 +189,7 @@ func (f Field) MarshalJSON() ([]byte, error) {
 		LeaseTypeName: f.LeaseTypeName,
 		LeaseTypeID:   f.LeaseTypeID,
 		Investors:     f.Investors,
+		Lessees:       f.Lessees,
 		Lots:          f.Lots,
 	}
 
@@ -249,6 +263,13 @@ func (r *Project) ToDomain() *domain.Project {
 				ID:         fi.ID,
 				Name:       fi.Name,
 				Percentage: fi.Percentage,
+			})
+		}
+		for _, le := range f.Lessees {
+			fld.Lessees = append(fld.Lessees, fielddom.Lessee{
+				ActorID:    le.ID,
+				Name:       le.Name,
+				Percentage: le.Percentage,
 			})
 		}
 		for _, lt := range f.Lots {
@@ -335,6 +356,13 @@ func FromDomain(d *domain.Project) *Project {
 				Percentage: fi.Percentage,
 			})
 		}
+		for _, le := range fld.Lessees {
+			dtoF.Lessees = append(dtoF.Lessees, Lessee{
+				ID:         le.ActorID,
+				Name:       le.Name,
+				Percentage: le.Percentage,
+			})
+		}
 		r.Fields = append(r.Fields, dtoF)
 	}
 
@@ -352,6 +380,11 @@ func FieldsFromDomain(d fielddom.Field) Field {
 	for _, inv := range d.Investors {
 		r.Investors = append(r.Investors, Investor{
 			ID: inv.ID, Name: inv.Name, Percentage: inv.Percentage,
+		})
+	}
+	for _, le := range d.Lessees {
+		r.Lessees = append(r.Lessees, Lessee{
+			ID: le.ActorID, Name: le.Name, Percentage: le.Percentage,
 		})
 	}
 	for _, ld := range d.Lots {

@@ -14,8 +14,11 @@ BEGIN;
 --                                   unique exacto per-tenant (migr 236).
 
 -- Catálogos planos: trigger genérico (por nombre, per-tenant) de migr 240.
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.crops;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.crops       FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.types;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.types       FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.lease_types;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.lease_types FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_name();
 
 -- categories: dedup de nombre normalizado dentro de (tenant, type_id).
@@ -59,6 +62,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_prevent_dup_name ON public.categories;
 CREATE TRIGGER trg_prevent_dup_name BEFORE INSERT OR UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.prevent_duplicate_category_name();
 
 COMMIT;

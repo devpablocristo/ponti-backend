@@ -75,7 +75,11 @@ func (r *Repository) loadActor(db *gorm.DB, id int64) (*domain.Actor, error) {
 		KeyType  string
 		KeyValue string
 	}
-	if err := db.Raw(`SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? AND active ORDER BY key_type`, id).Scan(&keys).Error; err != nil {
+	keysQuery := `SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? AND active ORDER BY key_type`
+	if a.DeletedAt.Valid {
+		keysQuery = `SELECT key_type, key_value FROM actor_keys WHERE actor_id = ? ORDER BY key_type`
+	}
+	if err := db.Raw(keysQuery, id).Scan(&keys).Error; err != nil {
 		return nil, err
 	}
 	for _, k := range keys {
@@ -133,6 +137,11 @@ func (r *Repository) Resolve(ctx context.Context, in domain.ResolveInput) (domai
 				return domainerr.Conflict("an entity with that identity already exists")
 			}
 			return e
+		}
+		if role == identity.RoleCustomer {
+			if e := r.ensureLegacyCustomerForActor(ctx, tx, rr.ActorID); e != nil {
+				return e
+			}
 		}
 		a, e := r.loadActor(tx, rr.ActorID)
 		if e != nil {

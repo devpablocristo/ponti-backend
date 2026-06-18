@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	ListByWorkOrder(context.Context, int64) ([]domain.LaborRawItem, error)
 	ListGroupLabor(context.Context, types.Input, int64, int64) ([]domain.LaborListItem, types.PageInfo, error)
 	ListAllGroupLabor(context.Context) ([]domain.LaborRawItem, error)
+	CreatePendingLabor(context.Context, int64, string) (int64, error)
 	GetMetrics(context.Context, domain.LaborFilter) (*domain.LaborMetrics, error)
 	GetLabor(context.Context, int64) (*domain.Labor, error)
 	ExistsLaborByProjectAndName(context.Context, int64, string) (bool, error)
@@ -46,7 +47,18 @@ func NewUseCases(repo RepositoryPort, excel ExporterAdapterPort, projectUC Proje
 	return &UseCases{repo: repo, excel: excel, projectUC: projectUC}
 }
 
-
+func (u *UseCases) CreatePendingLabor(ctx context.Context, projectID int64, name string) (*domain.Labor, error) {
+    id, err := u.repo.CreatePendingLabor(ctx, projectID, name)
+    if err != nil {
+        return nil, err
+    }
+    return &domain.Labor{
+        ID:        id,
+        Name:      name,
+        ProjectId: projectID,
+        IsPending: true,
+    }, nil
+}
 
 func (u *UseCases) CreateLabor(ctx context.Context, labor *domain.Labor) (int64, error) {
 	if labor == nil {

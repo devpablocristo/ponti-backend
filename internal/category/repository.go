@@ -2,15 +2,14 @@ package category
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/category/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/category/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -56,9 +55,7 @@ func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]d
 
 	countTx := r.db.Client().WithContext(ctx).Model(&models.Category{})
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		countTx = countTx.Where("tenant_id = ?", orgID)
-	}
+	countTx = sharedfilters.ScopeTenant(ctx, countTx)
 	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count categories")
 	}
@@ -70,9 +67,7 @@ func (r *Repository) ListCategories(ctx context.Context, page, perPage int) ([]d
 		Limit(perPage).
 		Order("id ASC")
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		listTx = listTx.Where("tenant_id = ?", orgID)
-	}
+	listTx = sharedfilters.ScopeTenant(ctx, listTx)
 	err := listTx.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list categories")
@@ -92,9 +87,7 @@ func (r *Repository) GetCategory(ctx context.Context, id int64) (*domain.Categor
 	var model models.Category
 	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — NotFound si la category no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "category", id)
 	}
@@ -115,9 +108,7 @@ func (r *Repository) UpdateCategory(ctx context.Context, c *domain.Category) err
 		updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
 	}
 	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomain(c))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update category")
@@ -137,9 +128,7 @@ func (r *Repository) DeleteCategory(ctx context.Context, id int64) error {
 	}
 	deleteTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — solo borra si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-	}
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 	result := deleteTx.Delete(&models.Category{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete category")
@@ -155,33 +144,9 @@ func (r *Repository) ArchiveCategory(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var category models.Category
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&category).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
-			}
-			return domainerr.Internal("failed to get category")
-		}
-		if category.DeletedAt.Valid {
-			return domainerr.Conflict("category already archived")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.Category{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive category")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.Category{}, id, "category", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -191,36 +156,9 @@ func (r *Repository) RestoreCategory(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var category models.Category
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&category).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("category %d not found", id))
-			}
-			return domainerr.Internal("failed to get category")
-		}
-		if !category.DeletedAt.Valid {
-			return domainerr.Conflict("category is not archived")
-		}
-
-		// El trigger de dedup (normalize_name) se dispara al reactivar y puede
-		// devolver un unique-violation → 409.
-		if err := tx.Unscoped().Model(&models.Category{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a category with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore category")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.Category{}, id, "category", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a category with that name already exists; cannot restore",
+		})
 	})
 }

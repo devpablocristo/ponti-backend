@@ -166,9 +166,7 @@ func ensureProvider(tx *gorm.DB, i *providermodel.Provider) (int64, error) {
 	var existing providermodel.Provider
 	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
 	provQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
-	if orgID, ok := sharedmodels.OrgIDFromContext(tx.Statement.Context); ok && sharedmodels.TenantEnforcementEnabled() {
-		provQ = provQ.Where("tenant_id = ?", orgID)
-	}
+	provQ = sharedfilters.ScopeTenant(tx.Statement.Context, provQ)
 	if err := provQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -566,9 +564,7 @@ func (r *Repository) GetProviders(ctx context.Context) ([]providerdomain.Provide
 	var providers []providermodel.Provider
 	db0 := r.getDB(ctx).Model(&providermodel.Provider{})
 	// T3 (Modelo 2): acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 	if err := db0.Find(&providers).Error; err != nil {
 		return nil, domainerr.Internal("failed to list providers")
 	}

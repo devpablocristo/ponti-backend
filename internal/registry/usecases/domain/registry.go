@@ -9,10 +9,25 @@ type RegistryRow struct {
 	Tax        string   // CUIT/CUIL/DNI (solo actores)
 	Roles      []string // solo actores
 	Archived   bool
+	Subtitle   string
 }
 
 // RegistryResult es una página de resultados + el total para paginar.
 type RegistryResult struct {
 	Rows  []RegistryRow
 	Total int64
+}
+
+// UsageItem es un proyecto que referencia una entidad del catálogo.
+type UsageItem struct {
+	ID       int64
+	Name     string
+	Customer string
+	Campaign string
+}
+
+// UsageResult es la lista de proyectos que usan una entidad dada.
+type UsageResult struct {
+	Items []UsageItem
+	Total int
 }

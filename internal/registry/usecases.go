@@ -9,6 +9,7 @@ import (
 type RepositoryPort interface {
 	SearchRegistry(ctx context.Context, q, typ, status string, page, perPage int) (domain.RegistryResult, error)
 	SetAliases(ctx context.Context, actorID int64, aliases []string) error
+	GetUsages(ctx context.Context, entityType string, id int64) (domain.UsageResult, error)
 }
 
 type UseCases struct {
@@ -25,4 +26,8 @@ func (u *UseCases) SearchRegistry(ctx context.Context, q, typ, status string, pa
 
 func (u *UseCases) SetAliases(ctx context.Context, actorID int64, aliases []string) error {
 	return u.repo.SetAliases(ctx, actorID, aliases)
+}
+
+func (u *UseCases) GetUsages(ctx context.Context, entityType string, id int64) (domain.UsageResult, error) {
+	return u.repo.GetUsages(ctx, entityType, id)
 }

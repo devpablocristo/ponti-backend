@@ -66,6 +66,10 @@ lint:
 	@echo "Linting the project..."
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run --timeout=5m
 
+lint-migrations:
+	@echo "Checking migration idempotency..."
+	@bash scripts/check-migrations-idempotent.sh
+
 run-api:
 	@echo "Starting API server..."
 	@go run ./cmd/api/

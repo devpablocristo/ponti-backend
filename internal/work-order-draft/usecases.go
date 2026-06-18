@@ -20,7 +20,10 @@ type RepositoryPort interface {
 	CreateWorkOrderDraft(context.Context, *domain.WorkOrderDraft) (int64, error)
 	CreateWorkOrderDraftBatch(context.Context, []*domain.WorkOrderDraft) ([]int64, error)
 	GetWorkOrderDraftByID(context.Context, int64) (*domain.WorkOrderDraft, error)
+	GetProjectCampaignID(context.Context, int64) (*int64, error)
 	ListPendingSupplyNamesByIDs(context.Context, []int64) ([]string, error)
+	GetPendingLaborNameByID(context.Context, int64) (string, error)
+	GetLaborContractorByID(context.Context, int64) (string, error)
 	ListRelatedDigitalWorkOrderDraftsByBaseNumber(context.Context, int64, string) ([]*domain.WorkOrderDraft, error)
 	ListWorkOrderDrafts(context.Context, string, string, *bool, types.Input) ([]domain.WorkOrderDraftListItem, types.PageInfo, error)
 	ListOccupiedWorkOrderNumbersByProject(context.Context, int64) ([]string, error)
@@ -82,12 +85,29 @@ func (u *UseCases) CreateWorkOrderDraft(ctx context.Context, d *domain.WorkOrder
 	return u.repo.CreateWorkOrderDraft(ctx, d)
 }
 
+// applyDigitalDraftInvariants es el ÚNICO punto que garantiza los invariantes de un draft
+// DIGITAL: marca IsDigital y deriva campaign_id del proyecto (1:1), en vez de confiar en el
+// payload de mobile (que puede traer una campaña errónea y dejar el draft fuera de los listados
+// filtrados por campaña → 400 en ResolveProjectIDs). TODO path de escritura digital (create,
+// batch, update single, update group) pasa por acá para que el invariante no pueda divergir.
+func (u *UseCases) applyDigitalDraftInvariants(ctx context.Context, d *domain.WorkOrderDraft) error {
+	d.IsDigital = true
+	campaignID, err := u.repo.GetProjectCampaignID(ctx, d.ProjectID)
+	if err != nil {
+		return err
+	}
+	d.CampaignID = campaignID
+	return nil
+}
+
 func (u *UseCases) CreateDigitalWorkOrderDraft(ctx context.Context, d *domain.WorkOrderDraft) (int64, error) {
 	if d == nil {
 		return 0, types.NewError(types.ErrValidation, "work order draft is nil", nil)
 	}
 
-	d.IsDigital = true
+	if err := u.applyDigitalDraftInvariants(ctx, d); err != nil {
+		return 0, err
+	}
 
 	if d.Status == "" {
 		d.Status = domain.StatusDraft
@@ -174,7 +194,6 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			Date:           b.Date,
 			CustomerID:     b.CustomerID,
 			ProjectID:      b.ProjectID,
-			CampaignID:     b.CampaignID,
 			FieldID:        b.FieldID,
 			LotID:          lot.LotID,
 			CropID:         b.CropID,
@@ -183,10 +202,13 @@ func (u *UseCases) CreateDigitalWorkOrderDraftBatch(ctx context.Context, b *doma
 			EffectiveArea:  lot.EffectiveArea,
 			Observations:   b.Observations,
 			InvestorID:     b.InvestorID,
-			IsDigital:      true,
 			Status:         domain.StatusDraft,
 			Items:          items,
 			InvestorSplits: b.InvestorSplits,
+		}
+		// Invariante digital (IsDigital + campaña del proyecto) vía el chokepoint único.
+		if err := u.applyDigitalDraftInvariants(ctx, draft); err != nil {
+			return nil, err
 		}
 
 		if err := u.hydrateDraftSupplyNames(ctx, draft); err != nil {
@@ -317,7 +339,11 @@ func (u *UseCases) UpdateWorkOrderDraftByID(ctx context.Context, d *domain.WorkO
 	}
 
 	if current.IsDigital || d.IsDigital {
-		d.IsDigital = true
+		// Cierra el path que faltaba: editar un draft digital por el endpoint singular también
+		// debe derivar la campaña del proyecto (antes tomaba campaign_id del payload → drift).
+		if err := u.applyDigitalDraftInvariants(ctx, d); err != nil {
+			return err
+		}
 
 		number, err := u.resolveDigitalDraftNumberForUpdate(ctx, d.ProjectID, d.ID, strings.TrimSpace(d.Number))
 		if err != nil {
@@ -371,7 +397,6 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			Date:           group.Date,
 			CustomerID:     group.CustomerID,
 			ProjectID:      group.ProjectID,
-			CampaignID:     group.CampaignID,
 			FieldID:        group.FieldID,
 			LotID:          lot.LotID,
 			CropID:         group.CropID,
@@ -380,10 +405,13 @@ func (u *UseCases) UpdateWorkOrderDraftGroupByID(ctx context.Context, id int64, 
 			EffectiveArea:  lot.EffectiveArea,
 			Observations:   group.Observations,
 			InvestorID:     group.InvestorID,
-			IsDigital:      true,
 			Status:         domain.StatusDraft,
 			Items:          make([]domain.WorkOrderDraftItem, len(group.Items)),
 			InvestorSplits: group.InvestorSplits,
+		}
+		// Invariante digital (IsDigital + campaña del proyecto) vía el chokepoint único.
+		if err := u.applyDigitalDraftInvariants(ctx, draft); err != nil {
+			return err
 		}
 
 		for j, item := range group.Items {
@@ -457,6 +485,30 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		return 0, err
 	}
 
+	// Validar labor pendiente
+	if draft.LaborID > 0 {
+		laborName, err := u.repo.GetPendingLaborNameByID(ctx, draft.LaborID)
+		if err != nil {
+			return 0, err
+		}
+		if laborName != "" {
+			return 0, types.NewError(
+				types.ErrConflict,
+				fmt.Sprintf("cannot publish work order draft with pending labor: %s", laborName),
+				nil,
+			)
+		}
+	}
+
+	contractor := draft.Contractor
+	if contractor == "" && draft.LaborID > 0 {
+		laborContractor, err := u.repo.GetLaborContractorByID(ctx, draft.LaborID)
+		if err != nil {
+			return 0, err
+		}
+		contractor = laborContractor
+	}
+
 	workOrder := &workorderdomain.WorkOrder{
 		Number:         draft.Number,
 		ProjectID:      draft.ProjectID,
@@ -465,7 +517,7 @@ func (u *UseCases) PublishWorkOrderDraft(ctx context.Context, id int64) (int64, 
 		CropID:         draft.CropID,
 		LaborID:        draft.LaborID,
 		IsDigital:      draft.IsDigital,
-		Contractor:     draft.Contractor,
+		Contractor:     contractor,
 		Observations:   draft.Observations,
 		Date:           draft.Date,
 		InvestorID:     draft.InvestorID,
@@ -571,9 +623,6 @@ func validateDraft(d *domain.WorkOrderDraft) error {
 	if d.LaborID <= 0 {
 		return types.NewError(types.ErrValidation, "labor_id must be greater than 0", nil)
 	}
-	if strings.TrimSpace(d.Contractor) == "" {
-		return types.NewError(types.ErrValidation, "contractor is required", nil)
-	}
 	if d.EffectiveArea.LessThanOrEqual(decimal.Zero) {
 		return types.NewError(types.ErrValidation, "effective_area must be greater than 0", nil)
 	}
@@ -641,12 +690,26 @@ func (u *UseCases) resolveDigitalDraftNumber(ctx context.Context, projectID int6
 }
 
 func (u *UseCases) resolveDigitalDraftNumberForUpdate(ctx context.Context, projectID int64, draftID int64, requested string) (string, error) {
-	occupied, err := u.repo.ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx, projectID, draftID)
-	if err != nil {
-		return "", err
-	}
+    occupied, err := u.repo.ListOccupiedWorkOrderNumbersByProjectExcludingDraft(ctx, projectID, draftID)
+    if err != nil {
+        return "", err
+    }
 
-	return resolveDigitalDraftNumberWithOccupied(projectID, requested, occupied)
+    // Si el número pedido es un split (D-N.M), excluir hermanos del mismo grupo
+    // (D-N.X con distinto X) para que no generen falso conflicto de base.
+    if reqBase, _, isSplit := extractDigitalSplitSequence(requested); isSplit {
+        filtered := occupied[:0]
+        for _, n := range occupied {
+            b, _, s := extractDigitalSplitSequence(n)
+            if s && b == reqBase {
+                continue
+            }
+            filtered = append(filtered, n)
+        }
+        occupied = filtered
+    }
+
+    return resolveDigitalDraftNumberWithOccupied(projectID, requested, occupied)
 }
 
 func (u *UseCases) resolveDigitalDraftBatchBaseNumber(ctx context.Context, projectID int64, requested string) (string, error) {
@@ -926,9 +989,10 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 		CropName:             first.CropName,
 		LaborID:              first.LaborID,
 		LaborName:            first.LaborName,
-		Contractor:           first.Contractor,
+		Contractor:           effectiveDraftContractor(first.Contractor, first.LaborContractorName),
 		Observations:         first.Observations,
 		InvestorID:           first.InvestorID,
+		InvestorName:         first.InvestorName,
 		IsDigital:            first.IsDigital,
 		Status:               groupDraftStatus(drafts),
 		PublishedWorkOrderID: first.PublishedWorkOrderID,
@@ -961,6 +1025,13 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 	}
 
 	return group
+}
+
+func effectiveDraftContractor(contractor, laborContractorName string) string {
+	if strings.TrimSpace(contractor) != "" {
+		return contractor
+	}
+	return laborContractorName
 }
 
 func groupDraftStatus(drafts []*domain.WorkOrderDraft) domain.Status {

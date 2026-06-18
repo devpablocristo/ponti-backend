@@ -24,22 +24,24 @@ type InvestorSplit struct {
 }
 
 type WorkOrderDraft struct {
-	Number         string               `json:"number"`
-	Date           string               `json:"date" binding:"required"`
-	CustomerID     int64                `json:"customer_id" binding:"required"`
-	ProjectID      int64                `json:"project_id" binding:"required"`
-	CampaignID     *int64               `json:"campaign_id"`
-	FieldID        int64                `json:"field_id" binding:"required"`
-	LotID          int64                `json:"lot_id" binding:"required"`
-	CropID         int64                `json:"crop_id" binding:"required"`
-	LaborID        int64                `json:"labor_id" binding:"required"`
-	Contractor     string               `json:"contractor" binding:"required"`
-	EffectiveArea  decimal.Decimal      `json:"effective_area" binding:"required"`
-	Observations   string               `json:"observations"`
-	InvestorID     int64                `json:"investor_id"`
-	IsDigital      bool                 `json:"is_digital"`
-	InvestorSplits []InvestorSplit      `json:"investor_splits,omitempty"`
-	Items          []WorkOrderDraftItem `json:"items"`
+	Number              string               `json:"number"`
+	Date                string               `json:"date" binding:"required"`
+	CustomerID          int64                `json:"customer_id" binding:"required"`
+	ProjectID           int64                `json:"project_id" binding:"required"`
+	CampaignID          *int64               `json:"campaign_id"`
+	FieldID             int64                `json:"field_id" binding:"required"`
+	LotID               int64                `json:"lot_id" binding:"required"`
+	CropID              int64                `json:"crop_id" binding:"required"`
+	LaborID             int64                `json:"labor_id" binding:"required"`
+	Contractor          string               `json:"contractor" binding:"required"`
+	LaborContractorName string               `json:"labor_contractor_name"`
+	EffectiveArea       decimal.Decimal      `json:"effective_area" binding:"required"`
+	Observations        string               `json:"observations"`
+	InvestorID          int64                `json:"investor_id"`
+	InvestorName        string               `json:"investor_name"`
+	IsDigital           bool                 `json:"is_digital"`
+	InvestorSplits      []InvestorSplit      `json:"investor_splits,omitempty"`
+	Items               []WorkOrderDraftItem `json:"items"`
 }
 
 type WorkOrderDraftBatchLotItem struct {
@@ -62,7 +64,7 @@ type WorkOrderDraftBatchCreateRequest struct {
 	FieldID        int64                    `json:"field_id" binding:"required"`
 	CropID         int64                    `json:"crop_id" binding:"required"`
 	LaborID        int64                    `json:"labor_id" binding:"required"`
-	Contractor     string                   `json:"contractor" binding:"required"`
+	Contractor     string                   `json:"contractor"`
 	Observations   string                   `json:"observations"`
 	InvestorID     int64                    `json:"investor_id"`
 	InvestorSplits []InvestorSplit          `json:"investor_splits,omitempty"`
@@ -208,9 +210,11 @@ type WorkOrderDraftResponse struct {
 	CropID               int64                                 `json:"crop_id"`
 	LaborID              int64                                 `json:"labor_id"`
 	Contractor           string                                `json:"contractor"`
+	LaborContractorName  string                                `json:"labor_contractor_name"`
 	EffectiveArea        decimal.Decimal                       `json:"effective_area"`
 	Observations         string                                `json:"observations"`
 	InvestorID           int64                                 `json:"investor_id"`
+	InvestorName         string                                `json:"investor_name"`
 	IsDigital            bool                                  `json:"is_digital"`
 	Status               string                                `json:"status"`
 	ReviewedBy           *int64                                `json:"reviewed_by,omitempty"`
@@ -239,8 +243,10 @@ type WorkOrderDraftGroupListItem struct {
 	ID            int64           `json:"id"`
 	Number        string          `json:"number"`
 	Date          string          `json:"date"`
+	CustomerName  string          `json:"customer_name"`
 	ProjectID     int64           `json:"project_id"`
 	ProjectName   string          `json:"project_name"`
+	CampaignName  string          `json:"campaign_name"`
 	FieldID       int64           `json:"field_id"`
 	FieldName     string          `json:"field_name"`
 	IsDigital     bool            `json:"is_digital"`
@@ -262,8 +268,10 @@ func NewGroupListResponse(pageInfo types.PageInfo, items []domain.WorkOrderDraft
 			ID:            item.ID,
 			Number:        item.Number,
 			Date:          item.Date.Format(dateLayout),
+			CustomerName:  item.CustomerName,
 			ProjectID:     item.ProjectID,
 			ProjectName:   item.ProjectName,
+			CampaignName:  item.CampaignName,
 			FieldID:       item.FieldID,
 			FieldName:     item.FieldName,
 			IsDigital:     item.IsDigital,
@@ -319,10 +327,12 @@ func FromDomain(d *domain.WorkOrderDraft) *WorkOrderDraftResponse {
 		LotID:                d.LotID,
 		CropID:               d.CropID,
 		LaborID:              d.LaborID,
-		Contractor:           d.Contractor,
+		Contractor:           effectiveContractor(d.Contractor, d.LaborContractorName),
+		LaborContractorName:  d.LaborContractorName,
 		EffectiveArea:        d.EffectiveArea,
 		Observations:         d.Observations,
 		InvestorID:           d.InvestorID,
+		InvestorName:         d.InvestorName,
 		IsDigital:            d.IsDigital,
 		Status:               string(d.Status),
 		ReviewedBy:           d.ReviewedBy,
@@ -386,6 +396,7 @@ func GroupFromDomain(d *domain.WorkOrderDraftGroup) *WorkOrderDraftGroupResponse
 		EffectiveArea:        d.EffectiveArea,
 		Observations:         d.Observations,
 		InvestorID:           d.InvestorID,
+		InvestorName:         d.InvestorName,
 		IsDigital:            d.IsDigital,
 		Status:               string(d.Status),
 		PublishedWorkOrderID: d.PublishedWorkOrderID,
@@ -396,6 +407,13 @@ func GroupFromDomain(d *domain.WorkOrderDraftGroup) *WorkOrderDraftGroupResponse
 		CreatedAt:            d.Base.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:            d.Base.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+func effectiveContractor(contractor, laborContractorName string) string {
+	if strings.TrimSpace(contractor) != "" {
+		return contractor
+	}
+	return laborContractorName
 }
 
 type WorkOrderDraftGroupLotResponse struct {
@@ -427,6 +445,7 @@ type WorkOrderDraftGroupResponse struct {
 	EffectiveArea        decimal.Decimal                       `json:"effective_area"`
 	Observations         string                                `json:"observations"`
 	InvestorID           int64                                 `json:"investor_id"`
+	InvestorName         string                                `json:"investor_name"`
 	IsDigital            bool                                  `json:"is_digital"`
 	Status               string                                `json:"status"`
 	PublishedWorkOrderID *int64                                `json:"published_work_order_id,omitempty"`

@@ -10,6 +10,7 @@ import (
 	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	models "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/investor/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -83,9 +84,7 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 
 	countQ := r.db.Client().WithContext(ctx).Model(&models.Investor{})
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		countQ = countQ.Where("tenant_id = ?", orgID)
-	}
+	countQ = sharedfilters.ScopeTenant(ctx, countQ)
 	if err := countQ.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count investors")
 	}
@@ -97,9 +96,7 @@ func (r *Repository) ListInvestors(ctx context.Context, page, perPage int) ([]do
 		Limit(perPage).
 		Order("id ASC")
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		listQ = listQ.Where("tenant_id = ?", orgID)
-	}
+	listQ = sharedfilters.ScopeTenant(ctx, listQ)
 	err := listQ.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list investors")
@@ -116,9 +113,7 @@ func (r *Repository) GetInvestor(ctx context.Context, id int64) (*domain.Investo
 	var model models.Investor
 	q := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — 404 si el investor no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "investor", id)
 	}
@@ -139,9 +134,7 @@ func (r *Repository) UpdateInvestor(ctx context.Context, inv *domain.Investor) e
 		updateTx = updateTx.Where("updated_at = ?", inv.UpdatedAt)
 	}
 	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		updateTx = updateTx.Where("tenant_id = ?", orgID)
-	}
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomain(inv))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update investor")
@@ -161,9 +154,7 @@ func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
 	}
 	delTx := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — solo borra si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		delTx = delTx.Where("tenant_id = ?", orgID)
-	}
+	delTx = sharedfilters.ScopeTenant(ctx, delTx)
 	result := delTx.Delete(&models.Investor{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete investor")
@@ -178,33 +169,21 @@ func (r *Repository) ArchiveInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	archiveTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
-	// T1.e: guard de ownership (flag-gated) — solo archiva si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		archiveTx = archiveTx.Where("tenant_id = ?", orgID)
-	}
-	result := archiveTx.Delete(&models.Investor{})
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive investor")
-	}
-	// Idempotente: si ya estaba archivado, RowsAffected == 0 es OK
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Investor{}, id, "investor", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
+	})
 }
 
 func (r *Repository) RestoreInvestor(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "investor"); err != nil {
 		return err
 	}
-	restoreTx := r.db.Client().WithContext(ctx).Unscoped().
-		Model(&models.Investor{}).
-		Where("id = ?", id)
-	// T1.e: guard de ownership (flag-gated) — solo restaura si es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		restoreTx = restoreTx.Where("tenant_id = ?", orgID)
-	}
-	result := restoreTx.Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore investor")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Investor{}, id, "investor", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "an investor with that name already exists; cannot restore",
+		})
+	})
 }

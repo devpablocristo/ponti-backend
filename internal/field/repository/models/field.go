@@ -5,6 +5,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	actormod "github.com/devpablocristo/ponti-backend/internal/actors/repository/models"
 	fielddom "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	invdom "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	leasetypemod "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
@@ -23,6 +24,7 @@ type Field struct {
 	LeaseTypeValue   *decimal.Decimal `gorm:"column:lease_type_value"`
 	sharedmodels.Base
 	FieldInvestors []FieldInvestor         `gorm:"foreignKey:FieldID;references:ID"`
+	FieldLessees   []FieldLessee           `gorm:"foreignKey:FieldID;references:ID"`
 	Lots           []lotmod.Lot            `gorm:"foreignKey:FieldID"`
 	LeaseType      *leasetypemod.LeaseType `gorm:"foreignKey:LeaseTypeID;references:ID"`
 }
@@ -35,6 +37,22 @@ type FieldInvestor struct {
 
 	Investor invdom.Investor `gorm:"foreignKey:InvestorID;references:ID"`
 }
+
+// FieldLessee = arrendatario de un campo. Espejo de FieldInvestor pero apunta DIRECTO
+// a actors(id): el arrendatario es un actor con rol lessee. La asociación Actor es de
+// solo lectura (resolver el nombre al precargar).
+type FieldLessee struct {
+	FieldID    int64 `gorm:"primaryKey;autoIncrement:false;column:field_id"`
+	ActorID    int64 `gorm:"primaryKey;autoIncrement:false;column:actor_id"`
+	Percentage int   `gorm:"not null;column:percentage"`
+	sharedmodels.Base
+
+	// Solo lectura ("->"): el registro de actores se escribe por otro camino (SQL crudo);
+	// acá GORM solo lo precarga para resolver el nombre, nunca lo crea ni actualiza.
+	Actor actormod.Actor `gorm:"foreignKey:ActorID;references:ID;->"`
+}
+
+func (FieldLessee) TableName() string { return "field_lessees" }
 
 // FROM DOMAIN (para INSERT: solo escalares)
 func FromDomain(d *fielddom.Field) *Field {

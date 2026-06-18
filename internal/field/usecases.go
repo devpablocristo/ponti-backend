@@ -11,6 +11,7 @@ type RepositoryPort interface {
 	ListFields(context.Context, int, int) ([]domain.Field, int64, error)
 	GetField(context.Context, int64) (*domain.Field, error)
 	UpdateField(context.Context, *domain.Field) error
+	UpdateFieldName(context.Context, int64, string) error
 	DeleteField(context.Context, int64) error
 	ArchiveField(context.Context, int64) error
 	RestoreField(context.Context, int64) error
@@ -38,6 +39,11 @@ func (u *UseCases) GetField(ctx context.Context, id int64) (*domain.Field, error
 
 func (u *UseCases) UpdateField(ctx context.Context, f *domain.Field) error {
 	return u.repo.UpdateField(ctx, f)
+}
+
+// UpdateFieldName edita solo el nombre del campo (catálogo/registry unificado).
+func (u *UseCases) UpdateFieldName(ctx context.Context, id int64, name string) error {
+	return u.repo.UpdateFieldName(ctx, id, name)
 }
 
 func (u *UseCases) DeleteField(ctx context.Context, id int64) error {

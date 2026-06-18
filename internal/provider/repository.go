@@ -6,7 +6,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/provider/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/provider/usecases/domain"
-	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	"gorm.io/gorm"
 )
 
@@ -30,9 +30,7 @@ func (r *Repository) GetProviders(ctx context.Context) ([]domain.Provider, error
 		Model(&models.Provider{})
 
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		db0 = db0.Where("tenant_id = ?", orgID)
-	}
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 
 	if err := db0.Find(&providers).Error; err != nil {
 		return nil, domainerr.Internal("failed to list providers")

@@ -13,6 +13,7 @@ type Labor struct {
 	IsPartialPrice bool
 	ProjectId      int64
 	CategoryId     int64
+	IsPending      bool 
 	shareddomain.Base
 }
 
@@ -25,6 +26,6 @@ type ListedLabor struct {
 	ProjectId      int64
 	CategoryId     int64
 	CategoryName   string
-
+	IsPending      bool 
 	shareddomain.Base
 }

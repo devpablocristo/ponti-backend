@@ -2,15 +2,14 @@ package classtype
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/class-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/class-type/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -52,9 +51,7 @@ func (r *Repository) ListClassTypes(ctx context.Context, status string, page, pe
 	var total int64
 	countQ := sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.ClassType{}), status)
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		countQ = countQ.Where("tenant_id = ?", orgID)
-	}
+	countQ = sharedfilters.ScopeTenant(ctx, countQ)
 	if err := countQ.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count class types")
 	}
@@ -66,9 +63,7 @@ func (r *Repository) ListClassTypes(ctx context.Context, status string, page, pe
 		Limit(perPage).
 		Order("id ASC"), status)
 	// T1.e: acotar al tenant activo (flag-gated).
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		listQ = listQ.Where("tenant_id = ?", orgID)
-	}
+	listQ = sharedfilters.ScopeTenant(ctx, listQ)
 	err := listQ.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list class types")
@@ -88,9 +83,7 @@ func (r *Repository) GetClassType(ctx context.Context, id int64) (*domain.ClassT
 	var model models.ClassType
 	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
 	// T1.e: guard de ownership (flag-gated) — NotFound si no es del tenant.
-	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-		q = q.Where("tenant_id = ?", orgID)
-	}
+	q = sharedfilters.ScopeTenant(ctx, q)
 	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "class type", id)
 	}
@@ -105,9 +98,7 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 		var count int64
 		existsQ := tx.Model(&models.ClassType{}).Where("id = ?", c.ID)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			existsQ = existsQ.Where("tenant_id = ?", orgID)
-		}
+		existsQ = sharedfilters.ScopeTenant(ctx, existsQ)
 		if err := existsQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check class type existence")
 		}
@@ -117,9 +108,7 @@ func (r *Repository) UpdateClassType(ctx context.Context, c *domain.ClassType) e
 		updateTx := tx.Model(&models.ClassType{}).
 			Where("id = ?", c.ID)
 		// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			updateTx = updateTx.Where("tenant_id = ?", orgID)
-		}
+		updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 		if !c.UpdatedAt.IsZero() {
 			updateTx = updateTx.Where("updated_at = ?", c.UpdatedAt)
 		}
@@ -151,9 +140,7 @@ func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
 		var count int64
 		existsQ := tx.Model(&models.ClassType{}).Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			existsQ = existsQ.Where("tenant_id = ?", orgID)
-		}
+		existsQ = sharedfilters.ScopeTenant(ctx, existsQ)
 		if err := existsQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check class type existence")
 		}
@@ -162,9 +149,7 @@ func (r *Repository) DeleteClassType(ctx context.Context, id int64) error {
 		}
 		deleteTx := tx.Where("id = ?", id)
 		// T1.e: guard de ownership (flag-gated) — solo borra si es del tenant.
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			deleteTx = deleteTx.Where("tenant_id = ?", orgID)
-		}
+		deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
 		result := deleteTx.Delete(&models.ClassType{})
 		if result.Error != nil {
 			return domainerr.Internal("failed to delete class type")
@@ -181,33 +166,9 @@ func (r *Repository) ArchiveClassType(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var classType models.ClassType
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&classType).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("class type %d not found", id))
-			}
-			return domainerr.Internal("failed to get class type")
-		}
-		if classType.DeletedAt.Valid {
-			return domainerr.Conflict("class type already archived")
-		}
-
-		updates := map[string]any{
-			"deleted_at": time.Now(),
-		}
-		updates["deleted_by"] = gorm.Expr("NULL")
-
-		if err := tx.Model(&models.ClassType{}).
-			Where("id = ?", id).
-			Updates(updates).Error; err != nil {
-			return domainerr.Internal("failed to archive class type")
-		}
-		return nil
+		return sharedrepo.SoftArchive(ctx, tx, &models.ClassType{}, id, "class type", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
 	})
 }
 
@@ -217,35 +178,9 @@ func (r *Repository) RestoreClassType(ctx context.Context, id int64) error {
 	}
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var classType models.ClassType
-		loadQ := tx.Unscoped().Where("id = ?", id)
-		// T1.e: guard de ownership (flag-gated).
-		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
-			loadQ = loadQ.Where("tenant_id = ?", orgID)
-		}
-		if err := loadQ.First(&classType).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("class type %d not found", id))
-			}
-			return domainerr.Internal("failed to get class type")
-		}
-		if !classType.DeletedAt.Valid {
-			return domainerr.Conflict("class type is not archived")
-		}
-
-		// El trigger normalize_name dispara al reactivar y puede violar el unique.
-		if err := tx.Unscoped().Model(&models.ClassType{}).
-			Where("id = ?", id).
-			Updates(map[string]any{
-				"deleted_at": nil,
-				"deleted_by": nil,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			if sharedrepo.IsUniqueViolation(err) {
-				return domainerr.Conflict("a type with that name already exists; cannot restore")
-			}
-			return domainerr.Internal("failed to restore class type")
-		}
-		return nil
+		return sharedrepo.SoftRestore(ctx, tx, &models.ClassType{}, id, "class type", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a type with that name already exists; cannot restore",
+		})
 	})
 }
