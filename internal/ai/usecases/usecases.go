@@ -497,23 +497,6 @@ func toolCallObjects(v any) []any {
 	return items
 }
 
-func toolCallNames(v any) []string {
-	out := []string{}
-	for _, item := range arrayValue(v) {
-		switch t := item.(type) {
-		case string:
-			if s := strings.TrimSpace(t); s != "" {
-				out = append(out, s)
-			}
-		case map[string]any:
-			if s := firstNonEmpty(stringValue(t["name"]), stringValue(t["tool"]), stringValue(t["capability_id"])); s != "" {
-				out = append(out, s)
-			}
-		}
-	}
-	return out
-}
-
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {

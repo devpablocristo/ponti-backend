@@ -48,7 +48,7 @@ func TestSubmitWithActionBinding(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(SubmitResponse{
+		_ = json.NewEncoder(w).Encode(SubmitResponse{
 			RequestID:   "req-abc",
 			Decision:    DecisionRequireApproval,
 			RiskLevel:   "high",
@@ -122,7 +122,7 @@ func TestApproveOnBehalfOf(t *testing.T) {
 			t.Errorf("expected note=lgtm, got %v", body["note"])
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"approved"}`))
+		_, _ = w.Write([]byte(`{"status":"approved"}`))
 	}))
 	defer srv.Close()
 
@@ -143,7 +143,7 @@ func TestRejectPropagatesConflict(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(`{"code":"CONFLICT","message":"approver cannot approve their own request"}`))
+		_, _ = w.Write([]byte(`{"code":"CONFLICT","message":"approver cannot approve their own request"}`))
 	}))
 	defer srv.Close()
 
@@ -170,7 +170,7 @@ func TestListRequestsDecodesEnvelope(t *testing.T) {
 			t.Errorf("unexpected query: %s", r.URL.RawQuery)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"data":[{"id":"req-1","action_type":"workorder.create","status":"pending_approval","risk_level":"high"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"req-1","action_type":"workorder.create","status":"pending_approval","risk_level":"high"}]}`))
 	}))
 	defer srv.Close()
 
@@ -193,7 +193,7 @@ func TestListPendingApprovalsPassesQuery(t *testing.T) {
 		}
 		gotQueries = append(gotQueries, r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"data":[{"id":"appr-1","request_id":"req-1","status":"pending","expires_at":"2026-06-10T13:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"appr-1","request_id":"req-1","status":"pending","expires_at":"2026-06-10T13:00:00Z"}]}`))
 	}))
 	defer srv.Close()
 
@@ -222,7 +222,7 @@ func TestGetEvidenceReturnsRawPack(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(pack))
+		_, _ = w.Write([]byte(pack))
 	}))
 	defer srv.Close()
 
