@@ -20,6 +20,7 @@ import (
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 	types "github.com/devpablocristo/ponti-backend/internal/shared/types"
+	stockmodel "github.com/devpablocristo/ponti-backend/internal/stock/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/supply/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 	workOrderModels "github.com/devpablocristo/ponti-backend/internal/work-order/repository/models"
@@ -367,6 +368,18 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		if count == 0 {
 			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("supply %d not found", id))
 		}
+
+		// El insumo no puede eliminarse ni archivarse mientras tenga registros
+		// ACTIVOS (órdenes de trabajo, ingresos/stocks o remitos/movimientos no
+		// eliminados). El usuario debe quitar esos registros activos primero.
+		activeRefs, err := countActiveSupplyReferences(tx, id)
+		if err != nil {
+			return domainerr.Internal("failed to check supply references")
+		}
+		if activeRefs > 0 {
+			return domainerr.BusinessRule("supply is in use by active records; remove them before deleting")
+		}
+
 		deleteTx := tx.Unscoped().Where("id = ?", id)
 		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
 			deleteTx = deleteTx.Where(cond, args...)
@@ -374,7 +387,7 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		result := deleteTx.Delete(&models.Supply{})
 		if result.Error != nil {
 			if isForeignKeyViolation(result.Error) {
-				return domainerr.Conflict("supply has historical references and cannot be permanently deleted")
+				return domainerr.Conflict("supply has historical references and can only be archived, not permanently deleted")
 			}
 			return domainerr.Internal("failed to delete supply")
 		}
@@ -383,6 +396,39 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		}
 		return nil
 	})
+}
+
+// countActiveSupplyReferences cuenta las referencias ACTIVAS (no soft-deleted) al
+// insumo: órdenes de trabajo vigentes, ingresos/stocks y remitos/movimientos. GORM
+// excluye automáticamente las filas con deleted_at en stocks y supply_movements, por
+// lo que solo se cuentan los registros realmente en uso. Si es 0, los únicos bloqueos
+// posibles para el hard-delete son referencias históricas y corresponde archivar.
+func countActiveSupplyReferences(tx *gorm.DB, supplyID int64) (int64, error) {
+	var total, n int64
+
+	if err := tx.Model(&workOrderModels.WorkOrder{}).
+		Joins("JOIN workorder_items ON workorder_items.workorder_id = workorders.id").
+		Where("workorder_items.supply_id = ? AND workorders.deleted_at IS NULL", supplyID).
+		Count(&n).Error; err != nil {
+		return 0, err
+	}
+	total += n
+
+	if err := tx.Model(&stockmodel.Stock{}).
+		Where("supply_id = ?", supplyID).
+		Count(&n).Error; err != nil {
+		return 0, err
+	}
+	total += n
+
+	if err := tx.Model(&models.SupplyMovement{}).
+		Where("supply_id = ?", supplyID).
+		Count(&n).Error; err != nil {
+		return 0, err
+	}
+	total += n
+
+	return total, nil
 }
 
 func isForeignKeyViolation(err error) bool {
