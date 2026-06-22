@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -374,6 +375,9 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 		// eliminados). El usuario debe quitar esos registros activos primero.
 		activeRefs, err := countActiveSupplyReferences(tx, id)
 		if err != nil {
+			// El mensaje del Internal se expone al cliente (httperr.Normalize), por
+			// eso lo dejamos genérico y logueamos la causa real para diagnóstico.
+			slog.Error("countActiveSupplyReferences failed", "supply_id", id, "error", err)
 			return domainerr.Internal("failed to check supply references")
 		}
 		if activeRefs > 0 {
@@ -403,6 +407,11 @@ func (r *Repository) DeleteSupply(ctx context.Context, id int64) error {
 // excluye automáticamente las filas con deleted_at en stocks y supply_movements, por
 // lo que solo se cuentan los registros realmente en uso. Si es 0, los únicos bloqueos
 // posibles para el hard-delete son referencias históricas y corresponde archivar.
+//
+// No aplica TenantProjectScope (a diferencia del resto de DeleteSupply): supply_id es
+// PK global y un insumo pertenece a un único proyecto, por lo que todas sus referencias
+// caen en el mismo scope. Si en el futuro se comparten insumos entre proyectos o se
+// activa TENANT_ENFORCEMENT, revisar esta asimetría.
 func countActiveSupplyReferences(tx *gorm.DB, supplyID int64) (int64, error) {
 	var total, n int64
 
