@@ -573,10 +573,17 @@ func (r *Repository) workOrderListBaseQuery(
 		base = base.Where("status = ?", *filt.Status)
 	}
 	if filt.SupplyID != nil {
+		// Discriminamos por el SIGNO del id, no por is_digital. La vista
+		// v4_report.workorder_list emite id POSITIVO para workorders reales
+		// (manuales y digitales publicadas/cerradas, con items en workorder_items) e
+		// id NEGATIVO para drafts digitales abiertos (-draft_id, items en
+		// work_order_draft_items). Branchear por is_digital dejaba afuera las digitales
+		// CERRADAS (is_digital=true pero id positivo): caían en la rama de drafts y el
+		// EXISTS sobre work_order_draft_items con draft_id = -id (negativo) nunca matcheaba.
 		base = base.Where(`
 			(
 				(
-					v4_report.workorder_list.is_digital = false
+					v4_report.workorder_list.id > 0
 					AND EXISTS (
 						SELECT 1
 						FROM workorder_items wi
@@ -586,7 +593,7 @@ func (r *Repository) workOrderListBaseQuery(
 					)
 				)
 				OR (
-					v4_report.workorder_list.is_digital = true
+					v4_report.workorder_list.id < 0
 					AND EXISTS (
 						SELECT 1
 						FROM work_order_draft_items wodi
