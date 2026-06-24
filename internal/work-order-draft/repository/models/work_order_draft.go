@@ -133,15 +133,23 @@ func FromDomain(d *domain.WorkOrderDraft) *WorkOrderDraft {
 }
 
 func (m *WorkOrderDraft) ToDomain() *domain.WorkOrderDraft {
-	items := make([]domain.WorkOrderDraftItem, len(m.Items))
-	for i, item := range m.Items {
-		items[i] = domain.WorkOrderDraftItem{
-			SupplyID:   item.SupplyID,
-			SupplyName: item.SupplyName,
-			TotalUsed:  item.TotalUsed,
-			FinalDose:  item.FinalDose,
-		}
-	}
+      items := make([]domain.WorkOrderDraftItem, len(m.Items))
+      for i, item := range m.Items {
+              // Preferimos el nombre VIVO del insumo (precargado con Preload("Items.Supply")),
+              // para que editar el insumo en PONTI se refleje en la app. Si el insumo fue
+              // borrado/archivado, el Preload viene vacío y caemos al snapshot histórico.
+              supplyName := item.SupplyName
+              if item.Supply.Name != "" {
+                      supplyName = item.Supply.Name
+              }
+
+              items[i] = domain.WorkOrderDraftItem{
+                      SupplyID:   item.SupplyID,
+                      SupplyName: supplyName,
+                      TotalUsed:  item.TotalUsed,
+                      FinalDose:  item.FinalDose,
+              }
+      }
 
 	splits := make([]domain.WorkOrderDraftInvestorSplit, len(m.InvestorSplits))
 	for i, split := range m.InvestorSplits {

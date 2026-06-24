@@ -1019,10 +1019,45 @@ func buildWorkOrderDraftGroup(drafts []*domain.WorkOrderDraft) *domain.WorkOrder
 
 	group.EffectiveArea = totalArea
 
-	if len(first.Items) > 0 {
-		group.Items = make([]domain.WorkOrderDraftItem, len(first.Items))
-		copy(group.Items, first.Items)
-	}
+	  type aggItem struct {
+              supplyID   int64
+              supplyName string
+              totalUsed  decimal.Decimal
+      }
+
+      supplyOrder := make([]int64, 0)
+      bySupply := make(map[int64]*aggItem)
+
+      for _, draft := range drafts {
+              for _, item := range draft.Items {
+                      portion := item.FinalDose.Mul(draft.EffectiveArea)
+
+                      agg, ok := bySupply[item.SupplyID]
+                      if !ok {
+                              agg = &aggItem{supplyID: item.SupplyID, supplyName: item.SupplyName}
+                              bySupply[item.SupplyID] = agg
+                              supplyOrder = append(supplyOrder, item.SupplyID)
+                      }
+                      agg.totalUsed = agg.totalUsed.Add(portion)
+              }
+      }
+
+      group.Items = make([]domain.WorkOrderDraftItem, 0, len(supplyOrder))
+      for _, sid := range supplyOrder {
+              agg := bySupply[sid]
+
+              finalDose := decimal.Zero
+              if group.EffectiveArea.GreaterThan(decimal.Zero) {
+                      finalDose = agg.totalUsed.Div(group.EffectiveArea).Round(6)
+              }
+
+              group.Items = append(group.Items, domain.WorkOrderDraftItem{
+                      SupplyID:   agg.supplyID,
+                      SupplyName: agg.supplyName,
+                      TotalUsed:  agg.totalUsed,
+                      FinalDose:  finalDose,
+              })
+      }
 
 	return group
 }
