@@ -41,6 +41,10 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateLot(ctx context.Context, l *domain.Lot) (int64, error) {
 	var lotID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Guard de tenant (flag-gated): el field debe pertenecer a un project del tenant activo.
+		if err := sharedfilters.GuardFieldForTenant(ctx, tx, l.FieldID); err != nil {
+			return err
+		}
 		var existing models.Lot
 		if err := tx.Where("name = ? AND field_id = ? AND deleted_at IS NULL", l.Name, l.FieldID).
 			First(&existing).Error; err == nil {
@@ -111,10 +115,13 @@ func (r *Repository) UpdateLot(ctx context.Context, l *domain.Lot) error {
 		}
 
 		// Verificación de existencia (distingue 404 de 409)
+		existsQ := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", l.ID)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			existsQ = existsQ.Where(cond, args...)
+		}
 		var exists int64
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", l.ID).
-			Count(&exists).Error; err != nil {
+		if err := existsQ.Count(&exists).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if exists == 0 {
@@ -264,8 +271,12 @@ func (r *Repository) UpdateLotTons(ctx context.Context, id int64, tons decimal.D
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		countQ := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			countQ = countQ.Where(cond, args...)
+		}
 		var count int64
-		if err := tx.Model(&models.Lot{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
+		if err := countQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
@@ -292,10 +303,13 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		countQ := tx.Model(&models.Lot{}).
+			Where("id = ? AND deleted_at IS NULL", id)
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			countQ = countQ.Where(cond, args...)
+		}
 		var count int64
-		if err := tx.Model(&models.Lot{}).
-			Where("id = ? AND deleted_at IS NULL", id).
-			Count(&count).Error; err != nil {
+		if err := countQ.Count(&count).Error; err != nil {
 			return domainerr.Internal("failed to check lot existence")
 		}
 		if count == 0 {
@@ -310,6 +324,43 @@ func (r *Repository) DeleteLot(ctx context.Context, id int64) error {
 			return domainerr.Internal("failed to soft-delete lot")
 		}
 		return nil
+	})
+}
+
+// lotTenantScope acota el query a la entidad hija lot por su predicado de tenant (field_id).
+// lot no tiene tenant_id propio, así que NO usa ScopeTenant.
+func lotTenantScope(ctx context.Context) func(*gorm.DB) *gorm.DB {
+	return func(q *gorm.DB) *gorm.DB {
+		if cond, args := sharedfilters.TenantFieldScope(ctx); cond != "" {
+			return q.Where(cond, args...)
+		}
+		return q
+	}
+}
+
+// ArchiveLot ejecuta un soft delete con la semántica unificada del helper compartido:
+// 404 si el lote no existe o no es del tenant; no-op idempotente si ya estaba archivado.
+func (r *Repository) ArchiveLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Lot{}, id, "lot", sharedrepo.ArchiveOptions{
+			Scope: lotTenantScope(ctx),
+		})
+	})
+}
+
+// RestoreLot restaura un registro previamente archivado con la semántica unificada del helper
+// compartido: 404 si el lote no existe o no es del tenant; no-op idempotente si no estaba archivado.
+func (r *Repository) RestoreLot(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lot"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Lot{}, id, "lot", sharedrepo.ArchiveOptions{
+			Scope: lotTenantScope(ctx),
+		})
 	})
 }
 

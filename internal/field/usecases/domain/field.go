@@ -19,7 +19,15 @@ type Field struct {
 	LeaseTypePercent *decimal.Decimal
 	LeaseTypeValue   *decimal.Decimal
 	Investors        []invdom.Investor
+	Lessees          []Lessee
 	Lots             []lotdom.Lot
 	ArchivedAt       *time.Time
 	shareddomain.Base
+}
+
+// Lessee = arrendatario de un campo. Referencia un actor (rol lessee) con su porcentaje.
+type Lessee struct {
+	ActorID    int64
+	Name       string
+	Percentage int
 }

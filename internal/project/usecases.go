@@ -20,6 +20,7 @@ type RepositoryPort interface {
 	GetProject(context.Context, int64) (*domain.Project, error)
 	GetProjectByNameAndCampaignID(context.Context, string, int64) (*domain.Project, error)
 	UpdateProject(context.Context, *domain.Project) error
+	UpdateProjectName(context.Context, int64, string) error
 	ArchiveProject(context.Context, int64) error
 	RestoreProject(context.Context, int64) error
 	DeleteProject(context.Context, int64) error
@@ -93,6 +94,11 @@ func (u *UseCases) UpdateProject(ctx context.Context, p *domain.Project) error {
 		return domainerr.Conflict("project already exists")
 	}
 	return u.repo.UpdateProject(ctx, p)
+}
+
+// UpdateProjectName edita solo el nombre del proyecto (catálogo/registry unificado).
+func (u *UseCases) UpdateProjectName(ctx context.Context, id int64, name string) error {
+	return u.repo.UpdateProjectName(ctx, id, name)
 }
 
 func (u *UseCases) ArchiveProject(ctx context.Context, id int64) error {

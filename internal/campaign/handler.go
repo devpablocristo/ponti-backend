@@ -14,6 +14,11 @@ type UseCasesPort interface {
 	CreateCampaign(context.Context, *domain.Campaign) (int64, error)
 	ListCampaigns(context.Context, int64, string) ([]domain.Campaign, error)
 	GetCampaign(context.Context, int64) (*domain.Campaign, error)
+	GetArchivedCampaigns(context.Context) ([]domain.Campaign, error)
+	UpdateCampaign(context.Context, *domain.Campaign) error
+	DeleteCampaign(context.Context, int64) error
+	ArchiveCampaign(context.Context, int64) error
+	RestoreCampaign(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -55,10 +60,24 @@ func (h *Handler) Routes() {
 	public := r.Group(baseURL, h.mws.GetValidation()...)
 	{
 		public.GET("", h.ListCampaigns)
+		public.POST("", h.CreateCampaign)
+		public.GET("/archived", h.GetArchivedCampaigns)
+		public.GET("/:campaign_id", h.GetCampaign)
+		public.PUT("/:campaign_id", h.UpdateCampaign)
+		public.DELETE("/:campaign_id", h.DeleteCampaign)
+		public.POST("/:campaign_id/archive", h.ArchiveCampaign)
+		public.POST("/:campaign_id/restore", h.RestoreCampaign)
 	}
 }
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
+	// El admin de catálogos pide los archivados con ?status=archived (mismo contrato que los
+	// otros catálogos); el form de project sigue llamando sin status → lista activa.
+	if c.Query("status") == "archived" {
+		h.GetArchivedCampaigns(c)
+		return
+	}
+
 	var customerID int64
 	customerIDValue, err := sharedhandlers.ParseOptionalInt64Query(c, "customer_id")
 	if err != nil {

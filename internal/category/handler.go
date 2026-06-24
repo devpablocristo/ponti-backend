@@ -17,6 +17,8 @@ type UseCasesPort interface {
 	GetCategory(context.Context, int64) (*domain.Category, error)
 	UpdateCategory(context.Context, *domain.Category) error
 	DeleteCategory(context.Context, int64) error
+	ArchiveCategory(context.Context, int64) error
+	RestoreCategory(context.Context, int64) error
 }
 
 type GinEnginePort interface {
@@ -65,6 +67,8 @@ func (h *Handler) Routes() {
 		group.GET("/:category_id", h.GetCategory)
 		group.PUT("/:category_id", h.UpdateCategory)
 		group.DELETE("/:category_id", h.DeleteCategory)
+		group.POST("/:category_id/archive", h.ArchiveCategory)
+		group.POST("/:category_id/restore", h.RestoreCategory)
 	}
 }
 
@@ -129,6 +133,33 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 		return
 	}
 	if err := h.ucs.DeleteCategory(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+// ArchiveCategory ejecuta soft delete (archivado) de la category.
+func (h *Handler) ArchiveCategory(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "category_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.ArchiveCategory(c.Request.Context(), id); err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	sharedhandlers.RespondNoContent(c)
+}
+
+func (h *Handler) RestoreCategory(c *gin.Context) {
+	id, err := ginmw.ParseParamID(c, "category_id")
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	if err := h.ucs.RestoreCategory(c.Request.Context(), id); err != nil {
 		sharedhandlers.RespondError(c, err)
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	models "github.com/devpablocristo/ponti-backend/internal/lease-type/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/lease-type/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -35,20 +36,32 @@ func (r *Repository) CreateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 		UpdatedBy: lt.UpdatedBy,
 	}
 	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
+		if sharedrepo.IsUniqueViolation(err) {
+			return 0, domainerr.Conflict("a lease type with that name already exists")
+		}
 		return 0, domainerr.Internal("failed to create lease type")
+	}
+	// T3 (Modelo 2): dual-write de tenant_id del tenant activo (flag-gated).
+	if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+		if err := r.db.Client().WithContext(ctx).Exec("UPDATE lease_types SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
+			return 0, domainerr.Internal("failed to set lease type tenant")
+		}
 	}
 	return model.ID, nil
 }
 
-func (r *Repository) ListLeaseTypes(ctx context.Context, page, perPage int) ([]domain.LeaseType, int64, error) {
+func (r *Repository) ListLeaseTypes(ctx context.Context, status string, page, perPage int) ([]domain.LeaseType, int64, error) {
+	// T3 (Modelo 2): acotar al tenant activo (flag-gated) vía helper compartido.
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.LeaseType{}).Count(&total).Error; err != nil {
+	countTx := sharedfilters.ScopeTenant(ctx, sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx).Model(&models.LeaseType{}), status))
+	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count lease types")
 	}
 
 	var list []models.LeaseType
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	listTx := sharedfilters.ScopeTenant(ctx, sharedrepo.ScopeByStatus(r.db.Client().WithContext(ctx), status))
+	err := listTx.
 		Offset(offset).
 		Limit(perPage).
 		Order("id ASC").
@@ -69,7 +82,10 @@ func (r *Repository) GetLeaseType(ctx context.Context, id int64) (*domain.LeaseT
 		return nil, err
 	}
 	var model models.LeaseType
-	if err := r.db.Client().WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+	q := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
+	q = sharedfilters.ScopeTenant(ctx, q)
+	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "lease type", id)
 	}
 	return model.ToDomain(), nil
@@ -88,8 +104,13 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	if !lt.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", lt.UpdatedAt)
 	}
+	// T3 (Modelo 2): guard de ownership (flag-gated) — solo actualiza si es del tenant.
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomainLeaseType(lt))
 	if result.Error != nil {
+		if sharedrepo.IsUniqueViolation(result.Error) {
+			return domainerr.Conflict("a lease type with that name already exists")
+		}
 		return domainerr.Internal("failed to update lease type")
 	}
 	if result.RowsAffected == 0 {
@@ -101,12 +122,37 @@ func (r *Repository) UpdateLeaseType(ctx context.Context, lt *domain.LeaseType) 
 	return nil
 }
 
+func (r *Repository) ArchiveLeaseType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.LeaseType{}, id, "lease type", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
+	})
+}
+
+func (r *Repository) RestoreLeaseType(ctx context.Context, id int64) error {
+	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
+		return err
+	}
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.LeaseType{}, id, "lease type", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a lease type with that name already exists; cannot restore",
+		})
+	})
+}
+
 func (r *Repository) DeleteLeaseType(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "lease type"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.LeaseType{}, "id = ?", id)
+	deleteTx := r.db.Client().WithContext(ctx).Where("id = ?", id)
+	// T3 (Modelo 2): guard de ownership (flag-gated) — NotFound si no es del tenant.
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
+	result := deleteTx.Delete(&models.LeaseType{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete lease type")
 	}

@@ -67,7 +67,63 @@ func TestIsForeignKeyViolation(t *testing.T) {
 	}
 }
 
-func TestDeleteSupply_ReturnsConflictWhenHistoricalReferencesExist(t *testing.T) {
+// TestDeleteSupply_ReturnsBusinessRuleWhenActiveReferencesExist: un insumo con
+// referencias ACTIVAS (stock + movimiento vivos) no puede eliminarse. El gate
+// countActiveSupplyReferences cuenta esas filas vivas y DeleteSupply devuelve
+// BusinessRule (-> 422), que el FE traduce a "in_use" y bloquea.
+func TestDeleteSupply_ReturnsBusinessRuleWhenActiveReferencesExist(t *testing.T) {
+	fx := setupDeleteSupplyFixture(t)
+
+	err := fx.repo.DeleteSupply(fx.ctx, fx.supplyID)
+	require.Error(t, err)
+	assert.True(t, domainerr.IsKind(err, domainerr.KindBusinessRule),
+		"se espera BusinessRule (422) cuando hay referencias activas, got: %v", err)
+	assert.Contains(t, err.Error(), "in use by active records")
+
+	var count int64
+	require.NoError(t, fx.db.Unscoped().Model(&models.Supply{}).Where("id = ?", fx.supplyID).Count(&count).Error)
+	assert.Equal(t, int64(1), count, "supply debe seguir existiendo cuando hay referencias activas")
+}
+
+// TestDeleteSupply_ReturnsConflictWhenOnlyHistoricalReferences: cuando el stock y
+// el movimiento estan SOFT-DELETED, countActiveSupplyReferences cuenta 0 (GORM
+// excluye deleted_at) pero las filas siguen fisicamente presentes y las FK
+// RESTRICT impiden el hard-delete. DeleteSupply devuelve Conflict (-> 409), que el
+// FE traduce a "conflict" y archiva en lugar de eliminar.
+func TestDeleteSupply_ReturnsConflictWhenOnlyHistoricalReferences(t *testing.T) {
+	fx := setupDeleteSupplyFixture(t)
+
+	// Soft-delete de las referencias: deja deleted_at seteado pero las filas
+	// fisicas siguen, manteniendo vivas las FK RESTRICT hacia el supply.
+	require.NoError(t, fx.db.Delete(&models.SupplyMovement{}, fx.movementID).Error)
+	require.NoError(t, fx.db.Delete(&stockmodels.Stock{}, fx.stockID).Error)
+
+	err := fx.repo.DeleteSupply(fx.ctx, fx.supplyID)
+	require.Error(t, err)
+	assert.True(t, domainerr.IsConflict(err),
+		"se espera Conflict (409) cuando solo hay referencias historicas, got: %v", err)
+	assert.Contains(t, err.Error(), "historical references")
+
+	var count int64
+	require.NoError(t, fx.db.Unscoped().Model(&models.Supply{}).Where("id = ?", fx.supplyID).Count(&count).Error)
+	assert.Equal(t, int64(1), count, "supply debe seguir existiendo cuando hay referencias historicas")
+}
+
+// deleteSupplyFixture agrupa lo necesario para ejercitar DeleteSupply contra una DB real.
+type deleteSupplyFixture struct {
+	db         *gorm.DB
+	repo       *Repository
+	ctx        context.Context
+	supplyID   int64
+	stockID    int64
+	movementID int64
+}
+
+// setupDeleteSupplyFixture crea un insumo con un stock y un movimiento VIVOS
+// (referencias activas) y registra la limpieza. Hace Skip si no hay DB de test.
+func setupDeleteSupplyFixture(t *testing.T) deleteSupplyFixture {
+	t.Helper()
+
 	host := getEnvOrDefault("TEST_DB_HOST", os.Getenv("DB_HOST"))
 	if host == "" {
 		t.Skip("Skipping integration test: TEST_DB_HOST or DB_HOST not set")
@@ -93,8 +149,6 @@ func TestDeleteSupply_ReturnsConflictWhenHistoricalReferencesExist(t *testing.T)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 
-	repo := NewRepository(&gormEngineAdapter{client: db})
-	ctx := context.Background()
 	now := time.Now().UTC()
 	suffix := now.UnixNano()
 
@@ -180,16 +234,18 @@ func TestDeleteSupply_ReturnsConflictWhenHistoricalReferencesExist(t *testing.T)
 	require.NoError(t, tx.Commit().Error)
 	committed = true
 
-	defer cleanupDeleteSupplyTestData(t, db, movement.ID, stock.ID, supply.ID, provider.ID, investor.ID, project.ID, campaign.ID, customer.ID, category.ID, classType.ID)
+	t.Cleanup(func() {
+		cleanupDeleteSupplyTestData(t, db, movement.ID, stock.ID, supply.ID, provider.ID, investor.ID, project.ID, campaign.ID, customer.ID, category.ID, classType.ID)
+	})
 
-	err = repo.DeleteSupply(ctx, supply.ID)
-	require.Error(t, err)
-	assert.True(t, domainerr.IsConflict(err))
-	assert.Contains(t, err.Error(), "historical references")
-
-	var count int64
-	require.NoError(t, db.Unscoped().Model(&models.Supply{}).Where("id = ?", supply.ID).Count(&count).Error)
-	assert.Equal(t, int64(1), count, "supply debe seguir existiendo cuando hay referencias históricas")
+	return deleteSupplyFixture{
+		db:         db,
+		repo:       NewRepository(&gormEngineAdapter{client: db}),
+		ctx:        context.Background(),
+		supplyID:   supply.ID,
+		stockID:    stock.ID,
+		movementID: movement.ID,
+	}
 }
 
 type gormEngineAdapter struct {

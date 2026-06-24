@@ -10,6 +10,7 @@ import (
 	models "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
 
@@ -28,6 +29,9 @@ func NewRepository(db GormEnginePort) *Repository {
 func (r *Repository) CreateField(ctx context.Context, f *domain.Field) (int64, error) {
 	var fieldID int64
 	err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := sharedfilters.GuardProjectForTenant(ctx, tx, f.ProjectID); err != nil {
+			return err
+		}
 		model := models.FromDomain(f)
 		if err := tx.Create(model).Error; err != nil {
 			return domainerr.Internal("failed to create field")
@@ -102,6 +106,9 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	updateTx := r.db.Client().WithContext(ctx).
 		Model(&models.Field{}).
 		Where("id = ?", f.ID)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
 	if !f.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", f.UpdatedAt)
 	}
@@ -121,14 +128,40 @@ func (r *Repository) UpdateField(ctx context.Context, f *domain.Field) error {
 	return nil
 }
 
+// UpdateFieldName actualiza únicamente el nombre del campo (edición desde el
+// catálogo/registry unificado), sin requerir el resto del payload (lease_type, lotes).
+func (r *Repository) UpdateFieldName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "field"); err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Field{}).
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		updateTx = updateTx.Where(cond, args...)
+	}
+	result := updateTx.Updates(map[string]any{"name": name})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update field name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("field %d not found", id))
+	}
+	return nil
+}
+
 // DeleteField ejecuta un hard delete (permanente).
 func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	delTx := r.db.Client().WithContext(ctx).
 		Unscoped().
-		Delete(&models.Field{}, "id = ?", id)
+		Where("id = ?", id)
+	if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+		delTx = delTx.Where(cond, args...)
+	}
+	result := delTx.Delete(&models.Field{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete field")
 	}
@@ -138,17 +171,27 @@ func (r *Repository) DeleteField(ctx context.Context, id int64) error {
 	return nil
 }
 
+// fieldScope acota el query al tenant/proyecto del caller (field es entidad hija,
+// sin tenant_id propio: usa el predicado project_id de TenantProjectScope).
+func fieldScope(ctx context.Context) func(*gorm.DB) *gorm.DB {
+	return func(q *gorm.DB) *gorm.DB {
+		if cond, args := sharedfilters.TenantProjectScope(ctx); cond != "" {
+			return q.Where(cond, args...)
+		}
+		return q
+	}
+}
+
 // ArchiveField ejecuta un soft delete (idempotente).
 func (r *Repository) ArchiveField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Field{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive field")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Field{}, id, "field", sharedrepo.ArchiveOptions{
+			Scope: fieldScope(ctx),
+		})
+	})
 }
 
 // RestoreField restaura un registro previamente archivado.
@@ -156,13 +199,9 @@ func (r *Repository) RestoreField(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "field"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Field{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore field")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Field{}, id, "field", sharedrepo.ArchiveOptions{
+			Scope: fieldScope(ctx),
+		})
+	})
 }

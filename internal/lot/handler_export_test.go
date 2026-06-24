@@ -18,6 +18,7 @@ type exportLotsUseCasesStub struct {
 	pageSize int
 }
 
+
 func (s *exportLotsUseCasesStub) CreateLot(context.Context, *domain.Lot) (int64, error) {
 	return 0, nil
 }
@@ -60,6 +61,14 @@ func (s *exportLotsUseCasesStub) GetMetrics(context.Context, int64, int64, int64
 
 func (s *exportLotsUseCasesStub) ListLots(context.Context, domain.LotListFilter, int, int) ([]domain.LotTable, int, decimal.Decimal, decimal.Decimal, error) {
 	return nil, 0, decimal.Zero, decimal.Zero, nil
+}
+
+func (s *exportLotsUseCasesStub) ArchiveLot(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (s *exportLotsUseCasesStub) RestoreLot(_ context.Context, _ int64) error {
+	return nil
 }
 
 func (s *exportLotsUseCasesStub) ExportLots(_ context.Context, filter domain.LotListFilter, page, pageSize int) ([]byte, error) {

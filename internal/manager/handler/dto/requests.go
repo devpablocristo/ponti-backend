@@ -6,11 +6,12 @@ import (
 
 // CreateManagerRequest es el DTO de entrada para crear un manager.
 type CreateManagerRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name  string  `json:"name" binding:"required"`
+	TaxID *string `json:"tax_id"` // opcional: CUIT/CUIL para el Identity Gate
 }
 
 func (r *CreateManagerRequest) ToDomain() *domain.Manager {
-	return &domain.Manager{Name: r.Name}
+	return &domain.Manager{Name: r.Name, TaxID: r.TaxID}
 }
 
 // UpdateManagerRequest es el DTO de entrada para actualizar un manager.

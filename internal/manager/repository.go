@@ -7,8 +7,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	models "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/manager/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -34,25 +36,67 @@ func (r *Repository) CreateManager(ctx context.Context, m *domain.Manager) (int6
 		CreatedBy: m.CreatedBy,
 		UpdatedBy: m.UpdatedBy,
 	}
-	if err := r.db.Client().WithContext(ctx).Create(model).Error; err != nil {
-		return 0, domainerr.Internal("failed to create manager")
+	create := func(db *gorm.DB) error {
+		if err := db.WithContext(ctx).Create(model).Error; err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("a manager with that name already exists")
+			}
+			return domainerr.Internal("failed to create manager")
+		}
+		// T1.e: dual-write de tenant_id (flag-gated).
+		if orgID, ok := sharedmodels.OrgIDFromContext(ctx); ok && sharedmodels.TenantEnforcementEnabled() {
+			if err := db.WithContext(ctx).Exec("UPDATE managers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, model.ID).Error; err != nil {
+				return domainerr.Internal("failed to set manager tenant")
+			}
+		}
+		return nil
+	}
+
+	// Flag off → comportamiento idéntico al actual.
+	if !sharedmodels.IdentityGateEnabled() {
+		if err := create(r.db.Client()); err != nil {
+			return 0, err
+		}
+		return model.ID, nil
+	}
+
+	// Identity Gate on: manager + resolución de identidad + stamp de actor_id en UNA tx.
+	if err := r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := create(tx); err != nil {
+			return err
+		}
+		res, err := identity.ResolveOrCreateIdentity(ctx, tx, identity.RoleManager, identity.ResolveInput{RawName: m.Name, TaxID: m.TaxID})
+		if err != nil {
+			if sharedrepo.IsUniqueViolation(err) {
+				return domainerr.Conflict("an entity with that identity already exists")
+			}
+			return domainerr.Internal("failed to resolve manager identity")
+		}
+		return tx.Exec("UPDATE managers SET actor_id = ? WHERE id = ?", res.ActorID, model.ID).Error
+	}); err != nil {
+		return 0, err
 	}
 	return model.ID, nil
 }
 
 func (r *Repository) ListManagers(ctx context.Context, page, perPage int) ([]domain.Manager, int64, error) {
 	var total int64
-	if err := r.db.Client().WithContext(ctx).Model(&models.Manager{}).Count(&total).Error; err != nil {
+	countTx := r.db.Client().WithContext(ctx).Model(&models.Manager{})
+	// T1.e: acotar al tenant activo (flag-gated).
+	countTx = sharedfilters.ScopeTenant(ctx, countTx)
+	if err := countTx.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count managers")
 	}
 
 	var list []models.Manager
 	offset := (page - 1) * perPage
-	err := r.db.Client().WithContext(ctx).
+	listTx := r.db.Client().WithContext(ctx).
 		Offset(offset).
 		Limit(perPage).
-		Order("id ASC").
-		Find(&list).Error
+		Order("id ASC")
+	// T1.e: acotar al tenant activo (flag-gated).
+	listTx = sharedfilters.ScopeTenant(ctx, listTx)
+	err := listTx.Find(&list).Error
 	if err != nil {
 		return nil, 0, domainerr.Internal("failed to list managers")
 	}
@@ -69,7 +113,10 @@ func (r *Repository) GetManager(ctx context.Context, id int64) (*domain.Manager,
 		return nil, err
 	}
 	var model models.Manager
-	if err := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id).First(&model).Error; err != nil {
+	q := r.db.Client().WithContext(ctx).Unscoped().Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated) — 404 si el manager no es del tenant.
+	q = sharedfilters.ScopeTenant(ctx, q)
+	if err := q.First(&model).Error; err != nil {
 		return nil, sharedrepo.HandleGormError(err, "manager", id)
 	}
 	return model.ToDomain(), nil
@@ -88,6 +135,8 @@ func (r *Repository) UpdateManager(ctx context.Context, m *domain.Manager) error
 	if !m.UpdatedAt.IsZero() {
 		updateTx = updateTx.Where("updated_at = ?", m.UpdatedAt)
 	}
+	// T1.e: guard de ownership (flag-gated) — solo actualiza si es del tenant.
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
 	result := updateTx.Updates(models.FromDomain(m))
 	if result.Error != nil {
 		return domainerr.Internal("failed to update manager")
@@ -106,9 +155,12 @@ func (r *Repository) DeleteManager(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "manager"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
+	deleteTx := r.db.Client().WithContext(ctx).
 		Unscoped().
-		Delete(&models.Manager{}, "id = ?", id)
+		Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated).
+	deleteTx = sharedfilters.ScopeTenant(ctx, deleteTx)
+	result := deleteTx.Delete(&models.Manager{})
 	if result.Error != nil {
 		return domainerr.Internal("failed to delete manager")
 	}
@@ -123,12 +175,11 @@ func (r *Repository) ArchiveManager(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "manager"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Delete(&models.Manager{}, "id = ?", id)
-	if result.Error != nil {
-		return domainerr.Internal("failed to archive manager")
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftArchive(ctx, tx, &models.Manager{}, id, "manager", sharedrepo.ArchiveOptions{
+			Scope: func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+		})
+	})
 }
 
 // RestoreManager restaura un manager archivado.
@@ -136,16 +187,10 @@ func (r *Repository) RestoreManager(ctx context.Context, id int64) error {
 	if err := sharedrepo.ValidateID(id, "manager"); err != nil {
 		return err
 	}
-	result := r.db.Client().WithContext(ctx).
-		Unscoped().
-		Model(&models.Manager{}).
-		Where("id = ?", id).
-		Update("deleted_at", nil)
-	if result.Error != nil {
-		return domainerr.Internal("failed to restore manager")
-	}
-	if result.RowsAffected == 0 {
-		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("manager with id %d does not exist", id))
-	}
-	return nil
+	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return sharedrepo.SoftRestore(ctx, tx, &models.Manager{}, id, "manager", sharedrepo.ArchiveOptions{
+			Scope:              func(q *gorm.DB) *gorm.DB { return sharedfilters.ScopeTenant(ctx, q) },
+			RestoreConflictMsg: "a manager with that name already exists; cannot restore",
+		})
+	})
 }

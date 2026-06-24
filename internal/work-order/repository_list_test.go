@@ -201,3 +201,53 @@ func TestRepository_ListWorkOrderFilterRows_ReturnsAllRowsWithoutPagination(t *t
 		t.Fatalf("expected filter rows to preserve work order ordering, got first=%d last=%d", rows[0].ID, rows[3].ID)
 	}
 }
+
+func TestRepository_ListWorkOrders_FiltersSupplyIncludesClosedDigital(t *testing.T) {
+	db := newListWorkOrdersTestDB(t)
+
+	// Orden digital CERRADA (publicada): fila real con id POSITIVO, is_digital=true e
+	// items en workorder_items. Antes del fix el filtro por supply_id branchaba por
+	// is_digital, así que esta fila caía en la rama de drafts (EXISTS sobre
+	// work_order_draft_items con draft_id = -id) y nunca matcheaba -> quedaba excluida.
+	// Con el branch por signo del id (id > 0 -> workorder_items) ahora sí aparece.
+	seed := []string{
+		`INSERT INTO v4_report.workorder_list (id, number, project_id, field_id, date, sequence_day, is_digital, status, supply_name) VALUES
+			(13, 'D-2001', 30, 40, '2026-04-22T00:00:00Z', 1, true, 'published', '2-4D');`,
+		`INSERT INTO workorder_items (id, workorder_id, supply_id, deleted_at) VALUES
+			(3, 13, 100, NULL);`,
+	}
+	for _, stmt := range seed {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("seed %q: %v", stmt, err)
+		}
+	}
+
+	repo := NewRepository(&listTestGormEngine{client: db})
+
+	projectID := int64(30)
+	supplyID := int64(100)
+	rows, _, err := repo.ListWorkOrders(
+		context.Background(),
+		domain.WorkOrderFilter{ProjectID: &projectID, SupplyID: &supplyID},
+		types.Input{Page: 1, PageSize: 10},
+	)
+	if err != nil {
+		t.Fatalf("list work orders: %v", err)
+	}
+
+	ids := make(map[int64]bool, len(rows))
+	for _, r := range rows {
+		ids[r.ID] = true
+	}
+
+	// La digital CERRADA (13) ahora aparece; la manual publicada (10) y el draft (-20) siguen.
+	if !ids[13] {
+		t.Fatalf("expected closed digital order (id=13) included in supply filter, got ids=%v", ids)
+	}
+	if !ids[10] || !ids[-20] {
+		t.Fatalf("expected manual published (10) and digital draft (-20) to remain, got ids=%v", ids)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows (closed digital + manual published + draft), got %d: ids=%v", len(rows), ids)
+	}
+}

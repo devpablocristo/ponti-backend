@@ -14,6 +14,7 @@ Runbooks summarize operational areas. Script-specific specs under `docs/specs/sc
 - `backup-restore.md`
 - `external-services.md`
 - `incident-response.md`
+- `tenancy-enforcement-activation.md`
 
 ## Script-Specific Specs
 

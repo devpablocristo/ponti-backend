@@ -16,11 +16,13 @@ import (
 	cusmod "github.com/devpablocristo/ponti-backend/internal/customer/repository/models"
 	fieldmod "github.com/devpablocristo/ponti-backend/internal/field/repository/models"
 	domainField "github.com/devpablocristo/ponti-backend/internal/field/usecases/domain"
+	identity "github.com/devpablocristo/ponti-backend/internal/identity"
 	invmod "github.com/devpablocristo/ponti-backend/internal/investor/repository/models"
 	lotmod "github.com/devpablocristo/ponti-backend/internal/lot/repository/models"
 	manmod "github.com/devpablocristo/ponti-backend/internal/manager/repository/models"
 	models "github.com/devpablocristo/ponti-backend/internal/project/repository/models"
 	domain "github.com/devpablocristo/ponti-backend/internal/project/usecases/domain"
+	sharedfilters "github.com/devpablocristo/ponti-backend/internal/shared/filters"
 	base "github.com/devpablocristo/ponti-backend/internal/shared/models"
 	sharedrepo "github.com/devpablocristo/ponti-backend/internal/shared/repository"
 )
@@ -166,6 +168,26 @@ func (r *Repository) CreateProject(ctx context.Context, p *domain.Project) (int6
 			return fmt.Errorf("failed to create project: %w", err)
 		}
 		projectID = projectModel.ID
+
+		// T1.e: dual-write de tenant_id (flag-gated). El project nace con el
+		// tenant activo; sus raíces (customer/campaign) solo si aún no tienen
+		// tenant (no se reasigna una raíz que ya pertenece a otro tenant).
+		if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+			if err := tx.Exec("UPDATE projects SET tenant_id = ? WHERE id = ?", orgID, projectID).Error; err != nil {
+				return fmt.Errorf("failed to set project tenant: %w", err)
+			}
+			if p.Customer.ID > 0 {
+				if err := tx.Exec("UPDATE customers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, p.Customer.ID).Error; err != nil {
+					return fmt.Errorf("failed to set customer tenant: %w", err)
+				}
+			}
+			if p.Campaign.ID > 0 {
+				if err := tx.Exec("UPDATE campaigns SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, p.Campaign.ID).Error; err != nil {
+					return fmt.Errorf("failed to set campaign tenant: %w", err)
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -191,6 +213,9 @@ func (r *Repository) ListProjects(ctx context.Context, page, perPage int) ([]dom
 		Model(&models.Project{}).
 		// Filtrar soft-deletes explícitamente para igualar remoto.
 		Where("deleted_at IS NULL")
+
+	// T1.e: acotar al tenant activo (flag-gated).
+	db0 = sharedfilters.ScopeTenant(ctx, db0)
 
 	if err := db0.Count(&total).Error; err != nil {
 		return nil, 0, domainerr.Internal("failed to count projects")
@@ -226,6 +251,11 @@ func (r *Repository) GetProjects(ctx context.Context, name string, customerID in
 	sumClient := r.db.Client().WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
+	// T1.e: acotar al tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		baseClient = baseClient.Where("projects.tenant_id = ?", orgID)
+		sumClient = sumClient.Where("projects.tenant_id = ?", orgID)
+	}
 	if name != "" {
 		baseClient = baseClient.Where("projects.name = ?", name)
 		sumClient = sumClient.Where("projects.name = ?", name)
@@ -296,6 +326,12 @@ func (r *Repository) ListArchivedProjects(ctx context.Context, page, perPage int
 		Joins("JOIN customers ON customers.id = projects.customer_id AND customers.deleted_at IS NULL").
 		Where("projects.deleted_at IS NOT NULL")
 
+	// T1.e: acotar archivados al tenant activo (flag-gated) — antes era global.
+	if orgID, ok := base.OrgIDFromContext(ctx); ok && base.TenantEnforcementEnabled() {
+		baseClient = baseClient.Where("projects.tenant_id = ?", orgID)
+		sumClient = sumClient.Where("projects.tenant_id = ?", orgID)
+	}
+
 	if err := baseClient.Count(&total).Error; err != nil {
 		return nil, decimal.Zero, 0, domainerr.Internal("failed to count archived projects")
 	}
@@ -340,10 +376,19 @@ func (r *Repository) ListProjectsByCustomerID(ctx context.Context, customerID in
 	var projects []domain.ListedProject
 	var total int64
 
+	// T1.e: leer orgID/flag con el paquete `base` ANTES de declarar la var local
+	// `base` (que lo shadowea).
+	tenantOrgID, tenantOK := base.OrgIDFromContext(ctx)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
+
 	base := r.db.Client().
 		WithContext(ctx).
 		Model(&models.Project{}).
 		Where("projects.deleted_at IS NULL")
+
+	if tenantOn {
+		base = base.Where("projects.tenant_id = ?", tenantOrgID)
+	}
 
 	if customerID > 0 {
 		base = base.Where("customer_id = ?", customerID)
@@ -373,7 +418,10 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 	}
 
 	var m models.Project
-	err := r.db.Client().WithContext(ctx).
+	q := r.db.Client().WithContext(ctx)
+	// T1.e: guard de ownership (flag-gated) — 404 si el project no es del tenant.
+	q = sharedfilters.ScopeTenant(ctx, q)
+	err := q.
 		Preload("Customer").
 		Preload("Campaign").
 		Preload("Managers").
@@ -387,6 +435,7 @@ func (r *Repository) GetProject(ctx context.Context, id int64) (*domain.Project,
 			return db.Order("id ASC")
 		}).
 		Preload("Fields.FieldInvestors.Investor").
+		Preload("Fields.FieldLessees.Actor").
 		Preload("Fields.Lots.PreviousCrop").
 		Preload("Fields.Lots.CurrentCrop").
 		First(&m, id).Error
@@ -451,15 +500,18 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar existencia y optimistic locking dentro de la transacción
 		var existing models.Project
-		err := tx.
+		loadQ := tx.
 			Preload("Managers").
 			Preload("Investors.Investor").
 			Preload("AdminCostInvestors.Investor").
 			Preload("Fields").
 			Preload("Fields.FieldInvestors.Investor").
+			Preload("Fields.FieldLessees").
 			Preload("Fields.Lots").
-			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt).
-			First(&existing).Error
+			Where("id = ? AND updated_at = ?", d.ID, d.UpdatedAt)
+		// T1.e: guard de ownership (flag-gated).
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
+		err := loadQ.First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFound("project not found or outdated")
 		}
@@ -547,12 +599,46 @@ func (r *Repository) UpdateProject(ctx context.Context, d *domain.Project) error
 			return err
 		}
 
+		if err := relinkFieldLessees(tx, existing, d); err != nil {
+			return err
+		}
+
 		if err := relinkFieldsAndLots(tx, existing, m.Fields); err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+// UpdateProjectName actualiza únicamente el nombre del proyecto. Aislado del flujo
+// UpdateProject (que reconcilia toda la jerarquía) para soportar la edición desde el
+// catálogo/registry sin requerir el payload completo.
+func (r *Repository) UpdateProjectName(ctx context.Context, id int64, name string) error {
+	if err := sharedrepo.ValidateID(id, "project"); err != nil {
+		return err
+	}
+	userID, err := actorFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	updateTx := r.db.Client().WithContext(ctx).
+		Model(&models.Project{}).
+		Where("id = ?", id)
+	// T1.e: guard de ownership (flag-gated).
+	updateTx = sharedfilters.ScopeTenant(ctx, updateTx)
+	result := updateTx.Updates(map[string]any{
+		"name":       name,
+		"updated_by": userID,
+		"updated_at": time.Now(),
+	})
+	if result.Error != nil {
+		return domainerr.Internal("failed to update project name")
+	}
+	if result.RowsAffected == 0 {
+		return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project with id %d does not exist", id))
+	}
+	return nil
 }
 
 // ArchiveProject archiva (soft delete) un proyecto por ID.
@@ -570,19 +656,19 @@ func (r *Repository) ArchiveProject(ctx context.Context, id int64) error {
 
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var project models.Project
-		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Select("id", "customer_id", "deleted_at").Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
 			return domainerr.Internal("failed to load project")
 		}
 
-		var count int64
-		if err := tx.Model(&models.Project{}).Where("id = ?", id).Count(&count).Error; err != nil {
-			return domainerr.Internal("failed to check project existence")
-		}
-		if count == 0 {
-			return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
+		// Idempotente: si el proyecto ya está archivado, no-op.
+		if project.DeletedAt.Valid {
+			return nil
 		}
 
 		if deletedBy != nil {
@@ -693,15 +779,19 @@ func (r *Repository) RestoreProject(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que el proyecto esté eliminado
 		var project models.Project
-		if err := tx.Unscoped().Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
 			return domainerr.Internal("failed to check project")
 		}
 
+		// Idempotente: si el proyecto ya está activo, no-op.
 		if !project.DeletedAt.Valid {
-			return domainerr.Validation("project is not deleted, cannot restore")
+			return nil
 		}
 
 		// Restaurar project (usar Unscoped para actualizar registros eliminados)
@@ -793,7 +883,10 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 	return r.db.Client().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verificar que el proyecto existe (con Unscoped para incluir eliminados)
 		var project models.Project
-		if err := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id).First(&project).Error; err != nil {
+		loadQ := tx.Unscoped().Select("id", "customer_id").Where("id = ?", id)
+		// T1.e: guard de ownership (flag-gated).
+		loadQ = sharedfilters.ScopeTenant(ctx, loadQ)
+		if err := loadQ.First(&project).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.New(domainerr.KindNotFound, fmt.Sprintf("project %d not found", id))
 			}
@@ -904,17 +997,38 @@ func (r *Repository) DeleteProject(ctx context.Context, id int64) error {
 
 // --- HELPERS ---
 
+// attachActorIdentity estampa el actor_id de una tabla de rol (delega en
+// identity.StampActor: no-op con el gate off). Corre en la tx del caller.
+func attachActorIdentity(tx *gorm.DB, role identity.Role, table, name string, entityID int64) error {
+	return identity.StampActor(tx.Statement.Context, tx, role, table, "actor_id", name, entityID)
+}
+
 func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
+	tenantOrgID, tenantOK := base.OrgIDFromContext(tx.Statement.Context)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
 	if c.ID != 0 {
 		var existing cusmod.Customer
-		if err := tx.First(&existing, c.ID).Error; err == nil {
+		q := tx
+		if tenantOn {
+			q = q.Where("tenant_id = ?", tenantOrgID)
+		}
+		if err := q.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check customer: %w", err)
+		} else if tenantOn {
+			return 0, fmt.Errorf("customer %d not found in tenant", c.ID)
 		}
 	}
 	var existing cusmod.Customer
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated) para no
+	// reutilizar un customer de otro tenant (Modelo 2).
+	// anti-dup: match por nombre NORMALIZADO (reusa "acme sa" ≡ "Acme SA").
+	custQ := tx.Where(projectNameMatchPredicate(tx), c.Name)
+	if tenantOn {
+		custQ = custQ.Where("tenant_id = ?", tenantOrgID)
+	}
+	if err := custQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check customer: %w", err)
@@ -923,20 +1037,41 @@ func ensureCustomer(tx *gorm.DB, c *cusmod.Customer) (int64, error) {
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create customer: %w", err)
 	}
+	if tenantOn {
+		if err := tx.Exec("UPDATE customers SET tenant_id = ? WHERE id = ?", tenantOrgID, c.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set customer tenant: %w", err)
+		}
+	}
+	if err := attachActorIdentity(tx, identity.RoleCustomer, "customers", c.Name, c.ID); err != nil {
+		return 0, err
+	}
 	return c.ID, nil
 }
 
 func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
+	tenantOrgID, tenantOK := base.OrgIDFromContext(tx.Statement.Context)
+	tenantOn := tenantOK && base.TenantEnforcementEnabled()
 	if c.ID != 0 {
 		var existing casmod.Campaign
-		if err := tx.First(&existing, c.ID).Error; err == nil {
+		q := tx
+		if tenantOn {
+			q = q.Where("tenant_id = ?", tenantOrgID)
+		}
+		if err := q.First(&existing, c.ID).Error; err == nil {
 			return existing.ID, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, fmt.Errorf("failed to check campaign: %w", err)
+		} else if tenantOn {
+			return 0, fmt.Errorf("campaign %d not found in tenant", c.ID)
 		}
 	}
 	var existing casmod.Campaign
-	if err := tx.Where("name = ?", c.Name).First(&existing).Error; err == nil {
+	// T3: buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	campQ := tx.Where(projectNameMatchPredicate(tx), c.Name)
+	if tenantOn {
+		campQ = campQ.Where("tenant_id = ?", tenantOrgID)
+	}
+	if err := campQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check campaign: %w", err)
@@ -945,7 +1080,19 @@ func ensureCampaign(tx *gorm.DB, c *casmod.Campaign) (int64, error) {
 	if err := tx.Create(c).Error; err != nil {
 		return 0, fmt.Errorf("failed to create campaign: %w", err)
 	}
+	if tenantOn {
+		if err := tx.Exec("UPDATE campaigns SET tenant_id = ? WHERE id = ?", tenantOrgID, c.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set campaign tenant: %w", err)
+		}
+	}
 	return c.ID, nil
+}
+
+func projectNameMatchPredicate(tx *gorm.DB) string {
+	if tx.Name() == "postgres" {
+		return "normalize_name(name) = normalize_name(?)"
+	}
+	return "lower(name) = lower(?)"
 }
 
 func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
@@ -958,7 +1105,10 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 		}
 	}
 	var existing manmod.Manager
-	if err := tx.Where("name = ?", m.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	mgrQ := tx.Where("normalize_name(name) = normalize_name(?)", m.Name)
+	mgrQ = sharedfilters.ScopeTenant(tx.Statement.Context, mgrQ)
+	if err := mgrQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check manager: %w", err)
@@ -966,6 +1116,15 @@ func ensureManager(tx *gorm.DB, m *manmod.Manager) (int64, error) {
 
 	if err := tx.Create(m).Error; err != nil {
 		return 0, fmt.Errorf("failed to create manager: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE managers SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, m.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set manager tenant: %w", err)
+		}
+	}
+	if err := attachActorIdentity(tx, identity.RoleManager, "managers", m.Name, m.ID); err != nil {
+		return 0, err
 	}
 	return m.ID, nil
 }
@@ -980,7 +1139,10 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 		}
 	}
 	var existing invmod.Investor
-	if err := tx.Where("name = ?", i.Name).First(&existing).Error; err == nil {
+	// T3 (Modelo 2): buscar por nombre SOLO dentro del tenant activo (flag-gated).
+	invQ := tx.Where("normalize_name(name) = normalize_name(?)", i.Name)
+	invQ = sharedfilters.ScopeTenant(tx.Statement.Context, invQ)
+	if err := invQ.First(&existing).Error; err == nil {
 		return existing.ID, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, fmt.Errorf("failed to check investor: %w", err)
@@ -988,6 +1150,15 @@ func ensureInvestor(tx *gorm.DB, i *invmod.Investor) (int64, error) {
 
 	if err := tx.Create(i).Error; err != nil {
 		return 0, fmt.Errorf("failed to create investor: %w", err)
+	}
+	// T3: stamp tenant_id del tenant activo (flag-gated).
+	if orgID, ok := base.OrgIDFromContext(tx.Statement.Context); ok && base.TenantEnforcementEnabled() {
+		if err := tx.Exec("UPDATE investors SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL", orgID, i.ID).Error; err != nil {
+			return 0, fmt.Errorf("failed to set investor tenant: %w", err)
+		}
+	}
+	if err := attachActorIdentity(tx, identity.RoleInvestor, "investors", i.Name, i.ID); err != nil {
+		return 0, err
 	}
 	return i.ID, nil
 }
@@ -1470,6 +1641,73 @@ func relinkFieldInvestors(tx *gorm.DB, existing models.Project, d *domain.Projec
 					ef.ID, invID,
 				).Error; err != nil {
 					return domainerr.Internal("failed to remove field investor")
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// relinkFieldLessees sincroniza los arrendatarios de cada campo (tabla field_lessees).
+// Espejo de relinkFieldInvestors pero keyeado por actor_id y SIN ensure: el actor ya
+// existe en el registry (lo seleccionó el usuario), nunca se crea acá.
+func relinkFieldLessees(tx *gorm.DB, existing models.Project, d *domain.Project) error {
+	findDomainField := func(fid int64, fname string) *domainField.Field {
+		for i := range d.Fields {
+			if d.Fields[i].ID > 0 && d.Fields[i].ID == fid {
+				return &d.Fields[i]
+			}
+			if d.Fields[i].ID == 0 && d.Fields[i].Name == fname {
+				return &d.Fields[i]
+			}
+		}
+		return nil
+	}
+
+	for _, ef := range existing.Fields {
+		df := findDomainField(ef.ID, ef.Name)
+		if df == nil {
+			continue
+		}
+
+		existingActorIDs := make(map[int64]struct{}, len(ef.FieldLessees))
+		for _, fl := range ef.FieldLessees {
+			existingActorIDs[fl.ActorID] = struct{}{}
+		}
+
+		newIDs := make(map[int64]struct{}, len(df.Lessees))
+		for i := range df.Lessees {
+			le := &df.Lessees[i]
+			if le.ActorID == 0 {
+				continue // sin actor resuelto no se persiste (el front manda actores existentes)
+			}
+			newIDs[le.ActorID] = struct{}{}
+
+			if _, existed := existingActorIDs[le.ActorID]; !existed {
+				if err := tx.Exec(
+					`INSERT INTO field_lessees (field_id, actor_id, percentage, created_by, updated_by)
+					 VALUES (?, ?, ?, ?, ?)`,
+					ef.ID, le.ActorID, le.Percentage, d.UpdatedBy, d.UpdatedBy,
+				).Error; err != nil {
+					return domainerr.Internal("failed to add field lessee")
+				}
+			} else {
+				if err := tx.Exec(
+					"UPDATE field_lessees SET percentage = ?, updated_by = ? WHERE field_id = ? AND actor_id = ?",
+					le.Percentage, d.UpdatedBy, ef.ID, le.ActorID,
+				).Error; err != nil {
+					return domainerr.Internal("failed to update field lessee")
+				}
+			}
+		}
+
+		for actorID := range existingActorIDs {
+			if _, exists := newIDs[actorID]; !exists {
+				if err := tx.Exec(
+					`DELETE FROM field_lessees WHERE field_id = ? AND actor_id = ?`,
+					ef.ID, actorID,
+				).Error; err != nil {
+					return domainerr.Internal("failed to remove field lessee")
 				}
 			}
 		}
