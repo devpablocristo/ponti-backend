@@ -30,7 +30,7 @@ func NewDefaultMiddlewares(cfg BuildConfig) *Middlewares {
 			ExcludedPaths:  []string{"/health", "/ping", "/swagger/spec", "/swagger/ui/index.html"},
 		}),
 	}
-	validation := []gin.HandlerFunc{coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
+	validation := []gin.HandlerFunc{BridgeAxisProductIntegrationAPIKey(), coreginmw.RequireAPIKeyFromEnv("X_API_KEY")}
 	if cfg.Auth.Enabled {
 		validation = append(validation, RequireIdentityPlatformAuthz(cfg.Auth, cfg.DB))
 	} else {

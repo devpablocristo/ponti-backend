@@ -9,6 +9,9 @@ Files in this directory must distinguish observable implementation decisions fro
 ## Files
 
 - `0000-observed-architectural-decisions.md`
+- `0001-identity-gate-actor-dedup.md`
+- `0002-tenant-enforcement-column-default-not-rls.md`
+- `0003-registry-aggregated-read-endpoint.md`
 
 ## Evidence Rules
 

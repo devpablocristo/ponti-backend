@@ -24,6 +24,7 @@ import (
 	dataintegrity "github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	dollar "github.com/devpablocristo/ponti-backend/internal/dollar"
 	field "github.com/devpablocristo/ponti-backend/internal/field"
+	governance "github.com/devpablocristo/ponti-backend/internal/governance"
 	investor "github.com/devpablocristo/ponti-backend/internal/investor"
 	invoice "github.com/devpablocristo/ponti-backend/internal/invoice"
 	labor "github.com/devpablocristo/ponti-backend/internal/labor"
@@ -52,6 +53,7 @@ type Dependencies struct {
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -61,6 +63,7 @@ type Dependencies struct {
 	ProviderHandler           *provider.Handler
 	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler
@@ -76,6 +79,9 @@ type Dependencies struct {
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 	WorkOrderDraftHandler     *workorderdraft.Handler
+	GovernanceHandler         *governance.Handler
+	GovernanceVerifier        *governance.Verifier
+	GovernanceExecutor        *governance.ApprovedExecutor
 }
 
 func Initialize() (*Dependencies, error) {
@@ -113,6 +119,7 @@ func Initialize() (*Dependencies, error) {
 		StockSet,
 		InvoiceSet,
 		AdminSet,
+		GovernanceSet,
 		wire.Struct(new(Dependencies), "*"),
 	)
 	return &Dependencies{}, nil

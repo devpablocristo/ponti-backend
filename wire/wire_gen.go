@@ -22,6 +22,7 @@ import (
 	"github.com/devpablocristo/ponti-backend/internal/data-integrity"
 	"github.com/devpablocristo/ponti-backend/internal/dollar"
 	"github.com/devpablocristo/ponti-backend/internal/field"
+	"github.com/devpablocristo/ponti-backend/internal/governance"
 	"github.com/devpablocristo/ponti-backend/internal/investor"
 	"github.com/devpablocristo/ponti-backend/internal/invoice"
 	"github.com/devpablocristo/ponti-backend/internal/labor"
@@ -194,6 +195,15 @@ func Initialize() (*Dependencies, error) {
 	providerConfigAPIPort := ProvideProviderConfigAPI(config)
 	providerMiddlewaresEnginePort := ProvideProviderMiddlewaresEnginePort(middlewares)
 	providerHandler := ProvideProviderHandler(providerGinEnginePort, providerUseCasesPort, providerConfigAPIPort, providerMiddlewaresEnginePort)
+	registryGinEnginePort := ProvideRegistryGinEnginePort(server)
+	registryGormEnginePort := ProvideRegistryGormEnginePort(repository)
+	registryRepository := ProvideRegistryRepository(registryGormEnginePort)
+	registryRepositoryPort := ProvideRegistryRepositoryPort(registryRepository)
+	registryUseCases := ProvideRegistryUseCases(registryRepositoryPort)
+	registryUseCasesPort := ProvideRegistryUseCasesPort(registryUseCases)
+	registryConfigAPIPort := ProvideRegistryConfigAPI(config)
+	registryMiddlewaresEnginePort := ProvideRegistryMiddlewaresEnginePort(middlewares)
+	registryHandler := ProvideRegistryHandler(registryGinEnginePort, registryUseCasesPort, registryConfigAPIPort, registryMiddlewaresEnginePort)
 	reportGinEnginePort := ProvideReportGinEnginePort(server)
 	reportUseCase := ProvideReportUseCases(reportRepositoryPort)
 	reportUseCasePort := ProvideReportUseCasesPort(reportUseCase)
@@ -319,7 +329,8 @@ func Initialize() (*Dependencies, error) {
 	aiGinEnginePort := ProvideAIGinEnginePort(server)
 	ai := ProvideConfigAI(config)
 	client := ProvideAIClient(ai)
-	usecasesUseCases := ProvideAIUseCases(client)
+	axisClient := ProvideAxisClient(ai)
+	usecasesUseCases := ProvideAIUseCases(client, axisClient, ai)
 	aiUseCasesPort := ProvideAIUseCasesPort(usecasesUseCases)
 	aiConfigAPIPort := ProvideAIConfigAPI(config)
 	aiMiddlewaresEnginePort := ProvideAIMiddlewaresEnginePort(middlewares)
@@ -347,15 +358,19 @@ func Initialize() (*Dependencies, error) {
 	workorderdraftConfigAPIPort := ProvideWorkOrderDraftConfigAPI(config)
 	workorderdraftMiddlewaresEnginePort := ProvideWorkOrderDraftMiddlewaresEnginePort(middlewares)
 	workorderdraftHandler := ProvideWorkOrderDraftHandler(workorderdraftGinEnginePort, workorderdraftUseCasesPort, workorderdraftConfigAPIPort, workorderdraftMiddlewaresEnginePort)
-	registryGinEnginePort := ProvideRegistryGinEnginePort(server)
-	registryGormEnginePort := ProvideRegistryGormEnginePort(repository)
-	registryRepository := ProvideRegistryRepository(registryGormEnginePort)
-	registryRepositoryPort := ProvideRegistryRepositoryPort(registryRepository)
-	registryUseCases := ProvideRegistryUseCases(registryRepositoryPort)
-	registryUseCasesPort := ProvideRegistryUseCasesPort(registryUseCases)
-	registryConfigAPIPort := ProvideRegistryConfigAPI(config)
-	registryMiddlewaresEnginePort := ProvideRegistryMiddlewaresEnginePort(middlewares)
-	registryHandler := ProvideRegistryHandler(registryGinEnginePort, registryUseCasesPort, registryConfigAPIPort, registryMiddlewaresEnginePort)
+	governanceRepository := ProvideGovernanceRepository(repository)
+	governanceRepositoryPort := ProvideGovernanceRepositoryPort(governanceRepository)
+	nexus := ProvideConfigNexus(config)
+	nexusClient := ProvideNexusClient(nexus)
+	nexusPort := ProvideGovernanceNexusPort(nexusClient)
+	approvedExecutor := ProvideGovernanceApprovedExecutor(governanceRepositoryPort, nexusClient, nexus)
+	executor := ProvideGovernanceExecutor(approvedExecutor)
+	governanceService := ProvideGovernanceService(governanceRepositoryPort, nexusPort, nexus, executor)
+	governanceGinEnginePort := ProvideGovernanceGinEnginePort(server)
+	governanceConfigAPIPort := ProvideGovernanceConfigAPI(config)
+	governanceMiddlewaresEnginePort := ProvideGovernanceMiddlewaresEnginePort(middlewares)
+	governanceHandler := ProvideGovernanceHandler(governanceService, governanceGinEnginePort, governanceConfigAPIPort, governanceMiddlewaresEnginePort)
+	verifier := ProvideGovernanceVerifier(nexusClient)
 	dependencies := &Dependencies{
 		Config:                    config,
 		GinEngine:                 server,
@@ -367,6 +382,7 @@ func Initialize() (*Dependencies, error) {
 		CampaignHandler:           campaignHandler,
 		DashboardHandler:          dashboardHandler,
 		DataIntegrityHandler:      dataintegrityHandler,
+		DataIntegrityUseCases:     dataintegrityUseCases,
 		InvestorHandler:           investorHandler,
 		CropHandler:               cropHandler,
 		LotHandler:                lotHandler,
@@ -376,6 +392,7 @@ func Initialize() (*Dependencies, error) {
 		ProviderHandler:           providerHandler,
 		RegistryHandler:           registryHandler,
 		ReportHandler:             reportHandler,
+		ReportUseCase:             reportUseCase,
 		LeaseTypeHandler:          leasetypeHandler,
 		SupplyHandler:             supplyHandler,
 		CategoryHandler:           categoryHandler,
@@ -391,6 +408,9 @@ func Initialize() (*Dependencies, error) {
 		AIHandler:                 aiHandler,
 		AdminHandler:              adminHandler,
 		WorkOrderDraftHandler:     workorderdraftHandler,
+		GovernanceHandler:         governanceHandler,
+		GovernanceVerifier:        verifier,
+		GovernanceExecutor:        approvedExecutor,
 	}
 	return dependencies, nil
 }
@@ -408,6 +428,7 @@ type Dependencies struct {
 	CampaignHandler           *campaign.Handler
 	DashboardHandler          *dashboard.Handler
 	DataIntegrityHandler      *dataintegrity.Handler
+	DataIntegrityUseCases     *dataintegrity.UseCases
 	InvestorHandler           *investor.Handler
 	CropHandler               *crop.Handler
 	LotHandler                *lot.Handler
@@ -417,6 +438,7 @@ type Dependencies struct {
 	ProviderHandler           *provider.Handler
 	RegistryHandler           *registry.Handler
 	ReportHandler             *report.ReportHandler
+	ReportUseCase             *report.ReportUseCase
 	LeaseTypeHandler          *leasetype.Handler
 	SupplyHandler             *supply.Handler
 	CategoryHandler           *category.Handler
@@ -432,4 +454,7 @@ type Dependencies struct {
 	AIHandler                 *ai.Handler
 	AdminHandler              *admin.Handler
 	WorkOrderDraftHandler     *workorderdraft.Handler
+	GovernanceHandler         *governance.Handler
+	GovernanceVerifier        *governance.Verifier
+	GovernanceExecutor        *governance.ApprovedExecutor
 }

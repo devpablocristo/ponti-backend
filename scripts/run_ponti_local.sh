@@ -84,9 +84,10 @@ fi
 
 # Check de axis (companion + nexus) — viven en repo paralelo. Si no están UP,
 # advertir; los endpoints /api/v1/ai/* van a fallar hasta que se levante axis.
-if [[ -n "${COMPANION_BASE_URL:-}" ]]; then
-  if ! http_ok "${COMPANION_BASE_URL}/readyz"; then
-    echo "WARN: Companion (${COMPANION_BASE_URL}) no responde. Levantá axis: cd ../../axis && docker compose up -d"
+companion_base_url="${AXIS_COMPANION_BASE_URL:-${COMPANION_BASE_URL:-}}"
+if [[ -n "$companion_base_url" ]]; then
+  if ! http_ok "${companion_base_url}/readyz"; then
+    echo "WARN: Companion (${companion_base_url}) no responde. Levantá axis: cd ../../axis && docker compose up -d"
   fi
 fi
 if [[ -n "${NEXUS_BASE_URL:-}" ]]; then

@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/platform/authn/go/jwks"
-	"github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/devpablocristo/platform/http/go/httperr"
+	"github.com/devpablocristo/platform/security/go/contextkeys"
 
 	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
@@ -67,6 +67,10 @@ func RequireIdentityPlatformAuthz(cfg IdentityAuthConfig, db *gorm.DB) gin.Handl
 	return func(c *gin.Context) {
 		start := time.Now()
 		permission := permissionForMethod(c.Request.Method)
+
+		if authorizeAxisProductIntegration(c, cfg, permission, start) {
+			return
+		}
 
 		tokenStr := extractBearer(c.GetHeader("Authorization"))
 		if tokenStr == "" {

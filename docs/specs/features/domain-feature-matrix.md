@@ -4,9 +4,9 @@ Specification type: baseline current-state mapping specification.
 
 | Domain | Feature IDs |
 |---|---|
-| Platform, Identity, And Admin | PL-01, PL-02, PL-03 |
+| Platform, Identity, And Admin | PL-01, PL-02, PL-03, PL-08, PL-09, PL-10, PL-11 |
 | Runtime, Migration, And Delivery | PL-04, PL-05, PL-06, PL-07 |
-| Portfolio And Master Data | PF-01, PF-02, PF-03, PF-04, PF-05, PF-06, PF-07, PF-08, PF-09, PF-10 |
+| Portfolio And Master Data | PF-01, PF-02, PF-03, PF-04, PF-05, PF-06, PF-07, PF-08, PF-09, PF-10, PF-11 |
 | Land And Crops | LC-01, LC-02, LC-03, LC-04, LC-05 |
 | Field Operations | OP-01, OP-02, OP-03, OP-04, OP-05, OP-06, OP-07, OP-08, OP-09, OP-10 |
 | Inventory And Stock | IN-01, IN-02, IN-03, IN-04, IN-05, IN-06, IN-07, IN-08, IN-09, IN-10 |

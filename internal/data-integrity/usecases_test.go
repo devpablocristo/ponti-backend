@@ -4,15 +4,167 @@ import (
 	"context"
 	"testing"
 
+	ctxkeys "github.com/devpablocristo/platform/security/go/contextkeys"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	dashboardDomain "github.com/devpablocristo/ponti-backend/internal/dashboard/usecases/domain"
+	"github.com/devpablocristo/ponti-backend/internal/data-integrity/usecases/domain"
 	lotDomain "github.com/devpablocristo/ponti-backend/internal/lot/usecases/domain"
 	reportDomain "github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
+	supplyDomain "github.com/devpablocristo/ponti-backend/internal/supply/usecases/domain"
 )
+
+type fakeBusinessInsightsNotifier struct {
+	notifyCalls                int
+	resolveCalls               int
+	tentativeNotifyCalls       int
+	tentativeResolveCalls      int
+	lastIssue                  DataIntegrityCriticalInput
+	lastTentativePricesIssue   TentativePricesInput
+	lastProject                string
+	lastTentativePricesProject string
+}
+
+func (f *fakeBusinessInsightsNotifier) NotifyDataIntegrityCritical(_ context.Context, _ uuid.UUID, _ string, issue DataIntegrityCriticalInput) error {
+	f.notifyCalls++
+	f.lastIssue = issue
+	return nil
+}
+
+func (f *fakeBusinessInsightsNotifier) MaybeResolveDataIntegrityCritical(_ context.Context, _ uuid.UUID, projectID string) error {
+	f.resolveCalls++
+	f.lastProject = projectID
+	return nil
+}
+
+func (f *fakeBusinessInsightsNotifier) NotifyTentativePrices(_ context.Context, _ uuid.UUID, _ string, issue TentativePricesInput) error {
+	f.tentativeNotifyCalls++
+	f.lastTentativePricesIssue = issue
+	return nil
+}
+
+func (f *fakeBusinessInsightsNotifier) MaybeResolveTentativePrices(_ context.Context, _ uuid.UUID, projectID string) error {
+	f.tentativeResolveCalls++
+	f.lastTentativePricesProject = projectID
+	return nil
+}
+
+func TestEvaluateIntegrityInsight_NotifiesWhenChecksFail(t *testing.T) {
+	notifier := &fakeBusinessInsightsNotifier{}
+	useCases := NewUseCases(nil, nil, nil, nil, nil, nil)
+	useCases.SetBusinessInsightsNotifier(notifier)
+	projectID := int64(4)
+	diffB := decimal.NewFromInt(9)
+	recalcBSource := "summary_results"
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, uuid.New())
+	ctx = context.WithValue(ctx, ctxkeys.Actor, "user-1")
+
+	useCases.evaluateIntegrityInsight(ctx, &projectID, &domain.IntegrityReport{
+		Checks: []domain.IntegrityCheck{
+			{ControlNumber: 1, Status: "OK"},
+			{
+				ControlNumber: 2,
+				Status:        "ERROR",
+				DataToVerify:  "Costos directos",
+				Description:   "Dashboard vs informes",
+				DifferenceA:   decimal.NewFromInt(10),
+				DifferenceB:   &diffB,
+				Tolerance:     decimal.NewFromInt(1),
+				SystemSource:  "dashboard",
+				RecalcASource: "lot_list",
+				RecalcBSource: &recalcBSource,
+			},
+		},
+	})
+
+	require.Equal(t, 1, notifier.notifyCalls)
+	require.Equal(t, 0, notifier.resolveCalls)
+	assert.Equal(t, "4", notifier.lastIssue.ProjectID)
+	assert.Equal(t, 1, notifier.lastIssue.FailedChecks)
+	assert.Equal(t, 2, notifier.lastIssue.TotalChecks)
+	require.Len(t, notifier.lastIssue.Controls, 1)
+	assert.Equal(t, 2, notifier.lastIssue.Controls[0].ControlNumber)
+	assert.Equal(t, "summary_results", notifier.lastIssue.Controls[0].RecalcBSource)
+}
+
+func TestEvaluateIntegrityInsight_ResolvesWhenChecksRecover(t *testing.T) {
+	notifier := &fakeBusinessInsightsNotifier{}
+	useCases := NewUseCases(nil, nil, nil, nil, nil, nil)
+	useCases.SetBusinessInsightsNotifier(notifier)
+	projectID := int64(4)
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, uuid.New())
+
+	useCases.evaluateIntegrityInsight(ctx, &projectID, &domain.IntegrityReport{
+		Checks: []domain.IntegrityCheck{{ControlNumber: 1, Status: "OK"}},
+	})
+
+	require.Equal(t, 0, notifier.notifyCalls)
+	require.Equal(t, 1, notifier.resolveCalls)
+	assert.Equal(t, "4", notifier.lastProject)
+}
+
+func TestGetTentativePrices_NotifiesWhenTentativePricesExist(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	supplyRepo := NewMockSupplyRepositoryPort(ctrl)
+	projectID := int64(4)
+	customerID := int64(1)
+	campaignID := int64(2)
+	supplyRepo.EXPECT().
+		ListTentativePrices(gomock.Any(), supplyDomain.SupplyFilter{
+			CustomerID: &customerID,
+			ProjectID:  &projectID,
+			CampaignID: &campaignID,
+		}, 10).
+		Return([]supplyDomain.TentativePriceItem{
+			{SupplyID: 10, Name: "Insumo", CategoryName: "Fertilizante", Price: decimal.RequireFromString("123.45")},
+		}, int64(1), nil)
+	notifier := &fakeBusinessInsightsNotifier{}
+	useCases := NewUseCases(nil, nil, nil, nil, nil, supplyRepo)
+	useCases.SetBusinessInsightsNotifier(notifier)
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, uuid.New())
+	ctx = context.WithValue(ctx, ctxkeys.Actor, "user-1")
+
+	report, err := useCases.GetTentativePrices(ctx, domain.TentativePricesFilter{
+		CustomerID: &customerID,
+		ProjectID:  &projectID,
+		CampaignID: &campaignID,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(1), report.Count)
+	require.Equal(t, 1, notifier.tentativeNotifyCalls)
+	require.Equal(t, 0, notifier.tentativeResolveCalls)
+	assert.Equal(t, "4", notifier.lastTentativePricesIssue.ProjectID)
+	require.Len(t, notifier.lastTentativePricesIssue.SampleItems, 1)
+	assert.Equal(t, "Insumo", notifier.lastTentativePricesIssue.SampleItems[0].Name)
+}
+
+func TestGetTentativePrices_ResolvesWhenNoTentativePricesRemain(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	supplyRepo := NewMockSupplyRepositoryPort(ctrl)
+	projectID := int64(4)
+	supplyRepo.EXPECT().
+		ListTentativePrices(gomock.Any(), supplyDomain.SupplyFilter{ProjectID: &projectID}, 10).
+		Return([]supplyDomain.TentativePriceItem{}, int64(0), nil)
+	notifier := &fakeBusinessInsightsNotifier{}
+	useCases := NewUseCases(nil, nil, nil, nil, nil, supplyRepo)
+	useCases.SetBusinessInsightsNotifier(notifier)
+	ctx := context.WithValue(context.Background(), ctxkeys.OrgID, uuid.New())
+
+	report, err := useCases.GetTentativePrices(ctx, domain.TentativePricesFilter{ProjectID: &projectID})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(0), report.Count)
+	require.Equal(t, 0, notifier.tentativeNotifyCalls)
+	require.Equal(t, 1, notifier.tentativeResolveCalls)
+	assert.Equal(t, "4", notifier.lastTentativePricesProject)
+}
 
 func TestUseCases_control1LotesVsDashboard(t *testing.T) {
 	tests := []struct {

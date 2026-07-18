@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/platform/errors/go/domainerr"
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,7 @@ type MiddlewaresEnginePort interface {
 // ListRepository expone la lectura de candidatos enriquecida con read_at por usuario.
 type ListRepository interface {
 	ListByTenantForUser(ctx context.Context, tenantID, userID string, opts ListOptions) ([]CandidateView, error)
+	GetByIDForTenant(ctx context.Context, tenantID, candidateID, userID string) (CandidateView, error)
 }
 
 // Handler expone lectura y mutaciones de candidatos (business insights).
@@ -51,6 +53,8 @@ func (h *Handler) Routes() {
 	base := h.cfg.APIBaseURL() + "/insights"
 	group := h.eng.GetRouter().Group(base, h.mws.GetValidation()...)
 	group.GET("", h.List)
+	group.GET("/summary", h.Summary)
+	group.GET("/:id/explain", h.Explain)
 	group.POST("/:id/read", h.MarkRead)
 	group.DELETE("/:id/read", h.MarkUnread)
 	group.POST("/:id/resolve", h.Resolve)
@@ -102,36 +106,82 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	out := make([]CandidateResponse, 0, len(views))
 	for _, v := range views {
-		item := CandidateResponse{
-			ID:              v.ID,
-			Kind:            v.Kind,
-			EventType:       v.EventType,
-			EntityType:      v.EntityType,
-			EntityID:        v.EntityID,
-			Severity:        v.Severity,
-			Status:          v.Status,
-			Title:           v.Title,
-			Body:            v.Body,
-			Evidence:        v.Evidence,
-			OccurrenceCount: v.OccurrenceCount,
-			FirstSeenAt:     v.FirstSeenAt.Format("2006-01-02T15:04:05Z07:00"),
-			LastSeenAt:      v.LastSeenAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
-		if v.LastNotifiedAt != nil {
-			ts := v.LastNotifiedAt.Format("2006-01-02T15:04:05Z07:00")
-			item.LastNotifiedAt = &ts
-		}
-		if v.ResolvedAt != nil {
-			ts := v.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
-			item.ResolvedAt = &ts
-		}
-		if v.ReadAt != nil {
-			ts := v.ReadAt.Format("2006-01-02T15:04:05Z07:00")
-			item.ReadAt = &ts
-		}
-		out = append(out, item)
+		out = append(out, candidateResponse(v, orgID.String()))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": out})
+	c.JSON(http.StatusOK, gin.H{
+		"items":    out,
+		"evidence": baseEvidence("ponti.businessinsights.list", orgID.String()),
+	})
+}
+
+// Summary devuelve agregados read-only de insights para consumo de Axis.
+func (h *Handler) Summary(c *gin.Context) {
+	orgID, err := sharedhandlers.ParseOrgID(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	userID, _ := sharedhandlers.ParseActor(c)
+	views, err := h.repo.ListByTenantForUser(c.Request.Context(), orgID.String(), userID, ListOptions{IncludeResolved: true, Limit: 200})
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	byStatus := map[string]int{}
+	bySeverity := map[string]int{}
+	byKind := map[string]int{}
+	byEventType := map[string]int{}
+	open := 0
+	resolved := 0
+	for _, v := range views {
+		byStatus[v.Status]++
+		bySeverity[v.Severity]++
+		byKind[v.Kind]++
+		byEventType[v.EventType]++
+		if strings.EqualFold(v.Status, "resolved") {
+			resolved++
+		} else {
+			open++
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"summary": gin.H{
+			"total":         len(views),
+			"open":          open,
+			"resolved":      resolved,
+			"by_status":     byStatus,
+			"by_severity":   bySeverity,
+			"by_kind":       byKind,
+			"by_event_type": byEventType,
+		},
+		"evidence": baseEvidence("ponti.businessinsights.summary", orgID.String()),
+	})
+}
+
+// Explain devuelve un insight puntual con evidencia y provenance.
+func (h *Handler) Explain(c *gin.Context) {
+	orgID, candidateID, userID, err := h.requireIDs(c)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	view, err := h.repo.GetByIDForTenant(c.Request.Context(), orgID.String(), candidateID, userID)
+	if err != nil {
+		sharedhandlers.RespondError(c, err)
+		return
+	}
+	evidence := baseEvidence("ponti.businessinsights.candidate:"+view.ID, orgID.String())
+	evidence["first_seen"] = view.FirstSeenAt.Format(time.RFC3339)
+	evidence["last_seen"] = view.LastSeenAt.Format(time.RFC3339)
+	evidence["event_type"] = view.EventType
+	evidence["entity"] = gin.H{
+		"type": view.EntityType,
+		"id":   view.EntityID,
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"insight":  candidateResponse(view, orgID.String()),
+		"evidence": evidence,
+	})
 }
 
 // MarkRead marca el candidato como leido para el usuario actual.
@@ -204,4 +254,55 @@ func (h *Handler) requireIDs(c *gin.Context) (uuid.UUID, string, string, error) 
 		return uuid.Nil, "", "", domainerr.Validation("candidate id is required")
 	}
 	return orgID, candidateID, userID, nil
+}
+
+func candidateResponse(v CandidateView, tenantID string) CandidateResponse {
+	item := CandidateResponse{
+		ID:              v.ID,
+		Kind:            v.Kind,
+		EventType:       v.EventType,
+		EntityType:      v.EntityType,
+		EntityID:        v.EntityID,
+		Severity:        v.Severity,
+		Status:          v.Status,
+		Title:           v.Title,
+		Body:            v.Body,
+		Evidence:        mergeEvidence(v.Evidence, baseEvidence("ponti.businessinsights.candidate:"+v.ID, tenantID)),
+		OccurrenceCount: v.OccurrenceCount,
+		FirstSeenAt:     v.FirstSeenAt.Format(time.RFC3339),
+		LastSeenAt:      v.LastSeenAt.Format(time.RFC3339),
+	}
+	if v.LastNotifiedAt != nil {
+		ts := v.LastNotifiedAt.Format(time.RFC3339)
+		item.LastNotifiedAt = &ts
+	}
+	if v.ResolvedAt != nil {
+		ts := v.ResolvedAt.Format(time.RFC3339)
+		item.ResolvedAt = &ts
+	}
+	if v.ReadAt != nil {
+		ts := v.ReadAt.Format(time.RFC3339)
+		item.ReadAt = &ts
+	}
+	return item
+}
+
+func baseEvidence(sourceRef, tenantID string) map[string]any {
+	return map[string]any{
+		"source_ref":   sourceRef,
+		"captured_at":  time.Now().UTC().Format(time.RFC3339),
+		"tenant_scope": tenantID,
+		"workspace":    map[string]any{},
+	}
+}
+
+func mergeEvidence(existing map[string]any, defaults map[string]any) map[string]any {
+	out := make(map[string]any, len(defaults)+len(existing))
+	for k, v := range defaults {
+		out[k] = v
+	}
+	for k, v := range existing {
+		out[k] = v
+	}
+	return out
 }

@@ -4,11 +4,16 @@ package report
 import (
 	"context"
 	"fmt"
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/devpablocristo/ponti-backend/internal/report/repository/models"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/domain"
 	"github.com/devpablocristo/ponti-backend/internal/report/usecases/mappers"
+	sharedmodels "github.com/devpablocristo/ponti-backend/internal/shared/models"
 )
 
 // ===== PORTS (Hexagonal Architecture) =====
@@ -26,7 +31,30 @@ type ReportRepositoryPort interface {
 type ReportUseCasePort interface {
 	GetFieldCropReport(domain.ReportFilter) (*domain.FieldCrop, error)
 	GetInvestorContributionReport(context.Context, domain.ReportFilter) (*domain.InvestorContributionReport, error)
-	GetSummaryResultsReport(domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
+	GetSummaryResultsReport(context.Context, domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error)
+}
+
+type BusinessInsightsNotifier interface {
+	NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, issue OperatingResultNegativeInput) error
+	MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error
+}
+
+type OperatingResultNegativeInput struct {
+	ProjectID               string
+	CustomerID              string
+	CampaignID              string
+	TotalOperatingResultUSD string
+	ProjectReturnPct        string
+	TotalInvestedProjectUSD string
+	NegativeCrops           []OperatingResultNegativeCrop
+}
+
+type OperatingResultNegativeCrop struct {
+	CropID             string
+	CropName           string
+	OperatingResultUSD string
+	SurfaceHa          string
+	ReturnPct          string
 }
 
 // ===== USE CASE IMPLEMENTATION =====
@@ -36,6 +64,7 @@ type ReportUseCase struct {
 	repository    ReportRepositoryPort
 	validator     *usecases.ReportFilterValidator
 	summaryMapper *mappers.SummaryResponseMapper
+	notifier      BusinessInsightsNotifier
 }
 
 // NewReportUseCase crea una nueva instancia del caso de uso.
@@ -45,6 +74,10 @@ func NewReportUseCase(repository ReportRepositoryPort) *ReportUseCase {
 		validator:     usecases.NewReportFilterValidator(),
 		summaryMapper: mappers.NewSummaryResponseMapper(),
 	}
+}
+
+func (uc *ReportUseCase) SetBusinessInsightsNotifier(n BusinessInsightsNotifier) {
+	uc.notifier = n
 }
 
 // ===== REPORTE POR CAMPO/CULTIVO =====
@@ -77,7 +110,7 @@ func (uc *ReportUseCase) GetInvestorContributionReport(ctx context.Context, filt
 // ===== REPORTE DE RESUMEN DE RESULTADOS =====
 
 // GetSummaryResultsReport obtiene el reporte de resumen de resultados.
-func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
+func (uc *ReportUseCase) GetSummaryResultsReport(ctx context.Context, filters domain.SummaryResultsFilter) (*domain.SummaryResultsResponse, error) {
 	// Validar workspace completo: customer_id + project_id + campaign_id
 	if err := uc.validator.ValidateRequiredWorkspaceFilter(filters); err != nil {
 		return nil, err
@@ -95,7 +128,12 @@ func (uc *ReportUseCase) GetSummaryResultsReport(filters domain.SummaryResultsFi
 	}
 
 	// Construir respuesta con datos
-	return uc.buildSummaryResponse(results)
+	report, err := uc.buildSummaryResponse(results)
+	if err != nil {
+		return nil, err
+	}
+	uc.evaluateOperatingResultInsight(ctx, report)
+	return report, nil
 }
 
 // ===== FUNCIONES PRIVADAS (DRY) =====
@@ -125,4 +163,52 @@ func (uc *ReportUseCase) calculateProjectTotals(results []domain.SummaryResults)
 	// Usar el mapper para convertir a punteros
 	resultsPtr := uc.summaryMapper.ConvertToPointers(results)
 	return models.CalculateProjectTotals(resultsPtr)
+}
+
+func (uc *ReportUseCase) evaluateOperatingResultInsight(ctx context.Context, report *domain.SummaryResultsResponse) {
+	if uc == nil || uc.notifier == nil || report == nil || report.ProjectID <= 0 {
+		return
+	}
+	orgID, ok := sharedmodels.OrgIDFromContext(ctx)
+	if !ok {
+		return
+	}
+	projectID := strconv.FormatInt(report.ProjectID, 10)
+	if !report.Totals.TotalOperatingResultUsd.LessThan(decimal.Zero) {
+		_ = uc.notifier.MaybeResolveOperatingResultNegative(ctx, orgID, projectID)
+		return
+	}
+	actor, _ := sharedmodels.ActorFromContext(ctx)
+	_ = uc.notifier.NotifyOperatingResultNegative(ctx, orgID, actor, buildOperatingResultNegativeInput(report))
+}
+
+func buildOperatingResultNegativeInput(report *domain.SummaryResultsResponse) OperatingResultNegativeInput {
+	if report == nil {
+		return OperatingResultNegativeInput{}
+	}
+	negativeCrops := make([]OperatingResultNegativeCrop, 0)
+	for _, crop := range report.Crops {
+		if !crop.OperatingResultUsd.LessThan(decimal.Zero) {
+			continue
+		}
+		if len(negativeCrops) >= 5 {
+			continue
+		}
+		negativeCrops = append(negativeCrops, OperatingResultNegativeCrop{
+			CropID:             strconv.FormatInt(crop.CropID, 10),
+			CropName:           crop.CropName,
+			OperatingResultUSD: crop.OperatingResultUsd.String(),
+			SurfaceHa:          crop.SurfaceHa.String(),
+			ReturnPct:          crop.CropReturnPct.String(),
+		})
+	}
+	return OperatingResultNegativeInput{
+		ProjectID:               strconv.FormatInt(report.ProjectID, 10),
+		CustomerID:              strconv.FormatInt(report.CustomerID, 10),
+		CampaignID:              strconv.FormatInt(report.CampaignID, 10),
+		TotalOperatingResultUSD: report.Totals.TotalOperatingResultUsd.String(),
+		ProjectReturnPct:        report.Totals.ProjectReturnPct.String(),
+		TotalInvestedProjectUSD: report.Totals.TotalInvestedProjectUsd.String(),
+		NegativeCrops:           negativeCrops,
+	}
 }

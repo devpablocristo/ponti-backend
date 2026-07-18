@@ -8,22 +8,40 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/devpablocristo/platform/kernels/governance/go/governanceclient"
 	corecandidates "github.com/devpablocristo/platform/notifications/go/candidates"
 	"github.com/google/uuid"
+
+	bparamsdomain "github.com/devpablocristo/ponti-backend/internal/business-parameters/usecases/domain"
 )
+
+// lowStockThresholdParamKey es la clave per-tenant del umbral de stock bajo.
+const lowStockThresholdParamKey = "ai.insights.low_stock_threshold_units"
 
 // ReviewClient es el subset de governanceclient.Client que usa el service.
 type ReviewClient interface {
 	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 }
 
+// BusinessParametersPort lee parametros de negocio del tenant activo (el
+// tenant se resuelve por contexto en el repositorio de business parameters).
+type BusinessParametersPort interface {
+	GetParameter(ctx context.Context, key string) (*bparamsdomain.BusinessParameter, error)
+}
+
 // Config centraliza thresholds y ventanas de dedup del service.
 type Config struct {
 	NegativeStockDedupWindow time.Duration
+	DataIntegrityDedupWindow time.Duration
+	// LowStockEnabled habilita el insight ponti.stock.low (default off).
+	LowStockEnabled bool
+	// LowStockThreshold es el umbral fallback (env) cuando el tenant no tiene
+	// configurado ai.insights.low_stock_threshold_units.
+	LowStockThreshold float64
 }
 
 // CandidateRepository es la persistencia de candidatos (implementada en repository.go).
@@ -51,6 +69,7 @@ type Service struct {
 	resolver   ResolverRepository
 	reads      ReadRepository
 	review     ReviewClient
+	params     BusinessParametersPort
 	config     Config
 }
 
@@ -59,6 +78,9 @@ type Service struct {
 func NewService(repo CandidateRepository, resolver ResolverRepository, reads ReadRepository, review ReviewClient, cfg Config) *Service {
 	if cfg.NegativeStockDedupWindow <= 0 {
 		cfg.NegativeStockDedupWindow = 6 * time.Hour
+	}
+	if cfg.DataIntegrityDedupWindow <= 0 {
+		cfg.DataIntegrityDedupWindow = 6 * time.Hour
 	}
 	return &Service{
 		candidates: corecandidates.NewWriteUsecases(repo, repo),
@@ -69,11 +91,92 @@ func NewService(repo CandidateRepository, resolver ResolverRepository, reads Rea
 	}
 }
 
+// SetBusinessParameters conecta la lectura de business parameters despues de
+// wire (mismo patron que los notifiers conectados en bootstrap). Opcional: si
+// no se setea, el umbral de stock bajo cae al fallback de Config.
+func (s *Service) SetBusinessParameters(p BusinessParametersPort) {
+	s.params = p
+}
+
 // StockLevel describe el estado de stock que motiva la notificacion.
 type StockLevel struct {
 	ProductID   string
 	ProductName string
 	Quantity    float64
+}
+
+// StockLowLevel describe el nivel de stock que se compara contra el umbral
+// per-tenant de stock bajo.
+type StockLowLevel struct {
+	SupplyID   string
+	StockID    string
+	SupplyName string
+	Level      float64
+}
+
+// DataIntegrityControlIssue resume un control de integridad fallido con la
+// evidencia minima necesaria para explicar el desvio.
+type DataIntegrityControlIssue struct {
+	ControlNumber int
+	DataToVerify  string
+	Description   string
+	DifferenceA   string
+	DifferenceB   string
+	Tolerance     string
+	SystemSource  string
+	RecalcASource string
+	RecalcBSource string
+}
+
+// DataIntegrityCritical describe un resultado de integridad con controles en
+// error. Se registra como insight read-only para que Axis lo explique con
+// evidencia, sin ejecutar acciones.
+type DataIntegrityCritical struct {
+	ProjectID    string
+	FailedChecks int
+	TotalChecks  int
+	Controls     []DataIntegrityControlIssue
+}
+
+// OperatingResultNegativeCrop resume un cultivo con resultado operativo
+// negativo dentro del reporte de resumen.
+type OperatingResultNegativeCrop struct {
+	CropID             string
+	CropName           string
+	OperatingResultUSD string
+	SurfaceHa          string
+	ReturnPct          string
+}
+
+// OperatingResultNegative describe un reporte de resumen con resultado
+// operativo total negativo. Axis lo consume como insight read-only.
+type OperatingResultNegative struct {
+	ProjectID               string
+	CustomerID              string
+	CampaignID              string
+	TotalOperatingResultUSD string
+	ProjectReturnPct        string
+	TotalInvestedProjectUSD string
+	NegativeCrops           []OperatingResultNegativeCrop
+}
+
+// TentativePriceItem resume un insumo con precio tentativo.
+type TentativePriceItem struct {
+	SupplyID     string
+	Name         string
+	CategoryName string
+	Price        string
+}
+
+// TentativePricesIssue describe insumos con precio parcial/tentativo dentro
+// de un workspace. Impacta directamente costos, reportes y decisiones.
+type TentativePricesIssue struct {
+	ProjectID   string
+	CustomerID  string
+	CampaignID  string
+	FieldID     string
+	Count       int64
+	SampleItems []TentativePriceItem
 }
 
 // NotifyStockNegative evalua via Nexus si corresponde notificar stock
@@ -131,6 +234,9 @@ func (s *Service) NotifyStockNegative(ctx context.Context, tenantID uuid.UUID, a
 			"quantity":          level.Quantity,
 			"review_request_id": decision.RequestID,
 			"review_policy_hit": decision.DecisionReason,
+			"suggested_action":  "review_stock_movements",
+			"source_ref":        "ponti.stock.real",
+			"workspace":         map[string]any{},
 		},
 		Actor: actor,
 		Now:   now,
@@ -160,6 +266,334 @@ func (s *Service) MaybeResolveStockNegative(ctx context.Context, tenantID uuid.U
 		"ponti.stock.negative",
 		"supply",
 		strings.TrimSpace(productID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// NotifyStockLow registra un insight cuando el stock real queda por debajo
+// del umbral per-tenant de stock bajo, y lo cierra automaticamente cuando el
+// nivel vuelve a alcanzar el umbral. No-op si el flag esta apagado o si no hay
+// umbral configurado (parametro per-tenant ni fallback de env).
+func (s *Service) NotifyStockLow(ctx context.Context, tenantID uuid.UUID, actor string, level StockLowLevel) error {
+	if s == nil || s.candidates == nil {
+		return nil
+	}
+	if !s.config.LowStockEnabled {
+		return nil
+	}
+	supplyID := strings.TrimSpace(level.SupplyID)
+	if supplyID == "" {
+		return nil
+	}
+	threshold := s.lowStockThreshold(ctx)
+	if threshold <= 0 {
+		return nil
+	}
+	if level.Level >= threshold {
+		return s.MaybeResolveStockLow(ctx, tenantID, supplyID)
+	}
+
+	now := time.Now().UTC()
+	fingerprint := bucketedID("ponti.stock.low", supplyID, s.config.NegativeStockDedupWindow, now)
+	body := fmt.Sprintf(
+		"%s tiene stock bajo: %s unidades, por debajo del umbral de %s. Conviene planificar la reposicion antes de que se agote.",
+		nonEmpty(level.SupplyName, "El insumo"),
+		formatNumber(level.Level),
+		formatNumber(threshold),
+	)
+	evidence := map[string]any{
+		"supply_id":        supplyID,
+		"level":            level.Level,
+		"threshold":        threshold,
+		"suggested_action": "review_stock_replenishment",
+		"source_ref":       "ponti.stock.low",
+		"workspace":        map[string]any{},
+	}
+	if stockID := strings.TrimSpace(level.StockID); stockID != "" {
+		evidence["stock_id"] = stockID
+	}
+
+	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
+		TenantID:    tenantID.String(),
+		Kind:        "insight",
+		EventType:   "ponti.stock.low",
+		EntityType:  "supply",
+		EntityID:    supplyID,
+		Fingerprint: fingerprint,
+		Severity:    "info",
+		Title:       "Stock bajo",
+		Body:        body,
+		Evidence:    evidence,
+		Actor:       actor,
+		Now:         now,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert stock low candidate: %w", err)
+	}
+	if !shouldNotify {
+		return nil
+	}
+	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
+}
+
+// MaybeResolveStockLow cierra automaticamente el insight de stock bajo cuando
+// el nivel del producto vuelve a estar en o por encima del umbral.
+func (s *Service) MaybeResolveStockLow(ctx context.Context, tenantID uuid.UUID, supplyID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(supplyID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.stock.low",
+		"supply",
+		strings.TrimSpace(supplyID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// lowStockThreshold resuelve el umbral per-tenant desde business parameters,
+// con fallback al valor de config (env) si la clave no existe o no es numerica.
+func (s *Service) lowStockThreshold(ctx context.Context) float64 {
+	if s.params != nil {
+		if param, err := s.params.GetParameter(ctx, lowStockThresholdParamKey); err == nil && param != nil {
+			if v, err := strconv.ParseFloat(strings.TrimSpace(param.Value), 64); err == nil {
+				return v
+			}
+		}
+	}
+	return s.config.LowStockThreshold
+}
+
+// NotifyDataIntegrityCritical registra un candidato cuando los controles de
+// integridad detectan diferencias fuera de tolerancia para un proyecto.
+func (s *Service) NotifyDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, actor string, issue DataIntegrityCritical) error {
+	if s == nil || s.candidates == nil {
+		return nil
+	}
+	if issue.FailedChecks <= 0 {
+		return s.MaybeResolveDataIntegrityCritical(ctx, tenantID, issue.ProjectID)
+	}
+
+	now := time.Now().UTC()
+	projectID := nonEmpty(issue.ProjectID, "unknown")
+	fingerprint := bucketedID("ponti.data_integrity.critical", projectID, s.config.DataIntegrityDedupWindow, now)
+	body := fmt.Sprintf(
+		"Se detectaron %d controles de integridad con diferencias fuera de tolerancia sobre %d controles evaluados. Revisar la consistencia entre dashboard, lotes, informes, stock y ordenes.",
+		issue.FailedChecks,
+		issue.TotalChecks,
+	)
+
+	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
+		TenantID:    tenantID.String(),
+		Kind:        "integrity",
+		EventType:   "ponti.data_integrity.critical",
+		EntityType:  "project",
+		EntityID:    projectID,
+		Fingerprint: fingerprint,
+		Severity:    dataIntegritySeverity(issue.FailedChecks),
+		Title:       "Integridad de datos crítica",
+		Body:        body,
+		Evidence: map[string]any{
+			"project_id":       projectID,
+			"failed_checks":    issue.FailedChecks,
+			"total_checks":     issue.TotalChecks,
+			"failed_controls":  issue.Controls,
+			"suggested_action": "review_data_integrity",
+			"source_ref":       "ponti.data_integrity.costs_check",
+			"workspace": map[string]any{
+				"project_id": projectID,
+			},
+		},
+		Actor: actor,
+		Now:   now,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert data integrity candidate: %w", err)
+	}
+	if !shouldNotify {
+		return nil
+	}
+	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
+}
+
+// MaybeResolveDataIntegrityCritical cierra automaticamente el insight de
+// integridad cuando el mismo proyecto vuelve a pasar todos los controles.
+func (s *Service) MaybeResolveDataIntegrityCritical(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.data_integrity.critical",
+		"project",
+		strings.TrimSpace(projectID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// NotifyOperatingResultNegative registra un insight cuando el resumen de
+// resultados expone resultado operativo total negativo.
+func (s *Service) NotifyOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, actor string, issue OperatingResultNegative) error {
+	if s == nil || s.candidates == nil {
+		return nil
+	}
+	projectID := nonEmpty(issue.ProjectID, "")
+	if projectID == "" {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	fingerprint := bucketedID("ponti.report.operating_result.negative", projectID, s.config.DataIntegrityDedupWindow, now)
+	body := fmt.Sprintf(
+		"El proyecto tiene resultado operativo negativo: USD %s. Revisar ingresos, costos directos, renta, estructura y cultivos con desvio.",
+		issue.TotalOperatingResultUSD,
+	)
+	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
+		TenantID:    tenantID.String(),
+		Kind:        "margin",
+		EventType:   "ponti.report.operating_result.negative",
+		EntityType:  "project",
+		EntityID:    projectID,
+		Fingerprint: fingerprint,
+		Severity:    "warning",
+		Title:       "Resultado operativo negativo",
+		Body:        body,
+		Evidence: map[string]any{
+			"project_id":                 projectID,
+			"customer_id":                issue.CustomerID,
+			"campaign_id":                issue.CampaignID,
+			"total_operating_result_usd": issue.TotalOperatingResultUSD,
+			"project_return_pct":         issue.ProjectReturnPct,
+			"total_invested_project_usd": issue.TotalInvestedProjectUSD,
+			"negative_crops":             issue.NegativeCrops,
+			"suggested_action":           "review_summary_results",
+			"source_ref":                 "ponti.reports.summary_results",
+			"workspace": map[string]any{
+				"customer_id":  issue.CustomerID,
+				"project_id":   projectID,
+				"campaign_id":  issue.CampaignID,
+			},
+		},
+		Actor: actor,
+		Now:   now,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert operating result candidate: %w", err)
+	}
+	if !shouldNotify {
+		return nil
+	}
+	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
+}
+
+// MaybeResolveOperatingResultNegative cierra el insight cuando el resultado
+// operativo total deja de ser negativo.
+func (s *Service) MaybeResolveOperatingResultNegative(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.report.operating_result.negative",
+		"project",
+		strings.TrimSpace(projectID),
+		"system",
+		time.Now().UTC(),
+	)
+	return err
+}
+
+// NotifyTentativePrices registra un insight cuando existen insumos con precio
+// tentativo dentro del proyecto consultado.
+func (s *Service) NotifyTentativePrices(ctx context.Context, tenantID uuid.UUID, actor string, issue TentativePricesIssue) error {
+	if s == nil || s.candidates == nil {
+		return nil
+	}
+	projectID := nonEmpty(issue.ProjectID, "")
+	if projectID == "" {
+		return nil
+	}
+	if issue.Count <= 0 {
+		return s.MaybeResolveTentativePrices(ctx, tenantID, projectID)
+	}
+
+	now := time.Now().UTC()
+	fingerprint := bucketedID("ponti.data_integrity.tentative_prices", projectID, s.config.DataIntegrityDedupWindow, now)
+	body := fmt.Sprintf(
+		"Hay %d insumos con precio tentativo. Los costos y reportes pueden estar distorsionados hasta confirmar esos precios.",
+		issue.Count,
+	)
+	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
+		TenantID:    tenantID.String(),
+		Kind:        "integrity",
+		EventType:   "ponti.data_integrity.tentative_prices",
+		EntityType:  "project",
+		EntityID:    projectID,
+		Fingerprint: fingerprint,
+		Severity:    "warning",
+		Title:       "Precios tentativos en insumos",
+		Body:        body,
+		Evidence: map[string]any{
+			"project_id":       projectID,
+			"customer_id":      issue.CustomerID,
+			"campaign_id":      issue.CampaignID,
+			"field_id":         issue.FieldID,
+			"count":            issue.Count,
+			"sample_items":     issue.SampleItems,
+			"suggested_action": "review_tentative_prices",
+			"source_ref":       "ponti.data_integrity.tentative_prices",
+			"workspace": map[string]any{
+				"customer_id": issue.CustomerID,
+				"project_id":  projectID,
+				"campaign_id": issue.CampaignID,
+				"field_id":    issue.FieldID,
+			},
+		},
+		Actor: actor,
+		Now:   now,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert tentative prices candidate: %w", err)
+	}
+	if !shouldNotify {
+		return nil
+	}
+	return s.candidates.MarkNotified(ctx, record.TenantID, record.ID)
+}
+
+// MaybeResolveTentativePrices cierra el insight cuando ya no existen precios
+// tentativos para el proyecto.
+func (s *Service) MaybeResolveTentativePrices(ctx context.Context, tenantID uuid.UUID, projectID string) error {
+	if s == nil || s.resolver == nil {
+		return nil
+	}
+	if strings.TrimSpace(projectID) == "" {
+		return nil
+	}
+	_, err := s.resolver.ResolveByEntity(
+		ctx,
+		tenantID.String(),
+		"ponti.data_integrity.tentative_prices",
+		"project",
+		strings.TrimSpace(projectID),
 		"system",
 		time.Now().UTC(),
 	)
@@ -238,4 +672,11 @@ func nonEmpty(v, fallback string) string {
 		return fallback
 	}
 	return strings.TrimSpace(v)
+}
+
+func dataIntegritySeverity(failedChecks int) string {
+	if failedChecks >= 3 {
+		return "critical"
+	}
+	return "warning"
 }

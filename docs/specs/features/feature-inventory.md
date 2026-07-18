@@ -9,6 +9,10 @@ Specification type: baseline current-state feature catalog.
 | PL-01 | Health, ping, and version endpoints | Implemented | `cmd/api/http_server.go` |
 | PL-02 | API key, JWT, and local dev auth | Implemented | `internal/platform/http/middlewares/gin/*`, `migrations_v4/000180_authn_authz_mvp.up.sql`, `migrations_v4/000201_auth_uuid_migration.up.sql` |
 | PL-03 | Admin tenant/user/membership management | Implemented | `internal/admin/handler.go`, `internal/admin/idp/*` |
+| PL-08 | Identity Gate / Actores (single-party identity + resolve-or-create dedup) | Implemented | `internal/actors/handler.go` (routes `/actors`, `/search`, `/by-tax-id`, `/similar`, `/:actor_id`, `/archive`, `/restore`, `/roles`, `/tax-id`), `internal/identity/resolver.go` (`ResolveOrCreateIdentity`, `LookupIdentity`, `candidateKeys`, `TenantFor`), `internal/identity/taxid.go` (`NormalizeTaxID`, `TaxIDIsNumeric`), `internal/identity/legalname.go` (`ParseLegalName`), `internal/identity/canonical.go` (`Canonicalize`), flag `IdentityGateEnabled()` in `internal/shared/models/base.go`, migrations `000241_actors_registry`, `000242_actor_id_fks`, `000243_actor_tenant_not_null`, `000247_actor_taxid_trgm` |
+| PL-09 | Tenant enforcement closure (tenant_id default + NOT NULL, flag-gated scoping) | Implemented | flag `TenantEnforcementEnabled()` in `internal/shared/models/base.go`, `OrgIDFromContext` scoping, migration `000245_tenant_id_default_not_null` (11 per-tenant tables: customers, campaigns, projects, managers, investors, providers, crops, types, lease_types, business_parameters, categories) |
+| PL-10 | Fine-grained permissions / authz dual-check | Implemented | `internal/shared/authz/authz.go` (`HasPermissionOrRole`, `RequirePermissionOrRole`, logs `fallback_to_coarse`), `internal/admin/handler.go` (`users:manage`), `internal/admin/invites.go` (`invites:write` in `canManageTenant`), migration `000246_fine_permissions` (seeds `users:manage`, `invites:write`) |
+| PL-11 | Registry unified read-only search + actor aliases | Implemented | `internal/registry/handler.go` (routes `GET /registry`, `PUT /registry/actors/:actor_id/aliases`), `internal/registry/repository.go` (`UNION ALL` over actors + 4 catalogs, `OrgIDFromContext` + `TenantEnforcementEnabled` scoping), `cmd/api/http_server.go` (`RegistryHandler.Routes()`) |
 
 ## Runtime, Migration, And Delivery
 
@@ -24,7 +28,7 @@ Specification type: baseline current-state feature catalog.
 | ID | Feature | Status | Evidence |
 |---|---|---|---|
 | PF-01 | Customer lifecycle | Implemented | `internal/customer/handler.go`, `internal/customer/usecases.go`, migrations `000020`, `000080` |
-| PF-02 | Campaign lookup | Partially Implemented | `internal/campaign/handler.go`; create/get usecases exist but routes expose list only |
+| PF-02 | Campaign lifecycle | Implemented | `internal/campaign/handler.go` (routes `POST`/`GET` list, `GET /archived`, `GET`/`PUT`/`DELETE /:campaign_id`, `archive`, `restore`; List accepts `?status=active\|archived\|all`, `?status=archived` routes to `GET /campaigns/archived`), `internal/campaign/handler_crudar.go`, `internal/campaign/usecases.go` |
 | PF-03 | Project lifecycle, search, and dropdown | Implemented | `internal/project/handler.go`, `internal/project/usecases.go`, `internal/project/repository.go` |
 | PF-04 | Project field lookup | Implemented | `internal/project/handler.go`, `internal/project/repository.go` |
 | PF-05 | Manager lifecycle | Implemented | `internal/manager/handler.go`, migrations `000020`, `000080` |
@@ -33,6 +37,7 @@ Specification type: baseline current-state feature catalog.
 | PF-08 | Business parameters CRUD | Implemented | `internal/business-parameters/handler.go`, `migrations_v4/000010_core_tables.up.sql` |
 | PF-09 | Category catalog CRUD | Implemented | `internal/category/handler.go`, migrations `000060`, `000080` |
 | PF-10 | Class/type catalog CRUD | Implemented | `internal/class-type/handler.go`, migrations `000060`, `000080` |
+| PF-11 | Catalog lifecycle (status filter + archive/restore + name-dedup 409) | Implemented | `internal/shared/repository/status.go` (`ScopeByStatus` for `?status=active\|archived\|all`), `internal/crop/repository.go`, `internal/class-type/repository.go`, `internal/lease-type/repository.go` (map `IsUniqueViolation` → Conflict on create and rename/restore), `internal/campaign/handler.go` (`?status=archived` routes to `GET /campaigns/archived`), migration `000244_catalog_name_dedup` (`prevent_duplicate_name` trigger on crops/types/lease_types) |
 
 ## Land And Crops
 
